@@ -14,7 +14,7 @@ import math             # For rounding in display
 # Import our engine modules (all built from scratch!)
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
 from engine.projections import build_player_projection, get_stat_standard_deviation
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 
@@ -25,7 +25,11 @@ from data.data_manager import (
     load_teams_data,
     find_player_by_name,
     load_props_from_session,
+    get_roster_health_report,
 )
+
+# Import the theme helpers
+from styles.theme import get_global_css, get_player_card_html, get_best_bets_section_html
 
 # ============================================================
 # SECTION: Page Setup
@@ -41,52 +45,8 @@ st.title("🏆 Analysis")
 st.markdown("Run the Monte Carlo simulation to find the highest-probability picks.")
 st.divider()
 
-# ─── Custom CSS ───────────────────────────────────────────────
-st.markdown("""
-<style>
-/* Analysis card */
-.analysis-card {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #0f3460;
-    border-radius: 12px;
-    padding: 18px 22px;
-    margin-bottom: 16px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-}
-/* Team badge in analysis card */
-.team-pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 700;
-    font-size: 0.85rem;
-    color: #fff;
-    background: #0f3460;
-    margin-left: 6px;
-    vertical-align: middle;
-}
-/* Tier badge */
-.tier-platinum { background: linear-gradient(135deg,#7b2ff7,#9b59b6); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
-.tier-gold     { background: linear-gradient(135deg,#f39c12,#e67e22); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
-.tier-silver   { background: linear-gradient(135deg,#95a5a6,#7f8c8d); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
-.tier-bronze   { background: linear-gradient(135deg,#cd6836,#a04020); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
-/* Probability bar */
-.prob-bar-wrap { background:#2d3748; border-radius:8px; height:14px; margin-top:4px; overflow:hidden; }
-.prob-bar-fill-over  { background:linear-gradient(90deg,#48bb78,#38a169); height:100%; border-radius:8px; }
-.prob-bar-fill-under { background:linear-gradient(90deg,#fc8181,#e53e3e); height:100%; border-radius:8px; }
-/* Recent form dots */
-.form-dot-over  { display:inline-block; width:12px; height:12px; border-radius:50%; background:#48bb78; margin:1px; }
-.form-dot-under { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fc8181; margin:1px; }
-/* Stat chips */
-.stat-chip {
-    display:inline-block; background:#2d3748; border-radius:6px;
-    padding:4px 10px; margin-right:8px; color:#e2e8f0; font-size:0.85rem;
-}
-/* Direction badge */
-.dir-over  { background:#276749; color:#9ae6b4; padding:3px 10px; border-radius:12px; font-weight:700; font-size:0.9rem; }
-.dir-under { background:#742a2a; color:#feb2b2; padding:3px 10px; border-radius:12px; font-weight:700; font-size:0.9rem; }
-</style>
-""", unsafe_allow_html=True)
+# ─── Inject Global CSS Theme ──────────────────────────────────
+st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup
@@ -146,183 +106,36 @@ def find_game_context_for_player(player_team, todays_games_list):
     }
 
 
+
 def display_prop_analysis_card(result):
     """
     Display a rich, visually styled analysis card for one prop result.
 
-    Shows team badge, probability gauge, recent form dots, tier badge,
-    and force breakdown in a dark-themed card.
+    Uses the theme module's get_player_card_html() for the main card,
+    then adds an expandable section with full forces breakdown.
 
     Args:
         result (dict): Full analysis result from the simulation loop
     """
     player = result.get("player_name", "Unknown")
     stat = result.get("stat_type", "").capitalize()
-    line = result.get("line", 0)
-    direction = result.get("direction", "OVER")
-    tier = result.get("tier", "Bronze")
-    tier_emoji = result.get("tier_emoji", "🥉")
-    prob_over = result.get("probability_over", 0.5)
-    edge = result.get("edge_percentage", 0)
-    confidence = result.get("confidence_score", 50)
-    platform = result.get("platform", "")
-    team = result.get("player_team", result.get("team", ""))
-    position = result.get("player_position", result.get("position", ""))
-    proj = result.get("adjusted_projection", 0)
 
-    # Season averages (from enriched prop data)
-    pts_avg = result.get("season_pts_avg", result.get("points_avg", 0))
-    reb_avg = result.get("season_reb_avg", result.get("rebounds_avg", 0))
-    ast_avg = result.get("season_ast_avg", result.get("assists_avg", 0))
+    # Render the styled card via theme module
+    st.markdown(get_player_card_html(result), unsafe_allow_html=True)
 
-    # Probability percentage (in the direction we're betting)
-    prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
-    direction_arrow = "⬆️" if direction == "OVER" else "⬇️"
-
-    # Tier CSS class
-    tier_class = {
-        "Platinum": "tier-platinum",
-        "Gold": "tier-gold",
-        "Silver": "tier-silver",
-        "Bronze": "tier-bronze",
-    }.get(tier, "tier-bronze")
-
-    # Direction CSS class
-    dir_class = "dir-over" if direction == "OVER" else "dir-under"
-
-    # Platform color
-    platform_colors = {
-        "PrizePicks": "#276749",
-        "Underdog": "#553c9a",
-        "DraftKings": "#2b6cb0",
-    }
-    plat_color = platform_colors.get(platform, "#2d3748")
-
-    # Probability bar width
-    bar_fill_class = "prob-bar-fill-over" if direction == "OVER" else "prob-bar-fill-under"
-    bar_width = int(min(100, max(0, prob_pct)))
-
-    # Team badge
-    team_badge = f'<span class="team-pill">{team}</span>' if team else ""
-
-    # Recent form dots (last 5 game results vs the line)
-    recent_results = result.get("recent_form_results", [])
-    form_dots_html = ""
-    if recent_results:
-        stat_key = stat.lower()
-        stat_map = {"points": "pts", "rebounds": "reb", "assists": "ast",
-                    "threes": "fg3m", "steals": "stl", "blocks": "blk", "turnovers": "tov"}
-        mapped_key = stat_map.get(stat_key, "pts")
-        for g in recent_results[:5]:
-            val = g.get(mapped_key, g.get("pts", 0))
-            if val >= line:
-                form_dots_html += '<span class="form-dot-over" title="Over"></span>'
-            else:
-                form_dots_html += '<span class="form-dot-under" title="Under"></span>'
-
-    # Over/under force counts
+    # Get force/distribution data for the expander
     over_forces = result.get("forces", {}).get("over_forces", [])
     under_forces = result.get("forces", {}).get("under_forces", [])
-    total_over_strength = sum(f.get("strength", 1) for f in over_forces)
-    total_under_strength = sum(f.get("strength", 1) for f in under_forces)
-    total_force = total_over_strength + total_under_strength or 1
-    over_bar_pct = int(total_over_strength / total_force * 100)
-
-    # Percentile display
     p10 = result.get("percentile_10", 0)
     p50 = result.get("percentile_50", 0)
     p90 = result.get("percentile_90", 0)
 
-    # Opponent info
-    opponent = result.get("opponent", "")
-    matchup_text = f"vs {opponent}" if opponent else ""
-
-    # Line vs average context
-    line_vs_avg = result.get("line_vs_avg_pct", 0)
-    if line_vs_avg != 0:
-        line_context = f"Line is {abs(line_vs_avg):.0f}% {'above' if line_vs_avg > 0 else 'below'} season avg"
-    else:
-        line_context = ""
-
-    # Render the main card header
-    st.markdown(f"""
-<div class="analysis-card">
-  <!-- Header row: player name + team badge + tier -->
-  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
-    <div>
-      <span style="font-size:1.25rem; font-weight:700; color:#e2e8f0;">{player}</span>
-      {team_badge}
-      {f'<span style="color:#718096; font-size:0.85rem; margin-left:8px;">{position}</span>' if position else ""}
-    </div>
-    <span class="{tier_class}">{tier_emoji} {tier}</span>
-  </div>
-
-  <!-- Stat type + platform + matchup -->
-  <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-    <span style="background:{plat_color}; color:#fff; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600;">{platform}</span>
-    <span style="color:#a0aec0; font-size:0.9rem;">{stat} | Line: <strong style="color:#e2e8f0;">{line}</strong></span>
-    {f'<span style="color:#718096; font-size:0.85rem;">{matchup_text}</span>' if matchup_text else ""}
-    {f'<span style="color:#718096; font-size:0.8rem; font-style:italic;">{line_context}</span>' if line_context else ""}
-  </div>
-
-  <!-- Season stats chips -->
-  {f"""<div style="margin-top:10px;">
-    <span class="stat-chip">🏀 {pts_avg} PPG</span>
-    <span class="stat-chip">📊 {reb_avg} RPG</span>
-    <span class="stat-chip">🎯 {ast_avg} APG</span>
-    <span class="stat-chip">📐 Proj: {proj}</span>
-  </div>""" if pts_avg or reb_avg or ast_avg else ""}
-
-  <!-- Probability gauge row -->
-  <div style="margin-top:14px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-      <span class="{dir_class}">{direction_arrow} {direction}</span>
-      <span style="color:#e2e8f0; font-weight:700; font-size:1.1rem;">{prob_pct:.1f}%</span>
-      <span style="color:#718096; font-size:0.85rem;">Edge: <strong style="color:#68d391;">+{abs(edge):.1f}%</strong></span>
-      <span style="color:#718096; font-size:0.85rem;">Confidence: <strong style="color:#e2e8f0;">{confidence:.0f}/100</strong></span>
-    </div>
-    <div class="prob-bar-wrap">
-      <div class="{bar_fill_class}" style="width:{bar_width}%;"></div>
-    </div>
-  </div>
-
-  <!-- Recent form dots + force bar -->
-  <div style="margin-top:12px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
-    {f'''<div>
-      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Last 5 vs Line</span><br/>
-      {form_dots_html}
-    </div>''' if form_dots_html else ""}
-    <div style="flex:1; min-width:160px;">
-      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Over/Under Forces</span>
-      <div style="display:flex; margin-top:4px; height:8px; border-radius:4px; overflow:hidden; background:#2d3748;">
-        <div style="width:{over_bar_pct}%; background:#48bb78;"></div>
-        <div style="width:{100-over_bar_pct}%; background:#fc8181;"></div>
-      </div>
-      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#718096; margin-top:2px;">
-        <span>⬆️ OVER ({len(over_forces)})</span>
-        <span>UNDER ({len(under_forces)}) ⬇️</span>
-      </div>
-    </div>
-    <!-- Distribution range -->
-    <div style="text-align:right;">
-      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Range</span><br/>
-      <span style="color:#fc8181; font-size:0.8rem;">{p10:.1f}</span>
-      <span style="color:#718096; font-size:0.8rem;"> — </span>
-      <span style="color:#e2e8f0; font-size:0.8rem;">{p50:.1f}</span>
-      <span style="color:#718096; font-size:0.8rem;"> — </span>
-      <span style="color:#48bb78; font-size:0.8rem;">{p90:.1f}</span>
-      <div style="color:#718096; font-size:0.7rem;">10th / 50th / 90th</div>
-    </div>
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
     # Detailed expander (forces breakdown, histogram)
-    with st.expander(f"🔍 Full Breakdown — {player} {stat}"):
+    with st.expander(f"\U0001f50d Full Breakdown — {player} {stat}"):
         detail_col1, detail_col2, detail_col3 = st.columns(3)
 
         with detail_col1:
-            st.markdown("**📊 Distribution**")
+            st.markdown("**\U0001f4ca Distribution**")
             st.caption(f"10th pct (bad game): **{p10:.1f}**")
             st.caption(f"50th pct (median): **{p50:.1f}**")
             st.caption(f"90th pct (great game): **{p90:.1f}**")
@@ -332,39 +145,50 @@ def display_prop_analysis_card(result):
             histogram = result.get("histogram", [])
             if histogram:
                 max_count = max(b["count"] for b in histogram) or 1
-                st.markdown("**Distribution (█ = over line)**")
+                st.markdown("**Distribution (\u2588 = over line)**")
                 for bucket in histogram[-10:]:
                     bar_length = int((bucket["count"] / max_count) * 15)
-                    bar_char = "█" if bucket["is_over_line"] else "░"
+                    bar_char = "\u2588" if bucket["is_over_line"] else "\u2591"
                     bar = bar_char * bar_length
                     st.caption(f"{bucket['bucket_label']:>5} {bar}")
 
+            # Recent form info
+            form_ratio = result.get("recent_form_ratio")
+            if form_ratio is not None:
+                form_label = "Hot \U0001f525" if form_ratio > 1.05 else ("Cold \U0001f9ca" if form_ratio < 0.95 else "Neutral")
+                st.caption(f"Recent form: **{form_ratio:.2f}x** ({form_label})")
+
+            # Games played sample size
+            games_played = result.get("games_played")
+            if games_played:
+                st.caption(f"Games played: **{games_played}**")
+
         with detail_col2:
-            st.markdown("**⬆️ Forces OVER**")
+            st.markdown("**\u2b06\ufe0f Forces OVER**")
             if over_forces:
                 for force in over_forces:
-                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
+                    strength_stars = "\u2b50" * max(1, round(force.get("strength", 1)))
                     st.caption(f"{strength_stars} **{force['name']}**")
                     st.caption(f"   _{force['description']}_")
             else:
                 st.caption("No OVER forces detected")
 
         with detail_col3:
-            st.markdown("**⬇️ Forces UNDER**")
+            st.markdown("**\u2b07\ufe0f Forces UNDER**")
             if under_forces:
                 for force in under_forces:
-                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
+                    strength_stars = "\u2b50" * max(1, round(force.get("strength", 1)))
                     st.caption(f"{strength_stars} **{force['name']}**")
                     st.caption(f"   _{force['description']}_")
             else:
                 st.caption("No UNDER forces detected")
 
         if result.get("should_avoid", False):
-            st.warning("⚠️ **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
+            st.warning("\u26a0\ufe0f **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
 
         breakdown = result.get("score_breakdown", {})
         if breakdown:
-            st.markdown("**🔬 Confidence Score Breakdown**")
+            st.markdown("**\U0001f52c Confidence Score Breakdown**")
             breakdown_cols = st.columns(len(breakdown))
             for i, (factor, score) in enumerate(breakdown.items()):
                 with breakdown_cols[i]:
@@ -375,7 +199,6 @@ def display_prop_analysis_card(result):
 # ============================================================
 # END SECTION: Helper Functions
 # ============================================================
-
 
 # ============================================================
 # SECTION: Load All Required Data
@@ -416,6 +239,31 @@ with status_col:
         st.success(f"🏟️ **{len(todays_games)} game(s)** configured for tonight.")
     else:
         st.caption("💡 No games configured — using default (neutral) game context.")
+
+    # Roster health check
+    if current_props and players_data:
+        health = get_roster_health_report(current_props, players_data)
+        if health["unmatched"]:
+            with st.expander(
+                f"⚠️ Roster Health: {health['match_count']}/{health['total_count']} players matched "
+                f"({health['match_rate']*100:.0f}%) — click to see unmatched"
+            ):
+                st.caption("**✅ Matched players:**")
+                matched_html = " ".join(
+                    f'<span class="health-matched">{n}</span>' for n in health["matched"]
+                )
+                st.markdown(matched_html, unsafe_allow_html=True)
+                st.caption("**❌ Unmatched players (will use fallback data):**")
+                unmatched_html = " ".join(
+                    f'<span class="health-unmatched">{n}</span>' for n in health["unmatched"]
+                )
+                st.markdown(unmatched_html, unsafe_allow_html=True)
+                st.caption(
+                    "💡 Unmatched players still get analyzed using the prop line as the baseline. "
+                    "For accurate results, update player data or check the name spelling."
+                )
+        else:
+            st.success(f"✅ All {health['total_count']} players matched in database.")
 
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
@@ -482,8 +330,9 @@ if run_analysis:
         prop_line = float(prop.get("line", 0))
         platform = prop.get("platform", "PrizePicks")
 
-        # Find the player in our player database
+        # Find the player in our player database (uses fuzzy/normalized matching)
         player_data = find_player_by_name(players_data, player_name)
+        player_matched = player_data is not None
 
         if player_data is None:
             # Player not in our database — create generic data from the line
@@ -500,6 +349,8 @@ if run_analysis:
         game_context = find_game_context_for_player(player_team, todays_games)
 
         # Step 3: Build the projection (adjusted for tonight)
+        # Pass recent form game logs if available from the prop
+        recent_form_games = prop.get("recent_form_results", [])
         projection_result = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=game_context.get("opponent", ""),
@@ -508,6 +359,7 @@ if run_analysis:
             game_total=game_context.get("game_total", 220.0),
             defensive_ratings_data=defensive_ratings_data,
             teams_data=teams_data,
+            recent_form_games=recent_form_games if recent_form_games else None,
         )
 
         # Step 4: Run Monte Carlo simulation
@@ -551,6 +403,8 @@ if run_analysis:
             stat_standard_deviation=stat_std,
             stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
             simulation_results=simulation_output,
+            games_played=int(player_data.get("games_played", 0) or 0) or None,
+            recent_form_ratio=projection_result.get("recent_form_ratio"),
         )
 
         # Step 7: Check if this should be on the avoid list
@@ -599,6 +453,9 @@ if run_analysis:
             # Projection info
             "adjusted_projection": round(projected_stat, 1),
             "overall_adjustment": round(projection_result.get("overall_adjustment", 1.0), 3),
+            "recent_form_ratio": projection_result.get("recent_form_ratio"),
+            # Sample size
+            "games_played": int(player_data.get("games_played", 0) or 0) or None,
             # Edge and confidence
             "edge_percentage": round(edge_pct, 1),
             "confidence_score": confidence_output.get("confidence_score", 50),
@@ -619,9 +476,17 @@ if run_analysis:
             "line_vs_avg_pct": prop.get("line_vs_avg_pct", 0),
             # Recent form game results (if available in enriched prop)
             "recent_form_results": prop.get("recent_form_results", []),
+            # Whether player was found in the database
+            "player_matched": player_matched,
         }
 
         analysis_results_list.append(full_result)
+
+    # Step 10: Detect correlated props (same-game pairs)
+    correlation_warnings = detect_correlated_props(analysis_results_list)
+    for idx, warning in correlation_warnings.items():
+        if idx < len(analysis_results_list):
+            analysis_results_list[idx]["_correlation_warning"] = warning
 
     # Save results to session state
     st.session_state["analysis_results"] = analysis_results_list
@@ -670,6 +535,11 @@ if analysis_results:
     total_under_picks = sum(1 for r in displayed_results if r.get("direction") == "UNDER")
     platinum_count = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
     gold_count = sum(1 for r in displayed_results if r.get("tier") == "Gold")
+    avg_edge = (
+        sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
+        if displayed_results else 0
+    )
+    unmatched_count = sum(1 for r in analysis_results if not r.get("player_matched", True))
 
     st.subheader(f"📊 Results: {len(displayed_results)} picks shown (of {total_analyzed} analyzed)")
 
@@ -681,7 +551,26 @@ if analysis_results:
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("🥇 Gold", gold_count)
 
+    # Unmatched player warning
+    if unmatched_count > 0:
+        unmatched_names = [r.get("player_name", "") for r in analysis_results if not r.get("player_matched", True)]
+        st.warning(
+            f"⚠️ **{unmatched_count} player(s) not found** in database and used fallback data: "
+            + ", ".join(unmatched_names)
+            + " — results for these may be less accurate."
+        )
+
     st.divider()
+
+    # Best Bets summary (top 5 by confidence, non-avoid picks)
+    best_bets = [
+        r for r in analysis_results
+        if not r.get("should_avoid", False) and abs(r.get("edge_percentage", 0)) >= minimum_edge
+    ]
+    best_bets.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
+    if best_bets[:5]:
+        st.markdown(get_best_bets_section_html(best_bets[:5]), unsafe_allow_html=True)
+        st.divider()
 
     # Display each result card
     for result in displayed_results:

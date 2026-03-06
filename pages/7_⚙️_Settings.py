@@ -19,6 +19,10 @@ st.set_page_config(
     layout="wide",
 )
 
+# ─── Inject Global CSS Theme ──────────────────────────────────
+from styles.theme import get_global_css
+st.markdown(get_global_css(), unsafe_allow_html=True)
+
 st.title("⚙️ Settings")
 st.markdown("Configure the SmartAI-NBA prediction engine.")
 st.divider()

@@ -35,6 +35,7 @@ def build_player_projection(
     game_total,
     defensive_ratings_data,
     teams_data,
+    recent_form_games=None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -45,6 +46,7 @@ def build_player_projection(
     - Home court advantage
     - Rest days (back-to-back fatigue)
     - Vegas total (high total = projected to be high-scoring game)
+    - Recent form: last 5 game averages weighted more heavily
 
     Args:
         player_data (dict): Player row from sample_players.csv
@@ -55,6 +57,10 @@ def build_player_projection(
         game_total (float): Vegas over/under total for tonight's game
         defensive_ratings_data (list of dict): From defensive_ratings.csv
         teams_data (list of dict): From teams.csv
+        recent_form_games (list of dict, optional): Last N game log rows.
+            Each row should have numeric keys matching stat names
+            (e.g., 'pts', 'reb', 'ast'). When provided, projections
+            blend season averages 60% + recent-form averages 40%.
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -71,6 +77,7 @@ def build_player_projection(
             - 'rest_factor': float (multiplier, ~0.9-1.0)
             - 'blowout_risk': float (0.0-1.0)
             - 'overall_adjustment': float (combined multiplier)
+            - 'recent_form_ratio': float or None (last5_avg / season_avg)
 
     Example:
         LeBron at home vs weak defense + fast pace →
@@ -92,6 +99,66 @@ def build_player_projection(
 
     # ============================================================
     # END SECTION: Extract Player's Season Averages
+    # ============================================================
+
+    # ============================================================
+    # SECTION: Recent Form Blending
+    # When game log data is available, blend season avg (60%) with
+    # recent 5-game avg (40%) for a more responsive projection.
+    # ============================================================
+
+    recent_form_ratio = None  # Will be set if we have game log data
+
+    if recent_form_games and len(recent_form_games) >= 3:
+        # Map game-log keys to stat names
+        form_key_map = {
+            "points": "pts",
+            "rebounds": "reb",
+            "assists": "ast",
+            "threes": "fg3m",
+            "steals": "stl",
+            "blocks": "blk",
+            "turnovers": "tov",
+        }
+
+        def _recent_avg(games, log_key, fallback):
+            """Compute average of a stat over recent games."""
+            vals = []
+            for g in games:
+                # Support both string and numeric values
+                v = g.get(log_key, g.get(log_key.lower(), None))
+                if v is not None:
+                    try:
+                        vals.append(float(v))
+                    except (TypeError, ValueError):
+                        pass
+            return sum(vals) / len(vals) if vals else fallback
+
+        pts_key = form_key_map["points"]
+        recent_pts = _recent_avg(recent_form_games, pts_key, season_points_average)
+
+        # Compute recent-form ratio for points (most reliable indicator)
+        if season_points_average > 0:
+            recent_form_ratio = round(recent_pts / season_points_average, 3)
+
+        # Blend: 60% season, 40% recent form
+        _blend = lambda season, recent: season * 0.6 + recent * 0.4
+        season_points_average   = _blend(season_points_average,   recent_pts)
+        season_rebounds_average = _blend(season_rebounds_average,
+                                         _recent_avg(recent_form_games, form_key_map["rebounds"], season_rebounds_average))
+        season_assists_average  = _blend(season_assists_average,
+                                         _recent_avg(recent_form_games, form_key_map["assists"],  season_assists_average))
+        season_threes_average   = _blend(season_threes_average,
+                                         _recent_avg(recent_form_games, form_key_map["threes"],   season_threes_average))
+        season_steals_average   = _blend(season_steals_average,
+                                         _recent_avg(recent_form_games, form_key_map["steals"],   season_steals_average))
+        season_blocks_average   = _blend(season_blocks_average,
+                                         _recent_avg(recent_form_games, form_key_map["blocks"],   season_blocks_average))
+        season_turnovers_average= _blend(season_turnovers_average,
+                                         _recent_avg(recent_form_games, form_key_map["turnovers"],season_turnovers_average))
+
+    # ============================================================
+    # END SECTION: Recent Form Blending
     # ============================================================
 
     # ============================================================
@@ -187,6 +254,7 @@ def build_player_projection(
         "game_total_factor": round(game_total_factor, 4),
         "blowout_risk": round(blowout_risk, 4),
         "overall_adjustment": round(offensive_stat_multiplier, 4),
+        "recent_form_ratio": recent_form_ratio,
     }
 
     return projections

@@ -341,3 +341,82 @@ def should_avoid_prop(
 # ============================================================
 # END SECTION: Avoid List Logic
 # ============================================================
+
+
+# ============================================================
+# SECTION: Correlation Detection
+# Identify correlated props that come from the same game.
+# Correlated props carry additional parlay risk.
+# ============================================================
+
+def detect_correlated_props(props_with_results):
+    """
+    Flag props from the same game as correlated bets.
+
+    When two players from the same game are included in a parlay,
+    their outcomes are statistically correlated (same pace, scoring
+    environment, and blowout risk). This should be disclosed to
+    the user so they can make informed parlay decisions.
+
+    Args:
+        props_with_results (list of dict): Analysis results. Each dict
+            must contain 'player_team' and 'opponent' keys.
+
+    Returns:
+        dict: Mapping of prop index (int) to a correlation warning
+              string, or an empty dict if no correlations found.
+
+    Example:
+        If props[0] is LeBron (LAL vs GSW) and props[2] is Steph
+        (GSW vs LAL), both are flagged with a correlation warning.
+    """
+    # Build a "game key" for each prop: frozenset of the two teams
+    # so LAL-vs-GSW and GSW-vs-LAL map to the same key.
+    game_key_to_indices = {}  # game_key → list of prop indices
+
+    for idx, result in enumerate(props_with_results):
+        team = result.get("player_team", result.get("team", "")).upper().strip()
+        opponent = result.get("opponent", "").upper().strip()
+        if team and opponent:
+            game_key = frozenset([team, opponent])
+        elif team:
+            game_key = frozenset([team])
+        else:
+            continue  # No team info — skip
+
+        if game_key not in game_key_to_indices:
+            game_key_to_indices[game_key] = []
+        game_key_to_indices[game_key].append(idx)
+
+    # Build the correlation warnings dict
+    correlation_warnings = {}
+
+    for game_key, indices in game_key_to_indices.items():
+        if len(indices) < 2:
+            continue  # Only one prop from this game — no correlation
+
+        teams_str = " vs ".join(sorted(game_key))
+        player_names = [props_with_results[i].get("player_name", "?") for i in indices]
+        others_str = ", ".join(
+            props_with_results[j].get("player_name", "?")
+            for j in indices
+            if j != indices[0]  # Will be customized per-prop below
+        )
+
+        for i in indices:
+            my_name = props_with_results[i].get("player_name", "?")
+            correlated_names = [
+                props_with_results[j].get("player_name", "?")
+                for j in indices if j != i
+            ]
+            correlated_str = ", ".join(correlated_names)
+            correlation_warnings[i] = (
+                f"Correlated with {correlated_str} ({teams_str} game) — "
+                "same game props share scoring environment and blowout risk"
+            )
+
+    return correlation_warnings
+
+# ============================================================
+# END SECTION: Correlation Detection
+# ============================================================

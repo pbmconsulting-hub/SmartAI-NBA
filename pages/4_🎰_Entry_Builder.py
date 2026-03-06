@@ -30,6 +30,10 @@ st.set_page_config(
     layout="wide",
 )
 
+# ─── Inject Global CSS Theme ──────────────────────────────────
+from styles.theme import get_global_css
+st.markdown(get_global_css(), unsafe_allow_html=True)
+
 st.title("🎰 Entry Builder")
 st.markdown("Build optimal parlay entries with maximum Expected Value (EV).")
 st.divider()

@@ -21,6 +21,10 @@ st.set_page_config(
     layout="wide",
 )
 
+# ─── Inject Global CSS Theme ──────────────────────────────────
+from styles.theme import get_global_css
+st.markdown(get_global_css(), unsafe_allow_html=True)
+
 # ─── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>

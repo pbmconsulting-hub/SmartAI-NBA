@@ -49,6 +49,10 @@ st.set_page_config(
     layout="wide",  # Use full-width layout
 )
 
+# ─── Inject Global CSS Theme ──────────────────────────────────
+from styles.theme import get_global_css
+st.markdown(get_global_css(), unsafe_allow_html=True)
+
 # Page title and description
 st.title("🔄 Update Live NBA Data")
 st.markdown(

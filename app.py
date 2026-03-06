@@ -13,6 +13,7 @@ import os
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.live_data_fetcher import load_last_updated
 from tracking.database import initialize_database
+from styles.theme import get_global_css
 
 # ============================================================
 # SECTION: Page Configuration
@@ -24,6 +25,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ─── Inject Global CSS Theme ──────────────────────────────────
+st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── Dark Theme CSS ───────────────────────────────────────────
 st.markdown("""

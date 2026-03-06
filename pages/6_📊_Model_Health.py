@@ -27,6 +27,10 @@ st.set_page_config(
     layout="wide",
 )
 
+# ─── Inject Global CSS Theme ──────────────────────────────────
+from styles.theme import get_global_css
+st.markdown(get_global_css(), unsafe_allow_html=True)
+
 st.title("📊 Model Health")
 st.markdown("Track your bets and measure the model's prediction accuracy over time.")
 st.divider()

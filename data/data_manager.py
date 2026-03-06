@@ -11,6 +11,8 @@ import csv        # Built-in CSV reader/writer
 import os         # File path operations
 import json       # For session state persistence
 import datetime   # For timestamp handling
+import unicodedata  # For normalizing unicode characters in names
+import re           # For regex-based suffix stripping
 from pathlib import Path  # Modern file path handling
 
 
@@ -160,6 +162,9 @@ def find_player_by_name(players_list, player_name):
     """
     Find a player by their name in the players list.
 
+    Uses fuzzy/normalized matching so slight name differences
+    (suffixes, unicode, nicknames) are handled automatically.
+
     Args:
         players_list (list of dict): Loaded player data
         player_name (str): Player name to search for
@@ -171,22 +176,265 @@ def find_player_by_name(players_list, player_name):
         player = find_player_by_name(players, "LeBron James")
         print(player['points_avg'])  # → '24.8'
     """
-    # Search through all players for a name match
-    # Use lower() for case-insensitive comparison
-    player_name_lower = player_name.lower().strip()
+    # Delegate to the fuzzy matcher which handles all matching strategies
+    return find_player_by_name_fuzzy(players_list, player_name)
 
+
+# ============================================================
+# SECTION: Player Name Normalization & Fuzzy Matching
+# These helpers ensure props from PrizePicks/Underdog/DraftKings
+# match our internal player database even when names differ in
+# capitalization, unicode accents, Jr./III suffixes, or nicknames.
+# ============================================================
+
+# Common nickname / alias mismatches between prop platforms and nba_api.
+# Key = variant used by prop sites, Value = canonical name in our DB.
+NAME_ALIASES = {
+    "nic claxton": "nicolas claxton",
+    "nicolas claxton": "nicolas claxton",
+    "og anunoby": "o.g. anunoby",
+    "o.g. anunoby": "o.g. anunoby",
+    "mo bamba": "mohamed bamba",
+    "tj mcconnell": "t.j. mcconnell",
+    "t.j. mcconnell": "t.j. mcconnell",
+    "tj warren": "t.j. warren",
+    "cj mccollum": "c.j. mccollum",
+    "c.j. mccollum": "c.j. mccollum",
+    "cj mccollum": "c.j. mccollum",
+    "pj tucker": "p.j. tucker",
+    "p.j. tucker": "p.j. tucker",
+    "rj barrett": "r.j. barrett",
+    "r.j. barrett": "r.j. barrett",
+    "aj green": "a.j. green",
+    "nah'shon hyland": "bones hyland",
+    "bones hyland": "bones hyland",
+    "gary trent jr": "gary trent jr.",
+    "gary trent jr.": "gary trent jr.",
+    "wendell carter jr": "wendell carter jr.",
+    "wendell carter jr.": "wendell carter jr.",
+    "jaren jackson jr": "jaren jackson jr.",
+    "jaren jackson jr.": "jaren jackson jr.",
+    "kenyon martin jr": "kenyon martin jr.",
+    "kenyon martin jr.": "kenyon martin jr.",
+    "kevin porter jr": "kevin porter jr.",
+    "larry nance jr": "larry nance jr.",
+    "otto porter jr": "otto porter jr.",
+    "derrick jones jr": "derrick jones jr.",
+    "marcus morris sr": "marcus morris sr.",
+    "naji marshall": "naji marshall",
+    "alex len": "alex len",
+    "alexandre sarr": "alexandre sarr",
+    "goga bitadze": "goga bitadze",
+    "giddey": "josh giddey",
+    "josh giddey": "josh giddey",
+    "sga": "shai gilgeous-alexander",
+    "shai": "shai gilgeous-alexander",
+    "shai gilgeous-alexander": "shai gilgeous-alexander",
+    "kt": "karl-anthony towns",
+    "karl-anthony towns": "karl-anthony towns",
+    "zion": "zion williamson",
+    "zion williamson": "zion williamson",
+    "kd": "kevin durant",
+    "kevin durant": "kevin durant",
+    "kyrie": "kyrie irving",
+    "kyrie irving": "kyrie irving",
+    "steph": "stephen curry",
+    "stephen curry": "stephen curry",
+    "lebron": "lebron james",
+    "lebron james": "lebron james",
+    "bron": "lebron james",
+    "ad": "anthony davis",
+    "anthony davis": "anthony davis",
+    "joker": "nikola jokic",
+    "nikola jokic": "nikola jokic",
+    "embiid": "joel embiid",
+    "joel embiid": "joel embiid",
+    "luka": "luka doncic",
+    "luka doncic": "luka doncic",
+    "tatum": "jayson tatum",
+    "jayson tatum": "jayson tatum",
+    "ja": "ja morant",
+    "ja morant": "ja morant",
+    "jrue holiday": "jrue holiday",
+    "demar derozan": "demar derozan",
+    "pascal siakam": "pascal siakam",
+    "darius garland": "darius garland",
+    "donovan mitchell": "donovan mitchell",
+    "damian lillard": "damian lillard",
+    "dam lillard": "damian lillard",
+    "dame": "damian lillard",
+    "khris middleton": "khris middleton",
+    "giannis": "giannis antetokounmpo",
+    "giannis antetokounmpo": "giannis antetokounmpo",
+    "bam": "bam adebayo",
+    "bam adebayo": "bam adebayo",
+    "jimmy butler": "jimmy butler",
+    "jimmy": "jimmy butler",
+    "trae": "trae young",
+    "trae young": "trae young",
+    "devin booker": "devin booker",
+    "book": "devin booker",
+    "ayton": "deandre ayton",
+    "deandre ayton": "deandre ayton",
+}
+
+# Suffixes to strip when normalizing player names for matching
+_NAME_SUFFIXES_TO_STRIP = re.compile(
+    r'\s+(jr\.?|sr\.?|ii|iii|iv|v)$',
+    flags=re.IGNORECASE,
+)
+
+
+def normalize_player_name(name):
+    """
+    Normalize a player name for fuzzy matching.
+
+    Steps:
+    1. Strip leading/trailing whitespace
+    2. Lowercase
+    3. Normalize unicode (NFD → ASCII where possible, e.g., é → e)
+    4. Remove trailing suffixes (Jr., Sr., II, III, IV)
+    5. Collapse multiple spaces
+
+    Args:
+        name (str): Raw player name (e.g., "LeBron James Jr.")
+
+    Returns:
+        str: Normalized name (e.g., "lebron james")
+
+    Example:
+        normalize_player_name("Nikola Jokić") → "nikola jokic"
+        normalize_player_name("Jaren Jackson Jr.") → "jaren jackson"
+    """
+    if not name:
+        return ""
+
+    # Step 1: Strip and lowercase
+    name = name.strip().lower()
+
+    # Step 2: Normalize unicode characters (e.g., ć → c, é → e)
+    nfkd = unicodedata.normalize("NFKD", name)
+    name = "".join(c for c in nfkd if not unicodedata.combining(c))
+
+    # Step 3: Strip common suffixes (Jr., Sr., II, III, etc.)
+    name = _NAME_SUFFIXES_TO_STRIP.sub("", name).strip()
+
+    # Step 4: Collapse multiple spaces
+    name = re.sub(r'\s+', ' ', name).strip()
+
+    return name
+
+
+def find_player_by_name_fuzzy(players_list, player_name):
+    """
+    Find a player using fuzzy / normalized name matching.
+
+    Matching order (first match wins):
+    1. Exact case-insensitive match
+    2. Alias lookup (common nickname / platform name variants)
+    3. Normalized name match (strip suffixes + unicode)
+    4. Partial / substring match on normalized names
+
+    Args:
+        players_list (list of dict): Loaded player data
+        player_name (str): Player name from prop (may be a nickname/alias)
+
+    Returns:
+        dict or None: Player data dict, or None if not found
+
+    Example:
+        find_player_by_name_fuzzy(players, "Nic Claxton")
+        → same result as find_player_by_name(players, "Nicolas Claxton")
+    """
+    if not player_name:
+        return None
+
+    search_lower = player_name.lower().strip()
+
+    # --- Pass 1: Exact case-insensitive ---
     for player in players_list:
-        stored_name = player.get("name", "").lower().strip()
-        if stored_name == player_name_lower:
+        if player.get("name", "").lower().strip() == search_lower:
             return player
 
-    # Also try partial match if exact match not found
+    # --- Pass 2: Alias lookup ---
+    alias_target = NAME_ALIASES.get(search_lower)
+    if alias_target:
+        for player in players_list:
+            if player.get("name", "").lower().strip() == alias_target:
+                return player
+
+    # --- Pass 3: Normalized name match (strip suffixes + unicode) ---
+    search_normalized = normalize_player_name(player_name)
     for player in players_list:
-        stored_name = player.get("name", "").lower().strip()
-        if player_name_lower in stored_name or stored_name in player_name_lower:
+        stored_normalized = normalize_player_name(player.get("name", ""))
+        if stored_normalized == search_normalized and search_normalized:
             return player
 
-    return None  # Player not found
+    # --- Pass 4: Partial / substring match on normalized names ---
+    for player in players_list:
+        stored_normalized = normalize_player_name(player.get("name", ""))
+        if (search_normalized in stored_normalized or stored_normalized in search_normalized) \
+                and len(search_normalized) > 3:
+            return player
+
+    return None
+
+
+def get_roster_health_report(props_list, players_list):
+    """
+    Check which props have matching players in the database.
+
+    Returns a report showing matched vs unmatched props so the user
+    can identify name mismatches before running analysis.
+
+    Args:
+        props_list (list of dict): Current props (with 'player_name')
+        players_list (list of dict): Loaded player data
+
+    Returns:
+        dict: {
+            'matched': list of str (player names that matched),
+            'unmatched': list of str (player names not found),
+            'match_count': int,
+            'total_count': int,
+            'match_rate': float (0.0–1.0),
+        }
+
+    Example:
+        report = get_roster_health_report(props, players)
+        if report['unmatched']:
+            st.warning(f"Unmatched: {report['unmatched']}")
+    """
+    matched = []
+    unmatched = []
+    seen = set()  # Deduplicate player names in report
+
+    for prop in props_list:
+        name = prop.get("player_name", "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+
+        player = find_player_by_name_fuzzy(players_list, name)
+        if player:
+            matched.append(name)
+        else:
+            unmatched.append(name)
+
+    total = len(matched) + len(unmatched)
+    match_rate = len(matched) / total if total > 0 else 1.0
+
+    return {
+        "matched": sorted(matched),
+        "unmatched": sorted(unmatched),
+        "match_count": len(matched),
+        "total_count": total,
+        "match_rate": round(match_rate, 3),
+    }
+
+# ============================================================
+# END SECTION: Player Name Normalization & Fuzzy Matching
+# ============================================================
 
 
 def get_all_player_names(players_list):
