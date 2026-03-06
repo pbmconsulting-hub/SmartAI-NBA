@@ -20,11 +20,13 @@ import math  # For rounding
 # How much each factor contributes to the overall confidence score
 # BEGINNER NOTE: These weights reflect how important each factor is
 # You can adjust these in Settings if you want to change the model
-WEIGHT_PROBABILITY_STRENGTH = 0.35    # Raw probability (35% of score)
-WEIGHT_EDGE_MAGNITUDE = 0.25          # How big the edge is (25%)
-WEIGHT_DIRECTIONAL_AGREEMENT = 0.20  # Multiple factors agree (20%)
-WEIGHT_MATCHUP_FAVORABILITY = 0.12   # How good the matchup is (12%)
+WEIGHT_PROBABILITY_STRENGTH = 0.30    # Raw probability (30% of score)
+WEIGHT_EDGE_MAGNITUDE = 0.22          # How big the edge is (22%)
+WEIGHT_DIRECTIONAL_AGREEMENT = 0.18  # Multiple factors agree (18%)
+WEIGHT_MATCHUP_FAVORABILITY = 0.10   # How good the matchup is (10%)
 WEIGHT_HISTORICAL_CONSISTENCY = 0.08  # Player's track record (8%)
+WEIGHT_SAMPLE_SIZE = 0.07             # How many games played (7%)
+WEIGHT_RECENT_FORM = 0.05             # Recent 5-game trend vs season (5%)
 
 # Validate that weights sum to exactly 1.0 (they must — that's the rule for weights).
 # This assertion catches any accidental edits that would break the model silently.
@@ -34,6 +36,8 @@ _ALL_WEIGHTS = (
     + WEIGHT_DIRECTIONAL_AGREEMENT
     + WEIGHT_MATCHUP_FAVORABILITY
     + WEIGHT_HISTORICAL_CONSISTENCY
+    + WEIGHT_SAMPLE_SIZE
+    + WEIGHT_RECENT_FORM
 )
 assert abs(_ALL_WEIGHTS - 1.0) < 1e-9, (
     f"Confidence weights must sum to 1.0, but got {_ALL_WEIGHTS:.4f}. "
@@ -63,11 +67,13 @@ def calculate_confidence_score(
     stat_standard_deviation,
     stat_average,
     simulation_results,
+    games_played=None,
+    recent_form_ratio=None,
 ):
     """
     Calculate a 0-100 confidence score for a prop pick.
 
-    Combines six factors into a weighted score, then assigns
+    Combines eight factors into a weighted score, then assigns
     a tier label: Platinum, Gold, Silver, or Bronze.
 
     Args:
@@ -79,6 +85,9 @@ def calculate_confidence_score(
         stat_standard_deviation (float): Stat variability
         stat_average (float): Player's season average for this stat
         simulation_results (dict): Full Monte Carlo output dict
+        games_played (int, optional): Games in season (higher = more reliable)
+        recent_form_ratio (float, optional): Last-5-game avg / season avg.
+            > 1.0 means hot streak, < 1.0 means cold streak.
 
     Returns:
         dict: {
@@ -126,6 +135,18 @@ def calculate_confidence_score(
         stat_standard_deviation, stat_average
     )
 
+    # --- Factor 6: Sample Size (0-100) ---
+    # More games played = more reliable season averages.
+    # 0 games = 0 score, 41+ games = 100 score
+    sample_size_score = _calculate_sample_size_score(games_played)
+
+    # --- Factor 7: Recent Form (0-100) ---
+    # Recent hot/cold streaks adjust the prediction reliability.
+    # ratio ≈ 1.0 = neutral (50), >> 1 = hot (high score), << 1 = cold (low)
+    recent_form_score = _calculate_recent_form_score(
+        recent_form_ratio, probability_over
+    )
+
     # ============================================================
     # END SECTION: Calculate Individual Factor Scores
     # ============================================================
@@ -141,6 +162,8 @@ def calculate_confidence_score(
         + directional_score * WEIGHT_DIRECTIONAL_AGREEMENT
         + matchup_score * WEIGHT_MATCHUP_FAVORABILITY
         + historical_score * WEIGHT_HISTORICAL_CONSISTENCY
+        + sample_size_score * WEIGHT_SAMPLE_SIZE
+        + recent_form_score * WEIGHT_RECENT_FORM
     )
 
     # Round to nearest whole number
@@ -194,6 +217,8 @@ def calculate_confidence_score(
             "directional_score": round(directional_score, 1),
             "matchup_score": round(matchup_score, 1),
             "historical_score": round(historical_score, 1),
+            "sample_size_score": round(sample_size_score, 1),
+            "recent_form_score": round(recent_form_score, 1),
         },
     }
 
@@ -277,6 +302,77 @@ def _calculate_consistency_score(stat_standard_deviation, stat_average):
     consistency_score = 100.0 - (coefficient_of_variation * 100.0)
 
     return max(0.0, min(100.0, consistency_score))
+
+
+def _calculate_sample_size_score(games_played):
+    """
+    Score the reliability of season averages based on games played.
+
+    More games = more reliable data = higher score.
+    Uses a logistic-style curve so the score grows quickly early
+    (0-20 games) and levels off after ~41 games (half a season).
+
+    Args:
+        games_played (int or None): Number of games played this season.
+            None or 0 returns a neutral score of 50.
+
+    Returns:
+        float: Score 0-100 (higher = more reliable sample)
+    """
+    if not games_played or games_played <= 0:
+        return 50.0  # No data — neutral
+
+    # Cap benefit at 82 games (full season)
+    games = min(games_played, 82)
+
+    # Linearly scale: 0 games → 10, 41 games → 70, 82 games → 100
+    # We use 41 as the "good enough" midpoint (half season)
+    if games <= 41:
+        score = 10.0 + (games / 41.0) * 60.0
+    else:
+        score = 70.0 + ((games - 41) / 41.0) * 30.0
+
+    return max(0.0, min(100.0, score))
+
+
+def _calculate_recent_form_score(recent_form_ratio, probability_over):
+    """
+    Score how recent form aligns with the predicted direction.
+
+    A hot player (ratio > 1) boosts confidence in OVER picks.
+    A cold player (ratio < 1) boosts confidence in UNDER picks.
+    A player whose recent form contradicts the pick reduces confidence.
+
+    Args:
+        recent_form_ratio (float or None): last_5_avg / season_avg.
+            > 1.0 = hot streak, < 1.0 = cold streak, 1.0 = neutral.
+            None means no recent form data available.
+        probability_over (float): P(over), used to determine direction.
+
+    Returns:
+        float: Score 0-100
+    """
+    if recent_form_ratio is None:
+        return 50.0  # No recent form data — neutral
+
+    bet_direction_is_over = probability_over >= 0.5
+
+    # How far from neutral (1.0) is the recent form?
+    form_deviation = recent_form_ratio - 1.0  # positive = hot, negative = cold
+
+    if bet_direction_is_over:
+        # OVER pick: hot streak is good, cold streak is bad
+        alignment = form_deviation  # positive when aligned
+    else:
+        # UNDER pick: cold streak is good, hot streak is bad
+        alignment = -form_deviation  # positive when aligned
+
+    # Scale to 0-100: strong alignment → high score, misalignment → low score
+    # The multiplier 200.0 maps the alignment range of [-0.25, +0.25] to [-50, +50],
+    # which when added to the base 50 gives a final score in [0, 100].
+    # A ±25% recent form deviation is considered a strong signal.
+    scaled = 50.0 + (alignment * 200.0)
+    return max(0.0, min(100.0, scaled))
 
 
 def get_tier_color(tier_name):
