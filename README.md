@@ -1,0 +1,3 @@
+# SmartAI-NBA
+
+Initializing repository...
