@@ -27,6 +27,13 @@ LEAGUE_AVERAGE_GAME_TOTAL = 220.0
 # Used to compute pace adjustment factors.
 LEAGUE_AVERAGE_PACE = 98.5
 
+# Recent form blending weights.
+# When last-N game log data is available, the projection blends
+# the season average with the recent form average.
+# Adjust these to change how much recent form is weighted.
+SEASON_AVG_WEIGHT = 0.6    # 60% season average (stabilizing factor)
+RECENT_FORM_WEIGHT = 0.4   # 40% recent form (responsiveness factor)
+
 def build_player_projection(
     player_data,
     opponent_team_abbreviation,
@@ -141,8 +148,8 @@ def build_player_projection(
         if season_points_average > 0:
             recent_form_ratio = round(recent_pts / season_points_average, 3)
 
-        # Blend: 60% season, 40% recent form
-        _blend = lambda season, recent: season * 0.6 + recent * 0.4
+        # Blend: season average weighted by SEASON_AVG_WEIGHT, recent form by RECENT_FORM_WEIGHT
+        _blend = lambda season, recent: season * SEASON_AVG_WEIGHT + recent * RECENT_FORM_WEIGHT
         season_points_average   = _blend(season_points_average,   recent_pts)
         season_rebounds_average = _blend(season_rebounds_average,
                                          _recent_avg(recent_form_games, form_key_map["rebounds"], season_rebounds_average))

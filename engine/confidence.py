@@ -368,7 +368,9 @@ def _calculate_recent_form_score(recent_form_ratio, probability_over):
         alignment = -form_deviation  # positive when aligned
 
     # Scale to 0-100: strong alignment → high score, misalignment → low score
-    # Cap: ±30% deviation is the max meaningful signal
+    # The multiplier 200.0 maps the alignment range of [-0.25, +0.25] to [-50, +50],
+    # which when added to the base 50 gives a final score in [0, 100].
+    # A ±25% recent form deviation is considered a strong signal.
     scaled = 50.0 + (alignment * 200.0)
     return max(0.0, min(100.0, scaled))
 

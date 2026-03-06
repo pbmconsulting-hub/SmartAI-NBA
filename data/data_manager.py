@@ -200,7 +200,6 @@ NAME_ALIASES = {
     "tj warren": "t.j. warren",
     "cj mccollum": "c.j. mccollum",
     "c.j. mccollum": "c.j. mccollum",
-    "cj mccollum": "c.j. mccollum",
     "pj tucker": "p.j. tucker",
     "p.j. tucker": "p.j. tucker",
     "rj barrett": "r.j. barrett",
