@@ -749,15 +749,21 @@ def fetch_player_recent_form(player_id, last_n_games=10):
         ast_list = [float(g.get("AST", 0) or 0) for g in recent]
         fg3m_list = [float(g.get("FG3M", 0) or 0) for g in recent]
 
-        # Trend: compare last 3 games vs last 10 games
-        last_3_pts = safe_avg(pts_list[:3]) if len(pts_list) >= 3 else safe_avg(pts_list)
-        full_avg_pts = safe_avg(pts_list)
-        if full_avg_pts > 0:
-            trend = "hot" if last_3_pts >= full_avg_pts * HOT_TREND_THRESHOLD else (
-                "cold" if last_3_pts <= full_avg_pts * COLD_TREND_THRESHOLD else "neutral"
+        # Trend: compare last 5 games vs prior 5 games
+        last_5_pts_vals = pts_list[:5]
+        prior_5_pts_vals = pts_list[5:10]
+        last5_avg = safe_avg(last_5_pts_vals)
+        prev5_avg = safe_avg(prior_5_pts_vals) if prior_5_pts_vals else last5_avg
+
+        if prev5_avg > 0:
+            trend = "hot" if last5_avg >= prev5_avg * HOT_TREND_THRESHOLD else (
+                "cold" if last5_avg <= prev5_avg * COLD_TREND_THRESHOLD else "neutral"
             )
         else:
             trend = "neutral"
+
+        trend_emoji_map = {"hot": "🔥", "cold": "❄️", "neutral": "➡️"}
+        trend_emoji = trend_emoji_map.get(trend, "➡️")
 
         # Build game-by-game results list (newest first)
         game_results = []
@@ -780,7 +786,9 @@ def fetch_player_recent_form(player_id, last_n_games=10):
             "recent_ast_avg": safe_avg(ast_list),
             "recent_fg3m_avg": safe_avg(fg3m_list),
             "trend": trend,
-            "last_3_pts_avg": last_3_pts,
+            "trend_emoji": trend_emoji,
+            "last_5_pts": last_5_pts_vals,
+            "last_5_pts_avg": last5_avg,
             "game_results": game_results,
             "games_played": len(recent),
         }
@@ -845,7 +853,7 @@ def fetch_player_stats(progress_callback=None):
 
         # Make the API call — this fetches ALL players' stats at once
         stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
-            per_mode_simple="PerGame",        # We want per-game averages
+            per_mode_detailed="PerGame",      # We want per-game averages
             season_type_all_star="Regular Season",  # Only regular season
         )
 
@@ -1138,7 +1146,7 @@ def fetch_team_stats(progress_callback=None):
         # for pace — they tell you how efficient a team is regardless of
         # whether they play fast or slow.
         team_stats_endpoint = leaguedashteamstats.LeagueDashTeamStats(
-            per_mode_simple="PerGame",            # Get per-game stats
+            per_mode_detailed="PerGame",          # Get per-game stats
             season_type_all_star="Regular Season",
         )
 
@@ -1157,7 +1165,7 @@ def fetch_team_stats(progress_callback=None):
 
         # Fetch advanced (per-possession) stats for ORTG/DRTG/Pace
         advanced_endpoint = advanced_stats_module.LeagueDashTeamStats(
-            per_mode_simple="Per100Possessions",      # Per 100 possessions = normalized
+            per_mode_detailed="Per100Possessions",    # Per 100 possessions = normalized
             measure_type_detailed_defense="Advanced",  # Advanced stats mode
             season_type_all_star="Regular Season",
         )
@@ -1520,4 +1528,96 @@ def fetch_all_data(progress_callback=None, targeted=False, todays_games=None):
 
 # ============================================================
 # END SECTION: Full Update Function
+# ============================================================
+
+
+# ============================================================
+# SECTION: One-Click Today's Data Fetcher
+# Fetches games, today's team rosters+stats, and team stats
+# in a single call — the "Auto-Load" button entry point.
+# ============================================================
+
+def fetch_all_todays_data(progress_callback=None):
+    """
+    One-click function: fetch tonight's games, player stats for those
+    teams, and team stats — all in a single call.
+
+    Steps:
+        1. Fetch tonight's games (ScoreBoard)
+        2. Fetch current rosters + player stats for tonight's teams only
+        3. Fetch team stats for the analysis engine
+
+    Args:
+        progress_callback (callable, optional): Called with (current, total, msg).
+
+    Returns:
+        dict: {
+            "games": list of game dicts (empty list if none),
+            "players_updated": bool,
+            "teams_updated": bool,
+        }
+    """
+    results = {
+        "games": [],
+        "players_updated": False,
+        "teams_updated": False,
+    }
+
+    # --------------------------------------------------------
+    # Step 1: Fetch tonight's games
+    # --------------------------------------------------------
+    if progress_callback:
+        progress_callback(0, 30, "Step 1/3 — Fetching tonight's games...")
+
+    games = fetch_todays_games()
+    results["games"] = games
+
+    if not games:
+        print("fetch_all_todays_data: No games found for tonight.")
+        return results
+
+    if progress_callback:
+        progress_callback(2, 30, f"Step 1/3 ✅ Found {len(games)} game(s). Fetching player rosters...")
+
+    # --------------------------------------------------------
+    # Step 2: Fetch player stats for tonight's teams only
+    # --------------------------------------------------------
+    def player_progress(current, total, message):
+        if progress_callback:
+            # Progress range for Step 2: steps 2-22 out of 30
+            # (Step 1 uses 0-2; Step 2 uses 2-22; Step 3 uses 22-29; final = 30)
+            scaled = 2 + int(20 * current / max(total, 1))
+            progress_callback(scaled, 30, f"Step 2/3 — {message}")
+
+    results["players_updated"] = fetch_todays_players_only(
+        games, progress_callback=player_progress
+    )
+
+    if progress_callback:
+        status = "✅" if results["players_updated"] else "⚠️"
+        progress_callback(22, 30, f"Step 2/3 {status} Player stats done. Fetching team stats...")
+
+    # --------------------------------------------------------
+    # Step 3: Fetch team stats
+    # --------------------------------------------------------
+    def team_progress(current, total, message):
+        if progress_callback:
+            # Progress range for Step 3: steps 22-29 out of 30
+            scaled = 22 + int(7 * current / max(total, 1))
+            progress_callback(scaled, 30, f"Step 3/3 — {message}")
+
+    results["teams_updated"] = fetch_team_stats(progress_callback=team_progress)
+
+    if progress_callback:
+        progress_callback(30, 30, "✅ All done! Games, players, and team stats loaded.")
+
+    players_updated = results["players_updated"]
+    teams_updated = results["teams_updated"]
+    games_count = len(results["games"])
+    print(f"fetch_all_todays_data complete: players_updated={players_updated}, "
+          f"teams_updated={teams_updated}, games={games_count}")
+    return results
+
+# ============================================================
+# END SECTION: One-Click Today's Data Fetcher
 # ============================================================

@@ -299,23 +299,21 @@ with left_column:
     st.markdown("""
     **Follow these steps to find tonight's best bets:**
 
-    **Step 0** → 🔄 **Update Data** *(recommended)* — Click
-    "**Smart Update (Today's Teams Only)**" for a fast 1-2 minute fetch
-    using only today's team rosters. No more traded players!
+    **Step 0** → 🏀 **Today's Games** — Click
+    "**Auto-Load Tonight's Games**" for a ONE-CLICK setup:
+    fetches tonight's matchups + current rosters + player stats + team stats.
+    Everything you need in a single button press!
 
-    **Step 1** → 🏀 **Today's Games** — Click Auto-Load to fetch tonight's
-    matchups with team records and streaks. Edit spreads/totals as needed.
-
-    **Step 2** → 📥 **Import Props** — Enter prop lines manually or upload a CSV.
+    **Step 1** → 📥 **Import Props** — Enter prop lines manually or upload a CSV.
     Sample props are pre-loaded so you can start immediately.
 
-    **Step 3** → 🏆 **Analysis** — Click "Run Analysis" to run Monte Carlo
+    **Step 2** → 🏆 **Analysis** — Click "Run Analysis" to run Monte Carlo
     simulation. See probability gauges, tier badges, and force breakdowns.
 
-    **Step 4** → 🎰 **Entry Builder** — Build optimal parlays with exact EV
+    **Step 3** → 🎰 **Entry Builder** — Build optimal parlays with exact EV
     calculations for PrizePicks, Underdog, and DraftKings.
 
-    **Step 5** → 📊 **Model Health** — After games, log results to track
+    **Step 4** → 📊 **Model Health** — After games, log results to track
     how accurate the model is over time.
     """)
 

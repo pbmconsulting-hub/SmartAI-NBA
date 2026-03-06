@@ -34,6 +34,7 @@ from data.live_data_fetcher import (
     fetch_team_stats,            # Fetch all team stats + defensive ratings
     fetch_all_data,              # Fetch everything at once
     fetch_todays_players_only,   # Targeted: only today's team rosters
+    fetch_all_todays_data,       # One-click: games + players + teams
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
@@ -173,13 +174,43 @@ st.divider()
 
 st.subheader("🔧 Update Data")
 
+# ─── One-Click Full Setup (recommended) ─────────────────────────────
+st.markdown("""
+<div style="background:linear-gradient(135deg,#0f3460,#533483); border:2px solid #e94560; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+  <div style="font-size:1.1rem; font-weight:700; color:#ffffff;">🏀 One-Click Full Setup (Best Choice)</div>
+  <div style="color:rgba(255,255,255,0.8); font-size:0.9rem; margin-top:4px;">
+    Fetches tonight's games → current rosters for those teams → player stats → team stats.
+    <strong>Everything in one click.</strong> Same as clicking Auto-Load on the Today's Games page.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+one_click_col1, one_click_col2 = st.columns([1, 3])
+with one_click_col1:
+    if st.button(
+        "🏀 One-Click Full Setup",
+        use_container_width=True,
+        type="primary",
+        help="Games + rosters + player stats + team stats — all in one click",
+    ):
+        st.session_state["update_action"] = "one_click"
+
+with one_click_col2:
+    st.caption(
+        "Best for first-time setup each day. "
+        "Fetches games first, then only the players on tonight's teams (~1-3 min total)."
+    )
+
+st.markdown("---")
+
 # ─── Smart Update (recommended) ─────────────────────────────
 st.markdown("""
 <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); border:1px solid #0f3460; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
-  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">⚡ Smart Update — Today's Teams Only (Recommended)</div>
+  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">⚡ Smart Update — Today's Teams Only</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
     Fetches team rosters using <code>CommonTeamRoster</code> (current, post-trade) 
-    then game logs for only those players. Takes <strong>1–2 minutes</strong> instead of 10–15.
+    then game logs for only those players. Requires games to already be loaded.
+    Takes <strong>1–2 minutes</strong> instead of 10–15.
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -189,7 +220,6 @@ with smart_col1:
     if st.button(
         "⚡ Smart Update (Today's Teams Only)",
         use_container_width=True,
-        type="primary",
         help="Fastest: fetches only players on teams playing tonight using current rosters",
     ):
         st.session_state["update_action"] = "smart"
@@ -224,9 +254,9 @@ with btn_col1:
 
 with btn_col2:
     if st.button(
-        "👤 Update Player Stats (All)",
+        "👤 Update Player Stats (All — Slow)",
         use_container_width=True,
-        help="Pull current season averages for ALL NBA players (~500, slow)",
+        help="Pull current season averages for ALL NBA players (~500, 5-15 min)",
     ):
         st.session_state["update_action"] = "players"
 
@@ -264,9 +294,50 @@ if current_action:
     st.divider()
 
     # --------------------------------------------------------
+    # Action: One-Click Full Setup
+    # --------------------------------------------------------
+    if current_action == "one_click":
+        st.subheader("🏀 One-Click Full Setup")
+
+        progress_bar = st.progress(0, text="Starting one-click setup...")
+        status_text = st.empty()
+
+        def one_click_progress(current, total, message):
+            frac = current / max(total, 1)
+            progress_bar.progress(frac, text=message)
+            status_text.caption(message)
+
+        with st.spinner("🏀 Fetching games + rosters + player stats + team stats..."):
+            result = fetch_all_todays_data(progress_callback=one_click_progress)
+
+        st.session_state["update_action"] = None
+        progress_bar.empty()
+        status_text.empty()
+
+        games = result.get("games", [])
+        players_ok = result.get("players_updated", False)
+        teams_ok = result.get("teams_updated", False)
+
+        if games:
+            st.session_state["todays_games"] = games
+            from data.data_manager import load_players_data
+            updated_players = load_players_data()
+            st.success(
+                f"✅ One-Click Setup complete! "
+                f"**{len(games)} game(s)** loaded | "
+                f"**{len(updated_players)} players** fetched | "
+                f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
+            )
+        else:
+            st.warning(
+                "⚠️ Could not fetch tonight's games (no games tonight, or API error). "
+                "Try again or load games manually on the 🏀 Today's Games page."
+            )
+
+    # --------------------------------------------------------
     # Action: Smart Update (today's teams only)
     # --------------------------------------------------------
-    if current_action == "smart":
+    elif current_action == "smart":
         st.subheader("⚡ Smart Update — Today's Teams Only")
 
         todays_games_for_smart = st.session_state.get("todays_games", [])
