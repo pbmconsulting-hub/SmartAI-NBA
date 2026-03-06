@@ -1,0 +1,24 @@
+# Python cache files — generated automatically, don't commit
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# SQLite database — created automatically on first run, don't commit
+db/*.db
+# Keep the .gitkeep placeholder
+!db/.gitkeep
+
+# Virtual environment (if user creates one)
+venv/
+.venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
