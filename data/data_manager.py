@@ -242,6 +242,97 @@ def get_team_by_abbreviation(teams_list, abbreviation):
             return team
     return None
 
+
+def find_players_by_team(players_list, team_abbrev):
+    """
+    Return all players on a given team.
+
+    Args:
+        players_list (list of dict): Loaded player data
+        team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL')
+
+    Returns:
+        list of dict: All players on that team, sorted by points avg (desc)
+    """
+    abbrev_upper = team_abbrev.upper().strip()
+    matches = [p for p in players_list if p.get("team", "").upper() == abbrev_upper]
+    # Sort by points average descending (stars first)
+    try:
+        matches.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
+    except Exception:
+        pass
+    return matches
+
+
+def get_todays_active_players(players_list, todays_games):
+    """
+    Return only players whose team is playing today.
+
+    Args:
+        players_list (list of dict): Loaded player data
+        todays_games (list of dict): Tonight's games (from session state)
+
+    Returns:
+        list of dict: Players on teams playing today
+    """
+    if not todays_games:
+        return players_list  # Fall back to all players if no games set
+
+    # Build set of teams playing today
+    playing_teams = set()
+    for game in todays_games:
+        playing_teams.add(game.get("home_team", "").upper())
+        playing_teams.add(game.get("away_team", "").upper())
+    playing_teams.discard("")
+
+    return [p for p in players_list if p.get("team", "").upper() in playing_teams]
+
+
+def enrich_prop_with_player_data(prop, players_list):
+    """
+    Add player season averages and team info to a prop dictionary.
+
+    Looks up the player in the players list and adds season stats
+    as extra fields on the prop dict for display purposes.
+
+    Args:
+        prop (dict): A prop dict with at least 'player_name'
+        players_list (list of dict): Loaded player data
+
+    Returns:
+        dict: The prop dict with added player stats (non-destructive copy)
+    """
+    enriched = dict(prop)  # Copy so we don't mutate the original
+
+    player = find_player_by_name(players_list, prop.get("player_name", ""))
+    if player:
+        enriched["player_team"] = player.get("team", prop.get("team", ""))
+        enriched["player_position"] = player.get("position", "")
+        enriched["season_pts_avg"] = float(player.get("points_avg", 0) or 0)
+        enriched["season_reb_avg"] = float(player.get("rebounds_avg", 0) or 0)
+        enriched["season_ast_avg"] = float(player.get("assists_avg", 0) or 0)
+        enriched["season_threes_avg"] = float(player.get("threes_avg", 0) or 0)
+        enriched["season_minutes_avg"] = float(player.get("minutes_avg", 0) or 0)
+
+        # Calculate how the prop line compares to the season average
+        stat_type = prop.get("stat_type", "").lower()
+        stat_avg_map = {
+            "points": enriched["season_pts_avg"],
+            "rebounds": enriched["season_reb_avg"],
+            "assists": enriched["season_ast_avg"],
+            "threes": enriched["season_threes_avg"],
+        }
+        season_avg = stat_avg_map.get(stat_type, 0)
+        prop_line = float(prop.get("line", 0) or 0)
+
+        if season_avg > 0 and prop_line > 0:
+            diff_pct = round((prop_line - season_avg) / season_avg * 100, 1)
+            enriched["line_vs_avg_pct"] = diff_pct  # + means line is higher than avg
+        else:
+            enriched["line_vs_avg_pct"] = 0.0
+
+    return enriched
+
 # ============================================================
 # END SECTION: Player Lookup Functions
 # ============================================================

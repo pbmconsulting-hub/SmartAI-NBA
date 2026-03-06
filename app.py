@@ -1,43 +1,111 @@
 # ============================================================
 # FILE: app.py
 # PURPOSE: Main entry point for the SmartAI-NBA v7 Streamlit app.
-#          Shows the welcome screen, quick-start guide, and status
-#          dashboard. All other pages are in the pages/ folder.
+#          Professional dark-themed dashboard with today's slate,
+#          status cards, and quick-start guide.
 # HOW TO RUN: streamlit run app.py
-# CONCEPTS COVERED: Streamlit basics, session state, page config
 # ============================================================
 
-# Import streamlit — our main UI framework
-import streamlit as st  # st is the standard alias everyone uses
+import streamlit as st
+import datetime
+import os
 
-# Standard library imports (no install needed — comes with Python)
-import datetime  # To show today's date and time
-import os        # For file path checks
-
-# Import our data loading module
 from data.data_manager import load_players_data, load_props_data, load_teams_data
-
-# Import our live data status checker
-# BEGINNER NOTE: load_last_updated reads a JSON file that tracks when
-# live data was last fetched. If the file doesn't exist, it means we
-# are still using sample data.
 from data.live_data_fetcher import load_last_updated
-
-# Import our database initializer (creates the DB on first run)
 from tracking.database import initialize_database
 
 # ============================================================
 # SECTION: Page Configuration
-# This MUST be the FIRST streamlit call in the file.
-# It sets the browser tab title, icon, and layout.
 # ============================================================
 
 st.set_page_config(
-    page_title="SmartAI-NBA v7",      # Browser tab title
-    page_icon="🏀",                    # Browser tab icon
-    layout="wide",                     # Use full screen width
-    initial_sidebar_state="expanded",  # Show sidebar by default
+    page_title="SmartAI-NBA v7",
+    page_icon="🏀",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
+
+# ─── Dark Theme CSS ───────────────────────────────────────────
+st.markdown("""
+<style>
+/* Hero banner gradient */
+.hero-banner {
+    background: linear-gradient(135deg, #0f3460 0%, #533483 50%, #e94560 100%);
+    border-radius: 14px;
+    padding: 28px 36px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.hero-title {
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+.hero-subtitle {
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.85);
+    margin-top: 6px;
+}
+.hero-date {
+    font-size: 0.95rem;
+    color: rgba(255,255,255,0.7);
+    margin-top: 4px;
+}
+/* Status card */
+.status-card {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 1px solid #0f3460;
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.status-card-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #e2e8f0;
+}
+.status-card-label {
+    font-size: 0.8rem;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+}
+/* Tonight's slate team chips */
+.team-chip {
+    display: inline-block;
+    background: #0f3460;
+    color: #e2e8f0;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 3px;
+}
+/* Tier badge pill */
+.live-badge {
+    display: inline-block;
+    background: #276749;
+    color: #9ae6b4;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+.sample-badge {
+    display: inline-block;
+    background: #744210;
+    color: #fbd38d;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Configuration
@@ -45,167 +113,185 @@ st.set_page_config(
 
 # ============================================================
 # SECTION: Initialize App on Startup
-# Run setup tasks that only need to happen once per session.
 # ============================================================
 
-# Initialize the SQLite database (creates tables if they don't exist)
 initialize_database()
 
-# Set default settings in session state if not already set
-# BEGINNER NOTE: Session state persists data between pages.
-# Think of it as global variables that survive page changes.
 if "simulation_depth" not in st.session_state:
-    st.session_state["simulation_depth"] = 1000  # Default: 1000 simulations
-
+    st.session_state["simulation_depth"] = 1000
 if "minimum_edge_threshold" not in st.session_state:
-    st.session_state["minimum_edge_threshold"] = 5.0  # Need 5% edge to show
-
+    st.session_state["minimum_edge_threshold"] = 5.0
 if "entry_fee" not in st.session_state:
-    st.session_state["entry_fee"] = 10.0  # Default $10 entry
-
+    st.session_state["entry_fee"] = 10.0
 if "selected_platforms" not in st.session_state:
     st.session_state["selected_platforms"] = ["PrizePicks", "Underdog", "DraftKings"]
-
 if "todays_games" not in st.session_state:
-    st.session_state["todays_games"] = []  # Empty until user enters games
-
+    st.session_state["todays_games"] = []
 if "analysis_results" not in st.session_state:
-    st.session_state["analysis_results"] = []  # Empty until analysis runs
+    st.session_state["analysis_results"] = []
 
 # ============================================================
 # END SECTION: Initialize App on Startup
 # ============================================================
 
 # ============================================================
-# SECTION: Welcome Header
+# SECTION: Hero Banner
 # ============================================================
 
-# Display the main title with emoji and styled text
-st.title("🏀 SmartAI-NBA v7")
-st.markdown("### *Your Personal NBA Prop Betting Analysis Engine*")
+today_str = datetime.date.today().strftime("%A, %B %d, %Y")
+todays_games = st.session_state.get("todays_games", [])
+game_count = len(todays_games)
+game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if game_count else "No games loaded yet"
 
-# Horizontal divider line
-st.divider()
+st.markdown(f"""
+<div class="hero-banner">
+  <div class="hero-title">🏀 SmartAI-NBA <span style="font-size:1.4rem; font-weight:600; opacity:0.8;">v7</span></div>
+  <div class="hero-subtitle">Your Personal NBA Prop Betting Analysis Engine</div>
+  <div class="hero-date">📅 {today_str} &nbsp;•&nbsp; 🏟️ {game_count_text}</div>
+</div>
+""", unsafe_allow_html=True)
 
 # ============================================================
-# END SECTION: Welcome Header
+# END SECTION: Hero Banner
+# ============================================================
+
+# ============================================================
+# SECTION: Tonight's Slate
+# ============================================================
+
+if todays_games:
+    st.subheader("🏟️ Tonight's Slate")
+
+    # Build team chips
+    chips_html = ""
+    for game in todays_games:
+        away = game.get("away_team", "")
+        home = game.get("home_team", "")
+        aw = game.get("away_wins", 0)
+        al = game.get("away_losses", 0)
+        hw = game.get("home_wins", 0)
+        hl = game.get("home_losses", 0)
+        rec_a = f" ({aw}-{al})" if aw or al else ""
+        rec_h = f" ({hw}-{hl})" if hw or hl else ""
+        chips_html += f'<span class="team-chip">🚌 {away}{rec_a}</span> '
+        chips_html += f'<span style="color:#e94560; font-weight:700; font-size:0.9rem;">vs</span> '
+        chips_html += f'<span class="team-chip">🏠 {home}{rec_h}</span> &nbsp;&nbsp;&nbsp;'
+
+    st.markdown(f'<div style="margin:8px 0 4px 0;">{chips_html}</div>', unsafe_allow_html=True)
+    st.caption("Go to 🏀 Today's Games to update spreads/totals")
+    st.divider()
+
+# ============================================================
+# END SECTION: Tonight's Slate
 # ============================================================
 
 # ============================================================
 # SECTION: Status Dashboard
-# Show a quick overview of the app's current status.
 # ============================================================
 
-# Load data to show how many players/props are available
-players_data = load_players_data()    # List of player dicts
-props_data = load_props_data()        # List of prop dicts
-teams_data = load_teams_data()        # List of team dicts
+players_data = load_players_data()
+props_data = load_props_data()
+teams_data = load_teams_data()
 
-# Count how many games are set up for today
-number_of_todays_games = len(st.session_state.get("todays_games", []))
-
-# Count how many props have been entered (from session or sample data)
 current_props = st.session_state.get("current_props", props_data)
 number_of_current_props = len(current_props)
-
-# Count how many analysis results exist
 number_of_analysis_results = len(st.session_state.get("analysis_results", []))
 
-# Display status metrics in columns (side-by-side layout)
-# BEGINNER NOTE: st.columns() creates a row of equal-width boxes
-column1, column2, column3, column4 = st.columns(4)
+# Live data status
+live_data_timestamps = load_last_updated()
+is_using_live_data = live_data_timestamps.get("is_live", False)
+data_badge = '<span class="live-badge">✅ LIVE</span>' if is_using_live_data else '<span class="sample-badge">📊 SAMPLE</span>'
 
-with column1:
-    # st.metric shows a big number with a label
-    st.metric(
-        label="📋 Players in Database",
-        value=len(players_data),
-        help="Total players with stats loaded from sample_players.csv"
-    )
+st.subheader("📊 Status")
 
-with column2:
-    st.metric(
-        label="🎯 Props Loaded",
-        value=number_of_current_props,
-        help="Prop lines available for analysis"
-    )
+col1, col2, col3, col4, col5 = st.columns(5)
 
-with column3:
-    st.metric(
-        label="🏟️ Games Tonight",
-        value=number_of_todays_games if number_of_todays_games > 0 else "—",
-        help="Games set up on the Today's Games page"
-    )
+with col1:
+    st.markdown(f"""
+    <div class="status-card">
+      <div class="status-card-value">{len(players_data)}</div>
+      <div class="status-card-label">👤 Players</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with column4:
-    st.metric(
-        label="📊 Analysis Results",
-        value=number_of_analysis_results if number_of_analysis_results > 0 else "—",
-        help="Props analyzed — go to Analysis page to run"
-    )
+with col2:
+    st.markdown(f"""
+    <div class="status-card">
+      <div class="status-card-value">{number_of_current_props}</div>
+      <div class="status-card-label">🎯 Props</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col3:
+    val3 = str(game_count) if game_count else "—"
+    st.markdown(f"""
+    <div class="status-card">
+      <div class="status-card-value">{val3}</div>
+      <div class="status-card-label">🏟️ Games Tonight</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col4:
+    val4 = str(number_of_analysis_results) if number_of_analysis_results else "—"
+    st.markdown(f"""
+    <div class="status-card">
+      <div class="status-card-value">{val4}</div>
+      <div class="status-card-label">📈 Analyzed</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with col5:
+    st.markdown(f"""
+    <div class="status-card">
+      <div class="status-card-value" style="font-size:1.1rem; padding-top:8px;">{data_badge}</div>
+      <div class="status-card-label">Data Source</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.divider()
 
 # ============================================================
 # END SECTION: Status Dashboard
 # ============================================================
 
-st.divider()
-
 # ============================================================
-# SECTION: Live Data Status Indicator
-# Show whether the app is using sample data or live data,
-# and when data was last updated.
+# SECTION: Live Data Status Banner
 # ============================================================
-
-# Load timestamps from last_updated.json
-# BEGINNER NOTE: load_last_updated() returns a dict like:
-# {'players': '2026-03-06T14:30:00', 'teams': '...', 'is_live': True}
-# If the file doesn't exist yet, it returns an empty dict {}.
-live_data_timestamps = load_last_updated()
-
-# Check if we have any live data (is_live flag is set)
-is_using_live_data = live_data_timestamps.get("is_live", False)
 
 if is_using_live_data:
-    # Show which data types have been updated and when
-    player_ts = live_data_timestamps.get("players")   # Player update timestamp
-    team_ts = live_data_timestamps.get("teams")        # Team update timestamp
+    player_ts = live_data_timestamps.get("players")
+    team_ts = live_data_timestamps.get("teams")
 
-    # Format timestamps for display (convert ISO format to human-readable)
     def format_timestamp(ts_string):
-        """Convert ISO timestamp string to friendly format like 'Mar 6, 2:30 PM'."""
         if not ts_string:
-            return "never"  # No timestamp = never updated
+            return "never"
         try:
             dt = datetime.datetime.fromisoformat(ts_string)
-            return dt.strftime("%b %d at %I:%M %p")  # e.g. "Mar 6 at 2:30 PM"
+            return dt.strftime("%b %d at %I:%M %p")
         except Exception:
-            return "unknown"  # If parsing fails, show "unknown"
+            return "unknown"
 
-    # Show a success banner with last update times
     st.success(
         f"✅ **Using Live NBA Data** — "
         f"Players: {format_timestamp(player_ts)} | "
         f"Teams: {format_timestamp(team_ts)}"
     )
 else:
-    # No live data — show a reminder to update
     st.info(
         "📊 **Using Sample Data** — Go to the **🔄 Update Data** page to pull "
         "real, up-to-date NBA stats for more accurate predictions!"
     )
 
 # ============================================================
-# END SECTION: Live Data Status Indicator
+# END SECTION: Live Data Status Banner
 # ============================================================
 
 st.divider()
 
 # ============================================================
 # SECTION: Quick Start Guide
-# Show new users exactly how to use the app.
 # ============================================================
 
-# Two-column layout: guide on left, tech info on right
 left_column, right_column = st.columns([2, 1])
 
 with left_column:
@@ -213,21 +299,21 @@ with left_column:
     st.markdown("""
     **Follow these steps to find tonight's best bets:**
 
-    **Step 0** → 🔄 **Update Data** *(optional but recommended)* — Click
-    "Update Everything" to pull real, live NBA stats before you start.
-    The app works with sample data, but live data is much more accurate!
+    **Step 0** → 🔄 **Update Data** *(recommended)* — Click
+    "**Smart Update (Today's Teams Only)**" for a fast 1-2 minute fetch
+    using only today's team rosters. No more traded players!
 
-    **Step 1** → 🏀 **Today's Games** — Select which teams are playing tonight
-    and enter the Vegas spread + total for each game.
+    **Step 1** → 🏀 **Today's Games** — Click Auto-Load to fetch tonight's
+    matchups with team records and streaks. Edit spreads/totals as needed.
 
     **Step 2** → 📥 **Import Props** — Enter prop lines manually or upload a CSV.
-    Sample props are pre-loaded so you can start immediately!
+    Sample props are pre-loaded so you can start immediately.
 
-    **Step 3** → 🏆 **Analysis** — Click "Run Analysis" to run the Monte Carlo
-    simulation. See probability, edge, tier, and direction for every prop.
+    **Step 3** → 🏆 **Analysis** — Click "Run Analysis" to run Monte Carlo
+    simulation. See probability gauges, tier badges, and force breakdowns.
 
-    **Step 4** → 🎰 **Entry Builder** — Build optimal parlays for PrizePicks,
-    Underdog, and DraftKings with exact EV calculations.
+    **Step 4** → 🎰 **Entry Builder** — Build optimal parlays with exact EV
+    calculations for PrizePicks, Underdog, and DraftKings.
 
     **Step 5** → 📊 **Model Health** — After games, log results to track
     how accurate the model is over time.
@@ -235,8 +321,6 @@ with left_column:
 
 with right_column:
     st.subheader("⚙️ Current Settings")
-
-    # Show the current simulation settings
     st.info(f"""
     **Simulations:** {st.session_state['simulation_depth']:,}
 
@@ -246,8 +330,6 @@ with right_column:
 
     **Platforms:** {', '.join(st.session_state['selected_platforms'])}
     """)
-
-    # Link to settings page
     st.caption("Change these on the ⚙️ Settings page")
 
 # ============================================================
@@ -258,7 +340,6 @@ st.divider()
 
 # ============================================================
 # SECTION: How It Works
-# Brief explanation of the engine for curious users.
 # ============================================================
 
 with st.expander("📖 How Does SmartAI-NBA Work?", expanded=False):
@@ -302,25 +383,14 @@ with st.expander("📖 How Does SmartAI-NBA Work?", expanded=False):
 
     ---
 
-    *All math is built from scratch using Python's standard library.
-    No external dependencies except Streamlit!*
+    #### 🎯 Smart Data Fetching (New!)
+    The "Update Data" page now has a **Smart Update** option that only fetches
+    players on today's teams using `CommonTeamRoster` — which reflects all
+    trades and signings. This is 10x faster than the full update!
     """)
-
-# ============================================================
-# END SECTION: How It Works
-# ============================================================
-
-# ============================================================
-# SECTION: Footer
-# ============================================================
 
 st.divider()
 st.caption(
-    f"SmartAI-NBA v7 | Built for personal use | "
-    f"Last loaded: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
-    f"Data: {len(players_data)} players, {len(teams_data)} teams"
+    f"SmartAI-NBA v7 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
+    f"{len(players_data)} players, {len(teams_data)} teams"
 )
-
-# ============================================================
-# END SECTION: Footer
-# ============================================================

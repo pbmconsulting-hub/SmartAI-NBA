@@ -41,6 +41,53 @@ st.title("🏆 Analysis")
 st.markdown("Run the Monte Carlo simulation to find the highest-probability picks.")
 st.divider()
 
+# ─── Custom CSS ───────────────────────────────────────────────
+st.markdown("""
+<style>
+/* Analysis card */
+.analysis-card {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid #0f3460;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+/* Team badge in analysis card */
+.team-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #fff;
+    background: #0f3460;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+/* Tier badge */
+.tier-platinum { background: linear-gradient(135deg,#7b2ff7,#9b59b6); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
+.tier-gold     { background: linear-gradient(135deg,#f39c12,#e67e22); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
+.tier-silver   { background: linear-gradient(135deg,#95a5a6,#7f8c8d); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
+.tier-bronze   { background: linear-gradient(135deg,#cd6836,#a04020); color:#fff; padding:4px 12px; border-radius:20px; font-weight:700; font-size:1rem; }
+/* Probability bar */
+.prob-bar-wrap { background:#2d3748; border-radius:8px; height:14px; margin-top:4px; overflow:hidden; }
+.prob-bar-fill-over  { background:linear-gradient(90deg,#48bb78,#38a169); height:100%; border-radius:8px; }
+.prob-bar-fill-under { background:linear-gradient(90deg,#fc8181,#e53e3e); height:100%; border-radius:8px; }
+/* Recent form dots */
+.form-dot-over  { display:inline-block; width:12px; height:12px; border-radius:50%; background:#48bb78; margin:1px; }
+.form-dot-under { display:inline-block; width:12px; height:12px; border-radius:50%; background:#fc8181; margin:1px; }
+/* Stat chips */
+.stat-chip {
+    display:inline-block; background:#2d3748; border-radius:6px;
+    padding:4px 10px; margin-right:8px; color:#e2e8f0; font-size:0.85rem;
+}
+/* Direction badge */
+.dir-over  { background:#276749; color:#9ae6b4; padding:3px 10px; border-radius:12px; font-weight:700; font-size:0.9rem; }
+.dir-under { background:#742a2a; color:#feb2b2; padding:3px 10px; border-radius:12px; font-weight:700; font-size:0.9rem; }
+</style>
+""", unsafe_allow_html=True)
+
 # ============================================================
 # END SECTION: Page Setup
 # ============================================================
@@ -101,12 +148,14 @@ def find_game_context_for_player(player_team, todays_games_list):
 
 def display_prop_analysis_card(result):
     """
-    Display a formatted analysis card for one prop result.
+    Display a rich, visually styled analysis card for one prop result.
+
+    Shows team badge, probability gauge, recent form dots, tier badge,
+    and force breakdown in a dark-themed card.
 
     Args:
         result (dict): Full analysis result from the simulation loop
     """
-    # Extract key values for display
     player = result.get("player_name", "Unknown")
     stat = result.get("stat_type", "").capitalize()
     line = result.get("line", 0)
@@ -117,65 +166,174 @@ def display_prop_analysis_card(result):
     edge = result.get("edge_percentage", 0)
     confidence = result.get("confidence_score", 50)
     platform = result.get("platform", "")
+    team = result.get("player_team", result.get("team", ""))
+    position = result.get("player_position", result.get("position", ""))
+    proj = result.get("adjusted_projection", 0)
 
-    # Arrow emoji for direction
+    # Season averages (from enriched prop data)
+    pts_avg = result.get("season_pts_avg", result.get("points_avg", 0))
+    reb_avg = result.get("season_reb_avg", result.get("rebounds_avg", 0))
+    ast_avg = result.get("season_ast_avg", result.get("assists_avg", 0))
+
+    # Probability percentage (in the direction we're betting)
+    prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
     direction_arrow = "⬆️" if direction == "OVER" else "⬇️"
 
-    # Column layout: player info | probability | edge | tier
-    header_col, prob_col, edge_col, tier_col = st.columns([3, 2, 2, 2])
+    # Tier CSS class
+    tier_class = {
+        "Platinum": "tier-platinum",
+        "Gold": "tier-gold",
+        "Silver": "tier-silver",
+        "Bronze": "tier-bronze",
+    }.get(tier, "tier-bronze")
 
-    with header_col:
-        st.markdown(f"### {player}")
-        st.caption(f"{platform} | {stat} | Line: **{line}**")
-        proj = result.get("adjusted_projection", 0)
-        st.caption(f"📐 Tonight's projection: **{proj}**")
+    # Direction CSS class
+    dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
-    with prob_col:
-        # Display probability prominently
-        prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
-        st.metric(
-            label=f"{direction_arrow} {direction} Probability",
-            value=f"{prob_pct:.1f}%",
-        )
+    # Platform color
+    platform_colors = {
+        "PrizePicks": "#276749",
+        "Underdog": "#553c9a",
+        "DraftKings": "#2b6cb0",
+    }
+    plat_color = platform_colors.get(platform, "#2d3748")
 
-    with edge_col:
-        edge_display = abs(edge)
-        st.metric(
-            label="Edge",
-            value=f"+{edge_display:.1f}%",
-            help="How far above 50% our probability is",
-        )
+    # Probability bar width
+    bar_fill_class = "prob-bar-fill-over" if direction == "OVER" else "prob-bar-fill-under"
+    bar_width = int(min(100, max(0, prob_pct)))
 
-    with tier_col:
-        st.metric(
-            label="Confidence",
-            value=f"{tier_emoji} {tier}",
-            delta=f"{confidence:.0f}/100",
-        )
+    # Team badge
+    team_badge = f'<span class="team-pill">{team}</span>' if team else ""
 
-    # Expander for detailed breakdown
-    with st.expander(f"🔍 View Full Analysis — {player} {stat.capitalize()}"):
+    # Recent form dots (last 5 game results vs the line)
+    recent_results = result.get("recent_form_results", [])
+    form_dots_html = ""
+    if recent_results:
+        stat_key = stat.lower()
+        stat_map = {"points": "pts", "rebounds": "reb", "assists": "ast",
+                    "threes": "fg3m", "steals": "stl", "blocks": "blk", "turnovers": "tov"}
+        mapped_key = stat_map.get(stat_key, "pts")
+        for g in recent_results[:5]:
+            val = g.get(mapped_key, g.get("pts", 0))
+            if val >= line:
+                form_dots_html += '<span class="form-dot-over" title="Over"></span>'
+            else:
+                form_dots_html += '<span class="form-dot-under" title="Under"></span>'
+
+    # Over/under force counts
+    over_forces = result.get("forces", {}).get("over_forces", [])
+    under_forces = result.get("forces", {}).get("under_forces", [])
+    total_over_strength = sum(f.get("strength", 1) for f in over_forces)
+    total_under_strength = sum(f.get("strength", 1) for f in under_forces)
+    total_force = total_over_strength + total_under_strength or 1
+    over_bar_pct = int(total_over_strength / total_force * 100)
+
+    # Percentile display
+    p10 = result.get("percentile_10", 0)
+    p50 = result.get("percentile_50", 0)
+    p90 = result.get("percentile_90", 0)
+
+    # Opponent info
+    opponent = result.get("opponent", "")
+    matchup_text = f"vs {opponent}" if opponent else ""
+
+    # Line vs average context
+    line_vs_avg = result.get("line_vs_avg_pct", 0)
+    if line_vs_avg != 0:
+        line_context = f"Line is {abs(line_vs_avg):.0f}% {'above' if line_vs_avg > 0 else 'below'} season avg"
+    else:
+        line_context = ""
+
+    # Render the main card header
+    st.markdown(f"""
+<div class="analysis-card">
+  <!-- Header row: player name + team badge + tier -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+    <div>
+      <span style="font-size:1.25rem; font-weight:700; color:#e2e8f0;">{player}</span>
+      {team_badge}
+      {f'<span style="color:#718096; font-size:0.85rem; margin-left:8px;">{position}</span>' if position else ""}
+    </div>
+    <span class="{tier_class}">{tier_emoji} {tier}</span>
+  </div>
+
+  <!-- Stat type + platform + matchup -->
+  <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+    <span style="background:{plat_color}; color:#fff; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:600;">{platform}</span>
+    <span style="color:#a0aec0; font-size:0.9rem;">{stat} | Line: <strong style="color:#e2e8f0;">{line}</strong></span>
+    {f'<span style="color:#718096; font-size:0.85rem;">{matchup_text}</span>' if matchup_text else ""}
+    {f'<span style="color:#718096; font-size:0.8rem; font-style:italic;">{line_context}</span>' if line_context else ""}
+  </div>
+
+  <!-- Season stats chips -->
+  {f"""<div style="margin-top:10px;">
+    <span class="stat-chip">🏀 {pts_avg} PPG</span>
+    <span class="stat-chip">📊 {reb_avg} RPG</span>
+    <span class="stat-chip">🎯 {ast_avg} APG</span>
+    <span class="stat-chip">📐 Proj: {proj}</span>
+  </div>""" if pts_avg or reb_avg or ast_avg else ""}
+
+  <!-- Probability gauge row -->
+  <div style="margin-top:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+      <span class="{dir_class}">{direction_arrow} {direction}</span>
+      <span style="color:#e2e8f0; font-weight:700; font-size:1.1rem;">{prob_pct:.1f}%</span>
+      <span style="color:#718096; font-size:0.85rem;">Edge: <strong style="color:#68d391;">+{abs(edge):.1f}%</strong></span>
+      <span style="color:#718096; font-size:0.85rem;">Confidence: <strong style="color:#e2e8f0;">{confidence:.0f}/100</strong></span>
+    </div>
+    <div class="prob-bar-wrap">
+      <div class="{bar_fill_class}" style="width:{bar_width}%;"></div>
+    </div>
+  </div>
+
+  <!-- Recent form dots + force bar -->
+  <div style="margin-top:12px; display:flex; gap:20px; align-items:center; flex-wrap:wrap;">
+    {f'''<div>
+      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Last 5 vs Line</span><br/>
+      {form_dots_html}
+    </div>''' if form_dots_html else ""}
+    <div style="flex:1; min-width:160px;">
+      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Over/Under Forces</span>
+      <div style="display:flex; margin-top:4px; height:8px; border-radius:4px; overflow:hidden; background:#2d3748;">
+        <div style="width:{over_bar_pct}%; background:#48bb78;"></div>
+        <div style="width:{100-over_bar_pct}%; background:#fc8181;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#718096; margin-top:2px;">
+        <span>⬆️ OVER ({len(over_forces)})</span>
+        <span>UNDER ({len(under_forces)}) ⬇️</span>
+      </div>
+    </div>
+    <!-- Distribution range -->
+    <div style="text-align:right;">
+      <span style="color:#718096; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px;">Range</span><br/>
+      <span style="color:#fc8181; font-size:0.8rem;">{p10:.1f}</span>
+      <span style="color:#718096; font-size:0.8rem;"> — </span>
+      <span style="color:#e2e8f0; font-size:0.8rem;">{p50:.1f}</span>
+      <span style="color:#718096; font-size:0.8rem;"> — </span>
+      <span style="color:#48bb78; font-size:0.8rem;">{p90:.1f}</span>
+      <div style="color:#718096; font-size:0.7rem;">10th / 50th / 90th</div>
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Detailed expander (forces breakdown, histogram)
+    with st.expander(f"🔍 Full Breakdown — {player} {stat}"):
         detail_col1, detail_col2, detail_col3 = st.columns(3)
 
         with detail_col1:
             st.markdown("**📊 Distribution**")
-            # Show percentile range
-            p10 = result.get("percentile_10", 0)
-            p50 = result.get("percentile_50", 0)
-            p90 = result.get("percentile_90", 0)
-            std = result.get("simulated_std", 0)
-
             st.caption(f"10th pct (bad game): **{p10:.1f}**")
             st.caption(f"50th pct (median): **{p50:.1f}**")
             st.caption(f"90th pct (great game): **{p90:.1f}**")
+            std = result.get("simulated_std", 0)
             st.caption(f"Simulated std dev: **{std:.1f}**")
 
-            # Simple text histogram
             histogram = result.get("histogram", [])
             if histogram:
                 max_count = max(b["count"] for b in histogram) or 1
                 st.markdown("**Distribution (█ = over line)**")
-                for bucket in histogram[-10:]:  # Show last 10 buckets only
+                for bucket in histogram[-10:]:
                     bar_length = int((bucket["count"] / max_count) * 15)
                     bar_char = "█" if bucket["is_over_line"] else "░"
                     bar = bar_char * bar_length
@@ -183,7 +341,6 @@ def display_prop_analysis_card(result):
 
         with detail_col2:
             st.markdown("**⬆️ Forces OVER**")
-            over_forces = result.get("forces", {}).get("over_forces", [])
             if over_forces:
                 for force in over_forces:
                     strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
@@ -194,7 +351,6 @@ def display_prop_analysis_card(result):
 
         with detail_col3:
             st.markdown("**⬇️ Forces UNDER**")
-            under_forces = result.get("forces", {}).get("under_forces", [])
             if under_forces:
                 for force in under_forces:
                     strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
@@ -203,18 +359,15 @@ def display_prop_analysis_card(result):
             else:
                 st.caption("No UNDER forces detected")
 
-        # Show avoid warning if applicable
         if result.get("should_avoid", False):
             st.warning("⚠️ **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
 
-        # Score breakdown
         breakdown = result.get("score_breakdown", {})
         if breakdown:
             st.markdown("**🔬 Confidence Score Breakdown**")
             breakdown_cols = st.columns(len(breakdown))
             for i, (factor, score) in enumerate(breakdown.items()):
                 with breakdown_cols[i]:
-                    # Format factor name nicely
                     factor_label = factor.replace("_score", "").replace("_", " ").title()
                     st.metric(factor_label, f"{score:.0f}/100")
 
@@ -421,9 +574,20 @@ if run_analysis:
             # Basic prop info
             "player_name": player_name,
             "team": player_team,
+            "player_team": player_team,
+            "player_position": player_data.get("position", ""),
             "stat_type": stat_type,
             "line": prop_line,
             "platform": platform,
+            # Season averages for display
+            "season_pts_avg": float(player_data.get("points_avg", 0) or 0),
+            "season_reb_avg": float(player_data.get("rebounds_avg", 0) or 0),
+            "season_ast_avg": float(player_data.get("assists_avg", 0) or 0),
+            "points_avg": float(player_data.get("points_avg", 0) or 0),
+            "rebounds_avg": float(player_data.get("rebounds_avg", 0) or 0),
+            "assists_avg": float(player_data.get("assists_avg", 0) or 0),
+            # Opponent context
+            "opponent": game_context.get("opponent", ""),
             # Simulation results
             "probability_over": round(probability_over, 4),
             "probability_under": round(1.0 - probability_over, 4),
@@ -451,6 +615,10 @@ if run_analysis:
             "histogram": histogram_data,
             # Score breakdown (for transparency)
             "score_breakdown": confidence_output.get("score_breakdown", {}),
+            # Line vs season average
+            "line_vs_avg_pct": prop.get("line_vs_avg_pct", 0),
+            # Recent form game results (if available in enriched prop)
+            "recent_form_results": prop.get("recent_form_results", []),
         }
 
         analysis_results_list.append(full_result)

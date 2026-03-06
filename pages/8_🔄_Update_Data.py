@@ -29,11 +29,12 @@ from data.data_manager import (
 # happen inside these functions. If nba_api is not installed, the
 # functions will show a friendly error message instead of crashing.
 from data.live_data_fetcher import (
-    fetch_todays_games,     # Fetch tonight's NBA games
-    fetch_player_stats,     # Fetch all player season averages
-    fetch_team_stats,       # Fetch all team stats + defensive ratings
-    fetch_all_data,         # Fetch everything at once
-    load_last_updated,      # Load timestamps from last_updated.json
+    fetch_todays_games,          # Fetch tonight's NBA games
+    fetch_player_stats,          # Fetch all player season averages
+    fetch_team_stats,            # Fetch all team stats + defensive ratings
+    fetch_all_data,              # Fetch everything at once
+    fetch_todays_players_only,   # Targeted: only today's team rosters
+    load_last_updated,           # Load timestamps from last_updated.json
 )
 
 # ============================================================
@@ -172,36 +173,64 @@ st.divider()
 
 st.subheader("🔧 Update Data")
 
-# BEGINNER NOTE: st.columns() creates side-by-side layout.
-# Here we make 4 equal-width columns for the 4 buttons.
+# ─── Smart Update (recommended) ─────────────────────────────
+st.markdown("""
+<div style="background:linear-gradient(135deg,#1a1a2e,#16213e); border:1px solid #0f3460; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">⚡ Smart Update — Today's Teams Only (Recommended)</div>
+  <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
+    Fetches team rosters using <code>CommonTeamRoster</code> (current, post-trade) 
+    then game logs for only those players. Takes <strong>1–2 minutes</strong> instead of 10–15.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+smart_col1, smart_col2 = st.columns([1, 3])
+with smart_col1:
+    if st.button(
+        "⚡ Smart Update (Today's Teams Only)",
+        use_container_width=True,
+        type="primary",
+        help="Fastest: fetches only players on teams playing tonight using current rosters",
+    ):
+        st.session_state["update_action"] = "smart"
+
+with smart_col2:
+    todays_games_for_hint = st.session_state.get("todays_games", [])
+    if todays_games_for_hint:
+        teams_playing = set()
+        for g in todays_games_for_hint:
+            teams_playing.add(g.get("home_team", ""))
+            teams_playing.add(g.get("away_team", ""))
+        teams_playing.discard("")
+        st.caption(f"Tonight's teams: {', '.join(sorted(teams_playing))}")
+    else:
+        st.caption("⚠️ Load tonight's games first (🏀 Today's Games page) for Smart Update to work.")
+
+st.markdown("---")
+st.markdown("**Full Updates (all 30 teams, takes 10–15 minutes):**")
+
 btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
 
-# Track which action the user clicked
-# BEGINNER NOTE: We use session state to remember what button was pressed
-# even after the page reruns (Streamlit reruns the script on every interaction)
 if "update_action" not in st.session_state:
-    st.session_state["update_action"] = None  # No action yet
+    st.session_state["update_action"] = None
 
 with btn_col1:
-    # Button to fetch tonight's games
     if st.button(
         "🏟️ Fetch Tonight's Games",
-        use_container_width=True,  # Fill the column width
+        use_container_width=True,
         help="Pull tonight's real NBA matchups automatically",
     ):
-        st.session_state["update_action"] = "games"  # Mark which action to run
+        st.session_state["update_action"] = "games"
 
 with btn_col2:
-    # Button to update player stats
     if st.button(
-        "👤 Update Player Stats",
+        "👤 Update Player Stats (All)",
         use_container_width=True,
-        help="Pull current season averages for all NBA players",
+        help="Pull current season averages for ALL NBA players (~500, slow)",
     ):
         st.session_state["update_action"] = "players"
 
 with btn_col3:
-    # Button to update team stats
     if st.button(
         "🏆 Update Team Stats",
         use_container_width=True,
@@ -210,12 +239,10 @@ with btn_col3:
         st.session_state["update_action"] = "teams"
 
 with btn_col4:
-    # Button to update everything at once
     if st.button(
-        "🔄 Update Everything",
+        "🔄 Update Everything (Full)",
         use_container_width=True,
-        type="primary",  # Highlighted button style
-        help="Update all data: games, players, and teams",
+        help="Update all data: games, all players, and teams (slow)",
     ):
         st.session_state["update_action"] = "all"
 
@@ -237,9 +264,65 @@ if current_action:
     st.divider()
 
     # --------------------------------------------------------
+    # Action: Smart Update (today's teams only)
+    # --------------------------------------------------------
+    if current_action == "smart":
+        st.subheader("⚡ Smart Update — Today's Teams Only")
+
+        todays_games_for_smart = st.session_state.get("todays_games", [])
+
+        if not todays_games_for_smart:
+            st.warning(
+                "⚠️ No games loaded yet. Please go to 🏀 **Today's Games** first and "
+                "click 'Auto-Load Tonight's Games', then come back here."
+            )
+            st.session_state["update_action"] = None
+        else:
+            # Show which teams we'll fetch
+            teams_set = set()
+            for g in todays_games_for_smart:
+                teams_set.add(g.get("home_team", ""))
+                teams_set.add(g.get("away_team", ""))
+            teams_set.discard("")
+            st.info(f"Fetching current rosters for: **{', '.join(sorted(teams_set))}**")
+
+            progress_bar = st.progress(0, text="Starting smart update...")
+            status_text = st.empty()
+
+            def smart_progress(current, total, message):
+                frac = current / max(total, 1)
+                progress_bar.progress(frac, text=message)
+                status_text.caption(message)
+
+            with st.spinner("Fetching today's team rosters and player stats..."):
+                success = fetch_todays_players_only(
+                    todays_games_for_smart,
+                    progress_callback=smart_progress
+                )
+
+            st.session_state["update_action"] = None
+            progress_bar.empty()
+            status_text.empty()
+
+            if success:
+                from data.data_manager import load_players_data
+                updated_players = load_players_data()
+                st.success(
+                    f"✅ Smart Update complete! Loaded **{len(updated_players)} players** "
+                    f"from today's {len(todays_games_for_smart)} game(s). "
+                    f"Only current roster players — no traded players!"
+                )
+                st.caption(f"Teams fetched: {', '.join(sorted(teams_set))}")
+            else:
+                st.error(
+                    "❌ Smart Update failed. Check your internet connection or try again.\n"
+                    "You can still use the full 'Update Player Stats' button as a fallback."
+                )
+
+    # --------------------------------------------------------
     # Action: Fetch Tonight's Games
     # --------------------------------------------------------
-    if current_action == "games":
+    elif current_action == "games":
         st.subheader("🏟️ Fetching Tonight's Games...")
 
         # Show a spinner while we fetch
