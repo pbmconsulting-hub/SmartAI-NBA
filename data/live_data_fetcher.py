@@ -260,6 +260,19 @@ def fetch_todays_games():
             if not home_abbrev or not away_abbrev:
                 continue
 
+            # Extract W-L records from scoreboard if available
+            home_wins = home_team_info.get("wins", 0) or 0
+            home_losses = home_team_info.get("losses", 0) or 0
+            away_wins = away_team_info.get("wins", 0) or 0
+            away_losses = away_team_info.get("losses", 0) or 0
+
+            home_record = f"{home_wins}-{home_losses}" if (home_wins or home_losses) else ""
+            away_record = f"{away_wins}-{away_losses}" if (away_wins or away_losses) else ""
+
+            # Game time from the scoreboard
+            game_time = game.get("gameTimeUTC", "")
+            game_status = game.get("gameStatusText", "")
+
             # Build a game dictionary in the format our app expects
             # BEGINNER NOTE: We use default values for spread/total
             # because the live scoreboard doesn't include Vegas lines
@@ -269,6 +282,12 @@ def fetch_todays_games():
                 "away_team": away_abbrev,                        # e.g. "GSW"
                 "home_team_full": f"{home_abbrev} — {home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}",
                 "away_team_full": f"{away_abbrev} — {away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}",
+                "home_team_name": f"{home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}".strip(),
+                "away_team_name": f"{away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}".strip(),
+                "home_record": home_record,
+                "away_record": away_record,
+                "game_time": game_time,
+                "game_status": game_status,
                 "vegas_spread": 0.0,    # Default: pick'em (user can edit)
                 "game_total": 220.0,    # Default total (user can edit)
                 "game_date": datetime.date.today().isoformat(),  # Today's date
@@ -1017,4 +1036,351 @@ def fetch_all_data(progress_callback=None):
 
 # ============================================================
 # END SECTION: Full Update Function
+# ============================================================
+
+
+# ============================================================
+# SECTION: Targeted Today's Players Fetcher
+# Only fetches players/stats for teams playing today.
+# Much faster than the full fetch (1-2 min vs 15 min).
+# ============================================================
+
+def fetch_todays_players_only(todays_games, progress_callback=None):
+    """
+    Fetch player stats ONLY for teams playing today.
+
+    Instead of fetching all ~500 NBA players, this function:
+    1. Looks at which teams are playing tonight
+    2. Uses commonteamroster to get CURRENT rosters (post-trade)
+    3. Fetches playergamelog for just those players
+    4. Saves only those players to sample_players.csv
+
+    This reflects trades/signings and runs in 1-2 minutes.
+
+    Args:
+        todays_games (list of dict): Tonight's games from fetch_todays_games()
+        progress_callback (callable, optional): Progress update function.
+
+    Returns:
+        bool: True if successful, False if the fetch failed.
+    """
+    try:
+        from nba_api.stats.endpoints import commonteamroster
+        from nba_api.stats.endpoints import playergamelog
+        from nba_api.stats.static import teams as nba_teams_static
+    except ImportError:
+        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        return False
+
+    if not todays_games:
+        print("No today's games provided — nothing to fetch.")
+        return False
+
+    try:
+        # --------------------------------------------------------
+        # Step 1: Collect all team abbreviations playing tonight
+        # --------------------------------------------------------
+        playing_team_abbrevs = set()
+        for game in todays_games:
+            home = game.get("home_team", "")
+            away = game.get("away_team", "")
+            if home:
+                playing_team_abbrevs.add(home)
+            if away:
+                playing_team_abbrevs.add(away)
+
+        print(f"Teams playing tonight: {sorted(playing_team_abbrevs)}")
+
+        if progress_callback:
+            progress_callback(1, 10, f"Found {len(playing_team_abbrevs)} teams playing tonight. Fetching rosters...")
+
+        # --------------------------------------------------------
+        # Step 2: Build a lookup from abbreviation → nba_api team ID
+        # --------------------------------------------------------
+        all_nba_teams = nba_teams_static.get_teams()
+        abbrev_to_team_id = {}
+        for t in all_nba_teams:
+            abbrev = t.get("abbreviation", "")
+            # Normalize our abbreviation variants
+            normalized = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
+            abbrev_to_team_id[normalized] = t.get("id")
+            abbrev_to_team_id[abbrev] = t.get("id")  # also store original
+
+        # --------------------------------------------------------
+        # Step 3: Fetch current rosters for all playing teams
+        # --------------------------------------------------------
+        all_players_to_fetch = []  # list of (player_id, player_name, team_abbrev)
+
+        for team_idx, team_abbrev in enumerate(sorted(playing_team_abbrevs)):
+            if progress_callback:
+                progress_callback(
+                    1 + team_idx,
+                    1 + len(playing_team_abbrevs) + 5,
+                    f"Fetching roster for {team_abbrev}...",
+                )
+
+            team_id = abbrev_to_team_id.get(team_abbrev)
+            if not team_id:
+                print(f"  Could not find team ID for {team_abbrev}, skipping.")
+                continue
+
+            try:
+                roster_endpoint = commonteamroster.CommonTeamRoster(
+                    team_id=team_id,
+                )
+                roster_data = roster_endpoint.get_data_frames()[0].to_dict("records")
+                time.sleep(API_DELAY_SECONDS)
+
+                for player_row in roster_data:
+                    player_id = player_row.get("PLAYER_ID")
+                    player_name = player_row.get("PLAYER", "")
+                    if player_id and player_name:
+                        all_players_to_fetch.append((player_id, player_name, team_abbrev))
+
+                print(f"  {team_abbrev}: {len(roster_data)} players on current roster")
+
+            except Exception as roster_err:
+                print(f"  Error fetching roster for {team_abbrev}: {roster_err}")
+
+        print(f"Total players to fetch stats for: {len(all_players_to_fetch)}")
+
+        if not all_players_to_fetch:
+            print("No players found from rosters.")
+            return False
+
+        if progress_callback:
+            progress_callback(
+                1 + len(playing_team_abbrevs),
+                1 + len(playing_team_abbrevs) + 5,
+                f"Fetching game logs for {len(all_players_to_fetch)} players...",
+            )
+
+        # --------------------------------------------------------
+        # Step 4: Fetch game logs for each player to get stats + std devs
+        # --------------------------------------------------------
+        formatted_players = []
+        total_players = len(all_players_to_fetch)
+
+        for player_idx, (player_id, player_name, team_abbrev) in enumerate(all_players_to_fetch):
+            if player_idx % 5 == 0 and progress_callback:
+                progress_callback(
+                    1 + len(playing_team_abbrevs) + int(4 * player_idx / max(total_players, 1)),
+                    1 + len(playing_team_abbrevs) + 5,
+                    f"Processing {player_name} ({player_idx + 1}/{total_players})...",
+                )
+
+            try:
+                game_log_endpoint = playergamelog.PlayerGameLog(
+                    player_id=player_id,
+                    season_type_all_star="Regular Season",
+                )
+                game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+                time.sleep(API_DELAY_SECONDS)
+
+                # Skip players with fewer than 3 games (inactive/injured)
+                if len(game_log_data) < 3:
+                    continue
+
+                # Take last 20 games for averages and std devs
+                recent_games = game_log_data[:20]
+
+                def safe_avg(lst):
+                    return round(sum(lst) / len(lst), 2) if lst else 0.0
+
+                def safe_std(lst):
+                    if len(lst) < 2:
+                        return 0.0
+                    return round(statistics.stdev(lst), 2)
+
+                pts_list = [float(g.get("PTS", 0) or 0) for g in recent_games]
+                reb_list = [float(g.get("REB", 0) or 0) for g in recent_games]
+                ast_list = [float(g.get("AST", 0) or 0) for g in recent_games]
+                fg3m_list = [float(g.get("FG3M", 0) or 0) for g in recent_games]
+                stl_list = [float(g.get("STL", 0) or 0) for g in recent_games]
+                blk_list = [float(g.get("BLK", 0) or 0) for g in recent_games]
+                tov_list = [float(g.get("TOV", 0) or 0) for g in recent_games]
+                min_list = [float(g.get("MIN", 0) or 0) for g in recent_games]
+                ft_pct_list = [float(g.get("FT_PCT", 0) or 0) for g in recent_games]
+
+                points_avg = safe_avg(pts_list)
+                rebounds_avg = safe_avg(reb_list)
+                assists_avg = safe_avg(ast_list)
+                threes_avg = safe_avg(fg3m_list)
+                steals_avg = safe_avg(stl_list)
+                blocks_avg = safe_avg(blk_list)
+                turnovers_avg = safe_avg(tov_list)
+                minutes_avg = safe_avg(min_list)
+                ft_pct = safe_avg(ft_pct_list)
+
+                # Estimate usage from minutes
+                usage_rate = min(35.0, max(10.0, minutes_avg * 0.8))
+
+                # Position from game log (not available here, default to SF)
+                formatted_player = {
+                    "name": player_name,
+                    "team": team_abbrev,
+                    "position": "SF",
+                    "minutes_avg": round(minutes_avg, 1),
+                    "points_avg": round(points_avg, 1),
+                    "rebounds_avg": round(rebounds_avg, 1),
+                    "assists_avg": round(assists_avg, 1),
+                    "threes_avg": round(threes_avg, 1),
+                    "steals_avg": round(steals_avg, 1),
+                    "blocks_avg": round(blocks_avg, 1),
+                    "turnovers_avg": round(turnovers_avg, 1),
+                    "ft_pct": round(ft_pct, 3),
+                    "usage_rate": round(usage_rate, 1),
+                    "points_std": safe_std(pts_list),
+                    "rebounds_std": safe_std(reb_list),
+                    "assists_std": safe_std(ast_list),
+                    "threes_std": safe_std(fg3m_list),
+                    "steals_std": safe_std(stl_list),
+                    "blocks_std": safe_std(blk_list),
+                    "turnovers_std": safe_std(tov_list),
+                }
+                formatted_players.append(formatted_player)
+
+            except Exception as player_err:
+                print(f"  Error processing {player_name}: {player_err}")
+
+        # --------------------------------------------------------
+        # Step 5: Sort and save
+        # --------------------------------------------------------
+        formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
+
+        if progress_callback:
+            progress_callback(
+                1 + len(playing_team_abbrevs) + 5,
+                1 + len(playing_team_abbrevs) + 5,
+                f"Saving {len(formatted_players)} players to CSV...",
+            )
+
+        fieldnames = [
+            "name", "team", "position", "minutes_avg",
+            "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
+            "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
+            "usage_rate", "points_std", "rebounds_std", "assists_std",
+            "threes_std", "steals_std", "blocks_std", "turnovers_std",
+        ]
+
+        with open(PLAYERS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(formatted_players)
+
+        save_last_updated("players")
+
+        print(f"Saved {len(formatted_players)} players (today's teams only) to {PLAYERS_CSV_PATH}")
+        return True
+
+    except Exception as error:
+        print(f"Error in fetch_todays_players_only: {error}")
+        return False
+
+# ============================================================
+# END SECTION: Targeted Today's Players Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Recent Form Fetcher
+# Fetch the last N game logs for a player and return
+# averages, trend, and game-by-game breakdown.
+# ============================================================
+
+def fetch_player_recent_form(player_id, last_n_games=10):
+    """
+    Fetch the last N game logs for a player and return recent form.
+
+    Returns recent averages, hot/cold trend, and game-by-game breakdown
+    to power the 'Recent Form' display in the UI.
+
+    Args:
+        player_id (int or str): The NBA player's unique ID
+        last_n_games (int): How many recent games to look at (default: 10)
+
+    Returns:
+        dict: {
+            'games': [...],           # List of recent game dicts
+            'recent_pts_avg': float,  # Recent PPG
+            'recent_reb_avg': float,  # Recent RPG
+            'recent_ast_avg': float,  # Recent APG
+            'trend': str,             # 'hot', 'cold', or 'neutral'
+            'trend_emoji': str,       # '🔥', '❄️', or '➡️'
+            'last_5_pts': [...],      # Last 5 game point totals
+        }
+    """
+    try:
+        from nba_api.stats.endpoints import playergamelog
+    except ImportError:
+        print("ERROR: nba_api is not installed.")
+        return {}
+
+    try:
+        game_log_endpoint = playergamelog.PlayerGameLog(
+            player_id=player_id,
+            season_type_all_star="Regular Season",
+        )
+        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+        time.sleep(API_DELAY_SECONDS)
+
+        recent = game_log_data[:last_n_games]
+        if not recent:
+            return {}
+
+        pts_list = [float(g.get("PTS", 0) or 0) for g in recent]
+        reb_list = [float(g.get("REB", 0) or 0) for g in recent]
+        ast_list = [float(g.get("AST", 0) or 0) for g in recent]
+
+        recent_pts_avg = round(sum(pts_list) / len(pts_list), 1) if pts_list else 0
+        recent_reb_avg = round(sum(reb_list) / len(reb_list), 1) if reb_list else 0
+        recent_ast_avg = round(sum(ast_list) / len(ast_list), 1) if ast_list else 0
+
+        # Trend: compare last 5 games vs. prior 5 games
+        if len(pts_list) >= 6:
+            last5_avg = sum(pts_list[:5]) / 5
+            prev_slice = pts_list[5:min(10, len(pts_list))]
+            prev5_avg = sum(prev_slice) / len(prev_slice)
+            if last5_avg >= prev5_avg * 1.10:
+                trend = "hot"
+                trend_emoji = "🔥"
+            elif last5_avg <= prev5_avg * 0.90:
+                trend = "cold"
+                trend_emoji = "❄️"
+            else:
+                trend = "neutral"
+                trend_emoji = "➡️"
+        else:
+            trend = "neutral"
+            trend_emoji = "➡️"
+
+        games_formatted = []
+        for g in recent:
+            games_formatted.append({
+                "game_date": g.get("GAME_DATE", ""),
+                "matchup": g.get("MATCHUP", ""),
+                "win_loss": g.get("WL", ""),
+                "pts": float(g.get("PTS", 0) or 0),
+                "reb": float(g.get("REB", 0) or 0),
+                "ast": float(g.get("AST", 0) or 0),
+                "fg3m": float(g.get("FG3M", 0) or 0),
+                "min": float(g.get("MIN", 0) or 0),
+            })
+
+        return {
+            "games": games_formatted,
+            "recent_pts_avg": recent_pts_avg,
+            "recent_reb_avg": recent_reb_avg,
+            "recent_ast_avg": recent_ast_avg,
+            "trend": trend,
+            "trend_emoji": trend_emoji,
+            "last_5_pts": pts_list[:5],
+        }
+
+    except Exception as error:
+        print(f"Error fetching recent form for player {player_id}: {error}")
+        return {}
+
+# ============================================================
+# END SECTION: Recent Form Fetcher
 # ============================================================
