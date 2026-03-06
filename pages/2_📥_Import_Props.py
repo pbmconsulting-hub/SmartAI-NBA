@@ -18,6 +18,8 @@ from data.data_manager import (
     get_all_player_names,
     parse_props_from_csv_text,
     get_csv_template,
+    find_player_by_name,
+    enrich_prop_with_player_data,
 )
 
 # ============================================================
@@ -29,6 +31,31 @@ st.set_page_config(
     page_icon="📥",
     layout="wide",
 )
+
+# Custom CSS for platform color coding
+st.markdown("""
+<style>
+.platform-tag {
+    display: inline-block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 5px;
+    color: white;
+}
+.platform-PrizePicks { background: #27ae60; }
+.platform-Underdog   { background: #8e44ad; }
+.platform-DraftKings { background: #2980b9; }
+.prop-highlight {
+    background: rgba(243,156,18,0.15);
+    border-left: 3px solid #f39c12;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    color: #f6ad55;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.title("📥 Import Props")
 st.markdown("Enter prop lines manually or upload a CSV. Sample props are pre-loaded!")
@@ -67,38 +94,69 @@ current_props = load_props_from_session(st.session_state)
 st.subheader(f"📋 Current Props ({len(current_props)} loaded)")
 
 if current_props:
-    # Show the props in a formatted table
-    # Create display data with formatted values
+    # Enrich props with player averages for context
+    enriched_props = [enrich_prop_with_player_data(p, players_data) for p in current_props]
+
+    # Build display rows with season avg context and difference flags
     display_rows = []
-    for i, prop in enumerate(current_props):
+    for i, prop in enumerate(enriched_props):
+        season_avg = prop.get("player_season_avg", 0)
+        line_val = float(prop.get("line", 0) or 0)
+        team = prop.get("player_team") or prop.get("team", "")
+        platform = prop.get("platform", "")
+
+        # Flag if line is significantly above/below season average
+        diff_flag = ""
+        if season_avg and season_avg > 0:
+            diff = line_val - season_avg
+            pct_diff = diff / season_avg * 100
+            if abs(pct_diff) >= 15:
+                diff_flag = f"{'▲' if diff > 0 else '▼'} {abs(pct_diff):.0f}% vs avg"
+
         display_rows.append({
             "#": i + 1,
-            "Player": prop.get("player_name", prop.get("player_name", "")),
-            "Team": prop.get("team", ""),
+            "Player": prop.get("player_name", ""),
+            "Team": team,
             "Stat": prop.get("stat_type", "").capitalize(),
-            "Line": prop.get("line", ""),
-            "Platform": prop.get("platform", ""),
+            "Line": line_val,
+            "Season Avg": round(season_avg, 1) if season_avg else "—",
+            "vs Avg": diff_flag if diff_flag else "—",
+            "Platform": platform,
             "Date": prop.get("game_date", ""),
         })
 
-    # Display as a table
-    # BEGINNER NOTE: st.dataframe makes a scrollable, sortable table
     st.dataframe(
         display_rows,
         use_container_width=True,
         hide_index=True,
+        column_config={
+            "vs Avg": st.column_config.TextColumn(
+                "vs Avg",
+                help="Line vs player's season average — flag if >15% off",
+            ),
+            "Platform": st.column_config.TextColumn("Platform"),
+        },
     )
 
-    # Buttons to manage current props
+    # Platform color legend
+    st.markdown(
+        '<small>'
+        '<span class="platform-tag platform-PrizePicks">PrizePicks</span> &nbsp;'
+        '<span class="platform-tag platform-Underdog">Underdog</span> &nbsp;'
+        '<span class="platform-tag platform-DraftKings">DraftKings</span>'
+        '</small>',
+        unsafe_allow_html=True,
+    )
+    st.caption("*'vs Avg' flags lines that are ≥15% above or below the player's season average.*")
+
     col_clear, col_load_sample, _ = st.columns([1, 1, 3])
     with col_clear:
         if st.button("🗑️ Clear All Props"):
             st.session_state["current_props"] = []
-            st.session_state["analysis_results"] = []  # Clear old results too
+            st.session_state["analysis_results"] = []
             st.rerun()
     with col_load_sample:
         if st.button("📦 Load Sample Props"):
-            # Reset to sample data
             sample_props = load_props_data()
             save_props_to_session(sample_props, st.session_state)
             st.success(f"Loaded {len(sample_props)} sample props!")

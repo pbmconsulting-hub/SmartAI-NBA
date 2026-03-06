@@ -248,6 +248,99 @@ def get_team_by_abbreviation(teams_list, abbreviation):
 
 
 # ============================================================
+# SECTION: Today's Active Players Helpers
+# ============================================================
+
+def find_players_by_team(players_list, team_abbrev):
+    """
+    Return all players on a given team.
+
+    Args:
+        players_list (list of dict): Loaded player data
+        team_abbrev (str): 3-letter team abbreviation, e.g. 'LAL'
+
+    Returns:
+        list of dict: Players whose team matches team_abbrev
+    """
+    abbrev_upper = team_abbrev.upper().strip()
+    return [
+        p for p in players_list
+        if p.get("team", "").upper().strip() == abbrev_upper
+    ]
+
+
+def get_todays_active_players(players_list, todays_games):
+    """
+    Return only players on teams that are playing today.
+
+    Args:
+        players_list (list of dict): All loaded player data
+        todays_games (list of dict): Tonight's games from session state
+
+    Returns:
+        list of dict: Players whose teams appear in tonight's games
+    """
+    # Collect all playing team abbreviations
+    playing_teams = set()
+    for game in todays_games:
+        home = game.get("home_team", "")
+        away = game.get("away_team", "")
+        if home:
+            playing_teams.add(home.upper())
+        if away:
+            playing_teams.add(away.upper())
+
+    if not playing_teams:
+        return players_list  # If no games set up, return everyone
+
+    return [
+        p for p in players_list
+        if p.get("team", "").upper() in playing_teams
+    ]
+
+
+def enrich_prop_with_player_data(prop, players_list):
+    """
+    Add player season averages to a prop dict for quick context.
+
+    Args:
+        prop (dict): A prop dict with 'player_name' key
+        players_list (list of dict): Loaded player data
+
+    Returns:
+        dict: The prop dict enriched with player stat fields,
+              or the original prop if no player data found
+    """
+    player_name = prop.get("player_name", "")
+    if not player_name:
+        return prop
+
+    player_data = find_player_by_name(players_list, player_name)
+    if not player_data:
+        return prop
+
+    # Build enriched copy without modifying original
+    enriched = dict(prop)
+    stat_type = prop.get("stat_type", "points").lower()
+
+    # Add the player's season average for the prop's stat type
+    avg_key = f"{stat_type}_avg"
+    enriched["player_season_avg"] = float(player_data.get(avg_key, 0) or 0)
+    enriched["player_team"] = player_data.get("team", prop.get("team", ""))
+    enriched["player_position"] = player_data.get("position", "")
+    enriched["player_minutes_avg"] = float(player_data.get("minutes_avg", 0) or 0)
+    enriched["player_points_avg"] = float(player_data.get("points_avg", 0) or 0)
+    enriched["player_rebounds_avg"] = float(player_data.get("rebounds_avg", 0) or 0)
+    enriched["player_assists_avg"] = float(player_data.get("assists_avg", 0) or 0)
+
+    return enriched
+
+# ============================================================
+# END SECTION: Today's Active Players Helpers
+# ============================================================
+
+
+# ============================================================
 # SECTION: Props Management
 # ============================================================
 

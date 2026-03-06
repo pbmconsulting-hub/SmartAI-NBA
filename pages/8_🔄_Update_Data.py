@@ -29,11 +29,12 @@ from data.data_manager import (
 # happen inside these functions. If nba_api is not installed, the
 # functions will show a friendly error message instead of crashing.
 from data.live_data_fetcher import (
-    fetch_todays_games,     # Fetch tonight's NBA games
-    fetch_player_stats,     # Fetch all player season averages
-    fetch_team_stats,       # Fetch all team stats + defensive ratings
-    fetch_all_data,         # Fetch everything at once
-    load_last_updated,      # Load timestamps from last_updated.json
+    fetch_todays_games,          # Fetch tonight's NBA games
+    fetch_player_stats,          # Fetch all player season averages
+    fetch_team_stats,            # Fetch all team stats + defensive ratings
+    fetch_all_data,              # Fetch everything at once
+    fetch_todays_players_only,   # Fetch players for tonight's teams only (fast!)
+    load_last_updated,           # Load timestamps from last_updated.json
 )
 
 # ============================================================
@@ -173,30 +174,38 @@ st.divider()
 st.subheader("🔧 Update Data")
 
 # BEGINNER NOTE: st.columns() creates side-by-side layout.
-# Here we make 4 equal-width columns for the 4 buttons.
-btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
+# Here we make 5 equal-width columns for the 5 buttons.
+btn_col0, btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(5)
 
 # Track which action the user clicked
-# BEGINNER NOTE: We use session state to remember what button was pressed
-# even after the page reruns (Streamlit reruns the script on every interaction)
 if "update_action" not in st.session_state:
-    st.session_state["update_action"] = None  # No action yet
+    st.session_state["update_action"] = None
+
+with btn_col0:
+    # NEW: Targeted fetch for today's teams only
+    if st.button(
+        "⚡ Today's Players Only",
+        use_container_width=True,
+        type="primary",
+        help="Fetch player stats ONLY for tonight's teams. Uses current rosters (no traded players). Runs in 1-2 min!",
+    ):
+        st.session_state["update_action"] = "todays_players"
 
 with btn_col1:
     # Button to fetch tonight's games
     if st.button(
         "🏟️ Fetch Tonight's Games",
-        use_container_width=True,  # Fill the column width
+        use_container_width=True,
         help="Pull tonight's real NBA matchups automatically",
     ):
-        st.session_state["update_action"] = "games"  # Mark which action to run
+        st.session_state["update_action"] = "games"
 
 with btn_col2:
     # Button to update player stats
     if st.button(
-        "👤 Update Player Stats",
+        "👤 Update All Player Stats",
         use_container_width=True,
-        help="Pull current season averages for all NBA players",
+        help="Pull current season averages for ALL NBA players (slow: 5-15 min)",
     ):
         st.session_state["update_action"] = "players"
 
@@ -214,10 +223,16 @@ with btn_col4:
     if st.button(
         "🔄 Update Everything",
         use_container_width=True,
-        type="primary",  # Highlighted button style
-        help="Update all data: games, players, and teams",
+        help="Update all data: games, all players, and teams (slow: 10-20 min)",
     ):
         st.session_state["update_action"] = "all"
+
+# Speed guide callout
+st.info(
+    "⚡ **Recommended:** Use **Today's Players Only** before each session. "
+    "It fetches CURRENT rosters for tonight's teams (1-2 min, no traded players). "
+    "Use **Update All Player Stats** only if you need the full database."
+)
 
 # ============================================================
 # END SECTION: Update Action Buttons
@@ -237,9 +252,51 @@ if current_action:
     st.divider()
 
     # --------------------------------------------------------
+    # Action: Fetch Today's Players Only (fast, targeted)
+    # --------------------------------------------------------
+    if current_action == "todays_players":
+        st.subheader("⚡ Fetching Players for Tonight's Teams Only...")
+
+        todays_games_for_fetch = st.session_state.get("todays_games", [])
+
+        if not todays_games_for_fetch:
+            st.warning(
+                "⚠️ No tonight's games loaded. "
+                "Go to **🏀 Today's Games** first and load tonight's matchups, "
+                "then come back here to fetch players."
+            )
+            st.session_state["update_action"] = None
+        else:
+            progress_bar = st.progress(0, text="Starting targeted player fetch...")
+
+            def targeted_progress(current, total, message):
+                frac = min(current / max(total, 1), 1.0)
+                progress_bar.progress(frac, text=message)
+
+            success = fetch_todays_players_only(
+                todays_games_for_fetch,
+                progress_callback=targeted_progress,
+            )
+            progress_bar.empty()
+            st.session_state["update_action"] = None
+
+            if success:
+                from data.data_manager import load_players_data as _reload_players
+                refreshed = _reload_players()
+                st.success(
+                    f"✅ Fetched player data for tonight's {len(todays_games_for_fetch)} game(s)! "
+                    f"**{len(refreshed)} players** saved (current rosters only, no traded players)."
+                )
+            else:
+                st.error(
+                    "❌ Could not fetch player data. Check your internet connection "
+                    "or try the full **Update All Player Stats** option."
+                )
+
+    # --------------------------------------------------------
     # Action: Fetch Tonight's Games
     # --------------------------------------------------------
-    if current_action == "games":
+    elif current_action == "games":
         st.subheader("🏟️ Fetching Tonight's Games...")
 
         # Show a spinner while we fetch

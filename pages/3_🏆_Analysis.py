@@ -37,6 +37,83 @@ st.set_page_config(
     layout="wide",
 )
 
+# Custom CSS for rich analysis cards
+st.markdown("""
+<style>
+.analysis-card {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 12px;
+    border-left: 5px solid #e94560;
+    color: #ffffff;
+}
+.analysis-card.platinum { border-left-color: #9b59b6; }
+.analysis-card.gold     { border-left-color: #f39c12; }
+.analysis-card.silver   { border-left-color: #95a5a6; }
+.analysis-card.bronze   { border-left-color: #cd6836; }
+.player-header {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+.team-badge {
+    display: inline-block;
+    background: #e94560;
+    color: white;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 2px 8px;
+    border-radius: 5px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.team-badge.platinum { background: #9b59b6; }
+.team-badge.gold     { background: #f39c12; color: #1a1a2e; }
+.team-badge.silver   { background: #95a5a6; color: #1a1a2e; }
+.team-badge.bronze   { background: #cd6836; }
+.tier-badge {
+    display: inline-block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 8px;
+    margin-left: 8px;
+}
+.tier-badge.platinum { background: rgba(155,89,182,0.25); color: #c39bd3; border: 1px solid #9b59b6; }
+.tier-badge.gold     { background: rgba(243,156,18,0.25); color: #f8c471; border: 1px solid #f39c12; }
+.tier-badge.silver   { background: rgba(149,165,166,0.25); color: #d5dbdb; border: 1px solid #95a5a6; }
+.tier-badge.bronze   { background: rgba(205,104,54,0.25); color: #e59866; border: 1px solid #cd6836; }
+.prob-bar-outer {
+    background: rgba(255,255,255,0.1);
+    border-radius: 6px;
+    height: 14px;
+    width: 100%;
+    margin-top: 4px;
+}
+.prob-bar-inner {
+    height: 14px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #e94560, #f39c12);
+}
+.matchup-line {
+    color: #a0aec0;
+    font-size: 0.88rem;
+    margin-top: 3px;
+}
+.stat-box {
+    background: rgba(255,255,255,0.07);
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: center;
+}
+.stat-box .stat-val { font-size: 1.2rem; font-weight: 700; color: #f6e58d; }
+.stat-box .stat-lbl { font-size: 0.75rem; color: #a0aec0; }
+.form-dot-over  { color: #68d391; font-size: 1.1rem; }
+.form-dot-under { color: #fc8181; font-size: 1.1rem; }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("🏆 Analysis")
 st.markdown("Run the Monte Carlo simulation to find the highest-probability picks.")
 st.divider()
@@ -101,13 +178,14 @@ def find_game_context_for_player(player_team, todays_games_list):
 
 def display_prop_analysis_card(result):
     """
-    Display a formatted analysis card for one prop result.
+    Display a rich, styled analysis card for one prop result.
 
     Args:
         result (dict): Full analysis result from the simulation loop
     """
     # Extract key values for display
     player = result.get("player_name", "Unknown")
+    team = result.get("team", "")
     stat = result.get("stat_type", "").capitalize()
     line = result.get("line", 0)
     direction = result.get("direction", "OVER")
@@ -117,65 +195,120 @@ def display_prop_analysis_card(result):
     edge = result.get("edge_percentage", 0)
     confidence = result.get("confidence_score", 50)
     platform = result.get("platform", "")
+    proj = result.get("adjusted_projection", 0)
+    opponent = result.get("opponent", "")
 
-    # Arrow emoji for direction
     direction_arrow = "⬆️" if direction == "OVER" else "⬇️"
+    prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
+    edge_display = abs(edge)
+    tier_lower = tier.lower()
 
-    # Column layout: player info | probability | edge | tier
-    header_col, prob_col, edge_col, tier_col = st.columns([3, 2, 2, 2])
+    # Platform color badge
+    platform_colors = {
+        "PrizePicks": "#27ae60",
+        "Underdog": "#8e44ad",
+        "DraftKings": "#2980b9",
+    }
+    platform_color = platform_colors.get(platform, "#555")
 
-    with header_col:
-        st.markdown(f"### {player}")
-        st.caption(f"{platform} | {stat} | Line: **{line}**")
-        proj = result.get("adjusted_projection", 0)
-        st.caption(f"📐 Tonight's projection: **{proj}**")
+    # Matchup line
+    matchup_str = f"{team} vs {opponent}" if opponent else team
+    if not team:
+        matchup_str = player
 
-    with prob_col:
-        # Display probability prominently
-        prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
-        st.metric(
-            label=f"{direction_arrow} {direction} Probability",
-            value=f"{prob_pct:.1f}%",
-        )
+    # Probability bar width
+    prob_bar_width = int(min(max(prob_pct, 10), 95))
 
-    with edge_col:
-        edge_display = abs(edge)
-        st.metric(
-            label="Edge",
-            value=f"+{edge_display:.1f}%",
-            help="How far above 50% our probability is",
-        )
+    # Recent form last 5 pts (if stored)
+    last_5 = result.get("last_5_pts", [])
+    form_dots_html = ""
+    if last_5:
+        dots = []
+        for pts_val in last_5[:5]:
+            # Compare each game to the prop line
+            if float(pts_val) >= float(line):
+                dots.append('<span class="form-dot-over">🟢</span>')
+            else:
+                dots.append('<span class="form-dot-under">🔴</span>')
+        form_dots_html = " ".join(dots) + f" <small style='color:#a0aec0;'>vs {line} line</small>"
 
-    with tier_col:
-        st.metric(
-            label="Confidence",
-            value=f"{tier_emoji} {tier}",
-            delta=f"{confidence:.0f}/100",
-        )
+    # Card HTML header
+    card_html = f"""
+<div class="analysis-card {tier_lower}">
+  <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+    <span class="player-header">{player}</span>
+    <span class="team-badge {tier_lower}">{team}</span>
+    <span class="tier-badge {tier_lower}">{tier_emoji} {tier}</span>
+    <span style="margin-left:auto; background:{platform_color}; color:white; font-size:0.78rem; padding:2px 8px; border-radius:5px;">{platform}</span>
+  </div>
+  <div class="matchup-line">{matchup_str} &nbsp;|&nbsp; {stat} Line: <b>{line}</b> &nbsp;|&nbsp; Proj: <b>{proj}</b></div>
+  {f'<div style="margin-top:4px; font-size:0.85rem; color:#a0aec0;">Last 5: {form_dots_html}</div>' if form_dots_html else ''}
+  <div style="margin-top:10px;">
+    <div style="display:flex; align-items:center; gap:6px; font-size:0.95rem; font-weight:600; color:#ffffff;">
+      {direction_arrow} {direction}: <span style="font-size:1.4rem; color:#f6e58d;">{prob_pct:.1f}%</span>
+      &nbsp;|&nbsp; Edge: <span style="color:#68d391;">+{edge_display:.1f}%</span>
+      &nbsp;|&nbsp; Score: <span style="color:#63b3ed;">{confidence:.0f}/100</span>
+    </div>
+    <div class="prob-bar-outer"><div class="prob-bar-inner" style="width:{prob_bar_width}%;"></div></div>
+  </div>
+</div>
+"""
+    st.markdown(card_html, unsafe_allow_html=True)
 
     # Expander for detailed breakdown
-    with st.expander(f"🔍 View Full Analysis — {player} {stat.capitalize()}"):
+    with st.expander(f"🔍 Full Analysis — {player} {stat} {direction}"):
+
+        # Stat boxes row
+        points_avg = result.get("player_points_avg", 0)
+        reb_avg = result.get("player_rebounds_avg", 0)
+        ast_avg = result.get("player_assists_avg", 0)
+
+        sb_col1, sb_col2, sb_col3, sb_col4 = st.columns(4)
+        with sb_col1:
+            st.markdown(
+                f'<div class="stat-box"><div class="stat-val">{points_avg}</div>'
+                f'<div class="stat-lbl">PPG (Season)</div></div>',
+                unsafe_allow_html=True
+            )
+        with sb_col2:
+            st.markdown(
+                f'<div class="stat-box"><div class="stat-val">{reb_avg}</div>'
+                f'<div class="stat-lbl">RPG (Season)</div></div>',
+                unsafe_allow_html=True
+            )
+        with sb_col3:
+            st.markdown(
+                f'<div class="stat-box"><div class="stat-val">{ast_avg}</div>'
+                f'<div class="stat-lbl">APG (Season)</div></div>',
+                unsafe_allow_html=True
+            )
+        with sb_col4:
+            p10 = result.get("percentile_10", 0)
+            p90 = result.get("percentile_90", 0)
+            st.markdown(
+                f'<div class="stat-box"><div class="stat-val">{p10:.1f}–{p90:.1f}</div>'
+                f'<div class="stat-lbl">10th–90th Pct</div></div>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown("")  # spacing
+
         detail_col1, detail_col2, detail_col3 = st.columns(3)
 
         with detail_col1:
             st.markdown("**📊 Distribution**")
-            # Show percentile range
-            p10 = result.get("percentile_10", 0)
             p50 = result.get("percentile_50", 0)
-            p90 = result.get("percentile_90", 0)
             std = result.get("simulated_std", 0)
-
             st.caption(f"10th pct (bad game): **{p10:.1f}**")
             st.caption(f"50th pct (median): **{p50:.1f}**")
             st.caption(f"90th pct (great game): **{p90:.1f}**")
             st.caption(f"Simulated std dev: **{std:.1f}**")
 
-            # Simple text histogram
             histogram = result.get("histogram", [])
             if histogram:
                 max_count = max(b["count"] for b in histogram) or 1
                 st.markdown("**Distribution (█ = over line)**")
-                for bucket in histogram[-10:]:  # Show last 10 buckets only
+                for bucket in histogram[-10:]:
                     bar_length = int((bucket["count"] / max_count) * 15)
                     bar_char = "█" if bucket["is_over_line"] else "░"
                     bar = bar_char * bar_length
@@ -203,18 +336,15 @@ def display_prop_analysis_card(result):
             else:
                 st.caption("No UNDER forces detected")
 
-        # Show avoid warning if applicable
         if result.get("should_avoid", False):
             st.warning("⚠️ **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
 
-        # Score breakdown
         breakdown = result.get("score_breakdown", {})
         if breakdown:
             st.markdown("**🔬 Confidence Score Breakdown**")
             breakdown_cols = st.columns(len(breakdown))
             for i, (factor, score) in enumerate(breakdown.items()):
                 with breakdown_cols[i]:
-                    # Format factor name nicely
                     factor_label = factor.replace("_score", "").replace("_", " ").title()
                     st.metric(factor_label, f"{score:.0f}/100")
 
@@ -421,6 +551,7 @@ if run_analysis:
             # Basic prop info
             "player_name": player_name,
             "team": player_team,
+            "opponent": game_context.get("opponent", ""),
             "stat_type": stat_type,
             "line": prop_line,
             "platform": platform,
@@ -451,6 +582,10 @@ if run_analysis:
             "histogram": histogram_data,
             # Score breakdown (for transparency)
             "score_breakdown": confidence_output.get("score_breakdown", {}),
+            # Player season stats for display
+            "player_points_avg": float(player_data.get("points_avg", 0) or 0),
+            "player_rebounds_avg": float(player_data.get("rebounds_avg", 0) or 0),
+            "player_assists_avg": float(player_data.get("assists_avg", 0) or 0),
         }
 
         analysis_results_list.append(full_result)
