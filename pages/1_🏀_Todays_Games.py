@@ -9,7 +9,7 @@ import streamlit as st
 import datetime
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
-from data.live_data_fetcher import fetch_todays_games
+from data.live_data_fetcher import fetch_todays_games, fetch_todays_players_only, fetch_all_todays_data
 
 # ============================================================
 # SECTION: Page Setup
@@ -82,32 +82,55 @@ st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight'
 # SECTION: Auto-Load Tonight's Games
 # ============================================================
 
-auto_col, info_col = st.columns([1, 3])
+auto_col, fetch_col, info_col = st.columns([1, 1, 2])
 
 with auto_col:
     auto_load_clicked = st.button(
         "🔄 Auto-Load Tonight's Games",
         use_container_width=True,
         type="primary",
-        help="Automatically fetch tonight's real NBA matchups from the NBA API",
+        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
+    )
+
+with fetch_col:
+    fetch_players_clicked = st.button(
+        "⚡ Fetch Players Only",
+        use_container_width=True,
+        help="Re-fetch player stats for tonight's teams (games must already be loaded)",
     )
 
 with info_col:
     st.caption(
-        "Fetches live games + team records from the NBA API. "
-        "Or use the manual form below."
+        "**Auto-Load** = one click does everything: games + rosters + player stats. "
+        "Use **Fetch Players Only** to refresh player data when games are already loaded."
     )
 
 if auto_load_clicked:
-    with st.spinner("Fetching tonight's games and team records..."):
-        fetched_games = fetch_todays_games()
+    progress_bar = st.progress(0, text="Starting one-click load...")
+    status_text = st.empty()
 
-    if fetched_games:
-        st.session_state["todays_games"] = fetched_games
-        st.success(
-            f"✅ Loaded **{len(fetched_games)} game(s)** for tonight! "
-            "Edit spreads and totals below if needed."
+    def _auto_load_progress(current, total, message):
+        frac = current / max(total, 1)
+        progress_bar.progress(frac, text=message)
+        status_text.caption(message)
+
+    with st.spinner("🔄 Loading tonight's games + player data + team stats..."):
+        result = fetch_all_todays_data(progress_callback=_auto_load_progress)
+
+    progress_bar.empty()
+    status_text.empty()
+
+    games_loaded = result.get("games", [])
+    if games_loaded:
+        st.session_state["todays_games"] = games_loaded
+        players_ok = result.get("players_updated", False)
+        teams_ok = result.get("teams_updated", False)
+        msg = (
+            f"✅ Loaded **{len(games_loaded)} game(s)** for tonight! "
+            f"Players: {'✅' if players_ok else '⚠️ failed'} | "
+            f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
         )
+        st.success(msg)
         st.rerun()
     else:
         st.warning(
@@ -117,6 +140,40 @@ if auto_load_clicked:
             "- No internet connection\n\n"
             "Please enter games manually using the form below."
         )
+
+if fetch_players_clicked:
+    todays_games_for_fetch = st.session_state.get("todays_games", [])
+    if not todays_games_for_fetch:
+        st.warning(
+            "⚠️ No games loaded yet. Click **Auto-Load Tonight's Games** first, "
+            "or add games manually below."
+        )
+    else:
+        progress_bar2 = st.progress(0, text="Fetching player data for tonight's teams...")
+        status_text2 = st.empty()
+
+        def _fetch_players_progress(current, total, message):
+            frac = current / max(total, 1)
+            progress_bar2.progress(frac, text=message)
+            status_text2.caption(message)
+
+        with st.spinner("⚡ Fetching current rosters and player stats..."):
+            success = fetch_todays_players_only(
+                todays_games_for_fetch,
+                progress_callback=_fetch_players_progress,
+            )
+
+        progress_bar2.empty()
+        status_text2.empty()
+
+        if success:
+            st.success("✅ Player stats refreshed for tonight's teams!")
+            st.rerun()
+        else:
+            st.error(
+                "❌ Could not fetch player stats. Check your internet connection "
+                "or try the Update Data page."
+            )
 
 st.divider()
 
