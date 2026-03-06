@@ -44,6 +44,27 @@ LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
 API_DELAY_SECONDS = 1.5
 
 # ============================================================
+# Standard deviation ratio constants for stat fallback estimates.
+# These are used when game log data is unavailable for a player.
+# Values are empirically derived from NBA stat distributions.
+# ============================================================
+FALLBACK_POINTS_STD_RATIO = 0.3      # Points: ~30% CV is typical for scorers
+FALLBACK_REBOUNDS_STD_RATIO = 0.4    # Rebounds: ~40% CV — more variable
+FALLBACK_ASSISTS_STD_RATIO = 0.4     # Assists: ~40% CV — game-plan dependent
+FALLBACK_THREES_STD_RATIO = 0.5      # 3-pointers: ~50% CV — most variable
+FALLBACK_STEALS_STD_RATIO = 0.5      # Steals: ~50% CV
+FALLBACK_BLOCKS_STD_RATIO = 0.6      # Blocks: ~60% CV
+FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
+
+# Minimum minutes threshold to include a player's stats.
+# Players below this threshold are considered inactive/garbage-time only.
+MIN_MINUTES_THRESHOLD = 5.0
+
+# Recent-form trend thresholds: how much above/below season avg to be "hot"/"cold"
+HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
+COLD_TREND_THRESHOLD = 0.9  # Last 3 games avg ≤ 90% of recent avg = cold
+
+# ============================================================
 # END SECTION: File Path Constants
 # ============================================================
 
@@ -196,6 +217,66 @@ def load_last_updated():
 
 
 # ============================================================
+# SECTION: Helper Utilities
+# Small internal helpers used by multiple fetcher functions.
+# ============================================================
+
+def _parse_win_loss_record(record_str):
+    """
+    Parse a win-loss record string like '15-8' into (wins, losses).
+
+    Args:
+        record_str (str): A string in the format 'W-L', e.g. '15-8'
+
+    Returns:
+        tuple: (wins: int, losses: int). Returns (0, 0) on failure.
+    """
+    try:
+        parts = str(record_str or "0-0").split("-")
+        wins = int(parts[0]) if parts else 0
+        losses = int(parts[1]) if len(parts) > 1 else 0
+        return wins, losses
+    except (ValueError, IndexError):
+        return 0, 0
+
+
+def _utc_to_et_display(game_time_utc):
+    """
+    Convert a UTC ISO timestamp string to Eastern Time display string.
+
+    Determines whether to apply EST (-5) or EDT (-4) offset based on
+    the current date using Python's time module DST flag.
+
+    Args:
+        game_time_utc (str): ISO timestamp like '2026-03-06T23:30:00Z'
+
+    Returns:
+        str: Time string like '7:30 PM ET', or '' on failure.
+    """
+    if not game_time_utc:
+        return ""
+    try:
+        # Determine current ET offset using DST flag
+        import time as _time_mod
+        dst_active = bool(_time_mod.localtime().tm_isdst)
+        et_offset_hours = -4 if dst_active else -5  # EDT or EST
+
+        utc_dt = datetime.datetime.fromisoformat(
+            game_time_utc.replace("Z", "+00:00")
+        )
+        et_dt = utc_dt + datetime.timedelta(hours=et_offset_hours)
+        # Use %I:%M %p for cross-platform compatibility (no %-I)
+        time_str = et_dt.strftime("%I:%M %p ET").lstrip("0")
+        return time_str
+    except Exception:
+        return ""
+
+# ============================================================
+# END SECTION: Helper Utilities
+# ============================================================
+
+
+# ============================================================
 # SECTION: Today's Games Fetcher
 # Fetches which NBA games are being played today.
 # ============================================================
@@ -250,13 +331,9 @@ def fetch_todays_games():
             else:
                 streak_display = ""
 
-            # Home and away records
-            home_wins = int(row.get("HOME", "0-0").split("-")[0] if "-" in str(row.get("HOME", "0-0")) else 0)
-            home_losses_str = str(row.get("HOME", "0-0")).split("-")
-            home_losses = int(home_losses_str[1]) if len(home_losses_str) > 1 else 0
-            road_str = str(row.get("ROAD", "0-0")).split("-")
-            away_wins = int(road_str[0]) if road_str else 0
-            away_losses = int(road_str[1]) if len(road_str) > 1 else 0
+            # Home and away records — use helper to avoid duplicated parsing
+            home_wins_s, home_losses_s = _parse_win_loss_record(row.get("HOME", "0-0"))
+            away_wins_s, away_losses_s = _parse_win_loss_record(row.get("ROAD", "0-0"))
 
             conf_rank = int(row.get("PlayoffRank", 0) or 0)
 
@@ -264,8 +341,8 @@ def fetch_todays_games():
                 "wins": wins,
                 "losses": losses,
                 "streak": streak_display,
-                "home_record": f"{home_wins}-{home_losses}",
-                "away_record": f"{away_wins}-{away_losses}",
+                "home_record": f"{home_wins_s}-{home_losses_s}",
+                "away_record": f"{away_wins_s}-{away_losses_s}",
                 "conf_rank": conf_rank,
             }
     except Exception as standings_error:
@@ -293,19 +370,8 @@ def fetch_todays_games():
             if not home_abbrev or not away_abbrev:
                 continue
 
-            # Game time (UTC) — convert for display
-            game_time_utc = game.get("gameTimeUTC", "")
-            game_time_et = ""
-            if game_time_utc:
-                try:
-                    import datetime as _dt
-                    # Parse UTC time and convert to ET (UTC-5 standard, UTC-4 daylight)
-                    utc_dt = _dt.datetime.fromisoformat(game_time_utc.replace("Z", "+00:00"))
-                    et_offset = _dt.timedelta(hours=-4)  # EDT
-                    et_dt = utc_dt + et_offset
-                    game_time_et = et_dt.strftime("%-I:%M %p ET")
-                except Exception:
-                    game_time_et = ""
+            # Game time (UTC) — convert to Eastern Time for display
+            game_time_et = _utc_to_et_display(game.get("gameTimeUTC", ""))
 
             # Arena
             arena = game.get("arenaName", "")
@@ -547,28 +613,29 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                     if len(pts_10) >= 2:
                         points_std = round(statistics.stdev(pts_10), 2)
                     else:
-                        points_std = max(1.0, points_avg * 0.3)
+                        points_std = max(1.0, points_avg * FALLBACK_POINTS_STD_RATIO)
                     if len(reb_10) >= 2:
                         rebounds_std = round(statistics.stdev(reb_10), 2)
                     else:
-                        rebounds_std = max(0.5, rebounds_avg * 0.4)
+                        rebounds_std = max(0.5, rebounds_avg * FALLBACK_REBOUNDS_STD_RATIO)
                     if len(ast_10) >= 2:
                         assists_std = round(statistics.stdev(ast_10), 2)
                     else:
-                        assists_std = max(0.5, assists_avg * 0.4)
+                        assists_std = max(0.5, assists_avg * FALLBACK_ASSISTS_STD_RATIO)
                     if len(fg3m_10) >= 2:
                         threes_std = round(statistics.stdev(fg3m_10), 2)
                     else:
-                        threes_std = max(0.3, threes_avg * 0.5)
-                    steals_std = round(statistics.stdev(stl_10), 2) if len(stl_10) >= 2 else max(0.1, steals_avg * 0.5)
-                    blocks_std = round(statistics.stdev(blk_10), 2) if len(blk_10) >= 2 else max(0.1, blocks_avg * 0.6)
-                    turnovers_std = round(statistics.stdev(tov_10), 2) if len(tov_10) >= 2 else max(0.1, turnovers_avg * 0.4)
+                        threes_std = max(0.3, threes_avg * FALLBACK_THREES_STD_RATIO)
+                    steals_std = round(statistics.stdev(stl_10), 2) if len(stl_10) >= 2 else max(0.1, steals_avg * FALLBACK_STEALS_STD_RATIO)
+                    blocks_std = round(statistics.stdev(blk_10), 2) if len(blk_10) >= 2 else max(0.1, blocks_avg * FALLBACK_BLOCKS_STD_RATIO)
+                    turnovers_std = round(statistics.stdev(tov_10), 2) if len(tov_10) >= 2 else max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO)
 
             except Exception as log_error:
                 print(f"  Could not fetch game log for {player_name}: {log_error}")
 
-            # Skip players who haven't played (no minutes)
-            if minutes_avg < 5.0:
+            # Skip players who haven't played (no meaningful minutes).
+            # Players below MIN_MINUTES_THRESHOLD are inactive or garbage-time only.
+            if minutes_avg < MIN_MINUTES_THRESHOLD:
                 continue
 
             formatted_player = {
@@ -686,7 +753,9 @@ def fetch_player_recent_form(player_id, last_n_games=10):
         last_3_pts = safe_avg(pts_list[:3]) if len(pts_list) >= 3 else safe_avg(pts_list)
         full_avg_pts = safe_avg(pts_list)
         if full_avg_pts > 0:
-            trend = "hot" if last_3_pts >= full_avg_pts * 1.1 else ("cold" if last_3_pts <= full_avg_pts * 0.9 else "neutral")
+            trend = "hot" if last_3_pts >= full_avg_pts * HOT_TREND_THRESHOLD else (
+                "cold" if last_3_pts <= full_avg_pts * COLD_TREND_THRESHOLD else "neutral"
+            )
         else:
             trend = "neutral"
 
@@ -873,16 +942,12 @@ def fetch_player_stats(progress_callback=None):
             player_id = player_row.get("PLAYER_ID")  # Unique NBA player ID
 
             # Default std devs if we can't fetch the game log.
-            # These percentages are empirically derived from NBA stat distributions:
-            # - Points: ~30% CV (coefficient of variation) is typical for scorers
-            # - Rebounds: ~40% CV — more variable due to matchup and game flow
-            # - Assists: ~40% CV — game-plan and opponent-specific
-            # - Threes: ~50% CV — highly variable night-to-night (hot/cold shooting)
-            # These defaults will be replaced by actual std devs once game logs load.
-            points_std = max(1.0, points_avg * 0.3)       # 30% CV default
-            rebounds_std = max(0.5, rebounds_avg * 0.4)   # 40% CV default
-            assists_std = max(0.5, assists_avg * 0.4)      # 40% CV default
-            threes_std = max(0.3, threes_avg * 0.5)        # 50% CV default (most variable)
+            # These are fallback estimates using the named ratio constants defined
+            # at module level. They will be replaced by actual std devs from game logs.
+            points_std = max(1.0, points_avg * FALLBACK_POINTS_STD_RATIO)
+            rebounds_std = max(0.5, rebounds_avg * FALLBACK_REBOUNDS_STD_RATIO)
+            assists_std = max(0.5, assists_avg * FALLBACK_ASSISTS_STD_RATIO)
+            threes_std = max(0.3, threes_avg * FALLBACK_THREES_STD_RATIO)
 
             # Initialize steals/blocks/turnovers std devs with CV-based defaults.
             # These will be overwritten with game-log-calculated values if available.
@@ -972,10 +1037,10 @@ def fetch_player_stats(progress_callback=None):
                 "rebounds_std": round(rebounds_std, 2),       # Rebounds std dev
                 "assists_std": round(assists_std, 2),         # Assists std dev
                 "threes_std": round(threes_std, 2),           # 3PM std dev
-                # Use game-log std devs when available; fall back to CV-based estimates
-                "steals_std": round(steals_std_from_log if steals_std_from_log is not None else max(0.1, steals_avg * 0.5), 2),
-                "blocks_std": round(blocks_std_from_log if blocks_std_from_log is not None else max(0.1, blocks_avg * 0.6), 2),
-                "turnovers_std": round(turnovers_std_from_log if turnovers_std_from_log is not None else max(0.1, turnovers_avg * 0.4), 2),
+                # Use game-log std devs when available; fall back to ratio-based estimates
+                "steals_std": round(steals_std_from_log if steals_std_from_log is not None else max(0.1, steals_avg * FALLBACK_STEALS_STD_RATIO), 2),
+                "blocks_std": round(blocks_std_from_log if blocks_std_from_log is not None else max(0.1, blocks_avg * FALLBACK_BLOCKS_STD_RATIO), 2),
+                "turnovers_std": round(turnovers_std_from_log if turnovers_std_from_log is not None else max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO), 2),
             }
 
             formatted_players.append(formatted_player)
