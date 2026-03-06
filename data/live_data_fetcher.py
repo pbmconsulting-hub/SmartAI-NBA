@@ -343,7 +343,7 @@ def fetch_player_stats(progress_callback=None):
 
         # Make the API call — this fetches ALL players' stats at once
         stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
-            per_mode_simple="PerGame",      # We want per-game averages
+            per_mode_detailed="PerGame",      # We want per-game averages
             season_type_all_star="Regular Season",  # Only regular season
         )
 
@@ -640,7 +640,7 @@ def fetch_team_stats(progress_callback=None):
         # for pace — they tell you how efficient a team is regardless of
         # whether they play fast or slow.
         team_stats_endpoint = leaguedashteamstats.LeagueDashTeamStats(
-            per_mode_simple="PerGame",          # Get per-game stats
+            per_mode_detailed="PerGame",          # Get per-game stats
             season_type_all_star="Regular Season",
         )
 
@@ -659,7 +659,7 @@ def fetch_team_stats(progress_callback=None):
 
         # Fetch advanced (per-possession) stats for ORTG/DRTG/Pace
         advanced_endpoint = advanced_stats_module.LeagueDashTeamStats(
-            per_mode_simple="Per100Possessions",    # Per 100 possessions = normalized
+            per_mode_detailed="Per100Possessions",    # Per 100 possessions = normalized
             measure_type_detailed_defense="Advanced",  # Advanced stats mode
             season_type_all_star="Regular Season",
         )
