@@ -271,16 +271,53 @@ def build_optimal_entries(
             entry_fee,
         )
 
+        # W2: Apply correlation discount to expected value
+        # If multiple legs share a game, their outcomes are correlated.
+        correlation_risk = calculate_correlation_risk(combo_picks)
+        discount = correlation_risk["discount_multiplier"]
+        if discount < 1.0:
+            # Scale down the EV to reflect correlation penalty.
+            # Shallow copy is safe here because we only modify top-level float fields,
+            # not the nested probability_per_hits / payout_per_hits dicts.
+            discounted_ev = ev_result["expected_value_dollars"] * discount
+            discounted_return = ev_result["total_expected_return"] * discount
+            discounted_roi = discounted_ev / entry_fee if entry_fee > 0 else 0.0
+            ev_result = dict(ev_result)  # copy
+            ev_result["expected_value_dollars"] = round(discounted_ev, 2)
+            ev_result["total_expected_return"] = round(discounted_return, 2)
+            ev_result["return_on_investment"] = round(discounted_roi, 4)
+            ev_result["correlation_discount_applied"] = True
+        else:
+            ev_result = dict(ev_result)
+            ev_result["correlation_discount_applied"] = False
+
         # Average confidence score of all picks in this combo
         average_confidence = sum(
             p.get("confidence_score", 50) for p in combo_picks
         ) / len(combo_picks)
+
+        # W9: Identify the weakest link in this combo
+        weakest = identify_weakest_link(combo_picks)
+        weakest_prob = 0.5
+        weakest_label = ""
+        if weakest:
+            wp = weakest.get("probability_over", 0.5)
+            weakest_prob = wp if weakest.get("direction", "OVER") == "OVER" else 1.0 - wp
+            weakest_label = (
+                f"{weakest.get('player_name','?')} "
+                f"{weakest.get('stat_type','').capitalize()} "
+                f"({weakest_prob*100:.0f}%)"
+            )
 
         all_entries_with_scores.append({
             "picks": combo_picks,
             "ev_result": ev_result,
             "combined_confidence": round(average_confidence, 1),
             "pick_probabilities": pick_probabilities,
+            "correlation_risk": correlation_risk,
+            "weakest_link": weakest,
+            "weakest_link_probability": round(weakest_prob, 4),
+            "weakest_link_label": weakest_label,
         })
 
     # ============================================================
@@ -297,6 +334,196 @@ def build_optimal_entries(
 
     # Return the top N entries
     return all_entries_with_scores[:max_entries_to_show]
+
+
+# ============================================================
+# SECTION: Correlation Risk Calculator (W2)
+# When multiple legs come from the SAME game, all are affected
+# simultaneously by game-level events (blowout, OT, foul trouble).
+# This is a hidden parlay risk that must be disclosed and penalized.
+# ============================================================
+
+def calculate_correlation_risk(selected_picks):
+    """
+    Calculate the correlation risk discount for a set of picks. (W2)
+
+    When 2+ picks come from the same game, their outcomes are
+    correlated — a blowout or overtime affects ALL of them.
+    We apply a probability discount to account for this hidden risk.
+
+    Args:
+        selected_picks (list of dict): Picks to check, each with
+            'player_team' (or 'team') and 'opponent' keys.
+
+    Returns:
+        dict: {
+            'discount_multiplier': float  (1.0 = no discount, 0.88 = 12% penalty)
+            'max_same_game_picks': int    (highest count from any single game)
+            'game_groups': dict           {game_key: [player_names]}
+            'warnings': list of str       (human-readable warnings)
+            'correlation_level': str      ('none', 'low', 'high')
+        }
+
+    Example:
+        3 picks from LAL vs GSW → discount_multiplier=0.88, level='high'
+    """
+    # Group picks by game (same two teams)
+    game_groups = {}  # game_key (frozenset of teams) → list of pick dicts
+
+    for pick in selected_picks:
+        team = pick.get("player_team", pick.get("team", "")).upper().strip()
+        opponent = pick.get("opponent", "").upper().strip()
+        if team and opponent:
+            game_key = frozenset([team, opponent])
+        elif team:
+            game_key = frozenset([team])
+        else:
+            continue
+        game_key_str = " vs ".join(sorted(game_key))
+        if game_key_str not in game_groups:
+            game_groups[game_key_str] = []
+        game_groups[game_key_str].append(pick)
+
+    # Find the game with the most picks
+    max_same_game = max((len(v) for v in game_groups.values()), default=0)
+
+    # Build warnings and determine discount
+    warnings = []
+    correlation_level = "none"
+    discount_multiplier = 1.0
+
+    for game_key_str, picks_in_game in game_groups.items():
+        n = len(picks_in_game)
+        if n < 2:
+            continue  # Single pick from a game — no correlation
+
+        names = [p.get("player_name", "?") for p in picks_in_game]
+        names_str = ", ".join(names)
+
+        if n >= 3:
+            # 12% penalty for 3+ picks from same game
+            discount_multiplier = min(discount_multiplier, 0.88)
+            correlation_level = "high"
+            warnings.append(
+                f"🚨 HIGH CORRELATION: {n} picks from {game_key_str} "
+                f"({names_str}) — 12% EV penalty applied. "
+                f"A blowout or foul-out affects ALL {n} legs simultaneously."
+            )
+        else:
+            # 5% penalty for 2 picks from same game
+            discount_multiplier = min(discount_multiplier, 0.95)
+            if correlation_level != "high":
+                correlation_level = "low"
+            warnings.append(
+                f"⚠️ CORRELATION: 2 picks from {game_key_str} "
+                f"({names_str}) — 5% EV penalty applied. "
+                f"Same-game events (blowout, OT) affect both legs."
+            )
+
+    return {
+        "discount_multiplier": round(discount_multiplier, 4),
+        "max_same_game_picks": max_same_game,
+        "game_groups": {k: [p.get("player_name", "?") for p in v]
+                        for k, v in game_groups.items()},
+        "warnings": warnings,
+        "correlation_level": correlation_level,
+    }
+
+# ============================================================
+# END SECTION: Correlation Risk Calculator
+# ============================================================
+
+
+# ============================================================
+# SECTION: Weakest Link Detection + Swap Suggestions (W9)
+# The entry is only as strong as its weakest pick.
+# Identify it, then suggest better alternatives.
+# ============================================================
+
+def identify_weakest_link(picks):
+    """
+    Find the weakest pick in an entry by probability. (W9)
+
+    The weakest link is the pick with the LOWEST win probability,
+    since a parlay fails if any single leg misses.
+
+    Args:
+        picks (list of dict): Entry picks, each with 'probability_over',
+            'direction', 'player_name', 'stat_type', 'line'
+
+    Returns:
+        dict or None: The weakest pick dict, or None if picks is empty.
+    """
+    if not picks:
+        return None
+
+    def _win_prob(pick):
+        """Get the win probability for the betted direction."""
+        p = pick.get("probability_over", 0.5)
+        return p if pick.get("direction", "OVER") == "OVER" else 1.0 - p
+
+    return min(picks, key=_win_prob)
+
+
+def suggest_swap(weakest_pick, available_picks, entry_picks):
+    """
+    Suggest a stronger alternative for the weakest pick in an entry. (W9)
+
+    Finds the available pick (not already in the entry) with the
+    highest win probability that could replace the weakest link.
+
+    Args:
+        weakest_pick (dict): The lowest-probability pick in the entry
+        available_picks (list of dict): All qualifying picks
+        entry_picks (list of dict): Current entry picks (to exclude from suggestions)
+
+    Returns:
+        dict or None: The best swap candidate, or None if no better option exists.
+            Includes the pick dict plus a 'swap_reason' key explaining the swap.
+    """
+    # Collect player+stat combos already in the entry (to avoid duplicates)
+    in_entry = set()
+    for p in entry_picks:
+        key = (p.get("player_name", ""), p.get("stat_type", ""))
+        in_entry.add(key)
+
+    weakest_prob = (
+        weakest_pick.get("probability_over", 0.5)
+        if weakest_pick.get("direction", "OVER") == "OVER"
+        else 1.0 - weakest_pick.get("probability_over", 0.5)
+    )
+
+    best_candidate = None
+    best_prob = weakest_prob  # Only suggest if it's actually better
+
+    for pick in available_picks:
+        key = (pick.get("player_name", ""), pick.get("stat_type", ""))
+        if key in in_entry:
+            continue  # Already in the entry
+
+        p = pick.get("probability_over", 0.5)
+        win_prob = p if pick.get("direction", "OVER") == "OVER" else 1.0 - p
+
+        if win_prob > best_prob:
+            best_prob = win_prob
+            best_candidate = pick
+
+    if best_candidate is None:
+        return None
+
+    improvement = (best_prob - weakest_prob) * 100.0
+    best_candidate = dict(best_candidate)  # copy to avoid mutating original
+    best_candidate["swap_reason"] = (
+        f"Replaces {weakest_pick.get('player_name','?')} "
+        f"{weakest_pick.get('stat_type','').capitalize()} "
+        f"({weakest_prob*100:.0f}% → {best_prob*100:.0f}%, "
+        f"+{improvement:.1f}% stronger)"
+    )
+    return best_candidate
+
+# ============================================================
+# END SECTION: Weakest Link Detection + Swap Suggestions
+# ============================================================
 
 
 def format_ev_display(ev_result, entry_fee):

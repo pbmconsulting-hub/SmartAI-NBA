@@ -14,7 +14,7 @@ import math             # For rounding in display
 # Import our engine modules (all built from scratch!)
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
 from engine.projections import build_player_projection, get_stat_standard_deviation
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
@@ -193,6 +193,24 @@ def display_prop_analysis_card(result):
         if result.get("should_avoid", False):
             st.warning("\u26a0\ufe0f **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
 
+        # W5: Trap line warning — displayed prominently in the card
+        trap_result = result.get("trap_line_result", {})
+        if trap_result and trap_result.get("is_trap"):
+            st.error(trap_result.get("warning_message", "⚠️ Possible Trap Line detected"))
+
+        # W1: Line sharpness warning
+        sharpness_force = result.get("line_sharpness_force")
+        if sharpness_force:
+            st.caption(
+                f"📐 **Sharp Line:** {sharpness_force.get('description', '')} "
+                f"(−{result.get('line_sharpness_penalty', 0):.0f} confidence pts)"
+            )
+
+        # W8: Teammate impact note
+        teammate_notes = result.get("teammate_out_notes", [])
+        if teammate_notes:
+            st.info("👥 **Teammate Impact:** " + " | ".join(teammate_notes))
+
         breakdown = result.get("score_breakdown", {})
         if breakdown:
             st.markdown("**\U0001f52c Confidence Score Breakdown**")
@@ -233,6 +251,9 @@ def display_prop_analysis_card(result):
                 ("🎲 Simulation", "simulation_narrative"),
                 ("⚖️ Forces", "forces_summary"),
                 ("🔥 Recent Form", "recent_form_explanation"),
+                ("📐 Line Sharpness", "line_sharpness_explanation"),   # W1
+                ("⚠️ Trap Line", "trap_line_explanation"),             # W5
+                ("👥 Teammate Impact", "teammate_impact_explanation"),  # W8
             ]
             for label, key in sections:
                 text = explanation.get(key, "")
@@ -413,6 +434,7 @@ if run_analysis:
             defensive_ratings_data=defensive_ratings_data,
             teams_data=teams_data,
             recent_form_games=recent_form_games if recent_form_games else None,
+            vegas_spread=game_context.get("vegas_spread", 0.0),  # W6: smart blowout risk
         )
 
         # Step 4: Run Monte Carlo simulation
@@ -444,6 +466,31 @@ if run_analysis:
             game_context=game_context,
         )
 
+        # Step 5b: Detect line sharpness (W1) — is the line priced at true average?
+        season_avg_for_stat = float(player_data.get(f"{stat_type}_avg", 0) or 0)
+        line_sharpness_force = detect_line_sharpness(
+            prop_line=prop_line,
+            season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
+            stat_type=stat_type,
+        )
+        # Extract penalty from the line sharpness force if present
+        line_sharpness_penalty = 0.0
+        if line_sharpness_force is not None:
+            # Strength 0-3 maps to penalty 0-8 points
+            line_sharpness_penalty = min(8.0, line_sharpness_force.get("strength", 0) * 2.5)
+
+        # Step 5c: Detect trap lines (W5)
+        trap_line_result = detect_trap_line(
+            prop_line=prop_line,
+            season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
+            defense_factor=projection_result.get("defense_factor", 1.0),
+            rest_factor=projection_result.get("rest_factor", 1.0),
+            game_total=game_context.get("game_total", 220.0),
+            blowout_risk=projection_result.get("blowout_risk", 0.15),
+            stat_type=stat_type,
+        )
+        trap_line_penalty = trap_line_result.get("confidence_penalty", 0.0)
+
         # Step 6: Calculate edge and confidence
         probability_over = simulation_output.get("probability_over", 0.5)
         edge_pct = calculate_edge_percentage(probability_over)
@@ -454,10 +501,12 @@ if run_analysis:
             directional_forces=forces_result,
             defense_factor=projection_result.get("defense_factor", 1.0),
             stat_standard_deviation=stat_std,
-            stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
+            stat_average=season_avg_for_stat,
             simulation_results=simulation_output,
             games_played=int(player_data.get("games_played", 0) or 0) or None,
             recent_form_ratio=projection_result.get("recent_form_ratio"),
+            line_sharpness_penalty=line_sharpness_penalty,   # W1
+            trap_line_penalty=trap_line_penalty,             # W5
         )
 
         # Step 7: Check if this should be on the avoid list
@@ -491,6 +540,9 @@ if run_analysis:
             recent_form_games=prop.get("recent_form_results", []),
             should_avoid=should_avoid,
             avoid_reasons=avoid_reasons,
+            trap_line_result=trap_line_result,              # W5
+            line_sharpness_info=line_sharpness_force,       # W1
+            teammate_out_notes=projection_result.get("teammate_out_notes", []),  # W8
         )
 
         # Step 10: Compile the full result
@@ -550,6 +602,15 @@ if run_analysis:
             "player_matched": player_matched,
             # Why This Pick explanation
             "explanation": explanation,
+            # W1: Line sharpness info
+            "line_sharpness_force": line_sharpness_force,
+            "line_sharpness_penalty": round(line_sharpness_penalty, 1),
+            # W5: Trap line info
+            "trap_line_result": trap_line_result,
+            "trap_line_penalty": round(trap_line_penalty, 1),
+            # W8: Teammate impact info
+            "teammate_out_notes": projection_result.get("teammate_out_notes", []),
+            "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
         }
 
         analysis_results_list.append(full_result)

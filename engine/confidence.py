@@ -20,13 +20,15 @@ import math  # For rounding
 # How much each factor contributes to the overall confidence score
 # BEGINNER NOTE: These weights reflect how important each factor is
 # You can adjust these in Settings if you want to change the model
+# NOTE (W1): Redistributed 2% from historical and sample to accommodate
+#            the new line_sharpness and calibration penalty factors.
 WEIGHT_PROBABILITY_STRENGTH = 0.30    # Raw probability (30% of score)
 WEIGHT_EDGE_MAGNITUDE = 0.22          # How big the edge is (22%)
 WEIGHT_DIRECTIONAL_AGREEMENT = 0.18  # Multiple factors agree (18%)
 WEIGHT_MATCHUP_FAVORABILITY = 0.10   # How good the matchup is (10%)
-WEIGHT_HISTORICAL_CONSISTENCY = 0.08  # Player's track record (8%)
-WEIGHT_SAMPLE_SIZE = 0.07             # How many games played (7%)
-WEIGHT_RECENT_FORM = 0.05             # Recent 5-game trend vs season (5%)
+WEIGHT_HISTORICAL_CONSISTENCY = 0.07  # Player's track record (7%)
+WEIGHT_SAMPLE_SIZE = 0.06             # How many games played (6%)
+WEIGHT_RECENT_FORM = 0.07             # Recent 5-game trend vs season (7%)
 
 # Validate that weights sum to exactly 1.0 (they must — that's the rule for weights).
 # This assertion catches any accidental edits that would break the model silently.
@@ -69,12 +71,17 @@ def calculate_confidence_score(
     simulation_results,
     games_played=None,
     recent_form_ratio=None,
+    line_sharpness_penalty=0.0,
+    trap_line_penalty=0.0,
+    calibration_adjustment=0.0,
 ):
     """
     Calculate a 0-100 confidence score for a prop pick.
 
     Combines eight factors into a weighted score, then assigns
     a tier label: Platinum, Gold, Silver, or Bronze.
+    Post-scoring penalties for line sharpness (W1), trap lines (W5),
+    and model calibration (W7) are applied additively.
 
     Args:
         probability_over (float): P(over line), from simulation
@@ -88,6 +95,14 @@ def calculate_confidence_score(
         games_played (int, optional): Games in season (higher = more reliable)
         recent_form_ratio (float, optional): Last-5-game avg / season avg.
             > 1.0 means hot streak, < 1.0 means cold streak.
+        line_sharpness_penalty (float, optional): Points to subtract when
+            the line is set at the player's true average (W1 — sharp line).
+            Typically 0-8 points. Passed in from edge_detection results.
+        trap_line_penalty (float, optional): Points to subtract when a
+            trap line is detected (W5 — bait line). Typically 0-15 points.
+        calibration_adjustment (float, optional): Historical calibration
+            offset in percentage points (W7). Positive = model overestimates,
+            scores get reduced. Negative = model underestimates, scores go up.
 
     Returns:
         dict: {
@@ -166,8 +181,16 @@ def calculate_confidence_score(
         + recent_form_score * WEIGHT_RECENT_FORM
     )
 
-    # Round to nearest whole number
-    final_score = round(combined_score, 1)
+    # --- Apply Post-Scoring Penalties ---
+    # W1: Line Sharpness Penalty — deduct when book has accurately priced the line
+    # W5: Trap Line Penalty — deduct when a bait line is detected
+    # W7: Calibration Adjustment — correct for systematic model over/underconfidence
+    combined_score -= line_sharpness_penalty
+    combined_score -= trap_line_penalty
+    combined_score -= calibration_adjustment  # positive = historically overconfident
+
+    # Round to nearest whole number, clamped to 0-100
+    final_score = round(max(0.0, min(100.0, combined_score)), 1)
 
     # ============================================================
     # END SECTION: Combine Scores with Weights

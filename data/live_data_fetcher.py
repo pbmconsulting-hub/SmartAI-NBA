@@ -47,11 +47,15 @@ API_DELAY_SECONDS = 1.5
 # Standard deviation ratio constants for stat fallback estimates.
 # These are used when game log data is unavailable for a player.
 # Values are empirically derived from NBA stat distributions.
+#
+# NOTE (W10): The fixed ratios below are kept for backward compatibility.
+# The new _dynamic_cv_for_live_fetch() function uses tier-based CV
+# which is called at the point of fallback estimate computation.
 # ============================================================
 FALLBACK_POINTS_STD_RATIO = 0.3      # Points: ~30% CV is typical for scorers
 FALLBACK_REBOUNDS_STD_RATIO = 0.4    # Rebounds: ~40% CV — more variable
 FALLBACK_ASSISTS_STD_RATIO = 0.4     # Assists: ~40% CV — game-plan dependent
-FALLBACK_THREES_STD_RATIO = 0.5      # 3-pointers: ~50% CV — most variable
+FALLBACK_THREES_STD_RATIO = 0.55     # 3-pointers: ~55% CV — streaky (minimum)
 FALLBACK_STEALS_STD_RATIO = 0.5      # Steals: ~50% CV
 FALLBACK_BLOCKS_STD_RATIO = 0.6      # Blocks: ~60% CV
 FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
@@ -614,19 +618,21 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                     if len(pts_10) >= 2:
                         points_std = round(statistics.stdev(pts_10), 2)
                     else:
-                        points_std = max(1.0, points_avg * FALLBACK_POINTS_STD_RATIO)
+                        # W10: Dynamic CV based on player scoring tier
+                        points_std = max(1.0, points_avg * _dynamic_cv_for_live_fetch("points", points_avg))
                     if len(reb_10) >= 2:
                         rebounds_std = round(statistics.stdev(reb_10), 2)
                     else:
-                        rebounds_std = max(0.5, rebounds_avg * FALLBACK_REBOUNDS_STD_RATIO)
+                        rebounds_std = max(0.5, rebounds_avg * _dynamic_cv_for_live_fetch("rebounds", rebounds_avg))
                     if len(ast_10) >= 2:
                         assists_std = round(statistics.stdev(ast_10), 2)
                     else:
-                        assists_std = max(0.5, assists_avg * FALLBACK_ASSISTS_STD_RATIO)
+                        assists_std = max(0.5, assists_avg * _dynamic_cv_for_live_fetch("assists", assists_avg))
                     if len(fg3m_10) >= 2:
                         threes_std = round(statistics.stdev(fg3m_10), 2)
                     else:
-                        threes_std = max(0.3, threes_avg * FALLBACK_THREES_STD_RATIO)
+                        # W10: Three-pointers use minimum 0.55 CV
+                        threes_std = max(0.3, threes_avg * _dynamic_cv_for_live_fetch("threes", threes_avg))
                     steals_std = round(statistics.stdev(stl_10), 2) if len(stl_10) >= 2 else max(0.1, steals_avg * FALLBACK_STEALS_STD_RATIO)
                     blocks_std = round(statistics.stdev(blk_10), 2) if len(blk_10) >= 2 else max(0.1, blocks_avg * FALLBACK_BLOCKS_STD_RATIO)
                     turnovers_std = round(statistics.stdev(tov_10), 2) if len(tov_10) >= 2 else max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO)
@@ -951,12 +957,12 @@ def fetch_player_stats(progress_callback=None):
             player_id = player_row.get("PLAYER_ID")  # Unique NBA player ID
 
             # Default std devs if we can't fetch the game log.
-            # These are fallback estimates using the named ratio constants defined
-            # at module level. They will be replaced by actual std devs from game logs.
-            points_std = max(1.0, points_avg * FALLBACK_POINTS_STD_RATIO)
-            rebounds_std = max(0.5, rebounds_avg * FALLBACK_REBOUNDS_STD_RATIO)
-            assists_std = max(0.5, assists_avg * FALLBACK_ASSISTS_STD_RATIO)
-            threes_std = max(0.3, threes_avg * FALLBACK_THREES_STD_RATIO)
+            # W10: Use dynamic tier-based CV instead of fixed ratios.
+            # Stars (high avg) are more consistent; role players are more volatile.
+            points_std = max(1.0, points_avg * _dynamic_cv_for_live_fetch("points", points_avg))
+            rebounds_std = max(0.5, rebounds_avg * _dynamic_cv_for_live_fetch("rebounds", rebounds_avg))
+            assists_std = max(0.5, assists_avg * _dynamic_cv_for_live_fetch("assists", assists_avg))
+            threes_std = max(0.3, threes_avg * _dynamic_cv_for_live_fetch("threes", threes_avg))
 
             # Initialize steals/blocks/turnovers std devs with CV-based defaults.
             # These will be overwritten with game-log-calculated values if available.
@@ -1707,4 +1713,36 @@ def get_cached_roster(team_abbrev):
 
 # ============================================================
 # END SECTION: Team Roster Cache
+# ============================================================
+
+
+# ============================================================
+# SECTION: Dynamic CV Estimation Helper (W10)
+# Returns tier-based coefficients of variation for fallback
+# std deviation estimates when live game logs are unavailable.
+# ============================================================
+
+def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
+    """
+    Get a dynamic coefficient of variation for fallback std estimation. (W10)
+
+    Delegates to `_get_dynamic_cv()` in projections.py to avoid duplicating
+    the tier-threshold logic. This ensures both the live fetcher and the
+    projection engine use identical CV tiers.
+
+    Args:
+        stat_type (str): 'points', 'rebounds', 'assists', 'threes', etc.
+        stat_avg (float): Player's season average for this stat.
+
+    Returns:
+        float: Coefficient of variation to multiply against stat_avg.
+    """
+    # Import here to avoid a circular import at module load time.
+    # (live_data_fetcher is imported by data_manager which may be imported
+    # before engine.projections, so this lazy import is intentional.)
+    from engine.projections import _get_dynamic_cv
+    return _get_dynamic_cv(stat_type, stat_avg)
+
+# ============================================================
+# END SECTION: Dynamic CV Estimation Helper
 # ============================================================

@@ -391,3 +391,97 @@ def sample_from_normal_distribution(mean, standard_deviation):
 # ============================================================
 # END SECTION: Edge and Probability Utilities
 # ============================================================
+
+
+# ============================================================
+# SECTION: Flex EV and Correlation Helpers (W2, W9)
+# Additional math utilities for the entry optimizer.
+# ============================================================
+
+def calculate_flex_ev(pick_probabilities, payout_table, entry_fee):
+    """
+    Calculate the expected value (EV) of a flex-play entry. (W9)
+
+    Convenience wrapper around the full EV calculation, returning
+    just the essential numbers for quick comparison across entries.
+
+    Args:
+        pick_probabilities (list of float): Win probability for each pick (0-1)
+        payout_table (dict): {hits: multiplier} for this entry size
+        entry_fee (float): Dollar amount bet
+
+    Returns:
+        dict: {
+            'ev_dollars': float (net EV),
+            'roi': float (net EV / entry_fee),
+            'all_hit_prob': float (P of hitting all picks),
+            'prob_at_least_one_miss': float (P of missing at least one)
+        }
+
+    Example:
+        6 picks at 62% each, $10 entry → ev_dollars, roi, all-hit-prob
+    """
+    import itertools as _itertools
+
+    n = len(pick_probabilities)
+    if n == 0:
+        return {"ev_dollars": 0.0, "roi": 0.0, "all_hit_prob": 0.0,
+                "prob_at_least_one_miss": 1.0}
+
+    # --- Probability of exactly k hits ---
+    prob_for_k = {}
+    for k in range(n + 1):
+        total_p = 0.0
+        for winning_idx in _itertools.combinations(range(n), k):
+            winning_set = set(winning_idx)
+            combo_p = 1.0
+            for i in range(n):
+                combo_p *= (pick_probabilities[i] if i in winning_set
+                            else 1.0 - pick_probabilities[i])
+            total_p += combo_p
+        prob_for_k[k] = total_p
+
+    # --- Expected return ---
+    total_return = sum(prob_for_k[k] * payout_table.get(k, 0.0) * entry_fee
+                       for k in range(n + 1))
+    net_ev = total_return - entry_fee
+    roi = net_ev / entry_fee if entry_fee > 0 else 0.0
+
+    # --- All-hit probability ---
+    all_hit_prob = prob_for_k.get(n, 0.0)
+
+    return {
+        "ev_dollars": round(net_ev, 2),
+        "roi": round(roi, 4),
+        "all_hit_prob": round(all_hit_prob, 6),
+        "prob_at_least_one_miss": round(1.0 - all_hit_prob, 6),
+    }
+
+
+def calculate_correlation_discount(same_game_pick_count):
+    """
+    Compute the EV discount multiplier for correlated same-game picks. (W2)
+
+    When picks share a game, their outcomes are correlated — a blowout
+    or overtime hit affects ALL legs simultaneously.
+
+    Args:
+        same_game_pick_count (int): How many picks from the same game
+
+    Returns:
+        float: Multiplier to apply to entry EV (1.0 = no discount)
+
+    Example:
+        2 picks same game → 0.95 (5% penalty)
+        3+ picks same game → 0.88 (12% penalty)
+    """
+    if same_game_pick_count <= 1:
+        return 1.0   # No correlation discount
+    elif same_game_pick_count == 2:
+        return 0.95  # 5% penalty — moderate correlation
+    else:
+        return 0.88  # 12% penalty — high correlation (3+ same-game legs)
+
+# ============================================================
+# END SECTION: Flex EV and Correlation Helpers
+# ============================================================

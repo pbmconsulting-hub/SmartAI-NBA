@@ -30,6 +30,53 @@ from engine.math_helpers import (
 # About 12% of games, a player picks up 4-5 fouls and sits.
 # This is based on historical NBA foul-out/sit-out data.
 FOUL_TROUBLE_PROBABILITY = 0.12
+
+# ============================================================
+# SECTION: Game Scenario Probabilities (W3: Ceiling/Floor Games)
+# Replaces the old independent blowout + foul trouble rolls with
+# a correlated game scenario system. Each scenario applies a
+# CORRELATED effect on both minutes AND stats.
+# Probabilities must sum to 1.0.
+# ============================================================
+
+# Each scenario: (probability, minutes_reduction_min, minutes_reduction_max, stat_multiplier_min, stat_multiplier_max)
+# minutes_reduction: fraction of minutes LOST (negative = extra minutes gained)
+# stat_multiplier: applied on top of the scaled projection
+GAME_SCENARIOS = [
+    # (name, probability, minutes_reduction_min, minutes_reduction_max, stat_boost_min, stat_boost_max)
+    ("normal",       0.65,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
+    ("blowout_win",  0.10,  0.15,  0.25,  0.90,  0.95),  # Team wins big, star sits late
+    ("blowout_loss", 0.08,  0.10,  0.20,  0.88,  0.98),  # Team loses big, garbage time
+    ("foul_trouble", 0.07,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
+    ("close_game",   0.07, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
+    ("injury_scare", 0.03,  0.40,  0.60,  0.30,  0.60),  # Injury scare: massive minutes cut
+]
+
+# Validate scenario probabilities sum to 1.0
+_SCENARIO_PROB_SUM = sum(s[1] for s in GAME_SCENARIOS)
+assert abs(_SCENARIO_PROB_SUM - 1.0) < 1e-6, (
+    f"GAME_SCENARIOS probabilities must sum to 1.0, got {_SCENARIO_PROB_SUM:.4f}"
+)
+
+# ============================================================
+# SECTION: Hot Hand / Cold Game Probabilities (W4: Momentum)
+# In real NBA games, players have "on fire" nights and "ice cold"
+# nights that create fatter tails than a pure normal distribution.
+# ============================================================
+
+# Probability and multiplier ranges for momentum games
+HOT_HAND_PROBABILITY = 0.15   # 15% chance player is "on fire"
+HOT_HAND_MULTIPLIER_MIN = 1.15
+HOT_HAND_MULTIPLIER_MAX = 1.30
+
+COLD_GAME_PROBABILITY = 0.10  # 10% chance player is "ice cold"
+COLD_GAME_MULTIPLIER_MIN = 0.70
+COLD_GAME_MULTIPLIER_MAX = 0.85
+
+# ============================================================
+# END SECTION: Module-Level Constants
+# ============================================================
+
 # SECTION: Monte Carlo Simulation Core
 # Monte Carlo = run the same random experiment thousands of
 # times and look at the overall distribution of results.
@@ -130,40 +177,46 @@ def run_monte_carlo_simulation(
     # We don't care about the index, just need to loop n times
     for _ in range(number_of_simulations):
 
-        # --- Step 1: Simulate Minutes Played ---
-        # Players don't always play full minutes. Randomize:
-        # - Blowout risk: big leads → stars sit in 4th quarter
-        # - Foul trouble: 4-5 fouls → reduced minutes
-        minutes_reduction_from_blowout = _simulate_blowout_minutes_reduction(
-            blowout_risk_factor
-        )
-        minutes_reduction_from_fouls = _simulate_foul_trouble_minutes_reduction()
-
-        # Combine minutes reductions (can't reduce more than 40%)
-        total_minutes_reduction = min(
-            0.40,
-            minutes_reduction_from_blowout + minutes_reduction_from_fouls
+        # --- Step 1: Pick a Game Scenario (W3: Ceiling/Floor Games) ---
+        # Instead of rolling blowout and foul trouble independently,
+        # we now pick ONE holistic scenario that determines BOTH minutes
+        # AND stats together. This models the real-world correlation:
+        # e.g., a player in foul trouble in a blowout DEFINITELY sits.
+        scenario_name, minutes_reduction, stat_scenario_multiplier = (
+            _simulate_game_scenario(blowout_risk_factor)
         )
 
-        # Minutes multiplier: 1.0 = full game, 0.6 = only 60% of minutes
-        minutes_multiplier = 1.0 - total_minutes_reduction
+        # minutes_reduction can be negative (close game/OT = extra minutes)
+        # Cap to [-0.15, 0.60] to avoid negative or impossibly high minutes
+        minutes_reduction = max(-0.15, min(0.60, minutes_reduction))
+        minutes_multiplier = 1.0 - minutes_reduction
 
-        # --- Step 2: Simulate the Actual Stat ---
+        # --- Step 2: Apply Hot Hand / Cold Game Modifier (W4: Momentum) ---
+        # In 15% of games the player is "on fire"; in 10% they're "ice cold".
+        # This creates fat tails in the distribution, especially for threes.
+        momentum_multiplier = _simulate_hot_cold_modifier()
+
+        # --- Step 3: Simulate the Actual Stat ---
         # Scale projection by minutes played, then add randomness
-        scaled_projection = adjusted_stat_projection * minutes_multiplier
+        effective_mean = (
+            adjusted_stat_projection
+            * minutes_multiplier
+            * stat_scenario_multiplier
+            * momentum_multiplier
+        )
 
         # Scale std dev proportionally (less minutes = less variance too)
-        scaled_std = adjusted_standard_deviation * math.sqrt(minutes_multiplier)
+        scaled_std = adjusted_standard_deviation * math.sqrt(max(0.1, minutes_multiplier))
 
         # Draw a random sample: this is one simulated game's result
         simulated_game_stat = sample_from_normal_distribution(
-            scaled_projection, scaled_std
+            effective_mean, scaled_std
         )
 
         # Stats can't be negative (can't have -3 assists)
         simulated_game_stat = max(0.0, simulated_game_stat)
 
-        # --- Step 3: Record the Result ---
+        # --- Step 4: Record the Result ---
         all_simulated_game_results.append(simulated_game_stat)
 
         # Did this simulated game go OVER the prop line?
@@ -213,12 +266,88 @@ def run_monte_carlo_simulation(
 # like blowouts and foul trouble.
 # ============================================================
 
+def _simulate_game_scenario(blowout_risk_factor):
+    """
+    Pick a holistic game scenario for this simulated game. (W3)
+
+    Replaces the old independent blowout + foul trouble rolls with
+    a single scenario that applies CORRELATED effects on both
+    minutes and stats. The blowout scenarios are scaled by the
+    incoming `blowout_risk_factor` so high-spread games still
+    get more blowout weight.
+
+    Args:
+        blowout_risk_factor (float): 0.0-1.0 blowout probability
+            from projections.py. Higher → more weight on blowout
+            scenarios, less on normal game.
+
+    Returns:
+        tuple: (scenario_name: str,
+                minutes_reduction: float,   # fraction of mins lost (negative = gained)
+                stat_multiplier: float)     # additional stat modifier
+    """
+    # Scale blowout scenario weights by the actual blowout risk.
+    # Base blowout_win + blowout_loss weight is 0.18. If blowout_risk_factor
+    # is higher than the base 0.15, shift weight from "normal" to blowout.
+    blowout_extra = max(0.0, blowout_risk_factor - 0.15)  # extra risk beyond base
+
+    adjusted_scenarios = []
+    for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in GAME_SCENARIOS:
+        if name in ("blowout_win", "blowout_loss"):
+            adjusted_prob = prob + blowout_extra * 0.5  # split extra between win/loss
+        elif name == "normal":
+            adjusted_prob = prob - blowout_extra  # reduce normal probability
+        else:
+            adjusted_prob = prob
+        adjusted_scenarios.append((name, max(0.0, adjusted_prob), min_red_lo, min_red_hi, stat_lo, stat_hi))
+
+    # Normalize so probabilities sum to 1
+    total_weight = sum(s[1] for s in adjusted_scenarios)
+    roll = random.random() * total_weight
+
+    cumulative = 0.0
+    for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:
+        cumulative += prob
+        if roll <= cumulative:
+            minutes_reduction = random.uniform(min_red_lo, min_red_hi)
+            stat_multiplier = random.uniform(stat_lo, stat_hi)
+            return name, minutes_reduction, stat_multiplier
+
+    # Fallback: normal game
+    return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
+
+
+def _simulate_hot_cold_modifier():
+    """
+    Apply a "hot hand" or "cold game" multiplier to the stat mean. (W4)
+
+    In real NBA games, players have momentum nights (three-point
+    streaks, every shot dropping) and ice-cold nights. This creates
+    a distribution with FATTER TAILS than a pure normal, which is
+    especially important for streaky stats like threes.
+
+    Returns:
+        float: Multiplier near 1.0 (hot → 1.15-1.30, cold → 0.70-0.85)
+    """
+    roll = random.random()
+
+    if roll < HOT_HAND_PROBABILITY:
+        # "On fire" game — player is in a rhythm
+        return random.uniform(HOT_HAND_MULTIPLIER_MIN, HOT_HAND_MULTIPLIER_MAX)
+    elif roll < HOT_HAND_PROBABILITY + COLD_GAME_PROBABILITY:
+        # "Ice cold" game — nothing going in
+        return random.uniform(COLD_GAME_MULTIPLIER_MIN, COLD_GAME_MULTIPLIER_MAX)
+    else:
+        # Typical game — no hot/cold modifier
+        return 1.0
+
+
 def _simulate_blowout_minutes_reduction(blowout_risk_factor):
     """
     Simulate whether a blowout causes star players to sit.
 
-    In blowout games, coaches rest starters in garbage time,
-    reducing their chance to pad stats.
+    NOTE: This function is kept for use by combo/fantasy simulations
+    that haven't yet migrated to the scenario system.
 
     Args:
         blowout_risk_factor (float): 0.0 to 1.0 probability
