@@ -30,6 +30,7 @@ from data.data_manager import (
     validate_props_against_roster,
     get_player_status,
     get_status_badge_html,
+    load_injury_status,
 )
 
 # Import the theme helpers
@@ -67,7 +68,9 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
 if "injury_status_map" not in st.session_state:
-    st.session_state["injury_status_map"] = {}
+    # Auto-load persisted injury status from disk on first visit so the
+    # Analysis page always has the latest status without a manual refresh.
+    st.session_state["injury_status_map"] = load_injury_status()
 
 # ============================================================
 # END SECTION: Page Setup
@@ -137,6 +140,9 @@ def display_prop_analysis_card(result):
     and an "Add to Entry" button. Keeps a detailed expander with the
     full forces breakdown.
 
+    OUT/IR players show a prominent ❌ warning and skip the simulation
+    display entirely. Questionable/Day-to-Day players show a ⚠️ badge.
+
     Args:
         result (dict): Full analysis result from the simulation loop
     """
@@ -149,6 +155,17 @@ def display_prop_analysis_card(result):
     edge_pct = result.get("edge_percentage", 0)
     platform = result.get("platform", "")
     opponent = result.get("opponent", "")
+
+    # ── OUT / Injured Reserve players — show banner and stop ─────
+    if result.get("player_is_out", False):
+        player_status = result.get("player_status", "Out")
+        status_note = result.get("player_status_note", "")
+        st.error(
+            f"❌ **{player}** is **{player_status}** — prop skipped. "
+            + (f"_{status_note}_" if status_note else "")
+            + "\n\nRemove this prop from your list."
+        )
+        return  # Nothing more to display for an inactive player
 
     # ── AI Verdict ──────────────────────────────────────────────
     if confidence >= 65 and not should_avoid:
@@ -164,7 +181,7 @@ def display_prop_analysis_card(result):
         verdict_text = "RISKY ⚠️"
         style = "risky"
 
-    tldr = result.get("explanation", {}).get("tldr", "")
+    tldr = result.get("explanation", {}).get("tldr", "") if result.get("explanation") else ""
     st.markdown(
         get_ai_verdict_card_html(verdict_key, confidence, tldr or result.get("recommendation", "")),
         unsafe_allow_html=True,
@@ -182,10 +199,18 @@ def display_prop_analysis_card(result):
             unsafe_allow_html=True,
         )
     with badge_col:
-        status_map = st.session_state.get("injury_status_map", {})
-        player_status_dict = get_player_status(player, status_map)
-        player_status = player_status_dict.get("status", "Active")
+        # Use status already resolved during the simulation loop when available,
+        # otherwise fall back to a live lookup in the session map.
+        player_status = result.get("player_status") or (
+            get_player_status(player, st.session_state.get("injury_status_map", {})).get("status", "Active")
+        )
         st.markdown(get_status_badge_html(player_status), unsafe_allow_html=True)
+
+        # Show ⚠️ inline note for Questionable / Day-to-Day
+        if player_status in ("Questionable", "Day-to-Day"):
+            note = result.get("player_status_note", "")
+            if note:
+                st.caption(f"⚠️ {note}")
 
     # ── Key Numbers grid ─────────────────────────────────────────
     stat_type_lower = result.get("stat_type", "points").lower()
@@ -518,6 +543,70 @@ if run_analysis:
         prop_line = float(prop.get("line", 0))
         platform = prop.get("platform", "PrizePicks")
 
+        # ── Injury / availability gate ────────────────────────────
+        # Check the player's status BEFORE running the simulation.
+        # If the player is Out or on IR, skip the full simulation and
+        # add a minimal "Out" result so the UI can display a clear warning.
+        injury_map = st.session_state.get("injury_status_map", {})
+        player_status_info = get_player_status(player_name, injury_map)
+        player_status = player_status_info.get("status", "Active")
+
+        if player_status in ("Out", "Injured Reserve"):
+            injury_note = player_status_info.get("injury_note", "Player is not active")
+            analysis_results_list.append({
+                "player_name": player_name,
+                "team": prop.get("team", ""),
+                "player_team": prop.get("team", ""),
+                "player_position": "",
+                "stat_type": stat_type,
+                "line": prop_line,
+                "platform": platform,
+                "season_pts_avg": 0,
+                "season_reb_avg": 0,
+                "season_ast_avg": 0,
+                "points_avg": 0,
+                "rebounds_avg": 0,
+                "assists_avg": 0,
+                "opponent": "",
+                "probability_over": 0.0,
+                "probability_under": 1.0,
+                "simulated_mean": 0.0,
+                "simulated_std": 0.0,
+                "percentile_10": 0.0,
+                "percentile_50": 0.0,
+                "percentile_90": 0.0,
+                "adjusted_projection": 0.0,
+                "overall_adjustment": 1.0,
+                "recent_form_ratio": None,
+                "games_played": None,
+                "edge_percentage": -50.0,
+                "confidence_score": 0,
+                "tier": "Bronze",
+                "tier_emoji": "🥉",
+                "direction": "UNDER",
+                "recommendation": f"SKIP — {player_name} is {player_status}",
+                "forces": {"over_forces": [], "under_forces": []},
+                "should_avoid": True,
+                "avoid_reasons": [f"Player is {player_status}: {injury_note}"],
+                "histogram": [],
+                "score_breakdown": {},
+                "line_vs_avg_pct": 0,
+                "recent_form_results": [],
+                "player_matched": False,
+                "explanation": None,
+                "line_sharpness_force": None,
+                "line_sharpness_penalty": 0.0,
+                "trap_line_result": {},
+                "trap_line_penalty": 0.0,
+                "teammate_out_notes": [],
+                "minutes_adjustment_factor": 1.0,
+                # Mark explicitly so display logic can show the ❌ OUT badge
+                "player_is_out": True,
+                "player_status": player_status,
+                "player_status_note": injury_note,
+            })
+            continue  # Skip to next prop — no simulation needed
+
         # Find the player in our player database (uses fuzzy/normalized matching)
         player_data = find_player_by_name(players_data, player_name)
         player_matched = player_data is not None
@@ -669,6 +758,8 @@ if run_analysis:
             "stat_type": stat_type,
             "line": prop_line,
             "platform": platform,
+            # Player ID for headshot lookup (from players CSV if available)
+            "player_id": player_data.get("player_id", ""),
             # Season averages for display
             "season_pts_avg": float(player_data.get("points_avg", 0) or 0),
             "season_reb_avg": float(player_data.get("rebounds_avg", 0) or 0),
@@ -725,6 +816,10 @@ if run_analysis:
             # W8: Teammate impact info
             "teammate_out_notes": projection_result.get("teammate_out_notes", []),
             "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
+            # Injury / availability status for this player
+            "player_is_out": False,
+            "player_status": player_status,
+            "player_status_note": player_status_info.get("injury_note", ""),
         }
 
         analysis_results_list.append(full_result)

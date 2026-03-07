@@ -36,6 +36,10 @@ DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"
 # when real data is downloaded. Its existence tells us if live data is loaded.
 LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
 
+# Path to the persisted injury/availability status cache written by
+# fetch_player_injury_status() in live_data_fetcher.py.
+INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
+
 # ============================================================
 # END SECTION: File Path Constants
 # ============================================================
@@ -94,6 +98,36 @@ def load_defensive_ratings_data():
         list of dict: Defensive rating rows with vs_PG_pts, etc.
     """
     return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
+
+
+def load_injury_status():
+    """
+    Load the persisted player injury/availability status map from disk.
+
+    The status map is written by ``fetch_player_injury_status()`` in
+    ``live_data_fetcher.py`` after each data-update cycle. This function
+    provides a fast, no-API-call way for the Analysis and Prop Scanner
+    pages to check player availability on startup.
+
+    Returns:
+        dict: player_name_lower → {
+            "status": str,          # "Active"|"Out"|"Questionable"|"Day-to-Day"|"Injured Reserve"
+            "injury_note": str,
+            "games_missed": int,
+            "return_date": str,
+            "last_game_date": str,
+            "gp_ratio": float,
+        }
+        Returns an empty dict if the file does not exist or cannot be parsed.
+    """
+    if not INJURY_STATUS_JSON_PATH.exists():
+        return {}
+    try:
+        with open(INJURY_STATUS_JSON_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as err:
+        print(f"load_injury_status: could not read {INJURY_STATUS_JSON_PATH}: {err}")
+        return {}
 
 
 def _load_csv_file(file_path):
@@ -541,6 +575,31 @@ def validate_props_against_roster(props_list, players_list):
         })
 
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
+
+    # Post-process matched/fuzzy_matched to flag any OUT players
+    # Load injury status once for the whole batch
+    injury_map = load_injury_status()
+    if injury_map:
+        for item in matched + fuzzy_matched:
+            matched_name = item.get("matched_name", "")
+            status_info = get_player_status(matched_name, injury_map)
+            player_status = status_info.get("status", "Active")
+            if player_status in ("Out", "Injured Reserve"):
+                note = status_info.get("injury_note", "")
+                item["out_warning"] = (
+                    f"⛔ {matched_name} is {player_status}"
+                    + (f" — {note}" if note else "")
+                    + " — remove this prop"
+                )
+                item["player_status"] = player_status
+            elif player_status in ("Questionable", "Day-to-Day"):
+                note = status_info.get("injury_note", "")
+                item["status_warning"] = (
+                    f"⚠️ {matched_name} is {player_status}"
+                    + (f" — {note}" if note else "")
+                )
+                item["player_status"] = player_status
+
     return {
         "matched": matched,
         "fuzzy_matched": fuzzy_matched,
@@ -710,17 +769,39 @@ def get_player_status(player_name, status_map):
     """
     Look up a player's injury/availability status from a status map.
 
+    If ``status_map`` is empty or None, the function automatically tries
+    to load the persisted status from INJURY_STATUS_JSON_PATH so callers
+    don't need to manage the file path themselves.
+
     Args:
         player_name (str): Player name to look up
         status_map (dict): Map from normalize_player_name -> status_dict
-                           (as returned by fetch_player_injury_status)
+                           (as returned by fetch_player_injury_status).
+                           Pass an empty dict or None to auto-load from disk.
 
     Returns:
         dict: Status dict with keys 'status', 'injury_note', 'games_missed',
-              'return_date'. Returns default "Active" status if not found.
+              'return_date', 'last_game_date', 'gp_ratio'.
+              Returns default "Active" status if not found.
     """
-    if not status_map or not player_name:
-        return {"status": "Active", "injury_note": "", "games_missed": 0, "return_date": ""}
+    _default = {
+        "status": "Active",
+        "injury_note": "",
+        "games_missed": 0,
+        "return_date": "",
+        "last_game_date": "",
+        "gp_ratio": 1.0,
+    }
+
+    if not player_name:
+        return _default
+
+    # Auto-load from disk when no in-memory map is provided
+    if not status_map:
+        status_map = load_injury_status()
+
+    if not status_map:
+        return _default
 
     # Try exact lowercase match first
     key = player_name.lower().strip()
@@ -733,7 +814,7 @@ def get_player_status(player_name, status_map):
         return status_map[normalized]
 
     # Default to Active if not found
-    return {"status": "Active", "injury_note": "", "games_missed": 0, "return_date": ""}
+    return _default
 
 
 def get_status_badge_html(status):

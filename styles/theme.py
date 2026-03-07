@@ -1078,11 +1078,17 @@ def get_player_card_html(result):
     """
     Build the complete styled analysis card HTML for one prop result.
 
+    The card header now includes a player headshot fetched from the NBA CDN
+    (``https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png``).
+    An ``onerror`` handler falls back to a generic silhouette when the image
+    is unavailable (e.g. sample / unknown player IDs).
+
     Args:
         result (dict): Full analysis result dict from the simulation loop.
             Expected keys: player_name, stat_type, line, direction, tier,
             tier_emoji, probability_over, edge_percentage, confidence_score,
-            platform, player_team, player_position, season_pts_avg, etc.
+            platform, player_team, player_position, season_pts_avg,
+            player_id (optional NBA player ID for headshot), etc.
 
     Returns:
         str: Complete HTML string for the card
@@ -1100,6 +1106,7 @@ def get_player_card_html(result):
     team = result.get("player_team", result.get("team", ""))
     position = result.get("player_position", result.get("position", ""))
     proj = result.get("adjusted_projection", 0)
+    player_id = result.get("player_id", "")
 
     pts_avg = result.get("season_pts_avg", result.get("points_avg", 0))
     reb_avg = result.get("season_reb_avg", result.get("rebounds_avg", 0))
@@ -1126,6 +1133,26 @@ def get_player_card_html(result):
     # Team badge
     team_badge = f'<span class="team-pill" style="background:{secondary_color};">{team}</span>' if team else ""
     position_tag = f'<span class="position-tag">{position}</span>' if position else ""
+
+    # Player headshot from NBA CDN with fallback silhouette
+    NBA_CDN_BASE = "https://cdn.nba.com/headshots/nba/latest/1040x760"
+    FALLBACK_HEADSHOT = f"{NBA_CDN_BASE}/fallback.png"
+    if player_id:
+        headshot_url = f"{NBA_CDN_BASE}/{player_id}.png"
+        headshot_html = (
+            f'<img src="{headshot_url}" '
+            f'onerror="this.onerror=null;this.src=\'{FALLBACK_HEADSHOT}\';" '
+            f'style="width:60px;height:44px;border-radius:8px;object-fit:cover;'
+            f'margin-right:12px;flex-shrink:0;background:#1a2035;" '
+            f'alt="{player}">'
+        )
+    else:
+        headshot_html = (
+            f'<div style="width:60px;height:44px;border-radius:8px;'
+            f'background:#1a2035;margin-right:12px;flex-shrink:0;'
+            f'display:flex;align-items:center;justify-content:center;'
+            f'font-size:1.6rem;">🏀</div>'
+        )
 
     # Stat pills
     stat_pills = ""
@@ -1197,12 +1224,14 @@ def get_player_card_html(result):
 
     return f"""
 <div class="smartai-card" style="border-top-color:{primary_color};">
-  <!-- Header: Player name + team + tier -->
+  <!-- Header: Headshot + Player name + team + tier -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-    <div>
-      <span class="player-name">{player}</span>
-      {team_badge}
-      {position_tag}
+    <div style="display:flex;align-items:center;">
+      {headshot_html}
+      <div>
+        <span class="player-name">{player}</span>
+        <div style="margin-top:2px;">{team_badge} {position_tag}</div>
+      </div>
     </div>
     <span class="{tier_class}">{tier_emoji} {tier}</span>
   </div>

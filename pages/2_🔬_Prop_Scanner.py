@@ -20,6 +20,8 @@ from data.data_manager import (
     find_player_by_name,
     enrich_prop_with_player_data,
     validate_props_against_roster,
+    get_player_status,
+    load_injury_status,
 )
 from data.platform_mappings import (
     normalize_stat_type,
@@ -106,6 +108,9 @@ valid_platforms = ["PrizePicks", "Underdog", "DraftKings"]
 
 current_props = load_props_from_session(st.session_state)
 
+# Load persisted injury status for warning display (no API call needed)
+injury_status_map = load_injury_status()
+
 st.subheader(f"📋 Current Props ({len(current_props)} loaded)")
 
 if current_props:
@@ -138,9 +143,19 @@ if current_props:
         else:
             line_ctx = "near avg"
 
+        # Injury / availability status flag
+        status_info = get_player_status(player_name, injury_status_map)
+        player_status = status_info.get("status", "Active")
+        status_emoji = {
+            "Out": "🔴", "Injured Reserve": "🔴",
+            "Questionable": "🟡", "Day-to-Day": "🟡",
+            "Active": "🟢",
+        }.get(player_status, "⚪")
+
         display_rows.append({
             "#": i + 1,
             "Player": player_name,
+            "Status": f"{status_emoji} {player_status}",
             "Team": team,
             "Stat": stat,
             "Line": line,
@@ -159,6 +174,34 @@ if current_props:
             "Season Avg": st.column_config.NumberColumn(format="%.1f"),
         },
     )
+
+    # Show prominent OUT/IR warnings above the table
+    out_warnings = []
+    for prop in current_props:
+        pname = prop.get("player_name", "")
+        si = get_player_status(pname, injury_status_map)
+        pstatus = si.get("status", "Active")
+        if pstatus in ("Out", "Injured Reserve"):
+            note = si.get("injury_note", "")
+            out_warnings.append(
+                f"⛔ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
+            )
+        elif pstatus in ("Questionable", "Day-to-Day"):
+            note = si.get("injury_note", "")
+            out_warnings.append(
+                f"⚠️ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
+            )
+
+    if out_warnings:
+        with st.expander(
+            f"🏥 Availability Alerts ({len(out_warnings)} player(s)) — click to expand",
+            expanded=True,
+        ):
+            for warning in out_warnings:
+                if warning.startswith("⛔"):
+                    st.error(warning)
+                else:
+                    st.warning(warning)
 
     col_clear, col_load_sample, _ = st.columns([1, 1, 3])
     with col_clear:
@@ -179,6 +222,15 @@ if current_props:
         validation = validate_props_against_roster(current_props, players_data)
         total_v = validation["total"]
         matched_count_v = validation["matched_count"]
+
+        # Show OUT warnings from the validation result (these are post-processed by data_manager)
+        out_in_validation = [
+            item for item in validation["matched"] + validation["fuzzy_matched"]
+            if item.get("out_warning")
+        ]
+        if out_in_validation:
+            for item in out_in_validation:
+                st.error(item["out_warning"])
 
         if total_v > 0:
             with st.expander(
