@@ -352,6 +352,18 @@ html, body, [class*="css"] {
     font-weight: 700;
     margin: 2px;
 }
+.health-fuzzy {
+    display: inline-block;
+    background: rgba(234,179,8,0.12);
+    border: 1px solid rgba(234,179,8,0.4);
+    color: #fbbf24;
+    padding: 2px 9px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin: 2px;
+    cursor: help;
+}
 .health-unmatched {
     display: inline-block;
     background: rgba(239,68,68,0.15);
@@ -759,6 +771,131 @@ def get_best_bets_section_html(best_bets):
   {cards_html}
 </div>
 """
+
+
+def get_roster_health_html(matched, fuzzy_matched, unmatched):
+    """
+    Return HTML showing prop-to-roster matching status.
+
+    Three categories:
+    - ✅ Matched players (green) — definitive match
+    - ⚠️ Fuzzy matched (yellow) — probable match with suggestion
+    - ❌ Unmatched (red) — no match found, closest suggestion shown
+
+    Args:
+        matched (list of dict): Items from validate_props_against_roster()['matched']
+            Each has 'prop' (dict) and 'matched_name' (str)
+        fuzzy_matched (list of dict): Items from ['fuzzy_matched']
+            Each has 'prop', 'matched_name', 'suggestion'
+        unmatched (list of dict): Items from ['unmatched']
+            Each has 'prop' (dict) and 'suggestion' (str or None)
+
+    Returns:
+        str: HTML string for the roster health section
+    """
+    sections = []
+
+    if matched:
+        chips = " ".join(
+            f'<span class="health-matched">✅ {item["prop"].get("player_name", "")}</span>'
+            for item in matched
+        )
+        sections.append(f"""
+<div style="margin-bottom:12px;">
+  <div style="color:#34d399;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+              letter-spacing:1px;margin-bottom:6px;">
+    ✅ Matched ({len(matched)})
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;">{chips}</div>
+</div>""")
+
+    if fuzzy_matched:
+        chips = " ".join(
+            f'<span class="health-fuzzy" title="{item.get("suggestion","")}">'
+            f'⚠️ {item["prop"].get("player_name", "")}'
+            f'<span style="font-size:0.7rem;opacity:0.8;"> → {item.get("matched_name","")}</span>'
+            f'</span>'
+            for item in fuzzy_matched
+        )
+        sections.append(f"""
+<div style="margin-bottom:12px;">
+  <div style="color:#fbbf24;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+              letter-spacing:1px;margin-bottom:6px;">
+    ⚠️ Fuzzy Matched ({len(fuzzy_matched)}) — using closest match
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;">{chips}</div>
+</div>""")
+
+    if unmatched:
+        chips = " ".join(
+            f'<span class="health-unmatched" title="Closest: {item.get("suggestion") or "none"}">'
+            f'❌ {item["prop"].get("player_name", "")}'
+            + (f'<span style="font-size:0.7rem;opacity:0.7;"> (suggest: {item["suggestion"]})</span>'
+               if item.get("suggestion") else "")
+            + "</span>"
+            for item in unmatched
+        )
+        sections.append(f"""
+<div style="margin-bottom:12px;">
+  <div style="color:#f87171;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+              letter-spacing:1px;margin-bottom:6px;">
+    ❌ Unmatched ({len(unmatched)}) — will use fallback data
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:4px;">{chips}</div>
+</div>""")
+
+    if not sections:
+        return '<div style="color:#34d399;">✅ All props matched to the player database.</div>'
+
+    inner = "\n".join(sections)
+    total = len(matched) + len(fuzzy_matched) + len(unmatched)
+    match_pct = int((len(matched) + len(fuzzy_matched)) / max(total, 1) * 100)
+    return f"""
+<div style="background:rgba(20,20,50,0.7);border:1px solid rgba(255,255,255,0.08);
+            border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+  <div style="font-size:1rem;font-weight:700;color:#f0f4ff;margin-bottom:12px;">
+    🧬 Roster Health Check
+    <span style="font-size:0.8rem;font-weight:400;color:#718096;margin-left:8px;">
+      {len(matched) + len(fuzzy_matched)}/{total} matched ({match_pct}%)
+    </span>
+  </div>
+  {inner}
+  <div style="font-size:0.75rem;color:#718096;margin-top:4px;">
+    💡 Add fuzzy-matched names to the alias map for exact matching next time.
+    Unmatched props use the prop line as the baseline projection.
+  </div>
+</div>"""
+
+
+def get_platform_badge_html(platform):
+    """
+    Return a styled platform badge for PrizePicks, DraftKings, or Underdog.
+
+    Args:
+        platform (str): Platform name
+
+    Returns:
+        str: HTML span with platform-specific gradient and styling
+    """
+    platform_styles = {
+        "PrizePicks": (
+            "background:linear-gradient(135deg,#276749,#48bb78);color:#f0fff4;"
+        ),
+        "DraftKings": (
+            "background:linear-gradient(135deg,#1a202c,#2b6cb0);color:#bee3f8;"
+        ),
+        "Underdog": (
+            "background:linear-gradient(135deg,#44337a,#805ad5);color:#e9d8fd;"
+        ),
+    }
+    style = platform_styles.get(
+        platform,
+        "background:rgba(45,55,72,0.9);color:#e2e8f0;",
+    )
+    return (
+        f'<span style="{style}padding:3px 10px;border-radius:6px;'
+        f'font-size:0.8rem;font-weight:700;display:inline-block;">{platform}</span>'
+    )
 
 # ============================================================
 # END SECTION: HTML Component Generators
