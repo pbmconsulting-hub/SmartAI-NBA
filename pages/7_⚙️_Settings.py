@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: pages/7_⚙️_Settings.py
-# PURPOSE: Configure the SmartAI-NBA engine settings:
+# PURPOSE: Configure the SmartBetPro NBA engine settings:
 #          simulation depth, edge thresholds, platform selection,
 #          and entry fee defaults. All settings persist in session state.
 # CONNECTS TO: All engine pages use settings from session state
@@ -20,12 +20,25 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 st.title("⚙️ Settings")
 st.markdown("Configure the SmartBetPro NBA prediction engine.")
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 What Do These Settings Do?",
+    """
+    <strong>Simulation Depth</strong>: How many game simulations to run per prop. 
+    More = more accurate but slower. 2,000 is the recommended balance.<br><br>
+    <strong>Minimum Edge Threshold</strong>: Only show picks with at least this much edge. 
+    5% = only show picks where we have at least a 5% probability advantage over the line.<br><br>
+    <strong>Entry Fee</strong>: Default dollar amount for EV calculations in Entry Builder.<br><br>
+    <strong>Platforms</strong>: Which betting platforms to analyze for. 
+    Different platforms have different payout structures.
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup

@@ -22,7 +22,7 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── Custom CSS ────────────────────────────────────────────
@@ -180,6 +180,18 @@ if fetch_players_clicked:
             )
 
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 Understanding NBA Game Context",
+    """
+    <strong>Spread</strong>: The Vegas point spread. A spread of +5 means the home team is expected to win by 5 points. 
+    Useful for estimating blowout risk — in a blowout, stars often sit the 4th quarter.<br><br>
+    <strong>Game Total (O/U)</strong>: The Vegas over/under for combined score of both teams. 
+    A high total (e.g., 230+) means Vegas expects a fast-paced, high-scoring game, boosting all players' stat projections.<br><br>
+    <strong>Why it matters</strong>: These numbers adjust our AI projections — a high total gives players +5-8% stat boost, 
+    while a large spread increases blowout risk and reduces projected minutes for stars.
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # SECTION: Display Current Games as Rich Cards

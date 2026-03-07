@@ -50,7 +50,7 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # Page title and description
@@ -61,6 +61,19 @@ st.markdown(
     "for the most accurate predictions!"
 )
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 How Data Updates Work",
+    """
+    <strong>Smart Update (Recommended)</strong>: Only fetches players on tonight's teams. 
+    10x faster than Full Update — use this before each session.<br><br>
+    <strong>Full Update</strong>: Fetches all 450+ NBA players. Takes 5-10 minutes. 
+    Use once a week to keep historical averages current.<br><br>
+    <strong>Live vs Sample data</strong>: Live data = real current season stats from NBA.com. 
+    Sample data = pre-loaded example data for demonstration.<br><br>
+    <strong>Rate limiting</strong>: We wait 1.5 seconds between API calls to respect NBA.com's limits.
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup

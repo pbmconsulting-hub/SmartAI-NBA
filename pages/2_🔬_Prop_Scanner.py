@@ -39,7 +39,7 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── Custom CSS ───────────────────────────────────────────────
@@ -62,6 +62,19 @@ st.markdown("""
 st.title("🔬 Prop Scanner")
 st.markdown("Enter prop lines manually or upload a CSV. Sample props are pre-loaded!")
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 What is a Prop Bet?",
+    """
+    <strong>Prop Bet</strong>: A bet on whether a player will exceed (Over) or fall short of (Under) a 
+    statistical threshold set by the platform.<br><br>
+    Example: "LeBron James Points OVER 24.5" — you win if LeBron scores 25 or more points.<br><br>
+    <strong>How to read a prop line</strong>: The number (24.5) is the threshold. 
+    Always bet OVER or UNDER — never equal (that's a push/tie).<br><br>
+    <strong>Platforms</strong>: PrizePicks and Underdog use Flex scoring (partial wins). 
+    DraftKings Pick6 requires all picks to hit for full payout.
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup
