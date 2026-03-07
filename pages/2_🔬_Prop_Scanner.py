@@ -49,13 +49,13 @@ st.markdown("""
 .plat-prizepicks { background:#276749; color:#9ae6b4; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; }
 .plat-underdog   { background:#553c9a; color:#d6bcfa; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; }
 .plat-draftkings { background:#2b6cb0; color:#bee3f8; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; }
-.plat-default    { background:#2d3748; color:#e2e8f0; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; }
+.plat-default    { background:#1a2035; color:#c0d0e8; padding:2px 8px; border-radius:4px; font-size:0.8rem; font-weight:700; border:1px solid rgba(0,240,255,0.20); }
 /* Team pill */
-.team-pill { background:#0f3460; color:#fff; padding:1px 6px; border-radius:4px; font-size:0.8rem; font-weight:700; }
+.team-pill { background:rgba(0,240,255,0.12); color:#fff; border:1px solid rgba(0,240,255,0.30); padding:1px 6px; border-radius:4px; font-size:0.8rem; font-weight:700; }
 /* Line context: high/low */
-.line-high { color:#fc8181; font-size:0.75rem; }
-.line-low  { color:#68d391; font-size:0.75rem; }
-.line-ok   { color:#718096; font-size:0.75rem; }
+.line-high { color:#ff6b6b; font-size:0.75rem; }
+.line-low  { color:#00ff9d; font-size:0.75rem; }
+.line-ok   { color:#8a9bb8; font-size:0.75rem; }
 </style>
 """, unsafe_allow_html=True)
 

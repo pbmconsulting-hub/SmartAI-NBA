@@ -32,48 +32,70 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 # ─── Light AI-Lab Theme CSS ───────────────────────────────────
 st.markdown("""
 <style>
-/* Hero banner gradient — vibrant high-tech */
+/* Hero banner gradient — vibrant high-tech Quantum Edge */
 .hero-banner {
-    background: linear-gradient(135deg, #0891b2 0%, #4f46e5 50%, #7c3aed 100%);
+    background: linear-gradient(135deg, #0a0f1a 0%, #0d1a2e 50%, #0a0f1a 100%);
+    border: 1px solid rgba(0,240,255,0.25);
     border-radius: 14px;
     padding: 28px 36px;
     margin-bottom: 24px;
-    box-shadow: 0 6px 28px rgba(79,70,229,0.22);
+    box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 6px 28px rgba(0,0,0,0.5);
+    position: relative;
+    overflow: hidden;
+}
+.hero-banner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
+    background-size: 200% 100%;
+    animation: headerShimmer 4s ease infinite;
 }
 .hero-title {
     font-size: 2.4rem;
     font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
     color: #ffffff;
     margin: 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 20px rgba(0,240,255,0.4);
 }
 .hero-subtitle {
     font-size: 1.05rem;
-    color: rgba(255,255,255,0.90);
+    color: rgba(192,208,232,0.90);
     margin-top: 6px;
 }
 .hero-date {
     font-size: 0.95rem;
-    color: rgba(255,255,255,0.80);
+    color: rgba(192,208,232,0.75);
     margin-top: 4px;
+    font-family: 'Courier New', Courier, monospace;
 }
-/* Status card — clean white AI-lab panel */
+/* Status card — dark glass panel */
 .status-card {
-    background: #ffffff;
-    border: 1px solid rgba(8,145,178,0.22);
+    background: rgba(20,25,43,0.85);
+    border: 1px solid rgba(0,240,255,0.15);
     border-radius: 10px;
     padding: 16px 20px;
     text-align: center;
-    box-shadow: 0 2px 8px rgba(8,145,178,0.09);
+    box-shadow: 0 0 16px rgba(0,240,255,0.07), 0 4px 16px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.status-card:hover {
+    border-color: rgba(0,240,255,0.35);
+    transform: translateY(-3px);
 }
 .status-card-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #0f172a;
+    color: rgba(255,255,255,0.95);
+    font-family: 'Courier New', Courier, monospace;
 }
 .status-card-label {
     font-size: 0.8rem;
-    color: #64748b;
+    color: #8a9bb8;
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-top: 4px;
@@ -81,9 +103,9 @@ st.markdown("""
 /* Tonight's slate team chips */
 .team-chip {
     display: inline-block;
-    background: rgba(8,145,178,0.10);
-    color: #0f172a;
-    border: 1px solid rgba(8,145,178,0.25);
+    background: rgba(0,240,255,0.07);
+    color: rgba(255,255,255,0.90);
+    border: 1px solid rgba(0,240,255,0.25);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 0.85rem;
@@ -93,19 +115,20 @@ st.markdown("""
 /* Tier badge pill */
 .live-badge {
     display: inline-block;
-    background: rgba(16,185,129,0.12);
-    color: #065f46;
-    border: 1px solid rgba(16,185,129,0.30);
+    background: rgba(0,255,157,0.10);
+    color: #00ff9d;
+    border: 1px solid rgba(0,255,157,0.35);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
+    text-shadow: 0 0 6px rgba(0,255,157,0.4);
 }
 .sample-badge {
     display: inline-block;
-    background: rgba(245,158,11,0.10);
-    color: #92400e;
-    border: 1px solid rgba(245,158,11,0.30);
+    background: rgba(255,94,0,0.10);
+    color: #ff9d4d;
+    border: 1px solid rgba(255,94,0,0.35);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
@@ -187,7 +210,7 @@ if todays_games:
         rec_a = f" ({aw}-{al})" if aw or al else ""
         rec_h = f" ({hw}-{hl})" if hw or hl else ""
         chips_html += f'<span class="team-chip">🚌 {away}{rec_a}</span> '
-        chips_html += f'<span style="color:#7c3aed; font-weight:700; font-size:0.9rem;">vs</span> '
+        chips_html += f'<span style="color:#c800ff; font-weight:700; font-size:0.9rem;">vs</span> '
         chips_html += f'<span class="team-chip">🏠 {home}{rec_h}</span> &nbsp;&nbsp;&nbsp;'
 
     st.markdown(f'<div style="margin:8px 0 4px 0;">{chips_html}</div>', unsafe_allow_html=True)

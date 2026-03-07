@@ -28,18 +28,22 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 # ─── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Game card wrapper */
+/* Game card wrapper — enhanced dark glass with cyan glow */
 .game-card {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid #0f3460;
+    background: linear-gradient(135deg, rgba(13,18,40,0.95) 0%, rgba(11,18,35,0.98) 100%);
+    border: 1px solid rgba(0,240,255,0.18);
     border-radius: 12px;
     padding: 20px 24px;
     margin-bottom: 18px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    box-shadow: 0 0 20px rgba(0,240,255,0.07), 0 4px 20px rgba(0,0,0,0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .game-card:hover {
-    border-color: #e94560;
-    box-shadow: 0 6px 20px rgba(233,69,96,0.25);
+    border-color: rgba(0,240,255,0.40);
+    box-shadow: 0 0 30px rgba(0,240,255,0.15), 0 6px 24px rgba(0,0,0,0.6);
+    transform: translateY(-3px);
     transition: all 0.2s ease;
 }
 /* Team badge */
@@ -51,31 +55,33 @@ st.markdown("""
     font-size: 1.1rem;
     letter-spacing: 1px;
     color: #ffffff;
-    background: #0f3460;
+    background: rgba(0,240,255,0.12);
+    border: 1px solid rgba(0,240,255,0.25);
     margin-right: 6px;
 }
-.home-badge { background: #0f3460; }
-.away-badge { background: #533483; }
+.home-badge { background: rgba(0,240,255,0.12); border-color: rgba(0,240,255,0.25); }
+.away-badge { background: rgba(200,0,255,0.12); border-color: rgba(200,0,255,0.25); }
 /* Record text */
-.record-text { color: #a0aec0; font-size: 0.9rem; }
+.record-text { color: #8a9bb8; font-size: 0.9rem; }
 /* Streak positive/negative */
-.streak-hot { color: #48bb78; font-weight: 700; }
-.streak-cold { color: #fc8181; font-weight: 700; }
-.streak-neutral { color: #e2e8f0; font-weight: 600; }
+.streak-hot { color: #00ff9d; font-weight: 700; text-shadow: 0 0 6px rgba(0,255,157,0.5); }
+.streak-cold { color: #ff6b6b; font-weight: 700; }
+.streak-neutral { color: rgba(255,255,255,0.85); font-weight: 600; }
 /* Game meta info */
-.game-meta { color: #718096; font-size: 0.85rem; margin-top: 4px; }
+.game-meta { color: #8a9bb8; font-size: 0.85rem; margin-top: 4px; }
 /* Divider */
 .vs-divider {
     text-align: center;
     font-size: 1.5rem;
-    color: #e94560;
+    color: #ff5e00;
     font-weight: 800;
     padding: 0 10px;
+    text-shadow: 0 0 10px rgba(255,94,0,0.6);
 }
 /* Key players row */
-.key-players { margin-top: 12px; padding-top: 12px; border-top: 1px solid #2d3748; }
-.key-players-title { color: #718096; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
-.player-stat { color: #e2e8f0; font-size: 0.9rem; }
+.key-players { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,240,255,0.12); }
+.key-players-title { color: #8a9bb8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+.player-stat { color: rgba(255,255,255,0.85); font-size: 0.9rem; }
 </style>
 """, unsafe_allow_html=True)
 
