@@ -29,51 +29,51 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-# ─── Dark Theme CSS ───────────────────────────────────────────
+# ─── Light AI-Lab Theme CSS ───────────────────────────────────
 st.markdown("""
 <style>
-/* Hero banner gradient */
+/* Hero banner gradient — vibrant high-tech */
 .hero-banner {
-    background: linear-gradient(135deg, #0f3460 0%, #533483 50%, #e94560 100%);
+    background: linear-gradient(135deg, #0891b2 0%, #4f46e5 50%, #7c3aed 100%);
     border-radius: 14px;
     padding: 28px 36px;
     margin-bottom: 24px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    box-shadow: 0 6px 28px rgba(79,70,229,0.22);
 }
 .hero-title {
     font-size: 2.4rem;
     font-weight: 800;
     color: #ffffff;
     margin: 0;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 .hero-subtitle {
     font-size: 1.05rem;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.90);
     margin-top: 6px;
 }
 .hero-date {
     font-size: 0.95rem;
-    color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.80);
     margin-top: 4px;
 }
-/* Status card */
+/* Status card — clean white AI-lab panel */
 .status-card {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 1px solid #0f3460;
+    background: #ffffff;
+    border: 1px solid rgba(8,145,178,0.22);
     border-radius: 10px;
     padding: 16px 20px;
     text-align: center;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(8,145,178,0.09);
 }
 .status-card-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #e2e8f0;
+    color: #0f172a;
 }
 .status-card-label {
     font-size: 0.8rem;
-    color: #718096;
+    color: #64748b;
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-top: 4px;
@@ -81,8 +81,9 @@ st.markdown("""
 /* Tonight's slate team chips */
 .team-chip {
     display: inline-block;
-    background: #0f3460;
-    color: #e2e8f0;
+    background: rgba(8,145,178,0.10);
+    color: #0f172a;
+    border: 1px solid rgba(8,145,178,0.25);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 0.85rem;
@@ -92,8 +93,9 @@ st.markdown("""
 /* Tier badge pill */
 .live-badge {
     display: inline-block;
-    background: #276749;
-    color: #9ae6b4;
+    background: rgba(16,185,129,0.12);
+    color: #065f46;
+    border: 1px solid rgba(16,185,129,0.30);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
@@ -101,8 +103,9 @@ st.markdown("""
 }
 .sample-badge {
     display: inline-block;
-    background: #744210;
-    color: #fbd38d;
+    background: rgba(245,158,11,0.10);
+    color: #92400e;
+    border: 1px solid rgba(245,158,11,0.30);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
@@ -184,7 +187,7 @@ if todays_games:
         rec_a = f" ({aw}-{al})" if aw or al else ""
         rec_h = f" ({hw}-{hl})" if hw or hl else ""
         chips_html += f'<span class="team-chip">🚌 {away}{rec_a}</span> '
-        chips_html += f'<span style="color:#e94560; font-weight:700; font-size:0.9rem;">vs</span> '
+        chips_html += f'<span style="color:#7c3aed; font-weight:700; font-size:0.9rem;">vs</span> '
         chips_html += f'<span class="team-chip">🏠 {home}{rec_h}</span> &nbsp;&nbsp;&nbsp;'
 
     st.markdown(f'<div style="margin:8px 0 4px 0;">{chips_html}</div>', unsafe_allow_html=True)
