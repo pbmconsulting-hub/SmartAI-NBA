@@ -29,12 +29,12 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-# ─── Light AI-Lab Theme CSS ───────────────────────────────────
+# ─── Quantum Edge Theme CSS — page-level overrides ───────────
 st.markdown("""
 <style>
-/* Hero banner gradient — vibrant high-tech Quantum Edge */
+/* Hero banner gradient — vibrant high-tech Quantum Edge teal/blue */
 .hero-banner {
-    background: linear-gradient(135deg, #0a0f1a 0%, #0d1a2e 50%, #0a0f1a 100%);
+    background: linear-gradient(135deg, #00b4ff 0%, #00ffd5 50%, #00e0b8 100%);
     border: 1px solid rgba(0,240,255,0.25);
     border-radius: 14px;
     padding: 28px 36px;
@@ -55,19 +55,19 @@ st.markdown("""
     font-size: 2.4rem;
     font-weight: 800;
     font-family: 'Orbitron', sans-serif;
-    color: #ffffff;
+    color: #0a0f1a;
     margin: 0;
     letter-spacing: 0.05em;
-    text-shadow: 0 0 20px rgba(0,240,255,0.4);
+    text-shadow: 0 0 20px rgba(0,0,0,0.2);
 }
 .hero-subtitle {
     font-size: 1.05rem;
-    color: rgba(192,208,232,0.90);
+    color: rgba(10,15,26,0.85);
     margin-top: 6px;
 }
 .hero-date {
     font-size: 0.95rem;
-    color: rgba(192,208,232,0.75);
+    color: rgba(10,15,26,0.70);
     margin-top: 4px;
     font-family: 'Courier New', Courier, monospace;
 }
