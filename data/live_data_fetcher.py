@@ -2066,10 +2066,16 @@ def fetch_player_injury_status(todays_games=None):
         # stale nba_api data when authoritative scraped data is available.
         # If ALL scrapers fail the status_map is left untouched.
         # --------------------------------------------------------
-        print("fetch_player_injury_status: Layer 5 — external web scraping (RotoWire + NBA.com)")
+        print("fetch_player_injury_status: Layer 5 — external web scraping (RotoWire + NBA.com + ESPN)")
         try:
-            from data.web_scraper import fetch_all_injury_data
-            scraped = fetch_all_injury_data()
+            # Prefer the consolidated multi-source fetcher (web_scrapers.py);
+            # fall back to the original single-module fetcher if unavailable.
+            try:
+                from data.web_scrapers import fetch_multi_source_injury_status
+                scraped = fetch_multi_source_injury_status(todays_games=todays_games)
+            except ImportError:
+                from data.web_scraper import fetch_all_injury_data
+                scraped = fetch_all_injury_data()
 
             if scraped:
                 overrides = 0

@@ -2706,3 +2706,583 @@ def get_game_report_html(game=None, analysis_results=None):
 # END SECTION: QDS Game Report Generator
 # ============================================================
 # ============================================================
+# SECTION: QDS Neural Analysis HTML Generators
+# Individual reusable building blocks for the Neural Analysis
+# page redesign using the Quantum Design System visual language.
+# All functions return self-contained HTML strings suitable for
+# st.markdown(unsafe_allow_html=True) injection.
+# ============================================================
+
+# Shared QDS CSS injected once per page (lightweight variant —
+# does not duplicate the full report CSS).
+_QDS_NA_CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Montserrat:wght@300;400;600;700&display=swap');
+:root{
+  --qds-primary:#00ffd5;--qds-bg:#0a101f;--qds-card:#141a2d;
+  --qds-accent:#00b4ff;--qds-text-light:#f0f4ff;--qds-text-muted:#a0b4d0;
+  --qds-success:#00ff88;--qds-warning:#ffcc00;--qds-danger:#ff3860;
+  --qds-neon-shadow:0 0 10px rgba(0,255,213,0.5);
+}
+.qds-na-card{background:var(--qds-card);border-radius:12px;padding:18px;
+  margin-bottom:18px;border-top:3px solid var(--qds-primary);
+  box-shadow:var(--qds-neon-shadow);}
+.qds-na-badge{display:inline-block;padding:3px 10px;border-radius:4px;
+  font-size:0.72rem;font-weight:700;text-transform:uppercase;
+  font-family:'Orbitron',sans-serif;letter-spacing:0.5px;}
+.qds-na-player-name{font-family:'Orbitron',sans-serif;font-size:1.05rem;
+  font-weight:700;color:var(--qds-text-light);margin-bottom:4px;}
+.qds-na-prop-desc{color:var(--qds-primary);font-size:1.1rem;font-weight:600;
+  margin-bottom:10px;}
+.qds-na-score{font-family:'Orbitron',sans-serif;font-size:1.6rem;font-weight:700;
+  color:var(--qds-primary);text-shadow:0 0 8px rgba(0,255,213,0.5);}
+.qds-na-metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:10px;margin:12px 0;}
+.qds-na-metric-card{background:rgba(10,16,31,0.7);border-radius:8px;padding:10px;
+  border:1px solid rgba(0,255,213,0.12);text-align:center;}
+.qds-na-metric-label{font-size:0.7rem;color:var(--qds-text-muted);
+  text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.qds-na-metric-value{font-size:1rem;font-weight:700;color:var(--qds-text-light);}
+.qds-na-conf-bar-wrap{margin:4px 0 12px;}
+.qds-na-conf-bar-label{font-size:0.8rem;color:var(--qds-text-muted);
+  margin-bottom:3px;display:flex;justify-content:space-between;}
+.qds-na-conf-bar-track{height:10px;background:rgba(255,255,255,0.08);
+  border-radius:5px;overflow:hidden;}
+.qds-na-conf-bar-fill{height:100%;border-radius:5px;
+  background:linear-gradient(90deg,var(--qds-primary),var(--qds-accent));
+  transition:width 0.5s ease;}
+.qds-na-bonus-item{display:flex;align-items:flex-start;gap:8px;
+  font-size:0.82rem;color:var(--qds-text-light);margin-bottom:5px;}
+.qds-na-bonus-icon{color:var(--qds-success);margin-top:2px;flex-shrink:0;}
+.qds-na-team-badge{display:inline-block;padding:2px 8px;border-radius:4px;
+  font-size:0.72rem;font-weight:700;margin-left:6px;vertical-align:middle;}
+.qds-na-header{text-align:center;padding:20px;border-radius:12px;
+  background:linear-gradient(135deg,rgba(0,255,213,0.06) 0%,rgba(0,180,255,0.06) 100%);
+  border:1px solid rgba(0,255,213,0.15);margin-bottom:18px;}
+.qds-na-matchup{display:flex;align-items:center;justify-content:center;
+  gap:16px;flex-wrap:wrap;padding:14px;border-radius:10px;
+  background:rgba(10,16,31,0.6);border:1px solid rgba(0,255,213,0.1);}
+.qds-na-team-block{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.qds-na-team-logo{width:44px;height:44px;object-fit:contain;
+  filter:drop-shadow(0 0 6px rgba(0,180,255,0.4));}
+.qds-na-team-abbrev{font-family:'Orbitron',sans-serif;font-weight:700;
+  font-size:0.9rem;color:var(--qds-text-light);}
+.qds-na-vs{font-family:'Orbitron',sans-serif;font-size:0.9rem;
+  color:var(--qds-text-muted);padding:4px 12px;
+  background:rgba(0,180,255,0.1);border-radius:20px;}
+.qds-na-strategy-table{width:100%;border-collapse:collapse;font-size:0.85rem;
+  color:var(--qds-text-light);}
+.qds-na-strategy-table th{background:rgba(0,255,213,0.08);color:var(--qds-primary);
+  padding:8px 12px;text-align:left;font-family:'Orbitron',sans-serif;
+  font-size:0.72rem;letter-spacing:0.5px;border-bottom:1px solid rgba(0,255,213,0.2);}
+.qds-na-strategy-table td{padding:8px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.05);vertical-align:top;}
+.qds-na-strategy-table tr:hover td{background:rgba(0,255,213,0.03);}
+.qds-na-logic-item{display:flex;align-items:flex-start;gap:10px;
+  padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);}
+.qds-na-logic-icon{color:var(--qds-accent);font-size:1rem;flex-shrink:0;margin-top:1px;}
+.qds-na-logic-title{font-weight:600;color:var(--qds-primary);font-size:0.85rem;}
+.qds-na-logic-desc{font-size:0.8rem;color:var(--qds-text-muted);margin-top:2px;}
+.qds-na-verdict{background:rgba(0,255,213,0.04);border-left:3px solid var(--qds-primary);
+  border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:14px;
+  font-style:italic;color:var(--qds-text-light);font-size:0.9rem;line-height:1.6;}
+.qds-na-rec-item{display:flex;align-items:flex-start;gap:8px;
+  font-size:0.85rem;color:var(--qds-text-light);margin-bottom:6px;}
+.qds-na-rec-icon{color:var(--qds-success);flex-shrink:0;}
+</style>
+"""
+
+
+def get_qds_css():
+    """Return the lightweight QDS CSS for the Neural Analysis page."""
+    return _QDS_NA_CSS
+
+
+def get_qds_confidence_bar_html(label, percentage, tier_icon=""):
+    """
+    Render a horizontal confidence bar for a single prop.
+
+    Args:
+        label (str):      Player + prop description, e.g. "LeBron James — Over 24.5 Pts"
+        percentage (float): Confidence percentage 0-100.
+        tier_icon (str):  Optional emoji prefix, e.g. "💎".
+
+    Returns:
+        str: HTML string.
+    """
+    pct = max(0.0, min(100.0, float(percentage)))
+    # Color by confidence tier
+    if pct >= 80:
+        color = "#00ffd5"
+    elif pct >= 65:
+        color = "#ffcc00"
+    elif pct >= 50:
+        color = "#00b4ff"
+    else:
+        color = "#a0b4d0"
+
+    safe_label = _html.escape(str(label))
+    safe_icon  = _html.escape(str(tier_icon)) if tier_icon else ""
+    return (
+        f'<div class="qds-na-conf-bar-wrap">'
+        f'<div class="qds-na-conf-bar-label">'
+        f'<span>{safe_icon} {safe_label}</span>'
+        f'<span style="color:{color};font-weight:700;">{pct:.0f}%</span>'
+        f'</div>'
+        f'<div class="qds-na-conf-bar-track">'
+        f'<div class="qds-na-conf-bar-fill" style="width:{pct}%;background:{color};"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def get_qds_metrics_grid_html(metrics_list):
+    """
+    Render a 4-card metrics grid.
+
+    Args:
+        metrics_list (list[dict]): Each dict has keys:
+            "label" (str), "value" (str|float), "icon" (str, optional)
+
+    Returns:
+        str: HTML string.
+    """
+    cards_html = ""
+    for m in metrics_list:
+        icon  = _html.escape(str(m.get("icon", "")))
+        label = _html.escape(str(m.get("label", "")))
+        value = _html.escape(str(m.get("value", "—")))
+        cards_html += (
+            f'<div class="qds-na-metric-card">'
+            f'<div class="qds-na-metric-label">{icon} {label}</div>'
+            f'<div class="qds-na-metric-value">{value}</div>'
+            f'</div>'
+        )
+    return f'<div class="qds-na-metrics-grid">{cards_html}</div>'
+
+
+def get_qds_prop_card_html(
+    player_name,
+    team,
+    prop_text,
+    score,
+    tier,
+    metrics,
+    bonus_factors,
+    player_id=None,
+):
+    """
+    Render a full QDS prop card for a single analysis result.
+
+    Args:
+        player_name (str): Player's full name.
+        team (str):        Team abbreviation, e.g. "LAL".
+        prop_text (str):   Prop description, e.g. "💣 Over 24.5 Points".
+        score (float):     Confidence score 0-100 (displayed as X.X / 10).
+        tier (str):        "Platinum", "Gold", "Silver", or "Bronze".
+        metrics (list[dict]): Metrics for the 4-card grid (see get_qds_metrics_grid_html).
+        bonus_factors (list[str]): Short bonus factor strings.
+        player_id (str|None): NBA player ID for headshot CDN URL.
+
+    Returns:
+        str: Self-contained HTML card string.
+    """
+    # ── Tier config ───────────────────────────────────────────────
+    _TIER_CFG = {
+        "Platinum": {
+            "badge_text": "⚡ QUANTUM PICK",
+            "badge_bg":   "#00ffd5",
+            "badge_fg":   "#0a101f",
+            "border":     "#00ffd5",
+            "icon":       "💎",
+        },
+        "Gold": {
+            "badge_text": "🔒 STRONG PICK",
+            "badge_bg":   "#ffcc00",
+            "badge_fg":   "#0a101f",
+            "border":     "#ffcc00",
+            "icon":       "🔒",
+        },
+        "Silver": {
+            "badge_text": "✓ SAFE PICK",
+            "badge_bg":   "#00b4ff",
+            "badge_fg":   "#0a101f",
+            "border":     "#00b4ff",
+            "icon":       "✓",
+        },
+        "Bronze": {
+            "badge_text": "★ PICK",
+            "badge_bg":   "#a0b4d0",
+            "badge_fg":   "#0a101f",
+            "border":     "#a0b4d0",
+            "icon":       "⭐",
+        },
+    }
+    cfg = _TIER_CFG.get(tier, _TIER_CFG["Bronze"])
+
+    # ── Player headshot ───────────────────────────────────────────
+    if player_id:
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+    else:
+        headshot_url = ""
+
+    fallback_svg = (
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
+        "width='60' height='60' viewBox='0 0 60 60'%3E"
+        "%3Ccircle cx='30' cy='30' r='30' fill='%23141a2d'/%3E"
+        "%3Ccircle cx='30' cy='22' r='10' fill='%23a0b4d0'/%3E"
+        "%3Cellipse cx='30' cy='50' rx='16' ry='12' fill='%23a0b4d0'/%3E"
+        "%3C/svg%3E"
+    )
+    if headshot_url:
+        img_html = (
+            f'<img src="{headshot_url}" '
+            f'onerror="this.onerror=null;this.src=\'{fallback_svg}\'" '
+            f'style="width:60px;height:60px;border-radius:50%;object-fit:cover;'
+            f'border:2px solid {cfg["border"]};flex-shrink:0;" alt="{_html.escape(player_name)}">'
+        )
+    else:
+        img_html = (
+            f'<img src="{fallback_svg}" '
+            f'style="width:60px;height:60px;border-radius:50%;object-fit:cover;'
+            f'border:2px solid {cfg["border"]};flex-shrink:0;" alt="{_html.escape(player_name)}">'
+        )
+
+    # ── Team badge ────────────────────────────────────────────────
+    team_primary, _ = get_team_colors(team)
+    team_badge_html = (
+        f'<span class="qds-na-team-badge" '
+        f'style="background:{team_primary};color:#fff;">'
+        f'{_html.escape(str(team))}</span>'
+    )
+
+    # ── Safe / Neural Score ───────────────────────────────────────
+    safe_score = round(min(10.0, float(score) / 10.0), 1)
+    safe_score_str = f"{safe_score:.1f}"
+
+    # ── Confidence bar ────────────────────────────────────────────
+    conf_bar = get_qds_confidence_bar_html(
+        f"{prop_text}", score, cfg["icon"]
+    )
+
+    # ── Metrics grid ─────────────────────────────────────────────
+    metrics_html = get_qds_metrics_grid_html(metrics) if metrics else ""
+
+    # ── Bonus factors ─────────────────────────────────────────────
+    bonus_html = ""
+    for factor in (bonus_factors or []):
+        safe_factor = _html.escape(str(factor))
+        bonus_html += (
+            f'<div class="qds-na-bonus-item">'
+            f'<span class="qds-na-bonus-icon">✓</span>'
+            f'<span>{safe_factor}</span>'
+            f'</div>'
+        )
+
+    # ── Build card ────────────────────────────────────────────────
+    safe_player = _html.escape(str(player_name))
+    safe_prop   = _html.escape(str(prop_text))
+    badge_text  = _html.escape(str(cfg["badge_text"]))
+    border_color = cfg["border"]
+    badge_bg     = cfg["badge_bg"]
+    badge_fg     = cfg["badge_fg"]
+
+    return (
+        f'<div class="qds-na-card" style="border-top-color:{border_color};">'
+        # Badge
+        f'<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">'
+        f'<span class="qds-na-badge" style="background:{badge_bg};color:{badge_fg};">'
+        f'{badge_text}</span>'
+        f'</div>'
+        # Player row
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
+        f'{img_html}'
+        f'<div style="flex:1;">'
+        f'<div class="qds-na-player-name">{safe_player}{team_badge_html}</div>'
+        f'<div class="qds-na-prop-desc">{safe_prop}</div>'
+        f'</div>'
+        # Score
+        f'<div style="text-align:center;flex-shrink:0;">'
+        f'<div style="font-size:0.65rem;color:var(--qds-text-muted);'
+        f'text-transform:uppercase;letter-spacing:0.5px;">SAFE Score™</div>'
+        f'<div class="qds-na-score">{safe_score_str}<span style="font-size:0.85rem;'
+        f'color:var(--qds-text-muted);">/10</span></div>'
+        f'</div>'
+        f'</div>'
+        # Confidence bar
+        f'{conf_bar}'
+        # Metrics grid
+        f'{metrics_html}'
+        # Bonus factors
+        + (
+            f'<div style="margin-top:10px;">'
+            f'<div style="font-size:0.75rem;color:var(--qds-text-muted);'
+            f'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">'
+            f'Bonus Factors</div>'
+            f'{bonus_html}'
+            f'</div>'
+            if bonus_html else ""
+        )
+        + f'</div>'
+    )
+
+
+def get_qds_matchup_header_html(away_team, home_team, game_info=""):
+    """
+    Render a matchup header banner with team logos, names, and game info.
+
+    Args:
+        away_team (str): Away team abbreviation, e.g. "BOS".
+        home_team (str): Home team abbreviation, e.g. "LAL".
+        game_info (str): Additional text, e.g. date + tip-off time.
+
+    Returns:
+        str: HTML string.
+    """
+    ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
+    away_logo = f"{ESPN_NBA}/{away_team.lower()}.png"
+    home_logo = f"{ESPN_NBA}/{home_team.lower()}.png"
+    away_color, _ = get_team_colors(away_team)
+    home_color, _ = get_team_colors(home_team)
+
+    safe_away      = _html.escape(str(away_team))
+    safe_home      = _html.escape(str(home_team))
+    safe_game_info = _html.escape(str(game_info))
+    fallback       = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
+
+    return (
+        f'<div class="qds-na-header">'
+        f'<div style="font-size:0.72rem;color:var(--qds-text-muted);'
+        f'text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">'
+        f'SmartBetPro Neural Engine™ — Tonight\'s Game</div>'
+        f'<div class="qds-na-matchup">'
+        # Away team
+        f'<div class="qds-na-team-block">'
+        f'<img src="{away_logo}" onerror="this.src=\'{fallback}\'" '
+        f'class="qds-na-team-logo" alt="{safe_away}">'
+        f'<div class="qds-na-team-abbrev" style="color:{away_color};">{safe_away}</div>'
+        f'</div>'
+        # VS
+        f'<div class="qds-na-vs">VS</div>'
+        # Home team
+        f'<div class="qds-na-team-block">'
+        f'<img src="{home_logo}" onerror="this.src=\'{fallback}\'" '
+        f'class="qds-na-team-logo" alt="{safe_home}">'
+        f'<div class="qds-na-team-abbrev" style="color:{home_color};">{safe_home}</div>'
+        f'</div>'
+        f'</div>'
+        + (
+            f'<div style="margin-top:10px;font-size:0.8rem;color:var(--qds-text-muted);">'
+            f'{safe_game_info}</div>'
+            if safe_game_info else ""
+        )
+        + f'</div>'
+    )
+
+
+def get_qds_team_card_html(team_name, team_abbrev, record, stats, key_players, team_color):
+    """
+    Render a QDS-styled team breakdown card.
+
+    Args:
+        team_name (str):   Full team name.
+        team_abbrev (str): Team abbreviation.
+        record (str):      Win-loss record, e.g. "42-30".
+        stats (list[dict]): List of {"label": str, "value": str} dicts.
+        key_players (list[str]): Player names to highlight.
+        team_color (str):  CSS color hex for the left border.
+
+    Returns:
+        str: HTML string.
+    """
+    safe_name   = _html.escape(str(team_name))
+    safe_abbrev = _html.escape(str(team_abbrev))
+    safe_record = _html.escape(str(record))
+    safe_color  = _html.escape(str(team_color))
+
+    # Stats rows
+    stats_html = ""
+    for s in (stats or []):
+        lbl = _html.escape(str(s.get("label", "")))
+        val = _html.escape(str(s.get("value", "")))
+        stats_html += (
+            f'<div style="display:flex;justify-content:space-between;'
+            f'padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+            f'<span style="color:var(--qds-text-muted);font-size:0.8rem;">{lbl}</span>'
+            f'<span style="font-weight:600;color:var(--qds-text-light);font-size:0.8rem;">{val}</span>'
+            f'</div>'
+        )
+
+    # Key players badges
+    players_html = ""
+    for p in (key_players or []):
+        safe_p = _html.escape(str(p))
+        players_html += (
+            f'<span style="background:rgba(0,255,213,0.1);color:var(--qds-primary);'
+            f'padding:2px 8px;border-radius:4px;font-size:0.75rem;margin:2px;'
+            f'display:inline-block;">{safe_p}</span>'
+        )
+
+    return (
+        f'<div style="background:var(--qds-card);border-radius:10px;padding:16px;'
+        f'border-left:4px solid {safe_color};margin-bottom:12px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+        f'<div style="width:8px;height:8px;border-radius:50%;'
+        f'background:{safe_color};"></div>'
+        f'<div style="font-family:\'Orbitron\',sans-serif;font-weight:700;'
+        f'font-size:0.9rem;color:var(--qds-text-light);">'
+        f'{safe_name} &nbsp;<span style="color:{safe_color};">({safe_abbrev})</span></div>'
+        f'<span style="margin-left:auto;background:rgba(0,0,0,0.3);padding:2px 8px;'
+        f'border-radius:4px;font-size:0.75rem;color:var(--qds-text-muted);">'
+        f'{safe_record}</span>'
+        f'</div>'
+        + (f'<div style="margin-bottom:10px;">{stats_html}</div>' if stats_html else "")
+        + (
+            f'<div style="margin-top:10px;">'
+            f'<div style="font-size:0.7rem;color:var(--qds-text-muted);'
+            f'text-transform:uppercase;margin-bottom:5px;">Key Players</div>'
+            f'{players_html}'
+            f'</div>'
+            if players_html else ""
+        )
+        + f'</div>'
+    )
+
+
+def get_qds_strategy_table_html(entries):
+    """
+    Render the Entry Strategy Matrix table.
+
+    Args:
+        entries (list[dict]): Each dict has keys:
+            "combo_type" (str), "picks" (str|list), "safe_avg" (float|str),
+            "strategy" (str)
+
+    Returns:
+        str: HTML string with a styled table.
+    """
+    if not entries:
+        return '<p style="color:var(--qds-text-muted);font-size:0.85rem;">No entry combinations available yet.</p>'
+
+    rows_html = ""
+    for entry in entries:
+        combo     = _html.escape(str(entry.get("combo_type", "")))
+        picks_raw = entry.get("picks", [])
+        if isinstance(picks_raw, list):
+            picks = ", ".join(_html.escape(str(p)) for p in picks_raw)
+        else:
+            picks = _html.escape(str(picks_raw))
+        safe_avg  = _html.escape(str(entry.get("safe_avg", "")))
+        strategy  = _html.escape(str(entry.get("strategy", "")))
+        rows_html += (
+            f'<tr>'
+            f'<td><span style="color:var(--qds-primary);font-weight:600;">{combo}</span></td>'
+            f'<td>{picks}</td>'
+            f'<td style="text-align:center;">{safe_avg}</td>'
+            f'<td style="color:var(--qds-text-muted);">{strategy}</td>'
+            f'</tr>'
+        )
+
+    return (
+        f'<table class="qds-na-strategy-table">'
+        f'<thead><tr>'
+        f'<th>Combo Type</th>'
+        f'<th>Picks</th>'
+        f'<th>SAFE Avg</th>'
+        f'<th>Strategy</th>'
+        f'</tr></thead>'
+        f'<tbody>{rows_html}</tbody>'
+        f'</table>'
+    )
+
+
+def get_qds_framework_logic_html():
+    """
+    Return the Framework Logic section HTML explaining the model pipeline.
+
+    Returns:
+        str: HTML string.
+    """
+    items = [
+        ("🧮", "Monte Carlo Simulation",
+         "We run 2,000+ simulated game outcomes per player, drawing from a "
+         "normal distribution centered on the adjusted projection."),
+        ("📐", "Projection Engine",
+         "Season averages are adjusted for matchup defense ratings, home/away "
+         "splits, rest days, pace, and blowout risk."),
+        ("⚡", "Directional Forces",
+         "Structural signals — pace edge, usage upticks, teammate absences, "
+         "target-share shifts — are scored and aggregated."),
+        ("🛡️", "Edge Detection",
+         "We compare the model's implied probability to the book's implied "
+         "probability to detect mispriced lines."),
+        ("🔒", "Confidence Scoring",
+         "A composite 0-100 confidence score is computed from simulation "
+         "probability, edge, form, and force alignment."),
+        ("⚠️", "Trap-Line & Sharpness Filters",
+         "Lines set suspiciously close to the season average are penalised. "
+         "Round-number traps are flagged for avoidance."),
+        ("🕸️", "Layer 5 Injury Data",
+         "Real-time injury status from NBA.com, RotoWire, and ESPN overrides "
+         "stale nba_api designations for the most accurate availability picture."),
+    ]
+
+    rows_html = ""
+    for icon, title, desc in items:
+        safe_icon  = _html.escape(str(icon))
+        safe_title = _html.escape(str(title))
+        safe_desc  = _html.escape(str(desc))
+        rows_html += (
+            f'<div class="qds-na-logic-item">'
+            f'<span class="qds-na-logic-icon">{safe_icon}</span>'
+            f'<div>'
+            f'<div class="qds-na-logic-title">{safe_title}</div>'
+            f'<div class="qds-na-logic-desc">{safe_desc}</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    return (
+        f'<div style="padding:6px 0;">{rows_html}</div>'
+    )
+
+
+def get_qds_final_verdict_html(summary_text, recommendations):
+    """
+    Render the Final Verdict section with italic summary and rec steps.
+
+    Args:
+        summary_text (str):       One or two sentence italic summary.
+        recommendations (list[str]): Actionable checkmark steps.
+
+    Returns:
+        str: HTML string.
+    """
+    safe_summary = _html.escape(str(summary_text))
+
+    recs_html = ""
+    for rec in (recommendations or []):
+        safe_rec = _html.escape(str(rec))
+        recs_html += (
+            f'<div class="qds-na-rec-item">'
+            f'<span class="qds-na-rec-icon">✓</span>'
+            f'<span>{safe_rec}</span>'
+            f'</div>'
+        )
+
+    return (
+        f'<div class="qds-na-verdict">"{safe_summary}"</div>'
+        + (
+            f'<div style="margin-top:12px;">'
+            f'<div style="font-size:0.75rem;color:var(--qds-text-muted);'
+            f'text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">'
+            f'Recommended Play Strategy</div>'
+            f'{recs_html}'
+            f'</div>'
+            if recs_html else ""
+        )
+    )
+
+# ============================================================
+# END SECTION: QDS Neural Analysis HTML Generators
+# ============================================================

@@ -856,6 +856,42 @@ def get_status_badge_html(status):
     return badges.get(status, '<span style="background:#8b949e;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">⚪ Unknown</span>')
 
 
+def get_source_attribution_html(source):
+    """
+    Return a small HTML badge showing which data source provided an
+    injury/availability entry (e.g. "Source: Rotowire").
+
+    Args:
+        source (str): Data source identifier, e.g. "RotoWire", "NBA.com",
+                      "NBA.com+RotoWire", "espn", "nba_api".
+
+    Returns:
+        str: HTML span element with source badge, or empty string if source
+             is blank.
+    """
+    if not source:
+        return ""
+
+    source_styles = {
+        "rotowire":         ("#e8a900", "#000", "RotoWire"),
+        "rotoWire":         ("#e8a900", "#000", "RotoWire"),
+        "nba.com":          ("#006bb6", "#fff", "NBA.com"),
+        "nba_official":     ("#006bb6", "#fff", "NBA.com"),
+        "nba.com+rotowire": ("#006bb6", "#fff", "NBA.com+RotoWire"),
+        "espn":             ("#c8102e", "#fff", "ESPN"),
+        "espn+rotowire":    ("#c8102e", "#fff", "ESPN+RotoWire"),
+        "nba_api":          ("#17408b", "#fff", "nba_api"),
+    }
+
+    key = source.lower().strip()
+    bg, fg, label = source_styles.get(key, ("#555", "#fff", source))
+    return (
+        f'<span style="background:{bg};color:{fg};padding:1px 6px;'
+        f'border-radius:4px;font-size:0.68rem;font-weight:600;'
+        f'vertical-align:middle;">Source: {label}</span>'
+    )
+
+
 def enrich_prop_with_player_data(prop, players_list):
     """
     Add player season averages and team info to a prop dictionary.
