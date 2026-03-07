@@ -452,6 +452,9 @@ def generate_pick_explanation(
     recent_form_games=None,
     should_avoid=False,
     avoid_reasons=None,
+    trap_line_result=None,
+    line_sharpness_info=None,
+    teammate_out_notes=None,
 ):
     """
     Generate a complete plain-English explanation for a prop pick.
@@ -479,6 +482,12 @@ def generate_pick_explanation(
         recent_form_games (list of dict, optional): Last N game logs
         should_avoid (bool): Whether the prop is on the avoid list
         avoid_reasons (list of str, optional): Reasons for avoid flag
+        trap_line_result (dict, optional): Output from detect_trap_line() (W5).
+            Includes 'is_trap', 'trap_type', 'warning_message' if applicable.
+        line_sharpness_info (dict, optional): Line sharpness force details (W1).
+            Includes 'name', 'description', 'strength' if sharpness detected.
+        teammate_out_notes (list of str, optional): Notes about absent teammates
+            and how they affect this player's projected usage (W8).
 
     Returns:
         dict: Explanation components:
@@ -493,6 +502,9 @@ def generate_pick_explanation(
             - 'simulation_narrative' (str): Simulation results narrative
             - 'forces_summary' (str): Forces agreement/disagreement
             - 'recent_form_explanation' (str): Recent form trend
+            - 'line_sharpness_explanation' (str): W1 line sharpness warning
+            - 'trap_line_explanation' (str): W5 trap line warning
+            - 'teammate_impact_explanation' (str): W8 teammate impact note
             - 'verdict' (str): Final recommendation with reasoning
             - 'risk_factors' (list of str): Things that could go wrong
             - 'indicators' (list of dict): Per-factor status badges
@@ -639,12 +651,48 @@ def generate_pick_explanation(
         "emoji": "🟢" if form_status == "favorable" else ("🔴" if form_status == "unfavorable" else "⚪"),
     })
 
-    # 11. Risk factors
+    # 11. Risk factors (including new W1/W5/W8 factors)
     risk_factors = _build_risk_factors(
         should_avoid, avoid_reasons,
         recent_form_ratio, stat_std, season_avg,
         game_total, rest_days,
     )
+
+    # ---- W1: Line Sharpness Explanation ----
+    line_sharpness_text = ""
+    if line_sharpness_info:
+        line_sharpness_text = (
+            f"📐 Line Sharpness: {line_sharpness_info.get('description', '')} "
+            f"Sharp lines have minimal edge — confidence reduced by "
+            f"{line_sharpness_info.get('strength', 0)*2:.0f} points."
+        )
+        risk_factors.append(f"📐 Sharp line detected — confidence penalized")
+
+    # ---- W5: Trap Line Explanation ----
+    trap_line_text = ""
+    if trap_line_result and trap_line_result.get("is_trap"):
+        trap_line_text = trap_line_result.get("warning_message", "")
+        penalty = trap_line_result.get("confidence_penalty", 0)
+        if penalty > 0:
+            risk_factors.append(
+                f"⚠️ Trap line penalty: −{penalty:.0f} confidence points applied"
+            )
+        neg = trap_line_result.get("negative_factors", [])
+        pos = trap_line_result.get("positive_factors", [])
+        if neg:
+            risk_factors.append(f"⬇️ Negative factors present: {'; '.join(neg)}")
+        if pos and trap_line_result.get("trap_type") == "over_trap":
+            risk_factors.append(f"⬆️ Positive factors: {'; '.join(pos)}")
+
+    # ---- W8: Teammate Impact Explanation ----
+    teammate_text = ""
+    if teammate_out_notes:
+        teammate_text = "👥 Teammate impact: " + " | ".join(teammate_out_notes)
+        mins_adj = projection_result.get("minutes_adjustment_factor", 1.0)
+        if mins_adj > 1.01:
+            teammate_text += f" → Projection boosted +{(mins_adj-1)*100:.0f}% for extra usage"
+        elif mins_adj < 0.99:
+            teammate_text += f" → Projection reduced {(1-mins_adj)*100:.0f}% for load concerns"
 
     # 12. Verdict
     verdict = _build_verdict(direction, confidence_score, tier, prob_pct, edge)
@@ -678,6 +726,9 @@ def generate_pick_explanation(
         "simulation_narrative": sim_narrative,
         "forces_summary": forces_desc,
         "recent_form_explanation": form_desc,
+        "line_sharpness_explanation": line_sharpness_text,   # W1
+        "trap_line_explanation": trap_line_text,             # W5
+        "teammate_impact_explanation": teammate_text,         # W8
         "verdict": verdict,
         "risk_factors": risk_factors,
         "platform_notes": platform_notes,

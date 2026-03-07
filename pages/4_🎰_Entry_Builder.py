@@ -13,6 +13,9 @@ from engine.entry_optimizer import (
     build_optimal_entries,
     calculate_entry_expected_value,
     format_ev_display,
+    calculate_correlation_risk,
+    identify_weakest_link,
+    suggest_swap,
     PRIZEPICKS_FLEX_PAYOUT_TABLE,
     PRIZEPICKS_POWER_PAYOUT_TABLE,
     UNDERDOG_FLEX_PAYOUT_TABLE,
@@ -201,6 +204,30 @@ if build_button:
             st.markdown(f"### Entry #{entry_rank} | EV: :{ev_color}[{ev_label}] | ROI: {roi_label}")
             st.caption(f"Combined confidence: {confidence:.0f}/100")
 
+            # W2: Correlation risk warnings
+            corr_risk = entry.get("correlation_risk", {})
+            corr_warnings = corr_risk.get("warnings", [])
+            if corr_warnings:
+                for w in corr_warnings:
+                    st.warning(w)
+            if ev_result.get("correlation_discount_applied"):
+                discount_pct = round((1.0 - corr_risk.get("discount_multiplier", 1.0)) * 100)
+                st.caption(f"📉 Correlation discount applied: −{discount_pct}% EV adjustment")
+
+            # W9: Weakest link warning + swap suggestion
+            weakest = entry.get("weakest_link")
+            weakest_label = entry.get("weakest_link_label", "")
+            weakest_prob = entry.get("weakest_link_probability", 0.5)
+            if weakest and weakest_prob < 0.60:
+                swap = suggest_swap(weakest, qualifying_picks, picks)
+                if swap:
+                    st.warning(
+                        f"⚠️ **Weakest leg:** {weakest_label} — "
+                        f"consider swapping: {swap.get('swap_reason', '')}"
+                    )
+                else:
+                    st.caption(f"⚠️ Weakest leg: {weakest_label}")
+
             # Show each pick in this entry
             pick_cols = st.columns(len(picks))
             for i, (pick, pick_col) in enumerate(zip(picks, pick_cols)):
@@ -220,6 +247,10 @@ if build_button:
                         delta=f"{pick.get('stat_type','').capitalize()} {pick.get('line',0)} | {display_prob:.0f}%",
                     )
                     st.caption(f"{tier_emoji} {pick.get('tier','')} | Edge: {pick.get('edge_percentage',0):.1f}%")
+                    # Show trap line warning inline if present
+                    trap = pick.get("trap_line_result", {})
+                    if trap and trap.get("is_trap"):
+                        st.caption(f"⚠️ {trap.get('warning_message','Trap line')}")
 
             # Show payout breakdown
             with st.expander(f"💰 Entry #{entry_rank} Payout Breakdown"):
@@ -230,7 +261,6 @@ if build_button:
                 for hits in sorted(prob_per_hits.keys(), reverse=True):
                     prob_pct = prob_per_hits[hits] * 100
                     payout = payout_per_hits.get(hits, 0)
-                    ev_contribution = (prob_per_hits[hits] * payout) - (entry_fee / (len(prob_per_hits)))
                     breakdown_rows.append({
                         "Hits": hits,
                         "Probability": f"{prob_pct:.1f}%",

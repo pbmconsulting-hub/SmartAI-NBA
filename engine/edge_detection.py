@@ -230,6 +230,31 @@ def analyze_directional_forces(
     # ============================================================
 
     # ============================================================
+    # SECTION: Line Sharpness Detection (W1)
+    # Sharp books set lines RIGHT at the player's true average.
+    # A line within 3% of the season avg is essentially a coin-flip —
+    # penalize over-confidence. Lines 8%+ away are where real edges live.
+    # ============================================================
+
+    season_average = player_data.get(f"{stat_type}_avg", None)
+    if season_average is not None:
+        try:
+            season_average = float(season_average)
+        except (TypeError, ValueError):
+            season_average = None
+
+    line_sharpness_force = detect_line_sharpness(prop_line, season_average, stat_type)
+    if line_sharpness_force is not None:
+        if line_sharpness_force["direction"] == "OVER":
+            all_over_forces.append(line_sharpness_force)
+        else:
+            all_under_forces.append(line_sharpness_force)
+
+    # ============================================================
+    # END SECTION: Line Sharpness Detection
+    # ============================================================
+
+    # ============================================================
     # SECTION: Summarize Forces
     # ============================================================
 
@@ -419,4 +444,204 @@ def detect_correlated_props(props_with_results):
 
 # ============================================================
 # END SECTION: Correlation Detection
+# ============================================================
+
+
+# ============================================================
+# SECTION: Line Sharpness Detection (W1)
+# Detect when books have set a "sharp" line right at the player's
+# true average (a trap for bettors) vs. a line with real edge.
+# ============================================================
+
+def detect_line_sharpness(prop_line, season_average, stat_type="points"):
+    """
+    Detect whether a prop line is "sharp" (set close to the true average).
+
+    Sharp lines are set RIGHT at the player's true average, making it
+    essentially a 50/50 coin-flip. The engine shouldn't be confident
+    on sharp lines — books have accurately priced them.
+
+    Lines set 8%+ away from the average are where real edges exist
+    because the book has (intentionally or not) left a gap.
+
+    Args:
+        prop_line (float): The betting line (e.g., 24.5)
+        season_average (float or None): Player's season average for this stat.
+            None means no average available — return None (no force).
+        stat_type (str): Stat name for description
+
+    Returns:
+        dict or None: A force dict pushing UNDER (sharpness penalty) when
+            line is within 3% of average, or None when not applicable.
+            Returns an OVER force when line is set far below average (real edge).
+
+    Example:
+        season_avg=24.8, line=24.5 → 1.2% below avg → sharp line → UNDER penalty
+        season_avg=24.8, line=20.5 → 17.3% below avg → real edge → no penalty (or OVER boost)
+    """
+    if season_average is None or season_average <= 0 or prop_line <= 0:
+        return None  # Can't compute sharpness without a valid average
+
+    # How far is the line from the season average (as percentage)?
+    # Positive = line ABOVE average (harder for OVER), negative = line BELOW average
+    gap_pct = (prop_line - season_average) / season_average * 100.0
+
+    abs_gap_pct = abs(gap_pct)
+
+    if abs_gap_pct < 3.0:
+        # Line is within 3% of season average — this is a SHARP line.
+        # Books have set it at the true average → 50/50 coin flip.
+        # Penalize confidence by pushing an UNDER force (signal of uncertainty).
+        strength = 1.5 - (abs_gap_pct / 3.0) * 1.0  # Closer to avg = stronger penalty
+        return {
+            "name": "Sharp Line — Books Set at True Average",
+            "description": (
+                f"Line of {prop_line} is only {abs_gap_pct:.1f}% from season avg "
+                f"({season_average:.1f}). Books have accurately priced this — "
+                f"edge is minimal."
+            ),
+            "strength": round(max(0.5, strength), 2),
+            "direction": "UNDER",  # Signals caution / reduced confidence
+        }
+    elif abs_gap_pct >= 8.0:
+        # Line is 8%+ away from average — real edge territory.
+        # Don't add a force (the Projection vs Line force already captures this),
+        # but this confirms the edge is real, not a trap.
+        # We return None here because the existing "Model Projection" force handles it.
+        return None
+    else:
+        # Gap between 3% and 8% — moderate zone, no special force needed
+        return None
+
+
+# ============================================================
+# END SECTION: Line Sharpness Detection
+# ============================================================
+
+
+# ============================================================
+# SECTION: Trap Line Detection (W5)
+# Detect when books set a deliberately bait-y line to attract
+# public money on the "obvious" side, but hidden factors make
+# the obvious side wrong.
+# ============================================================
+
+def detect_trap_line(
+    prop_line,
+    season_average,
+    defense_factor,
+    rest_factor,
+    game_total,
+    blowout_risk,
+    stat_type="points",
+):
+    """
+    Detect whether a prop line is a potential "trap."
+
+    A trap line is deliberately set to attract public money on
+    the obvious side, while hidden factors (tough defense + fatigue
+    + low total) make the obvious side a loser.
+
+    Two trap patterns:
+    1. Line 10%+ below average + multiple negative factors present
+       → Looks like easy OVER but the negative factors will kill it
+    2. Line 10%+ above average + multiple positive factors present
+       → Looks like a tough OVER but the positive factors will carry it
+       (though this pattern is less dangerous)
+
+    Args:
+        prop_line (float): The betting line
+        season_average (float or None): Player's season average
+        defense_factor (float): Defensive multiplier (>1 = weak defense)
+        rest_factor (float): Rest multiplier (<1 = fatigued)
+        game_total (float): Vegas over/under total
+        blowout_risk (float): Estimated blowout probability
+        stat_type (str): Stat name for description
+
+    Returns:
+        dict or None: Trap detection result with:
+            'is_trap': bool
+            'trap_type': str ('under_trap' | 'over_trap' | None)
+            'warning_message': str
+            'confidence_penalty': float (0-15 points to subtract)
+            'negative_factors': list of str
+            'positive_factors': list of str
+
+    Example:
+        Player avg 26 PPG, line 23.5 (9.6% below), opponent top-5 D,
+        back-to-back, game total 208 → under_trap detected
+    """
+    if season_average is None or season_average <= 0 or prop_line <= 0:
+        return {"is_trap": False, "trap_type": None, "warning_message": "",
+                "confidence_penalty": 0.0, "negative_factors": [], "positive_factors": []}
+
+    gap_pct = (prop_line - season_average) / season_average * 100.0
+
+    # --- Collect negative factors (push performance DOWN) ---
+    negative_factors = []
+    if defense_factor < 0.95:
+        negative_factors.append(f"Tough opponent defense ({(1-defense_factor)*100:.0f}% suppression)")
+    if rest_factor < 0.96:
+        negative_factors.append("Short rest / back-to-back fatigue")
+    if game_total > 0 and game_total < 214:
+        negative_factors.append(f"Low Vegas total ({game_total:.0f}) — slow defensive game")
+    if blowout_risk > 0.25:
+        negative_factors.append(f"High blowout risk ({blowout_risk*100:.0f}%)")
+
+    # --- Collect positive factors (push performance UP) ---
+    positive_factors = []
+    if defense_factor > 1.05:
+        positive_factors.append(f"Weak opponent defense ({(defense_factor-1)*100:.0f}% boost)")
+    if rest_factor > 1.005:
+        positive_factors.append("Well rested")
+    if game_total > 228:
+        positive_factors.append(f"High Vegas total ({game_total:.0f}) — fast pace expected")
+    if blowout_risk < 0.10:
+        positive_factors.append("Very low blowout risk (likely competitive game)")
+
+    # --- Check Trap Pattern 1: Line too LOW + multiple negative factors ---
+    # "Bait OVER" trap: line looks like easy over, but negatives will sink it
+    if gap_pct <= -10.0 and len(negative_factors) >= 2:
+        penalty = min(15.0, 8.0 + len(negative_factors) * 2.0)
+        return {
+            "is_trap": True,
+            "trap_type": "under_trap",
+            "warning_message": (
+                f"⚠️ Possible Trap Line: Line is {abs(gap_pct):.1f}% BELOW season avg "
+                f"({season_average:.1f}) — looks like easy OVER, but {len(negative_factors)} "
+                f"negative factors may cancel the edge."
+            ),
+            "confidence_penalty": round(penalty, 1),
+            "negative_factors": negative_factors,
+            "positive_factors": positive_factors,
+        }
+
+    # --- Check Trap Pattern 2: Line too HIGH + multiple positive factors ---
+    # "Bait UNDER" trap: line looks hard to exceed, but positives will carry it
+    if gap_pct >= 10.0 and len(positive_factors) >= 2:
+        penalty = min(10.0, 5.0 + len(positive_factors) * 1.5)
+        return {
+            "is_trap": True,
+            "trap_type": "over_trap",
+            "warning_message": (
+                f"⚠️ Possible Trap Line: Line is {gap_pct:.1f}% ABOVE season avg "
+                f"({season_average:.1f}) — looks tough to hit, but {len(positive_factors)} "
+                f"positive factors may carry the OVER."
+            ),
+            "confidence_penalty": round(penalty, 1),
+            "negative_factors": negative_factors,
+            "positive_factors": positive_factors,
+        }
+
+    return {
+        "is_trap": False,
+        "trap_type": None,
+        "warning_message": "",
+        "confidence_penalty": 0.0,
+        "negative_factors": negative_factors,
+        "positive_factors": positive_factors,
+    }
+
+# ============================================================
+# END SECTION: Trap Line Detection
 # ============================================================

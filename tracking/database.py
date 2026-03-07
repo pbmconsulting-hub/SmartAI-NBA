@@ -65,6 +65,26 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 """
 
+# SQL to create the prediction_history table for model calibration (W7)
+# Tracks each prediction made and whether it was correct.
+# Used to compute calibration adjustments that self-correct model overconfidence.
+CREATE_PREDICTION_HISTORY_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS prediction_history (
+    prediction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    prediction_date TEXT NOT NULL,
+    player_name TEXT NOT NULL,
+    stat_type TEXT NOT NULL,
+    prop_line REAL NOT NULL,
+    direction TEXT NOT NULL,
+    confidence_score REAL,
+    probability_predicted REAL,
+    was_correct INTEGER,
+    actual_value REAL,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -99,6 +119,7 @@ def initialize_database():
             # Create the tables
             cursor.execute(CREATE_BETS_TABLE_SQL)
             cursor.execute(CREATE_ENTRIES_TABLE_SQL)
+            cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
 
             # Save the changes
             connection.commit()
@@ -307,6 +328,237 @@ def get_performance_summary():
         "pushes": 0,
         "win_rate": 0.0,
     }
+
+
+# ============================================================
+# SECTION: Prediction History & Calibration (W7)
+# Store prediction outcomes and compute calibration adjustments
+# so the model can self-correct systematic over/underconfidence.
+# ============================================================
+
+def insert_prediction(prediction_data):
+    """
+    Save a model prediction to the history table. (W7)
+
+    Call this when a bet is placed. Later, update with
+    `update_prediction_outcome()` when the result is known.
+
+    Args:
+        prediction_data (dict): Prediction data with keys:
+            prediction_date (str), player_name (str), stat_type (str),
+            prop_line (float), direction (str), confidence_score (float),
+            probability_predicted (float), notes (str, optional)
+
+    Returns:
+        int or None: The new prediction's ID, or None if error
+    """
+    initialize_database()  # Ensure prediction_history table exists
+    insert_sql = """
+    INSERT INTO prediction_history (
+        prediction_date, player_name, stat_type, prop_line,
+        direction, confidence_score, probability_predicted, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    values = (
+        prediction_data.get("prediction_date", ""),
+        prediction_data.get("player_name", ""),
+        prediction_data.get("stat_type", ""),
+        prediction_data.get("prop_line", 0.0),
+        prediction_data.get("direction", "OVER"),
+        prediction_data.get("confidence_score", 0.0),
+        prediction_data.get("probability_predicted", 0.5),
+        prediction_data.get("notes", ""),
+    )
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            cursor = connection.cursor()
+            cursor.execute(insert_sql, values)
+            connection.commit()
+            return cursor.lastrowid
+    except sqlite3.Error as database_error:
+        print(f"Error inserting prediction: {database_error}")
+        return None
+
+
+def update_prediction_outcome(prediction_id, was_correct, actual_value):
+    """
+    Record the actual outcome for a prediction. (W7)
+
+    Args:
+        prediction_id (int): The prediction's database ID
+        was_correct (bool): True if the prediction was correct
+        actual_value (float): The actual stat value achieved
+
+    Returns:
+        bool: True if updated successfully
+    """
+    update_sql = """
+    UPDATE prediction_history
+    SET was_correct = ?, actual_value = ?
+    WHERE prediction_id = ?
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            cursor = connection.cursor()
+            cursor.execute(update_sql, (1 if was_correct else 0, actual_value, prediction_id))
+            connection.commit()
+            return True
+    except sqlite3.Error as database_error:
+        print(f"Error updating prediction outcome: {database_error}")
+        return False
+
+
+def get_calibration_adjustment(stat_type=None, min_samples=20):
+    """
+    Compute a calibration adjustment for the confidence model. (W7)
+
+    Compares the model's predicted probability to the actual
+    hit rate. If the model says 62% but only 58% of picks hit,
+    the calibration adjustment is +4 (subtract 4 from displayed score).
+
+    Args:
+        stat_type (str or None): Compute calibration for a specific
+            stat type, or overall if None.
+        min_samples (int): Minimum number of graded predictions needed
+            before returning a non-zero adjustment (default: 20).
+            With fewer samples, the adjustment is unreliable.
+
+    Returns:
+        float: Calibration adjustment in confidence points.
+            Positive = model overestimates (subtract from score).
+            Negative = model underestimates (add to score).
+            Returns 0.0 if insufficient data.
+
+    Example:
+        Model predicts avg 62% probability, actual hit rate is 57%
+        → calibration_adjustment = +5.0 points (reduce all scores by 5)
+    """
+    initialize_database()  # Ensure prediction_history table exists
+    if stat_type:
+        query_sql = """
+        SELECT
+            AVG(probability_predicted) as avg_predicted_prob,
+            AVG(CAST(was_correct AS REAL)) as actual_hit_rate,
+            COUNT(*) as sample_count
+        FROM prediction_history
+        WHERE was_correct IS NOT NULL AND stat_type = ?
+        """
+        params = (stat_type,)
+    else:
+        query_sql = """
+        SELECT
+            AVG(probability_predicted) as avg_predicted_prob,
+            AVG(CAST(was_correct AS REAL)) as actual_hit_rate,
+            COUNT(*) as sample_count
+        FROM prediction_history
+        WHERE was_correct IS NOT NULL
+        """
+        params = ()
+
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(query_sql, params)
+            row = cursor.fetchone()
+
+            if row and row["sample_count"] >= min_samples:
+                avg_predicted = row["avg_predicted_prob"] or 0.5
+                actual_rate = row["actual_hit_rate"] or 0.5
+                # Overconfidence = model probability higher than actual hit rate
+                # Convert probability gap to confidence score adjustment
+                # (1% probability gap ≈ 2 confidence score points)
+                prob_gap_pct = (avg_predicted - actual_rate) * 100.0
+                adjustment = prob_gap_pct * 2.0  # Scale to confidence score points
+                # Cap adjustment to ±15 points to avoid extreme corrections
+                return round(max(-15.0, min(15.0, adjustment)), 1)
+
+    except sqlite3.Error as database_error:
+        print(f"Error computing calibration: {database_error}")
+
+    return 0.0  # No adjustment if insufficient data
+
+
+def get_calibration_report():
+    """
+    Build a human-readable calibration report for the Model Health page. (W7)
+
+    Returns:
+        dict: {
+            'overall': dict with avg_predicted, actual_hit_rate, sample_count, adjustment
+            'by_stat': dict {stat_type: same dict}
+            'summary_text': str (human-readable summary)
+        }
+    """
+    initialize_database()  # Ensure prediction_history table exists
+    report = {"overall": {}, "by_stat": {}, "summary_text": ""}
+
+    query_overall = """
+    SELECT
+        stat_type,
+        AVG(probability_predicted) as avg_predicted_prob,
+        AVG(CAST(was_correct AS REAL)) as actual_hit_rate,
+        COUNT(*) as sample_count
+    FROM prediction_history
+    WHERE was_correct IS NOT NULL
+    GROUP BY stat_type
+    ORDER BY sample_count DESC
+    """
+
+    query_all = """
+    SELECT
+        AVG(probability_predicted) as avg_predicted_prob,
+        AVG(CAST(was_correct AS REAL)) as actual_hit_rate,
+        COUNT(*) as sample_count
+    FROM prediction_history
+    WHERE was_correct IS NOT NULL
+    """
+
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+
+            # Overall calibration
+            cursor.execute(query_all)
+            row = cursor.fetchone()
+            if row and row["sample_count"]:
+                avg_p = row["avg_predicted_prob"] or 0.5
+                actual = row["actual_hit_rate"] or 0.5
+                report["overall"] = {
+                    "avg_predicted_prob": round(avg_p * 100, 1),
+                    "actual_hit_rate": round(actual * 100, 1),
+                    "sample_count": row["sample_count"],
+                    "calibration_adjustment": round((avg_p - actual) * 100 * 2, 1),
+                }
+                cal_dir = "overconfident" if avg_p > actual else "underconfident"
+                report["summary_text"] = (
+                    f"Model is {cal_dir}: predicts {avg_p*100:.1f}% avg but "
+                    f"hits {actual*100:.1f}% ({row['sample_count']} graded predictions)"
+                )
+
+            # By stat type
+            cursor.execute(query_overall)
+            rows = cursor.fetchall()
+            for r in rows:
+                if r["sample_count"] and r["sample_count"] >= 5:
+                    avg_p = r["avg_predicted_prob"] or 0.5
+                    actual = r["actual_hit_rate"] or 0.5
+                    report["by_stat"][r["stat_type"]] = {
+                        "avg_predicted_prob": round(avg_p * 100, 1),
+                        "actual_hit_rate": round(actual * 100, 1),
+                        "sample_count": r["sample_count"],
+                        "calibration_adjustment": round((avg_p - actual) * 100 * 2, 1),
+                    }
+
+    except sqlite3.Error as database_error:
+        print(f"Error building calibration report: {database_error}")
+
+    return report
+
+# ============================================================
+# END SECTION: Prediction History & Calibration
+# ============================================================
 
 # ============================================================
 # END SECTION: Database CRUD Operations

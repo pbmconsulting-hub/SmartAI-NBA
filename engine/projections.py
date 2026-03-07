@@ -34,6 +34,40 @@ LEAGUE_AVERAGE_PACE = 98.5
 SEASON_AVG_WEIGHT = 0.6    # 60% season average (stabilizing factor)
 RECENT_FORM_WEIGHT = 0.4   # 40% recent form (responsiveness factor)
 
+# ============================================================
+# SECTION: Team Blowout Tendency Dictionary (W6)
+# Different coaches have very different policies on when to pull
+# starters in blowout games. Some teams (e.g., SAS) pull starters
+# early at +15; others (e.g., OKC under SGA) keep them in longer.
+# Values > 1.0 = team blows out MORE than average (increases risk)
+# Values < 1.0 = team manages leads conservatively (star sits earlier)
+# ============================================================
+
+TEAM_BLOWOUT_TENDENCY = {
+    # Teams that tend to keep starters in / run up scores (higher risk)
+    "OKC": 1.15,   # SGA era: aggressive, plays to win big
+    "BOS": 1.10,   # Aggressive offensive rotations
+    "DEN": 1.10,   # Jokic+ keeps stats up in wins
+    "MIL": 1.08,   # Giannis plays heavy minutes
+    "PHX": 1.05,   # Up-tempo, doesn't coast
+    # Teams that pull starters early / manage load (lower blowout risk for stars)
+    "SAS": 0.82,   # Popovich coaching philosophy: rest early
+    "MEM": 0.85,   # Development-first, rests stars
+    "DET": 0.88,   # Rebuilding team — load management
+    "UTA": 0.88,   # Building, rests stars
+    "WAS": 0.90,   # Similar rebuilding approach
+    # Neutral teams (most of the league)
+    "LAL": 1.00, "GSW": 1.00, "LAC": 1.00, "PHI": 1.00,
+    "BKN": 1.00, "NYK": 1.00, "MIA": 1.00, "ATL": 1.00,
+    "CHI": 1.00, "CLE": 1.00, "IND": 1.00, "TOR": 1.00,
+    "NOP": 1.00, "HOU": 1.00, "DAL": 1.00, "MIN": 1.00,
+    "POR": 1.00, "SAC": 1.00, "CHA": 1.00, "ORL": 1.00,
+}
+
+# ============================================================
+# END SECTION: Team Blowout Tendency Dictionary
+# ============================================================
+
 def build_player_projection(
     player_data,
     opponent_team_abbreviation,
@@ -43,6 +77,9 @@ def build_player_projection(
     defensive_ratings_data,
     teams_data,
     recent_form_games=None,
+    vegas_spread=0.0,
+    minutes_adjustment_factor=1.0,
+    teammate_out_notes=None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -53,7 +90,9 @@ def build_player_projection(
     - Home court advantage
     - Rest days (back-to-back fatigue)
     - Vegas total (high total = projected to be high-scoring game)
+    - Vegas spread (used for smart blowout risk calculation)
     - Recent form: last 5 game averages weighted more heavily
+    - Minutes adjustment for teammate injuries (W8)
 
     Args:
         player_data (dict): Player row from sample_players.csv
@@ -68,6 +107,16 @@ def build_player_projection(
             Each row should have numeric keys matching stat names
             (e.g., 'pts', 'reb', 'ast'). When provided, projections
             blend season averages 60% + recent-form averages 40%.
+        vegas_spread (float, optional): Vegas point spread for tonight.
+            Positive = player's team is favored by this many points.
+            Used by the smart blowout risk formula (W6).
+        minutes_adjustment_factor (float, optional): Multiplier for
+            projected minutes due to teammate injury/absence (W8).
+            > 1.0 = more minutes (teammate out), 1.0 = normal.
+            Passed in from injury report analysis.
+        teammate_out_notes (list of str, optional): Human-readable notes
+            about which teammates are out and how it affects this player (W8).
+            Included in the returned projection for display purposes.
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -85,6 +134,8 @@ def build_player_projection(
             - 'blowout_risk': float (0.0-1.0)
             - 'overall_adjustment': float (combined multiplier)
             - 'recent_form_ratio': float or None (last5_avg / season_avg)
+            - 'minutes_adjustment_factor': float (W8: teammate injury impact)
+            - 'teammate_out_notes': list of str (W8: teammate impact notes)
 
     Example:
         LeBron at home vs weak defense + fast pace →
@@ -210,10 +261,16 @@ def build_player_projection(
     else:
         game_total_factor = 1.0  # Neutral if no total provided
 
-    # --- Factor 6: Blowout Risk ---
-    # Estimate blowout risk based on opponent quality
+    # --- Factor 6: Blowout Risk (W6: Smart Blowout Risk) ---
+    # Now uses BOTH spread AND game total, plus team tendency,
+    # instead of just the defensive rating.
+    player_team = player_data.get("team", "")
     blowout_risk = _estimate_blowout_risk(
-        opponent_team_abbreviation, teams_data
+        player_team,
+        opponent_team_abbreviation,
+        teams_data,
+        vegas_spread=vegas_spread,
+        game_total=game_total,
     )
 
     # ============================================================
@@ -225,18 +282,23 @@ def build_player_projection(
     # ============================================================
 
     # Combine all factors into one multiplier for offensive stats
+    # W8: minutes_adjustment_factor boosts projections when a key
+    # teammate is OUT (more usage) or applies a slight discount when
+    # the player themselves is on a restriction.
     offensive_stat_multiplier = (
         defense_factor
         * pace_factor
         * game_total_factor
         * (1.0 + home_away_factor)
         * rest_factor
+        * minutes_adjustment_factor  # W8: teammate injury / minutes restriction
     )
 
     # Project each stat by applying the combined multiplier
     projected_points = season_points_average * offensive_stat_multiplier
     projected_rebounds = season_rebounds_average * (
         pace_factor * defense_factor * (1.0 + home_away_factor) * rest_factor
+        * minutes_adjustment_factor
     )
     projected_assists = season_assists_average * offensive_stat_multiplier
     projected_threes = season_threes_average * offensive_stat_multiplier
@@ -262,6 +324,9 @@ def build_player_projection(
         "blowout_risk": round(blowout_risk, 4),
         "overall_adjustment": round(offensive_stat_multiplier, 4),
         "recent_form_ratio": recent_form_ratio,
+        # W8: Minutes adjustment factors for injury/restriction transparency
+        "minutes_adjustment_factor": round(minutes_adjustment_factor, 4),
+        "teammate_out_notes": teammate_out_notes or [],
     }
 
     return projections
@@ -376,47 +441,95 @@ def _get_rest_adjustment_factor(rest_days):
     return rest_to_factor_map.get(capped_rest_days, 1.00)
 
 
-def _estimate_blowout_risk(opponent_team_abbreviation, teams_data):
+def _estimate_blowout_risk(
+    player_team_abbreviation,
+    opponent_team_abbreviation,
+    teams_data,
+    vegas_spread=0.0,
+    game_total=0.0,
+):
     """
-    Estimate the probability tonight's game becomes a blowout.
+    Estimate the probability tonight's game becomes a blowout. (W6)
 
-    Based on the difference in defensive ratings — if a great
-    offense faces a terrible defense (or vice versa), blowout
-    risk increases.
+    Now uses a three-factor formula that combines:
+    1. Vegas spread — the primary blowout predictor
+    2. Game total — high spread + low total = slow blowout (maximum risk)
+    3. Team blowout tendency — some coaches pull stars early, others don't
+
+    Formula:
+        blowout_risk = base_risk × spread_factor × total_factor × team_tendency
 
     Args:
+        player_team_abbreviation (str): Player's team 3-letter code
         opponent_team_abbreviation (str): Opponent 3-letter code
         teams_data (list of dict): Team data rows
+        vegas_spread (float): Today's point spread (positive = player's team favored)
+        game_total (float): Vegas over/under total for tonight's game
 
     Returns:
-        float: Blowout risk probability (0.0 to 0.40)
+        float: Blowout risk probability (0.05 to 0.45)
     """
-    # Find the opponent's defensive rating
+    # ---- Base blowout risk from defensive ratings (legacy fallback) ----
+    # Find the opponent's defensive rating for spread-independent baseline
     opponent_drtg = 115.0  # League average if not found
-
     for team_row in teams_data:
         if team_row.get("abbreviation", "") == opponent_team_abbreviation:
             opponent_drtg = float(team_row.get("drtg", 115.0))
             break
 
-    # High defensive rating = leaky defense = less likely to blow out YOUR team
-    # But also less likely opponent can control the game
-    # Base blowout risk is 15% in any NBA game
-    base_blowout_risk = 0.15
+    base_blowout_risk = 0.15  # 15% base in any NBA game
 
-    # If opponent has very weak defense (drtg > 117), blowout more likely
-    if opponent_drtg > 117:
-        extra_risk = (opponent_drtg - 117) * 0.01  # Each extra point = 1% more risk
-        blowout_risk = base_blowout_risk + extra_risk
-    elif opponent_drtg < 111:
-        # If opponent has elite defense, blowout risk is lower (competitive game)
-        reduction = (111 - opponent_drtg) * 0.01
-        blowout_risk = base_blowout_risk - reduction
+    # ---- Factor 1: Spread Factor ----
+    # Larger spread → higher blowout probability
+    # Use abs() to treat both favorite and underdog scenarios equally
+    # (a 14-point favorite or 14-point underdog both imply a lopsided game)
+    abs_spread = abs(vegas_spread) if vegas_spread != 0.0 else abs(
+        (opponent_drtg - 115.0) * 0.8  # Estimate from drtg if no spread
+    )
+    if abs_spread <= 3.0:
+        # Close game — very low blowout risk
+        spread_factor = 0.6
+    elif abs_spread <= 7.0:
+        # Moderate favorite/underdog
+        spread_factor = 0.85
+    elif abs_spread <= 12.0:
+        # Clear favorite — moderate blowout risk
+        spread_factor = 1.2
+    elif abs_spread <= 18.0:
+        # Heavy favorite — high blowout risk
+        spread_factor = 1.6
     else:
-        blowout_risk = base_blowout_risk
+        # Massive favorite — very high blowout risk
+        spread_factor = 2.0
 
-    # Cap between 5% and 40%
-    return max(0.05, min(0.40, blowout_risk))
+    # ---- Factor 2: Game Total Factor (W6: high spread + low total = max blowout risk) ----
+    # High spread + low total = one team wins a slow, controlled game = worst case
+    # High spread + high total = fast game but still one-sided = moderate risk
+    if game_total <= 0:
+        total_factor = 1.0  # No data — neutral
+    elif game_total < 210:
+        total_factor = 1.25  # Very low total = defensive slog = blowout stays close
+    elif game_total < 218:
+        total_factor = 1.10  # Below-average pace = slightly higher blowout risk
+    elif game_total <= 226:
+        total_factor = 1.00  # Average game total — neutral
+    elif game_total <= 232:
+        total_factor = 0.88  # High-scoring game — blowouts less frequent
+    else:
+        total_factor = 0.78  # Very high total — run-and-gun, close games common
+
+    # ---- Factor 3: Team Blowout Tendency ----
+    # Some coaches pull starters early (low tendency = lower risk for the PLAYER
+    # because coach pulls them sooner = less stats, but that's already captured
+    # in the minutes model). Here we track the OPPONENT's tendency to collapse.
+    # Use the PLAYER's team tendency (affects whether the player gets full mins).
+    team_tendency = TEAM_BLOWOUT_TENDENCY.get(player_team_abbreviation, 1.0)
+
+    # ---- Combine ----
+    blowout_risk = base_blowout_risk * spread_factor * total_factor * team_tendency
+
+    # Cap between 5% and 45%
+    return max(0.05, min(0.45, blowout_risk))
 
 
 def get_stat_standard_deviation(player_data, stat_type):
@@ -425,6 +538,10 @@ def get_stat_standard_deviation(player_data, stat_type):
 
     The CSV includes std values for main stats. For others,
     we estimate based on the average (coefficient of variation).
+    CV estimates are now DYNAMIC based on the player's tier (W10):
+    - Stars (high avg) have LOWER CV — they always get their shots
+    - Role players have HIGHER CV — usage is more situational
+    - Threes always get at least 0.55 CV (most streaky stat)
 
     Args:
         player_data (dict): Player row from CSV
@@ -446,22 +563,94 @@ def get_stat_standard_deviation(player_data, stat_type):
     average_column = f"{stat_type}_avg"
     stored_avg = float(player_data.get(average_column, 0))
 
-    # Different stats have different typical variability ratios
-    stat_variability_ratios = {
-        "points": 0.28,     # Points: ~28% of avg as std
-        "rebounds": 0.32,   # Rebounds: ~32% of avg as std
-        "assists": 0.38,    # Assists: ~38% of avg as std (more variable)
-        "threes": 0.55,     # 3-pointers: very variable (~55%)
-        "steals": 0.60,     # Steals: very variable
-        "blocks": 0.65,     # Blocks: very variable
-        "turnovers": 0.45,  # Turnovers: moderately variable
-    }
+    # W10: Dynamic CV based on player tier and stat type
+    # Stars (25+ PPG) are more consistent; role players are more volatile
+    cv = _get_dynamic_cv(stat_type, stored_avg)
 
-    variability_ratio = stat_variability_ratios.get(stat_type, 0.35)
-    estimated_std = stored_avg * variability_ratio
+    estimated_std = stored_avg * cv
 
     # Minimum std of 0.5 to avoid divide-by-zero issues
     return max(0.5, estimated_std)
+
+
+def _get_dynamic_cv(stat_type, stat_avg):
+    """
+    Get a dynamic coefficient of variation based on player tier and stat type. (W10)
+
+    High-usage stars have LOWER CV% because they always get their shots
+    and their production floor is higher. Low-usage role players have
+    HIGHER CV% because their production is more situational.
+    Three-point shooting is inherently streaky — always use at least 0.55 CV.
+
+    Args:
+        stat_type (str): 'points', 'rebounds', 'assists', 'threes', etc.
+        stat_avg (float): The player's average for this stat
+
+    Returns:
+        float: Coefficient of variation (0.0-1.0)
+
+    Example:
+        'points', avg=28.0 → 0.25 (star, very consistent)
+        'points', avg=5.0  → 0.50 (deep bench, very unpredictable)
+        'threes', avg=2.5  → 0.60 (minimum 0.55 always applied)
+    """
+    if stat_type == "points":
+        # Stars get guaranteed shots → lower variability
+        if stat_avg >= 25.0:
+            cv = 0.25   # Elite scorer — very consistent
+        elif stat_avg >= 15.0:
+            cv = 0.30   # Regular starter
+        elif stat_avg >= 8.0:
+            cv = 0.40   # Role player — situational production
+        else:
+            cv = 0.50   # Deep bench — very unpredictable
+
+    elif stat_type == "rebounds":
+        if stat_avg >= 10.0:
+            cv = 0.28   # Elite rebounder — positional, very consistent
+        elif stat_avg >= 6.0:
+            cv = 0.35
+        elif stat_avg >= 3.0:
+            cv = 0.42
+        else:
+            cv = 0.50
+
+    elif stat_type == "assists":
+        if stat_avg >= 8.0:
+            cv = 0.32   # Primary playmaker — fairly consistent
+        elif stat_avg >= 4.0:
+            cv = 0.40
+        else:
+            cv = 0.50
+
+    elif stat_type == "threes":
+        # Three-point shooting is inherently streaky — always minimum 0.55
+        # A 3-point specialist has slightly lower CV than a non-shooter
+        if stat_avg >= 3.0:
+            cv = 0.58   # Volume shooter — streaky but consistent volume
+        elif stat_avg >= 1.5:
+            cv = 0.65
+        else:
+            cv = 0.75   # Non-shooter attempting threes — very unpredictable
+        # Minimum 0.55 for all three-point props
+        cv = max(cv, 0.55)
+
+    elif stat_type == "steals":
+        cv = 0.60  # Steals are always high variance
+
+    elif stat_type == "blocks":
+        cv = 0.65  # Blocks are always high variance
+
+    elif stat_type == "turnovers":
+        if stat_avg >= 3.0:
+            cv = 0.42   # High-usage players have somewhat predictable turnovers
+        else:
+            cv = 0.50
+
+    else:
+        cv = 0.40  # Default for unknown stat types
+
+    return cv
 
 # ============================================================
 # END SECTION: Individual Adjustment Factor Functions
