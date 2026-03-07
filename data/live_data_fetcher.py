@@ -74,6 +74,28 @@ HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
 COLD_TREND_THRESHOLD = 0.9  # Last 3 games avg ≤ 90% of recent avg = cold
 
 # ============================================================
+# Multi-signal injury detection thresholds (fetch_player_injury_status)
+# ============================================================
+# GP ratio below this → likely long-term out (Injured Reserve)
+INJURED_RESERVE_GP_RATIO = 0.40
+# Game count gap above this → likely long-term out (Injured Reserve)
+INJURED_RESERVE_GAMES_THRESHOLD = 20
+# GP ratio below this → possibly injured (Questionable)
+QUESTIONABLE_GP_RATIO = 0.60
+# Game count gap above this → possibly injured (Questionable)
+QUESTIONABLE_GAMES_THRESHOLD = 10
+# Days without a game → "Out (no recent games)"
+OUT_DAYS_THRESHOLD = 30
+# Days without a game → "Questionable"
+QUESTIONABLE_DAYS_THRESHOLD = 14
+# Days without a game → "Day-to-Day"
+DAY_TO_DAY_DAYS_THRESHOLD = 7
+# Number of recent games to fetch for recency check (Layer 3)
+RECENT_GAMES_WINDOW = 15
+# Maximum players to do a game-log check for (cap to limit API calls)
+MAX_GAMELOG_CHECKS = 30
+
+# ============================================================
 # END SECTION: File Path Constants
 # ============================================================
 
@@ -1828,9 +1850,6 @@ def fetch_player_injury_status(todays_games=None):
         import datetime as _dt
 
         today = _dt.date.today()
-        cutoff_30 = today - _dt.timedelta(days=30)
-        cutoff_14 = today - _dt.timedelta(days=14)
-        cutoff_7  = today - _dt.timedelta(days=7)
 
         # --------------------------------------------------------
         # Layer 1: CommonAllPlayers — ROSTER_STATUS
@@ -1908,13 +1927,13 @@ def fetch_player_injury_status(todays_games=None):
             elif gp == 0:
                 status = "Out"
                 note = "0 games played this season"
-            elif gp_ratio < 0.40 or games_missed >= 20:
+            elif gp_ratio < INJURED_RESERVE_GP_RATIO or games_missed >= INJURED_RESERVE_GAMES_THRESHOLD:
                 # Very likely long-term out — needs recency confirmation
                 status = "Injured Reserve"
                 note = f"Only {gp_ratio:.0%} of team games played ({gp}/{team_total})"
                 priority = 2 if team in today_team_abbrevs else 1
                 needs_gamelog_check.append((priority, pid, key))
-            elif gp_ratio < 0.60 or games_missed >= 10:
+            elif gp_ratio < QUESTIONABLE_GP_RATIO or games_missed >= QUESTIONABLE_GAMES_THRESHOLD:
                 # Suspicious absence — may be recent injury
                 status = "Questionable"
                 note = f"Missed {games_missed} of {team_total} team games"
@@ -1936,19 +1955,19 @@ def fetch_player_injury_status(todays_games=None):
 
         # --------------------------------------------------------
         # Layer 3: PlayerGameLog — recency check for flagged players
-        # Cap at 30 API calls; prioritise today's team players (priority 2 first)
+        # Cap at MAX_GAMELOG_CHECKS API calls; prioritise today's team players
         # --------------------------------------------------------
         print(f"fetch_player_injury_status: Layer 3 — GameLog recency ({len(needs_gamelog_check)} flagged)")
         needs_gamelog_check.sort(key=lambda x: x[0], reverse=True)  # high priority first
         checked = 0
         for priority, pid, name_key in needs_gamelog_check:
-            if checked >= 30 or pid is None:
+            if checked >= MAX_GAMELOG_CHECKS or pid is None:
                 break
             try:
                 log_ep = playergamelog.PlayerGameLog(
                     player_id=pid,
                     season_type_all_star="Regular Season",
-                    last_n_games=15,
+                    last_n_games=RECENT_GAMES_WINDOW,
                 )
                 time.sleep(API_DELAY_SECONDS)
                 log_data = log_ep.get_data_frames()[0].to_dict("records")
@@ -1975,20 +1994,20 @@ def fetch_player_injury_status(todays_games=None):
                     status_map[name_key]["last_game_date"] = str(last_date)
                     days_ago = (today - last_date).days
                     entry = status_map[name_key]
-                    if days_ago >= 30:
+                    if days_ago >= OUT_DAYS_THRESHOLD:
                         entry["status"] = "Out"
                         entry["injury_note"] = f"No games in last {days_ago} days"
-                    elif days_ago >= 14:
+                    elif days_ago >= QUESTIONABLE_DAYS_THRESHOLD:
                         # Downgrade Injured Reserve to Questionable when recency is moderate
                         if entry["status"] == "Injured Reserve":
                             entry["status"] = "Questionable"
                         entry["injury_note"] = f"Last played {days_ago} days ago"
-                    elif days_ago >= 7:
+                    elif days_ago >= DAY_TO_DAY_DAYS_THRESHOLD:
                         if entry["status"] in ("Injured Reserve", "Questionable"):
                             entry["status"] = "Day-to-Day"
                         entry["injury_note"] = f"Last played {days_ago} days ago"
                     else:
-                        # Played within the last week → Active despite low GP ratio
+                        # Played within DAY_TO_DAY_DAYS_THRESHOLD → Active despite low GP ratio
                         entry["status"] = "Active"
                         entry["injury_note"] = f"Last played {days_ago} days ago (low game count)"
 
