@@ -38,6 +38,16 @@ from data.live_data_fetcher import (
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
+# Import web scraper for the Layer 5 injury report refresh button.
+# Import lazily inside the button handler to avoid ImportError when
+# requests/beautifulsoup4 are not yet installed.
+_web_scraper_available = False
+try:
+    from data.web_scraper import fetch_all_injury_data  # noqa: F401
+    _web_scraper_available = True
+except ImportError:
+    pass
+
 # ============================================================
 # SECTION: Page Setup
 # ============================================================
@@ -292,6 +302,45 @@ with btn_col4:
         help="Update all data: games, all players, and teams (slow)",
     ):
         st.session_state["update_action"] = "all"
+
+st.markdown("---")
+
+# ─── Injury Report Section ──────────────────────────────────
+st.markdown("""
+<div style="background:linear-gradient(135deg,#1a0a2e,#0f1a2e); border:1px solid #c800ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report (Layer 5)</div>
+  <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
+    Scrapes <strong>RotoWire</strong> and the <strong>NBA.com official injury report</strong> for
+    real-time GTD/Out/Doubtful designations, specific injury details, and expected return dates.
+    Overrides stale nba_api data when authoritative sources report a player as injured or inactive.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+injury_btn_col1, injury_btn_col2 = st.columns([1, 3])
+with injury_btn_col1:
+    _injury_btn_disabled = not _web_scraper_available
+    if st.button(
+        "🔄 Refresh Injury Report",
+        use_container_width=True,
+        help="Scrape RotoWire + NBA.com for live GTD/Out/injury data (requires requests & beautifulsoup4)",
+        disabled=_injury_btn_disabled,
+    ):
+        st.session_state["update_action"] = "injury_report"
+
+with injury_btn_col2:
+    if _web_scraper_available:
+        # Show last-scraped timestamp if available
+        _last_scraped = st.session_state.get("injury_report_last_scraped")
+        if _last_scraped:
+            st.caption(f"Last scraped: {_last_scraped}")
+        else:
+            st.caption("Click to pull real-time injury designations from RotoWire and NBA.com.")
+    else:
+        st.caption(
+            "⚠️ `requests` and `beautifulsoup4` are required. "
+            "Run `pip install requests beautifulsoup4 lxml` to enable this feature."
+        )
 
 # ============================================================
 # END SECTION: Update Action Buttons
@@ -672,6 +721,137 @@ if current_action:
             st.success(f"🏟️ Found **{len(todays_games)} game(s)** for tonight!")
         else:
             st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
+
+    # --------------------------------------------------------
+    # Action: Refresh Injury Report (Layer 5 web scraping)
+    # --------------------------------------------------------
+    elif current_action == "injury_report":
+        st.subheader("🏥 Refreshing Injury Report…")
+
+        st.info(
+            "Fetching real-time injury data from **RotoWire** and **NBA.com**. "
+            "This typically takes 5–15 seconds."
+        )
+
+        # Clear the action flag immediately so a page reload doesn't re-run it
+        st.session_state["update_action"] = None
+
+        with st.spinner("Scraping injury data…"):
+            try:
+                from data.web_scraper import fetch_all_injury_data
+                scraped_data = fetch_all_injury_data()
+            except ImportError:
+                scraped_data = {}
+                st.error(
+                    "❌ **Missing dependencies.** "
+                    "Run `pip install requests beautifulsoup4 lxml` then restart the app."
+                )
+            except Exception as scrape_exc:
+                scraped_data = {}
+                st.error(f"❌ **Scraping failed:** {scrape_exc}")
+
+        if scraped_data:
+            # Record the timestamp
+            _now_str = datetime.datetime.now().strftime("%b %d, %Y at %I:%M %p")
+            st.session_state["injury_report_last_scraped"] = _now_str
+            st.session_state["injury_report_data"] = scraped_data
+
+            # Summary metrics
+            out_count = sum(1 for v in scraped_data.values() if v.get("status") == "Out")
+            gtd_count = sum(
+                1 for v in scraped_data.values()
+                if v.get("status") in ("GTD", "Questionable", "Doubtful", "Day-to-Day")
+            )
+            total_count = len(scraped_data)
+
+            st.success(
+                f"✅ **Injury report refreshed** ({_now_str})  \n"
+                f"Found **{total_count}** players — "
+                f"**{out_count}** Out, **{gtd_count}** GTD/Questionable/Doubtful"
+            )
+
+            # Show a summary table
+            st.markdown("### 📋 Scraped Injury Data")
+            st.caption(
+                "Showing players with a non-Active designation from external sources. "
+                "This data supplements but does not replace the nba_api pipeline — "
+                "run a Smart Update or Full Setup to apply these overrides to the "
+                "full injury_status.json."
+            )
+
+            # Build display rows — only non-Active players
+            _STATUS_ORDER = {
+                "Out": 0, "Injured Reserve": 0,
+                "Doubtful": 1, "GTD": 2, "Questionable": 2,
+                "Day-to-Day": 3, "Probable": 4,
+            }
+            display_rows = [
+                {
+                    "Player":       key.title(),
+                    "Team":         v.get("team", ""),
+                    "Status":       v.get("status", ""),
+                    "Injury":       v.get("injury", "") or v.get("comment", ""),
+                    "Return Date":  v.get("return_date", ""),
+                    "Source":       v.get("source", ""),
+                    "_order":       _STATUS_ORDER.get(v.get("status", ""), 99),
+                }
+                for key, v in scraped_data.items()
+                if v.get("status", "Active") not in ("Active", "Unknown")
+            ]
+            display_rows.sort(key=lambda r: (r["_order"], r["Player"]))
+
+            if display_rows:
+                # Render as an HTML table with status badge colours
+                _STATUS_COLOURS = {
+                    "Out":            ("#ff3366", "#fff"),
+                    "Injured Reserve":("#cc0033", "#fff"),
+                    "Doubtful":       ("#ff6600", "#fff"),
+                    "GTD":            ("#ffd700", "#000"),
+                    "Questionable":   ("#ffd700", "#000"),
+                    "Day-to-Day":     ("#ffa500", "#000"),
+                    "Probable":       ("#00cc66", "#000"),
+                }
+
+                def _badge(status):
+                    bg, fg = _STATUS_COLOURS.get(status, ("#8b949e", "#fff"))
+                    return (
+                        f'<span style="background:{bg};color:{fg};padding:2px 7px;'
+                        f'border-radius:6px;font-size:0.75rem;font-weight:700;">'
+                        f"{status}</span>"
+                    )
+
+                table_html = (
+                    '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">'
+                    "<thead><tr>"
+                    + "".join(
+                        f'<th style="text-align:left;padding:6px 10px;border-bottom:1px solid #334;">{h}</th>'
+                        for h in ("Player", "Team", "Status", "Injury / Note", "Return", "Source")
+                    )
+                    + "</tr></thead><tbody>"
+                )
+                for row in display_rows:
+                    table_html += (
+                        "<tr>"
+                        f'<td style="padding:5px 10px;">{row["Player"]}</td>'
+                        f'<td style="padding:5px 10px;">{row["Team"]}</td>'
+                        f'<td style="padding:5px 10px;">{_badge(row["Status"])}</td>'
+                        f'<td style="padding:5px 10px;">{row["Injury"]}</td>'
+                        f'<td style="padding:5px 10px;">{row["Return Date"]}</td>'
+                        f'<td style="padding:5px 10px;font-size:0.75rem;color:#8b949e;">{row["Source"]}</td>'
+                        "</tr>"
+                    )
+                table_html += "</tbody></table>"
+                st.markdown(table_html, unsafe_allow_html=True)
+            else:
+                st.info("No injured / non-Active players found in the scraped data.")
+
+        else:
+            if scraped_data is not None and not scraped_data:
+                st.warning(
+                    "⚠️ **No injury data was returned.** "
+                    "The external sites may be unreachable or have changed their HTML structure. "
+                    "Existing nba_api injury data is preserved."
+                )
 
 # ============================================================
 # END SECTION: Execute the Selected Action
