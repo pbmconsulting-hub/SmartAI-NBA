@@ -17,6 +17,7 @@ from engine.projections import build_player_projection, get_stat_standard_deviat
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
+from engine.explainer import generate_pick_explanation
 
 # Import data loading functions
 from data.data_manager import (
@@ -26,10 +27,16 @@ from data.data_manager import (
     find_player_by_name,
     load_props_from_session,
     get_roster_health_report,
+    validate_props_against_roster,
 )
 
 # Import the theme helpers
-from styles.theme import get_global_css, get_player_card_html, get_best_bets_section_html
+from styles.theme import (
+    get_global_css,
+    get_player_card_html,
+    get_best_bets_section_html,
+    get_roster_health_html,
+)
 
 # ============================================================
 # SECTION: Page Setup
@@ -195,6 +202,55 @@ def display_prop_analysis_card(result):
                     factor_label = factor.replace("_score", "").replace("_", " ").title()
                     st.metric(factor_label, f"{score:.0f}/100")
 
+        # ── Why This Pick explanation ────────────────────────────
+        explanation = result.get("explanation")
+        if explanation:
+            st.divider()
+            st.markdown("**💡 Why This Pick**")
+
+            # TL;DR
+            st.info(explanation.get("tldr", ""))
+
+            # Indicators row
+            indicators = explanation.get("indicators", [])
+            if indicators:
+                ind_cols = st.columns(min(len(indicators), 4))
+                for j, ind in enumerate(indicators[:4]):
+                    with ind_cols[j % len(ind_cols)]:
+                        emoji = ind.get("emoji", "⚪")
+                        factor = ind.get("factor", "")
+                        st.caption(f"{emoji} **{factor}**")
+
+            # Section details
+            sections = [
+                ("📊 Season Avg vs Line", "average_vs_line"),
+                ("🛡️ Matchup Analysis", "matchup_explanation"),
+                ("⚡ Game Pace", "pace_explanation"),
+                ("🏠 Home/Away", "home_away_explanation"),
+                ("😴 Rest Days", "rest_explanation"),
+                ("💰 Vegas Lines", "vegas_explanation"),
+                ("📐 Projection", "projection_explanation"),
+                ("🎲 Simulation", "simulation_narrative"),
+                ("⚖️ Forces", "forces_summary"),
+                ("🔥 Recent Form", "recent_form_explanation"),
+            ]
+            for label, key in sections:
+                text = explanation.get(key, "")
+                if text:
+                    st.caption(f"**{label}:** {text}")
+
+            # Risk factors
+            risks = explanation.get("risk_factors", [])
+            if risks:
+                st.markdown("**⚠️ Risk Factors:**")
+                for risk in risks:
+                    st.caption(f"  {risk}")
+
+            # Verdict
+            verdict = explanation.get("verdict", "")
+            if verdict:
+                st.markdown(f"**🏁 Verdict:** {verdict}")
+
 
 # ============================================================
 # END SECTION: Helper Functions
@@ -242,28 +298,25 @@ with status_col:
 
     # Roster health check
     if current_props and players_data:
-        health = get_roster_health_report(current_props, players_data)
-        if health["unmatched"]:
+        validation = validate_props_against_roster(current_props, players_data)
+        total = validation["total"]
+        matched_count = validation["matched_count"]
+
+        if validation["unmatched"] or validation["fuzzy_matched"]:
             with st.expander(
-                f"⚠️ Roster Health: {health['match_count']}/{health['total_count']} players matched "
-                f"({health['match_rate']*100:.0f}%) — click to see unmatched"
+                f"⚠️ Roster Health: {matched_count}/{total} players matched "
+                f"({int(matched_count/max(total,1)*100)}%) — click to see details"
             ):
-                st.caption("**✅ Matched players:**")
-                matched_html = " ".join(
-                    f'<span class="health-matched">{n}</span>' for n in health["matched"]
-                )
-                st.markdown(matched_html, unsafe_allow_html=True)
-                st.caption("**❌ Unmatched players (will use fallback data):**")
-                unmatched_html = " ".join(
-                    f'<span class="health-unmatched">{n}</span>' for n in health["unmatched"]
-                )
-                st.markdown(unmatched_html, unsafe_allow_html=True)
-                st.caption(
-                    "💡 Unmatched players still get analyzed using the prop line as the baseline. "
-                    "For accurate results, update player data or check the name spelling."
+                st.markdown(
+                    get_roster_health_html(
+                        validation["matched"],
+                        validation["fuzzy_matched"],
+                        validation["unmatched"],
+                    ),
+                    unsafe_allow_html=True,
                 )
         else:
-            st.success(f"✅ All {health['total_count']} players matched in database.")
+            st.success(f"✅ All {total} players matched in database.")
 
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
@@ -423,7 +476,24 @@ if run_analysis:
             number_of_buckets=15,
         )
 
-        # Step 9: Compile the full result
+        # Step 9: Generate "Why This Pick" explanation
+        explanation = generate_pick_explanation(
+            player_data=player_data,
+            prop_line=prop_line,
+            stat_type=stat_type,
+            direction=confidence_output.get("direction", "OVER"),
+            projection_result=projection_result,
+            simulation_results=simulation_output,
+            forces=forces_result,
+            confidence_result=confidence_output,
+            game_context=game_context,
+            platform=platform,
+            recent_form_games=prop.get("recent_form_results", []),
+            should_avoid=should_avoid,
+            avoid_reasons=avoid_reasons,
+        )
+
+        # Step 10: Compile the full result
         full_result = {
             # Basic prop info
             "player_name": player_name,
@@ -478,6 +548,8 @@ if run_analysis:
             "recent_form_results": prop.get("recent_form_results", []),
             # Whether player was found in the database
             "player_matched": player_matched,
+            # Why This Pick explanation
+            "explanation": explanation,
         }
 
         analysis_results_list.append(full_result)

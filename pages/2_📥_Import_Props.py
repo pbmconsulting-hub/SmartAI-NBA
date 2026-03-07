@@ -19,6 +19,13 @@ from data.data_manager import (
     get_csv_template,
     find_player_by_name,
     enrich_prop_with_player_data,
+    validate_props_against_roster,
+)
+from data.platform_mappings import (
+    normalize_stat_type,
+    detect_platform_from_stat_names,
+    COMBO_STATS,
+    FANTASY_SCORING,
 )
 
 # ============================================================
@@ -67,7 +74,13 @@ st.divider()
 players_data = load_players_data()
 all_player_names = get_all_player_names(players_data)
 
-valid_stat_types = ["points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers"]
+# Simple stats + combo + fantasy stat types
+valid_stat_types = (
+    ["points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers"]
+    + sorted(COMBO_STATS.keys())
+    + sorted(FANTASY_SCORING.keys())
+    + ["double_double", "triple_double"]
+)
 valid_platforms = ["PrizePicks", "Underdog", "DraftKings"]
 
 # ============================================================
@@ -146,6 +159,29 @@ if current_props:
             save_props_to_session(sample_props, st.session_state)
             st.success(f"Loaded {len(sample_props)} sample props!")
             st.rerun()
+
+    # Roster validation table
+    if players_data:
+        from styles.theme import get_roster_health_html
+        validation = validate_props_against_roster(current_props, players_data)
+        total_v = validation["total"]
+        matched_count_v = validation["matched_count"]
+
+        if total_v > 0:
+            with st.expander(
+                f"🧬 Roster Health: {matched_count_v}/{total_v} props matched "
+                f"({int(matched_count_v/max(total_v,1)*100)}%) — click to see details",
+                expanded=(len(validation["unmatched"]) > 0),
+            ):
+                st.markdown(
+                    get_roster_health_html(
+                        validation["matched"],
+                        validation["fuzzy_matched"],
+                        validation["unmatched"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+
 else:
     st.info("No props loaded. Use the forms below to add props.")
 
@@ -279,6 +315,19 @@ if uploaded_file is not None:
             st.warning(f"⚠️ {error}")
 
     if parsed_props:
+        # Auto-detect platform and normalize stat types through platform mappings
+        raw_stat_names = [p.get("stat_type", "") for p in parsed_props]
+        detected_platform = detect_platform_from_stat_names(raw_stat_names)
+        if detected_platform:
+            st.info(f"🔍 Auto-detected platform: **{detected_platform}**")
+
+        for p in parsed_props:
+            raw_stat = p.get("stat_type", "")
+            platform_hint = p.get("platform", detected_platform or "")
+            normalized = normalize_stat_type(raw_stat, platform_hint)
+            if normalized != raw_stat:
+                p["stat_type"] = normalized
+
         st.success(f"✅ Parsed {len(parsed_props)} props from upload!")
 
         # Auto-enrich with player data
@@ -342,6 +391,14 @@ if st.button("⚡ Parse & Add Props") and quick_add_text.strip():
         st.warning(f"⚠️ {error}")
 
     if parsed_props_quick:
+        # Normalize stat types through platform mappings
+        for p in parsed_props_quick:
+            raw_stat = p.get("stat_type", "")
+            platform_hint = p.get("platform", "")
+            normalized = normalize_stat_type(raw_stat, platform_hint)
+            if normalized != raw_stat:
+                p["stat_type"] = normalized
+
         existing = load_props_from_session(st.session_state)
         combined = existing + parsed_props_quick
         save_props_to_session(combined, st.session_state)

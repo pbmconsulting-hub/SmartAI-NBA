@@ -320,6 +320,360 @@ def build_histogram_from_results(simulated_results, prop_line, number_of_buckets
 
     return histogram_buckets
 
+
 # ============================================================
-# END SECTION: Helper Functions for Game Scenario Randomization
+# SECTION: Combo / Fantasy Stat Simulations
+# These extend the Monte Carlo engine to handle multi-stat
+# props (Pts+Rebs, PRA, etc.) and fantasy score props.
+# ============================================================
+
+def simulate_combo_stat(
+    component_projections,
+    component_std_devs,
+    prop_line,
+    number_of_simulations,
+    blowout_risk_factor,
+    pace_adjustment_factor,
+    matchup_adjustment_factor,
+    home_away_adjustment,
+    rest_adjustment_factor,
+):
+    """
+    Run a correlated Monte Carlo simulation for a combo stat prop.
+
+    Combo stats (Pts+Rebs, PRA, etc.) share a minutes factor —
+    a blowout or foul trouble affects ALL component stats together.
+    This correlated approach avoids over-counting variance.
+
+    Args:
+        component_projections (dict): {stat_key: projected_avg}
+            e.g., {"points": 24.0, "rebounds": 8.0}
+        component_std_devs (dict): {stat_key: std_dev}
+        prop_line (float): Combo prop line (sum of components)
+        number_of_simulations (int): Simulations to run
+        blowout_risk_factor (float): Blowout probability (0-1)
+        pace_adjustment_factor (float): Pace multiplier
+        matchup_adjustment_factor (float): Defense multiplier
+        home_away_adjustment (float): Home-court additive
+        rest_adjustment_factor (float): Rest multiplier
+
+    Returns:
+        dict: Same structure as run_monte_carlo_simulation()
+    """
+    combined_multiplier = (
+        pace_adjustment_factor
+        * matchup_adjustment_factor
+        * (1.0 + home_away_adjustment)
+        * rest_adjustment_factor
+    )
+
+    # Adjust all component projections by the shared multiplier
+    adjusted = {
+        k: v * combined_multiplier
+        for k, v in component_projections.items()
+    }
+    adjusted_stds = {
+        k: max(v * (1.0 + 0.1 * (combined_multiplier - 1.0)), 0.3)
+        for k, v in component_std_devs.items()
+    }
+
+    all_combo_results = []
+    count_over = 0
+
+    for _ in range(number_of_simulations):
+        # Shared minutes multiplier (correlated across all components)
+        blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
+        foul_reduction = _simulate_foul_trouble_minutes_reduction()
+        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        minutes_mult = 1.0 - total_reduction
+
+        combo_value = 0.0
+        for stat_key, proj in adjusted.items():
+            scaled_proj = proj * minutes_mult
+            scaled_std = adjusted_stds.get(stat_key, proj * 0.35) * math.sqrt(minutes_mult)
+            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            combo_value += sim_val
+
+        all_combo_results.append(combo_value)
+        if combo_value > prop_line:
+            count_over += 1
+
+    raw_prob_over = count_over / number_of_simulations
+    final_prob_over = clamp_probability(raw_prob_over)
+
+    return {
+        "simulated_results": all_combo_results,
+        "probability_over": final_prob_over,
+        "simulated_mean": calculate_mean(all_combo_results),
+        "simulated_std": calculate_standard_deviation(all_combo_results),
+        "percentile_10": calculate_percentile(all_combo_results, 10),
+        "percentile_25": calculate_percentile(all_combo_results, 25),
+        "percentile_50": calculate_percentile(all_combo_results, 50),
+        "percentile_75": calculate_percentile(all_combo_results, 75),
+        "percentile_90": calculate_percentile(all_combo_results, 90),
+        "adjusted_projection": sum(adjusted.values()),
+        "combined_adjustment": combined_multiplier,
+    }
+
+
+def simulate_fantasy_score(
+    stat_projections,
+    stat_std_devs,
+    fantasy_formula,
+    prop_line,
+    number_of_simulations,
+    blowout_risk_factor,
+    pace_adjustment_factor,
+    matchup_adjustment_factor,
+    home_away_adjustment,
+    rest_adjustment_factor,
+):
+    """
+    Simulate a fantasy score prop using the platform's scoring formula.
+
+    All component stats share a minutes factor (correlated), then the
+    platform formula weights each stat to produce a fantasy total.
+
+    Args:
+        stat_projections (dict): {stat_key: projected_avg}
+        stat_std_devs (dict): {stat_key: std_dev}
+        fantasy_formula (dict): {stat_key: multiplier}
+            e.g., {"points": 1.0, "rebounds": 1.2, ...}
+        prop_line (float): Fantasy score line
+        number_of_simulations (int): Simulations to run
+        blowout_risk_factor (float): Blowout probability (0-1)
+        pace_adjustment_factor (float): Pace multiplier
+        matchup_adjustment_factor (float): Defense multiplier
+        home_away_adjustment (float): Home-court additive
+        rest_adjustment_factor (float): Rest multiplier
+
+    Returns:
+        dict: Same structure as run_monte_carlo_simulation()
+    """
+    combined_multiplier = (
+        pace_adjustment_factor
+        * matchup_adjustment_factor
+        * (1.0 + home_away_adjustment)
+        * rest_adjustment_factor
+    )
+
+    adjusted = {k: v * combined_multiplier for k, v in stat_projections.items()}
+    adjusted_stds = {
+        k: max(v * (1.0 + 0.1 * (combined_multiplier - 1.0)), 0.3)
+        for k, v in stat_std_devs.items()
+    }
+
+    all_fantasy_results = []
+    count_over = 0
+
+    for _ in range(number_of_simulations):
+        blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
+        foul_reduction = _simulate_foul_trouble_minutes_reduction()
+        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        minutes_mult = 1.0 - total_reduction
+
+        fantasy_val = 0.0
+        for stat_key, multiplier in fantasy_formula.items():
+            proj = adjusted.get(stat_key, 0.0)
+            std = adjusted_stds.get(stat_key, proj * 0.35)
+            scaled_proj = proj * minutes_mult
+            scaled_std = std * math.sqrt(minutes_mult)
+            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            fantasy_val += sim_val * multiplier
+
+        all_fantasy_results.append(fantasy_val)
+        if fantasy_val > prop_line:
+            count_over += 1
+
+    raw_prob_over = count_over / number_of_simulations
+    final_prob_over = clamp_probability(raw_prob_over)
+
+    # Compute the adjusted projected fantasy score
+    projected_fantasy = sum(
+        adjusted.get(s, 0.0) * m for s, m in fantasy_formula.items()
+    )
+
+    return {
+        "simulated_results": all_fantasy_results,
+        "probability_over": final_prob_over,
+        "simulated_mean": calculate_mean(all_fantasy_results),
+        "simulated_std": calculate_standard_deviation(all_fantasy_results),
+        "percentile_10": calculate_percentile(all_fantasy_results, 10),
+        "percentile_25": calculate_percentile(all_fantasy_results, 25),
+        "percentile_50": calculate_percentile(all_fantasy_results, 50),
+        "percentile_75": calculate_percentile(all_fantasy_results, 75),
+        "percentile_90": calculate_percentile(all_fantasy_results, 90),
+        "adjusted_projection": projected_fantasy,
+        "combined_adjustment": combined_multiplier,
+    }
+
+
+def simulate_double_double(
+    stat_projections,
+    stat_std_devs,
+    number_of_simulations,
+    blowout_risk_factor,
+    pace_adjustment_factor,
+    matchup_adjustment_factor,
+    home_away_adjustment,
+    rest_adjustment_factor,
+):
+    """
+    Simulate P(double-double) — 2+ stats each reaching 10+ in a game.
+
+    Double-double is a Yes/No prop. The "line" is always 0.5
+    (over 0.5 = Yes = double-double occurs).
+
+    Args:
+        stat_projections (dict): {stat_key: projected_avg} for relevant
+            stats (points, rebounds, assists, blocks, steals)
+        stat_std_devs (dict): {stat_key: std_dev}
+        number_of_simulations (int): Simulations to run
+        blowout_risk_factor (float): Blowout probability (0-1)
+        pace_adjustment_factor (float): Pace multiplier
+        matchup_adjustment_factor (float): Defense multiplier
+        home_away_adjustment (float): Home-court additive
+        rest_adjustment_factor (float): Rest multiplier
+
+    Returns:
+        dict: Simulation results where probability_over = P(double-double).
+              The "simulated_results" are 0.0/1.0 indicators.
+    """
+    combined_multiplier = (
+        pace_adjustment_factor
+        * matchup_adjustment_factor
+        * (1.0 + home_away_adjustment)
+        * rest_adjustment_factor
+    )
+
+    adjusted = {k: v * combined_multiplier for k, v in stat_projections.items()}
+    adjusted_stds = {
+        k: max(v * (1.0 + 0.1 * (combined_multiplier - 1.0)), 0.3)
+        for k, v in stat_std_devs.items()
+    }
+
+    all_results = []
+    count_double_double = 0
+    DOUBLE_DOUBLE_THRESHOLD = 10
+
+    for _ in range(number_of_simulations):
+        blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
+        foul_reduction = _simulate_foul_trouble_minutes_reduction()
+        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        minutes_mult = 1.0 - total_reduction
+
+        stats_at_10_plus = 0
+        for stat_key, proj in adjusted.items():
+            std = adjusted_stds.get(stat_key, proj * 0.35)
+            scaled_proj = proj * minutes_mult
+            scaled_std = std * math.sqrt(minutes_mult)
+            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            if sim_val >= DOUBLE_DOUBLE_THRESHOLD:
+                stats_at_10_plus += 1
+
+        hit = 1.0 if stats_at_10_plus >= 2 else 0.0
+        all_results.append(hit)
+        if hit:
+            count_double_double += 1
+
+    raw_prob = count_double_double / number_of_simulations
+    final_prob = clamp_probability(raw_prob)
+
+    return {
+        "simulated_results": all_results,
+        "probability_over": final_prob,
+        "simulated_mean": raw_prob,
+        "simulated_std": math.sqrt(raw_prob * (1 - raw_prob)) if 0 < raw_prob < 1 else 0.0,
+        "percentile_10": 0.0,
+        "percentile_25": 0.0,
+        "percentile_50": 1.0 if raw_prob >= 0.5 else 0.0,
+        "percentile_75": 1.0 if raw_prob >= 0.25 else 0.0,
+        "percentile_90": 1.0 if raw_prob >= 0.1 else 0.0,
+        "adjusted_projection": raw_prob,
+        "combined_adjustment": combined_multiplier,
+    }
+
+
+def simulate_triple_double(
+    stat_projections,
+    stat_std_devs,
+    number_of_simulations,
+    blowout_risk_factor,
+    pace_adjustment_factor,
+    matchup_adjustment_factor,
+    home_away_adjustment,
+    rest_adjustment_factor,
+):
+    """
+    Simulate P(triple-double) — 3+ stats each reaching 10+ in a game.
+
+    Args:
+        stat_projections (dict): {stat_key: projected_avg}
+        stat_std_devs (dict): {stat_key: std_dev}
+        number_of_simulations (int): Simulations to run
+        blowout_risk_factor (float): Blowout probability (0-1)
+        pace_adjustment_factor (float): Pace multiplier
+        matchup_adjustment_factor (float): Defense multiplier
+        home_away_adjustment (float): Home-court additive
+        rest_adjustment_factor (float): Rest multiplier
+
+    Returns:
+        dict: Simulation results where probability_over = P(triple-double).
+    """
+    combined_multiplier = (
+        pace_adjustment_factor
+        * matchup_adjustment_factor
+        * (1.0 + home_away_adjustment)
+        * rest_adjustment_factor
+    )
+
+    adjusted = {k: v * combined_multiplier for k, v in stat_projections.items()}
+    adjusted_stds = {
+        k: max(v * (1.0 + 0.1 * (combined_multiplier - 1.0)), 0.3)
+        for k, v in stat_std_devs.items()
+    }
+
+    all_results = []
+    count_triple_double = 0
+    TRIPLE_DOUBLE_THRESHOLD = 10
+
+    for _ in range(number_of_simulations):
+        blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
+        foul_reduction = _simulate_foul_trouble_minutes_reduction()
+        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        minutes_mult = 1.0 - total_reduction
+
+        stats_at_10_plus = 0
+        for stat_key, proj in adjusted.items():
+            std = adjusted_stds.get(stat_key, proj * 0.35)
+            scaled_proj = proj * minutes_mult
+            scaled_std = std * math.sqrt(minutes_mult)
+            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            if sim_val >= TRIPLE_DOUBLE_THRESHOLD:
+                stats_at_10_plus += 1
+
+        hit = 1.0 if stats_at_10_plus >= 3 else 0.0
+        all_results.append(hit)
+        if hit:
+            count_triple_double += 1
+
+    raw_prob = count_triple_double / number_of_simulations
+    final_prob = clamp_probability(raw_prob)
+
+    return {
+        "simulated_results": all_results,
+        "probability_over": final_prob,
+        "simulated_mean": raw_prob,
+        "simulated_std": math.sqrt(raw_prob * (1 - raw_prob)) if 0 < raw_prob < 1 else 0.0,
+        "percentile_10": 0.0,
+        "percentile_25": 0.0,
+        "percentile_50": 1.0 if raw_prob >= 0.5 else 0.0,
+        "percentile_75": 1.0 if raw_prob >= 0.25 else 0.0,
+        "percentile_90": 1.0 if raw_prob >= 0.1 else 0.0,
+        "adjusted_projection": raw_prob,
+        "combined_adjustment": combined_multiplier,
+    }
+
+# ============================================================
+# END SECTION: Combo / Fantasy Stat Simulations
 # ============================================================

@@ -58,7 +58,11 @@ FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
 
 # Minimum minutes threshold to include a player's stats.
 # Players below this threshold are considered inactive/garbage-time only.
-MIN_MINUTES_THRESHOLD = 5.0
+# Problem statement requires 15+ MPG for live fetch; we keep 10 for fallback.
+MIN_MINUTES_THRESHOLD = 15.0
+
+# Minimum MPG to include in analysis at all (very generous floor).
+MIN_MINUTES_ANALYSIS_THRESHOLD = 10.0
 
 # Recent-form trend thresholds: how much above/below season avg to be "hot"/"cold"
 HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
@@ -1051,6 +1055,11 @@ def fetch_player_stats(progress_callback=None):
                 "turnovers_std": round(turnovers_std_from_log if turnovers_std_from_log is not None else max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO), 2),
             }
 
+            # Skip players who aren't getting meaningful minutes.
+            # They won't have props and pollute the database with noise.
+            if minutes_avg < MIN_MINUTES_THRESHOLD:
+                continue
+
             formatted_players.append(formatted_player)
 
         # --------------------------------------------------------
@@ -1620,4 +1629,85 @@ def fetch_all_todays_data(progress_callback=None):
 
 # ============================================================
 # END SECTION: One-Click Today's Data Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Team Roster Cache
+# In-memory cache mapping team abbreviation → active player list.
+# Populated by fetch_active_rosters() to avoid repeated API calls.
+# ============================================================
+
+# Module-level cache (lives as long as the Python process runs)
+TEAM_ROSTER_CACHE = {}  # {team_abbrev: [player_name, ...]}
+
+
+def fetch_active_rosters(team_abbrevs=None, progress_callback=None):
+    """
+    Fetch current active rosters for the given teams and populate TEAM_ROSTER_CACHE.
+
+    Uses CommonTeamRoster to get the up-to-date roster for each team,
+    reflecting all recent trades and signings.
+
+    Args:
+        team_abbrevs (list of str, optional): Team abbreviations to fetch.
+            If None, fetches all 30 teams (slow, ~3-5 minutes).
+        progress_callback (callable, optional): Called with (current, total, msg).
+
+    Returns:
+        dict: {team_abbrev: [player_name, ...]} — the populated cache.
+    """
+    try:
+        from nba_api.stats.endpoints import commonteamroster
+        from nba_api.stats.static import teams as nba_teams_static
+    except ImportError:
+        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        return TEAM_ROSTER_CACHE
+
+    all_nba_teams = nba_teams_static.get_teams()
+    team_abbrev_to_id = {
+        NBA_API_ABBREV_TO_OURS.get(t["abbreviation"], t["abbreviation"]): t["id"]
+        for t in all_nba_teams
+    }
+
+    if team_abbrevs is None:
+        team_abbrevs = list(team_abbrev_to_id.keys())
+
+    total = len(team_abbrevs)
+    for idx, abbrev in enumerate(sorted(team_abbrevs)):
+        if progress_callback:
+            progress_callback(idx, total, f"Fetching roster for {abbrev}...")
+
+        team_id = team_abbrev_to_id.get(abbrev)
+        if not team_id:
+            continue
+
+        try:
+            roster_endpoint = commonteamroster.CommonTeamRoster(team_id=team_id)
+            roster_df = roster_endpoint.get_data_frames()[0]
+            player_names = roster_df["PLAYER"].tolist()
+            TEAM_ROSTER_CACHE[abbrev] = player_names
+            time.sleep(API_DELAY_SECONDS)
+        except Exception as err:
+            print(f"  Could not fetch roster for {abbrev}: {err}")
+
+    return TEAM_ROSTER_CACHE
+
+
+def get_cached_roster(team_abbrev):
+    """
+    Return the cached active roster for a team, or an empty list.
+
+    Call fetch_active_rosters() first to populate the cache.
+
+    Args:
+        team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL')
+
+    Returns:
+        list of str: Player names on the roster, or empty list.
+    """
+    return TEAM_ROSTER_CACHE.get(team_abbrev.upper(), [])
+
+# ============================================================
+# END SECTION: Team Roster Cache
 # ============================================================

@@ -431,6 +431,168 @@ def get_roster_health_report(props_list, players_list):
         "match_rate": round(match_rate, 3),
     }
 
+
+def validate_props_against_roster(props_list, players_list):
+    """
+    Validate every prop against the player database with detailed status.
+
+    Returns three categories:
+    - matched:       props with a definitive name match (exact or normalized)
+    - fuzzy_matched: props where we found a probable match (partial/alias)
+    - unmatched:     props where no match was found
+
+    For each unmatched prop, a suggestion is provided (closest player name).
+
+    Args:
+        props_list (list of dict): Prop dicts with 'player_name'
+        players_list (list of dict): Player dicts with 'name'
+
+    Returns:
+        dict: {
+            'matched':       list of {prop, matched_name},
+            'fuzzy_matched': list of {prop, matched_name, suggestion},
+            'unmatched':     list of {prop, suggestion or None},
+            'total':         int,
+            'matched_count': int,
+        }
+
+    Example:
+        report = validate_props_against_roster(props, players)
+        for item in report['unmatched']:
+            print(f"No match: {item['prop']['player_name']} → suggest: {item['suggestion']}")
+    """
+    matched = []
+    fuzzy_matched = []
+    unmatched = []
+
+    # Build a quick exact-name index for fast lookup
+    exact_name_index = {
+        p.get("name", "").lower().strip(): p.get("name", "")
+        for p in players_list
+        if p.get("name")
+    }
+
+    all_player_names_list = [p.get("name", "") for p in players_list if p.get("name")]
+
+    for prop in props_list:
+        raw_name = prop.get("player_name", "").strip()
+        if not raw_name:
+            continue
+
+        # --- Try exact match ---
+        if raw_name.lower() in exact_name_index:
+            matched.append({
+                "prop": prop,
+                "matched_name": exact_name_index[raw_name.lower()],
+                "match_type": "exact",
+            })
+            continue
+
+        # --- Try alias lookup ---
+        alias_target = NAME_ALIASES.get(raw_name.lower())
+        if alias_target and alias_target in exact_name_index:
+            matched.append({
+                "prop": prop,
+                "matched_name": exact_name_index[alias_target],
+                "match_type": "alias",
+            })
+            continue
+
+        # --- Try normalized match ---
+        normalized_search = normalize_player_name(raw_name)
+        normalized_match = None
+        for p_name in all_player_names_list:
+            if normalize_player_name(p_name) == normalized_search and normalized_search:
+                normalized_match = p_name
+                break
+
+        if normalized_match:
+            # Treat normalized as a confident match (same player, different formatting)
+            matched.append({
+                "prop": prop,
+                "matched_name": normalized_match,
+                "match_type": "normalized",
+            })
+            continue
+
+        # --- Try partial / substring match ---
+        partial_match = None
+        for p_name in all_player_names_list:
+            stored_norm = normalize_player_name(p_name)
+            if (normalized_search in stored_norm or stored_norm in normalized_search) \
+                    and len(normalized_search) > 3:
+                partial_match = p_name
+                break
+
+        if partial_match:
+            fuzzy_matched.append({
+                "prop": prop,
+                "matched_name": partial_match,
+                "match_type": "partial",
+                "suggestion": f"Did you mean '{partial_match}'?",
+            })
+            continue
+
+        # --- No match: find closest suggestion via simple edit distance ---
+        suggestion = _find_closest_name(raw_name, all_player_names_list)
+        unmatched.append({
+            "prop": prop,
+            "suggestion": suggestion,
+        })
+
+    total = len(matched) + len(fuzzy_matched) + len(unmatched)
+    return {
+        "matched": matched,
+        "fuzzy_matched": fuzzy_matched,
+        "unmatched": unmatched,
+        "total": total,
+        "matched_count": len(matched) + len(fuzzy_matched),
+    }
+
+
+def _find_closest_name(search_name, candidates_list, max_results=1):
+    """
+    Find the closest player name using simple edit-distance scoring.
+
+    Implements a lightweight similarity metric without external libraries:
+    - Letter overlap ratio (Dice coefficient)
+
+    Args:
+        search_name (str): The name to search for
+        candidates_list (list of str): All known player names
+        max_results (int): How many candidates to return (default 1)
+
+    Returns:
+        str or None: Best matching name, or None if list is empty
+    """
+    if not candidates_list:
+        return None
+
+    search_norm = normalize_player_name(search_name)
+    if not search_norm:
+        return None
+
+    def _dice_similarity(a, b):
+        """Dice coefficient: 2 * |bigrams(a) ∩ bigrams(b)| / (|bigrams(a)| + |bigrams(b)|)"""
+        if not a or not b:
+            return 0.0
+        bigrams_a = {a[i:i+2] for i in range(len(a) - 1)}
+        bigrams_b = {b[i:i+2] for i in range(len(b) - 1)}
+        intersection = bigrams_a & bigrams_b
+        total = len(bigrams_a) + len(bigrams_b)
+        return 2.0 * len(intersection) / total if total > 0 else 0.0
+
+    scored = []
+    for name in candidates_list:
+        norm = normalize_player_name(name)
+        score = _dice_similarity(search_norm, norm)
+        scored.append((score, name))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    if not scored or scored[0][0] < 0.3:
+        return None
+    return scored[0][1]
+
 # ============================================================
 # END SECTION: Player Name Normalization & Fuzzy Matching
 # ============================================================
