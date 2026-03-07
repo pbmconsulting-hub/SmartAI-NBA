@@ -706,6 +706,57 @@ def get_todays_active_players(players_list, todays_games):
     return [p for p in players_list if p.get("team", "").upper() in playing_teams]
 
 
+def get_player_status(player_name, status_map):
+    """
+    Look up a player's injury/availability status from a status map.
+
+    Args:
+        player_name (str): Player name to look up
+        status_map (dict): Map from normalize_player_name -> status_dict
+                           (as returned by fetch_player_injury_status)
+
+    Returns:
+        dict: Status dict with keys 'status', 'injury_note', 'games_missed',
+              'return_date'. Returns default "Active" status if not found.
+    """
+    if not status_map or not player_name:
+        return {"status": "Active", "injury_note": "", "games_missed": 0, "return_date": ""}
+
+    # Try exact lowercase match first
+    key = player_name.lower().strip()
+    if key in status_map:
+        return status_map[key]
+
+    # Try normalized name match
+    normalized = normalize_player_name(player_name)
+    if normalized in status_map:
+        return status_map[normalized]
+
+    # Default to Active if not found
+    return {"status": "Active", "injury_note": "", "games_missed": 0, "return_date": ""}
+
+
+def get_status_badge_html(status):
+    """
+    Return an HTML badge string for a player's injury/availability status.
+
+    Args:
+        status (str): Player status string (e.g., 'Active', 'Out', etc.)
+
+    Returns:
+        str: HTML span element with colored badge for the status.
+    """
+    badges = {
+        "Active": '<span style="background:#00ff88;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟢 Active</span>',
+        "Questionable": '<span style="background:#ffd700;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Questionable</span>',
+        "Day-to-Day": '<span style="background:#ffa500;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Day-to-Day</span>',
+        "Doubtful": '<span style="background:#ff6600;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟠 Doubtful</span>',
+        "Out": '<span style="background:#ff3366;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 Out</span>',
+        "Injured Reserve": '<span style="background:#cc0033;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 IR</span>',
+    }
+    return badges.get(status, '<span style="background:#8b949e;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">⚪ Unknown</span>')
+
+
 def enrich_prop_with_player_data(prop, players_list):
     """
     Add player season averages and team info to a prop dictionary.

@@ -1717,6 +1717,90 @@ def get_cached_roster(team_abbrev):
 
 
 # ============================================================
+# SECTION: Player Injury / Status Detection
+# Uses LeagueDashPlayerStats as a proxy for player availability.
+# A dedicated injury-report endpoint is not available in nba_api.
+# ============================================================
+
+def fetch_player_injury_status():
+    """
+    Fetch current NBA player injury and availability status.
+
+    Attempts to retrieve injury report data from nba_api. Returns a
+    dict mapping normalized player names to their current status.
+
+    Note: nba_api does not provide a dedicated injury-report endpoint.
+    This function uses LeagueDashPlayerStats (season GP count) as a proxy:
+    players with GP > 0 are marked "Active"; those absent from season logs
+    are marked "Out". Finer-grained statuses (Questionable, Day-to-Day,
+    Doubtful, Injured Reserve) are supported by the return schema but cannot
+    be populated without an external injury-report data source. The dict
+    structure is intentionally forward-compatible so callers can layer in
+    richer data later without changing the interface.
+    When live data is unavailable, returns an empty dict (app continues
+    with "Active" default for all players).
+
+    Returns:
+        dict: {
+            "player_name_lower": {
+                "status": str,       # "Active" or "Out" (proxy only)
+                "injury_note": str,  # "" or "Not in recent game logs"
+                "games_missed": int, # always 0 (proxy limitation)
+                "return_date": str,  # always "" (proxy limitation)
+            },
+            ...
+        }
+    """
+    try:
+        from nba_api.stats.endpoints import commonteamroster, leaguedashplayerstats
+        from nba_api.stats.static import teams as nba_teams_static
+    except ImportError:
+        return {}
+
+    try:
+        # Use LeagueDashPlayerStats with a recent date range to detect
+        # players who have not appeared in recent games (proxy for injuries)
+        import datetime as _dt
+
+        # Get current season stats to check games played
+        stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
+            per_mode_detailed="PerGame",
+            season_type_all_star="Regular Season",
+        )
+        time.sleep(API_DELAY_SECONDS)
+
+        player_stats = stats_endpoint.get_data_frames()[0].to_dict("records")
+
+        status_map = {}
+        for player_row in player_stats:
+            name = player_row.get("PLAYER_NAME", "")
+            gp = int(player_row.get("GP", 0) or 0)
+
+            if not name:
+                continue
+
+            # Players with 0 recent games are likely inactive/injured
+            # This is a proxy — real injury API not available in nba_api
+            key = name.lower().strip()
+            status_map[key] = {
+                "status": "Active" if gp > 0 else "Out",
+                "injury_note": "" if gp > 0 else "Not in recent game logs",
+                "games_missed": 0,
+                "return_date": "",
+            }
+
+        return status_map
+
+    except Exception as error:
+        print(f"fetch_player_injury_status error: {error}")
+        return {}
+
+# ============================================================
+# END SECTION: Player Injury / Status Detection
+# ============================================================
+
+
+# ============================================================
 # SECTION: Dynamic CV Estimation Helper (W10)
 # Returns tier-based coefficients of variation for fallback
 # std deviation estimates when live game logs are unavailable.
