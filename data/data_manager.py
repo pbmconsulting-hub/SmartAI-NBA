@@ -573,9 +573,18 @@ def _find_closest_name(search_name, candidates_list, max_results=1):
         return None
 
     def _dice_similarity(a, b):
-        """Dice coefficient: 2 * |bigrams(a) ∩ bigrams(b)| / (|bigrams(a)| + |bigrams(b)|)"""
+        """Dice coefficient: 2 * |bigrams(a) ∩ bigrams(b)| / (|bigrams(a)| + |bigrams(b)|)
+
+        Handles single-character strings by treating the character itself as the bigram.
+        """
         if not a or not b:
             return 0.0
+        # Exact match short-circuit
+        if a == b:
+            return 1.0
+        # For very short strings (len 1), use character set overlap
+        if len(a) == 1 or len(b) == 1:
+            return 1.0 if a[0] == b[0] else 0.0
         bigrams_a = {a[i:i+2] for i in range(len(a) - 1)}
         bigrams_b = {b[i:i+2] for i in range(len(b) - 1)}
         intersection = bigrams_a & bigrams_b

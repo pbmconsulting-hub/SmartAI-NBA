@@ -417,7 +417,7 @@ def _build_risk_factors(
         cv = stat_std / stat_avg  # Coefficient of variation
         if cv > 0.5:
             risks.append(
-                f"📊 High volatility stat (CV: {cv:.1f}) — this player's {'' } output varies significantly game-to-game."
+                f"📊 High volatility stat (CV: {cv:.1f}) — this player's output varies significantly game-to-game."
             )
 
     if game_total < 210:

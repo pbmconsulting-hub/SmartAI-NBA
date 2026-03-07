@@ -61,9 +61,6 @@ FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
 # Problem statement requires 15+ MPG for live fetch; we keep 10 for fallback.
 MIN_MINUTES_THRESHOLD = 15.0
 
-# Minimum MPG to include in analysis at all (very generous floor).
-MIN_MINUTES_ANALYSIS_THRESHOLD = 10.0
-
 # Recent-form trend thresholds: how much above/below season avg to be "hot"/"cold"
 HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
 COLD_TREND_THRESHOLD = 0.9  # Last 3 games avg ≤ 90% of recent avg = cold
