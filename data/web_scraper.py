@@ -607,10 +607,21 @@ def scrape_basketball_reference_roster(team_abbrev):
             number = th_cells[0] if th_cells else ""
 
             try:
-                name     = cells[col.get("name",     0) - 1] if "name"     in col else (cells[0] if cells else "")
-                position = cells[col.get("position", 1) - 1] if "position" in col else (cells[1] if len(cells) > 1 else "")
-                height   = cells[col.get("height",   2) - 1] if "height"   in col else (cells[2] if len(cells) > 2 else "")
-                weight   = cells[col.get("weight",   3) - 1] if "weight"   in col else (cells[3] if len(cells) > 3 else "")
+                # In Basketball-Reference tables the row header (<th scope="row">)
+                # is the jersey number and is already in th_cells. The <td> data
+                # cells therefore correspond to header column index - 1 (since the
+                # "No." header at index 0 has no matching <td>).
+                # We build a safe mapping to avoid negative indexing.
+                _data = {}
+                for _col_name, _col_idx in col.items():
+                    _td_idx = _col_idx - 1  # skip the "No." header column
+                    if 0 <= _td_idx < len(cells):
+                        _data[_col_name] = cells[_td_idx]
+
+                name     = _data.get("name",     cells[0] if cells else "")
+                position = _data.get("position", cells[1] if len(cells) > 1 else "")
+                height   = _data.get("height",   cells[2] if len(cells) > 2 else "")
+                weight   = _data.get("weight",   cells[3] if len(cells) > 3 else "")
             except IndexError:
                 name, position, height, weight = "", "", "", ""
 

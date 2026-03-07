@@ -2097,10 +2097,8 @@ def fetch_player_injury_status(todays_games=None):
                         # and NOT "Unknown" (which would represent a scraper parse error)
                         if scraped_severity > existing_severity and scraped_severity >= 0:
                             existing["status"] = scraped_status
-                            existing["injury_note"] = (
-                                scraped_entry.get("injury", "") or
-                                existing.get("injury_note", "")
-                            )
+                            # injury_note preserves the nba_api-generated signal for
+                            # backward compat; injury holds the scraped body-part detail.
                             existing["return_date"] = (
                                 scraped_entry.get("return_date", "") or
                                 existing.get("return_date", "")
