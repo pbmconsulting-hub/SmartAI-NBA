@@ -28,18 +28,34 @@ from engine.entry_optimizer import (
 # ============================================================
 
 st.set_page_config(
-    page_title="Entry Builder — SmartAI-NBA",
-    page_icon="🎰",
+    page_title="Entry Builder — SmartBetPro NBA",
+    page_icon="🧬",
     layout="wide",
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_neural_header_html, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-st.title("🎰 Entry Builder")
+if "selected_picks" not in st.session_state:
+    st.session_state["selected_picks"] = []
+
+st.title("🧬 Entry Builder")
 st.markdown("Build optimal parlay entries with maximum Expected Value (EV).")
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 Building a Winning Entry",
+    """
+    <strong>Expected Value (EV)</strong>: How much you'd expect to win or lose per dollar bet over many entries. 
+    Positive EV = good bet in the long run.<br><br>
+    <strong>Parlay</strong>: All picks in your entry must hit. More picks = bigger payout but lower probability.<br><br>
+    <strong>Flex vs Power</strong>: Flex entries pay even if 1-2 picks miss (at reduced rates). 
+    Power requires ALL picks to hit for maximum payout.<br><br>
+    <strong>Correlation warning</strong>: Two picks from the same game (e.g., two players on the same team) 
+    are correlated — if one does well, the other might too. This can be good or bad.
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup
@@ -127,6 +143,114 @@ with settings_col4:
 
 # ============================================================
 # END SECTION: Entry Builder Controls
+# ============================================================
+
+# ============================================================
+# SECTION: Selected Picks from Analysis
+# ============================================================
+
+selected_picks = st.session_state.get("selected_picks", [])
+
+if selected_picks:
+    st.subheader(f"✅ Your Selected Picks ({len(selected_picks)} picks)")
+    st.caption("These picks were selected from the ⚡ Neural Analysis page. Uncheck any you want to remove.")
+    
+    # Sort options
+    sort_by = st.selectbox("Sort by:", ["Confidence (highest first)", "Probability", "Edge"], key="selected_sort")
+    
+    # Sort the picks
+    if sort_by == "Confidence (highest first)":
+        selected_picks_sorted = sorted(selected_picks, key=lambda x: x.get("confidence_score", 0), reverse=True)
+    elif sort_by == "Probability":
+        selected_picks_sorted = sorted(selected_picks, key=lambda x: abs(x.get("probability_over", 0.5) - 0.5), reverse=True)
+    else:
+        selected_picks_sorted = sorted(selected_picks, key=lambda x: abs(x.get("edge_percentage", 0)), reverse=True)
+    
+    # Show picks as checkboxes
+    picks_to_include = []
+    for i, pick in enumerate(selected_picks_sorted):
+        direction = pick.get("direction", "OVER")
+        prob = pick.get("probability_over", 0.5)
+        display_prob = (1.0 - prob) * 100 if direction == "UNDER" else prob * 100
+        tier_emoji = pick.get("tier_emoji", "🥉")
+        
+        col_check, col_info = st.columns([0.1, 0.9])
+        with col_check:
+            include = st.checkbox("", value=True, key=f"pick_check_{i}_{pick.get('player_name','')}")
+        with col_info:
+            st.markdown(
+                f"**{pick.get('player_name','')}** — "
+                f"{pick.get('stat_type','').capitalize()} {direction} {pick.get('line',0)} "
+                f"| {tier_emoji} {pick.get('tier','')} "
+                f"| {display_prob:.0f}% "
+                f"| Edge: {pick.get('edge_percentage',0):.1f}%"
+            )
+        
+        if include:
+            picks_to_include.append(pick)
+    
+    if len(picks_to_include) >= 2:
+        st.divider()
+        st.subheader("💰 Quick EV Calculation for Selected Picks")
+        
+        quick_platform = st.selectbox("Platform for EV calc:", ["PrizePicks", "Underdog", "DraftKings"], key="quick_platform")
+        quick_fee = st.number_input("Entry Fee ($):", min_value=1.0, value=10.0, key="quick_fee")
+        
+        selected_probs = [
+            p.get("probability_over", 0.5) if p.get("direction") == "OVER"
+            else 1.0 - p.get("probability_over", 0.5)
+            for p in picks_to_include
+        ]
+        
+        platform_flex_table = PLATFORM_FLEX_TABLES.get(quick_platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+        payout_for_selected = platform_flex_table.get(len(picks_to_include), {})
+        
+        if payout_for_selected:
+            quick_ev = calculate_entry_expected_value(
+                pick_probabilities=selected_probs,
+                payout_table=payout_for_selected,
+                entry_fee=quick_fee,
+            )
+            quick_display = format_ev_display(quick_ev, quick_fee)
+            ev_color = "green" if quick_display["is_positive_ev"] else "red"
+            
+            col_ev1, col_ev2, col_ev3 = st.columns(3)
+            with col_ev1:
+                st.metric("Expected Value", quick_display["ev_label"])
+            with col_ev2:
+                st.metric("ROI", quick_display["roi_label"])
+            with col_ev3:
+                combined_prob = 1.0
+                for p in selected_probs:
+                    combined_prob *= p
+                st.metric("All-Hit Probability", f"{combined_prob*100:.1f}%")
+            
+            # Correlation check
+            corr_risk = calculate_correlation_risk(picks_to_include)
+            if corr_risk.get("warnings"):
+                for w in corr_risk["warnings"]:
+                    st.warning(w)
+            
+            # Weakest link
+            weakest = identify_weakest_link(picks_to_include)
+            if weakest:
+                weakest_prob = weakest.get("probability_over", 0.5) if weakest.get("direction") == "OVER" else 1.0 - weakest.get("probability_over", 0.5)
+                if weakest_prob < 0.60:
+                    st.warning(f"⚠️ Weakest leg: **{weakest.get('player_name','')}** ({weakest_prob*100:.0f}%) — consider swapping this pick")
+        
+        if st.button("🗑️ Clear All Selected Picks", key="clear_selected"):
+            st.session_state["selected_picks"] = []
+            st.rerun()
+    elif selected_picks:
+        st.caption(f"Select at least 2 picks to calculate EV ({len(picks_to_include)} currently checked)")
+    
+    st.divider()
+else:
+    st.info("💡 No picks selected yet. Go to **⚡ Neural Analysis** and click '➕ Add to Entry' on picks you like.")
+    st.divider()
+
+# ============================================================
+# END SECTION: Selected Picks from Analysis
 # ============================================================
 
 # ============================================================

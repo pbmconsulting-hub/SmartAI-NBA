@@ -1,14 +1,83 @@
 # ============================================================
 # FILE: styles/theme.py
-# PURPOSE: All CSS/HTML generators for the SmartAI-NBA UI.
-#          Provides a premium dark theme with glassmorphism
-#          cards, animated tier badges, and NBA team colors.
+# PURPOSE: All CSS/HTML generators for the SmartBetPro NBA UI.
+#          Provides a futuristic "AI Neural Network Lab" dark
+#          theme with glassmorphism cards, animated glow
+#          effects, and NBA team colors.
+# BRAND:   SmartBetPro NBA by JM5
 # USAGE:
 #   from styles.theme import get_global_css, get_player_card_html
 #   st.markdown(get_global_css(), unsafe_allow_html=True)
 # ============================================================
 
 # Standard library only — no new dependencies
+import html as _html
+import math as _math
+
+
+# ============================================================
+# SECTION: Glossary
+# Plain-English explanations for betting / AI terms shown
+# via tooltips and education boxes throughout the UI.
+# ============================================================
+
+GLOSSARY = {
+    "Monte Carlo Simulation": (
+        "We simulate thousands of possible game outcomes using the player's historical "
+        "stats, matchup data, and current conditions. The percentage you see reflects "
+        "how often the player hit the target across all those simulations."
+    ),
+    "Edge": (
+        "The difference between what we think will happen and what the betting line "
+        "implies. A positive edge means our model sees more value than the sportsbook "
+        "is offering — the bigger the edge, the better the opportunity."
+    ),
+    "Confidence Score": (
+        "A 0–100 rating of how sure the model is about this pick. It combines sample "
+        "size, consistency, matchup clarity, and simulation stability. Above 70 = "
+        "high confidence; below 50 = proceed with caution."
+    ),
+    "Expected Value (EV)": (
+        "How much money you'd expect to make (or lose) per dollar bet over time if "
+        "you placed this wager repeatedly under the same conditions. Positive EV bets "
+        "are profitable long-term even if any single bet can lose."
+    ),
+    "Coefficient of Variation": (
+        "A measure of how consistent a player is. It compares the spread of their "
+        "game-to-game stats to their average. Low CV = very consistent; high CV = "
+        "boom-or-bust performer who is harder to predict."
+    ),
+    "Prop Bet": (
+        "A bet on whether a player will exceed or fall short of a statistical threshold "
+        "(the 'line') set by the platform — for example, scoring more or fewer than "
+        "24.5 points in a game."
+    ),
+    "Over/Under": (
+        "Betting on whether a stat will be higher (Over) or lower (Under) than the "
+        "line. Our model calculates the true probability of each side so you can "
+        "spot when the line is mis-priced."
+    ),
+    "Line": (
+        "The threshold set by the platform for a specific player stat. If the line "
+        "for LeBron points is 24.5, you bet whether he scores more (Over) or fewer "
+        "(Under) than that number."
+    ),
+    "Parlay": (
+        "A multi-pick bet where ALL selections must be correct to win. The payout "
+        "multiplies across legs but so does the risk — one wrong pick loses everything. "
+        "Stick to high-confidence legs when building parlays."
+    ),
+    "Bankroll": (
+        "The total amount of money set aside exclusively for betting. Good bankroll "
+        "management means never risking more than 1–5% on a single bet, so a losing "
+        "streak doesn't wipe you out before the edge plays out."
+    ),
+}
+
+
+# ============================================================
+# END SECTION: Glossary
+# ============================================================
 
 
 # ============================================================
@@ -78,47 +147,105 @@ def get_team_colors(team_abbrev):
 
 def get_global_css():
     """
-    Return the full CSS string for the SmartAI-NBA dark theme.
+    Return the full CSS string for the SmartBetPro NBA AI Neural Network Lab theme.
 
     Includes:
-    - Deep navy/purple background gradients
-    - Glassmorphism card components
-    - Tier badge animations
+    - Deep space black background with neural dot pattern
+    - Glassmorphism cards with animated green-glow borders
+    - Futuristic tier badges with glow effects
+    - Pulsing live-indicator dot animation
+    - Monospace terminal readout class
+    - Smooth hover transitions throughout
+    - Sidebar "Powered by JM5 Neural Engine" branding
     - Custom scrollbar
-    - Metric cards with gradient borders
-    - Badge/pill styling
-    - Responsive helpers
 
     Returns:
         str: Full <style>...</style> block ready for st.markdown()
     """
     return """
 <style>
-/* ─── Base ────────────────────────────────────────────────── */
+/* ─── Keyframe Animations ─────────────────────────────────── */
+@keyframes borderGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(0,255,136,0.15),
+                            0 8px 32px rgba(0,0,0,0.55); }
+    50%       { box-shadow: 0 0 20px rgba(0,255,136,0.35),
+                            0 8px 32px rgba(0,0,0,0.55); }
+}
+@keyframes pulse-platinum {
+    0%, 100% { box-shadow: 0 0 10px rgba(255,255,255,0.4); }
+    50%       { box-shadow: 0 0 22px rgba(255,255,255,0.75); }
+}
+@keyframes pulse-gold {
+    0%, 100% { box-shadow: 0 0 10px rgba(255,215,0,0.45); }
+    50%       { box-shadow: 0 0 22px rgba(255,215,0,0.8); }
+}
+@keyframes live-dot-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.4; transform: scale(1.35); }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Base / Body ─────────────────────────────────────────── */
 html, body, [class*="css"] {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                  'Helvetica Neue', Arial, sans-serif;
-    color: #e2e8f0;
+    color: #e6edf3;
+    background-color: #0a0a1a;
+}
+/* Neural dot pattern on the page body */
+.stApp {
+    background-color: #0a0a1a;
+    background-image:
+        radial-gradient(circle, rgba(0,255,136,0.07) 1px, transparent 1px),
+        radial-gradient(circle, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px, 80px 80px;
+    background-position: 0 0, 20px 20px;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #0a0a1a; }
-::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+::-webkit-scrollbar-thumb { background: rgba(0,255,136,0.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,255,136,0.45); }
 
-/* ─── Analysis Card ───────────────────────────────────────── */
+/* ─── Sidebar ─────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background: #0d1117 !important;
+    border-right: 1px solid rgba(0,255,136,0.12) !important;
+}
+[data-testid="stSidebar"]::after {
+    content: "⚡ Powered by JM5 Neural Engine";
+    display: block;
+    position: fixed;
+    bottom: 18px;
+    left: 0;
+    width: 100%;
+    padding: 0 20px;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 0.68rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: 700;
+    color: rgba(0,255,136,0.45);
+    letter-spacing: 0.08em;
+    pointer-events: none;
+}
+
+/* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {
-    background: linear-gradient(135deg, rgba(26,26,46,0.95) 0%, rgba(22,33,62,0.95) 100%);
-    border: 1px solid rgba(99,102,241,0.25);
+    background: rgba(13,17,23,0.92);
+    border: 1px solid rgba(0,255,136,0.18);
     border-radius: 16px;
     padding: 20px 24px;
     margin-bottom: 18px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45),
-                inset 0 1px 0 rgba(255,255,255,0.05);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: borderGlow 3.5s ease-in-out infinite,
+               fadeInUp 0.35s ease both;
+    transition: border-color 0.2s ease, transform 0.2s ease;
     position: relative;
     overflow: hidden;
 }
@@ -126,20 +253,66 @@ html, body, [class*="css"] {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #00ff88, #6366f1, #ffd700);
-    opacity: 0.5;
+    background: linear-gradient(90deg, #00ff88, #00d4ff, #ffd700);
+    opacity: 0.7;
 }
 .smartai-card:hover {
-    border-color: rgba(99,102,241,0.5);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.55),
-                inset 0 1px 0 rgba(255,255,255,0.08);
+    border-color: rgba(0,255,136,0.45);
+    transform: translateY(-2px);
+}
+
+/* ─── Neural Header ───────────────────────────────────────── */
+.neural-header {
+    background: rgba(13,17,23,0.95);
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 16px;
+    padding: 24px 30px;
+    margin-bottom: 20px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+.neural-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00ff88, #00d4ff, #ffd700, #ff3366, #00ff88);
+    background-size: 200% 100%;
+}
+.neural-header-title {
+    font-size: 2rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #00ff88, #00d4ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+.neural-header-subtitle {
+    font-size: 0.88rem;
+    color: #8b949e;
+    margin-top: 6px;
+    font-family: 'Courier New', Courier, monospace;
+    letter-spacing: 0.06em;
+}
+.circuit-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #00ff88;
+    margin: 0 6px;
+    vertical-align: middle;
+    animation: live-dot-pulse 1.8s ease-in-out infinite;
 }
 
 /* ─── Player Name & Team Pill ─────────────────────────────── */
 .player-name {
     font-size: 1.3rem;
     font-weight: 800;
-    color: #f0f4ff;
+    color: #e6edf3;
     letter-spacing: -0.02em;
 }
 .team-pill {
@@ -149,13 +322,13 @@ html, body, [class*="css"] {
     font-weight: 700;
     font-size: 0.8rem;
     color: #fff;
-    background: rgba(15,52,96,0.9);
+    background: rgba(0,212,255,0.15);
     margin-left: 8px;
     vertical-align: middle;
-    border: 1px solid rgba(255,255,255,0.12);
+    border: 1px solid rgba(0,212,255,0.3);
 }
 .position-tag {
-    color: #718096;
+    color: #8b949e;
     font-size: 0.82rem;
     margin-left: 8px;
     vertical-align: middle;
@@ -171,29 +344,211 @@ html, body, [class*="css"] {
     letter-spacing: 0.03em;
     text-transform: uppercase;
     position: relative;
+    transition: box-shadow 0.2s ease;
 }
 .tier-platinum {
-    background: linear-gradient(135deg, #6d28d9, #8b5cf6);
-    color: #fff;
-    box-shadow: 0 0 12px rgba(109,40,217,0.55);
+    background: linear-gradient(135deg, #c0c0c0, #f0f0f0);
+    color: #0a0a1a;
     animation: pulse-platinum 2.5s infinite;
 }
-@keyframes pulse-platinum {
-    0%, 100% { box-shadow: 0 0 12px rgba(109,40,217,0.55); }
-    50% { box-shadow: 0 0 22px rgba(139,92,246,0.8); }
-}
 .tier-gold {
-    background: linear-gradient(135deg, #d97706, #f59e0b);
-    color: #fff;
-    box-shadow: 0 0 10px rgba(217,119,6,0.45);
+    background: linear-gradient(135deg, #b8860b, #ffd700);
+    color: #0a0a1a;
+    animation: pulse-gold 2.8s infinite;
 }
 .tier-silver {
     background: linear-gradient(135deg, #6b7280, #9ca3af);
-    color: #fff;
+    color: #0a0a1a;
+    box-shadow: 0 0 8px rgba(156,163,175,0.3);
 }
 .tier-bronze {
-    background: linear-gradient(135deg, #92400e, #b45309);
+    background: linear-gradient(135deg, #92400e, #d97706);
     color: #fff;
+    box-shadow: 0 0 8px rgba(217,119,6,0.35);
+}
+
+/* ─── AI Verdict Card ─────────────────────────────────────── */
+.verdict-bet {
+    background: rgba(0,255,136,0.08);
+    border: 2px solid rgba(0,255,136,0.45);
+    border-radius: 14px;
+    padding: 16px 20px;
+    animation: borderGlow 2.5s ease-in-out infinite;
+}
+.verdict-avoid {
+    background: rgba(255,51,102,0.08);
+    border: 2px solid rgba(255,51,102,0.45);
+    border-radius: 14px;
+    padding: 16px 20px;
+}
+.verdict-risky {
+    background: rgba(255,215,0,0.07);
+    border: 2px solid rgba(255,215,0,0.4);
+    border-radius: 14px;
+    padding: 16px 20px;
+}
+.verdict-label {
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'Courier New', Courier, monospace;
+}
+.verdict-label-bet   { color: #00ff88; }
+.verdict-label-avoid { color: #ff3366; }
+.verdict-label-risky { color: #ffd700; }
+.verdict-confidence {
+    font-size: 0.8rem;
+    color: #8b949e;
+    font-family: 'Courier New', Courier, monospace;
+    margin-top: 4px;
+}
+.verdict-explanation {
+    font-size: 0.9rem;
+    color: #e6edf3;
+    margin-top: 10px;
+    line-height: 1.55;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding-top: 10px;
+}
+
+/* ─── Stat Readout (monospace terminal) ───────────────────── */
+.stat-readout {
+    font-family: 'Courier New', Courier, monospace;
+    background: rgba(0,255,136,0.05);
+    border: 1px solid rgba(0,255,136,0.15);
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin: 4px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s ease;
+}
+.stat-readout:hover {
+    background: rgba(0,255,136,0.10);
+}
+.stat-readout-label {
+    color: #8b949e;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+.stat-readout-value {
+    color: #00ff88;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.stat-readout-context {
+    color: #8b949e;
+    font-size: 0.75rem;
+    margin-left: 10px;
+}
+
+/* ─── Education Box ───────────────────────────────────────── */
+.education-box {
+    background: rgba(0,212,255,0.05);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 10px 0;
+    transition: background 0.2s ease;
+}
+.education-box:hover {
+    background: rgba(0,212,255,0.09);
+}
+.education-box-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #00d4ff;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    user-select: none;
+}
+.education-box-content {
+    font-size: 0.84rem;
+    color: #8b949e;
+    margin-top: 9px;
+    line-height: 1.6;
+    border-top: 1px solid rgba(0,212,255,0.12);
+    padding-top: 9px;
+}
+
+/* ─── Progress Ring ───────────────────────────────────────── */
+.progress-ring-wrap {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+.progress-ring-label {
+    font-size: 0.72rem;
+    color: #8b949e;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+/* ─── Signal Strength Bar ─────────────────────────────────── */
+.signal-bar-wrap {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 22px;
+    vertical-align: middle;
+}
+.signal-bar-seg {
+    width: 7px;
+    border-radius: 2px;
+    background: rgba(0,255,136,0.15);
+    transition: background 0.2s ease;
+}
+.signal-bar-seg.active {
+    background: linear-gradient(180deg, #00ff88, #00d4ff);
+}
+.signal-strength-label {
+    font-size: 0.72rem;
+    color: #8b949e;
+    font-family: 'Courier New', Courier, monospace;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* ─── Inline Tooltip ──────────────────────────────────────── */
+.edu-tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dashed rgba(0,212,255,0.5);
+    color: #00d4ff;
+    cursor: help;
+    font-weight: 600;
+}
+.edu-tooltip .tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    width: 260px;
+    background: #0d1117;
+    border: 1px solid rgba(0,212,255,0.3);
+    color: #e6edf3;
+    font-size: 0.8rem;
+    font-weight: 400;
+    line-height: 1.5;
+    border-radius: 10px;
+    padding: 10px 14px;
+    position: absolute;
+    z-index: 999;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    pointer-events: none;
+}
+.edu-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
 }
 
 /* ─── Platform & Stat Badges ──────────────────────────────── */
@@ -203,74 +558,85 @@ html, body, [class*="css"] {
     border-radius: 5px;
     font-size: 0.78rem;
     font-weight: 700;
+    transition: opacity 0.2s ease;
 }
 .stat-chip {
     display: inline-block;
-    background: rgba(45,55,72,0.8);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,255,136,0.06);
+    border: 1px solid rgba(0,255,136,0.18);
     border-radius: 8px;
     padding: 4px 11px;
     margin-right: 6px;
     margin-top: 4px;
-    color: #e2e8f0;
+    color: #e6edf3;
     font-size: 0.83rem;
     font-weight: 600;
+    transition: background 0.2s ease;
 }
-.stat-label { color: #718096; font-size: 0.72rem; }
+.stat-chip:hover {
+    background: rgba(0,255,136,0.12);
+}
+.stat-label { color: #8b949e; font-size: 0.72rem; }
 
 /* ─── Probability Gauge ───────────────────────────────────── */
 .prob-gauge-wrap {
-    background: rgba(45,55,72,0.6);
+    background: rgba(13,17,23,0.8);
     border-radius: 10px;
     height: 16px;
     overflow: hidden;
     margin-top: 6px;
-    border: 1px solid rgba(255,255,255,0.06);
+    border: 1px solid rgba(0,255,136,0.1);
 }
 .prob-gauge-fill-over {
-    background: linear-gradient(90deg, #10b981, #34d399);
+    background: linear-gradient(90deg, #00ff88, #00d4ff);
     height: 100%;
     border-radius: 10px;
     transition: width 0.5s ease;
+    box-shadow: 0 0 8px rgba(0,255,136,0.4);
 }
 .prob-gauge-fill-under {
-    background: linear-gradient(90deg, #ef4444, #f87171);
+    background: linear-gradient(90deg, #ff3366, #ff6b6b);
     height: 100%;
     border-radius: 10px;
     transition: width 0.5s ease;
+    box-shadow: 0 0 8px rgba(255,51,102,0.4);
 }
 .prob-value {
     font-size: 1.15rem;
     font-weight: 800;
-    color: #f0f4ff;
+    color: #e6edf3;
+    font-family: 'Courier New', Courier, monospace;
 }
 .edge-badge {
     padding: 2px 8px;
     border-radius: 6px;
     font-size: 0.82rem;
     font-weight: 700;
+    font-family: 'Courier New', Courier, monospace;
 }
-.edge-positive { background: rgba(16,185,129,0.18); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
-.edge-negative { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+.edge-positive { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+.edge-negative { background: rgba(255,51,102,0.12); color: #ff3366; border: 1px solid rgba(255,51,102,0.3); }
 
 /* ─── Direction Badge ─────────────────────────────────────── */
 .dir-over {
-    background: rgba(39,103,73,0.9);
-    color: #9ae6b4;
+    background: rgba(0,255,136,0.12);
+    color: #00ff88;
     padding: 4px 12px;
     border-radius: 14px;
     font-weight: 800;
     font-size: 0.9rem;
-    border: 1px solid rgba(154,230,180,0.25);
+    border: 1px solid rgba(0,255,136,0.3);
+    font-family: 'Courier New', Courier, monospace;
 }
 .dir-under {
-    background: rgba(116,42,42,0.9);
-    color: #feb2b2;
+    background: rgba(255,51,102,0.12);
+    color: #ff3366;
     padding: 4px 12px;
     border-radius: 14px;
     font-weight: 800;
     font-size: 0.9rem;
-    border: 1px solid rgba(254,178,178,0.25);
+    border: 1px solid rgba(255,51,102,0.3);
+    font-family: 'Courier New', Courier, monospace;
 }
 
 /* ─── Force Bar ───────────────────────────────────────────── */
@@ -279,42 +645,55 @@ html, body, [class*="css"] {
     height: 10px;
     border-radius: 5px;
     overflow: hidden;
-    background: rgba(45,55,72,0.6);
+    background: rgba(13,17,23,0.8);
     margin-top: 5px;
+    border: 1px solid rgba(0,255,136,0.08);
 }
-.force-bar-over  { background: linear-gradient(90deg, #10b981, #34d399); }
-.force-bar-under { background: linear-gradient(90deg, #f87171, #ef4444); }
+.force-bar-over  { background: linear-gradient(90deg, #00ff88, #00d4ff); }
+.force-bar-under { background: linear-gradient(90deg, #ff3366, #ff6b6b); }
 
 /* ─── Distribution Range ──────────────────────────────────── */
 .dist-range-wrap { text-align: right; }
-.dist-p10  { color: #f87171; font-size: 0.82rem; font-weight: 700; }
-.dist-p50  { color: #f0f4ff; font-size: 0.9rem; font-weight: 800; }
-.dist-p90  { color: #34d399; font-size: 0.82rem; font-weight: 700; }
-.dist-sep  { color: #4a5568; font-size: 0.82rem; margin: 0 3px; }
-.dist-label { color: #4a5568; font-size: 0.7rem; }
+.dist-p10  { color: #ff3366; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+.dist-p50  { color: #e6edf3; font-size: 0.9rem; font-weight: 800; font-family: 'Courier New', Courier, monospace; }
+.dist-p90  { color: #00ff88; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+.dist-sep  { color: #30363d; font-size: 0.82rem; margin: 0 3px; }
+.dist-label { color: #30363d; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
 
 /* ─── Form Dots ───────────────────────────────────────────── */
-.form-dot-over  { display:inline-block; width:11px; height:11px; border-radius:50%; background:#10b981; margin:1px; vertical-align:middle; }
-.form-dot-under { display:inline-block; width:11px; height:11px; border-radius:50%; background:#ef4444; margin:1px; vertical-align:middle; }
+.form-dot-over  { display:inline-block; width:11px; height:11px; border-radius:50%;
+                  background:#00ff88; box-shadow:0 0 5px rgba(0,255,136,0.6);
+                  margin:1px; vertical-align:middle; }
+.form-dot-under { display:inline-block; width:11px; height:11px; border-radius:50%;
+                  background:#ff3366; box-shadow:0 0 5px rgba(255,51,102,0.6);
+                  margin:1px; vertical-align:middle; }
 
 /* ─── Summary Cards ───────────────────────────────────────── */
 .summary-card {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 1px solid rgba(99,102,241,0.2);
+    background: rgba(13,17,23,0.92);
+    border: 1px solid rgba(0,255,136,0.15);
     border-radius: 12px;
     padding: 16px 20px;
     text-align: center;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.summary-card:hover {
+    border-color: rgba(0,255,136,0.35);
+    box-shadow: 0 4px 20px rgba(0,255,136,0.1);
 }
 .summary-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #f0f4ff;
+    color: #e6edf3;
     line-height: 1.1;
+    font-family: 'Courier New', Courier, monospace;
 }
 .summary-label {
     font-size: 0.75rem;
-    color: #718096;
+    color: #8b949e;
     text-transform: uppercase;
     letter-spacing: 1.2px;
     margin-top: 5px;
@@ -322,30 +701,38 @@ html, body, [class*="css"] {
 
 /* ─── Best Bets Card ──────────────────────────────────────── */
 .best-bet-card {
-    background: linear-gradient(135deg, rgba(109,40,217,0.15), rgba(251,191,36,0.08));
-    border: 1px solid rgba(109,40,217,0.35);
+    background: rgba(13,17,23,0.85);
+    border: 1px solid rgba(0,255,136,0.2);
     border-radius: 14px;
     padding: 16px 20px;
     margin-bottom: 10px;
     position: relative;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.best-bet-card:hover {
+    border-color: rgba(0,255,136,0.4);
+    transform: translateX(3px);
 }
 .best-bet-rank {
     position: absolute;
     top: -10px; left: 16px;
-    background: linear-gradient(135deg, #6d28d9, #f59e0b);
-    color: #fff;
-    font-weight: 800;
+    background: linear-gradient(135deg, #00ff88, #00d4ff);
+    color: #0a0a1a;
+    font-weight: 900;
     font-size: 0.75rem;
     padding: 2px 10px;
     border-radius: 10px;
+    font-family: 'Courier New', Courier, monospace;
 }
 
 /* ─── Roster Health ───────────────────────────────────────── */
 .health-matched {
     display: inline-block;
-    background: rgba(16,185,129,0.15);
-    border: 1px solid rgba(16,185,129,0.35);
-    color: #34d399;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid rgba(0,255,136,0.35);
+    color: #00ff88;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -354,9 +741,9 @@ html, body, [class*="css"] {
 }
 .health-fuzzy {
     display: inline-block;
-    background: rgba(234,179,8,0.12);
-    border: 1px solid rgba(234,179,8,0.4);
-    color: #fbbf24;
+    background: rgba(255,215,0,0.1);
+    border: 1px solid rgba(255,215,0,0.4);
+    color: #ffd700;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -366,9 +753,9 @@ html, body, [class*="css"] {
 }
 .health-unmatched {
     display: inline-block;
-    background: rgba(239,68,68,0.15);
-    border: 1px solid rgba(239,68,68,0.35);
-    color: #f87171;
+    background: rgba(255,51,102,0.1);
+    border: 1px solid rgba(255,51,102,0.35);
+    color: #ff3366;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -379,34 +766,87 @@ html, body, [class*="css"] {
 /* ─── Live / Sample Badge ─────────────────────────────────── */
 .live-badge {
     display: inline-block;
-    background: rgba(39,103,73,0.85);
-    color: #9ae6b4;
+    background: rgba(0,255,136,0.12);
+    color: #00ff88;
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
-    border: 1px solid rgba(154,230,180,0.2);
+    border: 1px solid rgba(0,255,136,0.3);
+}
+.live-badge::before {
+    content: '';
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #00ff88;
+    margin-right: 6px;
+    vertical-align: middle;
+    animation: live-dot-pulse 1.5s ease-in-out infinite;
 }
 .sample-badge {
     display: inline-block;
-    background: rgba(116,66,16,0.85);
-    color: #fbd38d;
+    background: rgba(255,215,0,0.1);
+    color: #ffd700;
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
-    border: 1px solid rgba(251,211,141,0.2);
+    border: 1px solid rgba(255,215,0,0.3);
 }
 
 /* ─── Correlation Warning ─────────────────────────────────── */
 .corr-warning {
-    background: rgba(234,179,8,0.1);
-    border: 1px solid rgba(234,179,8,0.35);
+    background: rgba(255,215,0,0.07);
+    border: 1px solid rgba(255,215,0,0.3);
     border-radius: 8px;
     padding: 8px 14px;
-    color: #fbbf24;
+    color: #ffd700;
     font-size: 0.83rem;
     margin-top: 8px;
+}
+
+/* ─── Player Analysis Card ────────────────────────────────── */
+.player-analysis-card {
+    background: rgba(13,17,23,0.92);
+    border: 1px solid rgba(0,255,136,0.18);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: borderGlow 3.5s ease-in-out infinite,
+               fadeInUp 0.3s ease both;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+.player-analysis-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, #00ff88, #00d4ff, #ffd700);
+    opacity: 0.8;
+}
+.player-analysis-card:hover {
+    border-color: rgba(0,255,136,0.4);
+    transform: translateY(-2px);
+}
+.add-to-slip-btn {
+    background: linear-gradient(135deg, #00ff88, #00d4ff);
+    color: #0a0a1a;
+    border: none;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-weight: 800;
+    font-size: 0.8rem;
+    cursor: pointer;
+    font-family: 'Courier New', Courier, monospace;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.add-to-slip-btn:hover {
+    opacity: 0.85;
+    transform: scale(1.03);
 }
 </style>
 """
@@ -601,7 +1041,7 @@ def get_player_card_html(result):
     edge_html = f'<span class="edge-badge {edge_class}">{edge_sign}{edge:.1f}% edge</span>'
 
     # Confidence color
-    conf_color = "#34d399" if confidence >= 70 else "#fbbf24" if confidence >= 50 else "#f87171"
+    conf_color = "#00ff88" if confidence >= 70 else "#ffd700" if confidence >= 50 else "#ff3366"
 
     # Force bar
     over_forces = result.get("forces", {}).get("over_forces", [])
@@ -621,13 +1061,13 @@ def get_player_card_html(result):
 
     # Opponent
     opponent = result.get("opponent", "")
-    matchup_html = f'<span style="color:#718096;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+    matchup_html = f'<span style="color:#8b949e;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
 
     # Line context
     line_vs_avg = result.get("line_vs_avg_pct", 0)
     if line_vs_avg != 0:
         line_ctx = f"Line is {abs(line_vs_avg):.0f}% {'above' if line_vs_avg > 0 else 'below'} season avg"
-        line_ctx_html = f'<span style="color:#718096;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
+        line_ctx_html = f'<span style="color:#8b949e;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
     else:
         line_ctx_html = ""
 
@@ -644,7 +1084,7 @@ def get_player_card_html(result):
             dot_cls = "form-dot-over" if val >= line else "form-dot-under"
             dots += f'<span class="{dot_cls}"></span>'
         form_html = f"""<div style="margin-right:16px;">
-      <div style="color:#718096;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
       {dots}
     </div>"""
 
@@ -667,7 +1107,7 @@ def get_player_card_html(result):
   <!-- Subheader: Platform + stat + line + matchup -->
   <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
-    <span style="color:#a0aec0;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:#f0f4ff;">{line}</strong></span>
+    <span style="color:#8b949e;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:#e6edf3;">{line}</strong></span>
     {matchup_html}
     {line_ctx_html}
   </div>
@@ -681,7 +1121,7 @@ def get_player_card_html(result):
       <span class="{dir_class}">{direction_arrow} {direction}</span>
       <span class="prob-value">{prob_pct:.1f}%</span>
       {edge_html}
-      <span style="color:#718096;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
+      <span style="color:#8b949e;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
     </div>
     <div class="prob-gauge-wrap">
       <div class="{fill_class}" style="width:{bar_width}%;"></div>
@@ -692,11 +1132,11 @@ def get_player_card_html(result):
   <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     {form_html}
     <div style="flex:1;min-width:160px;">
-      <div style="color:#718096;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
       {force_bar}
     </div>
     <div style="min-width:110px;">
-      <div style="color:#718096;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
       {dist_range}
     </div>
   </div>
@@ -743,9 +1183,9 @@ def get_best_bets_section_html(best_bets):
   <div class="best-bet-rank">{emoji} #{i+1}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;">
     <div>
-      <strong style="color:#f0f4ff;font-size:1.05rem;">{player}</strong>
-      <span style="color:#a0aec0;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
-      <span style="color:#718096;font-size:0.8rem;margin-left:6px;">{platform}</span>
+      <strong style="color:#e6edf3;font-size:1.05rem;">{player}</strong>
+      <span style="color:#8b949e;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
+      <span style="color:#8b949e;font-size:0.8rem;margin-left:6px;">{platform}</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <span class="{dir_class}">{arrow} {direction}</span>
@@ -753,20 +1193,21 @@ def get_best_bets_section_html(best_bets):
     </div>
   </div>
   <div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <span style="color:#f0f4ff;font-weight:700;">{prob_pct:.1f}%</span>
-    <span style="color:#34d399;font-size:0.82rem;">{edge_sign}{edge:.1f}% edge</span>
-    <span style="color:#718096;font-size:0.82rem;font-style:italic;">{rec}</span>
+    <span style="color:#e6edf3;font-weight:700;font-family:'Courier New',monospace;">{prob_pct:.1f}%</span>
+    <span style="color:#00ff88;font-size:0.82rem;font-family:'Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
+    <span style="color:#8b949e;font-size:0.82rem;font-style:italic;">{rec}</span>
   </div>
 </div>
 """)
 
     cards_html = "\n".join(rows)
     return f"""
-<div style="background:linear-gradient(135deg,rgba(109,40,217,0.08),rgba(251,191,36,0.05));
-            border:1px solid rgba(109,40,217,0.25);border-radius:16px;padding:20px 24px;margin-bottom:20px;">
-  <div style="font-size:1.15rem;font-weight:800;color:#f0f4ff;margin-bottom:14px;">
+<div style="background:rgba(13,17,23,0.92);
+            border:1px solid rgba(0,255,136,0.2);border-radius:16px;padding:20px 24px;margin-bottom:20px;
+            backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);">
+  <div style="font-size:1.15rem;font-weight:800;color:#e6edf3;margin-bottom:14px;">
     🏆 Best Bets Today
-    <span style="font-size:0.8rem;font-weight:400;color:#718096;margin-left:10px;">Ranked by confidence score</span>
+    <span style="font-size:0.8rem;font-weight:400;color:#8b949e;margin-left:10px;">Ranked by confidence score</span>
   </div>
   {cards_html}
 </div>
@@ -802,7 +1243,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#34d399;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#00ff88;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ✅ Matched ({len(matched)})
   </div>
@@ -819,7 +1260,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#fbbf24;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#ffd700;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ⚠️ Fuzzy Matched ({len(fuzzy_matched)}) — using closest match
   </div>
@@ -837,7 +1278,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#f87171;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#ff3366;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ❌ Unmatched ({len(unmatched)}) — will use fallback data
   </div>
@@ -845,22 +1286,23 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
 </div>""")
 
     if not sections:
-        return '<div style="color:#34d399;">✅ All props matched to the player database.</div>'
+        return '<div style="color:#00ff88;">✅ All props matched to the player database.</div>'
 
     inner = "\n".join(sections)
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
     match_pct = int((len(matched) + len(fuzzy_matched)) / max(total, 1) * 100)
     return f"""
-<div style="background:rgba(20,20,50,0.7);border:1px solid rgba(255,255,255,0.08);
-            border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-  <div style="font-size:1rem;font-weight:700;color:#f0f4ff;margin-bottom:12px;">
+<div style="background:rgba(13,17,23,0.92);border:1px solid rgba(0,255,136,0.12);
+            border-radius:12px;padding:16px 20px;margin-bottom:16px;
+            backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);">
+  <div style="font-size:1rem;font-weight:700;color:#e6edf3;margin-bottom:12px;">
     🧬 Roster Health Check
-    <span style="font-size:0.8rem;font-weight:400;color:#718096;margin-left:8px;">
+    <span style="font-size:0.8rem;font-weight:400;color:#8b949e;margin-left:8px;">
       {len(matched) + len(fuzzy_matched)}/{total} matched ({match_pct}%)
     </span>
   </div>
   {inner}
-  <div style="font-size:0.75rem;color:#718096;margin-top:4px;">
+  <div style="font-size:0.75rem;color:#8b949e;margin-top:4px;">
     💡 Add fuzzy-matched names to the alias map for exact matching next time.
     Unmatched props use the prop line as the baseline projection.
   </div>
@@ -899,4 +1341,371 @@ def get_platform_badge_html(platform):
 
 # ============================================================
 # END SECTION: HTML Component Generators
+# ============================================================
+
+
+# ============================================================
+# SECTION: New AI Neural Network Lab Components
+# Additional HTML generators for the SmartBetPro NBA UI.
+# ============================================================
+
+def get_neural_header_html(title, subtitle):
+    """
+    Return a glowing circuit-decoration header for page/section headings.
+
+    Args:
+        title (str): Main heading text (rendered with gradient)
+        subtitle (str): Secondary line shown in monospace below the title
+
+    Returns:
+        str: HTML string for the neural header block
+    """
+    return f"""
+<div class="neural-header">
+  <div class="neural-header-title">{title}</div>
+  <div class="neural-header-subtitle">
+    <span class="circuit-dot"></span>
+    {subtitle}
+    <span class="circuit-dot"></span>
+  </div>
+</div>
+"""
+
+
+def get_ai_verdict_card_html(verdict, confidence, explanation):
+    """
+    Return a styled AI verdict card showing BET / AVOID / RISKY.
+
+    Args:
+        verdict (str): 'BET', 'AVOID', or 'RISKY'
+        confidence (float): Confidence score 0–100
+        explanation (str): Plain-English rationale for the verdict
+
+    Returns:
+        str: HTML string for the verdict card
+    """
+    verdict_upper = verdict.upper()
+    icons = {"BET": "✅", "AVOID": "🚫", "RISKY": "⚠️"}
+    icon = icons.get(verdict_upper, "🔍")
+    css_class_map = {"BET": "verdict-bet", "AVOID": "verdict-avoid", "RISKY": "verdict-risky"}
+    label_class_map = {"BET": "verdict-label-bet", "AVOID": "verdict-label-avoid", "RISKY": "verdict-label-risky"}
+    card_class = css_class_map.get(verdict_upper, "verdict-risky")
+    label_class = label_class_map.get(verdict_upper, "verdict-label-risky")
+    conf_bar_color = "#00ff88" if confidence >= 70 else "#ffd700" if confidence >= 50 else "#ff3366"
+    bar_width = int(min(100, max(0, confidence)))
+    return f"""
+<div class="{card_class}">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <span class="verdict-label {label_class}">{icon} {verdict_upper}</span>
+    <div style="text-align:right;">
+      <div class="verdict-confidence">CONFIDENCE</div>
+      <div style="font-size:1.1rem;font-weight:800;color:{conf_bar_color};
+                  font-family:'Courier New',Courier,monospace;">{confidence:.0f}/100</div>
+    </div>
+  </div>
+  <div style="margin-top:8px;background:rgba(0,0,0,0.3);border-radius:6px;height:6px;overflow:hidden;">
+    <div style="width:{bar_width}%;height:100%;background:{conf_bar_color};
+                border-radius:6px;box-shadow:0 0 6px {conf_bar_color};
+                transition:width 0.5s ease;"></div>
+  </div>
+  <div class="verdict-explanation">{explanation}</div>
+</div>
+"""
+
+
+def get_player_analysis_card_html(result, show_add_button=True):
+    """
+    Return a redesigned player analysis card with the neural network theme.
+
+    Wraps the core stat data in the .player-analysis-card container with
+    an optional '+ Add to Slip' button. Internally re-uses the proven
+    layout from get_player_card_html but applies the updated CSS class.
+
+    Args:
+        result (dict): Full analysis result dict (same schema as get_player_card_html)
+        show_add_button (bool): Whether to render the '+ Add to Slip' button
+
+    Returns:
+        str: HTML string for the player analysis card
+    """
+    player = result.get("player_name", "Unknown")
+    stat = result.get("stat_type", "").capitalize()
+    line = result.get("line", 0)
+    direction = result.get("direction", "OVER")
+    tier = result.get("tier", "Bronze")
+    tier_emoji = result.get("tier_emoji", "🥉")
+    prob_over = result.get("probability_over", 0.5)
+    edge = result.get("edge_percentage", 0)
+    confidence = result.get("confidence_score", 50)
+    platform = result.get("platform", "")
+    team = result.get("player_team", result.get("team", ""))
+    position = result.get("player_position", result.get("position", ""))
+    proj = result.get("adjusted_projection", 0)
+
+    pts_avg = result.get("season_pts_avg", result.get("points_avg", 0))
+    reb_avg = result.get("season_reb_avg", result.get("rebounds_avg", 0))
+    ast_avg = result.get("season_ast_avg", result.get("assists_avg", 0))
+
+    prob_pct = prob_over * 100 if direction == "OVER" else (1 - prob_over) * 100
+    direction_arrow = "⬆️" if direction == "OVER" else "⬇️"
+    tier_class = f"tier-badge tier-{tier.lower()}"
+    dir_class = "dir-over" if direction == "OVER" else "dir-under"
+
+    platform_colors = {
+        "PrizePicks": "rgba(0,120,70,0.85)",
+        "Underdog": "rgba(85,60,154,0.85)",
+        "DraftKings": "rgba(43,108,176,0.85)",
+    }
+    plat_color = platform_colors.get(platform, "rgba(30,40,60,0.85)")
+    fill_class = "prob-gauge-fill-over" if direction == "OVER" else "prob-gauge-fill-under"
+    bar_width = int(min(100, max(0, prob_pct)))
+    primary_color, secondary_color = get_team_colors(team)
+
+    team_badge = (
+        f'<span class="team-pill" style="background:rgba(0,212,255,0.15);">{team}</span>'
+        if team else ""
+    )
+    position_tag = f'<span class="position-tag">{position}</span>' if position else ""
+
+    stat_pills = ""
+    if pts_avg:
+        stat_pills += get_stat_pill_html("PPG", f"{pts_avg:.1f}", "🏀")
+    if reb_avg:
+        stat_pills += get_stat_pill_html("RPG", f"{reb_avg:.1f}", "📊")
+    if ast_avg:
+        stat_pills += get_stat_pill_html("APG", f"{ast_avg:.1f}", "🎯")
+    if proj:
+        stat_pills += get_stat_pill_html("Proj", f"{proj:.1f}", "📐")
+
+    edge_class = "edge-positive" if edge >= 0 else "edge-negative"
+    edge_sign = "+" if edge >= 0 else ""
+    edge_html = f'<span class="edge-badge {edge_class}">{edge_sign}{edge:.1f}% edge</span>'
+    conf_color = "#00ff88" if confidence >= 70 else "#ffd700" if confidence >= 50 else "#ff3366"
+
+    over_forces = result.get("forces", {}).get("over_forces", [])
+    under_forces = result.get("forces", {}).get("under_forces", [])
+    total_over_strength = sum(f.get("strength", 1) for f in over_forces)
+    total_under_strength = sum(f.get("strength", 1) for f in under_forces)
+    force_bar = get_force_bar_html(
+        total_over_strength, total_under_strength,
+        len(over_forces), len(under_forces)
+    )
+
+    p10 = result.get("percentile_10", 0)
+    p50 = result.get("percentile_50", 0)
+    p90 = result.get("percentile_90", 0)
+    dist_range = get_distribution_range_html(p10, p50, p90)
+
+    opponent = result.get("opponent", "")
+    matchup_html = f'<span style="color:#8b949e;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+
+    add_btn = (
+        '<button class="add-to-slip-btn">＋ Add to Slip</button>'
+        if show_add_button else ""
+    )
+
+    corr_warning = result.get("_correlation_warning", "")
+    corr_html = f'<div class="corr-warning">⚠️ {corr_warning}</div>' if corr_warning else ""
+
+    return f"""
+<div class="player-analysis-card" style="border-top-color:{primary_color};">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+    <div>
+      <span class="player-name">{player}</span>
+      {team_badge}
+      {position_tag}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <span class="{tier_class}">{tier_emoji} {tier}</span>
+      {add_btn}
+    </div>
+  </div>
+  <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
+    <span style="color:#8b949e;font-size:0.9rem;">{stat} &nbsp;·&nbsp;
+      Line: <strong style="color:#e6edf3;">{line}</strong></span>
+    {matchup_html}
+  </div>
+  {f'<div style="margin-top:10px;">{stat_pills}</div>' if stat_pills else ""}
+  <div style="margin-top:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;
+                flex-wrap:wrap;gap:6px;margin-bottom:4px;">
+      <span class="{dir_class}">{direction_arrow} {direction}</span>
+      <span class="prob-value">{prob_pct:.1f}%</span>
+      {edge_html}
+      <span style="color:#8b949e;font-size:0.82rem;">
+        Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong>
+      </span>
+    </div>
+    <div class="prob-gauge-wrap">
+      <div class="{fill_class}" style="width:{bar_width}%;"></div>
+    </div>
+  </div>
+  <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+    <div style="flex:1;min-width:160px;">
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;
+                  letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
+      {force_bar}
+    </div>
+    <div style="min-width:110px;">
+      <div style="color:#8b949e;font-size:0.72rem;text-transform:uppercase;
+                  letter-spacing:1px;margin-bottom:3px;">Range</div>
+      {dist_range}
+    </div>
+  </div>
+  {corr_html}
+</div>
+"""
+
+
+def get_stat_readout_html(label, value, context):
+    """
+    Return a monospace terminal-style stat readout row.
+
+    Args:
+        label (str): Stat name shown on the left (e.g., 'Season AVG')
+        value: The stat value to display prominently (e.g., 24.8)
+        context (str): Short contextual note shown on the right (e.g., 'last 10 games')
+
+    Returns:
+        str: HTML string for the stat readout
+    """
+    return f"""
+<div class="stat-readout">
+  <span class="stat-readout-label">{label}</span>
+  <span>
+    <span class="stat-readout-value">{value}</span>
+    <span class="stat-readout-context">{context}</span>
+  </span>
+</div>
+"""
+
+
+def get_education_box_html(title, content):
+    """
+    Return a collapsible education info box.
+
+    The box is rendered open by default using an HTML <details> element
+    so it works without JavaScript in Streamlit's sandboxed environment.
+
+    Args:
+        title (str): Box heading (e.g., 'What is Edge?')
+        content (str): Explanation text rendered inside the box
+
+    Returns:
+        str: HTML string for the education box
+    """
+    return f"""
+<details class="education-box" open>
+  <summary class="education-box-title">
+    <span>💡</span> {title}
+  </summary>
+  <div class="education-box-content">{content}</div>
+</details>
+"""
+
+
+def get_progress_ring_html(percentage, label):
+    """
+    Return an SVG circular confidence/progress ring indicator.
+
+    Args:
+        percentage (float): Value 0–100 to fill the ring
+        label (str): Text label displayed below the ring
+
+    Returns:
+        str: HTML string containing inline SVG ring and label
+    """
+    pct = max(0.0, min(100.0, float(percentage)))
+    radius = 28
+    circumference = 2 * _math.pi * radius
+    filled = circumference * pct / 100.0
+    gap = circumference - filled
+
+    if pct >= 70:
+        ring_color = "#00ff88"
+    elif pct >= 50:
+        ring_color = "#ffd700"
+    else:
+        ring_color = "#ff3366"
+
+    return f"""
+<div class="progress-ring-wrap">
+  <svg width="72" height="72" viewBox="0 0 72 72">
+    <circle cx="36" cy="36" r="{radius}"
+            fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+    <circle cx="36" cy="36" r="{radius}"
+            fill="none" stroke="{ring_color}" stroke-width="6"
+            stroke-linecap="round"
+            stroke-dasharray="{filled:.2f} {gap:.2f}"
+            stroke-dashoffset="{circumference * 0.25:.2f}"
+            style="filter:drop-shadow(0 0 4px {ring_color});transition:stroke-dasharray 0.5s ease;"/>
+    <text x="36" y="40" text-anchor="middle"
+          font-family="'Courier New',Courier,monospace"
+          font-size="13" font-weight="700"
+          fill="{ring_color}">{pct:.0f}%</text>
+  </svg>
+  <span class="progress-ring-label">{label}</span>
+</div>
+"""
+
+
+def get_signal_strength_bar_html(strength, label):
+    """
+    Return a WiFi-style signal-strength bar (5 segments).
+
+    Args:
+        strength (float): Signal level 0.0–1.0 (or 0–100)
+        label (str): Text label displayed next to the bars
+
+    Returns:
+        str: HTML string for the signal strength indicator
+    """
+    # Normalise to 0–1
+    if strength > 1:
+        strength = strength / 100.0
+    strength = max(0.0, min(1.0, strength))
+    active_bars = round(strength * 5)
+
+    heights = [8, 12, 16, 20, 24]  # px heights for each bar segment
+    bars_html = ""
+    for i, h in enumerate(heights):
+        active_class = "active" if i < active_bars else ""
+        bars_html += (
+            f'<div class="signal-bar-seg {active_class}" '
+            f'style="height:{h}px;"></div>'
+        )
+
+    return f"""
+<span>
+  <span class="signal-bar-wrap">{bars_html}</span>
+  <span class="signal-strength-label">{label}</span>
+</span>
+"""
+
+
+def get_education_tooltip_html(term, explanation):
+    """
+    Return an inline hover tooltip for a betting/AI term.
+
+    The tooltip uses pure CSS (no JavaScript) and works within
+    Streamlit's sandboxed HTML environment.
+
+    Args:
+        term (str): The term to underline and make hoverable
+        explanation (str): Plain-English explanation shown on hover
+
+    Returns:
+        str: HTML string with the tooltip span
+    """
+    safe_explanation = _html.escape(str(explanation))
+    return (
+        f'<span class="edu-tooltip">{term}'
+        f'<span class="tooltip-text">{safe_explanation}</span>'
+        f'</span>'
+    )
+
+
+# ============================================================
+# END SECTION: New AI Neural Network Lab Components
 # ============================================================

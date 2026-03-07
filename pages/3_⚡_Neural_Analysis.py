@@ -28,6 +28,8 @@ from data.data_manager import (
     load_props_from_session,
     get_roster_health_report,
     validate_props_against_roster,
+    get_player_status,
+    get_status_badge_html,
 )
 
 # Import the theme helpers
@@ -36,6 +38,12 @@ from styles.theme import (
     get_player_card_html,
     get_best_bets_section_html,
     get_roster_health_html,
+    get_neural_header_html,
+    get_ai_verdict_card_html,
+    get_education_box_html,
+    get_signal_strength_bar_html,
+    get_progress_ring_html,
+    GLOSSARY,
 )
 
 # ============================================================
@@ -43,17 +51,23 @@ from styles.theme import (
 # ============================================================
 
 st.set_page_config(
-    page_title="Analysis — SmartAI-NBA",
-    page_icon="🏆",
+    page_title="Neural Analysis — SmartBetPro NBA",
+    page_icon="⚡",
     layout="wide",
 )
 
-st.title("🏆 Analysis")
+st.title("⚡ Neural Analysis")
 st.markdown("Run the Monte Carlo simulation to find the highest-probability picks.")
 st.divider()
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ─── Session State Initialization ────────────────────────────
+if "selected_picks" not in st.session_state:
+    st.session_state["selected_picks"] = []
+if "injury_status_map" not in st.session_state:
+    st.session_state["injury_status_map"] = {}
 
 # ============================================================
 # END SECTION: Page Setup
@@ -116,33 +130,134 @@ def find_game_context_for_player(player_team, todays_games_list):
 
 def display_prop_analysis_card(result):
     """
-    Display a rich, visually styled analysis card for one prop result.
+    Display a redesigned analysis card for one prop result.
 
-    Uses the theme module's get_player_card_html() for the main card,
-    then adds an expandable section with full forces breakdown.
+    Shows an AI verdict, player status badge, key numbers grid,
+    signal-strength edge bar, confidence ring, plain-English summary,
+    and an "Add to Entry" button. Keeps a detailed expander with the
+    full forces breakdown.
 
     Args:
         result (dict): Full analysis result from the simulation loop
     """
     player = result.get("player_name", "Unknown")
     stat = result.get("stat_type", "").capitalize()
+    line = result.get("line", 0)
+    direction = result.get("direction", "OVER")
+    confidence = result.get("confidence_score", 50)
+    should_avoid = result.get("should_avoid", False)
+    edge_pct = result.get("edge_percentage", 0)
+    platform = result.get("platform", "")
+    opponent = result.get("opponent", "")
 
-    # Render the styled card via theme module
-    st.markdown(get_player_card_html(result), unsafe_allow_html=True)
+    # ── AI Verdict ──────────────────────────────────────────────
+    if confidence >= 65 and not should_avoid:
+        verdict_key = "BET"
+        verdict_text = "STRONG BET ✅"
+        style = "bet"
+    elif should_avoid or confidence < 40:
+        verdict_key = "AVOID"
+        verdict_text = "AVOID ❌"
+        style = "avoid"
+    else:
+        verdict_key = "RISKY"
+        verdict_text = "RISKY ⚠️"
+        style = "risky"
 
-    # Get force/distribution data for the expander
+    tldr = result.get("explanation", {}).get("tldr", "")
+    st.markdown(
+        get_ai_verdict_card_html(verdict_key, confidence, tldr or result.get("recommendation", "")),
+        unsafe_allow_html=True,
+    )
+
+    # ── Player header row ────────────────────────────────────────
+    header_col, badge_col = st.columns([3, 1])
+    with header_col:
+        tier_emoji = result.get("tier_emoji", "🥉")
+        tier = result.get("tier", "Bronze")
+        opp_str = f" · vs {opponent}" if opponent else ""
+        plat_str = f" · {platform}" if platform else ""
+        st.markdown(
+            f"**{player}** &nbsp; {tier_emoji} {tier}{opp_str}{plat_str}",
+            unsafe_allow_html=True,
+        )
+    with badge_col:
+        status_map = st.session_state.get("injury_status_map", {})
+        player_status_dict = get_player_status(player, status_map)
+        player_status = player_status_dict.get("status", "Active")
+        st.markdown(get_status_badge_html(player_status), unsafe_allow_html=True)
+
+    # ── Key Numbers grid ─────────────────────────────────────────
+    stat_type_lower = result.get("stat_type", "points").lower()
+    stat_label_map = {
+        "points": "PPG", "rebounds": "RPG", "assists": "APG", "threes": "3PM",
+    }
+    stat_label = stat_label_map.get(stat_type_lower, stat_type_lower.upper())
+
+    avg_key_map = {
+        "points": "season_pts_avg", "rebounds": "season_reb_avg",
+        "assists": "season_ast_avg", "threes": "season_threes_avg",
+    }
+    season_avg = result.get(avg_key_map.get(stat_type_lower, ""), 0) or 0
+    projected = result.get("adjusted_projection") or result.get("projected_stat") or 0
+
+    num_col1, num_col2, num_col3 = st.columns(3)
+    with num_col1:
+        st.metric(f"Season Avg ({stat_label})", f"{season_avg:.1f}")
+    with num_col2:
+        st.metric("Projected", f"{projected:.1f}")
+    with num_col3:
+        st.metric("Prop Line", f"{line}")
+
+    # ── Edge signal bar + Confidence ring ────────────────────────
+    vis_col1, vis_col2 = st.columns([2, 1])
+    with vis_col1:
+        edge_norm = min(1.0, abs(edge_pct) / 30.0)
+        edge_sign = "+" if edge_pct >= 0 else ""
+        st.markdown(
+            get_signal_strength_bar_html(edge_norm, f"Edge: {edge_sign}{edge_pct:.1f}%"),
+            unsafe_allow_html=True,
+        )
+    with vis_col2:
+        st.markdown(
+            get_progress_ring_html(confidence, "Confidence"),
+            unsafe_allow_html=True,
+        )
+
+    # ── Add to Entry button ──────────────────────────────────────
+    pick_key = f"{player}_{stat_type_lower}_{line}_{direction}"
+    selected_picks = st.session_state.get("selected_picks", [])
+    already_added = any(p.get("key") == pick_key for p in selected_picks)
+
+    btn_label = "✅ Added" if already_added else "➕ Add to Entry"
+    btn_disabled = already_added
+    if st.button(btn_label, key=f"add_pick_{pick_key}", disabled=btn_disabled):
+        st.session_state["selected_picks"].append({
+            "key": pick_key,
+            "player_name": player,
+            "stat_type": stat_type_lower,
+            "line": line,
+            "direction": direction,
+            "confidence_score": confidence,
+            "tier": tier,
+            "tier_emoji": tier_emoji,
+            "platform": platform,
+            "edge_percentage": edge_pct,
+        })
+        st.rerun()
+
+    # ── Detailed expander (forces breakdown) ─────────────────────
     over_forces = result.get("forces", {}).get("over_forces", [])
     under_forces = result.get("forces", {}).get("under_forces", [])
     p10 = result.get("percentile_10", 0)
     p50 = result.get("percentile_50", 0)
     p90 = result.get("percentile_90", 0)
 
-    # Detailed expander (forces breakdown, histogram)
-    with st.expander(f"\U0001f50d Full Breakdown — {player} {stat}"):
+    with st.expander(f"🔍 Full Breakdown — {player} {stat}"):
         detail_col1, detail_col2, detail_col3 = st.columns(3)
 
         with detail_col1:
-            st.markdown("**\U0001f4ca Distribution**")
+            st.markdown("**📊 Distribution**")
             st.caption(f"10th pct (bad game): **{p10:.1f}**")
             st.caption(f"50th pct (median): **{p50:.1f}**")
             st.caption(f"90th pct (great game): **{p90:.1f}**")
@@ -152,53 +267,49 @@ def display_prop_analysis_card(result):
             histogram = result.get("histogram", [])
             if histogram:
                 max_count = max(b["count"] for b in histogram) or 1
-                st.markdown("**Distribution (\u2588 = over line)**")
+                st.markdown("**Distribution (█ = over line)**")
                 for bucket in histogram[-10:]:
                     bar_length = int((bucket["count"] / max_count) * 15)
-                    bar_char = "\u2588" if bucket["is_over_line"] else "\u2591"
+                    bar_char = "█" if bucket["is_over_line"] else "░"
                     bar = bar_char * bar_length
                     st.caption(f"{bucket['bucket_label']:>5} {bar}")
 
-            # Recent form info
             form_ratio = result.get("recent_form_ratio")
             if form_ratio is not None:
-                form_label = "Hot \U0001f525" if form_ratio > 1.05 else ("Cold \U0001f9ca" if form_ratio < 0.95 else "Neutral")
+                form_label = "Hot 🔥" if form_ratio > 1.05 else ("Cold 🧊" if form_ratio < 0.95 else "Neutral")
                 st.caption(f"Recent form: **{form_ratio:.2f}x** ({form_label})")
 
-            # Games played sample size
             games_played = result.get("games_played")
             if games_played:
                 st.caption(f"Games played: **{games_played}**")
 
         with detail_col2:
-            st.markdown("**\u2b06\ufe0f Forces OVER**")
+            st.markdown("**⬆️ Forces OVER**")
             if over_forces:
                 for force in over_forces:
-                    strength_stars = "\u2b50" * max(1, round(force.get("strength", 1)))
+                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
                     st.caption(f"{strength_stars} **{force['name']}**")
                     st.caption(f"   _{force['description']}_")
             else:
                 st.caption("No OVER forces detected")
 
         with detail_col3:
-            st.markdown("**\u2b07\ufe0f Forces UNDER**")
+            st.markdown("**⬇️ Forces UNDER**")
             if under_forces:
                 for force in under_forces:
-                    strength_stars = "\u2b50" * max(1, round(force.get("strength", 1)))
+                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
                     st.caption(f"{strength_stars} **{force['name']}**")
                     st.caption(f"   _{force['description']}_")
             else:
                 st.caption("No UNDER forces detected")
 
-        if result.get("should_avoid", False):
-            st.warning("\u26a0\ufe0f **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
+        if should_avoid:
+            st.warning("⚠️ **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
 
-        # W5: Trap line warning — displayed prominently in the card
         trap_result = result.get("trap_line_result", {})
         if trap_result and trap_result.get("is_trap"):
             st.error(trap_result.get("warning_message", "⚠️ Possible Trap Line detected"))
 
-        # W1: Line sharpness warning
         sharpness_force = result.get("line_sharpness_force")
         if sharpness_force:
             st.caption(
@@ -206,30 +317,24 @@ def display_prop_analysis_card(result):
                 f"(−{result.get('line_sharpness_penalty', 0):.0f} confidence pts)"
             )
 
-        # W8: Teammate impact note
         teammate_notes = result.get("teammate_out_notes", [])
         if teammate_notes:
             st.info("👥 **Teammate Impact:** " + " | ".join(teammate_notes))
 
         breakdown = result.get("score_breakdown", {})
         if breakdown:
-            st.markdown("**\U0001f52c Confidence Score Breakdown**")
+            st.markdown("**🔬 Confidence Score Breakdown**")
             breakdown_cols = st.columns(len(breakdown))
             for i, (factor, score) in enumerate(breakdown.items()):
                 with breakdown_cols[i]:
                     factor_label = factor.replace("_score", "").replace("_", " ").title()
                     st.metric(factor_label, f"{score:.0f}/100")
 
-        # ── Why This Pick explanation ────────────────────────────
         explanation = result.get("explanation")
         if explanation:
             st.divider()
             st.markdown("**💡 Why This Pick**")
 
-            # TL;DR
-            st.info(explanation.get("tldr", ""))
-
-            # Indicators row
             indicators = explanation.get("indicators", [])
             if indicators:
                 ind_cols = st.columns(min(len(indicators), 4))
@@ -239,7 +344,6 @@ def display_prop_analysis_card(result):
                         factor = ind.get("factor", "")
                         st.caption(f"{emoji} **{factor}**")
 
-            # Section details
             sections = [
                 ("📊 Season Avg vs Line", "average_vs_line"),
                 ("🛡️ Matchup Analysis", "matchup_explanation"),
@@ -251,26 +355,24 @@ def display_prop_analysis_card(result):
                 ("🎲 Simulation", "simulation_narrative"),
                 ("⚖️ Forces", "forces_summary"),
                 ("🔥 Recent Form", "recent_form_explanation"),
-                ("📐 Line Sharpness", "line_sharpness_explanation"),   # W1
-                ("⚠️ Trap Line", "trap_line_explanation"),             # W5
-                ("👥 Teammate Impact", "teammate_impact_explanation"),  # W8
+                ("📐 Line Sharpness", "line_sharpness_explanation"),
+                ("⚠️ Trap Line", "trap_line_explanation"),
+                ("👥 Teammate Impact", "teammate_impact_explanation"),
             ]
             for label, key in sections:
                 text = explanation.get(key, "")
                 if text:
                     st.caption(f"**{label}:** {text}")
 
-            # Risk factors
             risks = explanation.get("risk_factors", [])
             if risks:
                 st.markdown("**⚠️ Risk Factors:**")
                 for risk in risks:
                     st.caption(f"  {risk}")
 
-            # Verdict
-            verdict = explanation.get("verdict", "")
-            if verdict:
-                st.markdown(f"**🏁 Verdict:** {verdict}")
+            verdict_text_exp = explanation.get("verdict", "")
+            if verdict_text_exp:
+                st.markdown(f"**🏁 Verdict:** {verdict_text_exp}")
 
 
 # ============================================================
@@ -349,6 +451,18 @@ with settings_col:
 # ============================================================
 
 st.divider()
+
+# ── Educational section ────────────────────────────────────────
+st.markdown(get_education_box_html(
+    "📖 How Neural Analysis Works",
+    """
+    <strong>Monte Carlo Simulation</strong>: We run 2,000 simulated games for each player,
+    using their season averages adjusted for tonight's matchup, pace, rest, and home/away factors.<br><br>
+    <strong>Edge</strong>: The gap between what our model predicts and what the prop line implies.
+    An edge of +10% means we think the player has a 10% better chance of hitting than the line suggests.<br><br>
+    <strong>Confidence Tiers</strong>: 💎 Platinum (80+), 🥇 Gold (65-79), 🥈 Silver (50-64), 🥉 Bronze (below 50).
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # SECTION: Analysis Runner
@@ -709,6 +823,20 @@ if analysis_results:
     for result in displayed_results:
         display_prop_analysis_card(result)
         st.markdown("---")  # Divider between cards
+
+    # ── Floating selected-picks counter ───────────────────────────
+    selected_count = len(st.session_state.get("selected_picks", []))
+    if selected_count > 0:
+        st.success(
+            f"✅ {selected_count} pick(s) selected for Entry Builder → "
+            "Go to 🧬 Entry Builder to build your entry!"
+        )
+
+    # ── Clear picks button ────────────────────────────────────────
+    if st.session_state.get("selected_picks"):
+        if st.button("🗑️ Clear Selected Picks"):
+            st.session_state["selected_picks"] = []
+            st.rerun()
 
 elif not run_analysis:
     # Show message if no results and analysis hasn't been run

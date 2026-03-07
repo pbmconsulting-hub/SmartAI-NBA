@@ -74,6 +74,7 @@ def calculate_confidence_score(
     line_sharpness_penalty=0.0,
     trap_line_penalty=0.0,
     calibration_adjustment=0.0,
+    injury_status_penalty=0.0,
 ):
     """
     Calculate a 0-100 confidence score for a prop pick.
@@ -81,7 +82,7 @@ def calculate_confidence_score(
     Combines eight factors into a weighted score, then assigns
     a tier label: Platinum, Gold, Silver, or Bronze.
     Post-scoring penalties for line sharpness (W1), trap lines (W5),
-    and model calibration (W7) are applied additively.
+    calibration (W7), and injury status are applied additively.
 
     Args:
         probability_over (float): P(over line), from simulation
@@ -103,6 +104,9 @@ def calculate_confidence_score(
         calibration_adjustment (float, optional): Historical calibration
             offset in percentage points (W7). Positive = model overestimates,
             scores get reduced. Negative = model underestimates, scores go up.
+        injury_status_penalty (float, optional): Points to subtract when the
+            player has a concerning injury/availability status (e.g. Questionable,
+            Doubtful). Typically 0-10 points. Default 0.0 (no penalty).
 
     Returns:
         dict: {
@@ -185,9 +189,11 @@ def calculate_confidence_score(
     # W1: Line Sharpness Penalty — deduct when book has accurately priced the line
     # W5: Trap Line Penalty — deduct when a bait line is detected
     # W7: Calibration Adjustment — correct for systematic model over/underconfidence
+    # Injury Status Penalty — deduct when player has a concerning availability status
     combined_score -= line_sharpness_penalty
     combined_score -= trap_line_penalty
     combined_score -= calibration_adjustment  # positive = historically overconfident
+    combined_score -= injury_status_penalty
 
     # Round to nearest whole number, clamped to 0-100
     final_score = round(max(0.0, min(100.0, combined_score)), 1)

@@ -22,18 +22,33 @@ from tracking.database import initialize_database, load_all_bets
 # ============================================================
 
 st.set_page_config(
-    page_title="Model Health — SmartAI-NBA",
+    page_title="Model Health — SmartBetPro NBA",
     page_icon="📊",
     layout="wide",
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 st.title("📊 Model Health")
 st.markdown("Track your bets and measure the model's prediction accuracy over time.")
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 What is Model Health?",
+    """
+    <strong>Model Calibration</strong>: Are the model's probabilities accurate? 
+    If we say 70% probability, does the pick hit ~70% of the time?<br><br>
+    <strong>Win Rate by Tier</strong>: Platinum picks should win more than Bronze picks. 
+    If Bronze is winning more than Platinum, the model needs recalibration.<br><br>
+    <strong>Why track results?</strong>: The more bets you log, the better we can see if 
+    the model is making money over time. Short-term variance can be misleading — 
+    track at least 50+ bets to see meaningful patterns.<br><br>
+    <strong>ROI</strong>: Return on Investment = (profit / total wagered) × 100. 
+    Positive ROI means you're profitable long-term.
+    """
+), unsafe_allow_html=True)
 
 # Ensure database exists
 initialize_database()
@@ -56,6 +71,7 @@ losses = overall.get("losses", 0)
 pushes = overall.get("pushes", 0)
 win_rate = overall.get("win_rate", 0.0)
 
+st.header("📈 Performance Dashboard")
 st.subheader("📈 Overall Performance")
 
 # Show metrics in a row

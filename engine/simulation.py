@@ -73,6 +73,17 @@ COLD_GAME_PROBABILITY = 0.10  # 10% chance player is "ice cold"
 COLD_GAME_MULTIPLIER_MIN = 0.70
 COLD_GAME_MULTIPLIER_MAX = 0.85
 
+# Convergence: stop early when the running probability changes by less than this
+# between 500-simulation checkpoints.
+CONVERGENCE_THRESHOLD = 0.005
+
+# Wilson score z-value for the 90% confidence interval (P(|Z| > 1.645) ≈ 0.10)
+Z_SCORE_90_CI = 1.645
+
+# Three-point props minimum CV floor = 1.3× elite-points CV (0.25).
+# Ensures three-point simulations always model adequate shooting streakiness.
+THREE_POINT_CV_FLOOR = 1.3 * 0.25  # = 0.325
+
 # ============================================================
 # END SECTION: Module-Level Constants
 # ============================================================
@@ -93,6 +104,7 @@ def run_monte_carlo_simulation(
     matchup_adjustment_factor,
     home_away_adjustment,
     rest_adjustment_factor,
+    stat_type=None,
 ):
     """
     Run a full Monte Carlo simulation for one player's one stat.
@@ -100,12 +112,13 @@ def run_monte_carlo_simulation(
     Simulates `number_of_simulations` games, each with randomized
     minutes (blowout risk, foul trouble) and stat variance.
     Builds a distribution and calculates P(over line).
+    Default recommended simulations: 2000.
 
     Args:
         projected_stat_average (float): Our projected mean for the stat
         stat_standard_deviation (float): Historical variability (std dev)
         prop_line (float): The betting line to beat
-        number_of_simulations (int): How many games to simulate (100-5000)
+        number_of_simulations (int): How many games to simulate (default 2000)
         blowout_risk_factor (float): 0.0-1.0; higher = more blowout risk
             A blowout (big lead) means stars play fewer garbage-time mins
         pace_adjustment_factor (float): Multiplier for game pace (0.85-1.15)
@@ -116,6 +129,9 @@ def run_monte_carlo_simulation(
             Typical: home=+0.02, away=-0.02
         rest_adjustment_factor (float): Adjustment for rest days
             Back-to-back game = tired player = slight negative adjustment
+        stat_type (str, optional): Stat being simulated (e.g. 'threes',
+            'fg3m', 'points'). When 'threes' or 'fg3m', enforces a minimum
+            CV of 1.3x the elite-points CV floor to capture streakiness.
 
     Returns:
         dict: Simulation results containing:
@@ -126,6 +142,10 @@ def run_monte_carlo_simulation(
             - 'percentile_10': float, 10th percentile (bad game)
             - 'percentile_50': float, median game
             - 'percentile_90': float, 90th percentile (great game)
+            - 'ci_90_low': float, lower bound of 90% Wilson confidence interval
+            - 'ci_90_high': float, upper bound of 90% Wilson confidence interval
+            - 'simulations_run': int, actual simulations completed (may be
+              fewer than requested if convergence was reached early)
 
     Example:
         LeBron projects 25 pts, std=6, line=24.5 →
@@ -157,6 +177,13 @@ def run_monte_carlo_simulation(
     # Make sure std doesn't go below a minimum (always some variability)
     adjusted_standard_deviation = max(adjusted_standard_deviation, 0.5)
 
+    # Three-point CV enforcement: threes/fg3m must have at least 1.3x the
+    # elite-points CV floor (0.25) to properly model shooting streakiness.
+    if stat_type in ("threes", "fg3m") and adjusted_stat_projection > 0:
+        current_cv = adjusted_standard_deviation / adjusted_stat_projection
+        if current_cv < THREE_POINT_CV_FLOOR:
+            adjusted_standard_deviation = adjusted_stat_projection * THREE_POINT_CV_FLOOR
+
     # ============================================================
     # END SECTION: Apply Pre-Simulation Adjustments
     # ============================================================
@@ -172,10 +199,15 @@ def run_monte_carlo_simulation(
     # Counter for games where player goes OVER the prop line
     count_of_games_over_line = 0
 
+    # Convergence tracking: check every 500 simulations whether the
+    # running probability has stabilized (early-exit optimisation).
+    prev_prob_checkpoint = 0.0
+    simulations_completed = number_of_simulations  # updated on early exit
+
     # Run the simulation `number_of_simulations` times
     # BEGINNER NOTE: range(n) creates numbers 0 to n-1
     # We don't care about the index, just need to loop n times
-    for _ in range(number_of_simulations):
+    for sim_index in range(number_of_simulations):
 
         # --- Step 1: Pick a Game Scenario (W3: Ceiling/Floor Games) ---
         # Instead of rolling blowout and foul trouble independently,
@@ -223,6 +255,16 @@ def run_monte_carlo_simulation(
         if simulated_game_stat > prop_line:
             count_of_games_over_line += 1
 
+        # --- Step 5: Convergence Check (every 500 simulations) ---
+        # If the running probability has stabilised, stop early to save time.
+        sims_done = sim_index + 1
+        if sims_done % 500 == 0 and sims_done >= 500:
+            current_prob = count_of_games_over_line / sims_done
+            if abs(current_prob - prev_prob_checkpoint) < CONVERGENCE_THRESHOLD:
+                simulations_completed = sims_done
+                break
+            prev_prob_checkpoint = current_prob
+
     # ============================================================
     # END SECTION: Run Simulation Loop
     # ============================================================
@@ -233,10 +275,22 @@ def run_monte_carlo_simulation(
     # ============================================================
 
     # Raw probability = games over / total games simulated
-    raw_probability_over = count_of_games_over_line / number_of_simulations
+    raw_probability_over = count_of_games_over_line / simulations_completed
 
     # Clamp to [0.01, 0.99] — never 100% certain
     final_probability_over = clamp_probability(raw_probability_over)
+
+    # --- Wilson Score 90% Confidence Interval ---
+    # Provides a statistically sound CI around the probability estimate.
+    # z = 1.645 for 90% confidence level.
+    _n = simulations_completed
+    _p = final_probability_over
+    _z = Z_SCORE_90_CI
+    _z2 = _z * _z
+    _center = (_p + _z2 / (2 * _n)) / (1 + _z2 / _n)
+    _margin = _z * math.sqrt(_p * (1 - _p) / _n + _z2 / (4 * _n * _n)) / (1 + _z2 / _n)
+    ci_90_low = max(0.0, _center - _margin)
+    ci_90_high = min(1.0, _center + _margin)
 
     # Build the results dictionary
     simulation_results = {
@@ -251,6 +305,9 @@ def run_monte_carlo_simulation(
         "percentile_90": calculate_percentile(all_simulated_game_results, 90),
         "adjusted_projection": adjusted_stat_projection,
         "combined_adjustment": combined_adjustment_multiplier,
+        "ci_90_low": round(ci_90_low, 4),
+        "ci_90_high": round(ci_90_high, 4),
+        "simulations_run": simulations_completed,
     }
 
     return simulation_results

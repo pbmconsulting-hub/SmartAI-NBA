@@ -34,6 +34,18 @@ LEAGUE_AVERAGE_PACE = 98.5
 SEASON_AVG_WEIGHT = 0.6    # 60% season average (stabilizing factor)
 RECENT_FORM_WEIGHT = 0.4   # 40% recent form (responsiveness factor)
 
+# Back-to-back fatigue: applied to rest_factor when player played yesterday.
+BACK_TO_BACK_FATIGUE_MULTIPLIER = 0.94  # 6% performance reduction
+
+# Spread threshold above which a blowout minutes-risk note is added.
+BLOWOUT_SPREAD_THRESHOLD = 10  # points
+
+# Injury-status stat reduction multipliers
+QUESTIONABLE_REDUCTION = 0.92    # 8% reduction for Questionable
+DOUBTFUL_REDUCTION = 0.75        # 25% reduction for Doubtful
+RUST_FACTOR_REDUCTION = 0.94     # 6% reduction for first game back after extended absence
+RUST_FACTOR_GAMES_THRESHOLD = 3  # Minimum games missed to trigger rust factor
+
 # ============================================================
 # SECTION: Team Blowout Tendency Dictionary (W6)
 # Different coaches have very different policies on when to pull
@@ -80,6 +92,7 @@ def build_player_projection(
     vegas_spread=0.0,
     minutes_adjustment_factor=1.0,
     teammate_out_notes=None,
+    played_yesterday=False,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -117,6 +130,9 @@ def build_player_projection(
         teammate_out_notes (list of str, optional): Human-readable notes
             about which teammates are out and how it affects this player (W8).
             Included in the returned projection for display purposes.
+        played_yesterday (bool, optional): True if this is a back-to-back
+            game (player played yesterday). Applies a 0.94 fatigue multiplier
+            to the rest adjustment factor. Default False.
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -136,6 +152,7 @@ def build_player_projection(
             - 'recent_form_ratio': float or None (last5_avg / season_avg)
             - 'minutes_adjustment_factor': float (W8: teammate injury impact)
             - 'teammate_out_notes': list of str (W8: teammate impact notes)
+            - 'notes': list of str (game-context warnings, e.g. back-to-back)
 
     Example:
         LeBron at home vs weak defense + fast pace →
@@ -250,6 +267,13 @@ def build_player_projection(
     # Back-to-back games cause fatigue; well-rested players perform better
     rest_factor = _get_rest_adjustment_factor(rest_days)
 
+    # Back-to-back override: if the player literally played yesterday, apply
+    # an additional 6% fatigue reduction on top of the rest-day factor.
+    notes = []
+    if played_yesterday:
+        rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER  # 6% fatigue penalty for back-to-back
+        notes.append("⚠️ Back-to-back game — fatigue factor applied")
+
     # --- Factor 5: Game Total / Scoring Environment ---
     # High-total games (230+ pts projected) are fast-paced, high scoring
     # Neutral total is LEAGUE_AVERAGE_GAME_TOTAL; adjust proportionally
@@ -272,6 +296,12 @@ def build_player_projection(
         vegas_spread=vegas_spread,
         game_total=game_total,
     )
+
+    # Warn when a large spread creates meaningful reduced-minutes risk.
+    if abs(vegas_spread) > BLOWOUT_SPREAD_THRESHOLD:
+        notes.append(
+            f"⚠️ Spread > 10 ({vegas_spread:+.1f}) — star player may face reduced minutes in blowout"
+        )
 
     # ============================================================
     # END SECTION: Calculate Adjustment Factors
@@ -327,6 +357,7 @@ def build_player_projection(
         # W8: Minutes adjustment factors for injury/restriction transparency
         "minutes_adjustment_factor": round(minutes_adjustment_factor, 4),
         "teammate_out_notes": teammate_out_notes or [],
+        "notes": notes,
     }
 
     return projections
@@ -654,4 +685,87 @@ def _get_dynamic_cv(stat_type, stat_avg):
 
 # ============================================================
 # END SECTION: Individual Adjustment Factor Functions
+# ============================================================
+
+
+# ============================================================
+# SECTION: Injury / Status Adjustment
+# ============================================================
+
+def apply_injury_status_adjustment(projection_dict, player_status, games_missed=0):
+    """
+    Apply injury/status impact factors to a player projection.
+
+    Reduces projected stats based on the player's availability status
+    and, if they missed several games, applies a rust-factor penalty
+    for the first game back.
+
+    Args:
+        projection_dict (dict): Return value of build_player_projection().
+            Modified in-place (via a shallow copy) and returned.
+        player_status (str): Player availability label, e.g.:
+            'Active', 'Questionable', 'Doubtful', 'Out', 'Injured Reserve'
+        games_missed (int, optional): Consecutive games missed before
+            tonight. If > 3, a 6% rust-factor reduction is applied.
+            Default 0 (no games missed).
+
+    Returns:
+        dict or None:
+            - None if player_status is 'Out' or 'Injured Reserve'
+            - Adjusted projection_dict otherwise (shallow copy, not mutated)
+
+    Examples:
+        apply_injury_status_adjustment(proj, "Questionable")   → -8%
+        apply_injury_status_adjustment(proj, "Doubtful")        → -25%
+        apply_injury_status_adjustment(proj, "Out")             → None
+        apply_injury_status_adjustment(proj, "Active", 4)       → -6% rust
+        apply_injury_status_adjustment(proj, "Questionable", 5) → -8% + -6%
+    """
+    if player_status in ("Out", "Injured Reserve"):
+        return None
+
+    if projection_dict is None:
+        return None
+
+    # Work on a shallow copy so the original is not mutated
+    adjusted = dict(projection_dict)
+    notes = list(adjusted.get("notes", []))
+
+    # Stat keys that represent player output (not factors/metadata)
+    _STAT_KEYS = [
+        "projected_points",
+        "projected_rebounds",
+        "projected_assists",
+        "projected_threes",
+        "projected_steals",
+        "projected_blocks",
+        "projected_turnovers",
+    ]
+
+    # Determine status-based reduction factor
+    reduction = 1.0
+    if player_status == "Questionable":
+        reduction *= QUESTIONABLE_REDUCTION  # 8% reduction
+        notes.append("⚠️ Questionable status — projected stats reduced 8%")
+    elif player_status == "Doubtful":
+        reduction *= DOUBTFUL_REDUCTION  # 25% reduction
+        notes.append("⚠️ Doubtful status — projected stats reduced 25%")
+
+    # Rust factor: reduction for first game back after missing 3+ games
+    if games_missed > RUST_FACTOR_GAMES_THRESHOLD:
+        reduction *= RUST_FACTOR_REDUCTION
+        notes.append(
+            f"⚠️ Rust factor — {games_missed} games missed, first game back (−6%)"
+        )
+
+    # Apply reduction to all output stats
+    for key in _STAT_KEYS:
+        if key in adjusted:
+            adjusted[key] = round(adjusted[key] * reduction, 1)
+
+    adjusted["notes"] = notes
+    return adjusted
+
+# ============================================================
+# END SECTION: Injury / Status Adjustment
 # ============================================================

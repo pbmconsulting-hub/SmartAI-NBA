@@ -13,21 +13,34 @@ import streamlit as st  # Main UI framework
 # ============================================================
 
 st.set_page_config(
-    page_title="Avoid List — SmartAI-NBA",
-    page_icon="🚫",
+    page_title="Risk Shield — SmartBetPro NBA",
+    page_icon="🛡️",
     layout="wide",
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-st.title("🚫 Avoid List")
+st.title("🛡️ Risk Shield")
 st.markdown(
     "These props have been flagged as **high-risk or low-edge** by the model. "
     "Understand WHY to make better decisions."
 )
 st.divider()
+
+st.markdown(get_education_box_html(
+    "📖 Why We Avoid These Picks",
+    """
+    The Risk Shield flags props that have one or more red flags:<br><br>
+    🚩 <strong>Low edge</strong>: The model's probability is too close to 50/50 — no real edge.<br>
+    🚩 <strong>Trap line</strong>: The line is set at an unusual position to attract bettors to the wrong side.<br>
+    🚩 <strong>Sharp line</strong>: Vegas has priced this line at the player's exact average — no value.<br>
+    🚩 <strong>High variance</strong>: The player's stats are too unpredictable to bet with confidence.<br>
+    🚩 <strong>Low confidence</strong>: Too many contradictory signals — the model isn't sure.<br><br>
+    <em>Rule of thumb: If a pick is on this list, it's not worth the risk regardless of how tempting it looks.</em>
+    """
+), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Setup
@@ -41,7 +54,7 @@ analysis_results = st.session_state.get("analysis_results", [])
 
 if not analysis_results:
     st.warning(
-        "⚠️ No analysis results yet. Go to **🏆 Analysis** and run analysis first!"
+        "⚠️ No analysis results yet. Go to **⚡ Neural Analysis** and run analysis first!"
     )
     st.stop()
 

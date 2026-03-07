@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: engine/math_helpers.py
 # PURPOSE: All mathematical and statistical functions needed
-#          by the SmartAI-NBA engine — built from scratch using
+#          by the SmartBetPro NBA engine — built from scratch using
 #          ONLY Python's standard library (math, statistics).
 #          No numpy, no scipy, no pandas.
 # CONNECTS TO: simulation.py, projections.py, confidence.py,
