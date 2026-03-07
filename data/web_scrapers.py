@@ -118,7 +118,7 @@ def _safe_get(url, headers=None, timeout=_REQUEST_TIMEOUT, retries=3):
     return None
 
 
-def _normalize_status_local(raw):
+def _canonicalize_status(raw):
     """Map raw status strings to canonical labels."""
     _MAP = {
         "out": "Out",
@@ -221,7 +221,7 @@ def scrape_espn_injury_report():
                 if not player_name:
                     continue
 
-                canonical_status = _normalize_status_local(status_cell)
+                canonical_status = _canonicalize_status(status_cell)
                 key = player_name.lower().strip()
 
                 results[key] = {
