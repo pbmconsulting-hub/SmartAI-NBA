@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: engine/__init__.py
-# PURPOSE: Shared constants for the SmartAI-NBA engine.
+# PURPOSE: Shared constants for the SmartBetPro NBA engine.
 #          Import these in any module that needs them.
 # ============================================================
 
