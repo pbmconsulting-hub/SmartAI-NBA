@@ -289,12 +289,12 @@ html, body, [class*="css"] {
 .stExpander { background: rgba(20,25,43,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
 .stExpander summary { color: rgba(255,255,255,0.90) !important; }
 button[kind="primary"] {
-    background: linear-gradient(135deg, #ff5e00, #00f0ff) !important;
-    color: #fff !important;
+    background: linear-gradient(135deg, #00ffd5, #00b4ff) !important;
+    color: #0a0f1a !important;
     border: none !important;
     font-family: 'Orbitron', sans-serif !important;
     letter-spacing: 0.05em !important;
-    box-shadow: 0 0 16px rgba(255,94,0,0.35) !important;
+    box-shadow: 0 0 16px rgba(0,255,213,0.35) !important;
 }
 .stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: rgba(255,255,255,0.9) !important; }
 
@@ -895,11 +895,11 @@ button[kind="primary"] {
 
 /* ─── Correlation Warning ─────────────────────────────────── */
 .corr-warning {
-    background: rgba(255,94,0,0.08);
-    border: 1px solid rgba(255,94,0,0.32);
+    background: rgba(245,158,11,0.10);
+    border: 1px solid rgba(245,158,11,0.32);
     border-radius: 8px;
     padding: 8px 14px;
-    color: #ff9d4d;
+    color: #facc15;
     font-size: 0.83rem;
     margin-top: 8px;
 }
@@ -1046,7 +1046,7 @@ def get_force_bar_html(over_strength, under_strength, over_count, under_count):
   <div class="force-bar-over" style="width:{over_pct}%;"></div>
   <div class="force-bar-under" style="width:{under_pct}%;"></div>
 </div>
-<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b;margin-top:3px;">
+<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#8a9bb8;margin-top:3px;">
   <span>⬆️ OVER ({over_count})</span>
   <span>UNDER ({under_count}) ⬇️</span>
 </div>"""
@@ -1612,6 +1612,10 @@ def get_player_analysis_card_html(result, show_add_button=True):
         stat_pills += get_stat_pill_html("Proj", f"{proj:.1f}", "📐")
 
     conf_color = "#00ff9d" if confidence >= 70 else "#ff9d4d" if confidence >= 50 else "#ff6b6b"
+
+    edge_class = "edge-positive" if edge >= 0 else "edge-negative"
+    edge_sign = "+" if edge >= 0 else ""
+    edge_html = f'<span class="edge-badge {edge_class}">{edge_sign}{edge:.1f}% edge</span>'
 
     over_forces = result.get("forces", {}).get("over_forces", [])
     under_forces = result.get("forces", {}).get("under_forces", [])
