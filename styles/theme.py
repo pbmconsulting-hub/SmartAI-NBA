@@ -120,7 +120,7 @@ _TEAM_COLORS = {
     "WAS": ("#002B5C", "#E31837"),
 }
 
-_DEFAULT_TEAM_COLORS = ("#0891b2", "#e0f2fe")
+_DEFAULT_TEAM_COLORS = ("#00f0ff", "#0a1a2e")
 
 
 def get_team_colors(team_abbrev):
@@ -148,40 +148,44 @@ def get_team_colors(team_abbrev):
 
 def get_global_css():
     """
-    Return the full CSS string for the SmartBetPro NBA AI Neural Network Lab theme.
+    Return the full CSS string for the SmartBetPro NBA Quantum Edge dark theme.
 
-    Implements a bright "high-tech AI lab" light theme with:
-    - Clean white / light metallic gray / holographic light-blue backgrounds
-    - Neural dot pattern adapted for light backgrounds
-    - Glassmorphism cards with cyan-glow borders on white
-    - Vibrant high-tech accent colors (cyan, neon green, gold, red) that pop
-    - Dark contrasting sidebar for the "lab workstation" feel
-    - Futuristic tier badges with glow effects
-    - Pulsing live-indicator dot animation
+    Implements a dark futuristic "AI command center" theme with:
+    - Deep space dark backgrounds (#0a0f1a) with radial gradient
+    - Glassmorphism cards with neon cyan glow borders on dark
+    - Neon orange (#ff5e00) primary + holographic cyan (#00f0ff) secondary accents
+    - Electric green (#00ff9d) for success, neon purple (#c800ff) tertiary
+    - Orbitron font for headings, Montserrat for body
+    - Animated holographic shimmer overlays
+    - Futuristic tier badges with neon glow effects
+    - Pulsing live-indicator dot animation with cyan glow
     - Monospace terminal readout class
-    - Smooth hover transitions throughout
-    - Sidebar "Powered by JM5 Neural Engine" branding
-    - Custom scrollbar
+    - Smooth hover transitions with lift + increased glow
+    - Sidebar "Powered by JM5 Neural Engine" branding with neon accent
+    - Custom dark scrollbar with cyan thumb
 
     Returns:
         str: Full <style>...</style> block ready for st.markdown()
     """
     return """
 <style>
+/* ─── Google Fonts ────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;800;900&family=Montserrat:wght@400;600;700&display=swap');
+
 /* ─── Keyframe Animations ─────────────────────────────────── */
 @keyframes borderGlow {
-    0%, 100% { box-shadow: 0 0 8px rgba(8,145,178,0.18),
-                            0 4px 20px rgba(8,145,178,0.08); }
-    50%       { box-shadow: 0 0 22px rgba(8,145,178,0.38),
-                            0 4px 24px rgba(8,145,178,0.14); }
+    0%, 100% { box-shadow: 0 0 12px rgba(0,240,255,0.15),
+                            0 4px 24px rgba(0,240,255,0.07); }
+    50%       { box-shadow: 0 0 28px rgba(0,240,255,0.35),
+                            0 4px 30px rgba(0,240,255,0.15); }
 }
 @keyframes pulse-platinum {
-    0%, 100% { box-shadow: 0 0 10px rgba(100,116,139,0.35); }
-    50%       { box-shadow: 0 0 22px rgba(100,116,139,0.60); }
+    0%, 100% { box-shadow: 0 0 10px rgba(0,240,255,0.30); }
+    50%       { box-shadow: 0 0 24px rgba(0,240,255,0.60); }
 }
 @keyframes pulse-gold {
-    0%, 100% { box-shadow: 0 0 10px rgba(217,119,6,0.40); }
-    50%       { box-shadow: 0 0 22px rgba(217,119,6,0.70); }
+    0%, 100% { box-shadow: 0 0 10px rgba(255,94,0,0.35); }
+    50%       { box-shadow: 0 0 24px rgba(255,94,0,0.65); }
 }
 @keyframes live-dot-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -196,24 +200,27 @@ def get_global_css():
     50%  { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
 }
-
-/* ─── Base / Body ─────────────────────────────────────────── */html, body, [class*="css"] {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-                 'Helvetica Neue', Arial, sans-serif;
-    color: #0f172a;
-    background-color: #eef2fb;
+@keyframes hologramEffect {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
 }
-/* Neural dot pattern — subtle circuit nodes on the light lab background */
+
+/* ─── Base / Body ─────────────────────────────────────────── */
+html, body, [class*="css"] {
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: rgba(255,255,255,0.95);
+    background-color: #0a0f1a;
+}
+/* Deep space dark background with radial gradient */
 .stApp {
-    background-color: #eef2fb;
+    background-color: #0a0f1a;
     background-image:
-        radial-gradient(circle, rgba(8,145,178,0.13) 1px, transparent 1px),
-        radial-gradient(circle, rgba(99,102,241,0.07) 1px, transparent 1px);
-    background-size: 40px 40px, 80px 80px;
-    background-position: 0 0, 20px 20px;
+        radial-gradient(ellipse at 20% 20%, rgba(0,240,255,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(200,0,255,0.03) 0%, transparent 50%),
+        radial-gradient(ellipse at center, #0d1220 0%, #0a0f1a 100%);
 }
 
-/* Streamlit text defaults on light background */
+/* Streamlit text defaults on dark background */
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li,
 [data-testid="stMarkdownContainer"] span,
@@ -223,7 +230,7 @@ def get_global_css():
 .stSlider label,
 .stCheckbox label,
 .stRadio label {
-    color: #0f172a;
+    color: rgba(255,255,255,0.85);
 }
 [data-testid="stMarkdownContainer"] h1,
 [data-testid="stMarkdownContainer"] h2,
@@ -232,26 +239,29 @@ def get_global_css():
 [data-testid="stMarkdownContainer"] h5,
 [data-testid="stMarkdownContainer"] h6,
 .stHeadingWithActionElements {
-    color: #0f172a;
+    color: rgba(255,255,255,0.95);
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.05em;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — dark track, cyan thumb */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #e2e8f0; }
-::-webkit-scrollbar-thumb { background: rgba(8,145,178,0.35); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(8,145,178,0.60); }
+::-webkit-scrollbar-track { background: rgba(10,15,26,0.8); }
+::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.35); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,240,255,0.60); }
 
-/* ─── Sidebar — dark "lab workstation" panel ──────────────── */
+/* ─── Sidebar — enhanced dark panel with neon border ─────── */
 [data-testid="stSidebar"] {
-    background: #0f172a !important;
-    border-right: 1px solid rgba(8,145,178,0.25) !important;
+    background: #0a0d18 !important;
+    border-right: 1px solid rgba(0,240,255,0.20) !important;
+    box-shadow: 2px 0 20px rgba(0,240,255,0.05) !important;
 }
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span,
 [data-testid="stSidebar"] div,
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] a {
-    color: #e2e8f0 !important;
+    color: #c0d0e8 !important;
 }
 [data-testid="stSidebar"]::after {
     content: "⚡ Powered by JM5 Neural Engine";
@@ -266,34 +276,38 @@ def get_global_css():
     font-size: 0.68rem;
     font-family: 'Courier New', Courier, monospace;
     font-weight: 700;
-    color: rgba(8,145,178,0.65) !important;
+    color: rgba(0,240,255,0.70) !important;
     letter-spacing: 0.08em;
     pointer-events: none;
+    text-shadow: 0 0 8px rgba(0,240,255,0.5);
 }
 
-/* ─── Streamlit native elements on light bg ───────────────── */
-[data-testid="stMetricValue"] { color: #0f172a !important; }
-[data-testid="stMetricLabel"] { color: #64748b !important; }
-.stAlert { background: rgba(255,255,255,0.85) !important; border-radius: 10px !important; }
-.stExpander { background: rgba(255,255,255,0.75) !important; border: 1px solid rgba(8,145,178,0.2) !important; border-radius: 12px !important; }
-.stExpander summary { color: #0f172a !important; }
+/* ─── Streamlit native elements on dark bg ───────────────── */
+[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; }
+[data-testid="stMetricLabel"] { color: #8a9bb8 !important; }
+.stAlert { background: rgba(20,25,43,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: rgba(255,255,255,0.9) !important; }
+.stExpander { background: rgba(20,25,43,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
+.stExpander summary { color: rgba(255,255,255,0.90) !important; }
 button[kind="primary"] {
-    background: linear-gradient(135deg, #0891b2, #4f46e5) !important;
+    background: linear-gradient(135deg, #ff5e00, #00f0ff) !important;
     color: #fff !important;
     border: none !important;
+    font-family: 'Orbitron', sans-serif !important;
+    letter-spacing: 0.05em !important;
+    box-shadow: 0 0 16px rgba(255,94,0,0.35) !important;
 }
-.stDataFrame, .stTable { background: #ffffff !important; }
+.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: rgba(255,255,255,0.9) !important; }
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(8,145,178,0.22);
+    background: rgba(20,25,43,0.85);
+    border: 1px solid rgba(0,240,255,0.15);
     border-radius: 16px;
     padding: 20px 24px;
     margin-bottom: 18px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 2px 12px rgba(8,145,178,0.09), 0 1px 3px rgba(0,0,0,0.06);
+    box-shadow: 0 0 20px rgba(0,240,255,0.08), 0 4px 24px rgba(0,0,0,0.4);
     animation: borderGlow 3.5s ease-in-out infinite,
                fadeInUp 0.35s ease both;
     transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
@@ -304,21 +318,21 @@ button[kind="primary"] {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #0891b2, #06b6d4, #10b981, #f59e0b, #0891b2);
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
     background-size: 200% 100%;
     animation: headerShimmer 4s ease infinite;
     opacity: 0.9;
 }
 .smartai-card:hover {
-    border-color: rgba(8,145,178,0.50);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(8,145,178,0.18);
+    border-color: rgba(0,240,255,0.40);
+    transform: translateY(-5px);
+    box-shadow: 0 0 30px rgba(0,240,255,0.20), 0 8px 32px rgba(0,0,0,0.5);
 }
 
 /* ─── Neural Header ───────────────────────────────────────── */
 .neural-header {
-    background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%);
-    border: 1px solid rgba(8,145,178,0.35);
+    background: linear-gradient(135deg, #0a0f1a 0%, #0d1a2e 50%, #0a0f1a 100%);
+    border: 1px solid rgba(0,240,255,0.30);
     border-radius: 16px;
     padding: 24px 30px;
     margin-bottom: 20px;
@@ -327,29 +341,32 @@ button[kind="primary"] {
     position: relative;
     overflow: hidden;
     text-align: center;
-    box-shadow: 0 4px 24px rgba(8,145,178,0.18);
+    box-shadow: 0 0 30px rgba(0,240,255,0.12), 0 4px 24px rgba(0,0,0,0.5);
 }
 .neural-header::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #06b6d4, #10b981, #f59e0b, #f43f5e, #06b6d4);
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
     background-size: 200% 100%;
     animation: headerShimmer 3s linear infinite;
 }
 .neural-header-title {
     font-size: 2rem;
     font-weight: 900;
-    background: linear-gradient(135deg, #06b6d4, #10b981);
+    font-family: 'Orbitron', sans-serif;
+    background: linear-gradient(135deg, #00f0ff, #00ff9d);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    letter-spacing: -0.02em;
+    letter-spacing: 0.05em;
     line-height: 1.15;
+    text-shadow: none;
+    filter: drop-shadow(0 0 12px rgba(0,240,255,0.5));
 }
 .neural-header-subtitle {
     font-size: 0.88rem;
-    color: rgba(226,232,240,0.75);
+    color: rgba(192,208,232,0.80);
     margin-top: 6px;
     font-family: 'Courier New', Courier, monospace;
     letter-spacing: 0.06em;
@@ -358,19 +375,20 @@ button[kind="primary"] {
     display: inline-block;
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: #06b6d4;
+    background: #00f0ff;
     margin: 0 6px;
     vertical-align: middle;
     animation: live-dot-pulse 1.8s ease-in-out infinite;
-    box-shadow: 0 0 6px rgba(6,182,212,0.7);
+    box-shadow: 0 0 8px rgba(0,240,255,0.9);
 }
 
 /* ─── Player Name & Team Pill ─────────────────────────────── */
 .player-name {
     font-size: 1.3rem;
     font-weight: 800;
-    color: #0f172a;
-    letter-spacing: -0.02em;
+    font-family: 'Orbitron', sans-serif;
+    color: rgba(255,255,255,0.95);
+    letter-spacing: 0.02em;
 }
 .team-pill {
     display: inline-block;
@@ -379,14 +397,14 @@ button[kind="primary"] {
     font-weight: 700;
     font-size: 0.8rem;
     color: #fff;
-    background: rgba(8,145,178,0.75);
+    background: rgba(0,240,255,0.15);
     margin-left: 8px;
     vertical-align: middle;
-    border: 1px solid rgba(8,145,178,0.4);
-    box-shadow: 0 1px 4px rgba(8,145,178,0.2);
+    border: 1px solid rgba(0,240,255,0.35);
+    box-shadow: 0 0 8px rgba(0,240,255,0.15);
 }
 .position-tag {
-    color: #64748b;
+    color: #8a9bb8;
     font-size: 0.82rem;
     margin-left: 8px;
     vertical-align: middle;
@@ -399,83 +417,92 @@ button[kind="primary"] {
     border-radius: 20px;
     font-weight: 800;
     font-size: 0.9rem;
-    letter-spacing: 0.03em;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     position: relative;
     transition: box-shadow 0.2s ease;
 }
 .tier-platinum {
-    background: linear-gradient(135deg, #94a3b8, #e2e8f0);
-    color: #0f172a;
+    background: linear-gradient(135deg, #1a2035, #2a3555);
+    color: #00f0ff;
     animation: pulse-platinum 2.5s infinite;
-    border: 1px solid rgba(100,116,139,0.4);
+    border: 1px solid rgba(0,240,255,0.45);
+    box-shadow: 0 0 12px rgba(0,240,255,0.25);
 }
 .tier-gold {
-    background: linear-gradient(135deg, #d97706, #fbbf24);
-    color: #1c1917;
+    background: linear-gradient(135deg, #2a1500, #3d2200);
+    color: #ff9d00;
     animation: pulse-gold 2.8s infinite;
+    border: 1px solid rgba(255,94,0,0.45);
+    box-shadow: 0 0 12px rgba(255,94,0,0.25);
 }
 .tier-silver {
-    background: linear-gradient(135deg, #6b7280, #d1d5db);
-    color: #0f172a;
-    box-shadow: 0 0 8px rgba(107,114,128,0.3);
+    background: linear-gradient(135deg, #1a1f30, #252b40);
+    color: #c0d0e8;
+    border: 1px solid rgba(192,208,232,0.35);
+    box-shadow: 0 0 8px rgba(192,208,232,0.15);
 }
 .tier-bronze {
-    background: linear-gradient(135deg, #92400e, #f97316);
-    color: #fff;
-    box-shadow: 0 0 8px rgba(249,115,22,0.35);
+    background: linear-gradient(135deg, #2a1800, #3d2500);
+    color: #ff7c3a;
+    border: 1px solid rgba(249,115,22,0.40);
+    box-shadow: 0 0 8px rgba(249,115,22,0.25);
 }
 
 /* ─── AI Verdict Card ─────────────────────────────────────── */
 .verdict-bet {
-    background: rgba(16,185,129,0.08);
-    border: 2px solid rgba(16,185,129,0.50);
+    background: rgba(0,255,157,0.06);
+    border: 2px solid rgba(0,255,157,0.45);
     border-radius: 14px;
     padding: 16px 20px;
     animation: borderGlow 2.5s ease-in-out infinite;
+    box-shadow: 0 0 20px rgba(0,255,157,0.10);
 }
 .verdict-avoid {
     background: rgba(239,68,68,0.07);
     border: 2px solid rgba(239,68,68,0.45);
     border-radius: 14px;
     padding: 16px 20px;
+    box-shadow: 0 0 20px rgba(239,68,68,0.10);
 }
 .verdict-risky {
-    background: rgba(245,158,11,0.07);
-    border: 2px solid rgba(245,158,11,0.40);
+    background: rgba(255,94,0,0.07);
+    border: 2px solid rgba(255,94,0,0.40);
     border-radius: 14px;
     padding: 16px 20px;
+    box-shadow: 0 0 20px rgba(255,94,0,0.10);
 }
 .verdict-label {
     font-size: 1.4rem;
     font-weight: 900;
-    letter-spacing: 0.08em;
+    font-family: 'Orbitron', sans-serif;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
-    font-family: 'Courier New', Courier, monospace;
 }
-.verdict-label-bet   { color: #059669; }
-.verdict-label-avoid { color: #dc2626; }
-.verdict-label-risky { color: #d97706; }
+.verdict-label-bet   { color: #00ff9d; text-shadow: 0 0 10px rgba(0,255,157,0.6); }
+.verdict-label-avoid { color: #ff4444; text-shadow: 0 0 10px rgba(239,68,68,0.6); }
+.verdict-label-risky { color: #ff5e00; text-shadow: 0 0 10px rgba(255,94,0,0.6); }
 .verdict-confidence {
     font-size: 0.8rem;
-    color: #64748b;
+    color: #8a9bb8;
     font-family: 'Courier New', Courier, monospace;
     margin-top: 4px;
 }
 .verdict-explanation {
     font-size: 0.9rem;
-    color: #1e293b;
+    color: rgba(192,208,232,0.90);
     margin-top: 10px;
     line-height: 1.55;
-    border-top: 1px solid rgba(8,145,178,0.12);
+    border-top: 1px solid rgba(0,240,255,0.12);
     padding-top: 10px;
 }
 
 /* ─── Stat Readout (monospace terminal) ───────────────────── */
 .stat-readout {
     font-family: 'Courier New', Courier, monospace;
-    background: rgba(8,145,178,0.05);
-    border: 1px solid rgba(8,145,178,0.18);
+    background: rgba(0,200,255,0.05);
+    border: 1px solid rgba(0,240,255,0.15);
     border-radius: 8px;
     padding: 8px 14px;
     margin: 4px 0;
@@ -485,53 +512,57 @@ button[kind="primary"] {
     transition: background 0.2s ease;
 }
 .stat-readout:hover {
-    background: rgba(8,145,178,0.10);
+    background: rgba(0,200,255,0.10);
 }
 .stat-readout-label {
-    color: #64748b;
+    color: #8a9bb8;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.07em;
 }
 .stat-readout-value {
-    color: #0891b2;
+    color: #00f0ff;
     font-size: 1rem;
     font-weight: 700;
+    text-shadow: 0 0 6px rgba(0,240,255,0.5);
 }
 .stat-readout-context {
-    color: #64748b;
+    color: #8a9bb8;
     font-size: 0.75rem;
     margin-left: 10px;
 }
 
 /* ─── Education Box ───────────────────────────────────────── */
 .education-box {
-    background: rgba(224,242,254,0.65);
-    border: 1px solid rgba(8,145,178,0.22);
+    background: rgba(20,25,43,0.70);
+    border: 1px solid rgba(0,240,255,0.18);
     border-radius: 12px;
     padding: 14px 18px;
     margin: 10px 0;
     transition: background 0.2s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 .education-box:hover {
-    background: rgba(224,242,254,0.90);
+    background: rgba(20,25,43,0.90);
 }
 .education-box-title {
     font-size: 0.88rem;
     font-weight: 700;
-    color: #0891b2;
+    color: #00f0ff;
     display: flex;
     align-items: center;
     gap: 7px;
     cursor: pointer;
     user-select: none;
+    text-shadow: 0 0 6px rgba(0,240,255,0.4);
 }
 .education-box-content {
     font-size: 0.84rem;
-    color: #334155;
+    color: rgba(192,208,232,0.90);
     margin-top: 9px;
     line-height: 1.6;
-    border-top: 1px solid rgba(8,145,178,0.15);
+    border-top: 1px solid rgba(0,240,255,0.12);
     padding-top: 9px;
 }
 
@@ -544,7 +575,7 @@ button[kind="primary"] {
 }
 .progress-ring-label {
     font-size: 0.72rem;
-    color: #64748b;
+    color: #8a9bb8;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-family: 'Courier New', Courier, monospace;
@@ -561,15 +592,16 @@ button[kind="primary"] {
 .signal-bar-seg {
     width: 7px;
     border-radius: 2px;
-    background: rgba(8,145,178,0.18);
+    background: rgba(0,240,255,0.12);
     transition: background 0.2s ease;
 }
 .signal-bar-seg.active {
-    background: linear-gradient(180deg, #0891b2, #06b6d4);
+    background: linear-gradient(180deg, #00f0ff, #00c8ff);
+    box-shadow: 0 0 4px rgba(0,240,255,0.5);
 }
 .signal-strength-label {
     font-size: 0.72rem;
-    color: #64748b;
+    color: #8a9bb8;
     font-family: 'Courier New', Courier, monospace;
     margin-left: 6px;
     vertical-align: middle;
@@ -579,8 +611,8 @@ button[kind="primary"] {
 .edu-tooltip {
     position: relative;
     display: inline-block;
-    border-bottom: 1px dashed rgba(8,145,178,0.6);
-    color: #0891b2;
+    border-bottom: 1px dashed rgba(0,240,255,0.6);
+    color: #00f0ff;
     cursor: help;
     font-weight: 600;
 }
@@ -588,8 +620,8 @@ button[kind="primary"] {
     visibility: hidden;
     opacity: 0;
     width: 260px;
-    background: #0f172a;
-    border: 1px solid rgba(8,145,178,0.35);
+    background: rgba(10,15,26,0.97);
+    border: 1px solid rgba(0,240,255,0.35);
     color: #e2e8f0;
     font-size: 0.8rem;
     font-weight: 400;
@@ -602,7 +634,7 @@ button[kind="primary"] {
     left: 50%;
     transform: translateX(-50%);
     transition: opacity 0.2s ease;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 20px rgba(0,240,255,0.15), 0 4px 16px rgba(0,0,0,0.5);
     pointer-events: none;
 }
 .edu-tooltip:hover .tooltip-text {
@@ -621,49 +653,49 @@ button[kind="primary"] {
 }
 .stat-chip {
     display: inline-block;
-    background: rgba(8,145,178,0.08);
-    border: 1px solid rgba(8,145,178,0.20);
+    background: rgba(0,240,255,0.07);
+    border: 1px solid rgba(0,240,255,0.20);
     border-radius: 8px;
     padding: 4px 11px;
     margin-right: 6px;
     margin-top: 4px;
-    color: #0f172a;
+    color: rgba(255,255,255,0.90);
     font-size: 0.83rem;
     font-weight: 600;
     transition: background 0.2s ease;
 }
 .stat-chip:hover {
-    background: rgba(8,145,178,0.16);
+    background: rgba(0,240,255,0.14);
 }
-.stat-label { color: #64748b; font-size: 0.72rem; }
+.stat-label { color: #8a9bb8; font-size: 0.72rem; }
 
 /* ─── Probability Gauge ───────────────────────────────────── */
 .prob-gauge-wrap {
-    background: rgba(226,232,240,0.80);
+    background: rgba(20,25,43,0.80);
     border-radius: 10px;
     height: 16px;
     overflow: hidden;
     margin-top: 6px;
-    border: 1px solid rgba(8,145,178,0.15);
+    border: 1px solid rgba(0,240,255,0.12);
 }
 .prob-gauge-fill-over {
-    background: linear-gradient(90deg, #0891b2, #06b6d4, #10b981);
+    background: linear-gradient(90deg, #00f0ff, #00e7ff, #00ff9d);
     height: 100%;
     border-radius: 10px;
     transition: width 0.5s ease;
-    box-shadow: 0 0 8px rgba(8,145,178,0.4);
+    box-shadow: 0 0 10px rgba(0,240,255,0.50);
 }
 .prob-gauge-fill-under {
     background: linear-gradient(90deg, #dc2626, #f87171);
     height: 100%;
     border-radius: 10px;
     transition: width 0.5s ease;
-    box-shadow: 0 0 8px rgba(220,38,38,0.35);
+    box-shadow: 0 0 8px rgba(220,38,38,0.45);
 }
 .prob-value {
     font-size: 1.15rem;
     font-weight: 800;
-    color: #0f172a;
+    color: rgba(255,255,255,0.95);
     font-family: 'Courier New', Courier, monospace;
 }
 .edge-badge {
@@ -673,28 +705,29 @@ button[kind="primary"] {
     font-weight: 700;
     font-family: 'Courier New', Courier, monospace;
 }
-.edge-positive { background: rgba(16,185,129,0.12); color: #065f46; border: 1px solid rgba(16,185,129,0.35); }
-.edge-negative { background: rgba(220,38,38,0.10); color: #991b1b; border: 1px solid rgba(220,38,38,0.30); }
+.edge-positive { background: rgba(0,255,157,0.10); color: #00ff9d; border: 1px solid rgba(0,255,157,0.35); text-shadow: 0 0 6px rgba(0,255,157,0.4); }
+.edge-negative { background: rgba(220,38,38,0.10); color: #ff6b6b; border: 1px solid rgba(220,38,38,0.35); }
 
 /* ─── Direction Badge ─────────────────────────────────────── */
 .dir-over {
-    background: rgba(16,185,129,0.12);
-    color: #065f46;
+    background: rgba(0,255,157,0.10);
+    color: #00ff9d;
     padding: 4px 12px;
     border-radius: 14px;
     font-weight: 800;
     font-size: 0.9rem;
-    border: 1px solid rgba(16,185,129,0.35);
+    border: 1px solid rgba(0,255,157,0.35);
     font-family: 'Courier New', Courier, monospace;
+    text-shadow: 0 0 6px rgba(0,255,157,0.5);
 }
 .dir-under {
     background: rgba(220,38,38,0.10);
-    color: #991b1b;
+    color: #ff6b6b;
     padding: 4px 12px;
     border-radius: 14px;
     font-weight: 800;
     font-size: 0.9rem;
-    border: 1px solid rgba(220,38,38,0.30);
+    border: 1px solid rgba(220,38,38,0.35);
     font-family: 'Courier New', Courier, monospace;
 }
 
@@ -704,55 +737,56 @@ button[kind="primary"] {
     height: 10px;
     border-radius: 5px;
     overflow: hidden;
-    background: rgba(226,232,240,0.80);
+    background: rgba(20,25,43,0.80);
     margin-top: 5px;
-    border: 1px solid rgba(8,145,178,0.12);
+    border: 1px solid rgba(0,240,255,0.10);
 }
-.force-bar-over  { background: linear-gradient(90deg, #0891b2, #10b981); }
+.force-bar-over  { background: linear-gradient(90deg, #00f0ff, #00ff9d); }
 .force-bar-under { background: linear-gradient(90deg, #dc2626, #f87171); }
 
 /* ─── Distribution Range ──────────────────────────────────── */
 .dist-range-wrap { text-align: right; }
-.dist-p10  { color: #dc2626; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
-.dist-p50  { color: #0f172a; font-size: 0.9rem; font-weight: 800; font-family: 'Courier New', Courier, monospace; }
-.dist-p90  { color: #0891b2; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
-.dist-sep  { color: #94a3b8; font-size: 0.82rem; margin: 0 3px; }
-.dist-label { color: #94a3b8; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
+.dist-p10  { color: #ff6b6b; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+.dist-p50  { color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 800; font-family: 'Courier New', Courier, monospace; }
+.dist-p90  { color: #00f0ff; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+.dist-sep  { color: #4a5568; font-size: 0.82rem; margin: 0 3px; }
+.dist-label { color: #8a9bb8; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
 
 /* ─── Form Dots ───────────────────────────────────────────── */
 .form-dot-over  { display:inline-block; width:11px; height:11px; border-radius:50%;
-                  background:#10b981; box-shadow:0 0 5px rgba(16,185,129,0.55);
+                  background:#00ff9d; box-shadow:0 0 6px rgba(0,255,157,0.70);
                   margin:1px; vertical-align:middle; }
 .form-dot-under { display:inline-block; width:11px; height:11px; border-radius:50%;
-                  background:#ef4444; box-shadow:0 0 5px rgba(239,68,68,0.55);
+                  background:#ef4444; box-shadow:0 0 6px rgba(239,68,68,0.65);
                   margin:1px; vertical-align:middle; }
 
 /* ─── Summary Cards ───────────────────────────────────────── */
 .summary-card {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(8,145,178,0.18);
+    background: rgba(20,25,43,0.85);
+    border: 1px solid rgba(0,240,255,0.15);
     border-radius: 12px;
     padding: 16px 20px;
     text-align: center;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 2px 12px rgba(8,145,178,0.10);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0 18px rgba(0,240,255,0.07), 0 4px 16px rgba(0,0,0,0.4);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .summary-card:hover {
-    border-color: rgba(8,145,178,0.40);
-    box-shadow: 0 4px 20px rgba(8,145,178,0.18);
+    border-color: rgba(0,240,255,0.35);
+    box-shadow: 0 0 28px rgba(0,240,255,0.18), 0 6px 24px rgba(0,0,0,0.5);
+    transform: translateY(-3px);
 }
 .summary-value {
     font-size: 2rem;
     font-weight: 800;
-    color: #0f172a;
+    color: rgba(255,255,255,0.95);
     line-height: 1.1;
     font-family: 'Courier New', Courier, monospace;
 }
 .summary-label {
     font-size: 0.75rem;
-    color: #64748b;
+    color: #8a9bb8;
     text-transform: uppercase;
     letter-spacing: 1.2px;
     margin-top: 5px;
@@ -760,39 +794,41 @@ button[kind="primary"] {
 
 /* ─── Best Bets Card ──────────────────────────────────────── */
 .best-bet-card {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(8,145,178,0.22);
+    background: rgba(20,25,43,0.85);
+    border: 1px solid rgba(0,240,255,0.18);
     border-radius: 14px;
     padding: 16px 20px;
     margin-bottom: 10px;
     position: relative;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    box-shadow: 0 2px 10px rgba(8,145,178,0.08);
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 0 16px rgba(0,240,255,0.06), 0 4px 16px rgba(0,0,0,0.4);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .best-bet-card:hover {
-    border-color: rgba(8,145,178,0.45);
+    border-color: rgba(0,240,255,0.40);
     transform: translateX(3px);
+    box-shadow: 0 0 24px rgba(0,240,255,0.15), 0 6px 20px rgba(0,0,0,0.5);
 }
 .best-bet-rank {
     position: absolute;
     top: -10px; left: 16px;
-    background: linear-gradient(135deg, #0891b2, #06b6d4);
+    background: linear-gradient(135deg, #ff5e00, #00f0ff);
     color: #ffffff;
     font-weight: 900;
     font-size: 0.75rem;
     padding: 2px 10px;
     border-radius: 10px;
     font-family: 'Courier New', Courier, monospace;
+    box-shadow: 0 0 10px rgba(255,94,0,0.4);
 }
 
 /* ─── Roster Health ───────────────────────────────────────── */
 .health-matched {
     display: inline-block;
-    background: rgba(16,185,129,0.10);
-    border: 1px solid rgba(16,185,129,0.35);
-    color: #065f46;
+    background: rgba(0,255,157,0.08);
+    border: 1px solid rgba(0,255,157,0.35);
+    color: #00ff9d;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -801,9 +837,9 @@ button[kind="primary"] {
 }
 .health-fuzzy {
     display: inline-block;
-    background: rgba(245,158,11,0.10);
-    border: 1px solid rgba(245,158,11,0.40);
-    color: #92400e;
+    background: rgba(255,94,0,0.08);
+    border: 1px solid rgba(255,94,0,0.40);
+    color: #ff9d4d;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -814,8 +850,8 @@ button[kind="primary"] {
 .health-unmatched {
     display: inline-block;
     background: rgba(220,38,38,0.08);
-    border: 1px solid rgba(220,38,38,0.30);
-    color: #991b1b;
+    border: 1px solid rgba(220,38,38,0.35);
+    color: #ff6b6b;
     padding: 2px 9px;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -826,57 +862,58 @@ button[kind="primary"] {
 /* ─── Live / Sample Badge ─────────────────────────────────── */
 .live-badge {
     display: inline-block;
-    background: rgba(16,185,129,0.12);
-    color: #065f46;
+    background: rgba(0,255,157,0.10);
+    color: #00ff9d;
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
-    border: 1px solid rgba(16,185,129,0.35);
+    border: 1px solid rgba(0,255,157,0.35);
+    text-shadow: 0 0 6px rgba(0,255,157,0.4);
 }
 .live-badge::before {
     content: '';
     display: inline-block;
     width: 7px; height: 7px;
     border-radius: 50%;
-    background: #10b981;
+    background: #00ff9d;
     margin-right: 6px;
     vertical-align: middle;
     animation: live-dot-pulse 1.5s ease-in-out infinite;
-    box-shadow: 0 0 5px rgba(16,185,129,0.5);
+    box-shadow: 0 0 6px rgba(0,255,157,0.7);
 }
 .sample-badge {
     display: inline-block;
-    background: rgba(245,158,11,0.10);
-    color: #92400e;
+    background: rgba(255,94,0,0.10);
+    color: #ff9d4d;
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
-    border: 1px solid rgba(245,158,11,0.35);
+    border: 1px solid rgba(255,94,0,0.35);
 }
 
 /* ─── Correlation Warning ─────────────────────────────────── */
 .corr-warning {
-    background: rgba(245,158,11,0.08);
-    border: 1px solid rgba(245,158,11,0.32);
+    background: rgba(255,94,0,0.08);
+    border: 1px solid rgba(255,94,0,0.32);
     border-radius: 8px;
     padding: 8px 14px;
-    color: #92400e;
+    color: #ff9d4d;
     font-size: 0.83rem;
     margin-top: 8px;
 }
 
 /* ─── Player Analysis Card ────────────────────────────────── */
 .player-analysis-card {
-    background: rgba(255,255,255,0.95);
-    border: 1px solid rgba(8,145,178,0.22);
+    background: rgba(20,25,43,0.85);
+    border: 1px solid rgba(0,240,255,0.15);
     border-radius: 16px;
     padding: 20px 24px;
     margin-bottom: 18px;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 2px 12px rgba(8,145,178,0.09), 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 0 20px rgba(0,240,255,0.07), 0 4px 24px rgba(0,0,0,0.4);
     animation: borderGlow 3.5s ease-in-out infinite,
                fadeInUp 0.3s ease both;
     transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
@@ -887,18 +924,18 @@ button[kind="primary"] {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #0891b2, #06b6d4, #10b981, #f59e0b, #0891b2);
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
     background-size: 200% 100%;
     animation: headerShimmer 4s ease infinite;
     opacity: 0.9;
 }
 .player-analysis-card:hover {
-    border-color: rgba(8,145,178,0.50);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(8,145,178,0.18);
+    border-color: rgba(0,240,255,0.40);
+    transform: translateY(-5px);
+    box-shadow: 0 0 30px rgba(0,240,255,0.18), 0 8px 32px rgba(0,0,0,0.5);
 }
 .add-to-slip-btn {
-    background: linear-gradient(135deg, #0891b2, #06b6d4);
+    background: linear-gradient(135deg, #ff5e00, #ff8c00);
     color: #ffffff;
     border: none;
     border-radius: 8px;
@@ -908,7 +945,7 @@ button[kind="primary"] {
     cursor: pointer;
     font-family: 'Courier New', Courier, monospace;
     transition: opacity 0.2s ease, transform 0.2s ease;
-    box-shadow: 0 2px 8px rgba(8,145,178,0.3);
+    box-shadow: 0 0 12px rgba(255,94,0,0.40);
 }
 .add-to-slip-btn:hover {
     opacity: 0.88;
@@ -1107,7 +1144,7 @@ def get_player_card_html(result):
     edge_html = f'<span class="edge-badge {edge_class}">{edge_sign}{edge:.1f}% edge</span>'
 
     # Confidence color
-    conf_color = "#059669" if confidence >= 70 else "#d97706" if confidence >= 50 else "#dc2626"
+    conf_color = "#00ff9d" if confidence >= 70 else "#ff9d4d" if confidence >= 50 else "#ff6b6b"
 
     # Force bar
     over_forces = result.get("forces", {}).get("over_forces", [])
@@ -1127,13 +1164,13 @@ def get_player_card_html(result):
 
     # Opponent
     opponent = result.get("opponent", "")
-    matchup_html = f'<span style="color:#64748b;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+    matchup_html = f'<span style="color:#8a9bb8;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
 
     # Line context
     line_vs_avg = result.get("line_vs_avg_pct", 0)
     if line_vs_avg != 0:
         line_ctx = f"Line is {abs(line_vs_avg):.0f}% {'above' if line_vs_avg > 0 else 'below'} season avg"
-        line_ctx_html = f'<span style="color:#64748b;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
+        line_ctx_html = f'<span style="color:#8a9bb8;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
     else:
         line_ctx_html = ""
 
@@ -1150,7 +1187,7 @@ def get_player_card_html(result):
             dot_cls = "form-dot-over" if val >= line else "form-dot-under"
             dots += f'<span class="{dot_cls}"></span>'
         form_html = f"""<div style="margin-right:16px;">
-      <div style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
+      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
       {dots}
     </div>"""
 
@@ -1173,7 +1210,7 @@ def get_player_card_html(result):
   <!-- Subheader: Platform + stat + line + matchup -->
   <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
-    <span style="color:#64748b;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:#0f172a;">{line}</strong></span>
+    <span style="color:#8a9bb8;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:rgba(255,255,255,0.95);">{line}</strong></span>
     {matchup_html}
     {line_ctx_html}
   </div>
@@ -1187,7 +1224,7 @@ def get_player_card_html(result):
       <span class="{dir_class}">{direction_arrow} {direction}</span>
       <span class="prob-value">{prob_pct:.1f}%</span>
       {edge_html}
-      <span style="color:#64748b;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
+      <span style="color:#8a9bb8;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
     </div>
     <div class="prob-gauge-wrap">
       <div class="{fill_class}" style="width:{bar_width}%;"></div>
@@ -1198,11 +1235,11 @@ def get_player_card_html(result):
   <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     {form_html}
     <div style="flex:1;min-width:160px;">
-      <div style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
+      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
       {force_bar}
     </div>
     <div style="min-width:110px;">
-      <div style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
+      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
       {dist_range}
     </div>
   </div>
@@ -1249,9 +1286,9 @@ def get_best_bets_section_html(best_bets):
   <div class="best-bet-rank">{emoji} #{i+1}</div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;">
     <div>
-      <strong style="color:#0f172a;font-size:1.05rem;">{player}</strong>
-      <span style="color:#64748b;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
-      <span style="color:#64748b;font-size:0.8rem;margin-left:6px;">{platform}</span>
+      <strong style="color:rgba(255,255,255,0.95);font-size:1.05rem;">{player}</strong>
+      <span style="color:#8a9bb8;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
+      <span style="color:#8a9bb8;font-size:0.8rem;margin-left:6px;">{platform}</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <span class="{dir_class}">{arrow} {direction}</span>
@@ -1259,22 +1296,22 @@ def get_best_bets_section_html(best_bets):
     </div>
   </div>
   <div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <span style="color:#0f172a;font-weight:700;font-family:'Courier New',monospace;">{prob_pct:.1f}%</span>
-    <span style="color:#059669;font-size:0.82rem;font-family:'Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
-    <span style="color:#64748b;font-size:0.82rem;font-style:italic;">{rec}</span>
+    <span style="color:rgba(255,255,255,0.95);font-weight:700;font-family:'Courier New',monospace;">{prob_pct:.1f}%</span>
+    <span style="color:#00ff9d;font-size:0.82rem;font-family:'Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
+    <span style="color:#8a9bb8;font-size:0.82rem;font-style:italic;">{rec}</span>
   </div>
 </div>
 """)
 
     cards_html = "\n".join(rows)
     return f"""
-<div style="background:rgba(255,255,255,0.95);
-            border:1px solid rgba(8,145,178,0.22);border-radius:16px;padding:20px 24px;margin-bottom:20px;
+<div style="background:rgba(20,25,43,0.85);
+            border:1px solid rgba(0,240,255,0.18);border-radius:16px;padding:20px 24px;margin-bottom:20px;
             backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-            box-shadow:0 2px 12px rgba(8,145,178,0.10);">
-  <div style="font-size:1.15rem;font-weight:800;color:#0f172a;margin-bottom:14px;">
+            box-shadow:0 0 20px rgba(0,240,255,0.08),0 4px 24px rgba(0,0,0,0.4);">
+  <div style="font-size:1.15rem;font-weight:800;color:rgba(255,255,255,0.95);margin-bottom:14px;font-family:'Orbitron',sans-serif;letter-spacing:0.05em;">
     🏆 Best Bets Today
-    <span style="font-size:0.8rem;font-weight:400;color:#64748b;margin-left:10px;">Ranked by confidence score</span>
+    <span style="font-size:0.8rem;font-weight:400;color:#8a9bb8;margin-left:10px;font-family:'Montserrat',sans-serif;">Ranked by confidence score</span>
   </div>
   {cards_html}
 </div>
@@ -1310,7 +1347,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#059669;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#00ff9d;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ✅ Matched ({len(matched)})
   </div>
@@ -1327,7 +1364,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#d97706;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#ff9d4d;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ⚠️ Fuzzy Matched ({len(fuzzy_matched)}) — using closest match
   </div>
@@ -1345,7 +1382,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
         )
         sections.append(f"""
 <div style="margin-bottom:12px;">
-  <div style="color:#dc2626;font-size:0.8rem;font-weight:700;text-transform:uppercase;
+  <div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;text-transform:uppercase;
               letter-spacing:1px;margin-bottom:6px;">
     ❌ Unmatched ({len(unmatched)}) — will use fallback data
   </div>
@@ -1353,24 +1390,24 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
 </div>""")
 
     if not sections:
-        return '<div style="color:#059669;">✅ All props matched to the player database.</div>'
+        return '<div style="color:#00ff9d;">✅ All props matched to the player database.</div>'
 
     inner = "\n".join(sections)
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
     match_pct = int((len(matched) + len(fuzzy_matched)) / max(total, 1) * 100)
     return f"""
-<div style="background:rgba(255,255,255,0.95);border:1px solid rgba(8,145,178,0.18);
+<div style="background:rgba(20,25,43,0.85);border:1px solid rgba(0,240,255,0.15);
             border-radius:12px;padding:16px 20px;margin-bottom:16px;
             backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-            box-shadow:0 2px 10px rgba(8,145,178,0.08);">
-  <div style="font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:12px;">
+            box-shadow:0 0 18px rgba(0,240,255,0.07),0 4px 16px rgba(0,0,0,0.4);">
+  <div style="font-size:1rem;font-weight:700;color:rgba(255,255,255,0.95);margin-bottom:12px;">
     🧬 Roster Health Check
-    <span style="font-size:0.8rem;font-weight:400;color:#64748b;margin-left:8px;">
+    <span style="font-size:0.8rem;font-weight:400;color:#8a9bb8;margin-left:8px;">
       {len(matched) + len(fuzzy_matched)}/{total} matched ({match_pct}%)
     </span>
   </div>
   {inner}
-  <div style="font-size:0.75rem;color:#64748b;margin-top:4px;">
+  <div style="font-size:0.75rem;color:#8a9bb8;margin-top:4px;">
     💡 Add fuzzy-matched names to the alias map for exact matching next time.
     Unmatched props use the prop line as the baseline projection.
   </div>
@@ -1459,7 +1496,7 @@ def get_ai_verdict_card_html(verdict, confidence, explanation):
     label_class_map = {"BET": "verdict-label-bet", "AVOID": "verdict-label-avoid", "RISKY": "verdict-label-risky"}
     card_class = css_class_map.get(verdict_upper, "verdict-risky")
     label_class = label_class_map.get(verdict_upper, "verdict-label-risky")
-    conf_bar_color = "#059669" if confidence >= 70 else "#d97706" if confidence >= 50 else "#dc2626"
+    conf_bar_color = "#00ff9d" if confidence >= 70 else "#ff9d4d" if confidence >= 50 else "#ff6b6b"
     bar_width = int(min(100, max(0, confidence)))
     return f"""
 <div class="{card_class}">
@@ -1471,9 +1508,9 @@ def get_ai_verdict_card_html(verdict, confidence, explanation):
                   font-family:'Courier New',Courier,monospace;">{confidence:.0f}/100</div>
     </div>
   </div>
-  <div style="margin-top:8px;background:rgba(226,232,240,0.80);border-radius:6px;height:6px;overflow:hidden;">
+  <div style="margin-top:8px;background:rgba(20,25,43,0.80);border-radius:6px;height:6px;overflow:hidden;">
     <div style="width:{bar_width}%;height:100%;background:{conf_bar_color};
-                border-radius:6px;box-shadow:0 0 6px {conf_bar_color};
+                border-radius:6px;box-shadow:0 0 8px {conf_bar_color};
                 transition:width 0.5s ease;"></div>
   </div>
   <div class="verdict-explanation">{explanation}</div>
@@ -1545,10 +1582,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
     if proj:
         stat_pills += get_stat_pill_html("Proj", f"{proj:.1f}", "📐")
 
-    edge_class = "edge-positive" if edge >= 0 else "edge-negative"
-    edge_sign = "+" if edge >= 0 else ""
-    edge_html = f'<span class="edge-badge {edge_class}">{edge_sign}{edge:.1f}% edge</span>'
-    conf_color = "#059669" if confidence >= 70 else "#d97706" if confidence >= 50 else "#dc2626"
+    conf_color = "#00ff9d" if confidence >= 70 else "#ff9d4d" if confidence >= 50 else "#ff6b6b"
 
     over_forces = result.get("forces", {}).get("over_forces", [])
     under_forces = result.get("forces", {}).get("under_forces", [])
@@ -1565,7 +1599,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
     dist_range = get_distribution_range_html(p10, p50, p90)
 
     opponent = result.get("opponent", "")
-    matchup_html = f'<span style="color:#64748b;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+    matchup_html = f'<span style="color:#8a9bb8;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
 
     add_btn = (
         '<button class="add-to-slip-btn">＋ Add to Slip</button>'
@@ -1590,8 +1624,8 @@ def get_player_analysis_card_html(result, show_add_button=True):
   </div>
   <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
-    <span style="color:#64748b;font-size:0.9rem;">{stat} &nbsp;·&nbsp;
-      Line: <strong style="color:#0f172a;">{line}</strong></span>
+    <span style="color:#8a9bb8;font-size:0.9rem;">{stat} &nbsp;·&nbsp;
+      Line: <strong style="color:rgba(255,255,255,0.95);">{line}</strong></span>
     {matchup_html}
   </div>
   {f'<div style="margin-top:10px;">{stat_pills}</div>' if stat_pills else ""}
@@ -1601,7 +1635,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
       <span class="{dir_class}">{direction_arrow} {direction}</span>
       <span class="prob-value">{prob_pct:.1f}%</span>
       {edge_html}
-      <span style="color:#64748b;font-size:0.82rem;">
+      <span style="color:#8a9bb8;font-size:0.82rem;">
         Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong>
       </span>
     </div>
@@ -1611,12 +1645,12 @@ def get_player_analysis_card_html(result, show_add_button=True):
   </div>
   <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     <div style="flex:1;min-width:160px;">
-      <div style="color:#64748b;font-size:0.72rem;text-transform:uppercase;
+      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;
                   letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
       {force_bar}
     </div>
     <div style="min-width:110px;">
-      <div style="color:#64748b;font-size:0.72rem;text-transform:uppercase;
+      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;
                   letter-spacing:1px;margin-bottom:3px;">Range</div>
       {dist_range}
     </div>
@@ -1691,17 +1725,17 @@ def get_progress_ring_html(percentage, label):
     gap = circumference - filled
 
     if pct >= 70:
-        ring_color = "#059669"
+        ring_color = "#00ff9d"
     elif pct >= 50:
-        ring_color = "#d97706"
+        ring_color = "#ff9d4d"
     else:
-        ring_color = "#dc2626"
+        ring_color = "#ff6b6b"
 
     return f"""
 <div class="progress-ring-wrap">
   <svg width="72" height="72" viewBox="0 0 72 72">
     <circle cx="36" cy="36" r="{radius}"
-            fill="none" stroke="rgba(8,145,178,0.12)" stroke-width="6"/>
+            fill="none" stroke="rgba(0,240,255,0.12)" stroke-width="6"/>
     <circle cx="36" cy="36" r="{radius}"
             fill="none" stroke="{ring_color}" stroke-width="6"
             stroke-linecap="round"
