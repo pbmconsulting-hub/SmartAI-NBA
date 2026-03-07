@@ -16,8 +16,8 @@ from data.live_data_fetcher import fetch_todays_games, fetch_todays_players_only
 # ============================================================
 
 st.set_page_config(
-    page_title="Today's Games — SmartAI-NBA",
-    page_icon="🏀",
+    page_title="Live Games — SmartBetPro NBA",
+    page_icon="📡",
     layout="wide",
 )
 
@@ -79,7 +79,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🏀 Today's Games")
+st.title("📡 Live Games")
 st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight's NBA Slate")
 
 # ============================================================

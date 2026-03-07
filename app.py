@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: app.py
-# PURPOSE: Main entry point for the SmartAI-NBA v7 Streamlit app.
+# PURPOSE: Main entry point for the SmartBetPro NBA Streamlit app.
 #          Professional dark-themed dashboard with today's slate,
 #          status cards, and quick-start guide.
 # HOW TO RUN: streamlit run app.py
@@ -13,15 +13,15 @@ import os
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.live_data_fetcher import load_last_updated
 from tracking.database import initialize_database
-from styles.theme import get_global_css
+from styles.theme import get_global_css, get_neural_header_html
 
 # ============================================================
 # SECTION: Page Configuration
 # ============================================================
 
 st.set_page_config(
-    page_title="SmartAI-NBA v7",
-    page_icon="🏀",
+    page_title="SmartBetPro NBA",
+    page_icon="🧠",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -133,6 +133,8 @@ if "todays_games" not in st.session_state:
     st.session_state["todays_games"] = []
 if "analysis_results" not in st.session_state:
     st.session_state["analysis_results"] = []
+if "selected_picks" not in st.session_state:
+    st.session_state["selected_picks"] = []
 
 # ============================================================
 # END SECTION: Initialize App on Startup
@@ -147,10 +149,14 @@ todays_games = st.session_state.get("todays_games", [])
 game_count = len(todays_games)
 game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if game_count else "No games loaded yet"
 
+st.markdown(get_neural_header_html(
+    title="🧠 SmartBetPro NBA",
+    subtitle="Engineered by JM5",
+), unsafe_allow_html=True)
+
 st.markdown(f"""
 <div class="hero-banner">
-  <div class="hero-title">🏀 SmartAI-NBA <span style="font-size:1.4rem; font-weight:600; opacity:0.8;">v7</span></div>
-  <div class="hero-subtitle">Your Personal NBA Prop Betting Analysis Engine</div>
+  <div class="hero-subtitle">Neural Prediction Engine v1.0 — Powered by JM5</div>
   <div class="hero-date">📅 {today_str} &nbsp;•&nbsp; 🏟️ {game_count_text}</div>
 </div>
 """, unsafe_allow_html=True)
@@ -182,7 +188,7 @@ if todays_games:
         chips_html += f'<span class="team-chip">🏠 {home}{rec_h}</span> &nbsp;&nbsp;&nbsp;'
 
     st.markdown(f'<div style="margin:8px 0 4px 0;">{chips_html}</div>', unsafe_allow_html=True)
-    st.caption("Go to 🏀 Today's Games to update spreads/totals")
+    st.caption("Go to 📡 Live Games to update spreads/totals")
     st.divider()
 
 # ============================================================
@@ -282,7 +288,7 @@ if is_using_live_data:
     )
 else:
     st.info(
-        "📊 **Using Sample Data** — Go to the **🔄 Update Data** page to pull "
+        "📊 **Using Sample Data** — Go to the **📡 Data Feed** page to pull "
         "real, up-to-date NBA stats for more accurate predictions!"
     )
 
@@ -303,18 +309,18 @@ with left_column:
     st.markdown("""
     **Follow these steps to find tonight's best bets:**
 
-    **Step 0** → 🏀 **Today's Games** — Click
+    **Step 0** → 📡 **Live Games** — Click
     "**Auto-Load Tonight's Games**" for a ONE-CLICK setup:
     fetches tonight's matchups + current rosters + player stats + team stats.
     Everything you need in a single button press!
 
-    **Step 1** → 📥 **Import Props** — Enter prop lines manually or upload a CSV.
+    **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually or upload a CSV.
     Sample props are pre-loaded so you can start immediately.
 
-    **Step 2** → 🏆 **Analysis** — Click "Run Analysis" to run Monte Carlo
+    **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Monte Carlo
     simulation. See probability gauges, tier badges, and force breakdowns.
 
-    **Step 3** → 🎰 **Entry Builder** — Build optimal parlays with exact EV
+    **Step 3** → 🧬 **Entry Builder** — Build optimal parlays with exact EV
     calculations for PrizePicks, Underdog, and DraftKings.
 
     **Step 4** → 📊 **Model Health** — After games, log results to track
@@ -344,11 +350,11 @@ st.divider()
 # SECTION: How It Works
 # ============================================================
 
-with st.expander("📖 How Does SmartAI-NBA Work?", expanded=False):
+with st.expander("📖 How Does SmartBetPro NBA Work?", expanded=False):
     st.markdown("""
     ### The Engine Under the Hood
 
-    SmartAI-NBA uses **Monte Carlo simulation** to predict player stat outcomes.
+    SmartBetPro NBA uses **Monte Carlo simulation** to predict player stat outcomes.
     Here's what happens when you click "Run Analysis":
 
     ---
@@ -393,6 +399,6 @@ with st.expander("📖 How Does SmartAI-NBA Work?", expanded=False):
 
 st.divider()
 st.caption(
-    f"SmartAI-NBA v7 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
+    f"SmartBetPro NBA | Engineered by JM5 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
     f"{len(players_data)} players, {len(teams_data)} teams"
 )

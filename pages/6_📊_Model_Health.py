@@ -22,7 +22,7 @@ from tracking.database import initialize_database, load_all_bets
 # ============================================================
 
 st.set_page_config(
-    page_title="Model Health — SmartAI-NBA",
+    page_title="Model Health — SmartBetPro NBA",
     page_icon="📊",
     layout="wide",
 )

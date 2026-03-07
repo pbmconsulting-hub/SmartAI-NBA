@@ -14,7 +14,7 @@ import streamlit as st  # Main UI framework
 # ============================================================
 
 st.set_page_config(
-    page_title="Settings — SmartAI-NBA",
+    page_title="Settings — SmartBetPro NBA",
     page_icon="⚙️",
     layout="wide",
 )
@@ -24,7 +24,7 @@ from styles.theme import get_global_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 st.title("⚙️ Settings")
-st.markdown("Configure the SmartAI-NBA prediction engine.")
+st.markdown("Configure the SmartBetPro NBA prediction engine.")
 st.divider()
 
 # ============================================================

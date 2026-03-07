@@ -13,8 +13,8 @@ import streamlit as st  # Main UI framework
 # ============================================================
 
 st.set_page_config(
-    page_title="Avoid List — SmartAI-NBA",
-    page_icon="🚫",
+    page_title="Risk Shield — SmartBetPro NBA",
+    page_icon="🛡️",
     layout="wide",
 )
 
@@ -22,7 +22,7 @@ st.set_page_config(
 from styles.theme import get_global_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-st.title("🚫 Avoid List")
+st.title("🛡️ Risk Shield")
 st.markdown(
     "These props have been flagged as **high-risk or low-edge** by the model. "
     "Understand WHY to make better decisions."

@@ -44,8 +44,8 @@ from data.live_data_fetcher import (
 
 # Configure the page (MUST be the first streamlit call)
 st.set_page_config(
-    page_title="Update Data — SmartAI-NBA",
-    page_icon="🔄",
+    page_title="Data Feed — SmartBetPro NBA",
+    page_icon="📡",
     layout="wide",  # Use full-width layout
 )
 
@@ -54,7 +54,7 @@ from styles.theme import get_global_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # Page title and description
-st.title("🔄 Update Live NBA Data")
+st.title("📡 Data Feed")
 st.markdown(
     "Pull real, up-to-date NBA stats from the **nba_api** library "
     "(free, no API key required). Update before each betting session "

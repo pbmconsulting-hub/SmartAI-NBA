@@ -43,12 +43,12 @@ from styles.theme import (
 # ============================================================
 
 st.set_page_config(
-    page_title="Analysis — SmartAI-NBA",
-    page_icon="🏆",
+    page_title="Neural Analysis — SmartBetPro NBA",
+    page_icon="⚡",
     layout="wide",
 )
 
-st.title("🏆 Analysis")
+st.title("⚡ Neural Analysis")
 st.markdown("Run the Monte Carlo simulation to find the highest-probability picks.")
 st.divider()
 

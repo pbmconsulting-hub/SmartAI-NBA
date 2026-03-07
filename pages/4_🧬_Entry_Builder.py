@@ -28,8 +28,8 @@ from engine.entry_optimizer import (
 # ============================================================
 
 st.set_page_config(
-    page_title="Entry Builder — SmartAI-NBA",
-    page_icon="🎰",
+    page_title="Entry Builder — SmartBetPro NBA",
+    page_icon="🧬",
     layout="wide",
 )
 
@@ -37,7 +37,7 @@ st.set_page_config(
 from styles.theme import get_global_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-st.title("🎰 Entry Builder")
+st.title("🧬 Entry Builder")
 st.markdown("Build optimal parlay entries with maximum Expected Value (EV).")
 st.divider()
 

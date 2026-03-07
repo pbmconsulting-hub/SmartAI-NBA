@@ -33,8 +33,8 @@ from data.platform_mappings import (
 # ============================================================
 
 st.set_page_config(
-    page_title="Import Props — SmartAI-NBA",
-    page_icon="📥",
+    page_title="Prop Scanner — SmartBetPro NBA",
+    page_icon="🔬",
     layout="wide",
 )
 
@@ -59,7 +59,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📥 Import Props")
+st.title("🔬 Prop Scanner")
 st.markdown("Enter prop lines manually or upload a CSV. Sample props are pre-loaded!")
 st.divider()
 
