@@ -2058,6 +2058,91 @@ def fetch_player_injury_status(todays_games=None):
                         entry["status"] = "Out"
                         entry["injury_note"] = "Not on current team roster"
 
+        # --------------------------------------------------------
+        # Layer 5: External web scraping (RotoWire + NBA.com)
+        # Provides real-time GTD/Out/Doubtful designations, specific
+        # injury details, and expected return dates that nba_api cannot
+        # supply.  Runs AFTER the nba_api layers so it can OVERRIDE
+        # stale nba_api data when authoritative scraped data is available.
+        # If ALL scrapers fail the status_map is left untouched.
+        # --------------------------------------------------------
+        print("fetch_player_injury_status: Layer 5 — external web scraping (RotoWire + NBA.com)")
+        try:
+            from data.web_scraper import fetch_all_injury_data
+            scraped = fetch_all_injury_data()
+
+            if scraped:
+                overrides = 0
+                new_entries = 0
+                for scraped_key, scraped_entry in scraped.items():
+                    scraped_status = scraped_entry.get("status", "")
+                    # Severity rankings — higher value = more severe / authoritative
+                    _SEVERITY = {
+                        "Out": 5,
+                        "Injured Reserve": 5,
+                        "Doubtful": 4,
+                        "GTD": 3,
+                        "Questionable": 3,
+                        "Day-to-Day": 2,
+                        "Probable": 1,
+                        "Active": 0,
+                        "Unknown": -1,
+                    }
+                    scraped_severity = _SEVERITY.get(scraped_status, -1)
+
+                    if scraped_key in status_map:
+                        existing = status_map[scraped_key]
+                        existing_severity = _SEVERITY.get(existing.get("status", ""), 0)
+                        # Override when scraped data is MORE severe (or is authoritative Out)
+                        # and NOT "Unknown" (which would represent a scraper parse error)
+                        if scraped_severity > existing_severity and scraped_severity >= 0:
+                            existing["status"] = scraped_status
+                            existing["injury_note"] = (
+                                scraped_entry.get("injury", "") or
+                                existing.get("injury_note", "")
+                            )
+                            existing["return_date"] = (
+                                scraped_entry.get("return_date", "") or
+                                existing.get("return_date", "")
+                            )
+                            existing["injury"] = scraped_entry.get("injury", "")
+                            existing["source"] = scraped_entry.get("source", "")
+                            existing["comment"] = scraped_entry.get("comment", "")
+                            overrides += 1
+                        else:
+                            # Still capture injury detail even without status override
+                            if not existing.get("injury"):
+                                existing["injury"] = scraped_entry.get("injury", "")
+                            if not existing.get("return_date"):
+                                existing["return_date"] = scraped_entry.get("return_date", "")
+                            if not existing.get("source"):
+                                existing["source"] = scraped_entry.get("source", "")
+                    else:
+                        # Player found by scraper but not in nba_api data — add entry
+                        status_map[scraped_key] = {
+                            "status":      scraped_status if scraped_severity > 0 else "Active",
+                            "injury_note": scraped_entry.get("injury", ""),
+                            "games_missed": 0,
+                            "return_date":  scraped_entry.get("return_date", ""),
+                            "last_game_date": "",
+                            "gp_ratio":    1.0,
+                            "injury":      scraped_entry.get("injury", ""),
+                            "source":      scraped_entry.get("source", ""),
+                            "comment":     scraped_entry.get("comment", ""),
+                        }
+                        new_entries += 1
+
+                print(
+                    f"fetch_player_injury_status Layer 5: {overrides} overrides, "
+                    f"{new_entries} new entries from web scraping"
+                )
+            else:
+                print("fetch_player_injury_status Layer 5: no scraped data returned — keeping nba_api results")
+
+        except Exception as layer5_err:
+            # Layer 5 failure must never break the existing pipeline
+            print(f"fetch_player_injury_status Layer 5 error (ignored): {layer5_err}")
+
         # Strip the internal helper field before returning / saving
         for entry in status_map.values():
             entry.pop("_player_id_int", None)

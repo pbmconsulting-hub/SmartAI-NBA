@@ -111,12 +111,16 @@ def load_injury_status():
 
     Returns:
         dict: player_name_lower → {
-            "status": str,          # "Active"|"Out"|"Questionable"|"Day-to-Day"|"Injured Reserve"
-            "injury_note": str,
+            "status": str,          # "Active"|"Out"|"GTD"|"Questionable"|"Day-to-Day"|"Injured Reserve"
+            "injury_note": str,     # human-readable reason from nba_api signals
             "games_missed": int,
-            "return_date": str,
+            "return_date": str,     # ISO date or "" (populated by web scraper when available)
             "last_game_date": str,
             "gp_ratio": float,
+            # Optional fields added by Layer 5 web scraping:
+            "injury": str,          # specific body part/reason, e.g. "Knee – soreness"
+            "source": str,          # scraper that provided this entry, e.g. "NBA.com"
+            "comment": str,         # additional notes from the official injury report
         }
         Returns an empty dict if the file does not exist or cannot be parsed.
     """
@@ -780,9 +784,14 @@ def get_player_status(player_name, status_map):
                            Pass an empty dict or None to auto-load from disk.
 
     Returns:
-        dict: Status dict with keys 'status', 'injury_note', 'games_missed',
-              'return_date', 'last_game_date', 'gp_ratio'.
-              Returns default "Active" status if not found.
+        dict: Status dict with keys:
+            'status', 'injury_note', 'games_missed', 'return_date',
+            'last_game_date', 'gp_ratio'
+            — plus optional Layer 5 fields when available:
+            'injury' (specific body part/reason),
+            'source' (which data source provided the entry),
+            'comment' (additional notes from the official injury report).
+            Returns default "Active" status if not found.
     """
     _default = {
         "status": "Active",
@@ -791,6 +800,9 @@ def get_player_status(player_name, status_map):
         "return_date": "",
         "last_game_date": "",
         "gp_ratio": 1.0,
+        "injury": "",
+        "source": "",
+        "comment": "",
     }
 
     if not player_name:
@@ -806,12 +818,16 @@ def get_player_status(player_name, status_map):
     # Try exact lowercase match first
     key = player_name.lower().strip()
     if key in status_map:
-        return status_map[key]
+        entry = dict(_default)
+        entry.update(status_map[key])
+        return entry
 
     # Try normalized name match
     normalized = normalize_player_name(player_name)
     if normalized in status_map:
-        return status_map[normalized]
+        entry = dict(_default)
+        entry.update(status_map[normalized])
+        return entry
 
     # Default to Active if not found
     return _default
@@ -822,18 +838,20 @@ def get_status_badge_html(status):
     Return an HTML badge string for a player's injury/availability status.
 
     Args:
-        status (str): Player status string (e.g., 'Active', 'Out', etc.)
+        status (str): Player status string (e.g., 'Active', 'Out', 'GTD', etc.)
 
     Returns:
         str: HTML span element with colored badge for the status.
     """
     badges = {
-        "Active": '<span style="background:#00ff88;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟢 Active</span>',
-        "Questionable": '<span style="background:#ffd700;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Questionable</span>',
-        "Day-to-Day": '<span style="background:#ffa500;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Day-to-Day</span>',
-        "Doubtful": '<span style="background:#ff6600;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟠 Doubtful</span>',
-        "Out": '<span style="background:#ff3366;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 Out</span>',
-        "Injured Reserve": '<span style="background:#cc0033;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 IR</span>',
+        "Active":         '<span style="background:#00ff88;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟢 Active</span>',
+        "Probable":       '<span style="background:#00cc66;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟢 Probable</span>',
+        "Questionable":   '<span style="background:#ffd700;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Questionable</span>',
+        "GTD":            '<span style="background:#ffd700;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 GTD</span>',
+        "Day-to-Day":     '<span style="background:#ffa500;color:#000;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟡 Day-to-Day</span>',
+        "Doubtful":       '<span style="background:#ff6600;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🟠 Doubtful</span>',
+        "Out":            '<span style="background:#ff3366;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 Out</span>',
+        "Injured Reserve":'<span style="background:#cc0033;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">🔴 IR</span>',
     }
     return badges.get(status, '<span style="background:#8b949e;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75rem;font-weight:700;">⚪ Unknown</span>')
 
