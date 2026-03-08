@@ -68,6 +68,45 @@ if "selected_picks" not in st.session_state:
 if "injury_status_map" not in st.session_state:
     st.session_state["injury_status_map"] = load_injury_status()
 
+# ─── Auto-refresh injury data if empty or stale (>4 hours) ──
+_INJURY_STALE_HOURS = 4
+_should_auto_refresh_injuries = not st.session_state["injury_status_map"]
+if not _should_auto_refresh_injuries:
+    try:
+        import datetime as _dt
+        from pathlib import Path as _Path
+        _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
+        if _inj_json_path.exists():
+            _inj_age_hours = (
+                _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
+            ) / 3600.0
+            _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
+    except Exception:
+        pass  # Staleness check is best-effort
+
+if _should_auto_refresh_injuries:
+    try:
+        from data.web_scraper import fetch_all_injury_data as _fetch_injuries
+        _scraped_inj = _fetch_injuries()
+        if _scraped_inj:
+            _auto_status_map = {
+                _k: {
+                    "status":        _v.get("status", "Active"),
+                    "injury_note":   _v.get("injury", ""),
+                    "games_missed":  0,
+                    "return_date":   _v.get("return_date", ""),
+                    "last_game_date": "",
+                    "gp_ratio":      1.0,
+                    "injury":        _v.get("injury", ""),
+                    "source":        _v.get("source", ""),
+                    "comment":       _v.get("comment", ""),
+                }
+                for _k, _v in _scraped_inj.items()
+            }
+            st.session_state["injury_status_map"] = _auto_status_map
+    except Exception:
+        pass  # Non-fatal — analysis page works without auto-refresh
+
 # ============================================================
 # END SECTION: Page Setup
 # ============================================================

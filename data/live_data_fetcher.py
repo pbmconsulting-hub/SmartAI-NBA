@@ -104,6 +104,11 @@ DEFAULT_GAME_TOTAL = 220.0   # Typical NBA over/under baseline used as placehold
 # Timeout for the ESPN public scoreboard HTTP request (seconds)
 ESPN_API_TIMEOUT_SECONDS = 10
 
+# Injury status values that indicate a player is unavailable.
+# Used by fetch_todays_players_only() and fetch_player_stats() to
+# filter out inactive players before writing to CSV.
+INACTIVE_INJURY_STATUSES = {"Out", "Injured Reserve"}
+
 # ============================================================
 # END SECTION: File Path Constants
 # ============================================================
@@ -960,6 +965,33 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
         # Sort by points average (stars appear first)
         formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
 
+        # --------------------------------------------------------
+        # Step 5: Filter out injured / inactive players
+        # Cross-reference with web-scraped injury data (RotoWire +
+        # NBA.com) to remove players confirmed as Out or on IR
+        # before writing to CSV.
+        # --------------------------------------------------------
+        try:
+            from data.web_scraper import fetch_all_injury_data
+            scraped_injuries = fetch_all_injury_data()
+            if scraped_injuries:
+                before_count = len(formatted_players)
+                formatted_players = [
+                    p for p in formatted_players
+                    if scraped_injuries.get(
+                        p["name"].lower().strip(), {}
+                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+                ]
+                removed_count = before_count - len(formatted_players)
+                if removed_count:
+                    print(
+                        f"  Injury filter: removed {removed_count} Out/IR players "
+                        f"from today's roster ({len(formatted_players)} remain)"
+                    )
+        except Exception as _inj_err:
+            # Non-fatal — proceed without injury filter if scraper fails
+            print(f"  Injury web scrape skipped in fetch_todays_players_only (non-fatal): {_inj_err}")
+
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
 
@@ -1360,6 +1392,33 @@ def fetch_player_stats(progress_callback=None):
 
         # Sort players so the best scorers appear at the top
         formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
+
+        # --------------------------------------------------------
+        # Step 5b: Filter out injured / inactive players
+        # Cross-reference with web-scraped injury data (RotoWire +
+        # NBA.com) to remove players confirmed as Out or on IR
+        # before writing to CSV.
+        # --------------------------------------------------------
+        try:
+            from data.web_scraper import fetch_all_injury_data
+            scraped_injuries = fetch_all_injury_data()
+            if scraped_injuries:
+                before_count = len(formatted_players)
+                formatted_players = [
+                    p for p in formatted_players
+                    if scraped_injuries.get(
+                        p["name"].lower().strip(), {}
+                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+                ]
+                removed_count = before_count - len(formatted_players)
+                if removed_count:
+                    print(
+                        f"  Injury filter: removed {removed_count} Out/IR players "
+                        f"from player stats ({len(formatted_players)} remain)"
+                    )
+        except Exception as _inj_err:
+            # Non-fatal — proceed without injury filter if scraper fails
+            print(f"  Injury web scrape skipped in fetch_player_stats (non-fatal): {_inj_err}")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")

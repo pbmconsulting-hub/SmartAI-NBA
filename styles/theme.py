@@ -2018,10 +2018,10 @@ h1,h2,h3,h4{font-family:'Orbitron',sans-serif;letter-spacing:0.5px;font-weight:7
 }
 .qds-score-label{font-size:0.85rem;color:var(--qds-text-muted);}
 .qds-confidence-tier{display:inline-flex;align-items:center;gap:5px;font-size:0.82rem;padding:4px 10px;border-radius:50px;}
-.qds-tier-diamond{background:rgba(0,255,136,0.12);color:var(--qds-primary);border:1px solid var(--qds-primary);}
-.qds-tier-lock{background:rgba(0,163,255,0.12);color:var(--qds-info);border:1px solid var(--qds-info);}
-.qds-tier-check{background:rgba(255,204,0,0.12);color:var(--qds-warning);border:1px solid var(--qds-warning);}
-.qds-tier-caution{background:rgba(255,56,96,0.10);color:var(--qds-danger);border:1px solid var(--qds-danger);}
+.qds-tier-diamond{background:rgba(0,255,213,0.12);color:var(--qds-primary);border:1px solid var(--qds-primary);box-shadow:0 0 8px rgba(0,255,213,0.5);}
+.qds-tier-lock{background:rgba(255,204,0,0.12);color:var(--qds-warning);border:1px solid var(--qds-warning);box-shadow:0 0 8px rgba(255,204,0,0.5);}
+.qds-tier-check{background:rgba(0,163,255,0.12);color:var(--qds-info);border:1px solid var(--qds-info);box-shadow:0 0 8px rgba(0,163,255,0.4);}
+.qds-tier-caution{background:rgba(255,94,0,0.10);color:#ff5e00;border:1px solid #ff5e00;box-shadow:0 0 8px rgba(255,94,0,0.4);}
 
 /* ── Metrics Grid ── */
 .qds-metrics-grid{display:grid;grid-template-columns:1fr;gap:12px;margin:16px 0;}
@@ -2049,8 +2049,19 @@ h1,h2,h3,h4{font-family:'Orbitron',sans-serif;letter-spacing:0.5px;font-weight:7
   width:0;border-radius:5px;
   transition:width 1.5s cubic-bezier(0.4,0,0.2,1);
 }
+/* Color-coded confidence fill variants (Platinum/Gold/Silver/Bronze) */
+.qds-conf-fill-high{background:linear-gradient(90deg,#00ffd5,#00ff88)!important;}
+.qds-conf-fill-mid{background:linear-gradient(90deg,#ffcc00,#ff9500)!important;}
+.qds-conf-fill-low{background:linear-gradient(90deg,#00b4ff,#0070cc)!important;}
+.qds-conf-fill-very-low{background:linear-gradient(90deg,#ff5e00,#ff3860)!important;}
 .qds-confidence-labels{display:flex;justify-content:space-between;font-size:0.85rem;color:var(--qds-text-muted);margin-bottom:14px;}
 .qds-confidence-name{display:flex;align-items:center;gap:7px;}
+/* ── Verdict paragraph ── */
+.qds-prop-verdict{
+  margin-top:12px;padding:10px 14px;font-size:0.83rem;line-height:1.6;
+  background:rgba(0,255,213,0.04);border-left:3px solid var(--qds-primary);
+  border-radius:0 6px 6px 0;color:var(--qds-text-light);font-style:italic;
+}
 
 /* ── Strategy Table ── */
 .qds-strategy-table{width:100%;border-collapse:collapse;margin-top:16px;font-size:0.85rem;background:var(--qds-card);border-radius:8px;overflow:hidden;}
@@ -2126,6 +2137,11 @@ def get_game_report_html(game=None, analysis_results=None):
     """
     NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/1040x760"
     ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
+
+    # Confidence thresholds for color-coded bar fills
+    _CONF_HIGH  = 80   # ≥ 80%  → cyan  gradient (Platinum / High)
+    _CONF_MID   = 60   # ≥ 60%  → gold  gradient (Gold / Moderate)
+    _CONF_LOW   = 40   # ≥ 40%  → blue  gradient (Silver / Lower)
 
     # ── Data Prep ─────────────────────────────────────────────
     results = sorted(
@@ -2224,9 +2240,16 @@ def get_game_report_html(game=None, analysis_results=None):
         prob_pct  = int(_prop_pct(pick))
         tier      = pick.get("tier", "Silver")
         td        = TIER.get(tier, TIER["Silver"])
+        # Color-code the fill based on confidence level
+        fill_class = (
+            "qds-conf-fill-high"     if prob_pct >= _CONF_HIGH else
+            "qds-conf-fill-mid"      if prob_pct >= _CONF_MID  else
+            "qds-conf-fill-low"      if prob_pct >= _CONF_LOW  else
+            "qds-conf-fill-very-low"
+        )
         conf_bars += (
             f'<div class="qds-confidence-bar">'
-            f'<div class="qds-confidence-fill" data-width="{prob_pct}%"></div></div>'
+            f'<div class="qds-confidence-fill {fill_class}" data-width="{prob_pct}%"></div></div>'
             f'<div class="qds-confidence-labels">'
             f'<span class="qds-confidence-name">'
             f'<i class="fas fa-{td["icon"]}" style="color:var(--qds-primary);"></i>'
@@ -2294,6 +2317,13 @@ def get_game_report_html(game=None, analysis_results=None):
             if platform else ""
         )
 
+        # Extract plain-English verdict for the prop card footer
+        pick_verdict = (pick.get("explanation") or {}).get("verdict") or pick.get("recommendation", "")
+        verdict_html = (
+            f'<p class="qds-prop-verdict">{_html.escape(str(pick_verdict))}</p>'
+            if pick_verdict else ""
+        )
+
         prop_cards += f"""
 <div class="qds-prop-card">
   <div class="qds-prop-badge"><i class="fas fa-{bi}"></i> {bl}</div>
@@ -2304,7 +2334,7 @@ def get_game_report_html(game=None, analysis_results=None):
       <h3 class="qds-player-name">{_html.escape(player)} {team_badge_html}</h3>
       <div class="qds-player-prop">
         <span class="qds-prop-emoji">{prop_emoji}</span>
-        <span>{direction} {line} {stat}</span>{plat_html}
+        <span><span style="color:{'var(--qds-success)' if direction == 'OVER' else '#ff5e00'};font-weight:700;">{direction}</span> {line} {stat}</span>{plat_html}
       </div>
       <div class="qds-safe-score">
         <span class="qds-score-value"><i class="fas fa-shield-alt"></i> {ss:.1f} / 10</span>
@@ -2360,7 +2390,7 @@ def get_game_report_html(game=None, analysis_results=None):
   <div class="qds-bonus-factors">
     <div class="qds-bonus-title"><i class="fas fa-star"></i> Key Supporting Factors:</div>
     {_force_items(pick)}
-  </div>
+  </div>{verdict_html}
 </div>"""
 
     if not prop_cards:

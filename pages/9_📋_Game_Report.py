@@ -13,7 +13,12 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from styles.theme import get_global_css, get_game_report_html
+from styles.theme import (
+    get_global_css,
+    get_game_report_html,
+    get_qds_css,
+    get_qds_strategy_table_html,
+)
 
 # ============================================================
 # SECTION: Page Configuration
@@ -26,6 +31,7 @@ st.set_page_config(
 )
 
 st.markdown(get_global_css(), unsafe_allow_html=True)
+st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION: Page Configuration
@@ -127,13 +133,106 @@ else:
 # SECTION: Render QDS Game Report
 # ============================================================
 
-html_content = get_game_report_html(
-    game=selected_game,
-    analysis_results=report_results,
-)
+def _build_entry_strategy(results):
+    """Build entry strategy matrix entries from analysis results."""
+    top = [
+        r for r in results
+        if not r.get("should_avoid", False)
+        and not r.get("player_is_out", False)
+        and abs(r.get("edge_percentage", 0)) >= 5.0
+    ]
+    top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
-# Render in a scrollable iframe — height covers ~3 prop cards + all sections
-components.html(html_content, height=6200, scrolling=True)
+    entries = []
+    if len(top) >= 2:
+        p1, p2 = top[0], top[1]
+        avg2 = round((p1.get("confidence_score", 0) + p2.get("confidence_score", 0)) / 2, 1)
+        entries.append({
+            "combo_type": "Power Play (2)",
+            "picks": [
+                f"{p1['player_name']} {p1['direction']} {p1['line']} {p1['stat_type'].title()}",
+                f"{p2['player_name']} {p2['direction']} {p2['line']} {p2['stat_type'].title()}",
+            ],
+            "safe_avg": f"{avg2:.1f}",
+            "strategy": "Highest-confidence 2-leg.",
+        })
+    if len(top) >= 3:
+        trio = top[:3]
+        avg3 = round(sum(r.get("confidence_score", 0) for r in trio) / 3, 1)
+        entries.append({
+            "combo_type": "Triple Threat (3)",
+            "picks": [
+                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
+                for r in trio
+            ],
+            "safe_avg": f"{avg3:.1f}",
+            "strategy": "Top-3 picks, balanced risk.",
+        })
+    if len(top) >= 5:
+        five = top[:5]
+        avg5 = round(sum(r.get("confidence_score", 0) for r in five) / 5, 1)
+        entries.append({
+            "combo_type": "Max Parlay (5)",
+            "picks": [
+                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
+                for r in five
+            ],
+            "safe_avg": f"{avg5:.1f}",
+            "strategy": "High ceiling, diversified 5-leg.",
+        })
+    return entries
+
+
+if not selected_game and len(todays_games) > 1 and report_results:
+    # ── Multiple matchups: per-game collapsible Streamlit expanders ──
+    for game in todays_games:
+        home = game.get("home_team", "")
+        away = game.get("away_team", "")
+        game_results = [
+            r for r in report_results
+            if r.get("player_team", "").upper() in (home.upper(), away.upper())
+        ]
+        n_game_props = len(game_results)
+        n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
+        expander_label = (
+            f"🏀 {away} @ {home} — "
+            f"{n_game_props} props · {n_conf} high-confidence"
+        )
+
+        with st.expander(expander_label, expanded=True):
+            if game_results:
+                html_content = get_game_report_html(
+                    game=game,
+                    analysis_results=game_results,
+                )
+                # Adjust height: ~2000px per prop card + base sections
+                card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
+                components.html(html_content, height=card_height, scrolling=True)
+            else:
+                st.info(
+                    "No analysis results for this matchup yet. "
+                    "Run **⚡ Neural Analysis** first."
+                )
+
+    # ── Overall Entry Strategy Matrix ─────────────────────────────────
+    strategy_entries = _build_entry_strategy(report_results)
+    if strategy_entries:
+        st.divider()
+        st.subheader("📊 Overall Entry Strategy Matrix")
+        st.markdown(
+            "Optimal multi-leg combinations ranked by SAFE Score™ across all tonight's matchups.",
+            help="Based on the highest-confidence, non-avoided props from all games.",
+        )
+        st.markdown(get_qds_strategy_table_html(strategy_entries), unsafe_allow_html=True)
+
+else:
+    # ── Single game or "All" with a selected matchup ──────────────────
+    html_content = get_game_report_html(
+        game=selected_game,
+        analysis_results=report_results,
+    )
+    # Render in a scrollable iframe — height covers ~3 prop cards + all sections
+    components.html(html_content, height=6200, scrolling=True)
 
 # ============================================================
 # END SECTION: Render QDS Game Report
