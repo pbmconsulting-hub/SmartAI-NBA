@@ -98,10 +98,16 @@ _STATUS_NORMALIZER = {
 # ============================================================
 
 # Common name suffixes to strip for normalised key comparison
-_NAME_SUFFIXES = re.compile(
+_NAME_SUFFIXES_RE = re.compile(
     r"\s+(jr\.?|sr\.?|ii|iii|iv|v)\s*$",
     re.IGNORECASE,
 )
+
+# Strategy C thresholds
+_MAX_CONTAINER_ELEMENTS = 500  # Prefer smaller containers (direct row-level parents)
+_MIN_PLAYER_NAME_LENGTH = 3    # Minimum characters to treat a cell as a player name
+_MIN_TEAM_ABBREV_LENGTH = 2    # NBA team abbreviations are 2–4 uppercase letters
+_MAX_TEAM_ABBREV_LENGTH = 4
 
 
 def _normalize_player_key(name):
@@ -121,8 +127,8 @@ def _normalize_player_key(name):
     if not name:
         return ""
     key = name.lower().strip()
-    key = re.sub(r"\s+", " ", key)       # collapse internal whitespace
-    key = _NAME_SUFFIXES.sub("", key)    # strip generational suffixes
+    key = re.sub(r"\s+", " ", key)         # collapse internal whitespace
+    key = _NAME_SUFFIXES_RE.sub("", key)   # strip generational suffixes
     return key.strip()
 
 
@@ -359,7 +365,7 @@ def scrape_rotowire_injury_report():
             text = tag.get_text(" ", strip=True)
             if len(_ROTOWIRE_HEADER_RE.findall(text)) >= 2:
                 # Prefer smaller containers (direct row-level parents)
-                if len(tag.find_all(True)) < 500:
+                if len(tag.find_all(True)) < _MAX_CONTAINER_ELEMENTS:
                     candidate_containers.append(tag)
 
         for container in candidate_containers:
@@ -384,7 +390,7 @@ def scrape_rotowire_injury_report():
                         continue
                     # Heuristic: first non-empty cell is often the player name
                     name = texts[0] if texts[0] else ""
-                    if not name or len(name) < 3:
+                    if not name or len(name) < _MIN_PLAYER_NAME_LENGTH:
                         continue
                     # Try to locate status/injury from the remaining cells
                     status = ""
@@ -401,7 +407,7 @@ def scrape_rotowire_injury_report():
                             status = cell_text
                         elif not injury and len(cell_text) > 2:
                             injury = cell_text
-                        elif not team and 2 <= len(cell_text) <= 4 and cell_text.isupper():
+                        elif not team and _MIN_TEAM_ABBREV_LENGTH <= len(cell_text) <= _MAX_TEAM_ABBREV_LENGTH and cell_text.isupper():
                             team = cell_text
                         elif not ret and any(
                             c.isdigit() for c in cell_text

@@ -107,6 +107,13 @@ ESPN_API_TIMEOUT_SECONDS = 10
 # Injury status values that indicate a player is unavailable.
 # Used by fetch_todays_players_only() and fetch_player_stats() to
 # filter out inactive players before writing to CSV.
+#
+# Note: "Doubtful" and "Questionable" are included here because
+# players with these designations almost never play and including
+# them in simulations/props would produce unreliable predictions.
+# GTD (Game Time Decision) and Day-to-Day players are treated
+# differently — they remain in the roster but receive a warning
+# flag via GTD_INJURY_STATUSES below.
 INACTIVE_INJURY_STATUSES = frozenset({
     "Out",
     "Doubtful",

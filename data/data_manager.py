@@ -606,6 +606,11 @@ def validate_props_against_roster(props_list, players_list):
 
     # Post-process matched/fuzzy_matched to flag any OUT/injured players.
     # Load injury status once for the whole batch.
+    # NOTE: These status sets mirror INACTIVE_INJURY_STATUSES and
+    # GTD_INJURY_STATUSES defined in data/live_data_fetcher.py.
+    # If those constants change, update these checks accordingly.
+    _UNAVAILABLE = frozenset({"Out", "Doubtful", "Questionable", "Injured Reserve"})
+    _GTD = frozenset({"GTD", "Day-to-Day"})
     injury_map = load_injury_status()
     if injury_map:
         for item in matched + fuzzy_matched:
@@ -613,14 +618,14 @@ def validate_props_against_roster(props_list, players_list):
             status_info = get_player_status(matched_name, injury_map)
             player_status = status_info.get("status", "Active")
             item["player_status"] = player_status
-            if player_status in ("Out", "Doubtful", "Questionable", "Injured Reserve"):
+            if player_status in _UNAVAILABLE:
                 note = status_info.get("injury_note", "")
                 item["out_warning"] = (
                     f"⛔ {matched_name} is {player_status}"
                     + (f" — {note}" if note else "")
                     + " — remove this prop"
                 )
-            elif player_status in ("GTD", "Day-to-Day"):
+            elif player_status in _GTD:
                 note = status_info.get("injury_note", "")
                 item["status_warning"] = (
                     f"⚠️ {matched_name} is {player_status}"
