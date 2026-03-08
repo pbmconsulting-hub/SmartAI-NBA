@@ -8,6 +8,7 @@
 
 import streamlit as st  # Main UI framework
 import math             # For rounding in display
+import html as _html   # For safe HTML escaping in inline cards
 
 # Import our engine modules
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
@@ -242,7 +243,7 @@ def _build_bonus_factors(result):
 
 
 def _build_entry_strategy(results):
-    """Build entry strategy matrix entries from top results."""
+    """Build entry strategy matrix entries from top results (2–6 legs)."""
     top = [
         r for r in results
         if not r.get("should_avoid", False)
@@ -251,45 +252,62 @@ def _build_entry_strategy(results):
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
+    _LEG_LABELS = {
+        2: "Power Play (2-Leg)",
+        3: "Triple Threat (3-Leg)",
+        4: "Quad Stack (4-Leg)",
+        5: "High Roller (5-Leg)",
+        6: "Max Entry (6-Leg)",
+    }
+    _LEG_STRATEGIES = {
+        2: "Highest-confidence 2-leg — best win rate.",
+        3: "Top-3 picks, balanced risk vs. reward.",
+        4: "Aggressive 4-leg for elevated payout.",
+        5: "High ceiling, diversified 5-leg.",
+        6: "Max multiplier — only for high-edge slates.",
+    }
+
     entries = []
-    if len(top) >= 2:
-        p1 = top[0]
-        p2 = top[1]
-        avg2 = round((p1.get("confidence_score", 0) + p2.get("confidence_score", 0)) / 2, 1)
-        entries.append({
-            "combo_type": "Power Play (2)",
-            "picks": [
-                f"{p1['player_name']} {p1['direction']} {p1['line']} {p1['stat_type'].title()}",
-                f"{p2['player_name']} {p2['direction']} {p2['line']} {p2['stat_type'].title()}",
-            ],
-            "safe_avg": f"{avg2:.1f}",
-            "strategy": "Highest-confidence 2-leg.",
-        })
+    for num_legs in range(2, 7):
+        if len(top) < num_legs:
+            continue
+        picks = top[:num_legs]
+        avg_conf = round(sum(r.get("confidence_score", 0) for r in picks) / num_legs, 1)
 
-    if len(top) >= 3:
-        trio = top[:3]
-        avg3 = round(sum(r.get("confidence_score", 0) for r in trio) / 3, 1)
+        # Combined probability (independent legs)
+        combined_prob = 1.0
+        for p in picks:
+            prob = p.get("confidence_score", 50) / 100.0
+            combined_prob *= max(0.01, min(0.99, prob))
+        combined_prob_pct = round(combined_prob * 100, 1)
+
+        avg_edge = round(
+            sum(p.get("edge_percentage", 0) for p in picks) / num_legs, 1
+        )
+
+        # Reasoning tags
+        reasons = []
+        if all(p.get("edge_percentage", 0) > 5 for p in picks):
+            reasons.append("All legs 5%+ edge")
+        if any(p.get("tier") == "Platinum" for p in picks):
+            reasons.append("Anchored by Platinum pick")
+        teams_in_parlay = {p.get("team", p.get("player_team", "")) for p in picks}
+        if len(teams_in_parlay) >= num_legs:
+            reasons.append("Diversified across games")
+
         entries.append({
-            "combo_type": "Triple Threat (3)",
+            "combo_type":    _LEG_LABELS.get(num_legs, f"{num_legs}-Leg"),
+            "num_legs":      num_legs,
             "picks": [
                 f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in trio
+                for r in picks
             ],
-            "safe_avg": f"{avg3:.1f}",
-            "strategy": "Top-3 picks, balanced risk.",
-        })
-
-    if len(top) >= 5:
-        five = top[:5]
-        avg5 = round(sum(r.get("confidence_score", 0) for r in five) / 5, 1)
-        entries.append({
-            "combo_type": "Max Parlay (5)",
-            "picks": [
-                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in five
-            ],
-            "safe_avg": f"{avg5:.1f}",
-            "strategy": "High ceiling, diversified 5-leg.",
+            "safe_avg":      f"{avg_conf:.1f}",
+            "combined_prob": combined_prob_pct,
+            "avg_edge":      avg_edge,
+            "strategy":      _LEG_STRATEGIES.get(num_legs, ""),
+            "reasons":       reasons,
+            "raw_picks":     picks,
         })
 
     return entries
@@ -405,7 +423,7 @@ def display_prop_analysis_card_qds(result):
     p50 = result.get("percentile_50", 0)
     p90 = result.get("percentile_90", 0)
 
-    with st.expander(f"🔍 Full Breakdown — {player} {stat.title()}"):
+    with st.expander(f"📊 Full Breakdown — {player} {stat.title()}"):
         detail_col1, detail_col2, detail_col3 = st.columns(3)
 
         with detail_col1:
@@ -590,7 +608,10 @@ with status_col:
     if todays_games:
         st.success(f"🏟️ **{len(todays_games)} game(s)** configured for tonight.")
     else:
-        st.caption("💡 No games configured — using default (neutral) game context.")
+        st.warning(
+            "⚠️ No games loaded for today. Click **🔄 Auto-Load Tonight's Games** "
+            "on the Live Games page first to ensure only tonight's players are analyzed."
+        )
 
     if current_props and players_data:
         validation     = validate_props_against_roster(current_props, players_data)
@@ -654,9 +675,54 @@ with filter_col:
 if run_analysis:
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
-    total_props_count    = len(current_props)
 
-    for prop_index, prop in enumerate(current_props):
+    # ── Filter props to only tonight's teams ──────────────────
+    playing_teams: set = set()
+    for _g in todays_games:
+        playing_teams.add(_g.get("home_team", "").upper())
+        playing_teams.add(_g.get("away_team", "").upper())
+    playing_teams.discard("")
+
+    if playing_teams:
+        props_to_analyze = [
+            p for p in current_props
+            if p.get("team", "").upper() in playing_teams
+        ]
+        skipped_count = len(current_props) - len(props_to_analyze)
+        if skipped_count > 0:
+            st.info(
+                f"ℹ️ Skipping **{skipped_count}** prop(s) for teams not playing tonight. "
+                f"Analyzing **{len(props_to_analyze)}** prop(s) for tonight's {len(todays_games)} game(s)."
+            )
+    else:
+        props_to_analyze = current_props  # Fallback: no games loaded
+
+    # ── Also skip confirmed Out/IR players via injury map ─────
+    injury_map_pre = st.session_state.get("injury_status_map", {})
+    _INACTIVE_STATUSES = frozenset({
+        "Out", "Injured Reserve", "Out (No Recent Games)",
+        "Suspended", "Not With Team",
+        "G League - Two-Way", "G League - On Assignment", "G League",
+    })
+    if injury_map_pre:
+        before_inj = len(props_to_analyze)
+        props_to_analyze = [
+            p for p in props_to_analyze
+            if injury_map_pre.get(
+                p.get("player_name", "").lower().strip(), {}
+            ).get("status", "Active") not in _INACTIVE_STATUSES
+        ]
+        inj_skipped = before_inj - len(props_to_analyze)
+        if inj_skipped > 0:
+            st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR players.")
+
+    total_props_count    = len(props_to_analyze)
+    if total_props_count == 0:
+        st.warning("⚠️ No props remain after filtering to tonight's teams / injury status. Check your games and props.")
+        progress_bar.empty()
+        st.stop()
+
+    for prop_index, prop in enumerate(props_to_analyze):
         progress_fraction = (prop_index + 1) / total_props_count
         progress_bar.progress(
             progress_fraction,
@@ -1059,12 +1125,51 @@ if analysis_results:
 
     # ── Entry Strategy Matrix ─────────────────────────────────────
     st.divider()
-    with st.expander("🎯 Entry Strategy Matrix", expanded=True):
-        strategy_entries = _build_entry_strategy(displayed_results)
-        st.markdown(
-            get_qds_strategy_table_html(strategy_entries),
-            unsafe_allow_html=True,
-        )
+    st.markdown("## 🎰 ENTRY STRATEGY MATRIX")
+    st.markdown("Optimized parlay combinations ranked by combined EDGE Score™")
+
+    strategy_entries = _build_entry_strategy(displayed_results)
+    if not strategy_entries:
+        st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
+    else:
+        for entry in strategy_entries:
+            picks_html = ""
+            for pick_str in entry.get("picks", []):
+                parts = pick_str.split(" ", 1)
+                pname = _html.escape(parts[0]) if parts else ""
+                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
+                picks_html += (
+                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
+                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
+                    f'<span style="color:#c0d0e8;">{rest}</span>'
+                    f'</div>'
+                )
+            reasons = entry.get("reasons", [])
+            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
+            avg_conf    = entry.get("safe_avg", "—")
+            combined    = entry.get("combined_prob", 0)
+            avg_edge    = entry.get("avg_edge", 0)
+            num_legs    = entry.get("num_legs", 0)
+            combo_type  = _html.escape(entry.get("combo_type", ""))
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:8px;padding:15px;margin-bottom:15px;'
+                f'border-left:3px solid #ff5e00;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+                f'<h4 style="color:#ff5e00;margin:0;">🎲 {combo_type}</h4>'
+                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 8px;border-radius:4px;'
+                f'font-size:0.8rem;font-weight:700;">Avg EDGE: {avg_conf}/100</span>'
+                f'</div>'
+                f'{picks_html}'
+                f'<div style="margin-top:10px;padding:8px;background:rgba(20,25,43,0.7);border-radius:4px;">'
+                f'<span style="color:#00c8ff;font-size:0.85rem;">💡 {reason_text}</span>'
+                f'</div>'
+                f'<div style="display:flex;gap:15px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
+                f'<span>Combined prob: {combined:.1f}%</span>'
+                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
