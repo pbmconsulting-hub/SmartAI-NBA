@@ -252,6 +252,7 @@ html, body, [class*="css"] {
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,240,255,0.60); }
 
 /* ─── Sidebar — enhanced dark panel with neon border ─────── */
+/* min-width: 280px ensures emoji + full page titles are always readable */
 [data-testid="stSidebar"] {
     background: #0a0d18 !important;
     border-right: 1px solid rgba(0,240,255,0.20) !important;
