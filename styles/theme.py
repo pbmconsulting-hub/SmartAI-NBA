@@ -256,6 +256,7 @@ html, body, [class*="css"] {
     background: #0a0d18 !important;
     border-right: 1px solid rgba(0,240,255,0.20) !important;
     box-shadow: 2px 0 20px rgba(0,240,255,0.05) !important;
+    min-width: 280px !important;
 }
 [data-testid="stSidebar"] p,
 [data-testid="stSidebar"] span,
@@ -263,6 +264,13 @@ html, body, [class*="css"] {
 [data-testid="stSidebar"] label,
 [data-testid="stSidebar"] a {
     color: #c0d0e8 !important;
+}
+[data-testid="stSidebar"] .stPageLink,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {
+    font-size: 0.9rem !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
 }
 [data-testid="stSidebar"]::after {
     content: "⚡ Powered by JM5 Neural Engine";
