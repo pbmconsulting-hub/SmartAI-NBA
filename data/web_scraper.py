@@ -63,6 +63,9 @@ ROTOWIRE_INJURY_URL = "https://www.rotowire.com/basketball/injury-report.php"
 NBA_CDN_INJURY_JSON_URL = (
     "https://cdn.nba.com/static/json/staticData/InjuryReport.json"
 )
+NBA_CDN_INJURY_JSON_URL_ALT = (
+    "https://cdn.nba.com/static/json/liveData/injuries/injuries_all.json"
+)
 NBA_HTML_INJURY_URL = "https://www.nba.com/players/injuries"
 BREF_ROSTER_URL_TEMPLATE = (
     "https://www.basketball-reference.com/teams/{team}/2026.html"
@@ -438,6 +441,56 @@ def scrape_rotowire_injury_report():
     except Exception as exc:
         print(f"scrape_rotowire_injury_report: error — {exc}")
 
+    # ── Strategy D: JSON API endpoint fallback ──────────────────────
+    #
+    # RotoWire sometimes exposes player injury data via an internal JSON
+    # endpoint.  We attempt this only when all HTML strategies have failed
+    # (result is still empty).  If the endpoint returns non-JSON or an
+    # error status we silently return whatever result we have so far.
+    #
+    if not result:
+        _ROTOWIRE_JSON_URL = (
+            "https://www.rotowire.com/basketball/tables/injury-report.php"
+            "?team=ALL&pos=ALL"
+        )
+        try:
+            print(
+                "scrape_rotowire_injury_report: trying JSON endpoint (Strategy D) →",
+                _ROTOWIRE_JSON_URL,
+            )
+            json_response = _get_with_retry(_ROTOWIRE_JSON_URL)
+            rows_json = json_response.json()
+            if isinstance(rows_json, list) and rows_json:
+                for item in rows_json:
+                    if not isinstance(item, dict):
+                        continue
+                    name = (
+                        item.get("player")
+                        or item.get("playerName")
+                        or ""
+                    )
+                    if not name:
+                        continue
+                    team   = item.get("team", "")
+                    injury = item.get("injury", "")
+                    status = item.get("status", "")
+                    ret    = item.get("expectedReturn", "")
+                    key = name.lower().strip()
+                    result[key] = {
+                        "status":      _normalize_status(status),
+                        "injury":      injury,
+                        "team":        team,
+                        "return_date": ret,
+                        "source":      "RotoWire",
+                    }
+                print(
+                    f"scrape_rotowire_injury_report: found {len(result)} players "
+                    f"(Strategy D)"
+                )
+        except Exception:
+            # Non-JSON response or network error — silently fall through
+            pass
+
     return result
 
 # ============================================================
@@ -543,6 +596,65 @@ def scrape_nba_official_injury_report():
 
     except Exception as cdn_err:
         print(f"scrape_nba_official_injury_report: JSON CDN failed — {cdn_err}")
+
+    # ── Attempt 1b: Alternate CDN URL ────────────────────────────────────
+    #
+    # If the primary CDN returned an empty list or raised, try the alternate
+    # CDN URL before falling through to the HTML scrape.
+    #
+    print(
+        "scrape_nba_official_injury_report: trying alternate CDN →",
+        NBA_CDN_INJURY_JSON_URL_ALT,
+    )
+    try:
+        alt_response = _get_with_retry(NBA_CDN_INJURY_JSON_URL_ALT)
+        alt_data = alt_response.json()
+        alt_injury_list = alt_data.get("InjuryList") or alt_data.get("injuryList") or []
+
+        if not alt_injury_list:
+            for value in alt_data.values():
+                if isinstance(value, list) and len(value) > 0:
+                    alt_injury_list = value
+                    break
+
+        if alt_injury_list:
+            for entry in alt_injury_list:
+                first = entry.get("FirstName", "") or entry.get("firstName", "")
+                last  = entry.get("LastName",  "") or entry.get("lastName",  "")
+                name  = f"{first} {last}".strip()
+                if not name:
+                    continue
+
+                team    = (entry.get("TeamAbbreviation", "") or
+                           entry.get("teamAbbreviation", "") or
+                           entry.get("teamTricode", ""))
+                status  = (entry.get("StatusCategory", "") or
+                           entry.get("statusCategory", "") or
+                           entry.get("gameStatus", ""))
+                injury  = (entry.get("Injury", "") or
+                           entry.get("injury", "") or
+                           entry.get("bodyPartCategory", ""))
+                comment = entry.get("Comment", "") or entry.get("comment", "")
+
+                key = name.lower().strip()
+                result[key] = {
+                    "status":  _normalize_status(status),
+                    "injury":  injury,
+                    "team":    team,
+                    "comment": comment,
+                    "source":  "NBA.com",
+                }
+
+            print(
+                f"scrape_nba_official_injury_report: found {len(result)} players "
+                f"from alternate CDN"
+            )
+            return result
+
+        print("scrape_nba_official_injury_report: alternate CDN returned empty injury list")
+
+    except Exception as alt_err:
+        print(f"scrape_nba_official_injury_report: alternate CDN failed — {alt_err}")
 
     # ── Attempt 2: HTML fallback ─────────────────────────────────────────
     #
