@@ -96,6 +96,15 @@ RECENT_GAMES_WINDOW = 15
 MAX_GAMELOG_CHECKS = 30
 
 # ============================================================
+# Game fetcher defaults (placeholder values used until live odds are added)
+# ============================================================
+DEFAULT_VEGAS_SPREAD = 0.0   # No live spread data yet; shown as 0 until integrated
+DEFAULT_GAME_TOTAL = 220.0   # Typical NBA over/under baseline used as placeholder
+
+# Timeout for the ESPN public scoreboard HTTP request (seconds)
+ESPN_API_TIMEOUT_SECONDS = 10
+
+# ============================================================
 # END SECTION: File Path Constants
 # ============================================================
 
@@ -309,31 +318,23 @@ def _utc_to_et_display(game_time_utc):
 
 # ============================================================
 # SECTION: Today's Games Fetcher
-# Fetches which NBA games are being played today.
+# Fetches which NBA games are being played today using a
+# 3-layer fallback system for maximum reliability.
 # ============================================================
 
-def fetch_todays_games():
+def _fetch_team_records():
     """
-    Fetch tonight's NBA games using the live ScoreBoard endpoint.
+    Fetch team records (W-L, streak, home/away splits) from the NBA standings.
 
-    Also attempts to fetch team records (W-L, streak) from the standings
-    endpoint to enrich each game card with context.
+    Shared helper used by all three game-fetching layers so standings are
+    only pulled once regardless of which layer succeeds.
 
     Returns:
-        list of dict: Tonight's games, each with home_team, away_team,
-                      team records, streak info, and default Vegas lines.
-                      Returns empty list if the API fails or no games today.
+        dict: Maps team abbreviation → {wins, losses, streak,
+              home_record, away_record, conf_rank}.
+              Returns empty dict if the standings API fails.
     """
-    try:
-        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
-    except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return []
-
-    # --------------------------------------------------------
-    # Step 1: Fetch team records from standings (optional — enriches cards)
-    # --------------------------------------------------------
-    team_records = {}  # abbreviation → {wins, losses, streak, home_record, away_record}
+    team_records = {}
     try:
         from nba_api.stats.endpoints import leaguestandingsv3
         standings_endpoint = leaguestandingsv3.LeagueStandingsV3(
@@ -379,10 +380,227 @@ def fetch_todays_games():
     except Exception as standings_error:
         print(f"Could not fetch standings (non-fatal): {standings_error}")
 
-    # --------------------------------------------------------
-    # Step 2: Fetch today's games from the live scoreboard
-    # --------------------------------------------------------
+    return team_records
+
+
+def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_name,
+                           game_time_et, arena_display, team_records):
+    """
+    Build the standardised game dict used throughout the app.
+
+    Args:
+        home_abbrev (str): Home team abbreviation (our format).
+        away_abbrev (str): Away team abbreviation (our format).
+        home_team_name (str): Full display name for the home team.
+        away_team_name (str): Full display name for the away team.
+        game_time_et (str): Game time in Eastern Time, e.g. "7:30 PM ET".
+        arena_display (str): Arena name and city string.
+        team_records (dict): Standings data from _fetch_team_records().
+
+    Returns:
+        dict: Standardised game record.
+    """
+    home_rec = team_records.get(home_abbrev, {})
+    away_rec = team_records.get(away_abbrev, {})
+
+    return {
+        "game_id": f"{home_abbrev}_vs_{away_abbrev}",
+        "home_team": home_abbrev,
+        "away_team": away_abbrev,
+        "home_team_full": f"{home_abbrev} — {home_team_name}",
+        "away_team_full": f"{away_abbrev} — {away_team_name}",
+        "home_team_name": home_team_name,
+        "away_team_name": away_team_name,
+        "vegas_spread": DEFAULT_VEGAS_SPREAD,
+        "game_total": DEFAULT_GAME_TOTAL,
+        "game_date": datetime.date.today().isoformat(),
+        "game_time_et": game_time_et,
+        "arena": arena_display,
+        # Team records
+        "home_wins": home_rec.get("wins", 0),
+        "home_losses": home_rec.get("losses", 0),
+        "home_streak": home_rec.get("streak", ""),
+        "home_home_record": home_rec.get("home_record", ""),
+        "home_conf_rank": home_rec.get("conf_rank", 0),
+        "away_wins": away_rec.get("wins", 0),
+        "away_losses": away_rec.get("losses", 0),
+        "away_streak": away_rec.get("streak", ""),
+        "away_away_record": away_rec.get("away_record", ""),
+        "away_conf_rank": away_rec.get("conf_rank", 0),
+    }
+
+
+def _fetch_games_layer1_scoreboard_v2(team_records):
+    """
+    Layer 1: Fetch today's games via the NBA Stats ScoreboardV2 endpoint.
+
+    ScoreboardV2 is the most reliable source — it uses the same NBA Stats
+    API as the rest of nba_api and returns a clean GameHeader data frame.
+
+    Args:
+        team_records (dict): Pre-fetched standings data from _fetch_team_records().
+
+    Returns:
+        list of dict: Formatted game records, or empty list on failure.
+    """
     try:
+        from nba_api.stats.endpoints import scoreboardv2
+        from nba_api.stats.static import teams as nba_teams_static
+
+        # Build team_id → abbreviation and name mapping
+        all_nba_teams = nba_teams_static.get_teams()
+        team_id_to_abbrev = {}
+        team_id_to_info = {}
+        for t in all_nba_teams:
+            abbrev = t.get("abbreviation", "")
+            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
+            tid = t.get("id")
+            team_id_to_abbrev[tid] = abbrev
+            team_id_to_info[tid] = {
+                "city": t.get("city", ""),
+                "name": t.get("nickname", ""),
+            }
+
+        today_str = datetime.date.today().strftime("%m/%d/%Y")
+        sb = scoreboardv2.ScoreboardV2(game_date=today_str, day_offset=0)
+        dfs = sb.get_data_frames()
+        time.sleep(API_DELAY_SECONDS)
+
+        if not dfs:
+            return []
+
+        game_header_df = dfs[0]  # First frame is GameHeader
+        if game_header_df.empty:
+            return []
+
+        formatted_games = []
+        for row in game_header_df.to_dict("records"):
+            home_team_id = row.get("HOME_TEAM_ID")
+            away_team_id = row.get("VISITOR_TEAM_ID")
+
+            home_abbrev = team_id_to_abbrev.get(home_team_id, "")
+            away_abbrev = team_id_to_abbrev.get(away_team_id, "")
+
+            if not home_abbrev or not away_abbrev:
+                continue
+
+            # GAME_STATUS_TEXT shows "7:30 pm ET" for scheduled games
+            game_time_et = str(row.get("GAME_STATUS_TEXT", "") or "").strip()
+
+            home_info = team_id_to_info.get(home_team_id, {})
+            away_info = team_id_to_info.get(away_team_id, {})
+            home_team_name = f"{home_info.get('city', '')} {home_info.get('name', '')}".strip()
+            away_team_name = f"{away_info.get('city', '')} {away_info.get('name', '')}".strip()
+
+            formatted_games.append(_build_formatted_game(
+                home_abbrev, away_abbrev,
+                home_team_name, away_team_name,
+                game_time_et, "",
+                team_records,
+            ))
+
+        return formatted_games
+
+    except Exception as error:
+        print(f"Layer 1 (ScoreboardV2) failed: {error}")
+        return []
+
+
+def _fetch_games_layer2_espn(team_records):
+    """
+    Layer 2: Fetch today's games via the ESPN public scoreboard API.
+
+    ESPN provides a free, unauthenticated JSON endpoint that returns the
+    current day's NBA schedule.  No API key required.
+
+    Args:
+        team_records (dict): Pre-fetched standings data from _fetch_team_records().
+
+    Returns:
+        list of dict: Formatted game records, or empty list on failure.
+    """
+    try:
+        import requests
+
+        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        resp = requests.get(url, timeout=ESPN_API_TIMEOUT_SECONDS)
+        resp.raise_for_status()
+        data = resp.json()
+
+        events = data.get("events", [])
+        if not events:
+            return []
+
+        formatted_games = []
+        for event in events:
+            competitions = event.get("competitions", [])
+            if not competitions:
+                continue
+            comp = competitions[0]
+
+            competitors = comp.get("competitors", [])
+            home_comp = next((c for c in competitors if c.get("homeAway") == "home"), None)
+            away_comp = next((c for c in competitors if c.get("homeAway") == "away"), None)
+
+            if not home_comp or not away_comp:
+                continue
+
+            home_team = home_comp.get("team", {})
+            away_team = away_comp.get("team", {})
+
+            home_abbrev = home_team.get("abbreviation", "")
+            away_abbrev = away_team.get("abbreviation", "")
+
+            # Normalise ESPN abbreviations to our internal codes
+            home_abbrev = NBA_API_ABBREV_TO_OURS.get(home_abbrev, home_abbrev)
+            away_abbrev = NBA_API_ABBREV_TO_OURS.get(away_abbrev, away_abbrev)
+
+            if not home_abbrev or not away_abbrev:
+                continue
+
+            # Game time — ESPN uses ISO 8601 UTC in startDate
+            start_date = comp.get("startDate", event.get("date", ""))
+            game_time_et = _utc_to_et_display(start_date)
+
+            # Venue
+            venue = comp.get("venue", {})
+            arena_name = venue.get("fullName", "")
+            arena_city = venue.get("address", {}).get("city", "")
+            arena_display = f"{arena_name}, {arena_city}".strip(", ") if arena_name else ""
+
+            home_team_name = home_team.get("displayName", "")
+            away_team_name = away_team.get("displayName", "")
+
+            formatted_games.append(_build_formatted_game(
+                home_abbrev, away_abbrev,
+                home_team_name, away_team_name,
+                game_time_et, arena_display,
+                team_records,
+            ))
+
+        return formatted_games
+
+    except Exception as error:
+        print(f"Layer 2 (ESPN API) failed: {error}")
+        return []
+
+
+def _fetch_games_layer3_live_scoreboard(team_records):
+    """
+    Layer 3: Fetch today's games via the nba_api live ScoreBoard endpoint.
+
+    This is the original single-source implementation, retained as the
+    final fallback when both ScoreboardV2 and the ESPN API are unavailable.
+
+    Args:
+        team_records (dict): Pre-fetched standings data from _fetch_team_records().
+
+    Returns:
+        list of dict: Formatted game records, or empty list on failure.
+    """
+    try:
+        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
+
         board = live_scoreboard.ScoreBoard()
         games_data = board.games.get_dict()
 
@@ -401,52 +619,95 @@ def fetch_todays_games():
             if not home_abbrev or not away_abbrev:
                 continue
 
-            # Game time (UTC) — convert to Eastern Time for display
             game_time_et = _utc_to_et_display(game.get("gameTimeUTC", ""))
 
-            # Arena
             arena = game.get("arenaName", "")
             arena_city = game.get("arenaCity", "")
             arena_display = f"{arena}, {arena_city}".strip(", ") if arena else ""
 
-            # Pull team records
-            home_rec = team_records.get(home_abbrev, {})
-            away_rec = team_records.get(away_abbrev, {})
+            home_team_name = f"{home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}".strip()
+            away_team_name = f"{away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}".strip()
 
-            formatted_game = {
-                "game_id": f"{home_abbrev}_vs_{away_abbrev}",
-                "home_team": home_abbrev,
-                "away_team": away_abbrev,
-                "home_team_full": f"{home_abbrev} — {home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}",
-                "away_team_full": f"{away_abbrev} — {away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}",
-                "home_team_name": f"{home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}".strip(),
-                "away_team_name": f"{away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}".strip(),
-                "vegas_spread": 0.0,
-                "game_total": 220.0,
-                "game_date": datetime.date.today().isoformat(),
-                "game_time_et": game_time_et,
-                "arena": arena_display,
-                # Team records
-                "home_wins": home_rec.get("wins", 0),
-                "home_losses": home_rec.get("losses", 0),
-                "home_streak": home_rec.get("streak", ""),
-                "home_home_record": home_rec.get("home_record", ""),
-                "home_conf_rank": home_rec.get("conf_rank", 0),
-                "away_wins": away_rec.get("wins", 0),
-                "away_losses": away_rec.get("losses", 0),
-                "away_streak": away_rec.get("streak", ""),
-                "away_away_record": away_rec.get("away_record", ""),
-                "away_conf_rank": away_rec.get("conf_rank", 0),
-            }
-
-            formatted_games.append(formatted_game)
+            formatted_games.append(_build_formatted_game(
+                home_abbrev, away_abbrev,
+                home_team_name, away_team_name,
+                game_time_et, arena_display,
+                team_records,
+            ))
 
         time.sleep(API_DELAY_SECONDS)
         return formatted_games
 
     except Exception as error:
-        print(f"Error fetching today's games: {error}")
+        print(f"Layer 3 (Live ScoreBoard) failed: {error}")
         return []
+
+
+def fetch_todays_games():
+    """
+    Fetch tonight's NBA games using a 3-layer fallback system.
+
+    Attempts each source in order, falling through to the next if a layer
+    fails or returns no games.  After Layer 1 succeeds, a quick cross-
+    validation check against Layer 2 logs a warning if the game counts
+    differ (so discrepancies are visible in the logs without blocking the
+    primary result).
+
+    Layers:
+        1. ScoreboardV2        — NBA Stats API (most reliable)
+        2. ESPN Public API     — free unauthenticated endpoint (fallback)
+        3. Live ScoreBoard     — nba_api live endpoint (final fallback)
+
+    Returns:
+        list of dict: Tonight's games, each with home_team, away_team,
+                      team records, streak info, and default Vegas lines.
+                      Returns empty list if all layers fail or no games today.
+    """
+    # Fetch team records once — shared by all layers
+    team_records = _fetch_team_records()
+
+    # --------------------------------------------------------
+    # Layer 1: ScoreboardV2
+    # --------------------------------------------------------
+    print("Trying Layer 1: ScoreboardV2...")
+    layer1_games = _fetch_games_layer1_scoreboard_v2(team_records)
+
+    if layer1_games:
+        print(f"Layer 1 success: {len(layer1_games)} game(s) found.")
+        # Cross-validate against Layer 2 — log a warning if counts disagree
+        try:
+            layer2_games = _fetch_games_layer2_espn(team_records)
+            if layer2_games and len(layer2_games) != len(layer1_games):
+                print(
+                    f"Cross-validation warning: Layer 1 found {len(layer1_games)} game(s), "
+                    f"Layer 2 found {len(layer2_games)} game(s). Using Layer 1 result."
+                )
+        except Exception as cv_error:
+            print(f"Cross-validation check failed (non-fatal): {cv_error}")
+        return layer1_games
+
+    # --------------------------------------------------------
+    # Layer 2: ESPN Public API
+    # --------------------------------------------------------
+    print("Layer 1 failed. Trying Layer 2: ESPN Public API...")
+    layer2_games = _fetch_games_layer2_espn(team_records)
+
+    if layer2_games:
+        print(f"Layer 2 success: {len(layer2_games)} game(s) found.")
+        return layer2_games
+
+    # --------------------------------------------------------
+    # Layer 3: Live ScoreBoard
+    # --------------------------------------------------------
+    print("Layer 2 failed. Trying Layer 3: Live ScoreBoard...")
+    layer3_games = _fetch_games_layer3_live_scoreboard(team_records)
+
+    if layer3_games:
+        print(f"Layer 3 success: {len(layer3_games)} game(s) found.")
+    else:
+        print("All layers failed. No games available.")
+
+    return layer3_games
 
 # ============================================================
 # END SECTION: Today's Games Fetcher

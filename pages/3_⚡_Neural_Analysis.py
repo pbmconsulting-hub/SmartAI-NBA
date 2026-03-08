@@ -36,7 +36,6 @@ from styles.theme import (
     get_global_css,
     get_roster_health_html,
     get_best_bets_section_html,
-    get_status_badge_html as _theme_status_badge,
     get_qds_css,
     get_qds_confidence_bar_html,
     get_qds_metrics_grid_html,
