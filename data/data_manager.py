@@ -419,10 +419,13 @@ def find_player_by_name_fuzzy(players_list, player_name):
 
 def get_roster_health_report(props_list, players_list):
     """
-    Check which props have matching players in the database.
+    Check which props have matching players in the database and report
+    on injury / availability status per matched player.
 
     Returns a report showing matched vs unmatched props so the user
-    can identify name mismatches before running analysis.
+    can identify name mismatches before running analysis.  Also counts
+    unavailable (Out/Doubtful/Questionable/IR) and GTD players so the
+    Roster Health widget in Neural Analysis is accurate.
 
     Args:
         props_list (list of dict): Current props (with 'player_name')
@@ -435,6 +438,10 @@ def get_roster_health_report(props_list, players_list):
             'match_count': int,
             'total_count': int,
             'match_rate': float (0.0–1.0),
+            'unavailable_count': int,  # Out / Doubtful / Questionable / IR
+            'gtd_count': int,          # GTD / Day-to-Day
+            'unavailable_players': list of str,
+            'gtd_players': list of str,
         }
 
     Example:
@@ -461,12 +468,29 @@ def get_roster_health_report(props_list, players_list):
     total = len(matched) + len(unmatched)
     match_rate = len(matched) / total if total > 0 else 1.0
 
+    # ── Injury status counts ─────────────────────────────────────────
+    injury_map = load_injury_status()
+    unavailable_players = []
+    gtd_players = []
+    if injury_map:
+        for name in matched:
+            status_info = get_player_status(name, injury_map)
+            status = status_info.get("status", "Active")
+            if status in ("Out", "Doubtful", "Questionable", "Injured Reserve"):
+                unavailable_players.append(name)
+            elif status in ("GTD", "Day-to-Day"):
+                gtd_players.append(name)
+
     return {
         "matched": sorted(matched),
         "unmatched": sorted(unmatched),
         "match_count": len(matched),
         "total_count": total,
         "match_rate": round(match_rate, 3),
+        "unavailable_count": len(unavailable_players),
+        "gtd_count": len(gtd_players),
+        "unavailable_players": sorted(unavailable_players),
+        "gtd_players": sorted(gtd_players),
     }
 
 
@@ -580,29 +604,33 @@ def validate_props_against_roster(props_list, players_list):
 
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
 
-    # Post-process matched/fuzzy_matched to flag any OUT players
-    # Load injury status once for the whole batch
+    # Post-process matched/fuzzy_matched to flag any OUT/injured players.
+    # Load injury status once for the whole batch.
+    # NOTE: These status sets mirror INACTIVE_INJURY_STATUSES and
+    # GTD_INJURY_STATUSES defined in data/live_data_fetcher.py.
+    # If those constants change, update these checks accordingly.
+    _UNAVAILABLE = frozenset({"Out", "Doubtful", "Questionable", "Injured Reserve"})
+    _GTD = frozenset({"GTD", "Day-to-Day"})
     injury_map = load_injury_status()
     if injury_map:
         for item in matched + fuzzy_matched:
             matched_name = item.get("matched_name", "")
             status_info = get_player_status(matched_name, injury_map)
             player_status = status_info.get("status", "Active")
-            if player_status in ("Out", "Injured Reserve"):
+            item["player_status"] = player_status
+            if player_status in _UNAVAILABLE:
                 note = status_info.get("injury_note", "")
                 item["out_warning"] = (
                     f"⛔ {matched_name} is {player_status}"
                     + (f" — {note}" if note else "")
                     + " — remove this prop"
                 )
-                item["player_status"] = player_status
-            elif player_status in ("Questionable", "Day-to-Day"):
+            elif player_status in _GTD:
                 note = status_info.get("injury_note", "")
                 item["status_warning"] = (
                     f"⚠️ {matched_name} is {player_status}"
                     + (f" — {note}" if note else "")
                 )
-                item["player_status"] = player_status
 
     return {
         "matched": matched,

@@ -111,15 +111,57 @@ current_props = load_props_from_session(st.session_state)
 # Load persisted injury status for warning display (no API call needed)
 injury_status_map = load_injury_status()
 
-st.subheader(f"📋 Current Props ({len(current_props)} loaded)")
+# ── Injury-status classification of all current props ─────────────
+_UNAVAILABLE_STATUSES = {"Out", "Doubtful", "Injured Reserve"}
+_GTD_STATUSES = {"GTD", "Questionable", "Day-to-Day"}
 
-if current_props:
-    # Enrich each prop with player data for display
-    enriched_props = [enrich_prop_with_player_data(p, players_data) for p in current_props]
+_unavailable_props = []
+_gtd_props = []
+_healthy_props = []
 
-    # Build display rows with season averages and line context
+for _p in current_props:
+    _pname = _p.get("player_name", "")
+    _si = get_player_status(_pname, injury_status_map)
+    _pstatus = _si.get("status", "Active")
+    if _pstatus in _UNAVAILABLE_STATUSES:
+        _unavailable_props.append((_p, _pstatus, _si.get("injury_note", "")))
+    elif _pstatus in _GTD_STATUSES:
+        _gtd_props.append((_p, _pstatus, _si.get("injury_note", "")))
+    else:
+        _healthy_props.append((_p, _pstatus, _si.get("injury_note", "")))
+
+# ── Toggle: show injured players anyway ───────────────────────────
+_show_injured = st.toggle(
+    "👁️ Show injured players anyway (Out/Doubtful)",
+    value=False,
+    help="By default, players confirmed Out or Doubtful are hidden. Enable this to see all props.",
+)
+
+# ── Summary banner for removed props ──────────────────────────────
+if _unavailable_props and not _show_injured:
+    st.error(
+        f"⚠️ **{len(_unavailable_props)} prop(s) hidden** — player(s) are confirmed "
+        f"**Out or Doubtful**: "
+        + ", ".join(f"**{p.get('player_name','')}**" for p, _, _ in _unavailable_props)
+        + ". Enable *'Show injured players anyway'* to view them."
+    )
+
+# ── Determine which props to display ──────────────────────────────
+if _show_injured:
+    _display_props_raw = current_props
+    _display_props_enriched = [enrich_prop_with_player_data(p, players_data) for p in _display_props_raw]
+else:
+    # Only non-unavailable props
+    _safe_props = [p for p, _, _ in _healthy_props + _gtd_props]
+    _display_props_raw = _safe_props
+    _display_props_enriched = [enrich_prop_with_player_data(p, players_data) for p in _safe_props]
+
+st.subheader(f"📋 Current Props ({len(_display_props_enriched)} displayed / {len(current_props)} total)")
+
+if _display_props_enriched:
+    # Build display rows with season averages, line context, and injury status
     display_rows = []
-    for i, prop in enumerate(enriched_props):
+    for i, prop in enumerate(_display_props_enriched):
         player_name = prop.get("player_name", "")
         team = prop.get("player_team", prop.get("team", ""))
         stat = prop.get("stat_type", "").capitalize()
@@ -143,13 +185,13 @@ if current_props:
         else:
             line_ctx = "near avg"
 
-        # Injury / availability status flag
+        # Injury / availability status badge
         status_info = get_player_status(player_name, injury_status_map)
         player_status = status_info.get("status", "Active")
         status_emoji = {
-            "Out": "🔴", "Injured Reserve": "🔴",
-            "Questionable": "🟡", "Day-to-Day": "🟡",
-            "Active": "🟢",
+            "Out": "🔴", "Injured Reserve": "🔴", "Doubtful": "🔴",
+            "Questionable": "🟡", "GTD": "🟡", "Day-to-Day": "🟡",
+            "Active": "🟢", "Probable": "🟢",
         }.get(player_status, "⚪")
 
         display_rows.append({
@@ -175,29 +217,27 @@ if current_props:
         },
     )
 
-    # Show prominent OUT/IR warnings above the table
-    out_warnings = []
-    for prop in current_props:
-        pname = prop.get("player_name", "")
-        si = get_player_status(pname, injury_status_map)
-        pstatus = si.get("status", "Active")
-        if pstatus in ("Out", "Injured Reserve"):
-            note = si.get("injury_note", "")
-            out_warnings.append(
+    # Show GTD / Questionable warnings
+    gtd_warnings = []
+    for p, pstatus, note in _gtd_props:
+        pname = p.get("player_name", "")
+        gtd_warnings.append(
+            f"⚠️ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
+        )
+    # If showing injured, also show Out/Doubtful warnings
+    if _show_injured:
+        for p, pstatus, note in _unavailable_props:
+            pname = p.get("player_name", "")
+            gtd_warnings.append(
                 f"⛔ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
             )
-        elif pstatus in ("Questionable", "Day-to-Day"):
-            note = si.get("injury_note", "")
-            out_warnings.append(
-                f"⚠️ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
-            )
 
-    if out_warnings:
+    if gtd_warnings:
         with st.expander(
-            f"🏥 Availability Alerts ({len(out_warnings)} player(s)) — click to expand",
+            f"🏥 Availability Alerts ({len(gtd_warnings)} player(s)) — click to expand",
             expanded=True,
         ):
-            for warning in out_warnings:
+            for warning in gtd_warnings:
                 if warning.startswith("⛔"):
                     st.error(warning)
                 else:
@@ -248,7 +288,14 @@ if current_props:
                 )
 
 else:
-    st.info("No props loaded. Use the forms below to add props.")
+    if current_props:
+        st.info(
+            f"No props to display. "
+            f"{'All ' + str(len(current_props)) + ' prop(s) are hidden (players are Out/Doubtful). '  if _unavailable_props and not _show_injured else ''}"
+            "Use the toggle above to show injured players."
+        )
+    else:
+        st.info("No props loaded. Use the forms below to add props.")
 
 # ============================================================
 # END SECTION: Current Props Table
