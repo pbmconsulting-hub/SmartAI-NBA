@@ -263,7 +263,67 @@ def scrape_espn_injury_report():
                     "source": "espn",
                 }
 
-        print(f"scrape_espn_injury_report: {len(results)} players found")
+        print(f"scrape_espn_injury_report: {len(results)} players found (Strategy 1)")
+
+        # ── Strategy 2: div.ResponsiveTable containers ───────────────────
+        #
+        # ESPN's current markup often uses <div class="ResponsiveTable">
+        # containers with an immediately preceding <h2> or <h3> for the
+        # team name, then a nested <table> with injury rows.
+        # This strategy runs only when Strategy 1 yields zero results and
+        # does not overwrite entries already found by Strategy 1.
+        #
+        if not results:
+            responsive_tables = soup.select("div.ResponsiveTable")
+            strategy2_results = {}
+            for container in responsive_tables:
+                # Find the nearest preceding h2/h3 for the team name
+                team_name_s2 = ""
+                for heading_tag in ("h2", "h3"):
+                    heading = container.find_previous(heading_tag)
+                    if heading:
+                        team_name_s2 = heading.get_text(strip=True)
+                        break
+
+                table_s2 = container.find("table")
+                if table_s2 is None:
+                    continue
+
+                rows_s2 = table_s2.find("tbody")
+                if rows_s2 is None:
+                    rows_s2 = table_s2
+                for row in rows_s2.find_all("tr"):
+                    cells = row.find_all("td")
+                    if len(cells) < 4:
+                        continue
+                    name_cell    = cells[0].get_text(strip=True)
+                    date_cell    = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                    status_cell  = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                    comment_cell = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+
+                    player_name_s2 = name_cell.strip()
+                    if not player_name_s2:
+                        continue
+
+                    key_s2 = player_name_s2.lower().strip()
+                    if key_s2 not in results:
+                        strategy2_results[key_s2] = {
+                            "status":      _canonicalize_status(status_cell),
+                            "injury":      comment_cell or date_cell,
+                            "team":        team_name_s2,
+                            "return_date": "",
+                            "comment":     comment_cell,
+                            "source":      "espn",
+                        }
+
+            results.update(strategy2_results)
+            if strategy2_results:
+                print(
+                    f"scrape_espn_injury_report: {len(strategy2_results)} additional players "
+                    f"found (Strategy 2 — div.ResponsiveTable)"
+                )
+
+        print(f"scrape_espn_injury_report: {len(results)} players total")
     except Exception as exc:
         print(f"scrape_espn_injury_report: parse error — {exc}")
 
@@ -437,8 +497,28 @@ def fetch_multi_source_injury_status(todays_games=None):
             nba_data = scrape_nba_official_injury_report() if scrape_nba_official_injury_report else {}
         except Exception as exc:
             print(f"fetch_multi_source_injury_status: NBA.com raised: {exc}")
-        # Merge: RotoWire first, NBA.com overrides
-        core_data = {**rotowire_data, **nba_data}
+        # Merge: start with RotoWire; for shared keys NBA.com wins on
+        # status/injury/comment/source but we preserve RotoWire's return_date
+        # when NBA.com's return_date is empty.
+        core_data = dict(rotowire_data)
+        for key, nba_entry in nba_data.items():
+            if key in core_data:
+                existing = core_data[key]
+                existing["status"]  = nba_entry.get("status",  existing["status"])
+                existing["injury"]  = nba_entry.get("injury",  existing["injury"])
+                existing["comment"] = nba_entry.get("comment", existing.get("comment", ""))
+                existing["source"]  = nba_entry.get("source",  existing["source"])
+                if nba_entry.get("return_date", ""):
+                    existing["return_date"] = nba_entry["return_date"]
+            else:
+                core_data[key] = {
+                    "status":      nba_entry.get("status", "Unknown"),
+                    "injury":      nba_entry.get("injury", ""),
+                    "team":        nba_entry.get("team", ""),
+                    "return_date": nba_entry.get("return_date", ""),
+                    "comment":     nba_entry.get("comment", ""),
+                    "source":      nba_entry.get("source", "NBA.com"),
+                }
 
     # ── ESPN scraper ─────────────────────────────────────────────
     espn_data = {}
