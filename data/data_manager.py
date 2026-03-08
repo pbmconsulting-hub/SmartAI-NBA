@@ -41,6 +41,13 @@ LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
 INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 
 # ============================================================
+# Injury statuses that indicate a player is unavailable and
+# should be excluded from simulation, prop scanning, and
+# analysis.  Import this set wherever injury filtering is needed.
+# ============================================================
+EXCLUDE_STATUSES = {"Out", "Injured Reserve", "Doubtful"}
+
+# ============================================================
 # END SECTION: File Path Constants
 # ============================================================
 
@@ -580,34 +587,67 @@ def validate_props_against_roster(props_list, players_list):
 
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
 
-    # Post-process matched/fuzzy_matched to flag any OUT players
-    # Load injury status once for the whole batch
+    # Post-process matched/fuzzy_matched: hard-filter EXCLUDE_STATUSES players
+    # and flag Questionable/Day-to-Day players with warnings.
     injury_map = load_injury_status()
+    excluded_injured = []
     if injury_map:
-        for item in matched + fuzzy_matched:
+        new_matched = []
+        for item in matched:
             matched_name = item.get("matched_name", "")
             status_info = get_player_status(matched_name, injury_map)
             player_status = status_info.get("status", "Active")
-            if player_status in ("Out", "Injured Reserve"):
+            if player_status in EXCLUDE_STATUSES:
                 note = status_info.get("injury_note", "")
                 item["out_warning"] = (
                     f"⛔ {matched_name} is {player_status}"
                     + (f" — {note}" if note else "")
-                    + " — remove this prop"
+                    + " — excluded from analysis"
                 )
                 item["player_status"] = player_status
-            elif player_status in ("Questionable", "Day-to-Day"):
+                excluded_injured.append(item)
+            else:
+                if player_status in ("Questionable", "Day-to-Day"):
+                    note = status_info.get("injury_note", "")
+                    item["status_warning"] = (
+                        f"⚠️ {matched_name} is {player_status}"
+                        + (f" — {note}" if note else "")
+                    )
+                    item["player_status"] = player_status
+                new_matched.append(item)
+
+        new_fuzzy = []
+        for item in fuzzy_matched:
+            matched_name = item.get("matched_name", "")
+            status_info = get_player_status(matched_name, injury_map)
+            player_status = status_info.get("status", "Active")
+            if player_status in EXCLUDE_STATUSES:
                 note = status_info.get("injury_note", "")
-                item["status_warning"] = (
-                    f"⚠️ {matched_name} is {player_status}"
+                item["out_warning"] = (
+                    f"⛔ {matched_name} is {player_status}"
                     + (f" — {note}" if note else "")
+                    + " — excluded from analysis"
                 )
                 item["player_status"] = player_status
+                excluded_injured.append(item)
+            else:
+                if player_status in ("Questionable", "Day-to-Day"):
+                    note = status_info.get("injury_note", "")
+                    item["status_warning"] = (
+                        f"⚠️ {matched_name} is {player_status}"
+                        + (f" — {note}" if note else "")
+                    )
+                    item["player_status"] = player_status
+                new_fuzzy.append(item)
+
+        matched = new_matched
+        fuzzy_matched = new_fuzzy
 
     return {
         "matched": matched,
         "fuzzy_matched": fuzzy_matched,
         "unmatched": unmatched,
+        "excluded_injured": excluded_injured,
         "total": total,
         "matched_count": len(matched) + len(fuzzy_matched),
     }
@@ -728,21 +768,74 @@ def find_players_by_team(players_list, team_abbrev):
     """
     Return all players on a given team.
 
+    Filters out players whose injury status is in EXCLUDE_STATUSES
+    (Out, Injured Reserve, Doubtful) using the persisted injury map.
+
     Args:
         players_list (list of dict): Loaded player data
         team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL')
 
     Returns:
-        list of dict: All players on that team, sorted by points avg (desc)
+        list of dict: Active players on that team, sorted by points avg (desc)
     """
     abbrev_upper = team_abbrev.upper().strip()
     matches = [p for p in players_list if p.get("team", "").upper() == abbrev_upper]
+
+    # Filter out injured/inactive players
+    injury_map = load_injury_status()
+    if injury_map:
+        matches = [
+            p for p in matches
+            if get_player_status(p.get("name", ""), injury_map).get("status", "Active")
+            not in EXCLUDE_STATUSES
+        ]
+
     # Sort by points average descending (stars first)
     try:
         matches.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
     except Exception:
         pass
     return matches
+
+
+def get_active_players_for_team(team_abbrev, players_list=None):
+    """
+    Return only players for a team whose injury status is NOT in EXCLUDE_STATUSES.
+
+    Args:
+        team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL')
+        players_list (list of dict, optional): Pre-loaded player data.
+            If None, loads from disk via load_players_data().
+
+    Returns:
+        tuple: (active_players, excluded_count)
+            active_players — list of dict sorted by points avg (desc)
+            excluded_count — int number of players filtered out
+    """
+    if players_list is None:
+        players_list = load_players_data()
+
+    abbrev_upper = team_abbrev.upper().strip()
+    all_team = [p for p in players_list if p.get("team", "").upper() == abbrev_upper]
+
+    injury_map = load_injury_status()
+    if injury_map:
+        active = [
+            p for p in all_team
+            if get_player_status(p.get("name", ""), injury_map).get("status", "Active")
+            not in EXCLUDE_STATUSES
+        ]
+    else:
+        active = all_team
+
+    excluded_count = len(all_team) - len(active)
+
+    try:
+        active.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
+    except Exception:
+        pass
+
+    return active, excluded_count
 
 
 def get_todays_active_players(players_list, todays_games):

@@ -16,6 +16,7 @@ from tracking.database import (
     load_all_bets,
     get_performance_summary,
     initialize_database,
+    insert_prediction,
 )
 
 # Import shared constants from the engine package
@@ -280,4 +281,60 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 
 # ============================================================
 # END SECTION: Performance Analytics
+# ============================================================
+
+
+# ============================================================
+# SECTION: Auto-Save Top Picks (Issue #9)
+# ============================================================
+
+def save_top_picks_from_analysis(analysis_results, max_picks=10):
+    """
+    Auto-save the top Platinum and Gold tier picks from an analysis
+    run to the prediction_history table for later outcome tracking.
+
+    Skips Out/IR/Doubtful players and avoid-flagged picks.
+
+    Args:
+        analysis_results (list of dict): Results from Neural Analysis.
+        max_picks (int): Maximum number of picks to save (default 10).
+
+    Returns:
+        int: Number of predictions successfully saved.
+    """
+    top_to_save = [
+        r for r in analysis_results
+        if r.get("tier") in ("Platinum", "Gold")
+        and not r.get("player_is_out", False)
+        and not r.get("should_avoid", False)
+    ][:max_picks]
+
+    today_str = datetime.date.today().isoformat()
+    saved_count = 0
+
+    for pick in top_to_save:
+        pred_data = {
+            "prediction_date":       today_str,
+            "player_name":           pick.get("player_name", ""),
+            "stat_type":             pick.get("stat_type", ""),
+            "prop_line":             pick.get("line", 0.0),
+            "direction":             pick.get("direction", "OVER"),
+            "confidence_score":      pick.get("confidence_score", 0.0),
+            "probability_predicted": pick.get("probability_over", 0.5),
+            "tier":                  pick.get("tier", "Gold"),
+            "team":                  pick.get("player_team", pick.get("team", "")),
+            "edge_percentage":       pick.get("edge_percentage", 0.0),
+            "notes": (
+                f"Auto-saved | {pick.get('tier','')} tier | "
+                f"Auto-saved from Neural Analysis"
+            ),
+        }
+        pid = insert_prediction(pred_data)
+        if pid:
+            saved_count += 1
+
+    return saved_count
+
+# ============================================================
+# END SECTION: Auto-Save Top Picks
 # ============================================================

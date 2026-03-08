@@ -60,7 +60,8 @@ if todays_games and analysis_results:
     if playing_teams:
         _valid = [
             r for r in analysis_results
-            if r.get("player_team", r.get("team", "")).upper() in playing_teams
+            if (r.get("player_team") or r.get("team") or "").upper().strip()
+            in playing_teams
         ]
         _stale_count = len(analysis_results) - len(_valid)
         if _stale_count > 0:
@@ -105,6 +106,16 @@ st.divider()
 # SECTION: Matchup Selector
 # ============================================================
 
+def _results_for_game(game, results):
+    """Return analysis results matching the players in a specific game."""
+    home = game.get("home_team", "").upper().strip()
+    away = game.get("away_team", "").upper().strip()
+    return [
+        r for r in results
+        if (r.get("player_team") or r.get("team", "")).upper().strip() in {home, away}
+    ]
+
+
 selected_game = None
 
 if todays_games:
@@ -112,7 +123,7 @@ if todays_games:
 
     with col_sel:
         game_labels = [
-            f"{g.get('away_team','?')} @ {g.get('home_team','?')}"
+            f"{g.get('away_team','?').upper().strip()} @ {g.get('home_team','?').upper().strip()}"
             for g in todays_games
         ]
         options = ["— All available props —"] + game_labels
@@ -149,10 +160,7 @@ else:
 if selected_game and analysis_results:
     home = selected_game.get("home_team", "")
     away = selected_game.get("away_team", "")
-    filtered = [
-        r for r in analysis_results
-        if r.get("player_team", "").upper() in (home.upper(), away.upper())
-    ]
+    filtered = _results_for_game(selected_game, analysis_results)
     report_results = filtered if filtered else analysis_results
 elif analysis_results:
     report_results = analysis_results
@@ -220,13 +228,15 @@ def _build_entry_strategy(results):
 
 if not selected_game and len(todays_games) > 1 and report_results:
     # ── Multiple matchups: per-game collapsible Streamlit expanders ──
+
+    # ── Generate Report for All Games button ─────────────────────────
+    if st.button("📊 Generate Report for All Games", type="primary"):
+        st.session_state["_game_report_show_all"] = True
+
     for game in todays_games:
         home = game.get("home_team", "")
         away = game.get("away_team", "")
-        game_results = [
-            r for r in report_results
-            if r.get("player_team", "").upper() in (home.upper(), away.upper())
-        ]
+        game_results = _results_for_game(game, report_results)
         n_game_props = len(game_results)
         n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
         expander_label = (

@@ -7,7 +7,6 @@
 
 import streamlit as st
 import datetime
-import threading
 import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
@@ -91,6 +90,97 @@ st.title("📡 Live Games")
 st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight's NBA Slate")
 
 # ============================================================
+# SECTION: Live ESPN Scoreboard
+# ============================================================
+
+@st.cache_data(ttl=30)
+def _fetch_espn_scores():
+    """Fetch live NBA scores from ESPN public API (no key required)."""
+    try:
+        import urllib.request
+        import json as _json
+        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+with st.expander("📺 Live Scores / Today's Games", expanded=True):
+    _scores_col, _refresh_col = st.columns([4, 1])
+    with _refresh_col:
+        _auto_refresh = st.checkbox("🔄 Auto-refresh (60s)", key="espn_auto_refresh")
+
+    espn_data = _fetch_espn_scores()
+    if espn_data and espn_data.get("events"):
+        _events = espn_data["events"]
+        _score_cols = st.columns(min(len(_events), 3))
+        for _i, _evt in enumerate(_events):
+            _state = _evt.get("status", {}).get("type", {}).get("state", "pre")
+            _detail = _evt.get("status", {}).get("type", {}).get("shortDetail", "")
+            _clock = _evt.get("status", {}).get("displayClock", "")
+            _period = _evt.get("status", {}).get("period", 0)
+            _competitors = _evt.get("competitions", [{}])[0].get("competitors", [])
+
+            # Extract team info
+            _teams_info = {}
+            for _c in _competitors:
+                _abbr = _c.get("team", {}).get("abbreviation", "?")
+                _score = _c.get("score", "—")
+                _home_away = _c.get("homeAway", "away")
+                _teams_info[_home_away] = {"abbr": _abbr, "score": _score}
+
+            _home = _teams_info.get("home", {"abbr": "?", "score": "—"})
+            _away = _teams_info.get("away", {"abbr": "?", "score": "—"})
+
+            # Status badge
+            if _state == "in":
+                _badge = '<span style="background:#ff3333;color:#fff;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;animation:pulse 1.5s infinite;">🔴 LIVE</span>'
+                _game_clock = f"<div style='font-size:0.8rem;color:#8a9bb8;'>{_detail}</div>"
+            elif _state == "post":
+                _badge = '<span style="background:#00ff9d;color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">✅ Final</span>'
+                _game_clock = ""
+            else:
+                _badge = '<span style="background:#1a2035;color:#c0d0e8;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">🕐 Scheduled</span>'
+                _game_clock = f"<div style='font-size:0.8rem;color:#8a9bb8;'>{_detail}</div>"
+
+            # Determine winning team for bold display
+            try:
+                _home_score_n = int(_home["score"])
+                _away_score_n = int(_away["score"])
+                _home_bold = "font-weight:700;" if _home_score_n >= _away_score_n else ""
+                _away_bold = "font-weight:700;" if _away_score_n >= _home_score_n else ""
+            except (ValueError, TypeError):
+                _home_bold = _away_bold = ""
+
+            _col_idx = _i % 3
+            with _score_cols[_col_idx]:
+                st.markdown(
+                    f'<div style="background:rgba(20,25,43,0.7);border-radius:8px;padding:12px;'
+                    f'margin-bottom:10px;border:1px solid rgba(0,240,255,0.15);">'
+                    f'{_badge}'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                    f'margin-top:8px;">'
+                    f'<span style="color:#c0d0e8;{_away_bold}">{_away["abbr"]} {_away["score"]}</span>'
+                    f'<span style="color:#ff5e00;font-weight:700;padding:0 8px;">—</span>'
+                    f'<span style="color:#c0d0e8;{_home_bold}">{_home["score"]} {_home["abbr"]}</span>'
+                    f'</div>'
+                    f'{_game_clock}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+    else:
+        st.caption("Live scores unavailable — ESPN API could not be reached.")
+
+    if _auto_refresh:
+        time.sleep(60)
+        st.cache_data.clear()
+        st.rerun()
+
+# ============================================================
+# END SECTION: Live ESPN Scoreboard
+# ============================================================
+
+# ============================================================
 # SECTION: Auto-Load Tonight's Games
 # ============================================================
 
@@ -119,17 +209,23 @@ with info_col:
 
 
 def _run_auto_load_background():
-    """Run the auto-load in a background thread, storing progress in session state."""
+    """Run the auto-load synchronously with an inline st.progress() bar."""
+    progress_bar = st.progress(0, text="🔄 Starting Auto-Load...")
+    status_text = st.empty()
+
+    def _progress(current, total, message):
+        pct = int((current / max(total, 1)) * 100)
+        progress_bar.progress(pct, text=f"🔄 {message}")
+        status_text.markdown(
+            f"<small style='color:#8a9bb8;'>{message}</small>",
+            unsafe_allow_html=True,
+        )
+
     try:
-        st.session_state["autoload_status"] = "running"
-        st.session_state["autoload_progress"] = "Starting one-click load…"
-
-        def progress_cb(current, total, message):
-            st.session_state["autoload_progress"] = (
-                f"Step {current}/{total} — {message}"
-            )
-
-        result = fetch_all_todays_data(progress_callback=progress_cb)
+        result = fetch_all_todays_data(progress_callback=_progress)
+        progress_bar.progress(100, text="✅ Complete!")
+        status_text.empty()
+        progress_bar.empty()
 
         games_loaded = result.get("games", [])
         if games_loaded:
@@ -152,32 +248,22 @@ def _run_auto_load_background():
             )
             st.session_state["autoload_status"] = "no_games"
 
-        st.session_state["autoload_progress"] = "Complete!"
     except Exception as exc:
+        progress_bar.empty()
+        status_text.empty()
         st.session_state["autoload_status"] = "error"
-        st.session_state["autoload_progress"] = str(exc)
         st.session_state["autoload_result_msg"] = str(exc)
 
 
 if auto_load_clicked:
-    if st.session_state.get("autoload_status") != "running":
-        st.session_state["autoload_status"] = "running"
-        st.session_state["autoload_progress"] = "Starting…"
-        st.session_state["autoload_result_msg"] = ""
-        thread = threading.Thread(target=_run_auto_load_background, daemon=True)
-        thread.start()
-
-# ── Polling display while background load is running ──────────
-_autoload_status = st.session_state.get("autoload_status")
-
-if _autoload_status == "running":
-    st.info(f"⏳ {st.session_state.get('autoload_progress', 'Loading…')}")
-    time.sleep(2)
+    st.session_state["autoload_result_msg"] = ""
+    _run_auto_load_background()
     st.rerun()
-elif _autoload_status == "done":
+
+_autoload_status = st.session_state.get("autoload_status")
+if _autoload_status == "done":
     st.success(st.session_state.get("autoload_result_msg", "✅ Auto-load complete!"))
     st.session_state["autoload_status"] = None
-    st.rerun()
 elif _autoload_status == "no_games":
     st.warning(st.session_state.get("autoload_result_msg", "⚠️ No games found."))
     st.session_state["autoload_status"] = None

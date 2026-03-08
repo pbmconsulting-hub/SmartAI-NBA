@@ -110,6 +110,7 @@ ESPN_API_TIMEOUT_SECONDS = 10
 INACTIVE_INJURY_STATUSES = frozenset({
     "Out",
     "Injured Reserve",
+    "Doubtful",
     "Out (No Recent Games)",
     "Suspended",
     "Not With Team",

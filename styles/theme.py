@@ -961,6 +961,32 @@ button[kind="primary"] {
     opacity: 0.88;
     transform: scale(1.03);
 }
+
+/* ─── Issue #3: Readability improvements ──────────────────── */
+body, .stMarkdown, .stText, p, li {
+    color: rgba(255,255,255,0.92) !important;
+    font-size: 0.95rem;
+    line-height: 1.7;
+}
+h1 { font-size: 1.8rem !important; color: #00ffd5 !important; margin-bottom: 12px; }
+h2 { font-size: 1.4rem !important; color: #ffffff !important; margin-bottom: 10px; }
+h3 { font-size: 1.15rem !important; color: #c0d0e8 !important; }
+[data-testid="stMetricValue"] { font-size: 2rem !important; color: #00ffd5 !important; font-weight: 700; }
+[data-testid="stMetricLabel"] { font-size: 0.85rem !important; color: #a0b4d0 !important; text-transform: uppercase; letter-spacing: 0.5px; }
+.stDataFrame { font-size: 0.88rem !important; }
+[data-testid="stDataFrameResizable"] thead th { background: #1a2035 !important; color: #00ffd5 !important; font-weight: 700; padding: 10px 12px !important; }
+[data-testid="stDataFrameResizable"] tbody tr:nth-child(even) { background: rgba(255,255,255,0.03) !important; }
+[data-testid="stDataFrameResizable"] tbody td { padding: 8px 12px !important; color: rgba(255,255,255,0.9) !important; }
+.streamlit-expanderHeader { font-size: 1rem !important; font-weight: 700 !important; color: #ffffff !important; }
+[data-testid="stSidebarNav"] a { font-size: 0.95rem !important; color: rgba(255,255,255,0.85) !important; }
+[data-testid="stSidebarNav"] a:hover { color: #00ffd5 !important; }
+.stButton > button { font-weight: 700 !important; letter-spacing: 0.3px; }
+.stSelectbox label, .stNumberInput label, .stTextInput label, .stRadio label {
+    color: rgba(255,255,255,0.85) !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+}
+.stAlert { font-size: 0.92rem !important; }
 </style>
 """
 
@@ -2762,6 +2788,8 @@ _QDS_NA_CSS = """
   --qds-accent:#00b4ff;--qds-text-light:#f0f4ff;--qds-text-muted:#a0b4d0;
   --qds-success:#00ff88;--qds-warning:#ffcc00;--qds-danger:#ff3860;
   --qds-neon-shadow:0 0 10px rgba(0,255,213,0.5);
+  /* QED/QDS reference CSS variables */
+  --qed-primary:#ff5e00;--qed-accent:#00c8ff;--qed-bg:#0a0f1a;--qed-card:#14192b;
 }
 .qds-na-card{background:var(--qds-card);border-radius:12px;padding:18px;
   margin-bottom:18px;border-top:3px solid var(--qds-primary);
@@ -2828,6 +2856,48 @@ _QDS_NA_CSS = """
 .qds-na-rec-item{display:flex;align-items:flex-start;gap:8px;
   font-size:0.85rem;color:var(--qds-text-light);margin-bottom:6px;}
 .qds-na-rec-icon{color:var(--qds-success);flex-shrink:0;}
+
+/* ── Issue #4: QDS Full Breakdown reference CSS ─────────── */
+.qds-collapsible{background:rgba(20,25,43,0.7);border-radius:10px;margin-bottom:20px;
+  border:1px solid rgba(255,94,0,0.1);overflow:hidden;}
+.qds-collapsible-header{padding:15px;
+  background:linear-gradient(90deg,rgba(255,94,0,0.05),rgba(0,200,255,0.05));
+  cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+.qds-collapsible.open .qds-collapsible-content{padding:15px;max-height:5000px;}
+.qds-collapsible-content{padding:0 15px;max-height:0;overflow:hidden;
+  transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);}
+.qds-collapsible-icon{transition:transform 0.3s ease;color:#00c8ff;}
+.qds-collapsible.open .qds-collapsible-icon{transform:rotate(180deg);color:#ff5e00;}
+.qds-metrics-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:12px;margin:15px 0;}
+.qds-metric-item{background:rgba(20,25,43,0.7);padding:12px;border-radius:6px;
+  border-left:3px solid #ff5e00;}
+.qds-metric-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.qds-metric-name{font-size:0.9rem;font-weight:600;color:#ff5e00;flex:1;}
+.qds-metric-score{font-weight:700;color:#0a0f1a;background:#ff5e00;
+  padding:2px 6px;border-radius:4px;}
+.qds-metric-justification{font-size:0.85rem;color:rgba(255,255,255,0.9);line-height:1.5;}
+.qds-prop-card{background:#14192b;border-radius:8px;padding:15px;margin-bottom:20px;
+  border-top:3px solid #ff5e00;position:relative;}
+.qds-prop-badge{position:absolute;top:10px;right:10px;background:#ff5e00;color:#0a0f1a;
+  padding:3px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;}
+.qds-player-name{font-size:1.2rem;color:#ff5e00;}
+.qds-player-team{font-size:0.8rem;background:rgba(255,255,255,0.1);
+  padding:2px 6px;border-radius:4px;color:#fff;}
+.qds-score-value{font-weight:700;color:#0a0f1a;background:#ff5e00;
+  padding:4px 10px;border-radius:4px;}
+.qds-confidence-tier{font-size:0.8rem;padding:4px 8px;border-radius:4px;
+  background:rgba(255,255,255,0.1);color:#fff;}
+.qds-confidence-bar{height:8px;background:#1a2035;border-radius:4px;
+  margin-bottom:10px;overflow:hidden;}
+.qds-conf-fill-high{background:linear-gradient(90deg,#00ffd5,#00c8ff);}
+.qds-conf-fill-mid{background:linear-gradient(90deg,#ffcc00,#ff9900);}
+.qds-conf-fill-low{background:linear-gradient(90deg,#ff5e00,#cc4b00);}
+.qds-strategy-table{width:100%;border-collapse:collapse;font-size:0.85rem;}
+.qds-strategy-table th{text-align:left;padding:10px;color:#ff5e00;
+  border-bottom:1px solid rgba(255,255,255,0.1);}
+.qds-strategy-table td{padding:10px;color:rgba(255,255,255,0.9);
+  border-bottom:1px solid rgba(255,255,255,0.05);}
 </style>
 """
 

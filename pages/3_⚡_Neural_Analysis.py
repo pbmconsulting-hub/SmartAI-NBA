@@ -31,6 +31,7 @@ from data.data_manager import (
     get_player_status,
     get_status_badge_html,
     load_injury_status,
+    EXCLUDE_STATUSES,
 )
 
 # Import the theme helpers — including new QDS generators
@@ -757,24 +758,19 @@ if run_analysis:
     else:
         props_to_analyze = current_props  # Fallback: no games loaded
 
-    # ── Also skip confirmed Out/IR players via injury map ─────
+    # ── Also skip confirmed Out/IR/Doubtful players via injury map ─────
     injury_map_pre = st.session_state.get("injury_status_map", {})
-    _INACTIVE_STATUSES = frozenset({
-        "Out", "Injured Reserve", "Out (No Recent Games)",
-        "Suspended", "Not With Team",
-        "G League - Two-Way", "G League - On Assignment", "G League",
-    })
     if injury_map_pre:
         before_inj = len(props_to_analyze)
         props_to_analyze = [
             p for p in props_to_analyze
             if injury_map_pre.get(
                 p.get("player_name", "").lower().strip(), {}
-            ).get("status", "Active") not in _INACTIVE_STATUSES
+            ).get("status", "Active") not in EXCLUDE_STATUSES
         ]
         inj_skipped = before_inj - len(props_to_analyze)
         if inj_skipped > 0:
-            st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR players.")
+            st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
 
     total_props_count    = len(props_to_analyze)
     if total_props_count == 0:
@@ -799,11 +795,7 @@ if run_analysis:
         player_status_info = get_player_status(player_name, injury_map)
         player_status      = player_status_info.get("status", "Active")
 
-        if player_status in (
-            "Out", "Injured Reserve", "Out (No Recent Games)",
-            "Suspended", "Not With Team",
-            "G League - Two-Way", "G League - On Assignment", "G League",
-        ):
+        if player_status in EXCLUDE_STATUSES:
             injury_note = player_status_info.get("injury_note", "Player is not active")
             analysis_results_list.append({
                 "player_name":   player_name,
@@ -869,6 +861,32 @@ if run_analysis:
             recent_form_games=recent_form_games if recent_form_games else None,
             vegas_spread=game_context.get("vegas_spread", 0.0),
         )
+
+        # ── Handle skip from projection (injury detected in projections.py) ──
+        if projection_result.get("skip"):
+            skip_reason = projection_result.get("reason", "Player is unavailable")
+            skip_status = projection_result.get("player_status", "Out")
+            analysis_results_list.append({
+                "player_name":   player_name,
+                "team":          player_team,
+                "player_team":   player_team,
+                "stat_type":     stat_type,
+                "line":          prop_line,
+                "platform":      platform,
+                "probability_over": 0.0, "probability_under": 1.0,
+                "edge_percentage": -50.0, "confidence_score": 0,
+                "tier": "Bronze", "direction": "UNDER",
+                "should_avoid": True,
+                "avoid_reasons": [skip_reason],
+                "forces": {"over_forces": [], "under_forces": []},
+                "histogram": [], "score_breakdown": {},
+                "player_is_out": True,
+                "player_status": skip_status,
+                "player_status_note": skip_reason,
+                "player_matched": player_matched,
+                "player_id": player_data.get("player_id", ""),
+            })
+            continue
 
         stat_std      = get_stat_standard_deviation(player_data, stat_type)
         projected_stat = projection_result.get(
@@ -1032,6 +1050,16 @@ if run_analysis:
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
     progress_bar.empty()
     st.success(f"✅ Analysis complete! {len(analysis_results_list)} props analyzed.")
+
+    # ── Auto-save top Platinum / Gold picks to prediction history ─
+    try:
+        from tracking.bet_tracker import save_top_picks_from_analysis
+        _saved_count = save_top_picks_from_analysis(analysis_results_list)
+        if _saved_count > 0:
+            st.success(f"💾 {_saved_count} top pick(s) auto-saved to Past Predictions for tracking.")
+    except Exception as _save_err:
+        pass  # Auto-save is best-effort; don't block the UI
+
     st.rerun()
 
 # ============================================================
@@ -1094,6 +1122,27 @@ if analysis_results:
             + ", ".join(unmatched_names)
             + " — results may be less accurate."
         )
+
+    # ── Excluded — Injured section ────────────────────────────────
+    _excluded_injured = [r for r in analysis_results if r.get("player_is_out", False)]
+    if _excluded_injured:
+        with st.expander(
+            f"🚫 Excluded — Injured ({len(_excluded_injured)} player(s))",
+            expanded=False,
+        ):
+            for _r in _excluded_injured:
+                _pname  = _r.get("player_name", "")
+                _pstat  = _r.get("player_status", "Out")
+                _pnote  = _r.get("player_status_note", "")
+                st.markdown(
+                    f'<div style="background:rgba(255,51,102,0.08);border-left:3px solid #ff3366;'
+                    f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
+                    f'<span style="color:#ff3366;font-weight:700;">🚫 {_pname}</span> '
+                    f'<span style="color:#c0d0e8;">is <strong>{_pstat}</strong>'
+                    + (f' — {_pnote}' if _pnote else '')
+                    + f'</span></div>',
+                    unsafe_allow_html=True,
+                )
 
     st.divider()
 

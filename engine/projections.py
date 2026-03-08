@@ -159,6 +159,30 @@ def build_player_projection(
         projected_points might be 27.1 instead of his 24.8 average
     """
     # ============================================================
+    # SECTION: Injury Status Check
+    # Hard-skip players who are Out, Injured Reserve, or Doubtful
+    # so the simulation engine never runs projections for them.
+    # ============================================================
+    try:
+        from data.data_manager import get_player_status, EXCLUDE_STATUSES
+        _player_name = player_data.get("name", "")
+        _status_info = get_player_status(_player_name, {})
+        _status = _status_info.get("status", "Active")
+        if _status in EXCLUDE_STATUSES:
+            return {
+                "skip": True,
+                "reason": f"Player is {_status}",
+                "player_name": _player_name,
+                "player_status": _status,
+            }
+    except Exception:
+        pass  # Injury check is best-effort; continue with projection if it fails
+
+    # ============================================================
+    # END SECTION: Injury Status Check
+    # ============================================================
+
+    # ============================================================
     # SECTION: Extract Player's Season Averages
     # ============================================================
 

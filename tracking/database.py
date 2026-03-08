@@ -10,6 +10,7 @@
 # Standard library imports only
 import sqlite3    # Built-in SQLite database (no install needed!)
 import os         # For file path operations
+import datetime   # For date calculations
 from pathlib import Path  # Modern file path handling
 
 
@@ -120,6 +121,21 @@ def initialize_database():
             cursor.execute(CREATE_BETS_TABLE_SQL)
             cursor.execute(CREATE_ENTRIES_TABLE_SQL)
             cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
+
+            # Add new columns to prediction_history if they don't exist yet
+            # (backward-compatible migration for existing databases)
+            _new_cols = [
+                ("tier",            "TEXT"),
+                ("team",            "TEXT"),
+                ("edge_percentage", "REAL"),
+            ]
+            for _col_name, _col_type in _new_cols:
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE prediction_history ADD COLUMN {_col_name} {_col_type}"
+                    )
+                except sqlite3.OperationalError:
+                    pass  # Column already exists — safe to ignore
 
             # Save the changes
             connection.commit()
@@ -356,8 +372,9 @@ def insert_prediction(prediction_data):
     insert_sql = """
     INSERT INTO prediction_history (
         prediction_date, player_name, stat_type, prop_line,
-        direction, confidence_score, probability_predicted, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        direction, confidence_score, probability_predicted, notes,
+        tier, team, edge_percentage
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
     values = (
         prediction_data.get("prediction_date", ""),
@@ -368,6 +385,9 @@ def insert_prediction(prediction_data):
         prediction_data.get("confidence_score", 0.0),
         prediction_data.get("probability_predicted", 0.5),
         prediction_data.get("notes", ""),
+        prediction_data.get("tier", ""),
+        prediction_data.get("team", ""),
+        prediction_data.get("edge_percentage", 0.0),
     )
     try:
         with sqlite3.connect(str(DB_FILE_PATH)) as connection:
@@ -558,6 +578,147 @@ def get_calibration_report():
 
 # ============================================================
 # END SECTION: Prediction History & Calibration
+# ============================================================
+
+
+# ============================================================
+# SECTION: Recent Predictions & Accuracy (Issue #9)
+# ============================================================
+
+def load_recent_predictions(days=10):
+    """
+    Load predictions from the last N days.
+
+    Args:
+        days (int): Number of days to look back (default 10).
+
+    Returns:
+        list of dict: Prediction rows ordered by date desc then confidence desc.
+    """
+    initialize_database()
+    cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    sql = """
+    SELECT * FROM prediction_history
+    WHERE prediction_date >= ?
+    ORDER BY prediction_date DESC, confidence_score DESC
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(sql, (cutoff,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as database_error:
+        print(f"Error loading recent predictions: {database_error}")
+        return []
+
+
+def purge_old_predictions(days=10):
+    """
+    Delete predictions older than N days.
+
+    Args:
+        days (int): Predictions older than this are deleted (default 10).
+
+    Returns:
+        int: Number of rows deleted.
+    """
+    initialize_database()
+    cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+    sql = "DELETE FROM prediction_history WHERE prediction_date < ?"
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            cursor = connection.cursor()
+            cursor.execute(sql, (cutoff,))
+            connection.commit()
+            return cursor.rowcount
+    except sqlite3.Error as database_error:
+        print(f"Error purging old predictions: {database_error}")
+        return 0
+
+
+def get_prediction_accuracy_stats(days=10):
+    """
+    Return accuracy stats for predictions in the last N days.
+
+    Args:
+        days (int): Window to analyse (default 10).
+
+    Returns:
+        dict: {
+            'total': int,
+            'correct': int,
+            'wrong': int,
+            'pending': int,
+            'accuracy_pct': float,
+            'by_tier': {tier: {'total', 'correct', 'wrong', 'accuracy'}},
+            'by_stat':  {stat_type: {'total', 'correct', 'wrong', 'accuracy'}},
+        }
+    """
+    initialize_database()
+    cutoff = (datetime.date.today() - datetime.timedelta(days=days)).isoformat()
+
+    sql = """
+    SELECT tier, stat_type, was_correct
+    FROM prediction_history
+    WHERE prediction_date >= ?
+    """
+    result = {
+        "total": 0, "correct": 0, "wrong": 0, "pending": 0,
+        "accuracy_pct": 0.0, "by_tier": {}, "by_stat": {},
+    }
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(sql, (cutoff,))
+            rows = cursor.fetchall()
+
+        for row in rows:
+            result["total"] += 1
+            wc = row["was_correct"]
+            if wc is None:
+                result["pending"] += 1
+            elif wc == 1:
+                result["correct"] += 1
+            else:
+                result["wrong"] += 1
+
+            # By tier
+            tier = row["tier"] or "Unknown"
+            if tier not in result["by_tier"]:
+                result["by_tier"][tier] = {"total": 0, "correct": 0, "wrong": 0, "accuracy": 0.0}
+            result["by_tier"][tier]["total"] += 1
+            if wc == 1:
+                result["by_tier"][tier]["correct"] += 1
+            elif wc == 0:
+                result["by_tier"][tier]["wrong"] += 1
+
+            # By stat
+            stat = row["stat_type"] or "unknown"
+            if stat not in result["by_stat"]:
+                result["by_stat"][stat] = {"total": 0, "correct": 0, "wrong": 0, "accuracy": 0.0}
+            result["by_stat"][stat]["total"] += 1
+            if wc == 1:
+                result["by_stat"][stat]["correct"] += 1
+            elif wc == 0:
+                result["by_stat"][stat]["wrong"] += 1
+
+        # Compute accuracy percentages
+        graded = result["correct"] + result["wrong"]
+        result["accuracy_pct"] = round(result["correct"] / graded * 100, 1) if graded > 0 else 0.0
+        for _group in list(result["by_tier"].values()) + list(result["by_stat"].values()):
+            _graded = _group["correct"] + _group["wrong"]
+            _group["accuracy"] = round(_group["correct"] / _graded * 100, 1) if _graded > 0 else 0.0
+
+    except sqlite3.Error as database_error:
+        print(f"Error computing prediction accuracy: {database_error}")
+
+    return result
+
+# ============================================================
+# END SECTION: Recent Predictions & Accuracy
 # ============================================================
 
 # ============================================================
