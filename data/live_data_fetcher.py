@@ -734,7 +734,7 @@ def fetch_todays_games():
 # This is MUCH faster than fetching all 500+ NBA players.
 # ============================================================
 
-def fetch_todays_players_only(todays_games, progress_callback=None):
+def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_injury_map=None):
     """
     Fetch player stats ONLY for teams playing today.
 
@@ -750,6 +750,10 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
     Args:
         todays_games (list of dict): Tonight's games from fetch_todays_games()
         progress_callback (callable, optional): Called with (current, total, msg)
+        precomputed_injury_map (dict, optional): Pre-fetched injury map from
+            fetch_player_injury_status().  When supplied, this is used directly
+            for the Step 5 injury filter instead of calling the web scraper,
+            ensuring the most accurate data is applied before the CSV is written.
 
     Returns:
         bool: True if successful, False if the fetch failed.
@@ -818,6 +822,17 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                     player_id = player_row.get("PLAYER_ID")
                     player_name = player_row.get("PLAYER", "")
                     position = player_row.get("POSITION", "")
+
+                    # ── Filter out two-way / G-League assigned players ────────
+                    # CommonTeamRoster includes two-way players on G-League
+                    # assignment who won't play in tonight's NBA game.
+                    player_type  = str(player_row.get("PLAYER_TYPE",  "") or "").lower()
+                    how_acquired = str(player_row.get("HOW_ACQUIRED", "") or "").lower()
+                    if (player_type and "two-way" in player_type) or (
+                        how_acquired and "two-way" in how_acquired
+                    ):
+                        print(f"  Skipping two-way player: {player_name}")
+                        continue
 
                     # Normalize position
                     position_map = {
@@ -943,9 +958,13 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                 print(f"  Could not fetch game log for {player_name}: {log_error}")
 
             # ── Game-log recency filter ───────────────────────────────
-            # Skip players whose last recorded game was more than 21 days
-            # ago — they are almost certainly out long-term (e.g. season-
-            # ending injury) and won't have props offered today.
+            # Skip players whose last recorded game was more than 14 days
+            # ago — they are almost certainly out long-term and won't have
+            # props offered tonight.  14 days is used because sportsbooks
+            # typically stop posting lines for players missing 2+ weeks,
+            # and fetching data for them wastes API quota.
+            # Also skip players with NO game log — they haven't played
+            # this season and should not appear in analysis.
             if game_log_data:
                 last_game_date_str = game_log_data[0].get("GAME_DATE", "")
                 if last_game_date_str:
@@ -954,19 +973,18 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                             last_game_date_str, "%b %d, %Y"
                         ).date()
                         days_since_last_game = (datetime.date.today() - last_game_date).days
-                        if days_since_last_game > 21:
+                        if days_since_last_game > 14:
                             print(
                                 f"  Skipping {player_name}: last played "
                                 f"{days_since_last_game} days ago (likely long-term out)"
                             )
                             continue
-                        elif days_since_last_game > 14:
-                            print(
-                                f"  Warning: {player_name} last played "
-                                f"{days_since_last_game} days ago"
-                            )
                     except ValueError:
                         pass  # Unrecognised date format — don't skip on parse error
+            else:
+                # No game log at all → hasn't played this season
+                print(f"  Skipping {player_name} — no game log found")
+                continue
 
             # Skip players who haven't played (no meaningful minutes).
             # Players below MIN_MINUTES_THRESHOLD are inactive or garbage-time only.
@@ -1003,56 +1021,46 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
 
         # --------------------------------------------------------
         # Step 5: Filter out injured / inactive players
-        # Cross-reference with web-scraped injury data (RotoWire +
-        # NBA.com) to remove players confirmed as Out or on IR
-        # before writing to CSV.
+        # Use precomputed_injury_map when available (passed from
+        # fetch_all_todays_data after injury detection runs first).
+        # Fall back to web scraper → cached JSON when not available.
         # --------------------------------------------------------
-        try:
-            from data.web_scraper import fetch_all_injury_data
-            scraped_injuries = fetch_all_injury_data()
-            if scraped_injuries:
-                before_count = len(formatted_players)
-                formatted_players = [
-                    p for p in formatted_players
-                    if scraped_injuries.get(
-                        p["name"].lower().strip(), {}
-                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                ]
-                removed_count = before_count - len(formatted_players)
-                if removed_count:
-                    print(
-                        f"  Injury filter: removed {removed_count} Out/IR players "
-                        f"from today's roster ({len(formatted_players)} remain)"
-                    )
-        except Exception as _inj_err:
-            # Web scraper failed — fall back to the cached injury_status.json
-            # written by a previous fetch_player_injury_status() run.
-            print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+        injury_data = precomputed_injury_map or {}
+        if not injury_data:
             try:
-                cached_injuries = {}
-                if INJURY_STATUS_JSON_PATH.exists():
-                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                        cached_injuries = json.load(_jf)
-                if cached_injuries:
-                    before_count = len(formatted_players)
-                    formatted_players = [
-                        p for p in formatted_players
-                        if cached_injuries.get(
-                            p["name"].lower().strip(), {}
-                        ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                    ]
-                    removed_count = before_count - len(formatted_players)
-                    print(
-                        f"  Injury fallback (cached JSON): removed {removed_count} "
-                        f"players ({len(formatted_players)} remain)"
-                    )
-                else:
-                    print(
-                        "  WARNING: Web scraper failed and no cached injury data "
-                        "available — no injury filter applied"
-                    )
-            except Exception as _cache_err:
-                print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+                from data.web_scraper import fetch_all_injury_data
+                scraped_injuries = fetch_all_injury_data()
+                if scraped_injuries:
+                    injury_data = scraped_injuries
+            except Exception as _inj_err:
+                # Web scraper failed — fall back to the cached injury_status.json
+                # written by a previous fetch_player_injury_status() run.
+                print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+                try:
+                    if INJURY_STATUS_JSON_PATH.exists():
+                        with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                            injury_data = json.load(_jf)
+                except Exception as _cache_err:
+                    print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+
+        if injury_data:
+            before_count = len(formatted_players)
+            formatted_players = [
+                p for p in formatted_players
+                if injury_data.get(
+                    p["name"].lower().strip(), {}
+                ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+            ]
+            removed_count = before_count - len(formatted_players)
+            if removed_count:
+                print(
+                    f"  Injury filter: removed {removed_count} Out/IR players "
+                    f"from today's roster ({len(formatted_players)} remain)"
+                )
+        else:
+            print(
+                "  WARNING: No injury data available — no injury filter applied"
+            )
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
@@ -1992,9 +2000,11 @@ def fetch_all_todays_data(progress_callback=None):
 
     Steps:
         1. Fetch tonight's games (ScoreBoard)
-        2. Fetch current rosters + player stats for tonight's teams only
-        3. Fetch team stats for the analysis engine
-        4. Fetch multi-signal player injury/availability status
+        2. Fetch multi-signal player injury/availability status FIRST
+           (ensures CSV is filtered with accurate data on first write)
+        3. Fetch current rosters + player stats for tonight's teams only
+           (passes precomputed injury map so no redundant scraping)
+        4. Fetch team stats for the analysis engine
 
     Args:
         progress_callback (callable, optional): Called with (current, total, msg).
@@ -2031,46 +2041,56 @@ def fetch_all_todays_data(progress_callback=None):
         progress_callback(2, 40, f"Step 1/4 ✅ Found {len(games)} game(s). Fetching player rosters...")
 
     # --------------------------------------------------------
-    # Step 2: Fetch player stats for tonight's teams only
+    # Step 2: Fetch multi-signal injury/availability status FIRST
+    # Running this before fetch_todays_players_only() ensures the
+    # most accurate injury data is available when writing the CSV.
     # --------------------------------------------------------
-    def player_progress(current, total, message):
-        if progress_callback:
-            # Progress range for Step 2: steps 2-22 out of 40
-            scaled = 2 + int(20 * current / max(total, 1))
-            progress_callback(scaled, 40, f"Step 2/4 — {message}")
-
-    results["players_updated"] = fetch_todays_players_only(
-        games, progress_callback=player_progress
-    )
-
     if progress_callback:
-        status = "✅" if results["players_updated"] else "⚠️"
-        progress_callback(22, 40, f"Step 2/4 {status} Player stats done. Fetching team stats...")
+        progress_callback(2, 40, "Step 2/4 — Fetching injury / availability status...")
 
-    # --------------------------------------------------------
-    # Step 3: Fetch team stats
-    # --------------------------------------------------------
-    def team_progress(current, total, message):
-        if progress_callback:
-            # Progress range for Step 3: steps 22-29 out of 40
-            scaled = 22 + int(7 * current / max(total, 1))
-            progress_callback(scaled, 40, f"Step 3/4 — {message}")
-
-    results["teams_updated"] = fetch_team_stats(progress_callback=team_progress)
-
-    if progress_callback:
-        progress_callback(29, 40, "Step 3/4 ✅ Team stats done. Fetching injury/availability status...")
-
-    # --------------------------------------------------------
-    # Step 4: Fetch multi-signal injury/availability status
-    # Pass tonight's games so Layer 4 can cross-reference rosters
-    # --------------------------------------------------------
+    injury_map = {}
     try:
         injury_map = fetch_player_injury_status(todays_games=games)
         results["injury_status"] = injury_map
     except Exception as inj_err:
         print(f"fetch_all_todays_data: injury status fetch failed: {inj_err}")
         results["injury_status"] = {}
+
+    if progress_callback:
+        status_inj = "✅" if results["injury_status"] else "⚠️"
+        progress_callback(12, 40, f"Step 2/4 {status_inj} Injury status done. Fetching player rosters...")
+
+    # --------------------------------------------------------
+    # Step 3: Fetch player stats for tonight's teams only
+    # Pass the pre-computed injury map so the CSV is filtered
+    # with the best available data on first write.
+    # --------------------------------------------------------
+    def player_progress(current, total, message):
+        if progress_callback:
+            # Progress range for Step 3: steps 12-29 out of 40
+            scaled = 12 + int(17 * current / max(total, 1))
+            progress_callback(scaled, 40, f"Step 3/4 — {message}")
+
+    results["players_updated"] = fetch_todays_players_only(
+        games,
+        progress_callback=player_progress,
+        precomputed_injury_map=injury_map,
+    )
+
+    if progress_callback:
+        status = "✅" if results["players_updated"] else "⚠️"
+        progress_callback(29, 40, f"Step 3/4 {status} Player stats done. Fetching team stats...")
+
+    # --------------------------------------------------------
+    # Step 4: Fetch team stats
+    # --------------------------------------------------------
+    def team_progress(current, total, message):
+        if progress_callback:
+            # Progress range for Step 4: steps 29-40 out of 40
+            scaled = 29 + int(11 * current / max(total, 1))
+            progress_callback(scaled, 40, f"Step 4/4 — {message}")
+
+    results["teams_updated"] = fetch_team_stats(progress_callback=team_progress)
 
     if progress_callback:
         progress_callback(40, 40, "✅ All done! Games, players, team stats, and injury status loaded.")

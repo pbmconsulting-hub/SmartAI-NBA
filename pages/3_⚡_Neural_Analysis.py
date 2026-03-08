@@ -9,6 +9,7 @@
 import streamlit as st  # Main UI framework
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
+import datetime         # For analysis result freshness timestamps
 
 # Import our engine modules
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
@@ -313,6 +314,175 @@ def _build_entry_strategy(results):
     return entries
 
 
+def _render_qds_full_breakdown_html(result):
+    """Generate QDS-styled HTML for the full breakdown section.
+
+    Uses the same colour palette as the Game Report's QDS dark-card CSS:
+    background #14192b, primary #ff5e00, cyan #00f0ff, text #c0d0e8.
+    Rendered as a native <details>/<summary> element so it collapses
+    inside the existing dark-card visual context without a plain Streamlit
+    expander frame breaking the design.
+
+    Args:
+        result (dict): Full analysis result from the simulation loop.
+
+    Returns:
+        str: Safe HTML string ready for st.markdown(unsafe_allow_html=True).
+    """
+    player = _html.escape(str(result.get("player_name", "Unknown")))
+    stat   = _html.escape(str(result.get("stat_type", "points")).title())
+
+    p10 = result.get("percentile_10", 0) or 0
+    p50 = result.get("percentile_50", 0) or 0
+    p90 = result.get("percentile_90", 0) or 0
+    std = result.get("simulated_std", result.get("std_dev", 0)) or 0
+
+    over_forces  = result.get("forces", {}).get("over_forces",  [])
+    under_forces = result.get("forces", {}).get("under_forces", [])
+    breakdown    = result.get("score_breakdown", {}) or {}
+    explanation  = result.get("explanation") or {}
+    should_avoid = result.get("should_avoid", False)
+    avoid_reasons = result.get("avoid_reasons", [])
+
+    # ── Forces HTML ──────────────────────────────────────────────
+    def _forces_html(forces):
+        if not forces:
+            return '<span style="color:#8b949e;">None detected</span>'
+        parts = []
+        for f in forces:
+            stars = "⭐" * max(1, round(f.get("strength", 1)))
+            name  = _html.escape(str(f.get("name", "")))
+            desc  = _html.escape(str(f.get("description", "")))
+            parts.append(
+                f'<div style="margin-bottom:6px;">'
+                f'<span style="color:#00f0ff;">{stars}</span> '
+                f'<strong style="color:#ff5e00;">{name}</strong><br>'
+                f'<span style="color:#c0d0e8;font-size:0.8rem;">{desc}</span>'
+                f'</div>'
+            )
+        return "".join(parts)
+
+    # ── Score-breakdown bars ─────────────────────────────────────
+    breakdown_html = ""
+    if breakdown:
+        rows = []
+        for factor, score in breakdown.items():
+            label = _html.escape(
+                factor.replace("_score", "").replace("_", " ").title()
+            )
+            bar_w = min(100, max(0, float(score or 0)))
+            bar_c = "#00f0ff" if bar_w >= 70 else "#ff5e00" if bar_w >= 40 else "#ff4444"
+            rows.append(
+                f'<div style="margin-bottom:8px;">'
+                f'<div style="display:flex;justify-content:space-between;'
+                f'font-size:0.8rem;color:#c0d0e8;margin-bottom:3px;">'
+                f'<span>{label}</span>'
+                f'<span style="color:#ff5e00;font-weight:600;">{score:.0f}/100</span>'
+                f'</div>'
+                f'<div style="height:6px;background:#1a2035;border-radius:3px;overflow:hidden;">'
+                f'<div style="height:100%;width:{bar_w}%;'
+                f'background:linear-gradient(90deg,{bar_c},{bar_c}88);'
+                f'border-radius:3px;"></div>'
+                f'</div></div>'
+            )
+        breakdown_html = (
+            "<div style='margin-bottom:15px;'>"
+            "<h4 style='color:#ff5e00;font-size:0.9rem;margin-bottom:10px;'>"
+            "🔬 Confidence Score Breakdown</h4>"
+            + "".join(rows)
+            + "</div>"
+        )
+
+    # ── Explanation sections ─────────────────────────────────────
+    explain_html = ""
+    if explanation:
+        sections = [
+            ("📊 Season Avg vs Line",  "average_vs_line"),
+            ("🛡️ Matchup Analysis",    "matchup_explanation"),
+            ("⚡ Game Pace",            "pace_explanation"),
+            ("🏠 Home/Away",           "home_away_explanation"),
+            ("😴 Rest Days",           "rest_explanation"),
+            ("💰 Vegas Lines",         "vegas_explanation"),
+        ]
+        for label, key in sections:
+            text = explanation.get(key, "")
+            if text:
+                explain_html += (
+                    f'<div style="margin-bottom:8px;padding:8px;'
+                    f'background:rgba(20,25,43,0.5);border-radius:4px;'
+                    f'border-left:2px solid #ff5e00;">'
+                    f'<span style="color:#ff5e00;font-weight:600;font-size:0.8rem;">'
+                    f'{label}</span>'
+                    f'<p style="color:#c0d0e8;font-size:0.85rem;margin:4px 0 0 0;">'
+                    f'{_html.escape(str(text))}</p>'
+                    f'</div>'
+                )
+
+    # ── Avoid warning ────────────────────────────────────────────
+    avoid_html = ""
+    if should_avoid and avoid_reasons:
+        reasons_str = _html.escape(" | ".join(avoid_reasons))
+        avoid_html = (
+            f'<div style="margin-bottom:10px;padding:8px 12px;'
+            f'background:rgba(255,68,68,0.1);border-radius:6px;'
+            f'border-left:3px solid #ff4444;color:#ff4444;font-size:0.85rem;">'
+            f'⚠️ <strong>Avoid List:</strong> {reasons_str}</div>'
+        )
+
+    return f"""
+<details style="background:#14192b;border-radius:8px;padding:0;margin-top:10px;
+    border:1px solid rgba(255,94,0,0.15);">
+  <summary style="cursor:pointer;color:#ff5e00;font-weight:600;font-size:0.9rem;
+      padding:12px 15px;list-style:none;">
+    📊 Full Breakdown — {player} {stat}
+  </summary>
+  <div style="padding:12px 15px 15px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
+
+    <!-- Distribution grid -->
+    <div style="margin-bottom:15px;">
+      <h4 style="color:#ff5e00;font-size:0.9rem;margin-bottom:8px;">📊 Distribution</h4>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+          <div style="color:#8b949e;font-size:0.75rem;">10th pct</div>
+          <div style="color:#ff5e00;font-weight:700;">{p10:.1f}</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+          <div style="color:#8b949e;font-size:0.75rem;">Median</div>
+          <div style="color:#00f0ff;font-weight:700;">{p50:.1f}</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+          <div style="color:#8b949e;font-size:0.75rem;">90th pct</div>
+          <div style="color:#ff5e00;font-weight:700;">{p90:.1f}</div>
+        </div>
+        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+          <div style="color:#8b949e;font-size:0.75rem;">Std Dev</div>
+          <div style="color:white;font-weight:700;">{std:.1f}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Forces grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">
+      <div style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;
+          border-left:3px solid #00f0ff;">
+        <h4 style="color:#00f0ff;font-size:0.85rem;margin-bottom:8px;">⬆️ Forces OVER</h4>
+        {_forces_html(over_forces)}
+      </div>
+      <div style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;
+          border-left:3px solid #ff5e00;">
+        <h4 style="color:#ff5e00;font-size:0.85rem;margin-bottom:8px;">⬇️ Forces UNDER</h4>
+        {_forces_html(under_forces)}
+      </div>
+    </div>
+
+    {avoid_html}
+    {breakdown_html}
+    {explain_html}
+  </div>
+</details>
+"""
+
+
 def display_prop_analysis_card_qds(result):
     """
     Display a QDS-styled analysis card for one prop result.
@@ -416,118 +586,8 @@ def display_prop_analysis_card_qds(result):
         })
         st.rerun()
 
-    # ── Detailed expander (forces breakdown) ─────────────────────
-    over_forces  = result.get("forces", {}).get("over_forces",  [])
-    under_forces = result.get("forces", {}).get("under_forces", [])
-    p10 = result.get("percentile_10", 0)
-    p50 = result.get("percentile_50", 0)
-    p90 = result.get("percentile_90", 0)
-
-    with st.expander(f"📊 Full Breakdown — {player} {stat.title()}"):
-        detail_col1, detail_col2, detail_col3 = st.columns(3)
-
-        with detail_col1:
-            st.markdown("**📊 Distribution**")
-            st.caption(f"10th pct (bad game): **{p10:.1f}**")
-            st.caption(f"50th pct (median): **{p50:.1f}**")
-            st.caption(f"90th pct (great game): **{p90:.1f}**")
-            std = result.get("simulated_std", 0)
-            st.caption(f"Simulated std dev: **{std:.1f}**")
-
-            histogram = result.get("histogram", [])
-            if histogram:
-                max_count = max(b["count"] for b in histogram) or 1
-                st.markdown("**Distribution (█ = over line)**")
-                for bucket in histogram[-10:]:
-                    bar_length = int((bucket["count"] / max_count) * 15)
-                    bar_char = "█" if bucket["is_over_line"] else "░"
-                    bar = bar_char * bar_length
-                    st.caption(f"{bucket['bucket_label']:>5} {bar}")
-
-            form_ratio = result.get("recent_form_ratio")
-            if form_ratio is not None:
-                form_label = "Hot 🔥" if form_ratio > 1.05 else ("Cold 🧊" if form_ratio < 0.95 else "Neutral")
-                st.caption(f"Recent form: **{form_ratio:.2f}x** ({form_label})")
-
-            games_played = result.get("games_played")
-            if games_played:
-                st.caption(f"Games played: **{games_played}**")
-
-        with detail_col2:
-            st.markdown("**⬆️ Forces OVER**")
-            if over_forces:
-                for force in over_forces:
-                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
-                    st.caption(f"{strength_stars} **{force['name']}**")
-                    st.caption(f"   _{force['description']}_")
-            else:
-                st.caption("No OVER forces detected")
-
-        with detail_col3:
-            st.markdown("**⬇️ Forces UNDER**")
-            if under_forces:
-                for force in under_forces:
-                    strength_stars = "⭐" * max(1, round(force.get("strength", 1)))
-                    st.caption(f"{strength_stars} **{force['name']}**")
-                    st.caption(f"   _{force['description']}_")
-            else:
-                st.caption("No UNDER forces detected")
-
-        if should_avoid:
-            st.warning("⚠️ **Avoid List:** " + " | ".join(result.get("avoid_reasons", [])))
-
-        breakdown = result.get("score_breakdown", {})
-        if breakdown:
-            st.markdown("**🔬 Confidence Score Breakdown**")
-            breakdown_cols = st.columns(len(breakdown))
-            for i, (factor, score) in enumerate(breakdown.items()):
-                with breakdown_cols[i]:
-                    factor_label = factor.replace("_score", "").replace("_", " ").title()
-                    st.metric(factor_label, f"{score:.0f}/100")
-
-        explanation = result.get("explanation")
-        if explanation:
-            st.divider()
-            st.markdown("**💡 Why This Pick**")
-
-            indicators = explanation.get("indicators", [])
-            if indicators:
-                ind_cols = st.columns(min(len(indicators), 4))
-                for j, ind in enumerate(indicators[:4]):
-                    with ind_cols[j % len(ind_cols)]:
-                        emoji  = ind.get("emoji", "⚪")
-                        factor = ind.get("factor", "")
-                        st.caption(f"{emoji} **{factor}**")
-
-            sections = [
-                ("📊 Season Avg vs Line",  "average_vs_line"),
-                ("🛡️ Matchup Analysis",    "matchup_explanation"),
-                ("⚡ Game Pace",            "pace_explanation"),
-                ("🏠 Home/Away",           "home_away_explanation"),
-                ("😴 Rest Days",           "rest_explanation"),
-                ("💰 Vegas Lines",         "vegas_explanation"),
-                ("📐 Projection",          "projection_explanation"),
-                ("🎲 Simulation",          "simulation_narrative"),
-                ("⚖️ Forces",              "forces_summary"),
-                ("🔥 Recent Form",         "recent_form_explanation"),
-                ("📐 Line Sharpness",      "line_sharpness_explanation"),
-                ("⚠️ Trap Line",           "trap_line_explanation"),
-                ("👥 Teammate Impact",     "teammate_impact_explanation"),
-            ]
-            for label, key in sections:
-                text = explanation.get(key, "")
-                if text:
-                    st.caption(f"**{label}:** {text}")
-
-            risks = explanation.get("risk_factors", [])
-            if risks:
-                st.markdown("**⚠️ Risk Factors:**")
-                for risk in risks:
-                    st.caption(f"  {risk}")
-
-            verdict_text_exp = explanation.get("verdict", "")
-            if verdict_text_exp:
-                st.markdown(f"**🏁 Verdict:** {verdict_text_exp}")
+    # ── Full Breakdown (QDS-styled HTML, matching Game Report design) ─
+    st.markdown(_render_qds_full_breakdown_html(result), unsafe_allow_html=True)
 
 
 # ============================================================
@@ -969,6 +1029,7 @@ if run_analysis:
             analysis_results_list[idx]["_correlation_warning"] = warning
 
     st.session_state["analysis_results"] = analysis_results_list
+    st.session_state["analysis_timestamp"] = datetime.datetime.now()
     progress_bar.empty()
     st.success(f"✅ Analysis complete! {len(analysis_results_list)} props analyzed.")
     st.rerun()

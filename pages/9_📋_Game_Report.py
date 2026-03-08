@@ -12,6 +12,7 @@
 
 import streamlit as st
 import streamlit.components.v1 as components
+import datetime
 
 from styles.theme import (
     get_global_css,
@@ -44,6 +45,40 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 todays_games     = st.session_state.get("todays_games",     [])
 analysis_results = st.session_state.get("analysis_results", [])
+
+# ── Filter out stale results not matching tonight's teams ──────
+# If the user ran analysis yesterday and didn't clear session state,
+# results for teams not playing tonight are silently removed here
+# rather than polluting the report with stale data.
+if todays_games and analysis_results:
+    playing_teams = set()
+    for _game in todays_games:
+        playing_teams.add(_game.get("home_team", "").upper())
+        playing_teams.add(_game.get("away_team", "").upper())
+    playing_teams.discard("")
+
+    if playing_teams:
+        _valid = [
+            r for r in analysis_results
+            if r.get("player_team", r.get("team", "")).upper() in playing_teams
+        ]
+        _stale_count = len(analysis_results) - len(_valid)
+        if _stale_count > 0:
+            st.warning(
+                f"⚠️ Filtered out {_stale_count} stale result(s) from a previous "
+                "session (players not on tonight's teams)."
+            )
+        analysis_results = _valid
+
+# ── Freshness check — warn if results are older than 6 hours ──
+_analysis_ts = st.session_state.get("analysis_timestamp")
+if _analysis_ts and analysis_results:
+    _age_hours = (datetime.datetime.now() - _analysis_ts).total_seconds() / 3600
+    if _age_hours > 6:
+        st.warning(
+            f"⚠️ Analysis results are {_age_hours:.0f} hour(s) old. "
+            "Re-run **⚡ Neural Analysis** for fresh data."
+        )
 
 # ============================================================
 # END SECTION: Data Loading
