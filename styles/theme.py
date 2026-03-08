@@ -209,7 +209,8 @@ def get_global_css():
 /* ─── Base / Body ─────────────────────────────────────────── */
 html, body, [class*="css"] {
     font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    color: rgba(255,255,255,0.95);
+    font-size: 16px;
+    color: #c8d8f0;
     background-color: #0a0f1a;
 }
 /* Deep space dark background with radial gradient */
@@ -231,7 +232,8 @@ html, body, [class*="css"] {
 .stSlider label,
 .stCheckbox label,
 .stRadio label {
-    color: rgba(255,255,255,0.85);
+    color: #c8d8f0 !important;
+    font-size: 1rem !important;
 }
 [data-testid="stMarkdownContainer"] h1,
 [data-testid="stMarkdownContainer"] h2,
@@ -239,9 +241,10 @@ html, body, [class*="css"] {
 [data-testid="stMarkdownContainer"] h4,
 [data-testid="stMarkdownContainer"] h5,
 [data-testid="stMarkdownContainer"] h6,
-.stHeadingWithActionElements {
-    color: rgba(255,255,255,0.95);
-    font-family: 'Orbitron', sans-serif;
+.stHeadingWithActionElements,
+h1, h2, h3, h4, h5, h6 {
+    color: #00f0ff !important;
+    font-family: 'Orbitron', sans-serif !important;
     letter-spacing: 0.05em;
 }
 
@@ -293,11 +296,11 @@ html, body, [class*="css"] {
 }
 
 /* ─── Streamlit native elements on dark bg ───────────────── */
-[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; }
-[data-testid="stMetricLabel"] { color: #8a9bb8 !important; }
-.stAlert { background: rgba(20,25,43,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: rgba(255,255,255,0.9) !important; }
+[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; font-size: 1.4rem !important; }
+[data-testid="stMetricLabel"] { color: #c8d8f0 !important; font-size: 1rem !important; }
+.stAlert { background: rgba(20,25,43,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: #e0eeff !important; font-size: 1rem !important; padding: 14px 18px !important; }
 .stExpander { background: rgba(20,25,43,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
-.stExpander summary { color: rgba(255,255,255,0.90) !important; }
+.stExpander summary, .stExpander [data-testid="stExpanderToggleIcon"] + span { color: #e0eeff !important; font-size: 1rem !important; font-weight: 600 !important; }
 button[kind="primary"] {
     background: linear-gradient(135deg, #00ffd5, #00b4ff) !important;
     color: #0a0f1a !important;
@@ -306,7 +309,23 @@ button[kind="primary"] {
     letter-spacing: 0.05em !important;
     box-shadow: 0 0 16px rgba(0,255,213,0.35) !important;
 }
-.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: rgba(255,255,255,0.9) !important; }
+/* Tab labels */
+[data-testid="stTab"] button {
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    color: #c8d8f0 !important;
+}
+[data-testid="stTab"] button[aria-selected="true"] {
+    color: #00f0ff !important;
+    border-bottom: 2px solid #00f0ff !important;
+}
+/* Dataframe / table text */
+[data-testid="stDataFrame"] td,
+[data-testid="stDataFrame"] th {
+    font-size: 0.95rem !important;
+    color: #e0eeff !important;
+}
+.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: #e0eeff !important; }
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {

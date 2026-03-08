@@ -109,6 +109,8 @@ ESPN_API_TIMEOUT_SECONDS = 10
 # filter out inactive players before writing to CSV.
 INACTIVE_INJURY_STATUSES = frozenset({
     "Out",
+    "Doubtful",
+    "Questionable",
     "Injured Reserve",
     "Out (No Recent Games)",
     "Suspended",
@@ -116,6 +118,13 @@ INACTIVE_INJURY_STATUSES = frozenset({
     "G League - Two-Way",
     "G League - On Assignment",
     "G League",
+})
+
+# Statuses that are not fully removed but should be flagged separately
+# (e.g., GTD players remain selectable but show a warning badge).
+GTD_INJURY_STATUSES = frozenset({
+    "GTD",
+    "Day-to-Day",
 })
 
 # ============================================================
@@ -2563,6 +2572,21 @@ def fetch_player_injury_status(todays_games=None):
                             "comment":     scraped_entry.get("comment", ""),
                         }
                         new_entries += 1
+
+                # Post-Layer-5: apply case-insensitive "out" catch-all for any
+                # statuses containing "out" that weren't already normalised.
+                # GTD players get a separate flag (gtd=True) but are NOT removed
+                # so power users can still select them.
+                for entry in status_map.values():
+                    status_val = entry.get("status", "")
+                    if (
+                        status_val not in ("Out", "Injured Reserve", "Out (No Recent Games)")
+                        and "out" in status_val.lower()
+                    ):
+                        entry["status"] = "Out"
+                        overrides += 1
+                    if status_val in ("GTD", "Day-to-Day"):
+                        entry["gtd"] = True
 
                 print(
                     f"fetch_player_injury_status Layer 5: {overrides} overrides, "

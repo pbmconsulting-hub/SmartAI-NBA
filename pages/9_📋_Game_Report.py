@@ -50,17 +50,22 @@ analysis_results = st.session_state.get("analysis_results", [])
 # If the user ran analysis yesterday and didn't clear session state,
 # results for teams not playing tonight are silently removed here
 # rather than polluting the report with stale data.
+# Uses case-insensitive, stripped fuzzy team matching.
 if todays_games and analysis_results:
     playing_teams = set()
     for _game in todays_games:
-        playing_teams.add(_game.get("home_team", "").upper())
-        playing_teams.add(_game.get("away_team", "").upper())
+        ht = _game.get("home_team", "").upper().strip()
+        at = _game.get("away_team", "").upper().strip()
+        if ht:
+            playing_teams.add(ht)
+        if at:
+            playing_teams.add(at)
     playing_teams.discard("")
 
     if playing_teams:
         _valid = [
             r for r in analysis_results
-            if r.get("player_team", r.get("team", "")).upper() in playing_teams
+            if r.get("player_team", r.get("team", "")).upper().strip() in playing_teams
         ]
         _stale_count = len(analysis_results) - len(_valid)
         if _stale_count > 0:
@@ -130,6 +135,32 @@ if todays_games:
         n_picks   = len([r for r in analysis_results if r.get("confidence_score", 0) >= 70])
         st.metric("Analysed Props",  n_props)
         st.metric("High-Conf Picks", n_picks, help="Picks with confidence ≥ 70")
+
+    # ── "Generate Report for ALL Games Tonight" button ─────────────
+    if len(todays_games) > 1:
+        all_games_btn = st.button(
+            "📋 Generate Report for ALL Games Tonight",
+            use_container_width=True,
+            help="Render a full QDS breakdown for every game on tonight's slate.",
+        )
+        if all_games_btn:
+            st.session_state["game_report_show_all"] = True
+    else:
+        st.session_state.setdefault("game_report_show_all", False)
+
+elif not todays_games and not analysis_results:
+    st.info(
+        "💡 No games loaded yet. "
+        "Go to **📡 Live Games** to fetch tonight's NBA slate, "
+        "then run **⚡ Neural Analysis** to generate prop predictions."
+    )
+elif todays_games and not analysis_results:
+    st.warning(
+        "⚡ **Run Neural Analysis first, then return here.**\n\n"
+        "Games are loaded but no analysis results were found. "
+        "Go to the **⚡ Neural Analysis** page and click **Run Analysis**, "
+        "then come back here for the full QDS breakdown."
+    )
 else:
     st.info(
         "💡 No games loaded yet. "
@@ -147,11 +178,11 @@ else:
 # ============================================================
 
 if selected_game and analysis_results:
-    home = selected_game.get("home_team", "")
-    away = selected_game.get("away_team", "")
+    home = selected_game.get("home_team", "").upper().strip()
+    away = selected_game.get("away_team", "").upper().strip()
     filtered = [
         r for r in analysis_results
-        if r.get("player_team", "").upper() in (home.upper(), away.upper())
+        if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
     ]
     report_results = filtered if filtered else analysis_results
 elif analysis_results:
@@ -221,11 +252,11 @@ def _build_entry_strategy(results):
 if not selected_game and len(todays_games) > 1 and report_results:
     # ── Multiple matchups: per-game collapsible Streamlit expanders ──
     for game in todays_games:
-        home = game.get("home_team", "")
-        away = game.get("away_team", "")
+        home = game.get("home_team", "").upper().strip()
+        away = game.get("away_team", "").upper().strip()
         game_results = [
             r for r in report_results
-            if r.get("player_team", "").upper() in (home.upper(), away.upper())
+            if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
         ]
         n_game_props = len(game_results)
         n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
@@ -259,6 +290,31 @@ if not selected_game and len(todays_games) > 1 and report_results:
             help="Based on the highest-confidence, non-avoided props from all games.",
         )
         st.markdown(get_qds_strategy_table_html(strategy_entries), unsafe_allow_html=True)
+
+elif st.session_state.get("game_report_show_all") and todays_games and analysis_results:
+    # ── "Generate Report for ALL Games Tonight" was clicked ───────────
+    st.session_state["game_report_show_all"] = False
+    for game in todays_games:
+        home = game.get("home_team", "").upper().strip()
+        away = game.get("away_team", "").upper().strip()
+        game_results = [
+            r for r in analysis_results
+            if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
+        ]
+        n_game_props = len(game_results)
+        n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
+        st.subheader(f"🏀 {away} @ {home}")
+        st.caption(f"{n_game_props} props analysed · {n_conf} high-confidence picks")
+        if game_results:
+            html_content = get_game_report_html(
+                game=game,
+                analysis_results=game_results,
+            )
+            card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
+            components.html(html_content, height=card_height, scrolling=True)
+        else:
+            st.info("No analysis results for this matchup. Run **⚡ Neural Analysis** first.")
+        st.divider()
 
 else:
     # ── Single game or "All" with a selected matchup ──────────────────

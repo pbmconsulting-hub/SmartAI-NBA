@@ -7,7 +7,6 @@
 
 import streamlit as st
 import datetime
-import threading
 import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
@@ -118,72 +117,65 @@ with info_col:
     )
 
 
-def _run_auto_load_background():
-    """Run the auto-load in a background thread, storing progress in session state."""
+if auto_load_clicked:
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+
     try:
-        st.session_state["autoload_status"] = "running"
-        st.session_state["autoload_progress"] = "Starting one-click load…"
+        status_text.text("⏳ Step 1/4 — Fetching tonight's games...")
+        progress_bar.progress(10)
+        games = fetch_todays_games()
 
-        def progress_cb(current, total, message):
-            st.session_state["autoload_progress"] = (
-                f"Step {current}/{total} — {message}"
-            )
-
-        result = fetch_all_todays_data(progress_callback=progress_cb)
-
-        games_loaded = result.get("games", [])
-        if games_loaded:
-            st.session_state["todays_games"] = games_loaded
-            players_ok = result.get("players_updated", False)
-            teams_ok = result.get("teams_updated", False)
-            st.session_state["autoload_result_msg"] = (
-                f"✅ Loaded **{len(games_loaded)} game(s)** for tonight! "
-                f"Players: {'✅' if players_ok else '⚠️ failed'} | "
-                f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
-            )
-            st.session_state["autoload_status"] = "done"
-        else:
-            st.session_state["autoload_result_msg"] = (
+        if not games:
+            progress_bar.empty()
+            status_text.empty()
+            st.warning(
                 "⚠️ Could not auto-load games. Possible reasons:\n"
                 "- `nba_api` is not installed (run: `pip install nba_api`)\n"
                 "- No games scheduled tonight\n"
                 "- No internet connection\n\n"
                 "Please enter games manually using the form below."
             )
-            st.session_state["autoload_status"] = "no_games"
+        else:
+            st.session_state["todays_games"] = games
 
-        st.session_state["autoload_progress"] = "Complete!"
-    except Exception as exc:
-        st.session_state["autoload_status"] = "error"
-        st.session_state["autoload_progress"] = str(exc)
-        st.session_state["autoload_result_msg"] = str(exc)
+            status_text.text(f"⏳ Step 2/4 — Loading team rosters for {len(games)} game(s)...")
+            progress_bar.progress(35)
 
+            from data.live_data_fetcher import fetch_player_injury_status
+            injury_map = {}
+            try:
+                injury_map = fetch_player_injury_status(todays_games=games)
+                st.session_state["injury_status_map"] = injury_map
+            except Exception as _inj_err:
+                print(f"Auto-load: injury fetch failed: {_inj_err}")
 
-if auto_load_clicked:
-    if st.session_state.get("autoload_status") != "running":
-        st.session_state["autoload_status"] = "running"
-        st.session_state["autoload_progress"] = "Starting…"
-        st.session_state["autoload_result_msg"] = ""
-        thread = threading.Thread(target=_run_auto_load_background, daemon=True)
-        thread.start()
+            status_text.text("⏳ Step 3/4 — Refreshing injury reports...")
+            progress_bar.progress(65)
 
-# ── Polling display while background load is running ──────────
-_autoload_status = st.session_state.get("autoload_status")
+            players_ok = fetch_todays_players_only(games, precomputed_injury_map=injury_map)
 
-if _autoload_status == "running":
-    st.info(f"⏳ {st.session_state.get('autoload_progress', 'Loading…')}")
-    time.sleep(2)
-    st.rerun()
-elif _autoload_status == "done":
-    st.success(st.session_state.get("autoload_result_msg", "✅ Auto-load complete!"))
-    st.session_state["autoload_status"] = None
-    st.rerun()
-elif _autoload_status == "no_games":
-    st.warning(st.session_state.get("autoload_result_msg", "⚠️ No games found."))
-    st.session_state["autoload_status"] = None
-elif _autoload_status == "error":
-    st.error(f"❌ Auto-load failed: {st.session_state.get('autoload_result_msg', 'Unknown error')}")
-    st.session_state["autoload_status"] = None
+            status_text.text("⏳ Step 4/4 — Finalizing data...")
+            progress_bar.progress(90)
+
+            time.sleep(0.3)
+            progress_bar.progress(100)
+            status_text.text("✅ Done! Tonight's slate is ready.")
+            time.sleep(1)
+            status_text.empty()
+            progress_bar.empty()
+
+            st.success(
+                f"✅ Loaded **{len(games)} game(s)** for tonight! "
+                f"Players: {'✅' if players_ok else '⚠️ failed'} | "
+                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'}"
+            )
+            st.rerun()
+
+    except Exception as _exc:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"❌ Auto-load failed: {_exc}")
 
 if fetch_players_clicked:
     todays_games_for_fetch = st.session_state.get("todays_games", [])

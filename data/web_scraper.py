@@ -20,6 +20,7 @@
 #   - All requests include a User-Agent header to avoid auto-blocks
 # ============================================================
 
+import re
 import time
 import json
 
@@ -95,6 +96,35 @@ _STATUS_NORMALIZER = {
 # ============================================================
 # SECTION: Internal Helpers
 # ============================================================
+
+# Common name suffixes to strip for normalised key comparison
+_NAME_SUFFIXES = re.compile(
+    r"\s+(jr\.?|sr\.?|ii|iii|iv|v)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_player_key(name):
+    """
+    Return a consistent lowercase key for a player name.
+
+    Strips leading/trailing whitespace, collapses internal whitespace,
+    and removes common generational suffixes (Jr., Sr., II, III, IV, V)
+    so that "Jaren Jackson Jr." and "Jaren Jackson" map to the same key.
+
+    Args:
+        name (str): Raw player name.
+
+    Returns:
+        str: Normalised lowercase key.
+    """
+    if not name:
+        return ""
+    key = name.lower().strip()
+    key = re.sub(r"\s+", " ", key)       # collapse internal whitespace
+    key = _NAME_SUFFIXES.sub("", key)    # strip generational suffixes
+    return key.strip()
+
 
 def _get_with_retry(url, params=None, timeout=REQUEST_TIMEOUT_SECONDS):
     """
@@ -308,6 +338,94 @@ def scrape_rotowire_injury_report():
 
             print(f"scrape_rotowire_injury_report: found {len(result)} players (Strategy B)")
             return result
+
+        # ── Strategy C: broad regex/class partial matching ──────────────
+        #
+        # Last-resort fallback for markup that doesn't match Strategy A or B.
+        # Searches for any <div> or <table> that contains the column header
+        # text that RotoWire typically uses: "Player", "Status", "Injury",
+        # "Est. Return".  This is intentionally broader so that minor
+        # markup rewrites don't immediately break the scraper.
+        #
+        _ROTOWIRE_HEADER_RE = re.compile(
+            r"\b(player|status|injury|est\.?\s*return)\b",
+            re.IGNORECASE,
+        )
+
+        # Find any container whose text mentions at least two of the
+        # known RotoWire column headers.
+        candidate_containers = []
+        for tag in soup.find_all(["div", "table", "section"]):
+            text = tag.get_text(" ", strip=True)
+            if len(_ROTOWIRE_HEADER_RE.findall(text)) >= 2:
+                # Prefer smaller containers (direct row-level parents)
+                if len(tag.find_all(True)) < 500:
+                    candidate_containers.append(tag)
+
+        for container in candidate_containers:
+            rows_c = container.find_all("tr")
+            if not rows_c:
+                # Try div rows — each row sibling containing a player name
+                rows_c = [
+                    el for el in container.find_all(True)
+                    if el.get("class") and any(
+                        "player" in c.lower() for c in el.get("class", [])
+                    )
+                ]
+            if not rows_c:
+                continue
+
+            tmp_result = {}
+            for row in rows_c:
+                try:
+                    cells = row.find_all(["td", "li", "span", "div"])
+                    texts = [c.get_text(strip=True) for c in cells]
+                    if len(texts) < 2:
+                        continue
+                    # Heuristic: first non-empty cell is often the player name
+                    name = texts[0] if texts[0] else ""
+                    if not name or len(name) < 3:
+                        continue
+                    # Try to locate status/injury from the remaining cells
+                    status = ""
+                    injury = ""
+                    team = ""
+                    ret = ""
+                    for cell_text in texts[1:]:
+                        lower_ct = cell_text.lower()
+                        if not status and any(
+                            kw in lower_ct for kw in
+                            ("out", "gtd", "doubtful", "questionable",
+                             "day-to-day", "probable", "active")
+                        ):
+                            status = cell_text
+                        elif not injury and len(cell_text) > 2:
+                            injury = cell_text
+                        elif not team and 2 <= len(cell_text) <= 4 and cell_text.isupper():
+                            team = cell_text
+                        elif not ret and any(
+                            c.isdigit() for c in cell_text
+                        ):
+                            ret = cell_text
+                    if name and status:
+                        key = name.lower().strip()
+                        tmp_result[key] = {
+                            "status":      _normalize_status(status),
+                            "injury":      injury,
+                            "team":        team,
+                            "return_date": ret,
+                            "source":      "RotoWire",
+                        }
+                except Exception:
+                    continue
+
+            if tmp_result:
+                result.update(tmp_result)
+                print(
+                    f"scrape_rotowire_injury_report: found {len(result)} players "
+                    f"(Strategy C)"
+                )
+                return result
 
         print("scrape_rotowire_injury_report: no recognisable HTML structure found")
 

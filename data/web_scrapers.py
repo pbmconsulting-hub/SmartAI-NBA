@@ -22,6 +22,7 @@
 #   - All requests include a User-Agent header
 # ============================================================
 
+import re
 import time
 import json
 import os
@@ -137,6 +138,35 @@ def _canonicalize_status(raw):
         "active": "Active",
     }
     return _MAP.get(str(raw).strip().lower(), "Unknown")
+
+
+# Common name suffixes to strip for normalised key comparison
+_NAME_SUFFIXES_RE = re.compile(
+    r"\s+(jr\.?|sr\.?|ii|iii|iv|v)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_player_key(name):
+    """
+    Return a consistent lowercase key for a player name.
+
+    Strips leading/trailing whitespace, collapses internal whitespace,
+    and removes common generational suffixes (Jr., Sr., II, III, IV, V)
+    so that "Jaren Jackson Jr." and "Jaren Jackson" map to the same key.
+
+    Args:
+        name (str): Raw player name.
+
+    Returns:
+        str: Normalised lowercase key.
+    """
+    if not name:
+        return ""
+    key = name.lower().strip()
+    key = re.sub(r"\s+", " ", key)          # collapse internal whitespace
+    key = _NAME_SUFFIXES_RE.sub("", key)    # strip generational suffixes
+    return key.strip()
 
 # ============================================================
 # END SECTION: Internal Helpers
@@ -455,6 +485,28 @@ def fetch_multi_source_injury_status(todays_games=None):
                 "comment":     entry.get("comment", ""),
                 "source":      entry.get("source", "unknown"),
             }
+
+    # ── Final deduplication + normalization pass ──────────────
+    # Some scrapers return names with suffixes (e.g. "Jr.", "III").
+    # Re-key using _normalize_player_key so lookup is consistent
+    # regardless of suffix differences between sources.
+    normalized_merged = {}
+    for raw_key, entry in merged.items():
+        norm_key = _normalize_player_key(raw_key)
+        if norm_key and norm_key not in normalized_merged:
+            normalized_merged[norm_key] = entry
+        elif norm_key in normalized_merged:
+            # Keep the entry with higher-severity status
+            _SEV = {
+                "Out": 5, "Injured Reserve": 5, "Doubtful": 4,
+                "GTD": 3, "Questionable": 3, "Day-to-Day": 2,
+                "Probable": 1, "Active": 0, "Unknown": -1,
+            }
+            existing_sev = _SEV.get(normalized_merged[norm_key]["status"], -1)
+            new_sev = _SEV.get(entry["status"], -1)
+            if new_sev > existing_sev:
+                normalized_merged[norm_key] = entry
+    merged = normalized_merged
 
     total = len(merged)
     out_count = sum(1 for v in merged.values() if v["status"] == "Out")
