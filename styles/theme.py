@@ -293,11 +293,49 @@ html, body, [class*="css"] {
 }
 
 /* ─── Streamlit native elements on dark bg ───────────────── */
-[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; }
-[data-testid="stMetricLabel"] { color: #8a9bb8 !important; }
+[data-testid="stMetricValue"] {
+    color: rgba(255,255,255,0.95) !important;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+}
+[data-testid="stMetricLabel"] { color: rgba(192,208,232,0.85) !important; }
 .stAlert { background: rgba(20,25,43,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: rgba(255,255,255,0.9) !important; }
+div[data-testid="stAlert"] { color: rgba(255,255,255,0.92) !important; }
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] span { color: rgba(255,255,255,0.92) !important; }
 .stExpander { background: rgba(20,25,43,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
-.stExpander summary { color: rgba(255,255,255,0.90) !important; }
+.stExpander summary,
+[data-testid="stExpander"] summary { color: rgba(255,255,255,0.90) !important; }
+[data-testid="stExpander"] details summary span { color: rgba(255,255,255,0.90) !important; }
+/* Tab buttons */
+[data-testid="stTab"] button {
+    color: rgba(255,255,255,0.65) !important;
+}
+[data-testid="stTab"] button[aria-selected="true"],
+[data-testid="stTab"] button[data-selected="true"] {
+    color: rgba(255,255,255,1.0) !important;
+    font-weight: 700 !important;
+}
+/* DataFrame table cells */
+[data-testid="stDataFrame"] table,
+[data-testid="stDataFrame"] td,
+[data-testid="stDataFrame"] th {
+    color: rgba(255,255,255,0.88) !important;
+    background-color: #0d1220 !important;
+}
+.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: rgba(255,255,255,0.88) !important; }
+/* Selectbox */
+[data-testid="stSelectbox"] div,
+[data-testid="stSelectbox"] span { color: rgba(255,255,255,0.90) !important; }
+/* Number input */
+[data-testid="stNumberInput"] input { color: rgba(255,255,255,0.90) !important; }
+/* Text input */
+[data-testid="stTextInput"] input { color: rgba(255,255,255,0.90) !important; }
+/* Buttons — default (secondary) */
+.stButton > button {
+    color: rgba(255,255,255,0.92) !important;
+    border-color: rgba(0,240,255,0.30) !important;
+}
 button[kind="primary"] {
     background: linear-gradient(135deg, #00ffd5, #00b4ff) !important;
     color: #0a0f1a !important;
@@ -306,7 +344,18 @@ button[kind="primary"] {
     letter-spacing: 0.05em !important;
     box-shadow: 0 0 16px rgba(0,255,213,0.35) !important;
 }
-.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: rgba(255,255,255,0.9) !important; }
+/* Sidebar nav links */
+[data-testid="stSidebar"] .stPageLink a,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] a,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span {
+    font-size: 0.95rem !important;
+    color: rgba(255,255,255,0.88) !important;
+}
+/* Caption / st.caption */
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p { color: rgba(192,208,232,0.80) !important; }
+/* Dividers / hr */
+hr { border-color: rgba(0,240,255,0.20) !important; }
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {
@@ -2144,6 +2193,32 @@ def get_game_report_html(game=None, analysis_results=None):
     Returns:
         str: Complete self-contained HTML document with embedded CSS and JS
     """
+    # ── Early return: placeholder if no analysis results ──────────
+    if not analysis_results:
+        return """<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8">
+<style>
+body { background: #0a0f1a; color: #c0d0e8; font-family: 'Segoe UI', sans-serif;
+       display: flex; justify-content: center; align-items: center;
+       min-height: 200px; margin: 0; padding: 20px; box-sizing: border-box; }
+.placeholder { text-align: center; padding: 40px 30px;
+    background: #14192b; border: 1px solid rgba(255,94,0,0.20);
+    border-radius: 10px; max-width: 560px; }
+.placeholder h2 { color: #ff5e00; font-size: 1.2rem; margin: 0 0 12px; }
+.placeholder p  { color: #8b949e; font-size: 0.9rem; line-height: 1.6; margin: 0; }
+.placeholder a  { color: #00f0ff; }
+</style>
+</head>
+<body>
+<div class="placeholder">
+  <h2>📊 No Analysis Results Yet</h2>
+  <p>Run <strong style="color:#00f0ff;">⚡ Neural Analysis</strong> on the Neural Analysis tab first,
+  then return here to view the full game report.</p>
+</div>
+</body>
+</html>"""
+
     NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/1040x760"
     ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
 

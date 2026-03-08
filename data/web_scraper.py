@@ -62,6 +62,13 @@ ROTOWIRE_INJURY_URL = "https://www.rotowire.com/basketball/injury-report.php"
 NBA_CDN_INJURY_JSON_URL = (
     "https://cdn.nba.com/static/json/staticData/InjuryReport.json"
 )
+# Alternate CDN path used if the primary fails (NBA sometimes rotates CDN domains).
+# Note: This endpoint contains player movement/transaction data rather than a
+# dedicated injury report; it is used as a last-resort fallback to extract any
+# available status information when the primary CDN is unreachable.
+NBA_CDN_INJURY_JSON_URL_ALT = (
+    "https://stats.nba.com/js/data/playermovement/NBA_Player_Movement.json"
+)
 NBA_HTML_INJURY_URL = "https://www.nba.com/players/injuries"
 BREF_ROSTER_URL_TEMPLATE = (
     "https://www.basketball-reference.com/teams/{team}/2026.html"
@@ -309,6 +316,90 @@ def scrape_rotowire_injury_report():
             print(f"scrape_rotowire_injury_report: found {len(result)} players (Strategy B)")
             return result
 
+        # ── Strategy C: <table class="injury-report-table"> ─────────────────
+        #
+        # RotoWire 2025-26 season uses a dedicated CSS class on the table.
+        #
+        table_c = soup.select_one("table.injury-report-table")
+        if not table_c:
+            table_c = soup.find("table", id=lambda x: x and "injury" in x.lower())
+        if table_c:
+            headers = [th.get_text(strip=True).lower() for th in table_c.select("th")]
+            col = {}
+            for i, h in enumerate(headers):
+                if "player" in h:
+                    col["name"] = i
+                elif "team" in h:
+                    col["team"] = i
+                elif "injury" in h or "description" in h:
+                    col["injury"] = i
+                elif "status" in h:
+                    col["status"] = i
+                elif "return" in h:
+                    col["return_date"] = i
+
+            for tr in table_c.select("tbody tr"):
+                cells = [td.get_text(strip=True) for td in tr.select("td")]
+                if not cells:
+                    continue
+                try:
+                    name        = cells[col.get("name",   0)] if "name"        in col else ""
+                    team        = cells[col.get("team",   1)] if "team"        in col else ""
+                    injury      = cells[col.get("injury", 2)] if "injury"      in col else ""
+                    status      = cells[col.get("status", 3)] if "status"      in col else ""
+                    return_date = cells[col.get("return_date", 4)] if "return_date" in col else ""
+                    if not name:
+                        continue
+                    key = name.lower().strip()
+                    result[key] = {
+                        "status":      _normalize_status(status),
+                        "injury":      injury,
+                        "team":        team,
+                        "return_date": return_date,
+                        "source":      "RotoWire",
+                    }
+                except (IndexError, KeyError) as cell_err:
+                    print(f"  scrape_rotowire Strategy C: cell parse error: {cell_err}")
+                    continue
+
+            if result:
+                print(f"scrape_rotowire_injury_report: found {len(result)} players (Strategy C)")
+                return result
+
+        # ── Strategy D: broad div[class*="injury"] row heuristic ────────────
+        #
+        # Last resort: look for any div whose class contains "injury" and extract
+        # player/status text from children.
+        #
+        injury_rows = soup.select("div[class*='injury']")
+        for row in injury_rows:
+            try:
+                name_el   = row.select_one("[class*='player'], [class*='name']")
+                team_el   = row.select_one("[class*='team']")
+                status_el = row.select_one("[class*='status']")
+                injury_el = row.select_one("[class*='injury'], [class*='desc']")
+                name   = name_el.get_text(strip=True)   if name_el   else ""
+                team   = team_el.get_text(strip=True)   if team_el   else ""
+                status = status_el.get_text(strip=True) if status_el else ""
+                injury = injury_el.get_text(strip=True) if injury_el else ""
+                if not name or not status:
+                    continue
+                key = name.lower().strip()
+                if key not in result:
+                    result[key] = {
+                        "status":      _normalize_status(status),
+                        "injury":      injury,
+                        "team":        team,
+                        "return_date": "",
+                        "source":      "RotoWire",
+                    }
+            except Exception:
+                continue
+
+        if result:
+            print(f"scrape_rotowire_injury_report: found {len(result)} players (Strategy D)")
+            return result
+
         print("scrape_rotowire_injury_report: no recognisable HTML structure found")
 
     except Exception as exc:
@@ -369,56 +460,58 @@ def scrape_nba_official_injury_report():
 
     # ── Attempt 1: JSON CDN endpoint ────────────────────────────────────
     print("scrape_nba_official_injury_report: trying JSON CDN →", NBA_CDN_INJURY_JSON_URL)
-    try:
-        response = _get_with_retry(NBA_CDN_INJURY_JSON_URL)
-        data = response.json()
-        injury_list = data.get("InjuryList") or data.get("injuryList") or []
+    cdn_urls = [NBA_CDN_INJURY_JSON_URL, NBA_CDN_INJURY_JSON_URL_ALT]
+    for cdn_url in cdn_urls:
+        try:
+            response = _get_with_retry(cdn_url)
+            data = response.json()
+            injury_list = data.get("InjuryList") or data.get("injuryList") or []
 
-        # Also handle wrapper like {"LeagueInjuries": [...]}
-        if not injury_list:
-            for value in data.values():
-                if isinstance(value, list) and len(value) > 0:
-                    injury_list = value
-                    break
+            # Also handle wrapper like {"LeagueInjuries": [...]}
+            if not injury_list:
+                for value in data.values():
+                    if isinstance(value, list) and len(value) > 0:
+                        injury_list = value
+                        break
 
-        if injury_list:
-            for entry in injury_list:
-                first = entry.get("FirstName", "") or entry.get("firstName", "")
-                last  = entry.get("LastName",  "") or entry.get("lastName",  "")
-                name  = f"{first} {last}".strip()
-                if not name:
-                    continue
+            if injury_list:
+                for entry in injury_list:
+                    first = entry.get("FirstName", "") or entry.get("firstName", "")
+                    last  = entry.get("LastName",  "") or entry.get("lastName",  "")
+                    name  = f"{first} {last}".strip()
+                    if not name:
+                        continue
 
-                team    = (entry.get("TeamAbbreviation", "") or
-                           entry.get("teamAbbreviation", "") or
-                           entry.get("teamTricode", ""))
-                status  = (entry.get("StatusCategory", "") or
-                           entry.get("statusCategory", "") or
-                           entry.get("gameStatus", ""))
-                injury  = (entry.get("Injury", "") or
-                           entry.get("injury", "") or
-                           entry.get("bodyPartCategory", ""))
-                comment = entry.get("Comment", "") or entry.get("comment", "")
+                    team    = (entry.get("TeamAbbreviation", "") or
+                               entry.get("teamAbbreviation", "") or
+                               entry.get("teamTricode", ""))
+                    status  = (entry.get("StatusCategory", "") or
+                               entry.get("statusCategory", "") or
+                               entry.get("gameStatus", ""))
+                    injury  = (entry.get("Injury", "") or
+                               entry.get("injury", "") or
+                               entry.get("bodyPartCategory", ""))
+                    comment = entry.get("Comment", "") or entry.get("comment", "")
 
-                key = name.lower().strip()
-                result[key] = {
-                    "status":  _normalize_status(status),
-                    "injury":  injury,
-                    "team":    team,
-                    "comment": comment,
-                    "source":  "NBA.com",
-                }
+                    key = name.lower().strip()
+                    result[key] = {
+                        "status":  _normalize_status(status),
+                        "injury":  injury,
+                        "team":    team,
+                        "comment": comment,
+                        "source":  "NBA.com",
+                    }
 
-            print(
-                f"scrape_nba_official_injury_report: found {len(result)} players "
-                f"from JSON CDN"
-            )
-            return result
+                print(
+                    f"scrape_nba_official_injury_report: found {len(result)} players "
+                    f"from JSON CDN ({cdn_url})"
+                )
+                return result
 
-        print("scrape_nba_official_injury_report: JSON CDN returned empty injury list")
+            print(f"scrape_nba_official_injury_report: JSON CDN returned empty injury list ({cdn_url})")
 
-    except Exception as cdn_err:
-        print(f"scrape_nba_official_injury_report: JSON CDN failed — {cdn_err}")
+        except Exception as cdn_err:
+            print(f"scrape_nba_official_injury_report: JSON CDN failed for {cdn_url} — {cdn_err}")
 
     # ── Attempt 2: HTML fallback ─────────────────────────────────────────
     #

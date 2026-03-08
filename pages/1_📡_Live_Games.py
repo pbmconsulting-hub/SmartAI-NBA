@@ -170,8 +170,22 @@ if auto_load_clicked:
 # ── Polling display while background load is running ──────────
 _autoload_status = st.session_state.get("autoload_status")
 
+
+def _parse_progress_fraction(progress_text):
+    """Parse 'Step X/Y — ...' string and return fraction (0.0–1.0)."""
+    import re
+    m = re.search(r"Step\s+(\d+)\s*/\s*(\d+)", progress_text or "")
+    if m:
+        current, total = int(m.group(1)), int(m.group(2))
+        if total > 0:
+            return min(1.0, current / total)
+    return 0.0
+
+
 if _autoload_status == "running":
-    st.info(f"⏳ {st.session_state.get('autoload_progress', 'Loading…')}")
+    progress_text = st.session_state.get("autoload_progress", "Loading…")
+    frac = _parse_progress_fraction(progress_text)
+    st.progress(frac, text=f"⏳ {progress_text}")
     time.sleep(2)
     st.rerun()
 elif _autoload_status == "done":

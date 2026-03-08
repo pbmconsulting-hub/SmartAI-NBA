@@ -180,9 +180,61 @@ def scrape_espn_injury_report():
     try:
         soup = BeautifulSoup(resp.text, "lxml")
 
-        # ESPN injury page structure: sections per team, each with a table
-        # Each team section has an <h2> or similar with team name,
-        # followed by a <table> with tbody rows.
+        # ── Strategy A: ESPN's current wrapper div.ResponsiveTable ──────────
+        #
+        # ESPN's 2025-26 markup wraps each team's injury table in a
+        # <div class="ResponsiveTable"> block. Each block contains a
+        # title element (team name) and a <table> with player rows.
+        #
+        responsive_tables = soup.select("div.ResponsiveTable")
+        if responsive_tables:
+            for block in responsive_tables:
+                # Team name is in a nearby title element
+                title_el = block.select_one("div.Table__Title, .Table__header, h2, h3")
+                team_name = title_el.get_text(strip=True) if title_el else "Unknown"
+
+                table = block.find("table")
+                if table is None:
+                    continue
+
+                tbody = table.find("tbody")
+                if tbody is None:
+                    continue
+
+                for row in tbody.find_all("tr"):
+                    cells = row.find_all("td")
+                    if len(cells) < 4:
+                        continue
+
+                    name_cell    = cells[0].get_text(strip=True)
+                    status_cell  = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                    comment_cell = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                    date_cell    = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+
+                    player_name = name_cell.strip()
+                    if not player_name:
+                        continue
+
+                    canonical_status = _canonicalize_status(status_cell)
+                    key = player_name.lower().strip()
+                    results[key] = {
+                        "status":      canonical_status,
+                        "injury":      comment_cell or date_cell,
+                        "team":        team_name,
+                        "return_date": "",
+                        "comment":     comment_cell,
+                        "source":      "espn",
+                    }
+
+            if results:
+                print(f"scrape_espn_injury_report: {len(results)} players found (Strategy A: ResponsiveTable)")
+                return results
+
+        # ── Strategy B: Table__Title class-based section selector (fallback) ─
+        #
+        # ESPN injury page structure: sections per team, each with a table.
+        # Each team section has an element with "Table__Title" class.
+        #
         team_sections = soup.find_all("div", class_=lambda c: c and "Table__Title" in c)
 
         for section in team_sections:
@@ -211,10 +263,9 @@ def scrape_espn_injury_report():
                     continue
 
                 # ESPN columns (may vary): Name | Pos | Date | Status | Comment
-                name_cell = cells[0].get_text(strip=True)
-                pos_cell = cells[1].get_text(strip=True) if len(cells) > 1 else ""
-                date_cell = cells[2].get_text(strip=True) if len(cells) > 2 else ""
-                status_cell = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                name_cell    = cells[0].get_text(strip=True)
+                date_cell    = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                status_cell  = cells[3].get_text(strip=True) if len(cells) > 3 else ""
                 comment_cell = cells[4].get_text(strip=True) if len(cells) > 4 else ""
 
                 player_name = name_cell.strip()
@@ -225,15 +276,15 @@ def scrape_espn_injury_report():
                 key = player_name.lower().strip()
 
                 results[key] = {
-                    "status": canonical_status,
-                    "injury": comment_cell or date_cell,
-                    "team": team_name,
+                    "status":      canonical_status,
+                    "injury":      comment_cell or date_cell,
+                    "team":        team_name,
                     "return_date": "",
-                    "comment": comment_cell,
-                    "source": "espn",
+                    "comment":     comment_cell,
+                    "source":      "espn",
                 }
 
-        print(f"scrape_espn_injury_report: {len(results)} players found")
+        print(f"scrape_espn_injury_report: {len(results)} players found (Strategy B: Table__Title)")
     except Exception as exc:
         print(f"scrape_espn_injury_report: parse error — {exc}")
 
@@ -400,11 +451,13 @@ def fetch_multi_source_injury_status(todays_games=None):
         rotowire_data = {}
         nba_data = {}
         try:
-            rotowire_data = scrape_rotowire_injury_report() if scrape_rotowire_injury_report else {}
+            if callable(scrape_rotowire_injury_report):
+                rotowire_data = scrape_rotowire_injury_report()
         except Exception as exc:
             print(f"fetch_multi_source_injury_status: RotoWire raised: {exc}")
         try:
-            nba_data = scrape_nba_official_injury_report() if scrape_nba_official_injury_report else {}
+            if callable(scrape_nba_official_injury_report):
+                nba_data = scrape_nba_official_injury_report()
         except Exception as exc:
             print(f"fetch_multi_source_injury_status: NBA.com raised: {exc}")
         # Merge: RotoWire first, NBA.com overrides
@@ -466,10 +519,112 @@ def fetch_multi_source_injury_status(todays_games=None):
         f"fetch_multi_source_injury_status complete: {total} players — "
         f"{out_count} Out, {gtd_count} GTD/Questionable/Doubtful"
     )
+
+    # ── Self-validation in debug mode ─────────────────────────────
+    if os.environ.get("SMARTAI_DEBUG", "").lower() in ("1", "true", "yes"):
+        validate_injury_pipeline(merged)
+
     return merged
 
 # ============================================================
 # END SECTION: Consolidated Multi-Source Injury Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Injury Pipeline Validator
+# ============================================================
+
+def validate_injury_pipeline(merged_map=None):
+    """
+    Self-test / validation for the full injury data pipeline.
+
+    Calls all three scrapers independently, merges results, and prints
+    a summary table so the pipeline can verify itself without any manual
+    data entry.
+
+    If all scrapers fail, falls back to the cached injury_status.json and
+    logs a clear warning.
+
+    Args:
+        merged_map (dict|None): Pre-merged map to validate (avoids redundant
+            scraper calls if already merged by fetch_multi_source_injury_status).
+
+    Returns:
+        dict: Summary counts: {"total", "out", "gtd", "source"}.
+    """
+    print("=" * 60)
+    print("validate_injury_pipeline: starting self-test")
+
+    summary = {"total": 0, "out": 0, "gtd": 0, "source": "none"}
+
+    if merged_map is not None:
+        # Use the already-merged data supplied by the caller
+        data = merged_map
+        source = "pre-merged"
+    else:
+        # Run all three scrapers fresh
+        rw_data, nba_data, espn_data = {}, {}, {}
+        try:
+            if callable(scrape_rotowire_injury_report):
+                rw_data = scrape_rotowire_injury_report()
+            print(f"  validate_injury_pipeline: RotoWire → {len(rw_data)} players")
+        except Exception as exc:
+            print(f"  validate_injury_pipeline: RotoWire failed — {exc}")
+
+        try:
+            if callable(scrape_nba_official_injury_report):
+                nba_data = scrape_nba_official_injury_report()
+            print(f"  validate_injury_pipeline: NBA.com   → {len(nba_data)} players")
+        except Exception as exc:
+            print(f"  validate_injury_pipeline: NBA.com failed — {exc}")
+
+        try:
+            espn_data = scrape_espn_injury_report()
+            print(f"  validate_injury_pipeline: ESPN      → {len(espn_data)} players")
+        except Exception as exc:
+            print(f"  validate_injury_pipeline: ESPN failed — {exc}")
+
+        # Merge: ESPN lowest priority, RotoWire mid, NBA.com highest
+        data = {**espn_data, **rw_data, **nba_data}
+        source = "live"
+
+        if not data:
+            # All scrapers failed — fall back to cached JSON
+            try:
+                if INJURY_STATUS_JSON_PATH and os.path.exists(INJURY_STATUS_JSON_PATH):
+                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _f:
+                        data = json.load(_f)
+                    print(
+                        f"  validate_injury_pipeline: WARNING — all scrapers failed; "
+                        f"using cached injury_status.json ({len(data)} entries)"
+                    )
+                    source = "cached"
+            except Exception as cache_exc:
+                print(f"  validate_injury_pipeline: cached JSON also failed — {cache_exc}")
+
+    total = len(data)
+    out_count = sum(1 for v in data.values() if v.get("status") == "Out")
+    gtd_count = sum(
+        1 for v in data.values()
+        if v.get("status") in ("GTD", "Questionable", "Doubtful", "Day-to-Day")
+    )
+    ir_count = sum(1 for v in data.values() if v.get("status") == "Injured Reserve")
+
+    print(
+        f"  validate_injury_pipeline SUMMARY [{source}]:\n"
+        f"    Total players in injury data : {total}\n"
+        f"    Out                          : {out_count}\n"
+        f"    Injured Reserve              : {ir_count}\n"
+        f"    GTD / Questionable / Doubtful: {gtd_count}\n"
+    )
+    print("=" * 60)
+
+    summary.update({"total": total, "out": out_count + ir_count, "gtd": gtd_count, "source": source})
+    return summary
+
+# ============================================================
+# END SECTION: Injury Pipeline Validator
 # ============================================================
 
 
@@ -524,19 +679,36 @@ def fetch_verified_rosters(team_abbrevs, todays_games=None):
     if not nba_api_rosters:
         return {}
 
-    # ── Step 2: Fetch Rotowire injury list for cross-reference ────
-    rotowire_injured = set()
+    # ── Step 2: Fetch multi-source injury list for cross-reference ───
+    inactive_players = set()
+    _INACTIVE_FOR_ROSTER = frozenset({
+        "Out", "Injured Reserve", "Out (No Recent Games)", "Suspended",
+        "Not With Team", "G League", "G League - Two-Way", "G League - On Assignment",
+        "Doubtful",
+    })
     try:
-        if scrape_rotowire_injury_report is not None:
-            rw_data = scrape_rotowire_injury_report()
-            # Players listed on Rotowire injury report are considered injured/inactive
-            for key, entry in rw_data.items():
-                if entry.get("status", "") in (
-                    "Out", "Injured Reserve", "Doubtful", "GTD", "Day-to-Day", "Questionable"
-                ):
-                    rotowire_injured.add(key)
+        # Prefer the full multi-source merged map (highest coverage)
+        multi_injury = fetch_multi_source_injury_status(todays_games=todays_games)
+        for key, entry in multi_injury.items():
+            if entry.get("status", "") in _INACTIVE_FOR_ROSTER:
+                inactive_players.add(key)
+        print(
+            f"fetch_verified_rosters: multi-source injury cross-ref → "
+            f"{len(inactive_players)} inactive players"
+        )
     except Exception as exc:
-        print(f"fetch_verified_rosters: Rotowire cross-ref failed: {exc}")
+        print(f"fetch_verified_rosters: multi-source cross-ref failed: {exc} — falling back to RotoWire only")
+        # Fallback: RotoWire-only cross-reference
+        rotowire_injured = set()
+        try:
+            if scrape_rotowire_injury_report is not None:
+                rw_data = scrape_rotowire_injury_report()
+                for key, entry in rw_data.items():
+                    if entry.get("status", "") in _INACTIVE_FOR_ROSTER:
+                        rotowire_injured.add(key)
+        except Exception as rw_exc:
+            print(f"fetch_verified_rosters: Rotowire cross-ref also failed: {rw_exc}")
+        inactive_players = rotowire_injured
 
     # ── Step 3: Build verified roster — flag discrepancies ────────
     discrepancy_log = []
@@ -544,9 +716,9 @@ def fetch_verified_rosters(team_abbrevs, todays_games=None):
         active_players = []
         for player in players:
             player_key = player.lower().strip()
-            if player_key in rotowire_injured:
+            if player_key in inactive_players:
                 discrepancy_log.append(
-                    f"{player} ({abbrev}): on nba_api roster but flagged injured by Rotowire"
+                    f"{player} ({abbrev}): on nba_api roster but flagged inactive by injury pipeline"
                 )
             else:
                 active_players.append(player)

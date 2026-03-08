@@ -113,6 +113,7 @@ INACTIVE_INJURY_STATUSES = frozenset({
     "Out (No Recent Games)",
     "Suspended",
     "Not With Team",
+    "Doubtful",
     "G League - Two-Way",
     "G League - On Assignment",
     "G League",
@@ -1028,20 +1029,29 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         injury_data = precomputed_injury_map or {}
         if not injury_data:
             try:
-                from data.web_scraper import fetch_all_injury_data
-                scraped_injuries = fetch_all_injury_data()
+                # Prefer multi-source (ESPN + RotoWire + NBA.com) for maximum coverage
+                from data.web_scrapers import fetch_multi_source_injury_status
+                scraped_injuries = fetch_multi_source_injury_status()
                 if scraped_injuries:
                     injury_data = scraped_injuries
-            except Exception as _inj_err:
-                # Web scraper failed — fall back to the cached injury_status.json
-                # written by a previous fetch_player_injury_status() run.
-                print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+            except Exception as _multi_err:
+                print(f"  fetch_multi_source_injury_status failed in fetch_todays_players_only: {_multi_err}")
+                # Single-module fallback
                 try:
-                    if INJURY_STATUS_JSON_PATH.exists():
-                        with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                            injury_data = json.load(_jf)
-                except Exception as _cache_err:
-                    print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+                    from data.web_scraper import fetch_all_injury_data
+                    scraped_injuries = fetch_all_injury_data()
+                    if scraped_injuries:
+                        injury_data = scraped_injuries
+                except Exception as _inj_err:
+                    # Web scraper failed — fall back to the cached injury_status.json
+                    # written by a previous fetch_player_injury_status() run.
+                    print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+                    try:
+                        if INJURY_STATUS_JSON_PATH.exists():
+                            with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                                injury_data = json.load(_jf)
+                    except Exception as _cache_err:
+                        print(f"  WARNING: All injury filter methods failed: {_cache_err}")
 
         if injury_data:
             before_count = len(formatted_players)

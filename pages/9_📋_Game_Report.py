@@ -94,6 +94,30 @@ st.markdown(
     "AI-powered prop betting report with **SAFE Score™** analysis — "
     "collapsible sections, confidence bars, and entry strategy matrix."
 )
+
+# ── Analysis summary banner ────────────────────────────────────
+if analysis_results:
+    _n_games_with_results = len({
+        r.get("player_team", r.get("team", "")).upper()
+        for r in analysis_results
+    } & {
+        t
+        for g in todays_games
+        for t in (g.get("home_team", "").upper(), g.get("away_team", "").upper())
+    }) if todays_games else 0
+    _games_label = (
+        f"across {_n_games_with_results} game(s)"
+        if _n_games_with_results > 0
+        else "loaded"
+    )
+    st.info(f"✅ **{len(analysis_results)} prop(s) analysed {_games_label}.**")
+elif todays_games:
+    st.warning(
+        "⚡ Run **Neural Analysis** first — "
+        "go to the ⚡ Neural Analysis tab to generate predictions, "
+        "then return here to view the full report."
+    )
+
 st.divider()
 
 # ============================================================
@@ -152,6 +176,7 @@ if selected_game and analysis_results:
     filtered = [
         r for r in analysis_results
         if r.get("player_team", "").upper() in (home.upper(), away.upper())
+        or r.get("team", "").upper() in (home.upper(), away.upper())
     ]
     report_results = filtered if filtered else analysis_results
 elif analysis_results:
@@ -218,7 +243,7 @@ def _build_entry_strategy(results):
     return entries
 
 
-if not selected_game and len(todays_games) > 1 and report_results:
+if not selected_game and len(todays_games) > 1 and (report_results or todays_games):
     # ── Multiple matchups: per-game collapsible Streamlit expanders ──
     for game in todays_games:
         home = game.get("home_team", "")
@@ -226,6 +251,7 @@ if not selected_game and len(todays_games) > 1 and report_results:
         game_results = [
             r for r in report_results
             if r.get("player_team", "").upper() in (home.upper(), away.upper())
+            or r.get("team", "").upper() in (home.upper(), away.upper())
         ]
         n_game_props = len(game_results)
         n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])

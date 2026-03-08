@@ -430,33 +430,32 @@ def _render_qds_full_breakdown_html(result):
         )
 
     return f"""
-<details style="background:#14192b;border-radius:8px;padding:0;margin-top:10px;
-    border:1px solid rgba(255,94,0,0.15);">
-  <summary style="cursor:pointer;color:#ff5e00;font-weight:600;font-size:0.9rem;
-      padding:12px 15px;list-style:none;">
-    📊 Full Breakdown — {player} {stat}
-  </summary>
-  <div style="padding:12px 15px 15px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
+<div style="background:#14192b;border-radius:10px;padding:18px;margin-top:10px;
+    border:1px solid rgba(255,94,0,0.20);">
+  <div style="color:#ff5e00;font-weight:700;font-size:1rem;margin-bottom:14px;">
+    📊 Full Breakdown
+  </div>
+  <div style="color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
 
     <!-- Distribution grid -->
     <div style="margin-bottom:15px;">
       <h4 style="color:#ff5e00;font-size:0.9rem;margin-bottom:8px;">📊 Distribution</h4>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+        <div style="text-align:center;padding:8px;background:rgba(10,15,26,0.7);border-radius:6px;">
           <div style="color:#8b949e;font-size:0.75rem;">10th pct</div>
           <div style="color:#ff5e00;font-weight:700;">{p10:.1f}</div>
         </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+        <div style="text-align:center;padding:8px;background:rgba(10,15,26,0.7);border-radius:6px;">
           <div style="color:#8b949e;font-size:0.75rem;">Median</div>
           <div style="color:#00f0ff;font-weight:700;">{p50:.1f}</div>
         </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+        <div style="text-align:center;padding:8px;background:rgba(10,15,26,0.7);border-radius:6px;">
           <div style="color:#8b949e;font-size:0.75rem;">90th pct</div>
           <div style="color:#ff5e00;font-weight:700;">{p90:.1f}</div>
         </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
+        <div style="text-align:center;padding:8px;background:rgba(10,15,26,0.7);border-radius:6px;">
           <div style="color:#8b949e;font-size:0.75rem;">Std Dev</div>
-          <div style="color:white;font-weight:700;">{std:.1f}</div>
+          <div style="color:#00f0ff;font-weight:700;">{std:.1f}</div>
         </div>
       </div>
     </div>
@@ -479,7 +478,7 @@ def _render_qds_full_breakdown_html(result):
     {breakdown_html}
     {explain_html}
   </div>
-</details>
+</div>
 """
 
 

@@ -111,11 +111,33 @@ current_props = load_props_from_session(st.session_state)
 # Load persisted injury status for warning display (no API call needed)
 injury_status_map = load_injury_status()
 
-st.subheader(f"📋 Current Props ({len(current_props)} loaded)")
+# ── Auto-filter Out / Injured Reserve players from active props ─
+_OUT_IR_STATUSES = frozenset({"Out", "Injured Reserve"})
+active_props = []
+unavailable_props = []
+for _prop in current_props:
+    _pname = _prop.get("player_name", "")
+    _si = get_player_status(_pname, injury_status_map)
+    _pstatus = _si.get("status", "Active")
+    if _pstatus in _OUT_IR_STATUSES:
+        unavailable_props.append((_prop, _si))
+    else:
+        active_props.append(_prop)
 
-if current_props:
+# Write the cleaned (no Out/IR) list back to session state so Neural Analysis
+# never picks up unavailable players.
+if unavailable_props:
+    st.session_state["current_props"] = active_props
+    st.error(
+        f"⛔ **{len(unavailable_props)} prop(s) for OUT/IR player(s) detected and "
+        f"removed from the active list.** See \"⛔ Unavailable Players\" section below."
+    )
+
+st.subheader(f"📋 Current Props ({len(active_props)} active)")
+
+if active_props:
     # Enrich each prop with player data for display
-    enriched_props = [enrich_prop_with_player_data(p, players_data) for p in current_props]
+    enriched_props = [enrich_prop_with_player_data(p, players_data) for p in active_props]
 
     # Build display rows with season averages and line context
     display_rows = []
@@ -143,12 +165,13 @@ if current_props:
         else:
             line_ctx = "near avg"
 
-        # Injury / availability status flag
+        # Injury / availability status flag (active_props won't have Out/IR)
         status_info = get_player_status(player_name, injury_status_map)
         player_status = status_info.get("status", "Active")
         status_emoji = {
             "Out": "🔴", "Injured Reserve": "🔴",
             "Questionable": "🟡", "Day-to-Day": "🟡",
+            "GTD": "🟡", "Doubtful": "🟠",
             "Active": "🟢",
         }.get(player_status, "⚪")
 
@@ -175,33 +198,25 @@ if current_props:
         },
     )
 
-    # Show prominent OUT/IR warnings above the table
-    out_warnings = []
-    for prop in current_props:
+    # Show availability alerts for active (non-Out/IR) players
+    availability_warnings = []
+    for prop in active_props:
         pname = prop.get("player_name", "")
         si = get_player_status(pname, injury_status_map)
         pstatus = si.get("status", "Active")
-        if pstatus in ("Out", "Injured Reserve"):
+        if pstatus in ("Questionable", "Day-to-Day", "GTD", "Doubtful"):
             note = si.get("injury_note", "")
-            out_warnings.append(
-                f"⛔ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
-            )
-        elif pstatus in ("Questionable", "Day-to-Day"):
-            note = si.get("injury_note", "")
-            out_warnings.append(
+            availability_warnings.append(
                 f"⚠️ **{pname}** is **{pstatus}**" + (f" — {note}" if note else "")
             )
 
-    if out_warnings:
+    if availability_warnings:
         with st.expander(
-            f"🏥 Availability Alerts ({len(out_warnings)} player(s)) — click to expand",
+            f"🏥 Availability Alerts ({len(availability_warnings)} player(s)) — click to expand",
             expanded=True,
         ):
-            for warning in out_warnings:
-                if warning.startswith("⛔"):
-                    st.error(warning)
-                else:
-                    st.warning(warning)
+            for warning in availability_warnings:
+                st.warning(warning)
 
     col_clear, col_load_sample, _ = st.columns([1, 1, 3])
     with col_clear:
@@ -219,7 +234,7 @@ if current_props:
     # Roster validation table
     if players_data:
         from styles.theme import get_roster_health_html
-        validation = validate_props_against_roster(current_props, players_data)
+        validation = validate_props_against_roster(active_props, players_data)
         total_v = validation["total"]
         matched_count_v = validation["matched_count"]
 
@@ -248,7 +263,34 @@ if current_props:
                 )
 
 else:
-    st.info("No props loaded. Use the forms below to add props.")
+    st.info("No active props loaded. Use the forms below to add props.")
+
+# ── Unavailable Players section ────────────────────────────────
+if unavailable_props:
+    show_unavailable = st.checkbox("Show unavailable players (Out/IR)", value=False)
+    if show_unavailable:
+        st.subheader("⛔ Unavailable Players (removed from active list)")
+        st.caption("These props are for OUT/IR players and will NOT be sent to Neural Analysis.")
+        unavail_rows = []
+        for _uprop, _usi in unavailable_props:
+            _upname = _uprop.get("player_name", "")
+            _ustatus = _usi.get("status", "Out")
+            _note = _usi.get("injury_note", "")
+            unavail_rows.append({
+                "Player": _upname,
+                "Status": f"🔴 {_ustatus}",
+                "Note": _note,
+                "Team": _uprop.get("player_team", _uprop.get("team", "")),
+                "Stat": _uprop.get("stat_type", "").capitalize(),
+                "Line": _uprop.get("line", 0),
+                "Platform": _uprop.get("platform", ""),
+            })
+        st.dataframe(
+            unavail_rows,
+            use_container_width=True,
+            hide_index=True,
+            column_config={"Line": st.column_config.NumberColumn(format="%.1f")},
+        )
 
 # ============================================================
 # END SECTION: Current Props Table
