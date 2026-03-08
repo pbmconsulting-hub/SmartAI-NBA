@@ -46,11 +46,34 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 todays_games     = st.session_state.get("todays_games",     [])
 analysis_results = st.session_state.get("analysis_results", [])
 
+# ── Build expanded team alias set for stale-result filtering ──────
+# Covers common NBA abbreviation variants (e.g. "GS" ↔ "GSW", "NY" ↔ "NYK").
+_ABBREV_ALIASES = {
+    "GS": "GSW", "GSW": "GS",
+    "NY": "NYK", "NYK": "NY",
+    "NO": "NOP", "NOP": "NO",
+    "SA": "SAS", "SAS": "SA",
+    "UTAH": "UTA", "UTA": "UTAH",
+    "WSH": "WAS", "WAS": "WSH",
+    "BKN": "BRK", "BRK": "BKN",
+    "PHX": "PHO", "PHO": "PHX",
+    "CHA": "CHO", "CHO": "CHA",
+}
+
+def _expand_teams(abbrevs: set) -> set:
+    """Return abbrevs expanded with all known alias variants."""
+    expanded = set(abbrevs)
+    for a in list(abbrevs):
+        alias = _ABBREV_ALIASES.get(a)
+        if alias:
+            expanded.add(alias)
+    return expanded
+
 # ── Filter out stale results not matching tonight's teams ──────
 # If the user ran analysis yesterday and didn't clear session state,
 # results for teams not playing tonight are silently removed here
 # rather than polluting the report with stale data.
-# Uses case-insensitive, stripped fuzzy team matching.
+# Uses case-insensitive, stripped fuzzy team matching + alias expansion.
 if todays_games and analysis_results:
     playing_teams = set()
     for _game in todays_games:
@@ -61,11 +84,15 @@ if todays_games and analysis_results:
         if at:
             playing_teams.add(at)
     playing_teams.discard("")
+    playing_teams = _expand_teams(playing_teams)
 
     if playing_teams:
         _valid = [
             r for r in analysis_results
-            if r.get("player_team", r.get("team", "")).upper().strip() in playing_teams
+            if (
+                r.get("player_team", r.get("team", "")).upper().strip() in playing_teams
+                or not r.get("player_team", r.get("team", "")).strip()
+            )
         ]
         _stale_count = len(analysis_results) - len(_valid)
         if _stale_count > 0:
@@ -125,6 +152,7 @@ if todays_games:
             "🏟️ Select Matchup",
             range(len(options)),
             format_func=lambda i: options[i],
+            index=0,  # default to "All available props"
             help="Filter the report to a single game, or show all analysed props.",
         )
         if sel_idx > 0:
@@ -136,15 +164,15 @@ if todays_games:
         st.metric("Analysed Props",  n_props)
         st.metric("High-Conf Picks", n_picks, help="Picks with confidence ≥ 70")
 
-    # ── "Generate Report for ALL Games Tonight" button ─────────────
-    if len(todays_games) > 1:
-        all_games_btn = st.button(
-            "📋 Generate Report for ALL Games Tonight",
-            use_container_width=True,
-            help="Render a full QDS breakdown for every game on tonight's slate.",
-        )
-        if all_games_btn:
-            st.session_state["game_report_show_all"] = True
+    # ── "Generate Full Report" button — always visible ─────────────
+    # Shows a report for ALL analysis results regardless of game filter.
+    full_report_btn = st.button(
+        "📋 Generate Full Report for ALL Props",
+        use_container_width=True,
+        help="Render a complete QDS breakdown for every analysed prop, ignoring the game filter.",
+    )
+    if full_report_btn:
+        st.session_state["game_report_show_all"] = True
     else:
         st.session_state.setdefault("game_report_show_all", False)
 
@@ -154,6 +182,12 @@ elif not todays_games and not analysis_results:
         "Go to **📡 Live Games** to fetch tonight's NBA slate, "
         "then run **⚡ Neural Analysis** to generate prop predictions."
     )
+
+    # Still allow generating a report if there are analysis results without games
+    if analysis_results:
+        if st.button("📋 Generate Full Report for All Props", use_container_width=True):
+            st.session_state["game_report_show_all"] = True
+
 elif todays_games and not analysis_results:
     st.warning(
         "⚡ **Run Neural Analysis first, then return here.**\n\n"
@@ -167,6 +201,9 @@ else:
         "Go to **📡 Live Games** to fetch tonight's NBA slate, "
         "then run **⚡ Neural Analysis** to generate prop predictions."
     )
+    if analysis_results:
+        if st.button("📋 Generate Full Report for All Props", use_container_width=True):
+            st.session_state["game_report_show_all"] = True
 
 # ============================================================
 # END SECTION: Matchup Selector
@@ -180,9 +217,11 @@ else:
 if selected_game and analysis_results:
     home = selected_game.get("home_team", "").upper().strip()
     away = selected_game.get("away_team", "").upper().strip()
+    # Build alias-expanded set for the selected game's teams
+    game_teams = _expand_teams({home, away} - {""})
     filtered = [
         r for r in analysis_results
-        if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
+        if r.get("player_team", r.get("team", "")).upper().strip() in game_teams
     ]
     report_results = filtered if filtered else analysis_results
 elif analysis_results:
