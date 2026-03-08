@@ -175,8 +175,9 @@ def build_player_projection(
                 "player_name": _player_name,
                 "player_status": _status,
             }
-    except Exception:
-        pass  # Injury check is best-effort; continue with projection if it fails
+    except (ImportError, KeyError, AttributeError) as _inj_check_err:
+        # Log but do not block — injury check is best-effort
+        print(f"projections: injury check skipped for {player_data.get('name', '?')}: {_inj_check_err}")
 
     # ============================================================
     # END SECTION: Injury Status Check

@@ -325,8 +325,7 @@ def save_top_picks_from_analysis(analysis_results, max_picks=10):
             "team":                  pick.get("player_team", pick.get("team", "")),
             "edge_percentage":       pick.get("edge_percentage", 0.0),
             "notes": (
-                f"Auto-saved | {pick.get('tier','')} tier | "
-                f"Auto-saved from Neural Analysis"
+                f"Auto-saved from Neural Analysis | {pick.get('tier','')} tier"
             ),
         }
         pid = insert_prediction(pred_data)
