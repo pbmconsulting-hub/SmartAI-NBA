@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS bets (
     result TEXT,
     actual_value REAL,
     notes TEXT,
+    auto_logged INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
 );
 """
@@ -121,6 +122,24 @@ def initialize_database():
             cursor.execute(CREATE_ENTRIES_TABLE_SQL)
             cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
 
+            # ── Schema migrations for existing databases ──────────────
+            # Add auto_logged column if it doesn't exist yet
+            # (ALTER TABLE is idempotent-safe via the try/except)
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN auto_logged INTEGER DEFAULT 0"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            # Ensure actual_value column exists (older schema may not have it)
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN actual_value REAL"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
             # Save the changes
             connection.commit()
 
@@ -168,7 +187,8 @@ def insert_bet(bet_data):
         bet_data (dict): Bet information with keys:
             bet_date, player_name, team, stat_type, prop_line,
             direction, platform, confidence_score, probability_over,
-            edge_percentage, tier, entry_type, entry_fee, notes
+            edge_percentage, tier, entry_type, entry_fee, notes,
+            auto_logged (optional, default 0)
 
     Returns:
         int or None: The new bet's ID, or None if error
@@ -180,8 +200,8 @@ def insert_bet(bet_data):
     INSERT INTO bets (
         bet_date, player_name, team, stat_type, prop_line,
         direction, platform, confidence_score, probability_over,
-        edge_percentage, tier, entry_type, entry_fee, notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        edge_percentage, tier, entry_type, entry_fee, notes, auto_logged
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     values = (
@@ -199,6 +219,7 @@ def insert_bet(bet_data):
         bet_data.get("entry_type", ""),
         bet_data.get("entry_fee", 0.0),
         bet_data.get("notes", ""),
+        int(bet_data.get("auto_logged", 0)),
     )
 
     try:

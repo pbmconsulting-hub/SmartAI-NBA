@@ -1041,36 +1041,57 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         # fetch_all_todays_data after injury detection runs first).
         # Fall back to web scraper → cached JSON when not available.
         # --------------------------------------------------------
+        # ── Step 5: Injury filter via RosterEngine (primary) ──────────
+        # Use RosterEngine as the authoritative multi-source injury pipeline.
+        # Fall back to precomputed_injury_map → web_scraper → cached JSON.
         injury_data = precomputed_injury_map or {}
-        if not injury_data:
-            try:
-                from data.web_scraper import fetch_all_injury_data
-                scraped_injuries = fetch_all_injury_data()
-                if scraped_injuries:
-                    injury_data = scraped_injuries
-            except Exception as _inj_err:
-                # Web scraper failed — fall back to the cached injury_status.json
-                # written by a previous fetch_player_injury_status() run.
-                print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+        _engine = None
+        try:
+            from data.roster_engine import RosterEngine
+            _engine = RosterEngine()
+            _engine.refresh(list(playing_team_abbrevs))
+            injury_data = _engine.get_injury_report()
+            print(f"  RosterEngine supplied {len(injury_data)} injury entries")
+        except Exception as _re_err:
+            print(f"  RosterEngine failed: {_re_err} — falling back to legacy sources")
+            if not injury_data:
                 try:
-                    if INJURY_STATUS_JSON_PATH.exists():
-                        with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                            injury_data = json.load(_jf)
-                except Exception as _cache_err:
-                    print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+                    from data.web_scraper import fetch_all_injury_data
+                    scraped_injuries = fetch_all_injury_data()
+                    if scraped_injuries:
+                        injury_data = scraped_injuries
+                except Exception as _inj_err:
+                    print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+                    try:
+                        if INJURY_STATUS_JSON_PATH.exists():
+                            with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                                injury_data = json.load(_jf)
+                    except Exception as _cache_err:
+                        print(f"  WARNING: All injury filter methods failed: {_cache_err}")
 
         if injury_data:
             before_count = len(formatted_players)
-            formatted_players = [
-                p for p in formatted_players
-                if injury_data.get(
-                    p["name"].lower().strip(), {}
-                ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-            ]
+            # Cross-check each player against RosterEngine.is_player_active() when available,
+            # otherwise fall back to the simpler status-key lookup.
+            if _engine is not None:
+                filtered = []
+                for p in formatted_players:
+                    is_active, _reason = _engine.is_player_active(p["name"])
+                    if is_active:
+                        filtered.append(p)
+                formatted_players = filtered
+            else:
+                formatted_players = [
+                    p for p in formatted_players
+                    if injury_data.get(
+                        p["name"].lower().strip(), {}
+                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+                ]
             removed_count = before_count - len(formatted_players)
             if removed_count:
                 print(
-                    f"  Injury filter: removed {removed_count} Out/IR players "
+                    f"  Injury filter: removed {removed_count} inactive players "
+                    f"(Out/IR/Doubtful/Suspended/G-League/etc.) "
                     f"from today's roster ({len(formatted_players)} remain)"
                 )
         else:

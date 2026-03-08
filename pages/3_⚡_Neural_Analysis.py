@@ -430,12 +430,13 @@ def _render_qds_full_breakdown_html(result):
         )
 
     return f"""
-<details style="background:#14192b;border-radius:8px;padding:0;margin-top:10px;
+<div style="background:#14192b;border-radius:8px;padding:0;margin-top:10px;
     border:1px solid rgba(255,94,0,0.15);">
-  <summary style="cursor:pointer;color:#ff5e00;font-weight:600;font-size:0.9rem;
-      padding:12px 15px;list-style:none;">
-    📊 Full Breakdown — {player} {stat}
-  </summary>
+  <div style="padding:12px 15px;border-bottom:1px solid rgba(255,94,0,0.1);">
+    <span style="color:#ff5e00;font-weight:600;font-size:0.9rem;">
+      📊 Full Breakdown — {player} {stat}
+    </span>
+  </div>
   <div style="padding:12px 15px 15px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
 
     <!-- Distribution grid -->
@@ -461,16 +462,16 @@ def _render_qds_full_breakdown_html(result):
       </div>
     </div>
 
-    <!-- Forces grid -->
+    <!-- Forces grid (2 columns side by side) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">
       <div style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;
           border-left:3px solid #00f0ff;">
-        <h4 style="color:#00f0ff;font-size:0.85rem;margin-bottom:8px;">⬆️ Forces OVER</h4>
+        <h4 style="color:#00f0ff;font-size:0.85rem;margin-bottom:8px;">🔵 Forces OVER</h4>
         {_forces_html(over_forces)}
       </div>
       <div style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;
           border-left:3px solid #ff5e00;">
-        <h4 style="color:#ff5e00;font-size:0.85rem;margin-bottom:8px;">⬇️ Forces UNDER</h4>
+        <h4 style="color:#ff5e00;font-size:0.85rem;margin-bottom:8px;">🔴 Forces UNDER</h4>
         {_forces_html(under_forces)}
       </div>
     </div>
@@ -479,7 +480,7 @@ def _render_qds_full_breakdown_html(result):
     {breakdown_html}
     {explain_html}
   </div>
-</details>
+</div>
 """
 
 
@@ -736,17 +737,46 @@ if run_analysis:
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
 
-    # ── Filter props to only tonight's teams ──────────────────
-    playing_teams: set = set()
-    for _g in todays_games:
-        playing_teams.add(_g.get("home_team", "").upper())
-        playing_teams.add(_g.get("away_team", "").upper())
-    playing_teams.discard("")
+    # ── Filter props to only tonight's teams (with abbreviation aliases) ──
+    # Build expanded playing-teams set that covers all known alias variants
+    # (e.g. "GS" ↔ "GSW", "NY" ↔ "NYK") so team-abbreviation mismatches
+    # don't silently drop valid props.
+    ABBREV_ALIASES = {
+        "GS": "GSW", "GSW": "GS",
+        "NY": "NYK", "NYK": "NY",
+        "NO": "NOP", "NOP": "NO",
+        "SA": "SAS", "SAS": "SA",
+        "UTAH": "UTA", "UTA": "UTAH",
+        "WSH": "WAS", "WAS": "WSH",
+        "BKN": "BRK", "BRK": "BKN",
+        "PHX": "PHO", "PHO": "PHX",
+        "CHA": "CHO", "CHO": "CHA",
+        "NJ": "BKN",
+    }
 
-    if playing_teams:
+    playing_teams_expanded: set = set()
+    for _g in todays_games:
+        for _abbrev in (
+            _g.get("home_team", "").upper().strip(),
+            _g.get("away_team", "").upper().strip(),
+        ):
+            if not _abbrev:
+                continue
+            playing_teams_expanded.add(_abbrev)
+            # Add known alias for this abbreviation (if any)
+            _alias = ABBREV_ALIASES.get(_abbrev)
+            if _alias:
+                playing_teams_expanded.add(_alias)
+    playing_teams_expanded.discard("")
+
+    if playing_teams_expanded:
         props_to_analyze = [
             p for p in current_props
-            if p.get("team", "").upper() in playing_teams
+            if (
+                not playing_teams_expanded  # if no games loaded, include all
+                or p.get("team", "").upper().strip() in playing_teams_expanded
+                or not p.get("team", "").strip()  # include props with no team set
+            )
         ]
         skipped_count = len(current_props) - len(props_to_analyze)
         if skipped_count > 0:
@@ -757,10 +787,11 @@ if run_analysis:
     else:
         props_to_analyze = current_props  # Fallback: no games loaded
 
-    # ── Also skip confirmed Out/IR players via injury map ─────
+    # ── Also skip confirmed Out/IR/Doubtful players via injury map ─────
+    # If injury_map_pre is empty (failed to load), do NOT filter — just proceed.
     injury_map_pre = st.session_state.get("injury_status_map", {})
     _INACTIVE_STATUSES = frozenset({
-        "Out", "Injured Reserve", "Out (No Recent Games)",
+        "Out", "Doubtful", "Injured Reserve", "Out (No Recent Games)",
         "Suspended", "Not With Team",
         "G League - Two-Way", "G League - On Assignment", "G League",
     })
@@ -774,7 +805,7 @@ if run_analysis:
         ]
         inj_skipped = before_inj - len(props_to_analyze)
         if inj_skipped > 0:
-            st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR players.")
+            st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
 
     total_props_count    = len(props_to_analyze)
     if total_props_count == 0:
@@ -1032,6 +1063,68 @@ if run_analysis:
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
     progress_bar.empty()
     st.success(f"✅ Analysis complete! {len(analysis_results_list)} props analyzed.")
+
+    # ── Auto-log all qualifying picks to the Bet Tracker ────────
+    try:
+        from tracking.bet_tracker import log_new_bet as _log_bet
+        from tracking.database import load_all_bets as _load_bets
+        import datetime as _dt
+
+        _existing_bets = _load_bets(limit=500)
+        _today_str = _dt.date.today().isoformat()
+        _existing_keys = {
+            (
+                b.get("player_name", "").lower(),
+                b.get("stat_type", ""),
+                float(b.get("prop_line", 0) or 0),
+                b.get("direction", "OVER"),
+                b.get("bet_date", ""),
+            )
+            for b in _existing_bets
+        }
+
+        _auto_logged = 0
+        for _res in analysis_results_list:
+            if _res.get("edge_percentage", 0) < minimum_edge:
+                continue
+            if _res.get("player_is_out", False):
+                continue
+            _key = (
+                _res.get("player_name", "").lower(),
+                _res.get("stat_type", ""),
+                float(_res.get("line", 0) or 0),
+                _res.get("direction", "OVER"),
+                _today_str,
+            )
+            if _key in _existing_keys:
+                continue  # don't double-log
+            _ok, _msg = _log_bet(
+                player_name=_res.get("player_name", ""),
+                stat_type=_res.get("stat_type", "points"),
+                prop_line=float(_res.get("line", 0) or 0),
+                direction=_res.get("direction", "OVER"),
+                platform="SmartAI-Auto",
+                confidence_score=float(_res.get("confidence_score", 0) or 0),
+                probability_over=float(_res.get("probability_over", 0.5) or 0.5),
+                edge_percentage=float(_res.get("edge_percentage", 0) or 0),
+                tier=_res.get("tier", "Bronze"),
+                team=_res.get("player_team", _res.get("team", "")),
+                notes=(
+                    f"Auto-logged by SmartAI. "
+                    f"SAFE Score: {_res.get('confidence_score', 0):.0f}"
+                ),
+            )
+            if _ok:
+                _auto_logged += 1
+
+        if _auto_logged > 0:
+            st.info(
+                f"📊 Auto-logged **{_auto_logged}** qualifying pick(s) to the Bet Tracker."
+            )
+    except Exception as _auto_log_err:
+        # Auto-logging is best-effort — never block the main analysis flow
+        print(f"Auto-log error (non-fatal): {_auto_log_err}")
+
     st.rerun()
 
 # ============================================================

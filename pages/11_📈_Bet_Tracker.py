@@ -12,6 +12,7 @@ from tracking.bet_tracker import (
     log_new_bet,
     record_bet_result,
     get_model_performance_stats,
+    auto_resolve_bet_results,
 )
 from tracking.database import load_all_bets, initialize_database
 from styles.theme import get_global_css, get_qds_css
@@ -47,9 +48,11 @@ st.divider()
 # SECTION: Tabs
 # ============================================================
 
-tab_log, tab_bets, tab_predict = st.tabs([
+tab_log, tab_bets, tab_ai_picks, tab_auto_resolve, tab_predict = st.tabs([
     "➕ Log a Bet",
     "📋 My Bets",
+    "📊 AI Picks",
+    "🤖 Auto-Resolve",
     "🔮 Performance Predictor",
 ])
 
@@ -252,6 +255,158 @@ with tab_bets:
 
 # ============================================================
 # END SECTION: My Bets
+# ============================================================
+
+
+# ============================================================
+# SECTION: AI Picks
+# ============================================================
+
+with tab_ai_picks:
+    st.subheader("📊 AI Picks — Auto-Logged by SmartAI")
+    st.markdown(
+        "These bets were automatically logged by the Neural Analysis engine "
+        "for all qualifying picks (edge ≥ minimum threshold)."
+    )
+
+    all_bets_for_ai = load_all_bets(limit=500)
+    ai_bets = [
+        b for b in all_bets_for_ai
+        if b.get("platform", "") == "SmartAI-Auto"
+        or str(b.get("notes", "")).startswith("Auto-logged")
+        or int(b.get("auto_logged", 0) or 0) == 1
+    ]
+
+    if not ai_bets:
+        st.info(
+            "📭 No AI-auto-logged picks yet. "
+            "Run **⚡ Neural Analysis** — qualifying picks above the edge threshold "
+            "will be logged here automatically."
+        )
+    else:
+        _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄", None: "⏳", "": "⏳"}
+        ai_display = []
+        for b in ai_bets:
+            res = b.get("result") or ""
+            ai_display.append({
+                "ID":        b.get("bet_id", ""),
+                "Date":      b.get("bet_date", ""),
+                "Player":    b.get("player_name", ""),
+                "Team":      b.get("team", ""),
+                "Stat":      b.get("stat_type", "").title(),
+                "Line":      b.get("prop_line", 0),
+                "Dir":       b.get("direction", ""),
+                "Tier":      b.get("tier", ""),
+                "Conf":      round(b.get("confidence_score", 0), 1),
+                "Edge%":     round(b.get("edge_percentage", 0), 1),
+                "Result":    f"{_RESULT_EMOJI.get(res, '⏳')} {res}" if res else "⏳ Pending",
+                "Actual":    b.get("actual_value", "—"),
+                "Notes":     b.get("notes", ""),
+            })
+
+        st.dataframe(
+            ai_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Line": st.column_config.NumberColumn(format="%.1f"),
+                "Conf": st.column_config.NumberColumn(format="%.1f"),
+                "Edge%": st.column_config.NumberColumn(format="%.1f"),
+            },
+        )
+
+        # Summary metrics for AI picks
+        ai_resolved = [b for b in ai_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
+        ai_wins     = sum(1 for b in ai_resolved if b.get("result") == "WIN")
+        ai_total    = len(ai_resolved)
+        ai_rate     = round(ai_wins / ai_total * 100, 1) if ai_total > 0 else 0.0
+
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1.metric("AI Picks (Total)", len(ai_bets))
+        mc2.metric("Resolved",         ai_total)
+        mc3.metric("Wins",             ai_wins)
+        mc4.metric("Win Rate",         f"{ai_rate:.1f}%" if ai_total > 0 else "—")
+
+# ============================================================
+# END SECTION: AI Picks
+# ============================================================
+
+
+# ============================================================
+# SECTION: Auto-Resolve
+# ============================================================
+
+with tab_auto_resolve:
+    st.subheader("🤖 Auto-Resolve — Fetch Actual Stats & Mark Results")
+    st.markdown(
+        "Automatically fetch yesterday's (or any date's) actual player stats from "
+        "the NBA API and mark all pending bets as WIN / LOSS / PUSH."
+    )
+
+    all_bets_for_resolve = load_all_bets(limit=500)
+    pending_all = [b for b in all_bets_for_resolve if not b.get("result")]
+
+    if not pending_all:
+        st.info("✅ No pending bets found. All bets have results recorded.")
+    else:
+        # Group pending bets by date for display
+        _pending_by_date = {}
+        for _b in pending_all:
+            _d = _b.get("bet_date", "Unknown")
+            _pending_by_date.setdefault(_d, []).append(_b)
+
+        st.markdown(f"**{len(pending_all)} pending bet(s)** across {len(_pending_by_date)} date(s):")
+        _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄", None: "⏳", "": "⏳"}
+        pending_display = []
+        for _b in pending_all:
+            pending_display.append({
+                "ID":     _b.get("bet_id", ""),
+                "Date":   _b.get("bet_date", ""),
+                "Player": _b.get("player_name", ""),
+                "Stat":   _b.get("stat_type", "").title(),
+                "Line":   _b.get("prop_line", 0),
+                "Dir":    _b.get("direction", ""),
+                "Tier":   _b.get("tier", ""),
+            })
+        st.dataframe(pending_display, use_container_width=True, hide_index=True,
+                     column_config={"Line": st.column_config.NumberColumn(format="%.1f")})
+
+    st.divider()
+
+    col_date, col_btn = st.columns([2, 1])
+    with col_date:
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        resolve_date = st.date_input(
+            "Date to resolve",
+            value=yesterday,
+            help="Bets with this date that still have no result will be auto-resolved.",
+        )
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True)  # vertical alignment
+        resolve_btn = st.button(
+            "🔄 Fetch Actual Stats & Auto-Resolve",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if resolve_btn:
+        with st.spinner("Fetching actual stats from NBA API…"):
+            date_str_to_resolve = resolve_date.isoformat()
+            resolved, errors = auto_resolve_bet_results(date_str=date_str_to_resolve)
+
+        if resolved > 0:
+            st.success(f"✅ Auto-resolved **{resolved}** bet(s) for {date_str_to_resolve}.")
+            st.rerun()
+        else:
+            st.warning(f"⚠️ No bets resolved for {date_str_to_resolve}.")
+
+        if errors:
+            with st.expander(f"⚠️ {len(errors)} error(s) during auto-resolve"):
+                for err in errors:
+                    st.markdown(f"- {err}")
+
+# ============================================================
+# END SECTION: Auto-Resolve
 # ============================================================
 
 

@@ -987,3 +987,33 @@ def fetch_all_injury_data():
 # ============================================================
 # END SECTION: Master Aggregator
 # ============================================================
+
+
+# ============================================================
+# SECTION: Convenience function for tonight's active players
+# ============================================================
+
+def get_active_players_for_tonight(todays_games: list) -> dict:
+    """
+    Convenience wrapper: uses RosterEngine to return active (non-injured)
+    players for every team playing tonight.
+
+    Delegates to data.roster_engine.get_active_players_for_tonight() so
+    there is a single source of truth for roster + injury logic.
+
+    Args:
+        todays_games (list): List of game dicts with 'home_team'/'away_team'.
+
+    Returns:
+        dict: {team_abbrev: [player_name, ...]}  — injured players excluded.
+    """
+    try:
+        from data.roster_engine import get_active_players_for_tonight as _re_fn
+        return _re_fn(todays_games)
+    except Exception as exc:
+        print(f"get_active_players_for_tonight (web_scraper): {exc}")
+        return {}
+
+# ============================================================
+# END SECTION: Convenience function for tonight's active players
+# ============================================================

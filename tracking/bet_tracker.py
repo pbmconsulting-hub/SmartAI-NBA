@@ -281,3 +281,164 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # ============================================================
 # END SECTION: Performance Analytics
 # ============================================================
+
+
+# ============================================================
+# SECTION: Auto-Resolve
+# ============================================================
+
+def auto_resolve_bet_results(date_str=None):
+    """
+    For all pending bets on date_str (default: yesterday), fetch actual
+    player stats from nba_api and automatically mark WIN/LOSS/PUSH.
+
+    Uses nba_api.stats.endpoints.PlayerGameLog to get actual stat values.
+    Compares actual value vs prop_line + direction → WIN/LOSS/PUSH.
+
+    Args:
+        date_str (str|None): ISO date string "YYYY-MM-DD".
+                             Defaults to yesterday if None.
+
+    Returns:
+        tuple: (resolved_count: int, errors_list: list[str])
+    """
+    import datetime as _dt
+
+    if date_str is None:
+        date_str = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+
+    resolved_count = 0
+    errors_list = []
+
+    # Load all pending bets for the target date
+    all_bets = load_all_bets(limit=500)
+    pending_bets = [
+        b for b in all_bets
+        if b.get("bet_date", "") == date_str and not b.get("result")
+    ]
+
+    if not pending_bets:
+        return 0, [f"No pending bets found for {date_str}"]
+
+    # Try to import nba_api
+    try:
+        from nba_api.stats.endpoints import playergamelog
+        from nba_api.stats.static import players as nba_players_static
+        import time as _time
+    except ImportError:
+        return 0, ["nba_api not available — cannot auto-resolve bets"]
+
+    # Build player name → nba_api player_id map (case-insensitive)
+    _all_nba_players = nba_players_static.get_players()
+    _name_to_id = {
+        p["full_name"].lower(): p["id"]
+        for p in _all_nba_players
+    }
+
+    # Stat key mapping: our stat_type labels → PlayerGameLog column names
+    _STAT_COL = {
+        "points":    "PTS",
+        "rebounds":  "REB",
+        "assists":   "AST",
+        "threes":    "FG3M",
+        "steals":    "STL",
+        "blocks":    "BLK",
+        "turnovers": "TOV",
+    }
+
+    # Season string for PlayerGameLog (current season)
+    current_year = _dt.date.today().year
+    current_month = _dt.date.today().month
+    season_year = current_year if current_month >= 10 else current_year - 1
+    season_str = f"{season_year}-{str(season_year + 1)[-2:]}"
+
+    for bet in pending_bets:
+        bet_id      = bet.get("bet_id")
+        player_name = bet.get("player_name", "")
+        stat_type   = bet.get("stat_type", "").lower()
+        prop_line   = float(bet.get("prop_line", 0) or 0)
+        direction   = (bet.get("direction") or "OVER").upper()
+
+        stat_col = _STAT_COL.get(stat_type)
+        if not stat_col:
+            errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
+            continue
+
+        player_id = _name_to_id.get(player_name.lower())
+        if not player_id:
+            # Try partial match (first + last name)
+            parts = player_name.lower().split()
+            if len(parts) >= 2:
+                player_id = next(
+                    (
+                        pid
+                        for pname, pid in _name_to_id.items()
+                        if parts[0] in pname and parts[-1] in pname
+                    ),
+                    None,
+                )
+        if not player_id:
+            errors_list.append(f"#{bet_id} {player_name}: player not found in nba_api")
+            continue
+
+        try:
+            _time.sleep(1.0)  # respect nba_api rate limit
+            game_log = playergamelog.PlayerGameLog(
+                player_id=player_id,
+                season=season_str,
+                season_type_all_star="Regular Season",
+            )
+            df = game_log.get_data_frames()[0]
+            if df.empty:
+                errors_list.append(f"#{bet_id} {player_name}: no game log found")
+                continue
+
+            # Find the game on target date (GAME_DATE format: "MMM DD, YYYY" or "MMM D, YYYY")
+            df["GAME_DATE"] = df["GAME_DATE"].astype(str)
+            target_dt = _dt.datetime.strptime(date_str, "%Y-%m-%d")
+            # Zero-padded format (e.g. "Mar 08, 2025")
+            target_fmt = target_dt.strftime("%b %d, %Y")
+            # Non-zero-padded format (e.g. "Mar 8, 2025") — cross-platform approach
+            target_fmt_alt = target_fmt.replace(
+                f" 0{target_dt.day},", f" {target_dt.day},"
+            ) if target_dt.day < 10 else target_fmt
+
+            matching = df[
+                df["GAME_DATE"].str.strip() == target_fmt
+            ]
+            if matching.empty:
+                # Try alternative format
+                matching = df[
+                    df["GAME_DATE"].str.strip() == target_fmt_alt
+                ]
+            if matching.empty:
+                errors_list.append(
+                    f"#{bet_id} {player_name}: no game found on {date_str} "
+                    f"(last game: {df['GAME_DATE'].iloc[0]})"
+                )
+                continue
+
+            actual_value = float(matching.iloc[0].get(stat_col, 0) or 0)
+
+            # Determine WIN / LOSS / PUSH
+            if actual_value == prop_line:
+                result = "PUSH"
+            elif direction == "OVER":
+                result = "WIN" if actual_value > prop_line else "LOSS"
+            else:  # UNDER
+                result = "WIN" if actual_value < prop_line else "LOSS"
+
+            success, msg = record_bet_result(bet_id, result, actual_value)
+            if success:
+                resolved_count += 1
+            else:
+                errors_list.append(f"#{bet_id} {player_name}: DB update failed — {msg}")
+
+        except Exception as exc:
+            errors_list.append(f"#{bet_id} {player_name}: {exc}")
+
+    return resolved_count, errors_list
+
+# ============================================================
+# END SECTION: Auto-Resolve
+# ============================================================

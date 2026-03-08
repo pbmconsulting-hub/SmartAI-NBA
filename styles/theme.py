@@ -2419,6 +2419,38 @@ def get_game_report_html(game=None, analysis_results=None):
     <div class="qds-bonus-title"><i class="fas fa-star"></i> Key Supporting Factors:</div>
     {_force_items(pick)}
   </div>{verdict_html}
+  <!-- Always-open full breakdown panel -->
+  <div style="background:rgba(20,25,43,0.7);border-radius:6px;padding:12px 15px;margin-top:10px;border:1px solid rgba(255,94,0,0.12);">
+    <div style="color:#ff5e00;font-weight:600;font-size:0.8rem;margin-bottom:10px;">📊 Distribution</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
+      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+        <div style="color:#8b949e;font-size:0.7rem;">10th pct</div>
+        <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_10", 0):.1f}</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+        <div style="color:#8b949e;font-size:0.7rem;">Median</div>
+        <div style="color:var(--qds-primary);font-weight:700;font-size:0.85rem;">{pick.get("percentile_50", 0):.1f}</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+        <div style="color:#8b949e;font-size:0.7rem;">90th pct</div>
+        <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_90", 0):.1f}</div>
+      </div>
+      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+        <div style="color:#8b949e;font-size:0.7rem;">Std Dev</div>
+        <div style="color:white;font-weight:700;font-size:0.85rem;">{pick.get("simulated_std", 0):.1f}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="padding:8px;background:rgba(0,240,255,0.04);border-radius:5px;border-left:2px solid var(--qds-primary);">
+        <div style="color:var(--qds-primary);font-size:0.75rem;font-weight:600;margin-bottom:4px;">🔵 Forces OVER</div>
+        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("over_forces") else '<span style="color:#8b949e;font-size:0.75rem;">None detected</span>'}
+      </div>
+      <div style="padding:8px;background:rgba(255,94,0,0.04);border-radius:5px;border-left:2px solid #ff5e00;">
+        <div style="color:#ff5e00;font-size:0.75rem;font-weight:600;margin-bottom:4px;">🔴 Forces UNDER</div>
+        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("under_forces") else '<span style="color:#8b949e;font-size:0.75rem;">None detected</span>'}
+      </div>
+    </div>
+  </div>
 </div>"""
 
     if not prop_cards:
