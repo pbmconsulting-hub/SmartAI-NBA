@@ -107,7 +107,16 @@ ESPN_API_TIMEOUT_SECONDS = 10
 # Injury status values that indicate a player is unavailable.
 # Used by fetch_todays_players_only() and fetch_player_stats() to
 # filter out inactive players before writing to CSV.
-INACTIVE_INJURY_STATUSES = {"Out", "Injured Reserve"}
+INACTIVE_INJURY_STATUSES = frozenset({
+    "Out",
+    "Injured Reserve",
+    "Out (No Recent Games)",
+    "Suspended",
+    "Not With Team",
+    "G League - Two-Way",
+    "G League - On Assignment",
+    "G League",
+})
 
 # ============================================================
 # END SECTION: File Path Constants
@@ -860,6 +869,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
             usage_rate = 15.0
             points_std = rebounds_std = assists_std = threes_std = 1.0
             steals_std = blocks_std = turnovers_std = 0.5
+            game_log_data = []  # Initialize so recency check works even if fetch fails
 
             try:
                 game_log_endpoint = playergamelog.PlayerGameLog(
@@ -932,6 +942,32 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
             except Exception as log_error:
                 print(f"  Could not fetch game log for {player_name}: {log_error}")
 
+            # ── Game-log recency filter ───────────────────────────────
+            # Skip players whose last recorded game was more than 21 days
+            # ago — they are almost certainly out long-term (e.g. season-
+            # ending injury) and won't have props offered today.
+            if game_log_data:
+                last_game_date_str = game_log_data[0].get("GAME_DATE", "")
+                if last_game_date_str:
+                    try:
+                        last_game_date = datetime.datetime.strptime(
+                            last_game_date_str, "%b %d, %Y"
+                        ).date()
+                        days_since_last_game = (datetime.date.today() - last_game_date).days
+                        if days_since_last_game > 21:
+                            print(
+                                f"  Skipping {player_name}: last played "
+                                f"{days_since_last_game} days ago (likely long-term out)"
+                            )
+                            continue
+                        elif days_since_last_game > 14:
+                            print(
+                                f"  Warning: {player_name} last played "
+                                f"{days_since_last_game} days ago"
+                            )
+                    except ValueError:
+                        pass  # Unrecognised date format — don't skip on parse error
+
             # Skip players who haven't played (no meaningful minutes).
             # Players below MIN_MINUTES_THRESHOLD are inactive or garbage-time only.
             if minutes_avg < MIN_MINUTES_THRESHOLD:
@@ -989,8 +1025,34 @@ def fetch_todays_players_only(todays_games, progress_callback=None):
                         f"from today's roster ({len(formatted_players)} remain)"
                     )
         except Exception as _inj_err:
-            # Non-fatal — proceed without injury filter if scraper fails
-            print(f"  Injury web scrape skipped in fetch_todays_players_only (non-fatal): {_inj_err}")
+            # Web scraper failed — fall back to the cached injury_status.json
+            # written by a previous fetch_player_injury_status() run.
+            print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+            try:
+                cached_injuries = {}
+                if INJURY_STATUS_JSON_PATH.exists():
+                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                        cached_injuries = json.load(_jf)
+                if cached_injuries:
+                    before_count = len(formatted_players)
+                    formatted_players = [
+                        p for p in formatted_players
+                        if cached_injuries.get(
+                            p["name"].lower().strip(), {}
+                        ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+                    ]
+                    removed_count = before_count - len(formatted_players)
+                    print(
+                        f"  Injury fallback (cached JSON): removed {removed_count} "
+                        f"players ({len(formatted_players)} remain)"
+                    )
+                else:
+                    print(
+                        "  WARNING: Web scraper failed and no cached injury data "
+                        "available — no injury filter applied"
+                    )
+            except Exception as _cache_err:
+                print(f"  WARNING: All injury filter methods failed: {_cache_err}")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
@@ -1417,8 +1479,34 @@ def fetch_player_stats(progress_callback=None):
                         f"from player stats ({len(formatted_players)} remain)"
                     )
         except Exception as _inj_err:
-            # Non-fatal — proceed without injury filter if scraper fails
-            print(f"  Injury web scrape skipped in fetch_player_stats (non-fatal): {_inj_err}")
+            # Web scraper failed — fall back to the cached injury_status.json
+            # written by a previous fetch_player_injury_status() run.
+            print(f"  Injury web scrape failed in fetch_player_stats: {_inj_err}")
+            try:
+                cached_injuries = {}
+                if INJURY_STATUS_JSON_PATH.exists():
+                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                        cached_injuries = json.load(_jf)
+                if cached_injuries:
+                    before_count = len(formatted_players)
+                    formatted_players = [
+                        p for p in formatted_players
+                        if cached_injuries.get(
+                            p["name"].lower().strip(), {}
+                        ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
+                    ]
+                    removed_count = before_count - len(formatted_players)
+                    print(
+                        f"  Injury fallback (cached JSON): removed {removed_count} "
+                        f"players ({len(formatted_players)} remain)"
+                    )
+                else:
+                    print(
+                        "  WARNING: Web scraper failed and no cached injury data "
+                        "available — no injury filter applied"
+                    )
+            except Exception as _cache_err:
+                print(f"  WARNING: All injury filter methods failed: {_cache_err}")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")

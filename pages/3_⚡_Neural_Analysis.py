@@ -673,7 +673,11 @@ if run_analysis:
         player_status_info = get_player_status(player_name, injury_map)
         player_status      = player_status_info.get("status", "Active")
 
-        if player_status in ("Out", "Injured Reserve"):
+        if player_status in (
+            "Out", "Injured Reserve", "Out (No Recent Games)",
+            "Suspended", "Not With Team",
+            "G League - Two-Way", "G League - On Assignment", "G League",
+        ):
             injury_note = player_status_info.get("injury_note", "Player is not active")
             analysis_results_list.append({
                 "player_name":   player_name,
