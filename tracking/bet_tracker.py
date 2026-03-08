@@ -393,12 +393,15 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
-            # Find the game on target date (GAME_DATE format: "MMM DD, YYYY")
+            # Find the game on target date (GAME_DATE format: "MMM DD, YYYY" or "MMM D, YYYY")
             df["GAME_DATE"] = df["GAME_DATE"].astype(str)
             target_dt = _dt.datetime.strptime(date_str, "%Y-%m-%d")
+            # Zero-padded format (e.g. "Mar 08, 2025")
             target_fmt = target_dt.strftime("%b %d, %Y")
-            # Also try zero-padded vs non-zero-padded day
-            target_fmt_alt = target_dt.strftime("%b %-d, %Y") if hasattr(target_dt, "strftime") else target_fmt
+            # Non-zero-padded format (e.g. "Mar 8, 2025") — cross-platform approach
+            target_fmt_alt = target_fmt.replace(
+                f" 0{target_dt.day},", f" {target_dt.day},"
+            ) if target_dt.day < 10 else target_fmt
 
             matching = df[
                 df["GAME_DATE"].str.strip() == target_fmt

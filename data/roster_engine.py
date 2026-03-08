@@ -32,6 +32,7 @@ import json
 import datetime
 import os
 from pathlib import Path
+from typing import Optional
 
 try:
     import requests
@@ -246,7 +247,7 @@ class RosterEngine:
         self._full_rosters: dict = {}
         # {team_abbrev → [player_name, ...]}  — filtered active-only
         self._active_rosters: dict = {}
-        self._last_refresh: datetime.datetime | None = None
+        self._last_refresh: Optional[datetime.datetime] = None
 
     # ----------------------------------------------------------
     # Public API
@@ -534,7 +535,7 @@ class RosterEngine:
                 continue
             for row in table.select("tr"):
                 cells = [td.get_text(strip=True) for td in row.select("td")]
-                if len(cells) <= max(filter(None, [name_idx, status_idx])):
+                if len(cells) <= max(i for i in [name_idx, status_idx] if i is not None):
                     continue
                 name   = cells[name_idx]
                 status = _normalize_status(cells[status_idx])
@@ -612,7 +613,7 @@ class RosterEngine:
 
                 for row in rows:
                     cells = [td.get_text(strip=True) for td in row.select("td")]
-                    if len(cells) <= max(filter(None, [name_idx, status_idx])):
+                    if len(cells) <= max(i for i in [name_idx, status_idx] if i is not None):
                         continue
                     name   = cells[name_idx]
                     status = _normalize_status(cells[status_idx])

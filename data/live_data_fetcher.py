@@ -1090,7 +1090,8 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             removed_count = before_count - len(formatted_players)
             if removed_count:
                 print(
-                    f"  Injury filter: removed {removed_count} Out/IR/Doubtful players "
+                    f"  Injury filter: removed {removed_count} inactive players "
+                    f"(Out/IR/Doubtful/Suspended/G-League/etc.) "
                     f"from today's roster ({len(formatted_players)} remain)"
                 )
         else:
