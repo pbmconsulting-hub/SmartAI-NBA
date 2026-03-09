@@ -945,9 +945,11 @@ def fetch_all_injury_data():
     merged = {}
 
     for key, entry in rotowire_data.items():
+        injury_val = entry.get("injury", "")
         merged[key] = {
             "status":      entry.get("status", "Unknown"),
-            "injury":      entry.get("injury", ""),
+            "injury":      injury_val,
+            "injury_note": injury_val,
             "team":        entry.get("team", ""),
             "return_date": entry.get("return_date", ""),
             "comment":     "",
@@ -959,18 +961,42 @@ def fetch_all_injury_data():
             # NBA.com overrides RotoWire for status and injury detail
             existing = merged[key]
             existing["status"]  = entry.get("status", existing["status"])
-            existing["injury"]  = entry.get("injury", "") or existing["injury"]
+            new_injury = entry.get("injury", "") or existing["injury"]
+            existing["injury"]       = new_injury
+            existing["injury_note"]  = new_injury
             existing["comment"] = entry.get("comment", "")
             existing["source"]  = "NBA.com+RotoWire" if existing["source"] == "RotoWire" else "NBA.com"
         else:
+            injury_val = entry.get("injury", "")
             merged[key] = {
                 "status":      entry.get("status", "Unknown"),
-                "injury":      entry.get("injury", ""),
+                "injury":      injury_val,
+                "injury_note": injury_val,
                 "team":        entry.get("team", ""),
                 "return_date": "",
                 "comment":     entry.get("comment", ""),
                 "source":      entry.get("source", "NBA.com"),
             }
+
+    # ── Final normalization pass: collapse suffix variants + deduplicate ──
+    normalized_merged = {}
+    _SEV = {
+        "Out": 5, "Injured Reserve": 5, "Doubtful": 4,
+        "GTD": 3, "Questionable": 3, "Day-to-Day": 2,
+        "Probable": 1, "Active": 0, "Unknown": -1,
+    }
+    for raw_key, entry in merged.items():
+        norm_key = _normalize_player_key(raw_key)
+        if not norm_key:
+            continue
+        if norm_key not in normalized_merged:
+            normalized_merged[norm_key] = entry
+        else:
+            existing_sev = _SEV.get(normalized_merged[norm_key]["status"], -1)
+            new_sev      = _SEV.get(entry["status"], -1)
+            if new_sev > existing_sev:
+                normalized_merged[norm_key] = entry
+    merged = normalized_merged
 
     total = len(merged)
     out_count = sum(1 for v in merged.values() if v["status"] == "Out")
