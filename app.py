@@ -314,8 +314,8 @@ if is_using_live_data:
     )
 else:
     st.info(
-        "📊 **Using Sample Data** — Go to the **📡 Data Feed** page to pull "
-        "real, up-to-date NBA stats for more accurate predictions!"
+        "📊 **No live data loaded yet** — Go to the **📡 Data Feed** page to pull "
+        "real, up-to-date NBA stats for accurate predictions!"
     )
 
 # ============================================================

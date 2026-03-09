@@ -76,8 +76,7 @@ SmartAI-NBA/
 ├── data/
 │   ├── data_manager.py                # Load/save CSV data
 │   ├── live_data_fetcher.py           # Live NBA data fetcher ← NEW!
-│   ├── sample_players.csv             # Player stats (sample OR live)
-│   ├── sample_props.csv               # 40 sample prop lines
+│   ├── players.csv                    # Player stats (written by live data fetch)
 │   ├── teams.csv                      # All 30 NBA teams with pace/ratings
 │   ├── defensive_ratings.csv          # Team defense by position
 │   └── last_updated.json              # Timestamps (created after first update)
@@ -198,33 +197,28 @@ pip install -r requirements.txt
 
 | Data | Source | File Updated |
 |------|--------|-------------|
-| Player stats (PPG, RPG, APG, etc.) | LeagueDashPlayerStats | `sample_players.csv` |
-| Standard deviations | PlayerGameLog (last 20 games) | `sample_players.csv` |
+| Player stats (PPG, RPG, APG, etc.) | LeagueDashPlayerStats | `players.csv` |
+| Standard deviations | PlayerGameLog (last 20 games) | `players.csv` |
 | Team pace + ratings (ORTG/DRTG) | LeagueDashTeamStats | `teams.csv` |
 | Defensive ratings by position | Calculated from team drtg | `defensive_ratings.csv` |
 | Tonight's games | ScoreboardV2 | Session state |
 
-### Sample Data vs Live Data
+### Live Data
 
-The app ships with **sample data** so it works immediately without any setup.
-The sample data is from a recent NBA season but may be slightly outdated.
+The app is designed to work with live data pulled from the NBA API.
+On first run, no player data will be loaded — go to **📡 Data Feed** and click
+**Smart Update** to pull tonight's rosters and stats.
 
-After running **Update Everything**, the CSVs are overwritten with real data.
-The home page shows a banner indicating which type of data you're using.
+After running **Update Everything**, the CSVs are written with real data.
+The home page shows a banner indicating whether live data has been loaded.
 
 ---
 
 ## 📊 How to Add Your Own Data
 
 ### Adding a New Player
-Open `data/sample_players.csv` and add a new row:
-```csv
-Player Name,TEAM,POS,minutes,pts,reb,ast,3s,stl,blk,to,ft%,usage,pts_std,reb_std,ast_std,3s_std
-Jaylen Wells,MEM,SF,28.0,14.5,3.2,2.1,1.8,0.9,0.3,1.2,0.82,18.0,4.2,1.4,1.0,0.8
-```
-
-### Updating Stats
-Just edit the numbers in `data/sample_players.csv`. The app reads it fresh each time.
+Go to **📡 Data Feed** and run a **Smart Update** to pull tonight's active roster.
+Player data is stored in `data/players.csv` — you can also edit it directly.
 
 ### Entering Tonight's Props
 Go to **📥 Import Props** and either:
@@ -243,8 +237,7 @@ Run: `pip install streamlit` first.
 Run: `pip install streamlit` and make sure you're using the right Python version.
 
 ### "ModuleNotFoundError: No module named 'nba_api'"
-Run: `pip install nba_api`. The app works without it (using sample data),
-but you need it to fetch live stats on the **🔄 Update Data** page.
+Run: `pip install nba_api`. You need it to fetch live stats on the **📡 Data Feed** page.
 
 ### Live data update takes too long
 This is normal! The fetcher adds a 1.5-second delay between API calls to avoid
@@ -258,12 +251,12 @@ streamlit run app.py --server.port 8502
 ```
 
 ### App shows "No props loaded"
-Go to **📥 Import Props** and click "Load Sample Props" or enter your own.
+Go to **📥 Import Props** and click "Load Props from CSV" or enter your own.
 
 ### Analysis results seem off
 Check that you have:
 1. Games configured on **🏀 Today's Games** page
-2. Player names in your props match the names in `sample_players.csv`
+2. Run a **Smart Update** on the **📡 Data Feed** page to load live player data
 3. Stat types are lowercase: `points`, `rebounds`, `assists`, `threes`, etc.
 
 ---

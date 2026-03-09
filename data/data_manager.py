@@ -26,8 +26,8 @@ from pathlib import Path  # Modern file path handling
 DATA_DIRECTORY = Path(__file__).parent
 
 # Build full paths to each CSV file
-PLAYERS_CSV_PATH = DATA_DIRECTORY / "sample_players.csv"
-PROPS_CSV_PATH = DATA_DIRECTORY / "sample_props.csv"
+PLAYERS_CSV_PATH = DATA_DIRECTORY / "players.csv"
+PROPS_CSV_PATH = DATA_DIRECTORY / "props.csv"
 TEAMS_CSV_PATH = DATA_DIRECTORY / "teams.csv"
 DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"
 
@@ -51,10 +51,12 @@ INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 
 def load_players_data():
     """
-    Load all player data from the sample_players.csv file.
+    Load all player data from the players.csv file.
 
     Returns a list of dictionaries, where each dictionary
     represents one player with all their stats as keys.
+    Returns an empty list if the file does not exist yet (first run before
+    a live data fetch has been performed).
 
     Returns:
         list of dict: Player rows, e.g.:
@@ -62,15 +64,22 @@ def load_players_data():
 
     Example:
         players = load_players_data()
-        lebron = players[0]
-        print(lebron['points_avg'])  # → '24.8'
+        if not players:
+            # Prompt user to fetch live data from the Data Feed page
+            pass
+        else:
+            lebron = players[0]
+            print(lebron['points_avg'])  # → '24.8'
     """
     return _load_csv_file(PLAYERS_CSV_PATH)
 
 
 def load_props_data():
     """
-    Load all prop lines from the sample_props.csv file.
+    Load all prop lines from the props.csv file.
+
+    Returns an empty list if the file does not exist yet (first run before
+    a live data fetch has been performed).
 
     Returns:
         list of dict: Prop rows, e.g.:
@@ -1044,7 +1053,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     Players with < 15 minutes average or with Out/IR/Doubtful status are skipped.
 
     Args:
-        players_data (list[dict]): Loaded player rows from players.csv / sample_players.csv.
+        players_data (list[dict]): Loaded player rows from players.csv.
         todays_games (list[dict]): Tonight's games, each with home_team / away_team keys.
         platforms (list[str] | None): Platforms to generate for.  Defaults to all three.
 

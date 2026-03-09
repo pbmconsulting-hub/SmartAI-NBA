@@ -101,8 +101,10 @@ if not _should_auto_refresh_injuries:
 
 if _should_auto_refresh_injuries:
     try:
-        from data.web_scraper import fetch_all_injury_data as _fetch_injuries
-        _scraped_inj = _fetch_injuries()
+        from data.roster_engine import RosterEngine as _RosterEngine
+        _re = _RosterEngine()
+        _re.refresh()
+        _scraped_inj = _re.get_injury_report()
         if _scraped_inj:
             _auto_status_map = {
                 _k: {

@@ -27,12 +27,32 @@ LEAGUE_AVERAGE_GAME_TOTAL = 220.0
 # Used to compute pace adjustment factors.
 LEAGUE_AVERAGE_PACE = 98.5
 
-# Recent form blending weights.
-# When last-N game log data is available, the projection blends
-# the season average with the recent form average.
-# Adjust these to change how much recent form is weighted.
-SEASON_AVG_WEIGHT = 0.6    # 60% season average (stabilizing factor)
-RECENT_FORM_WEIGHT = 0.4   # 40% recent form (responsiveness factor)
+# Recent form blending thresholds.
+# When game log data is available the projection uses decay-weighted recency
+# averaging instead of a flat season-average blend.
+#
+# ≥ RECENCY_FULL_THRESHOLD games  → use decay-weighted avg (75%) + season avg (25%)
+# ≥ RECENCY_FALLBACK_THRESHOLD games → plain recent avg (60%) + season avg (40%)
+# < RECENCY_FALLBACK_THRESHOLD games → season average only (Bayesian shrinkage still applies)
+RECENCY_FULL_THRESHOLD   = 10   # games needed for full decay-weighted model
+RECENCY_FALLBACK_THRESHOLD = 5  # games needed for simple recent-form blend
+RECENCY_WEIGHT   = 0.75   # weight of decay-weighted recent avg when ≥10 games
+SEASON_WEIGHT_HI = 0.25   # weight of season avg when ≥10 games
+SEASON_AVG_WEIGHT = 0.60  # weight of season avg when 5–9 games (legacy fallback)
+RECENT_FORM_WEIGHT = 0.40 # weight of simple recent avg when 5–9 games
+
+# Exponential decay factor for recency weighting.
+# Decay of 0.85 means each additional game back is weighted 15% less than the game
+# immediately after it.  A value of 1.0 would give equal weight to all games.
+RECENCY_DECAY = 0.85
+
+# Streak detection constants.
+# If the last STREAK_WINDOW games are all above/below the weighted recent average
+# by more than STREAK_THRESHOLD, apply a small multiplier to the projection.
+STREAK_WINDOW    = 3     # consecutive games to confirm a streak
+STREAK_THRESHOLD = 0.15  # 15% above/below triggers streak detection
+STREAK_MULTIPLIER_HOT  = 1.04  # +4% for a confirmed hot streak
+STREAK_MULTIPLIER_COLD = 0.96  # −4% for a confirmed cold streak
 
 # Back-to-back fatigue: applied to rest_factor when player played yesterday.
 BACK_TO_BACK_FATIGUE_MULTIPLIER = 0.94  # 6% performance reduction
@@ -125,6 +145,80 @@ TEAMMATE_OUT_MAX_BOOST = 0.15       # Cap total teammate-out boost at +15%
 # ============================================================
 
 
+# ============================================================
+# SECTION: Recency Weighting Helpers
+# ============================================================
+
+def calculate_recency_weighted_average(game_log_values, decay=RECENCY_DECAY):
+    """
+    Compute an exponentially decay-weighted average of recent game values.
+
+    More recent games receive higher weight.  The most recent game (index 0)
+    has weight 1.0; each subsequent older game is multiplied by *decay*.
+
+    Args:
+        game_log_values (list[float]): Stat values ordered most-recent-first.
+            Must contain at least one element.
+        decay (float): Per-game decay factor in (0, 1].  Default: RECENCY_DECAY.
+
+    Returns:
+        float: Weighted average.  Falls back to the arithmetic mean if all
+        weights are zero (should only happen with decay=0).
+    """
+    if not game_log_values:
+        return 0.0
+
+    total_weight = 0.0
+    weighted_sum = 0.0
+    for i, val in enumerate(game_log_values):
+        w = decay ** i
+        weighted_sum += val * w
+        total_weight += w
+
+    if total_weight == 0:
+        return sum(game_log_values) / len(game_log_values)
+    return weighted_sum / total_weight
+
+
+def detect_streak(game_log_values, reference_avg, threshold=STREAK_THRESHOLD):
+    """
+    Detect a hot or cold streak in the last STREAK_WINDOW game log values.
+
+    A streak is confirmed when ALL of the last *STREAK_WINDOW* games are
+    above (hot) or below (cold) *reference_avg* by more than *threshold*.
+
+    Args:
+        game_log_values (list[float]): Stat values ordered most-recent-first.
+        reference_avg (float): The baseline to compare against (e.g., decay-
+            weighted recent average).
+        threshold (float): Fractional deviation required. Default: STREAK_THRESHOLD.
+
+    Returns:
+        float: STREAK_MULTIPLIER_HOT for hot, STREAK_MULTIPLIER_COLD for cold,
+        or 1.0 if no streak is detected or data is insufficient.
+    """
+    if not game_log_values or reference_avg <= 0:
+        return 1.0
+
+    window = game_log_values[:STREAK_WINDOW]
+    if len(window) < STREAK_WINDOW:
+        return 1.0
+
+    hot_threshold  = reference_avg * (1.0 + threshold)
+    cold_threshold = reference_avg * (1.0 - threshold)
+
+    if all(v > hot_threshold for v in window):
+        return STREAK_MULTIPLIER_HOT
+    if all(v < cold_threshold for v in window):
+        return STREAK_MULTIPLIER_COLD
+    return 1.0
+
+
+# ============================================================
+# END SECTION: Recency Weighting Helpers
+# ============================================================
+
+
 def build_player_projection(
     player_data,
     opponent_team_abbreviation,
@@ -156,7 +250,7 @@ def build_player_projection(
       defensive data with season averages when available
 
     Args:
-        player_data (dict): Player row from sample_players.csv
+        player_data (dict): Player row from players.csv
             Keys: name, team, position, points_avg, etc.
         opponent_team_abbreviation (str): e.g., "GSW", "BOS"
         is_home_game (bool): True if playing at home tonight
@@ -265,13 +359,21 @@ def build_player_projection(
 
     # ============================================================
     # SECTION: Recent Form Blending
-    # When game log data is available, blend season avg (60%) with
-    # recent 5-game avg (40%) for a more responsive projection.
+    # When game log data is available, use decay-weighted recency
+    # averaging for a more responsive projection.
+    #
+    # ≥ RECENCY_FULL_THRESHOLD (10) games:
+    #   decay-weighted recent avg (75%) + season avg (25%)
+    #   + streak multiplier if last 3 games all above/below baseline by >15%
+    # ≥ RECENCY_FALLBACK_THRESHOLD (5) games:
+    #   plain recent avg (40%) + season avg (60%)  — legacy fallback
+    # < RECENCY_FALLBACK_THRESHOLD games:
+    #   season average only (Bayesian shrinkage still applies above)
     # ============================================================
 
     recent_form_ratio = None  # Will be set if we have game log data
 
-    if recent_form_games and len(recent_form_games) >= 3:
+    if recent_form_games and len(recent_form_games) >= RECENCY_FALLBACK_THRESHOLD:
         # Map game-log keys to stat names
         form_key_map = {
             "points": "pts",
@@ -283,41 +385,72 @@ def build_player_projection(
             "turnovers": "tov",
         }
 
-        def _recent_avg(games, log_key, fallback):
-            """Compute average of a stat over recent games."""
+        def _extract_vals(games, log_key):
+            """Extract numeric values for a stat from game logs (most-recent first)."""
             vals = []
             for g in games:
-                # Support both string and numeric values
                 v = g.get(log_key, g.get(log_key.lower(), None))
                 if v is not None:
                     try:
                         vals.append(float(v))
                     except (TypeError, ValueError):
                         pass
+            return vals
+
+        def _recent_avg(games, log_key, fallback):
+            """Simple arithmetic average for fallback use."""
+            vals = _extract_vals(games, log_key)
             return sum(vals) / len(vals) if vals else fallback
 
-        pts_key = form_key_map["points"]
-        recent_pts = _recent_avg(recent_form_games, pts_key, season_points_average)
+        n_games = len(recent_form_games)
 
-        # Compute recent-form ratio for points (most reliable indicator)
-        if season_points_average > 0:
-            recent_form_ratio = round(recent_pts / season_points_average, 3)
+        if n_games >= RECENCY_FULL_THRESHOLD:
+            # Full decay-weighted model
+            def _blend_stat(season_val, log_key):
+                vals = _extract_vals(recent_form_games, log_key)
+                if not vals:
+                    return season_val
+                decay_avg = calculate_recency_weighted_average(vals)
+                streak_mult = detect_streak(vals, decay_avg)
+                blended = RECENCY_WEIGHT * decay_avg + SEASON_WEIGHT_HI * season_val
+                return blended * streak_mult
 
-        # Blend: season average weighted by SEASON_AVG_WEIGHT, recent form by RECENT_FORM_WEIGHT
-        _blend = lambda season, recent: season * SEASON_AVG_WEIGHT + recent * RECENT_FORM_WEIGHT
-        season_points_average   = _blend(season_points_average,   recent_pts)
-        season_rebounds_average = _blend(season_rebounds_average,
-                                         _recent_avg(recent_form_games, form_key_map["rebounds"], season_rebounds_average))
-        season_assists_average  = _blend(season_assists_average,
-                                         _recent_avg(recent_form_games, form_key_map["assists"],  season_assists_average))
-        season_threes_average   = _blend(season_threes_average,
-                                         _recent_avg(recent_form_games, form_key_map["threes"],   season_threes_average))
-        season_steals_average   = _blend(season_steals_average,
-                                         _recent_avg(recent_form_games, form_key_map["steals"],   season_steals_average))
-        season_blocks_average   = _blend(season_blocks_average,
-                                         _recent_avg(recent_form_games, form_key_map["blocks"],   season_blocks_average))
-        season_turnovers_average= _blend(season_turnovers_average,
-                                         _recent_avg(recent_form_games, form_key_map["turnovers"],season_turnovers_average))
+            # Use decay-weighted points to compute recent-form ratio
+            pts_vals = _extract_vals(recent_form_games, form_key_map["points"])
+            if pts_vals and season_points_average > 0:
+                decay_pts = calculate_recency_weighted_average(pts_vals)
+                recent_form_ratio = round(decay_pts / season_points_average, 3)
+
+            season_points_average   = _blend_stat(season_points_average,   form_key_map["points"])
+            season_rebounds_average = _blend_stat(season_rebounds_average, form_key_map["rebounds"])
+            season_assists_average  = _blend_stat(season_assists_average,  form_key_map["assists"])
+            season_threes_average   = _blend_stat(season_threes_average,   form_key_map["threes"])
+            season_steals_average   = _blend_stat(season_steals_average,   form_key_map["steals"])
+            season_blocks_average   = _blend_stat(season_blocks_average,   form_key_map["blocks"])
+            season_turnovers_average= _blend_stat(season_turnovers_average,form_key_map["turnovers"])
+
+        else:
+            # Fallback: simple recent-average blend (5–9 games)
+            pts_key = form_key_map["points"]
+            recent_pts = _recent_avg(recent_form_games, pts_key, season_points_average)
+
+            if season_points_average > 0:
+                recent_form_ratio = round(recent_pts / season_points_average, 3)
+
+            _blend = lambda season, recent: season * SEASON_AVG_WEIGHT + recent * RECENT_FORM_WEIGHT
+            season_points_average   = _blend(season_points_average,   recent_pts)
+            season_rebounds_average = _blend(season_rebounds_average,
+                                             _recent_avg(recent_form_games, form_key_map["rebounds"], season_rebounds_average))
+            season_assists_average  = _blend(season_assists_average,
+                                             _recent_avg(recent_form_games, form_key_map["assists"],  season_assists_average))
+            season_threes_average   = _blend(season_threes_average,
+                                             _recent_avg(recent_form_games, form_key_map["threes"],   season_threes_average))
+            season_steals_average   = _blend(season_steals_average,
+                                             _recent_avg(recent_form_games, form_key_map["steals"],   season_steals_average))
+            season_blocks_average   = _blend(season_blocks_average,
+                                             _recent_avg(recent_form_games, form_key_map["blocks"],   season_blocks_average))
+            season_turnovers_average= _blend(season_turnovers_average,
+                                             _recent_avg(recent_form_games, form_key_map["turnovers"],season_turnovers_average))
 
     # ============================================================
     # END SECTION: Recent Form Blending

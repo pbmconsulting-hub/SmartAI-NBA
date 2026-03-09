@@ -433,7 +433,7 @@ def _render_game_team_stats(game, game_pred):
 
 def _render_key_players(team_abbrev, label):
     """
-    Show the top 3 scorers and top rebounder from sample_players.csv for a team.
+    Show the top 3 scorers and top rebounder from players.csv for a team.
     Falls back gracefully if no data is available.
     """
     players = PLAYERS_BY_TEAM.get(team_abbrev.upper(), [])
@@ -560,7 +560,7 @@ if _games_to_show:
                 card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
                 components.html(html_content, height=card_height, scrolling=True)
             else:
-                # ── Key player matchups from sample_players.csv ────────
+                # ── Key player matchups from players.csv ────────
                 kp_col1, kp_col2 = st.columns(2)
                 with kp_col1:
                     _render_key_players(away, away)
