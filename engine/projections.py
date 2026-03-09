@@ -250,7 +250,7 @@ def build_player_projection(
       defensive data with season averages when available
 
     Args:
-        player_data (dict): Player row from players.csv
+        player_data (dict): Player row from players.csv (live data fetched via nba_api).
             Keys: name, team, position, points_avg, etc.
         opponent_team_abbreviation (str): e.g., "GSW", "BOS"
         is_home_game (bool): True if playing at home tonight
