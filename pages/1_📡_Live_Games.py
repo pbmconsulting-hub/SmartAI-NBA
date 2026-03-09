@@ -139,30 +139,31 @@ if auto_load_clicked:
         else:
             st.session_state["todays_games"] = games
 
-            status_text.text(f"⏳ Step 2/4 — Loading team rosters for {len(games)} game(s)...")
-            progress_bar.progress(35)
+            status_text.text(f"⏳ Step 2/3 — Fetching active rosters & player stats for {len(games)} game(s)...")
+            progress_bar.progress(40)
 
-            from data.live_data_fetcher import fetch_player_injury_status
-            injury_map = {}
-            try:
-                injury_map = fetch_player_injury_status(todays_games=games)
-                st.session_state["injury_status_map"] = injury_map
-            except Exception as _inj_err:
-                print(f"Auto-load: injury fetch failed: {_inj_err}")
+            players_ok = fetch_todays_players_only(games)
 
-            status_text.text("⏳ Step 3/4 — Refreshing injury reports...")
-            progress_bar.progress(65)
+            # ── Load injury data saved by fetch_todays_players_only ──────────
+            # fetch_todays_players_only writes injury_status.json via RosterEngine,
+            # so we can load it here without a separate (expensive) API call.
+            if players_ok:
+                try:
+                    from data.data_manager import load_injury_status as _load_inj
+                    _injury_map = _load_inj()
+                    if _injury_map:
+                        st.session_state["injury_status_map"] = _injury_map
+                except Exception as _inj_err:
+                    print(f"Auto-load: injury map load failed: {_inj_err}")
 
-            players_ok = fetch_todays_players_only(games, precomputed_injury_map=injury_map)
-
-            # ── Step 5 (bonus): Auto-generate props for all 3 platforms ──────────
+            # ── Step 3/3: Auto-generate props for all 3 platforms ──────────
             # Do this *after* fetch_todays_players_only so the freshly-written
             # players.csv is available for reading.  This ensures every game has
             # props ready to analyze without requiring a separate manual step.
             props_msg = "Props: ⏭️ skipped (player fetch failed)"
             if players_ok:
                 try:
-                    status_text.text("⏳ Step 4/4 — Auto-generating props for tonight's players…")
+                    status_text.text("⏳ Step 3/3 — Auto-generating props for tonight's players…")
                     progress_bar.progress(80)
                     from data.data_manager import (
                         load_players_data as _load_players,
@@ -193,10 +194,11 @@ if auto_load_clicked:
             status_text.empty()
             progress_bar.empty()
 
+            _injury_loaded = bool(st.session_state.get("injury_status_map"))
             st.success(
                 f"✅ Loaded **{len(games)} game(s)** for tonight! "
                 f"Players: {'✅' if players_ok else '⚠️ failed'} | "
-                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'} | "
+                f"Injuries: {'✅' if _injury_loaded else '⚠️ unavailable'} | "
                 f"{props_msg}"
             )
             st.rerun()

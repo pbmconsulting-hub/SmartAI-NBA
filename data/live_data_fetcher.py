@@ -873,11 +873,13 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                                 None,
                             )
                     if pid:
+                        # Get position from RosterEngine (uses CommonTeamRoster data)
+                        position = _roster_engine.get_player_position(player_name, abbrev)
                         all_roster_players.append({
                             "player_id":   pid,
                             "player_name": player_name,
                             "team":        abbrev,
-                            "position":    "SF",  # default; refined by game-log data below
+                            "position":    position,
                         })
                         added += 1
                     else:
@@ -1028,6 +1030,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                 "name": player_name,
                 "team": team_abbrev,
                 "position": position,
+                "games_played": len(game_log_data),
                 "minutes_avg": minutes_avg,
                 "points_avg": points_avg,
                 "rebounds_avg": rebounds_avg,
@@ -1114,7 +1117,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
         # Write to the CSV file (same format as full fetch)
         fieldnames = [
-            "player_id", "name", "team", "position", "minutes_avg",
+            "player_id", "name", "team", "position", "games_played", "minutes_avg",
             "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
             "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
             "usage_rate", "points_std", "rebounds_std", "assists_std",
@@ -1127,6 +1130,15 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             writer.writerows(formatted_players)
 
         save_last_updated("players")
+
+        # Persist injury data for session reuse (Neural Analysis reads this on load)
+        if injury_data:
+            try:
+                with open(INJURY_STATUS_JSON_PATH, "w", encoding="utf-8") as _jf:
+                    json.dump(injury_data, _jf, indent=2)
+                save_last_updated("injuries")
+            except Exception as _save_err:
+                print(f"  Warning: could not save injury_status.json: {_save_err}")
 
         if progress_callback:
             progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players (today's teams only)!")
@@ -1476,6 +1488,7 @@ def fetch_player_stats(progress_callback=None):
                 "name": player_name,                          # Player full name
                 "team": team_abbrev,                          # 3-letter team code
                 "position": mapped_position,                  # PG/SG/SF/PF/C
+                "games_played": int(player_row.get("GP", 0) or 0),  # Games played this season
                 "minutes_avg": round(minutes_avg, 1),         # Minutes per game
                 "points_avg": round(points_avg, 1),           # Points per game
                 "rebounds_avg": round(rebounds_avg, 1),       # Rebounds per game
@@ -1574,7 +1587,7 @@ def fetch_player_stats(progress_callback=None):
 
         # Define the column order (must match players.csv exactly)
         fieldnames = [
-            "player_id", "name", "team", "position", "minutes_avg",
+            "player_id", "name", "team", "position", "games_played", "minutes_avg",
             "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
             "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
             "usage_rate", "points_std", "rebounds_std", "assists_std",
@@ -2077,7 +2090,7 @@ def fetch_all_todays_data(progress_callback=None):
     # Step 1: Fetch tonight's games
     # --------------------------------------------------------
     if progress_callback:
-        progress_callback(0, 40, "Step 1/4 — Fetching tonight's games...")
+        progress_callback(0, 30, "Step 1/3 — Fetching tonight's games...")
 
     games = fetch_todays_games()
     results["games"] = games
@@ -2087,62 +2100,47 @@ def fetch_all_todays_data(progress_callback=None):
         return results
 
     if progress_callback:
-        progress_callback(2, 40, f"Step 1/4 ✅ Found {len(games)} game(s). Fetching player rosters...")
+        progress_callback(2, 30, f"Step 1/3 ✅ Found {len(games)} game(s). Fetching player rosters...")
 
     # --------------------------------------------------------
-    # Step 2: Fetch multi-signal injury/availability status FIRST
-    # Running this before fetch_todays_players_only() ensures the
-    # most accurate injury data is available when writing the CSV.
-    # --------------------------------------------------------
-    if progress_callback:
-        progress_callback(2, 40, "Step 2/4 — Fetching injury / availability status...")
-
-    injury_map = {}
-    try:
-        injury_map = fetch_player_injury_status(todays_games=games)
-        results["injury_status"] = injury_map
-    except Exception as inj_err:
-        print(f"fetch_all_todays_data: injury status fetch failed: {inj_err}")
-        results["injury_status"] = {}
-
-    if progress_callback:
-        status_inj = "✅" if results["injury_status"] else "⚠️"
-        progress_callback(12, 40, f"Step 2/4 {status_inj} Injury status done. Fetching player rosters...")
-
-    # --------------------------------------------------------
-    # Step 3: Fetch player stats for tonight's teams only
-    # Pass the pre-computed injury map so the CSV is filtered
-    # with the best available data on first write.
+    # Step 2: Fetch current rosters + player stats for tonight's teams.
+    # RosterEngine (called internally) handles injury filtering and
+    # writes injury_status.json — no separate injury API call needed.
     # --------------------------------------------------------
     def player_progress(current, total, message):
         if progress_callback:
-            # Progress range for Step 3: steps 12-29 out of 40
-            scaled = 12 + int(17 * current / max(total, 1))
-            progress_callback(scaled, 40, f"Step 3/4 — {message}")
+            scaled = 2 + int(20 * current / max(total, 1))
+            progress_callback(scaled, 30, f"Step 2/3 — {message}")
 
     results["players_updated"] = fetch_todays_players_only(
         games,
         progress_callback=player_progress,
-        precomputed_injury_map=injury_map,
     )
+
+    # Load the injury data saved by fetch_todays_players_only
+    try:
+        if INJURY_STATUS_JSON_PATH.exists():
+            with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                results["injury_status"] = json.load(_jf)
+    except Exception as _inj_err:
+        print(f"fetch_all_todays_data: could not load injury_status.json: {_inj_err}")
 
     if progress_callback:
         status = "✅" if results["players_updated"] else "⚠️"
-        progress_callback(29, 40, f"Step 3/4 {status} Player stats done. Fetching team stats...")
+        progress_callback(22, 30, f"Step 2/3 {status} Player stats done. Fetching team stats...")
 
     # --------------------------------------------------------
-    # Step 4: Fetch team stats
+    # Step 3: Fetch team stats
     # --------------------------------------------------------
     def team_progress(current, total, message):
         if progress_callback:
-            # Progress range for Step 4: steps 29-40 out of 40
-            scaled = 29 + int(11 * current / max(total, 1))
-            progress_callback(scaled, 40, f"Step 4/4 — {message}")
+            scaled = 22 + int(8 * current / max(total, 1))
+            progress_callback(scaled, 30, f"Step 3/3 — {message}")
 
     results["teams_updated"] = fetch_team_stats(progress_callback=team_progress)
 
     if progress_callback:
-        progress_callback(40, 40, "✅ All done! Games, players, team stats, and injury status loaded.")
+        progress_callback(30, 30, "✅ All done! Games, players, team stats, and injury status loaded.")
 
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]

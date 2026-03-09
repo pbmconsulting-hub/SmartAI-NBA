@@ -682,6 +682,31 @@ todays_games   = st.session_state.get("todays_games", [])
 simulation_depth = st.session_state.get("simulation_depth", 1000)
 minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 
+# ── Stale data detection ─────────────────────────────────────
+# Warn the user when player data is missing or doesn't match tonight's teams.
+_player_data_stale = False
+_stale_reason = ""
+if not players_data:
+    _player_data_stale = True
+    _stale_reason = "No player data found — players.csv is empty or missing."
+elif todays_games:
+    # Check whether any players in the CSV belong to tonight's teams
+    tonight_teams = set()
+    for _g in todays_games:
+        tonight_teams.add(_g.get("home_team", "").upper().strip())
+        tonight_teams.add(_g.get("away_team", "").upper().strip())
+    tonight_teams.discard("")
+    if tonight_teams:
+        csv_teams = {p.get("team", "").upper().strip() for p in players_data}
+        matching_teams = csv_teams & tonight_teams
+        if not matching_teams:
+            _player_data_stale = True
+            _stale_reason = (
+                f"Player data doesn't match tonight's teams "
+                f"({', '.join(sorted(tonight_teams))}). "
+                "The CSV was likely fetched for a different day."
+            )
+
 # ============================================================
 # END SECTION: Load All Required Data
 # ============================================================
@@ -734,6 +759,14 @@ elif len(todays_games) > 1:
 status_col, settings_col = st.columns([2, 1])
 
 with status_col:
+    # ── Stale player data warning ────────────────────────────
+    if _player_data_stale:
+        st.warning(
+            f"⚠️ **Player data is stale** — {_stale_reason}  \n"
+            "Go to **📡 Live Games** and click **🔄 Auto-Load Tonight's Games**, "
+            "or go to **📡 Data Feed** and click **⚡ Smart Update** to fetch fresh data."
+        )
+
     if current_props:
         # Show per-platform breakdown of loaded props
         _prerun_plat_counts: dict = {}
@@ -995,6 +1028,10 @@ if run_analysis:
         player_matched = player_data is not None
 
         if player_data is None:
+            print(
+                f"Neural Analysis: player '{player_name}' not found in players.csv — "
+                "using prop line as fallback average. Run Smart Update to refresh player data."
+            )
             player_data = {
                 "name":            player_name,
                 "team":            prop.get("team", ""),

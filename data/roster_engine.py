@@ -191,6 +191,8 @@ class RosterEngine:
         self._full_rosters: dict = {}
         # {team_abbrev → [player_name, ...]}  — filtered active-only
         self._active_rosters: dict = {}
+        # {team_abbrev → {player_name_lower → position_str}}
+        self._player_positions: dict = {}
         self._last_refresh: Optional[datetime.datetime] = None
 
     # ----------------------------------------------------------
@@ -256,6 +258,34 @@ class RosterEngine:
         Format: {player_name_lower: {status, injury, team, return_date, source}}
         """
         return dict(self._injury_map)
+
+    def get_player_position(self, player_name: str, team_abbrev: str = None) -> str:
+        """Return the NBA position for a player (e.g. 'PG', 'SF', 'C').
+
+        Looks up the position from the CommonTeamRoster data fetched by
+        refresh().  Falls back to 'SF' when the player is not found so
+        callers always get a valid position string.
+
+        Args:
+            player_name (str): Player full name.
+            team_abbrev (str, optional): 3-letter team abbreviation.
+
+        Returns:
+            str: Position abbreviation (PG/SG/SF/PF/C). Default: 'SF'.
+        """
+        name_key = player_name.lower().strip()
+        if team_abbrev:
+            team_key = team_abbrev.upper().strip()
+            team_positions = self._player_positions.get(team_key, {})
+            pos = team_positions.get(name_key)
+            if pos:
+                return pos
+        # Fall back: search all teams
+        for team_positions in self._player_positions.values():
+            pos = team_positions.get(name_key)
+            if pos:
+                return pos
+        return "SF"
 
     def refresh(self, team_abbrevs: list = None):
         """
@@ -424,12 +454,23 @@ class RosterEngine:
                 df = resp.get_data_frames()[0]
 
                 all_players = []
+                team_positions: dict = {}
+                # Map CommonTeamRoster position codes to PG/SG/SF/PF/C
+                _pos_map = {
+                    "G": "PG", "G-F": "SF", "F-G": "SG",
+                    "F": "SF", "F-C": "PF", "C-F": "PF", "C": "C",
+                }
                 for _, row in df.iterrows():
                     player_name = row.get("PLAYER", "")
                     if not player_name:
                         continue
 
                     all_players.append(player_name)
+
+                    # Capture position
+                    raw_pos = str(row.get("POSITION", "") or "").strip()
+                    mapped_pos = _pos_map.get(raw_pos, "SF")
+                    team_positions[player_name.lower().strip()] = mapped_pos
 
                     # Flag two-way / G-League players as inactive
                     player_type  = str(row.get("PLAYER_TYPE",  "") or "").lower()
@@ -448,6 +489,7 @@ class RosterEngine:
                         print(f"  Flagged two-way player: {player_name} ({abbrev})")
 
                 self._full_rosters[abbrev.upper()] = all_players
+                self._player_positions[abbrev.upper()] = team_positions
                 print(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
             except Exception as exc:
                 print(f"  RosterEngine nba_api error for {abbrev}: {exc}")

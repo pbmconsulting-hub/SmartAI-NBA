@@ -474,6 +474,22 @@ if current_action:
                     f"Only current roster players — no traded players!"
                 )
                 st.caption(f"Teams fetched: {', '.join(sorted(teams_set))}")
+
+                # Show per-team player count breakdown
+                if updated_players:
+                    team_counts: dict = {}
+                    for _p in updated_players:
+                        _t = _p.get("team", "?")
+                        team_counts[_t] = team_counts.get(_t, 0) + 1
+
+                    missing_teams = sorted(teams_set - set(team_counts.keys()))
+                    breakdown_parts = [f"**{t}**: {n}" for t, n in sorted(team_counts.items())]
+                    st.markdown("**Players by team:** " + " · ".join(breakdown_parts))
+                    if missing_teams:
+                        st.warning(
+                            f"⚠️ Could not fetch roster for: {', '.join(missing_teams)}. "
+                            "Check console for details or try the Full Update."
+                        )
             else:
                 st.error(
                     "❌ Smart Update failed. Check your internet connection or try again.\n"
