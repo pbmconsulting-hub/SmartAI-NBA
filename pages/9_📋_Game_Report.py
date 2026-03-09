@@ -237,48 +237,69 @@ else:
 # ============================================================
 
 def _build_entry_strategy(results):
-    """Build entry strategy matrix entries from analysis results."""
+    """Build entry strategy matrix entries from analysis results.
+
+    Enforces a unique-player constraint: each parlay leg must be a
+    different player.  Fantasy-score composite stat types are excluded
+    so legs stay comparable across sportsbooks.
+    """
     top = [
         r for r in results
         if not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
         and abs(r.get("edge_percentage", 0)) >= 5.0
+        # Exclude fantasy-score composite stats from parlay legs
+        and not str(r.get("stat_type", "")).startswith("fantasy_score")
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
+    def _pick_unique_players(candidates, num_legs):
+        """Return up to num_legs picks with no repeated players."""
+        seen: set = set()
+        selected = []
+        for r in candidates:
+            pname = r.get("player_name", "")
+            if pname and pname in seen:
+                continue
+            seen.add(pname)
+            selected.append(r)
+            if len(selected) == num_legs:
+                break
+        return selected
+
     entries = []
-    if len(top) >= 2:
-        p1, p2 = top[0], top[1]
-        avg2 = round((p1.get("confidence_score", 0) + p2.get("confidence_score", 0)) / 2, 1)
+    picks2 = _pick_unique_players(top, 2)
+    if len(picks2) >= 2:
+        avg2 = round(sum(r.get("confidence_score", 0) for r in picks2) / 2, 1)
         entries.append({
             "combo_type": "Power Play (2)",
             "picks": [
-                f"{p1['player_name']} {p1['direction']} {p1['line']} {p1['stat_type'].title()}",
-                f"{p2['player_name']} {p2['direction']} {p2['line']} {p2['stat_type'].title()}",
+                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
+                for r in picks2
             ],
             "safe_avg": f"{avg2:.1f}",
             "strategy": "Highest-confidence 2-leg.",
         })
-    if len(top) >= 3:
-        trio = top[:3]
-        avg3 = round(sum(r.get("confidence_score", 0) for r in trio) / 3, 1)
+    picks3 = _pick_unique_players(top, 3)
+    if len(picks3) >= 3:
+        avg3 = round(sum(r.get("confidence_score", 0) for r in picks3) / 3, 1)
         entries.append({
             "combo_type": "Triple Threat (3)",
             "picks": [
                 f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in trio
+                for r in picks3
             ],
             "safe_avg": f"{avg3:.1f}",
             "strategy": "Top-3 picks, balanced risk.",
         })
-    if len(top) >= 5:
-        five = top[:5]
-        avg5 = round(sum(r.get("confidence_score", 0) for r in five) / 5, 1)
+    picks5 = _pick_unique_players(top, 5)
+    if len(picks5) >= 5:
+        avg5 = round(sum(r.get("confidence_score", 0) for r in picks5) / 5, 1)
         entries.append({
             "combo_type": "Max Parlay (5)",
             "picks": [
                 f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in five
+                for r in picks5
             ],
             "safe_avg": f"{avg5:.1f}",
             "strategy": "High ceiling, diversified 5-leg.",

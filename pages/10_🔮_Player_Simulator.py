@@ -239,6 +239,121 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
     }
 
 
+def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = False):
+    """Render a Betting Recommendations section based on simulation output.
+
+    Compares projected values against the season average (used as a proxy
+    for typical prop lines) and shows suggested OVER/UNDER picks with the
+    projected edge for each stat.  For dark horse players it also explains
+    WHY they are flagged as a dark horse opportunity.
+    """
+    player_data = sim_result["player"]
+    ctx = sim_result["context"]
+    stats = sim_result["stats"]
+    player_name = player_data.get("name", "")
+
+    rec_rows = ""
+    for stat in _STAT_TYPES:
+        s = stats.get(stat, {})
+        projected = s.get("projected", 0)
+        season_avg = s.get("season_avg", 0)
+        p10 = s.get("p10", 0)
+        p90 = s.get("p90", 0)
+        upside = s.get("upside_ratio", 1.0)
+
+        if season_avg < 0.5:
+            continue  # Skip stats where the player has essentially no production
+
+        # Use season avg as proxy for the prop line
+        prop_line = round(season_avg * 2) / 2  # Round to nearest 0.5 (typical book format)
+        edge_pct = round((projected - prop_line) / max(prop_line, 0.1) * 100, 1)
+        direction = "OVER" if projected >= prop_line else "UNDER"
+        dir_color = "#00ff9d" if direction == "OVER" else "#ff5e00"
+        edge_label = f"{edge_pct:+.1f}%"
+        emoji = _STAT_EMOJI.get(stat, "📊")
+
+        # Only show meaningful edges (≥ 3%)
+        if abs(edge_pct) < 3.0:
+            continue
+
+        upside_tag = ""
+        if upside >= 1.5:
+            upside_tag = (
+                '<span style="background:#ff5e00;color:#0a0f1a;padding:1px 6px;'
+                'border-radius:3px;font-size:0.72rem;font-weight:700;margin-left:6px;">'
+                '🌑 DARK HORSE UPSIDE</span>'
+            )
+
+        rec_rows += (
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+            f'<td style="padding:6px 8px;color:#c0d0e8;">{emoji} {_html.escape(stat.replace("_", " ").title())}</td>'
+            f'<td style="padding:6px 8px;color:#ff5e00;font-weight:700;">{projected}</td>'
+            f'<td style="padding:6px 8px;color:#8a9bb8;">{prop_line}</td>'
+            f'<td style="padding:6px 8px;color:{dir_color};font-weight:700;">'
+            f'{direction} {upside_tag}</td>'
+            f'<td style="padding:6px 8px;color:{dir_color};">{edge_label}</td>'
+            f'<td style="padding:6px 8px;color:#8a9bb8;font-size:0.8rem;">'
+            f'{p10}–{p90}</td>'
+            f'</tr>'
+        )
+
+    if not rec_rows:
+        return  # Nothing actionable to show
+
+    # Dark horse explanation block
+    dark_horse_explain = ""
+    if is_dark_horse:
+        opponent = ctx.get("opponent", "?")
+        game_total = ctx.get("game_total", 220)
+        is_home = ctx.get("is_home", True)
+        loc_label = "home" if is_home else "away"
+        dark_horse_stats = [
+            stat for stat in _STAT_TYPES
+            if stats.get(stat, {}).get("upside_ratio", 0) >= 1.5
+            and stats.get(stat, {}).get("season_avg", 0) > 0.5
+        ]
+        dh_stat_str = ", ".join(s.replace("_", " ").title() for s in dark_horse_stats)
+        dark_horse_explain = (
+            f'<div style="margin-bottom:12px;padding:10px 14px;'
+            f'background:rgba(255,94,0,0.1);border-radius:6px;border-left:3px solid #ff5e00;">'
+            f'<div style="color:#ff5e00;font-weight:700;font-size:0.88rem;margin-bottom:4px;">'
+            f'🌑 Why Dark Horse?</div>'
+            f'<div style="color:#c0d0e8;font-size:0.84rem;line-height:1.6;">'
+            f'{_html.escape(player_data.get("name", ""))} is flagged as a <strong style="color:#ff5e00;">dark horse</strong> '
+            f'for {dh_stat_str or "key stats"} — the 90th-percentile projection is ≥ 1.5× the season average. '
+            f'Playing <em>{loc_label}</em> vs <strong>{_html.escape(opponent)}</strong> '
+            f'in a game with an O/U of <strong>{game_total:.0f}</strong>. '
+            f'This combination of matchup and pace context creates significant upside risk.</div>'
+            f'</div>'
+        )
+
+    html_out = (
+        f'<div style="background:#0f1424;border-radius:8px;padding:16px 18px;'
+        f'margin-top:6px;margin-bottom:16px;border-top:2px solid #00ff9d;">'
+        f'<div style="font-family:\'Orbitron\',sans-serif;color:#00ff9d;'
+        f'font-size:0.92rem;font-weight:700;margin-bottom:10px;">💡 Betting Recommendations</div>'
+        + dark_horse_explain +
+        f'<div style="overflow-x:auto;">'
+        f'<table style="width:100%;border-collapse:collapse;font-size:0.86rem;">'
+        f'<thead><tr style="border-bottom:1px solid rgba(0,255,157,0.3);">'
+        f'<th style="padding:6px 8px;text-align:left;color:#00ff9d;">Stat</th>'
+        f'<th style="padding:6px 8px;text-align:left;color:#ff5e00;">Projected</th>'
+        f'<th style="padding:6px 8px;text-align:left;color:#8a9bb8;">Prop Line</th>'
+        f'<th style="padding:6px 8px;text-align:left;color:#00ff9d;">Pick</th>'
+        f'<th style="padding:6px 8px;text-align:left;color:#c0d0e8;">Edge</th>'
+        f'<th style="padding:6px 8px;text-align:left;color:#8a9bb8;">10–90th Range</th>'
+        f'</tr></thead>'
+        f'<tbody>{rec_rows}</tbody>'
+        f'</table></div>'
+        f'<div style="margin-top:10px;font-size:0.75rem;color:#8a9bb8;">'
+        f'ℹ️ Methodology: projections based on Monte Carlo simulation using '
+        f'matchup-adjusted season averages, pace, rest, and home/away factors. '
+        f'Prop line ≈ season average rounded to nearest 0.5.</div>'
+        f'</div>'
+    )
+    st.markdown(html_out, unsafe_allow_html=True)
+
+
 def _render_sim_card(sim_result: dict):
     """Render a styled simulation result card for one player."""
     player_data = sim_result["player"]
@@ -386,10 +501,22 @@ if run_sim and selected_names:
         # Also render individual cards
         for sim_result in _all_sim_results:
             _render_sim_card(sim_result)
+            _is_dh = any(
+                s["upside_ratio"] >= 1.5
+                for s in sim_result["stats"].values()
+                if s["season_avg"] > 0.5
+            )
+            _render_betting_recommendations(sim_result, is_dark_horse=_is_dh)
     else:
         # Standard / Scenario: render full cards + game log overlay
         for sim_result in _all_sim_results:
             _render_sim_card(sim_result)
+            _is_dh = any(
+                s["upside_ratio"] >= 1.5
+                for s in sim_result["stats"].values()
+                if s["season_avg"] > 0.5
+            )
+            _render_betting_recommendations(sim_result, is_dark_horse=_is_dh)
 
             # ── Historical Game Log Overlay ────────────────────────────
             _pdata = sim_result["player"]
@@ -399,14 +526,19 @@ if run_sim and selected_names:
                 with st.expander(f"📅 {_pname_log} — Last {len(_recent_games)} Game Log", expanded=False):
                     _log_rows = []
                     for _gi, _g in enumerate(_recent_games[:10], start=1):
+                        def _to_float(val):
+                            try:
+                                return float(val)
+                            except (TypeError, ValueError):
+                                return None
                         _log_rows.append({
                             "Game": f"G-{_gi}",
-                            "PTS": _g.get("pts", "—"),
-                            "REB": _g.get("reb", "—"),
-                            "AST": _g.get("ast", "—"),
-                            "3PM": _g.get("fg3m", "—"),
-                            "STL": _g.get("stl", "—"),
-                            "BLK": _g.get("blk", "—"),
+                            "PTS": _to_float(_g.get("pts")),
+                            "REB": _to_float(_g.get("reb")),
+                            "AST": _to_float(_g.get("ast")),
+                            "3PM": _to_float(_g.get("fg3m")),
+                            "STL": _to_float(_g.get("stl")),
+                            "BLK": _to_float(_g.get("blk")),
                         })
                     st.dataframe(_log_rows, use_container_width=True, hide_index=True)
             elif _scenario_mode:
@@ -487,3 +619,9 @@ if run_dark_horse:
     for dh in dark_horses[:3]:
         sim_full = _simulate_player(dh["player"], sim_depth, todays_games)
         _render_sim_card(sim_full)
+        _is_dh_full = any(
+            s["upside_ratio"] >= 1.5
+            for s in sim_full["stats"].values()
+            if s["season_avg"] > 0.5
+        )
+        _render_betting_recommendations(sim_full, is_dark_horse=_is_dh_full)

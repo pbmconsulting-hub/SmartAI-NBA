@@ -673,6 +673,34 @@ def _fetch_games_layer3_live_scoreboard(team_records):
         return []
 
 
+def _deduplicate_games(games: list) -> list:
+    """Return *games* with duplicate matchups removed.
+
+    Two entries are considered duplicates when they share the same
+    home_team + away_team pair (case-insensitive).  The first occurrence
+    is kept and any subsequent duplicate is silently dropped.  A unique
+    game_id (if present) is also used as an alternative deduplication key.
+    """
+    seen_matchups: set = set()
+    seen_game_ids: set = set()
+    deduped: list = []
+    for g in (games or []):
+        game_id = g.get("game_id", "")
+        home = g.get("home_team", "").upper().strip()
+        away = g.get("away_team", "").upper().strip()
+        matchup_key = (home, away)
+        if game_id and game_id in seen_game_ids:
+            continue
+        if home and away and matchup_key in seen_matchups:
+            continue
+        if game_id:
+            seen_game_ids.add(game_id)
+        if home and away:
+            seen_matchups.add(matchup_key)
+        deduped.append(g)
+    return deduped
+
+
 def fetch_todays_games():
     """
     Fetch tonight's NBA games using a 3-layer fallback system.
@@ -714,7 +742,7 @@ def fetch_todays_games():
                 )
         except Exception as cv_error:
             print(f"Cross-validation check failed (non-fatal): {cv_error}")
-        return layer1_games
+        return _deduplicate_games(layer1_games)
 
     # --------------------------------------------------------
     # Layer 2: ESPN Public API
@@ -724,7 +752,7 @@ def fetch_todays_games():
 
     if layer2_games:
         print(f"Layer 2 success: {len(layer2_games)} game(s) found.")
-        return layer2_games
+        return _deduplicate_games(layer2_games)
 
     # --------------------------------------------------------
     # Layer 3: Live ScoreBoard
@@ -737,7 +765,7 @@ def fetch_todays_games():
     else:
         print("All layers failed. No games available.")
 
-    return layer3_games
+    return _deduplicate_games(layer3_games or [])
 
 # ============================================================
 # END SECTION: Today's Games Fetcher
