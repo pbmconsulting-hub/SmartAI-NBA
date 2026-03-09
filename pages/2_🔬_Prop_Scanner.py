@@ -109,6 +109,26 @@ valid_platforms = ["PrizePicks", "Underdog", "DraftKings"]
 
 current_props = load_props_from_session(st.session_state)
 
+# ── Auto-generate props when games are loaded but no props exist yet ──────────
+# This makes the Prop Scanner "just work" immediately after the user loads
+# tonight's games on the Live Games page, with no extra manual step needed.
+if not current_props:
+    _auto_games = st.session_state.get("todays_games", [])
+    if _auto_games:
+        _auto_platforms = st.session_state.get(
+            "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
+        )
+        _silent_props = generate_props_for_todays_players(
+            players_data, _auto_games, platforms=_auto_platforms
+        )
+        if _silent_props:
+            save_props_to_session(_silent_props, st.session_state)
+            current_props = _silent_props
+            st.toast(
+                f"✅ Auto-generated {len(_silent_props)} props for tonight's {len(_auto_games)} game(s).",
+                icon="🤖",
+            )
+
 # Load persisted injury status for warning display (no API call needed)
 injury_status_map = load_injury_status()
 

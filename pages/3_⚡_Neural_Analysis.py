@@ -1590,7 +1590,21 @@ elif not run_analysis:
     if current_props:
         st.info("👆 Click **Run Analysis** to analyze all loaded props.")
     else:
-        st.warning("⚠️ No props loaded. Go to **📥 Import Props** to add props first.")
+        _has_games = bool(st.session_state.get("todays_games"))
+        if _has_games:
+            st.warning(
+                "⚠️ No props loaded yet. "
+                "Go to **🔬 Prop Scanner** and click **🤖 Auto-Generate Props for Tonight** "
+                "to instantly create props for all active players on tonight's teams — "
+                "or click **🔄 Auto-Load Tonight's Games** on the **📡 Live Games** page "
+                "to reload games and auto-generate props in one step."
+            )
+        else:
+            st.warning(
+                "⚠️ No props loaded and no games found. "
+                "Start on the **📡 Live Games** page — click **🔄 Auto-Load Tonight's Games** "
+                "to fetch tonight's schedule and auto-generate props for all active players."
+            )
 
 # ============================================================
 # END SECTION: Display Analysis Results

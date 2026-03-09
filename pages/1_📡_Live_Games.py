@@ -155,7 +155,35 @@ if auto_load_clicked:
 
             players_ok = fetch_todays_players_only(games, precomputed_injury_map=injury_map)
 
-            status_text.text("⏳ Step 4/4 — Finalizing data...")
+            # ── Step 5 (bonus): Auto-generate props for all 3 platforms ──────────
+            # Do this *after* fetch_todays_players_only so the freshly-written
+            # players.csv is available for reading.  This ensures every game has
+            # props ready to analyze without requiring a separate manual step.
+            props_msg = "Props: ⏭️ skipped (player fetch failed)"
+            if players_ok:
+                try:
+                    status_text.text("⏳ Step 4/4 — Auto-generating props for tonight's players…")
+                    progress_bar.progress(80)
+                    from data.data_manager import (
+                        load_players_data as _load_players,
+                        generate_props_for_todays_players as _gen_props,
+                        save_props_to_session as _save_props,
+                    )
+                    _selected_platforms = st.session_state.get(
+                        "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
+                    )
+                    _fresh_players = _load_players()
+                    _auto_props = _gen_props(_fresh_players, games, platforms=_selected_platforms)
+                    if _auto_props:
+                        _save_props(_auto_props, st.session_state)
+                        props_msg = f"Props: ✅ {len(_auto_props)} generated"
+                    else:
+                        props_msg = "Props: ⚠️ none generated (check player data)"
+                except Exception as _prop_err:
+                    print(f"Auto-load: prop generation failed: {_prop_err}")
+                    props_msg = "Props: ⚠️ generation failed"
+
+            status_text.text("⏳ Finalizing…")
             progress_bar.progress(90)
 
             time.sleep(0.3)
@@ -168,7 +196,8 @@ if auto_load_clicked:
             st.success(
                 f"✅ Loaded **{len(games)} game(s)** for tonight! "
                 f"Players: {'✅' if players_ok else '⚠️ failed'} | "
-                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'}"
+                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'} | "
+                f"{props_msg}"
             )
             st.rerun()
 

@@ -1054,13 +1054,41 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     if platforms is None:
         platforms = ["PrizePicks", "Underdog", "DraftKings"]
 
-    # ── Build set of tonight's teams ──────────────────────────
-    tonight_teams = set()
+    # ── Build set of tonight's teams (with abbreviation variants) ────
+    # NBA CDN, nba_api, and prop platforms sometimes use different three-
+    # letter codes for the same franchise (e.g. "GS" vs "GSW").  We store
+    # canonical → variant(s) pairs and add all of them to tonight_teams so
+    # no player is silently dropped by a formatting mismatch.
+    # Each tuple is (canonical, *variants).
+    _ABBREV_VARIANT_GROUPS = [
+        ("GSW", "GS"),        # Golden State Warriors
+        ("NYK", "NY"),        # New York Knicks
+        ("NOP", "NO"),        # New Orleans Pelicans
+        ("SAS", "SA"),        # San Antonio Spurs
+        ("UTA", "UTAH"),      # Utah Jazz
+        ("WAS", "WSH"),       # Washington Wizards
+        ("BKN", "BRK"),       # Brooklyn Nets
+        ("PHX", "PHO"),       # Phoenix Suns
+        ("CHA", "CHO"),       # Charlotte Hornets
+        # Historical: New Jersey Nets (relocated to Brooklyn 2012); some legacy
+        # CSV exports or third-party data sources still use "NJ".
+        ("BKN", "NJ"),
+    ]
+    # Build a flat lookup: any variant → frozenset of all siblings in its group
+    _alias_lookup: dict = {}
+    for group in _ABBREV_VARIANT_GROUPS:
+        siblings = frozenset(group)
+        for code in group:
+            _alias_lookup[code] = siblings
+
+    tonight_teams: set = set()
     for game in (todays_games or []):
         for key in ("home_team", "away_team"):
             abbrev = game.get(key, "").upper().strip()
             if abbrev:
                 tonight_teams.add(abbrev)
+                # Add all known variants for this abbreviation
+                tonight_teams.update(_alias_lookup.get(abbrev, ()))
 
     # ── Load persisted injury map (best-effort, no API call) ──
     injury_map = load_injury_status()
