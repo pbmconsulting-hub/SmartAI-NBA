@@ -18,6 +18,8 @@ from engine.edge_detection import analyze_directional_forces, should_avoid_prop,
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
+from engine.calibration import get_calibration_adjustment   # C10: historical calibration
+from engine.clv_tracker import store_opening_line            # C12: closing line value tracking
 
 # Import data loading functions
 from data.data_manager import (
@@ -997,6 +999,11 @@ if run_analysis:
         probability_over  = simulation_output.get("probability_over", 0.5)
         edge_pct          = calculate_edge_percentage(probability_over)
 
+        # C10: Historical calibration — adjust confidence score based on
+        # how well-calibrated the model has been historically at this
+        # probability level.  Returns 0.0 on cold start (no history yet).
+        calibration_adj = get_calibration_adjustment(probability_over)
+
         confidence_output = calculate_confidence_score(
             probability_over=probability_over,
             edge_percentage=edge_pct,
@@ -1009,7 +1016,26 @@ if run_analysis:
             recent_form_ratio=projection_result.get("recent_form_ratio"),
             line_sharpness_penalty=line_sharpness_penalty,
             trap_line_penalty=trap_line_penalty,
+            calibration_adjustment=calibration_adj,  # C10
         )
+
+        # C12: Closing Line Value — record the model's opening projection and
+        # recommendation at analysis time.  Callers can later call
+        # engine.clv_tracker.update_closing_line() with the final closing line
+        # to compute CLV and validate the model's edge.
+        try:
+            store_opening_line(
+                player_name=player_name,
+                stat_type=stat_type,
+                opening_line=prop_line,
+                model_projection=projected_stat,
+                model_direction=confidence_output.get("direction", "OVER"),
+                confidence_score=confidence_output.get("confidence_score", 0.0),
+                tier=confidence_output.get("tier", "Bronze"),
+                edge_percentage=edge_pct,
+            )
+        except Exception:
+            pass  # CLV recording is non-critical; never block analysis
 
         should_avoid_flag, avoid_reasons = should_avoid_prop(
             probability_over=probability_over,

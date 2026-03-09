@@ -1,0 +1,18 @@
+{
+  "jayson_tatum_points_20260309_051810": {
+    "record_id": "jayson_tatum_points_20260309_051810",
+    "player_name": "Jayson Tatum",
+    "stat_type": "points",
+    "opening_line": 26.5,
+    "model_projection": 27.3,
+    "model_direction": "OVER",
+    "confidence_score": 72.5,
+    "tier": "Gold",
+    "edge_percentage": 14.2,
+    "opening_timestamp": "2026-03-09T05:18:10.949891",
+    "closing_line": null,
+    "closing_timestamp": null,
+    "clv": null,
+    "clv_direction": null
+  }
+}
