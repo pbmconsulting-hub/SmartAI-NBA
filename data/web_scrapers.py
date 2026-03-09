@@ -445,12 +445,14 @@ def scrape_bref_season_stats():
 
 def fetch_multi_source_injury_status(todays_games=None):
     """
-    Fetch and merge injury status from all available web sources.
+    Fetch and merge injury status from official NBA CDN sources.
 
-    Priority (highest wins):
-        1. NBA.com Official — authoritative designation
-        2. RotoWire         — fastest updates, GTD granularity
-        3. ESPN             — broad coverage
+    Uses only free, official NBA data feeds (no third-party HTML scraping):
+        1. NBA.com CDN static injury JSON  — authoritative designation
+        2. Live daily CDN injury JSON      — latest daily updates
+
+    Both feeds are accessed via RosterEngine which handles retries,
+    format variations, and status normalisation.
 
     Args:
         todays_games (list|None): Tonight's games (used for logging context).
@@ -465,140 +467,44 @@ def fetch_multi_source_injury_status(todays_games=None):
                   "comment":     str,
                   "source":      str,
               }}
-        Empty dict if all scrapers fail.
+        Empty dict if all sources fail.
     """
-    if not _SCRAPER_DEPS_AVAILABLE:
-        print(
-            "fetch_multi_source_injury_status: requests/bs4 not installed — "
-            "Layer 5 skipped.  Run: pip install requests beautifulsoup4 lxml"
-        )
-        return {}
-
-    # ── Existing core scrapers (NBA.com + RotoWire) ──────────────
-    core_data = {}
-    if _CORE_SCRAPER_AVAILABLE and fetch_all_injury_data is not None:
-        try:
-            core_data = fetch_all_injury_data()
-            print(
-                f"fetch_multi_source_injury_status: core scrapers returned "
-                f"{len(core_data)} players"
-            )
-        except Exception as exc:
-            print(f"fetch_multi_source_injury_status: core scrapers raised: {exc}")
-    else:
-        # Run individual scrapers if the re-export failed
-        rotowire_data = {}
-        nba_data = {}
-        try:
-            rotowire_data = scrape_rotowire_injury_report() if scrape_rotowire_injury_report else {}
-        except Exception as exc:
-            print(f"fetch_multi_source_injury_status: RotoWire raised: {exc}")
-        try:
-            nba_data = scrape_nba_official_injury_report() if scrape_nba_official_injury_report else {}
-        except Exception as exc:
-            print(f"fetch_multi_source_injury_status: NBA.com raised: {exc}")
-        # Merge: start with RotoWire; for shared keys NBA.com wins on
-        # status/injury/comment/source but we preserve RotoWire's return_date
-        # when NBA.com's return_date is empty.
-        core_data = dict(rotowire_data)
-        for key, nba_entry in nba_data.items():
-            if key in core_data:
-                existing = core_data[key]
-                existing["status"]  = nba_entry.get("status",  existing["status"])
-                existing["injury"]  = nba_entry.get("injury",  existing["injury"])
-                existing["comment"] = nba_entry.get("comment", existing.get("comment", ""))
-                existing["source"]  = nba_entry.get("source",  existing["source"])
-                if nba_entry.get("return_date", ""):
-                    existing["return_date"] = nba_entry["return_date"]
-            else:
-                core_data[key] = {
-                    "status":      nba_entry.get("status", "Unknown"),
-                    "injury":      nba_entry.get("injury", ""),
-                    "team":        nba_entry.get("team", ""),
-                    "return_date": nba_entry.get("return_date", ""),
-                    "comment":     nba_entry.get("comment", ""),
-                    "source":      nba_entry.get("source", "NBA.com"),
-                }
-
-    # ── ESPN scraper ─────────────────────────────────────────────
-    espn_data = {}
     try:
-        espn_data = scrape_espn_injury_report()
-        print(
-            f"fetch_multi_source_injury_status: ESPN returned {len(espn_data)} players"
-        )
-    except Exception as exc:
-        print(f"fetch_multi_source_injury_status: ESPN raised: {exc}")
+        from data.roster_engine import RosterEngine
+        engine = RosterEngine()
+        # refresh() without team_abbrevs fetches only the CDN injury feeds
+        engine.refresh()
+        raw = engine.get_injury_report()
 
-    # ── Merge: ESPN first (lowest priority), then core (higher priority) ──
-    merged = {}
-
-    for key, entry in espn_data.items():
-        merged[key] = {
-            "status":      entry.get("status", "Unknown"),
-            "injury":      entry.get("injury", ""),
-            "injury_note": entry.get("comment", entry.get("injury", "")),
-            "team":        entry.get("team", ""),
-            "return_date": entry.get("return_date", ""),
-            "comment":     entry.get("comment", ""),
-            "source":      "espn",
-        }
-
-    for key, entry in core_data.items():
-        if key in merged:
-            # Core data overrides ESPN
-            existing = merged[key]
-            existing["status"]      = entry.get("status", existing["status"])
-            existing["injury"]      = entry.get("injury", "") or existing["injury"]
-            existing["injury_note"] = entry.get("injury", "") or existing["injury_note"]
-            existing["return_date"] = entry.get("return_date", "") or existing["return_date"]
-            existing["comment"]     = entry.get("comment", "") or existing["comment"]
-            src = entry.get("source", "")
-            existing["source"] = f"{src}+espn" if src else "espn"
-        else:
+        # Normalise to the output schema callers expect.
+        # 'injury_note' and 'comment' mirror 'injury' for backward
+        # compatibility — callers may read either field for the injury description.
+        merged = {}
+        for key, entry in raw.items():
             merged[key] = {
                 "status":      entry.get("status", "Unknown"),
                 "injury":      entry.get("injury", ""),
                 "injury_note": entry.get("injury", ""),
                 "team":        entry.get("team", ""),
                 "return_date": entry.get("return_date", ""),
-                "comment":     entry.get("comment", ""),
-                "source":      entry.get("source", "unknown"),
+                "comment":     entry.get("injury", ""),
+                "source":      entry.get("source", "NBA-CDN"),
             }
 
-    # ── Final deduplication + normalization pass ──────────────
-    # Some scrapers return names with suffixes (e.g. "Jr.", "III").
-    # Re-key using _normalize_player_key so lookup is consistent
-    # regardless of suffix differences between sources.
-    normalized_merged = {}
-    for raw_key, entry in merged.items():
-        norm_key = _normalize_player_key(raw_key)
-        if norm_key and norm_key not in normalized_merged:
-            normalized_merged[norm_key] = entry
-        elif norm_key in normalized_merged:
-            # Keep the entry with higher-severity status
-            _SEV = {
-                "Out": 5, "Injured Reserve": 5, "Doubtful": 4,
-                "GTD": 3, "Questionable": 3, "Day-to-Day": 2,
-                "Probable": 1, "Active": 0, "Unknown": -1,
-            }
-            existing_sev = _SEV.get(normalized_merged[norm_key]["status"], -1)
-            new_sev = _SEV.get(entry["status"], -1)
-            if new_sev > existing_sev:
-                normalized_merged[norm_key] = entry
-    merged = normalized_merged
-
-    total = len(merged)
-    out_count = sum(1 for v in merged.values() if v["status"] == "Out")
-    gtd_count = sum(
-        1 for v in merged.values()
-        if v["status"] in ("GTD", "Questionable", "Doubtful", "Day-to-Day")
-    )
-    print(
-        f"fetch_multi_source_injury_status complete: {total} players — "
-        f"{out_count} Out, {gtd_count} GTD/Questionable/Doubtful"
-    )
-    return merged
+        total     = len(merged)
+        out_count = sum(1 for v in merged.values() if v["status"] == "Out")
+        gtd_count = sum(
+            1 for v in merged.values()
+            if v["status"] in ("GTD", "Questionable", "Doubtful", "Day-to-Day")
+        )
+        print(
+            f"fetch_multi_source_injury_status complete: {total} players — "
+            f"{out_count} Out, {gtd_count} GTD/Questionable/Doubtful"
+        )
+        return merged
+    except Exception as exc:
+        print(f"fetch_multi_source_injury_status: error — {exc}")
+        return {}
 
 # ============================================================
 # END SECTION: Consolidated Multi-Source Injury Fetcher
@@ -611,11 +517,11 @@ def fetch_multi_source_injury_status(todays_games=None):
 
 def fetch_verified_rosters(team_abbrevs, todays_games=None):
     """
-    Fetch and cross-validate rosters for a list of team abbreviations.
+    Fetch rosters for a list of team abbreviations using nba_api.
 
-    Primary source: nba_api CommonTeamRoster
-    Validation:     Cross-references against RotoWire active roster
-                    (players listed as injured on RotoWire are flagged)
+    Primary source: nba_api CommonTeamRoster (official, always free)
+    Two-way / G-League assigned players are excluded automatically using
+    the PLAYER_TYPE and HOW_ACQUIRED columns from the roster endpoint.
 
     Args:
         team_abbrevs (list[str]): Team abbreviations, e.g. ["LAL", "BOS"]
@@ -623,12 +529,10 @@ def fetch_verified_rosters(team_abbrevs, todays_games=None):
 
     Returns:
         dict: {team_abbrev: [player_name, ...]}
-              Players flagged as inactive are excluded from the list.
+              Two-way / G-League assigned players are excluded.
     """
     verified = {}
 
-    # ── Step 1: Get rosters via nba_api ──────────────────────────
-    nba_api_rosters = {}
     try:
         from nba_api.stats.endpoints import CommonTeamRoster
         from nba_api.stats.static import teams as nba_static_teams
@@ -644,51 +548,27 @@ def fetch_verified_rosters(team_abbrevs, todays_games=None):
                 _time.sleep(1.0)  # respect nba_api rate limits
                 roster_resp = CommonTeamRoster(team_id=team_id)
                 roster_df = roster_resp.get_data_frames()[0]
-                players = roster_df["PLAYER"].tolist() if "PLAYER" in roster_df.columns else []
-                nba_api_rosters[abbrev] = players
-                print(f"fetch_verified_rosters: {abbrev} → {len(players)} players via nba_api")
+
+                active_players = []
+                for _, row in roster_df.iterrows():
+                    player_name = row.get("PLAYER", "")
+                    if not player_name:
+                        continue
+                    # Skip two-way / G-League assigned players
+                    player_type  = str(row.get("PLAYER_TYPE",  "") or "").lower()
+                    how_acquired = str(row.get("HOW_ACQUIRED", "") or "").lower()
+                    if "two-way" in player_type or "two-way" in how_acquired:
+                        print(f"  fetch_verified_rosters: skipping two-way {player_name} ({abbrev})")
+                        continue
+                    active_players.append(player_name)
+
+                verified[abbrev] = active_players
+                print(f"fetch_verified_rosters: {abbrev} → {len(active_players)} players via nba_api")
             except Exception as exc:
                 print(f"fetch_verified_rosters: nba_api failed for {abbrev}: {exc}")
-                nba_api_rosters[abbrev] = []
+                verified[abbrev] = []
     except ImportError:
         print("fetch_verified_rosters: nba_api not available")
-
-    if not nba_api_rosters:
-        return {}
-
-    # ── Step 2: Fetch Rotowire injury list for cross-reference ────
-    rotowire_injured = set()
-    try:
-        if scrape_rotowire_injury_report is not None:
-            rw_data = scrape_rotowire_injury_report()
-            # Players listed on Rotowire injury report are considered injured/inactive
-            for key, entry in rw_data.items():
-                if entry.get("status", "") in (
-                    "Out", "Injured Reserve", "Doubtful", "GTD", "Day-to-Day", "Questionable"
-                ):
-                    rotowire_injured.add(key)
-    except Exception as exc:
-        print(f"fetch_verified_rosters: Rotowire cross-ref failed: {exc}")
-
-    # ── Step 3: Build verified roster — flag discrepancies ────────
-    discrepancy_log = []
-    for abbrev, players in nba_api_rosters.items():
-        active_players = []
-        for player in players:
-            player_key = player.lower().strip()
-            if player_key in rotowire_injured:
-                discrepancy_log.append(
-                    f"{player} ({abbrev}): on nba_api roster but flagged injured by Rotowire"
-                )
-            else:
-                active_players.append(player)
-        verified[abbrev] = active_players
-
-    if discrepancy_log:
-        print(
-            f"fetch_verified_rosters: {len(discrepancy_log)} discrepancies found:\n  "
-            + "\n  ".join(discrepancy_log)
-        )
 
     return verified
 

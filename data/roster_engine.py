@@ -1,17 +1,13 @@
 # ============================================================
 # FILE: data/roster_engine.py
 # PURPOSE: Centralised active-roster and injury resolution engine.
-#          Replaces scattered scraping logic across web_scraper.py /
-#          web_scrapers.py / live_data_fetcher.py with a single class
-#          that aggregates four independent data sources and applies
+#          Aggregates data from official free sources and applies
 #          consistent filtering rules.
 #
 # DATA SOURCES (in priority order):
-#   1. NBA.com CDN JSON       — static schedule + injury feed (no rate-limit)
-#   2. Live Injury JSON       — cdn.nba.com daily injury file
-#   3. RotoWire scraper       — four CSS-selector fallback strategies
-#   4. ESPN scraper           — ResponsiveTable selector
-#   5. nba_api CommonTeamRoster — validation layer only
+#   1. NBA.com CDN JSON       — static injury feed (no rate-limit, free)
+#   2. Live Injury JSON       — cdn.nba.com daily injury file (free)
+#   3. nba_api CommonTeamRoster — official roster + G-League/two-way status
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
@@ -36,10 +32,9 @@ from typing import Optional
 
 try:
     import requests
-    from bs4 import BeautifulSoup
-    _SCRAPER_DEPS_AVAILABLE = True
+    _REQUESTS_AVAILABLE = True
 except ImportError:
-    _SCRAPER_DEPS_AVAILABLE = False
+    _REQUESTS_AVAILABLE = False
 
 # ============================================================
 # SECTION: Module-level constants
@@ -58,12 +53,6 @@ NBA_HTML_INJURY_URL = "https://www.nba.com/players/injuries"
 def _today_cdn_injury_url():
     date_str = datetime.date.today().strftime("%Y%m%d")
     return f"https://cdn.nba.com/static/json/liveData/injuries/injuries_{date_str}.json"
-
-# RotoWire
-ROTOWIRE_INJURY_URL = "https://www.rotowire.com/basketball/injury-report.php"
-
-# ESPN
-ESPN_INJURIES_URL = "https://www.espn.com/nba/injuries"
 
 # HTTP headers
 _HEADERS = {
@@ -190,7 +179,7 @@ def _severity(status: str) -> int:
 
 def _get_with_retry(url, params=None, headers=None, timeout=REQUEST_TIMEOUT):
     """HTTP GET with exponential-backoff retry.  Returns Response or None."""
-    if not _SCRAPER_DEPS_AVAILABLE:
+    if not _REQUESTS_AVAILABLE:
         return None
     hdrs = headers or _HEADERS
     for attempt in range(MAX_RETRIES):
@@ -299,51 +288,45 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from all sources.
+        Fetch fresh data from official free sources.
+
+        Sources used (in order):
+            1. NBA.com CDN static injury JSON  — no rate-limit, always free
+            2. Live daily CDN injury JSON      — no rate-limit, always free
+            3. nba_api CommonTeamRoster        — official roster + status filter
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data sources are refreshed.
         """
-        print("RosterEngine.refresh() — starting multi-source data pull")
+        print("RosterEngine.refresh() — starting data pull")
         merged: dict = {}
 
-        # ── Source 1: NBA.com CDN injury report (JSON) ─────────────
+        # ── Source 1: NBA.com CDN static injury JSON ───────────────
         src1 = self._fetch_nba_cdn_injury()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 1 (NBA CDN):  {len(src1)} players")
+        print(f"  Source 1 (NBA CDN):      {len(src1)} players")
 
         # ── Source 2: Live daily CDN injury file ──────────────────
         src2 = self._fetch_live_cdn_injury()
         for k, v in src2.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 2 (Live CDN): {len(src2)} players")
-
-        # ── Source 3: RotoWire ────────────────────────────────────
-        src3 = self._fetch_rotowire()
-        for k, v in src3.items():
-            merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 3 (RotoWire): {len(src3)} players")
-
-        # ── Source 4: ESPN ────────────────────────────────────────
-        src4 = self._fetch_espn()
-        for k, v in src4.items():
-            merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 4 (ESPN):     {len(src4)} players")
+        print(f"  Source 2 (Live CDN):     {len(src2)} players")
 
         self._injury_map = merged
 
-        # ── Source 5 (validation): nba_api CommonTeamRoster ──────
+        # ── Source 3: nba_api CommonTeamRoster (primary) ──────────
+        # Fetches official rosters and also flags G-League / two-way players.
         if team_abbrevs:
             self._fetch_nba_api_rosters(team_abbrevs)
 
         # Invalidate active-roster cache
         self._active_rosters = {}
         self._last_refresh = datetime.datetime.now()
-        out_count = sum(1 for v in merged.values() if v.get("status") in EXCLUDE_STATUSES)
+        out_count = sum(1 for v in self._injury_map.values() if v.get("status") in EXCLUDE_STATUSES)
         print(
-            f"RosterEngine.refresh() complete: {len(merged)} injured players "
+            f"RosterEngine.refresh() complete: {len(self._injury_map)} injured players "
             f"({out_count} hard-excluded)"
         )
 
@@ -438,203 +421,18 @@ class RosterEngine:
         return result
 
     # ----------------------------------------------------------
-    # Source 3: RotoWire — four CSS-selector fallback strategies
-    # ----------------------------------------------------------
-
-    def _fetch_rotowire(self) -> dict:
-        result: dict = {}
-        if not _SCRAPER_DEPS_AVAILABLE:
-            return result
-        try:
-            resp = _get_with_retry(ROTOWIRE_INJURY_URL, headers=_HEADERS)
-            if not resp:
-                return result
-            soup = BeautifulSoup(resp.text, "html.parser")
-
-            # Strategy A: ul.injury-report li items
-            found = self._rw_strategy_a(soup)
-            if found:
-                return found
-
-            # Strategy B: div[class*="injury"] containers
-            found = self._rw_strategy_b(soup)
-            if found:
-                return found
-
-            # Strategy C: table with Player/Team/Status headers
-            found = self._rw_strategy_c(soup)
-            if found:
-                return found
-
-            # Strategy D: tr rows containing Out / GTD / Questionable
-            found = self._rw_strategy_d(soup)
-            return found
-
-        except Exception as exc:
-            print(f"RosterEngine._fetch_rotowire: {exc}")
-        return result
-
-    def _rw_strategy_a(self, soup) -> dict:
-        """Strategy A: ul.injury-report li items."""
-        result = {}
-        items = soup.select("ul.injury-report li")
-        for li in items:
-            name_el   = li.select_one(".player-name, .name, [class*='player']")
-            status_el = li.select_one(".status, [class*='status']")
-            team_el   = li.select_one(".team, [class*='team']")
-            injury_el = li.select_one(".injury, [class*='injury'], .detail")
-            name   = name_el.get_text(strip=True) if name_el else ""
-            status = _normalize_status(status_el.get_text(strip=True) if status_el else "")
-            team   = team_el.get_text(strip=True) if team_el else ""
-            injury = injury_el.get_text(strip=True) if injury_el else ""
-            if name and status:
-                result[_normalize_name(name)] = {
-                    "status": status, "injury": injury,
-                    "team": team, "return_date": "", "source": "RotoWire-A",
-                }
-        return result
-
-    def _rw_strategy_b(self, soup) -> dict:
-        """Strategy B: div[class*='injury'] containers."""
-        result = {}
-        containers = soup.select("div[class*='injury']")
-        for div in containers:
-            rows = div.select("tr")
-            for row in rows:
-                cells = [td.get_text(strip=True) for td in row.select("td")]
-                if len(cells) < 3:
-                    continue
-                # Heuristic: last cell or cell containing Out/GTD is status
-                name = cells[0]
-                status_raw = next(
-                    (c for c in cells if c.lower() in _STATUS_NORM), cells[-1]
-                )
-                status = _normalize_status(status_raw)
-                injury = cells[2] if len(cells) > 2 else ""
-                team   = cells[1] if len(cells) > 1 else ""
-                if name and status not in ("Active", "Unknown"):
-                    result[_normalize_name(name)] = {
-                        "status": status, "injury": injury,
-                        "team": team, "return_date": "", "source": "RotoWire-B",
-                    }
-        return result
-
-    def _rw_strategy_c(self, soup) -> dict:
-        """Strategy C: any <table> with Player/Team/Status headers."""
-        result = {}
-        for table in soup.find_all("table"):
-            headers = [th.get_text(strip=True).lower() for th in table.select("th")]
-            if not any(h in ("player", "name") for h in headers):
-                continue
-            try:
-                name_idx   = next(i for i, h in enumerate(headers) if h in ("player", "name"))
-                status_idx = next(i for i, h in enumerate(headers) if "status" in h)
-                team_idx   = next((i for i, h in enumerate(headers) if "team" in h), None)
-                injury_idx = next((i for i, h in enumerate(headers) if "injury" in h or "detail" in h), None)
-            except StopIteration:
-                continue
-            for row in table.select("tr"):
-                cells = [td.get_text(strip=True) for td in row.select("td")]
-                if len(cells) <= max(i for i in [name_idx, status_idx] if i is not None):
-                    continue
-                name   = cells[name_idx]
-                status = _normalize_status(cells[status_idx])
-                team   = cells[team_idx] if team_idx is not None and team_idx < len(cells) else ""
-                injury = cells[injury_idx] if injury_idx is not None and injury_idx < len(cells) else ""
-                if name and status not in ("Active",):
-                    result[_normalize_name(name)] = {
-                        "status": status, "injury": injury,
-                        "team": team, "return_date": "", "source": "RotoWire-C",
-                    }
-        return result
-
-    def _rw_strategy_d(self, soup) -> dict:
-        """Strategy D: any <tr> rows where a cell contains Out/GTD/Questionable."""
-        result = {}
-        _TARGET = {"out", "gtd", "questionable", "doubtful", "day-to-day"}
-        for row in soup.find_all("tr"):
-            cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
-            matching = [c for c in cells if c.lower() in _TARGET or c.lower() in _STATUS_NORM]
-            if not matching:
-                continue
-            status = _normalize_status(matching[0])
-            # First cell is usually the player name
-            name = cells[0] if cells else ""
-            if name and name.lower() not in _STATUS_NORM and status not in ("Active",):
-                result[_normalize_name(name)] = {
-                    "status": status, "injury": "",
-                    "team": "", "return_date": "", "source": "RotoWire-D",
-                }
-        return result
-
-    # ----------------------------------------------------------
-    # Source 4: ESPN — ResponsiveTable selector (primary)
-    # ----------------------------------------------------------
-
-    def _fetch_espn(self) -> dict:
-        result: dict = {}
-        if not _SCRAPER_DEPS_AVAILABLE:
-            return result
-        try:
-            resp = _get_with_retry(ESPN_INJURIES_URL, headers=_HEADERS)
-            if not resp:
-                return result
-            soup = BeautifulSoup(resp.text, "html.parser")
-
-            # Primary: div.ResponsiveTable
-            tables = soup.select("div.ResponsiveTable")
-            for table_div in tables:
-                # Team name is usually in a heading above the table
-                team_heading = table_div.find_previous(["h3", "h4", "span"], class_=re.compile(r"team|title|headline", re.I))
-                team = team_heading.get_text(strip=True) if team_heading else ""
-
-                rows = table_div.select("tr")
-                headers = [th.get_text(strip=True).lower() for th in table_div.select("th")]
-                try:
-                    name_idx   = next(i for i, h in enumerate(headers) if "name" in h or "athlete" in h)
-                    status_idx = next(i for i, h in enumerate(headers) if "status" in h)
-                    injury_idx = next((i for i, h in enumerate(headers) if "injury" in h or "comment" in h), None)
-                except StopIteration:
-                    # Fallback: use column positions 0=name, 1=pos, 2=date, 3=injury, 4=status
-                    for row in rows:
-                        cells = [td.get_text(strip=True) for td in row.select("td")]
-                        if len(cells) < 3:
-                            continue
-                        name   = cells[0]
-                        status_raw = cells[-1] if cells else ""
-                        injury = cells[3] if len(cells) > 3 else ""
-                        status = _normalize_status(status_raw)
-                        if name and status not in ("Active", "Unknown", ""):
-                            result[_normalize_name(name)] = {
-                                "status": status, "injury": injury,
-                                "team": team, "return_date": "", "source": "ESPN",
-                            }
-                    continue
-
-                for row in rows:
-                    cells = [td.get_text(strip=True) for td in row.select("td")]
-                    if len(cells) <= max(i for i in [name_idx, status_idx] if i is not None):
-                        continue
-                    name   = cells[name_idx]
-                    status = _normalize_status(cells[status_idx])
-                    injury = cells[injury_idx] if injury_idx is not None and injury_idx < len(cells) else ""
-                    if name and status not in ("Active", "Unknown", ""):
-                        result[_normalize_name(name)] = {
-                            "status": status, "injury": injury,
-                            "team": team, "return_date": "", "source": "ESPN",
-                        }
-        except Exception as exc:
-            print(f"RosterEngine._fetch_espn: {exc}")
-        return result
-
-    # ----------------------------------------------------------
-    # Source 5 (validation): nba_api CommonTeamRoster
+    # Source 3: nba_api CommonTeamRoster (primary roster source)
     # ----------------------------------------------------------
 
     def _fetch_nba_api_rosters(self, team_abbrevs: list):
         """
-        Fetch full rosters from nba_api and store them.
-        Cross-check against injury map: remove excluded players.
+        Fetch full rosters from nba_api, store them in _full_rosters,
+        and update the injury map for G-League / two-way contract players.
+
+        CommonTeamRoster is the authoritative source for who is currently
+        on an NBA roster (reflects all trades and signings).  Players
+        on two-way contracts who are on G-League assignment are flagged
+        as inactive so they are excluded from tonight's active roster.
         """
         try:
             from nba_api.stats.endpoints import CommonTeamRoster
@@ -654,9 +452,33 @@ class RosterEngine:
                 time.sleep(1.0)
                 resp = CommonTeamRoster(team_id=team_id)
                 df = resp.get_data_frames()[0]
-                players = df["PLAYER"].tolist() if "PLAYER" in df.columns else []
-                self._full_rosters[abbrev.upper()] = players
-                print(f"  RosterEngine nba_api: {abbrev} → {len(players)} players")
+
+                all_players = []
+                for _, row in df.iterrows():
+                    player_name = row.get("PLAYER", "")
+                    if not player_name:
+                        continue
+
+                    all_players.append(player_name)
+
+                    # Flag two-way / G-League players as inactive
+                    player_type  = str(row.get("PLAYER_TYPE",  "") or "").lower()
+                    how_acquired = str(row.get("HOW_ACQUIRED", "") or "").lower()
+                    if "two-way" in player_type or "two-way" in how_acquired:
+                        key = _normalize_name(player_name)
+                        existing = self._injury_map.get(key, {})
+                        if _severity(existing.get("status", "Active")) < _severity("G League - Two-Way"):
+                            self._injury_map[key] = {
+                                "status":      "G League - Two-Way",
+                                "injury":      "Two-way contract",
+                                "team":        abbrev.upper(),
+                                "return_date": "",
+                                "source":      "nba_api",
+                            }
+                        print(f"  Flagged two-way player: {player_name} ({abbrev})")
+
+                self._full_rosters[abbrev.upper()] = all_players
+                print(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
             except Exception as exc:
                 print(f"  RosterEngine nba_api error for {abbrev}: {exc}")
 
