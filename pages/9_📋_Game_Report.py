@@ -412,8 +412,21 @@ def _render_key_players(team_abbrev, label):
     )
 
 
-# ── Determine which games to display ────────────────────────
-_games_to_show = [selected_game] if selected_game else todays_games
+# ── Determine which games to display (deduplicated) ──────────
+if selected_game:
+    _games_to_show = [selected_game]
+else:
+    # Deduplicate: keep only the first occurrence of each home+away pair
+    _seen_matchups: set = set()
+    _games_to_show = []
+    for _g in todays_games:
+        _key = (
+            _g.get("home_team", "").upper().strip(),
+            _g.get("away_team", "").upper().strip(),
+        )
+        if _key not in _seen_matchups and (_key[0] or _key[1]):
+            _seen_matchups.add(_key)
+            _games_to_show.append(_g)
 
 if _games_to_show:
     for game in _games_to_show:

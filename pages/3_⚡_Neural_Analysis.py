@@ -257,12 +257,18 @@ def _build_bonus_factors(result):
 
 
 def _build_entry_strategy(results):
-    """Build entry strategy matrix entries from top results (2–6 legs)."""
+    """Build entry strategy matrix entries from top results (2–6 legs).
+
+    Enforces unique players per parlay (no repeating the same player on
+    multiple props) and excludes fantasy-score variants from parlay legs.
+    """
     top = [
         r for r in results
         if not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
         and abs(r.get("edge_percentage", 0)) >= 5.0
+        # Exclude fantasy-score composite stats from parlay legs
+        and not str(r.get("stat_type", "")).startswith("fantasy_score")
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
@@ -281,11 +287,25 @@ def _build_entry_strategy(results):
         6: "Max multiplier — only for high-edge slates.",
     }
 
+    def _pick_unique_players(candidates, num_legs):
+        """Return up to num_legs picks with no repeated players."""
+        seen_players: set = set()
+        selected = []
+        for r in candidates:
+            pname = r.get("player_name", "")
+            if pname and pname in seen_players:
+                continue
+            seen_players.add(pname)
+            selected.append(r)
+            if len(selected) == num_legs:
+                break
+        return selected
+
     entries = []
     for num_legs in range(2, 7):
-        if len(top) < num_legs:
+        picks = _pick_unique_players(top, num_legs)
+        if len(picks) < num_legs:
             continue
-        picks = top[:num_legs]
         avg_conf = round(sum(r.get("confidence_score", 0) for r in picks) / num_legs, 1)
 
         # Combined probability (independent legs)
@@ -308,6 +328,7 @@ def _build_entry_strategy(results):
         teams_in_parlay = {p.get("team", p.get("player_team", "")) for p in picks}
         if len(teams_in_parlay) >= num_legs:
             reasons.append("Diversified across games")
+        reasons.append("Unique players per leg")
 
         entries.append({
             "combo_type":    _LEG_LABELS.get(num_legs, f"{num_legs}-Leg"),
@@ -363,7 +384,7 @@ def _render_qds_full_breakdown_html(result):
     # ── Forces HTML ──────────────────────────────────────────────
     def _forces_html(forces):
         if not forces:
-            return '<span style="color:#8b949e;font-size:0.85rem;">None detected</span>'
+            return '<span style="color:#b0bec5;font-size:0.85rem;">None detected</span>'
         parts = []
         for f in (forces or []):
             if not isinstance(f, dict):
@@ -378,7 +399,7 @@ def _render_qds_full_breakdown_html(result):
                 '<span style="color:#c0d0e8;font-size:0.8rem;">' + desc + '</span>'
                 '</div>'
             )
-        return "".join(parts) if parts else '<span style="color:#8b949e;font-size:0.85rem;">None detected</span>'
+        return "".join(parts) if parts else '<span style="color:#b0bec5;font-size:0.85rem;">None detected</span>'
 
     # ── Score-breakdown bars ─────────────────────────────────────
     breakdown_rows = []
@@ -453,19 +474,19 @@ def _render_qds_full_breakdown_html(result):
         '<table style="width:100%;border-collapse:separate;border-spacing:4px;">'
         '<tr>'
         '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
-        '<div style="color:#8b949e;font-size:0.75rem;">10th pct</div>'
+        '<div style="color:#b0bec5;font-size:0.75rem;">10th pct</div>'
         '<div style="color:#ff5e00;font-weight:700;font-size:1rem;">' + f"{p10:.1f}" + '</div>'
         '</td>'
         '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
-        '<div style="color:#8b949e;font-size:0.75rem;">Median</div>'
+        '<div style="color:#b0bec5;font-size:0.75rem;">Median</div>'
         '<div style="color:#00f0ff;font-weight:700;font-size:1rem;">' + f"{p50:.1f}" + '</div>'
         '</td>'
         '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
-        '<div style="color:#8b949e;font-size:0.75rem;">90th pct</div>'
+        '<div style="color:#b0bec5;font-size:0.75rem;">90th pct</div>'
         '<div style="color:#ff5e00;font-weight:700;font-size:1rem;">' + f"{p90:.1f}" + '</div>'
         '</td>'
         '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
-        '<div style="color:#8b949e;font-size:0.75rem;">Std Dev</div>'
+        '<div style="color:#b0bec5;font-size:0.75rem;">Std Dev</div>'
         '<div style="color:#ffffff;font-weight:700;font-size:1rem;">' + f"{std:.1f}" + '</div>'
         '</td>'
         '</tr>'
@@ -624,8 +645,21 @@ def display_prop_analysis_card_qds(result):
 
     # ── Full Breakdown (QDS-styled HTML rendered via iframe to avoid st.markdown stripping) ─
     breakdown_html = _render_qds_full_breakdown_html(result)
-    # Estimate height: collapsed summary bar ~50px + expanded content ~350px
-    _components.html(breakdown_html, height=420, scrolling=False)
+    # Dynamic height: base + per-section additions so content is never cut off
+    _over_forces  = len(result.get("forces", {}).get("over_forces",  []) or [])
+    _under_forces = len(result.get("forces", {}).get("under_forces", []) or [])
+    _breakdown_n  = len(result.get("score_breakdown", {}) or {})
+    _explain_n    = len([v for v in (result.get("explanation") or {}).values() if v])
+    _est_height = (
+        60                              # summary bar / <details> toggle
+        + 130                           # distribution grid
+        + max(_over_forces, _under_forces, 1) * 55 + 80  # forces grid
+        + _breakdown_n * 28 + (40 if _breakdown_n else 0)
+        + _explain_n   * 60 + (20 if _explain_n   else 0)
+        + (50 if result.get("should_avoid") else 0)
+    )
+    _est_height = max(200, min(900, _est_height))
+    _components.html(breakdown_html, height=_est_height, scrolling=True)
 
 
 # ============================================================
@@ -1370,6 +1404,122 @@ if analysis_results:
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("🥇 Gold",     gold_count)
 
+    # ── Slate Summary Dashboard ────────────────────────────────
+    silver_count  = sum(1 for r in displayed_results if r.get("tier") == "Silver")
+    bronze_count  = sum(1 for r in displayed_results if r.get("tier") == "Bronze")
+    best_pick     = max(
+        (r for r in displayed_results if not r.get("player_is_out", False)),
+        key=lambda r: r.get("confidence_score", 0),
+        default=None,
+    )
+    _tier_bar_html = (
+        f'<span style="color:#c800ff;font-weight:700;">💎 {platinum_count} Platinum</span>'
+        f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {gold_count} Gold</span>'
+        f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {silver_count} Silver</span>'
+        f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥉 {bronze_count} Bronze</span>'
+    )
+    _best_html = ""
+    if best_pick:
+        _bp_name  = _html.escape(str(best_pick.get("player_name", "")))
+        _bp_stat  = _html.escape(str(best_pick.get("stat_type", "")).title())
+        _bp_line  = best_pick.get("line", 0)
+        _bp_dir   = "Over" if best_pick.get("direction") == "OVER" else "Under"
+        _bp_conf  = best_pick.get("confidence_score", 0)
+        _bp_tier  = best_pick.get("tier", "")
+        _bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
+        _best_html = (
+            f'<div style="margin-top:10px;padding:10px 14px;background:rgba(255,94,0,0.08);'
+            f'border-radius:6px;border-left:3px solid #ff5e00;">'
+            f'<span style="color:#ff5e00;font-weight:700;font-size:0.85rem;">🏆 Best Pick: </span>'
+            f'<span style="color:#e0e7ef;font-weight:600;">{_bp_emoji} {_bp_name} — {_bp_dir} {_bp_line} {_bp_stat}</span>'
+            f'<span style="color:#00f0ff;font-weight:700;margin-left:10px;">{_bp_conf:.0f}/100</span>'
+            f'</div>'
+        )
+    st.markdown(
+        f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);border:1px solid rgba(255,94,0,0.25);'
+        f'border-radius:8px;padding:14px 18px;margin:8px 0 14px;">'
+        f'<div style="font-size:0.9rem;font-weight:600;color:#e0e7ef;margin-bottom:6px;">'
+        f'🗂️ Tier Distribution &nbsp;·&nbsp; '
+        f'<span style="color:#00f0ff;">Avg Edge: {avg_edge:.1f}%</span>'
+        f'</div>'
+        f'<div style="font-size:0.85rem;">{_tier_bar_html}</div>'
+        + _best_html +
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Quick-select buttons ───────────────────────────────────
+    _qb_col1, _qb_col2, _qb_col3 = st.columns([1, 1, 2])
+    with _qb_col1:
+        if st.button("💎 Select All Platinum", help="Add all Platinum tier picks to Entry Builder"):
+            _plat_picks = [
+                r for r in displayed_results
+                if r.get("tier") == "Platinum"
+                and not r.get("player_is_out", False)
+                and not r.get("should_avoid", False)
+            ]
+            _existing_keys = {p.get("key") for p in st.session_state.get("selected_picks", [])}
+            _added = 0
+            for r in _plat_picks:
+                _stat     = r.get("stat_type", "").lower()
+                _line     = r.get("line", 0)
+                _dir      = r.get("direction", "OVER")
+                _pick_key = f"{r.get('player_name', '')}_{_stat}_{_line}_{_dir}"
+                if _pick_key not in _existing_keys:
+                    st.session_state.setdefault("selected_picks", []).append({
+                        "key":             _pick_key,
+                        "player_name":     r.get("player_name", ""),
+                        "stat_type":       _stat,
+                        "line":            _line,
+                        "direction":       _dir,
+                        "confidence_score": r.get("confidence_score", 0),
+                        "tier":            r.get("tier", "Platinum"),
+                        "tier_emoji":      "💎",
+                        "platform":        r.get("platform", ""),
+                        "edge_percentage": r.get("edge_percentage", 0),
+                    })
+                    _added += 1
+            if _added:
+                st.success(f"✅ Added {_added} Platinum pick(s).")
+                st.rerun()
+            else:
+                st.info("All Platinum picks already added.")
+    with _qb_col2:
+        if st.button("🥇 Select All Gold+", help="Add all Gold and Platinum tier picks to Entry Builder"):
+            _gold_picks = [
+                r for r in displayed_results
+                if r.get("tier") in ("Platinum", "Gold")
+                and not r.get("player_is_out", False)
+                and not r.get("should_avoid", False)
+            ]
+            _existing_keys = {p.get("key") for p in st.session_state.get("selected_picks", [])}
+            _added = 0
+            for r in _gold_picks:
+                _stat     = r.get("stat_type", "").lower()
+                _line     = r.get("line", 0)
+                _dir      = r.get("direction", "OVER")
+                _pick_key = f"{r.get('player_name', '')}_{_stat}_{_line}_{_dir}"
+                if _pick_key not in _existing_keys:
+                    _t_emoji = "💎" if r.get("tier") == "Platinum" else "🥇"
+                    st.session_state.setdefault("selected_picks", []).append({
+                        "key":             _pick_key,
+                        "player_name":     r.get("player_name", ""),
+                        "stat_type":       _stat,
+                        "line":            _line,
+                        "direction":       _dir,
+                        "confidence_score": r.get("confidence_score", 0),
+                        "tier":            r.get("tier", "Gold"),
+                        "tier_emoji":      _t_emoji,
+                        "platform":        r.get("platform", ""),
+                        "edge_percentage": r.get("edge_percentage", 0),
+                    })
+                    _added += 1
+            if _added:
+                st.success(f"✅ Added {_added} Gold+ pick(s).")
+                st.rerun()
+            else:
+                st.info("All Gold+ picks already added.")
+
     if unmatched_count > 0:
         unmatched_names = [
             r.get("player_name", "") for r in analysis_results
@@ -1534,7 +1684,10 @@ if analysis_results:
     # ── Prop Cards (sorted by confidence) ────────────────────────
     for result in displayed_results:
         display_prop_analysis_card_qds(result)
-        st.markdown("---")
+        st.markdown(
+            '<div style="height:6px;"></div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()

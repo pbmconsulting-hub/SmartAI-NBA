@@ -341,30 +341,21 @@ def fetch_verified_rosters(team_abbrevs, todays_games=None):
     """
     Fetch rosters for a list of team abbreviations.
 
-    Delegates entirely to RosterEngine so that CommonTeamRoster is called
-    through a single, consistent path.  Injured and two-way / G-League
-    players are excluded by RosterEngine.
+    Delegates entirely to RosterEngine (nba_api CommonTeamRoster) — the
+    single authoritative source. Injured and two-way / G-League players
+    are excluded by RosterEngine.
 
     Args:
         team_abbrevs (list[str]): Team abbreviations, e.g. ["LAL", "BOS"]
-        todays_games (list|None): Tonight's games (optional context).
+        todays_games (list|None): Tonight's games (optional, unused).
 
     Returns:
         dict: {team_abbrev: [player_name, ...]}
-              Injured and two-way / G-League players are excluded.
     """
-    verified = {}
-    try:
-        from data.roster_engine import RosterEngine as _RE
-        engine = _RE()
-        engine.refresh(list(team_abbrevs or []))
-        for abbrev in (team_abbrevs or []):
-            active = engine.get_active_roster(abbrev)
-            verified[abbrev] = active
-            print(f"fetch_verified_rosters: {abbrev} → {len(active)} players via RosterEngine")
-    except Exception as exc:
-        print(f"fetch_verified_rosters: RosterEngine error — {exc}")
-    return verified
+    from data.roster_engine import RosterEngine
+    engine = RosterEngine()
+    engine.refresh(team_abbrevs)
+    return {abbrev: engine.get_active_roster(abbrev) for abbrev in (team_abbrevs or [])}
 
 # ============================================================
 # END SECTION: Consolidated Roster Fetcher
