@@ -151,6 +151,14 @@ _SUFFIX_RE = re.compile(
     r"\s+(jr\.?|sr\.?|ii|iii|iv|v)\s*$", re.IGNORECASE
 )
 
+# Position normalisation map for CommonTeamRoster POSITION column
+_POSITION_MAP = {
+    "G": "PG", "F": "SF", "C": "C",
+    "G-F": "SF", "F-G": "SG", "F-C": "PF", "C-F": "PF",
+    "PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF",
+    "": "SF",
+}
+
 # ============================================================
 # END SECTION: Module-level constants
 # ============================================================
@@ -468,12 +476,6 @@ class RosterEngine:
 
                 all_players = []
                 all_player_details = []
-                _POSITION_MAP = {
-                    "G": "PG", "F": "SF", "C": "C",
-                    "G-F": "SF", "F-G": "SG", "F-C": "PF", "C-F": "PF",
-                    "PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF",
-                    "": "SF",
-                }
                 for _, row in df.iterrows():
                     player_name = row.get("PLAYER", "")
                     if not player_name:

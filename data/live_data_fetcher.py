@@ -766,8 +766,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
     Args:
         todays_games (list of dict): Tonight's games from fetch_todays_games()
         progress_callback (callable, optional): Called with (current, total, msg)
-        precomputed_injury_map (dict, optional): Unused — kept for backward
-            compatibility.  RosterEngine now supplies the injury data directly.
+        precomputed_injury_map (dict, optional): Fallback injury map used
+            when RosterEngine cannot supply injury data.  Under normal
+            operation RosterEngine is the primary injury source; this
+            parameter exists for legacy call-sites that pass a pre-fetched
+            map from fetch_player_injury_status().
 
     Returns:
         bool: True if successful, False if the fetch failed.
@@ -2128,14 +2131,14 @@ def fetch_active_rosters(team_abbrevs=None, progress_callback=None):
 
     total = len(team_abbrevs)
     if progress_callback:
-        progress_callback(0, total, "Initialising RosterEngine…")
+        progress_callback(0, total, "Initialising RosterEngine...")
 
     engine = RosterEngine()
     engine.refresh(list(team_abbrevs))
 
     for idx, abbrev in enumerate(sorted(team_abbrevs)):
         if progress_callback:
-            progress_callback(idx, total, f"Processing roster for {abbrev}…")
+            progress_callback(idx, total, f"Processing roster for {abbrev}...")
         TEAM_ROSTER_CACHE[abbrev] = engine.get_active_roster(abbrev)
 
     return TEAM_ROSTER_CACHE
