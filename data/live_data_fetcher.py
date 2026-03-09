@@ -2135,72 +2135,47 @@ def fetch_all_todays_data(progress_callback=None):
 
 # ============================================================
 # SECTION: Team Roster Cache
-# In-memory cache mapping team abbreviation → active player list.
-# Populated by fetch_active_rosters() which now delegates to
-# RosterEngine — the single authoritative source for all roster data.
+# Delegates entirely to RosterEngine — the single authoritative
+# source for all roster data (nba_api CommonTeamRoster).
 # ============================================================
-
-# Module-level cache (lives as long as the Python process runs)
-TEAM_ROSTER_CACHE = {}  # {team_abbrev: [player_name, ...]}
 
 
 def fetch_active_rosters(team_abbrevs=None, progress_callback=None):
     """
-    Fetch current active rosters for the given teams and populate TEAM_ROSTER_CACHE.
+    Fetch current active rosters for the given teams.
 
-    Delegates to RosterEngine (nba_api CommonTeamRoster via the single
-    authoritative source), replacing the old direct CommonTeamRoster calls.
+    Delegates to RosterEngine (nba_api CommonTeamRoster) — the single
+    authoritative source — replacing the old direct CommonTeamRoster calls.
 
     Args:
         team_abbrevs (list of str, optional): Team abbreviations to fetch.
-            If None, fetches all 30 teams (slow, ~3-5 minutes).
-        progress_callback (callable, optional): Called with (current, total, msg).
+            If None, returns an empty dict (caller should specify teams).
+        progress_callback (callable, optional): Accepted for API compatibility
+            but not used (RosterEngine handles its own progress internally).
 
     Returns:
-        dict: {team_abbrev: [player_name, ...]} — the populated cache.
+        dict: {team_abbrev: [player_name, ...]}
     """
-    try:
-        from data.roster_engine import RosterEngine as _RE
-        from nba_api.stats.static import teams as _nba_teams_static
-    except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return TEAM_ROSTER_CACHE
-
-    if team_abbrevs is None:
-        all_nba_teams = _nba_teams_static.get_teams()
-        team_abbrevs = [
-            NBA_API_ABBREV_TO_OURS.get(t["abbreviation"], t["abbreviation"])
-            for t in all_nba_teams
-        ]
-
-    total = len(team_abbrevs)
-    if progress_callback:
-        progress_callback(0, total, "Initialising RosterEngine…")
-
-    engine = _RE()
-    engine.refresh(list(team_abbrevs))
-
-    for idx, abbrev in enumerate(sorted(team_abbrevs)):
-        if progress_callback:
-            progress_callback(idx, total, f"Caching roster for {abbrev}…")
-        TEAM_ROSTER_CACHE[abbrev] = engine.get_active_roster(abbrev)
-
-    return TEAM_ROSTER_CACHE
+    from data.roster_engine import RosterEngine
+    engine = RosterEngine()
+    engine.refresh(team_abbrevs)
+    result = {}
+    for abbrev in (team_abbrevs or []):
+        result[abbrev] = engine.get_active_roster(abbrev)
+    return result
 
 
 def get_cached_roster(team_abbrev):
     """
-    Return the cached active roster for a team, or an empty list.
-
-    Call fetch_active_rosters() first to populate the cache.
+    Return the active roster for a team via RosterEngine.
 
     Args:
         team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL')
 
     Returns:
-        list of str: Player names on the roster, or empty list.
+        list of str: Player names on the active roster, or empty list.
     """
-    return TEAM_ROSTER_CACHE.get(team_abbrev.upper(), [])
+    return fetch_active_rosters([team_abbrev]).get(team_abbrev.upper(), [])
 
 # ============================================================
 # END SECTION: Team Roster Cache

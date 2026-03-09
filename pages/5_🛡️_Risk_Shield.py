@@ -151,11 +151,27 @@ if avoided_props:
         prob = result.get("probability_over", 0.5)
         avoid_reasons = result.get("avoid_reasons", [])
 
-        # Red-framed card for avoided props
+        # ── Risk Score Bar ─────────────────────────────────────────────
+        # Risk = inverse of edge/confidence composite
+        _risk_score = max(0, min(100, round(100 - abs(edge) * 2.5 - confidence * 0.3)))
+        _risk_color = "#ff4444" if _risk_score > 70 else ("#ffcc00" if _risk_score > 40 else "#00ff9d")
+        _risk_label = "HIGH RISK 🔴" if _risk_score > 70 else ("MEDIUM RISK 🟡" if _risk_score > 40 else "LOW RISK 🟢")
+
         with st.container():
-            st.markdown(
-                f"#### 🚫 {player} — {stat} ({line}) | {platform}"
-            )
+            _rc1, _rc2 = st.columns([3, 1])
+            with _rc1:
+                st.markdown(f"#### 🚫 {player} — {stat} ({line}) | {platform}")
+            with _rc2:
+                st.markdown(
+                    f'<div style="text-align:right;">'
+                    f'<span style="color:{_risk_color};font-weight:700;font-size:0.85rem;">{_risk_label}</span>'
+                    f'</div>'
+                    f'<div style="height:6px;background:#1a2035;border-radius:3px;margin-top:4px;">'
+                    f'<div style="width:{_risk_score}%;height:6px;background:{_risk_color};border-radius:3px;"></div>'
+                    f'</div>'
+                    f'<div style="font-size:0.72rem;color:#8b949e;text-align:right;">Risk Score: {_risk_score}/100</div>',
+                    unsafe_allow_html=True,
+                )
 
             reason_col, stats_col = st.columns([2, 1])
 
@@ -164,13 +180,27 @@ if avoided_props:
                 for reason in avoid_reasons:
                     st.markdown(f"  - ❌ {reason}")
 
+                # ── "What would make this playable?" ──────────────────────
+                playable_hints = []
+                if abs(edge) < 5:
+                    playable_hints.append(f"Edge needs to reach ≥5% (currently {edge:.1f}%) — line would need to move to make this a value bet.")
+                if confidence < 55:
+                    playable_hints.append(f"Confidence score needs to reach ≥55 (currently {confidence:.0f}) — more consistent recent form would help.")
+                forces = result.get("forces", {})
+                over_strength = forces.get("over_strength", 0)
+                under_strength = forces.get("under_strength", 0)
+                if abs(over_strength - under_strength) < 5:
+                    playable_hints.append("OVER/UNDER forces are nearly balanced — wait for a clearer directional signal.")
+                if playable_hints:
+                    with st.expander("🤔 What would make this playable?", expanded=False):
+                        for hint in playable_hints:
+                            st.markdown(f"  💡 {hint}")
+
             with stats_col:
                 st.caption(f"Probability Over: {prob*100:.1f}%")
                 st.caption(f"Edge: {edge:.1f}%")
                 st.caption(f"Confidence Score: {confidence:.0f}/100")
 
-            # Show forces if they're conflicting
-            forces = result.get("forces", {})
             over_count = forces.get("over_count", 0)
             under_count = forces.get("under_count", 0)
             if over_count > 0 and under_count > 0:

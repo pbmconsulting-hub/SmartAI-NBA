@@ -1132,6 +1132,62 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     props = []
     seen = set()  # (player_name, stat_type, platform) dedup
 
+    # ── Star-player safety net ────────────────────────────────────
+    # Guarantee that the top 8 players per team (by points avg) are
+    # always included with core stats even if their minutes_avg is
+    # slightly below the 15-min threshold due to load management or
+    # recent rest — prevents star players being silently excluded.
+    _CORE_STATS      = ["points", "rebounds", "assists", "threes"]
+    _star_names_seen: set = set()
+    if tonight_teams and players_data:
+        _by_team: dict = {}
+        for _p in players_data:
+            _t = _p.get("team", "").upper().strip()
+            if _t and _t in tonight_teams:
+                _by_team.setdefault(_t, []).append(_p)
+        for _t, _team_players in _by_team.items():
+            # Sort by points_avg descending and take top 8
+            _top8 = sorted(
+                _team_players,
+                key=lambda p: float(p.get("points_avg", 0) or 0),
+                reverse=True,
+            )[:8]
+            for _sp in _top8:
+                _sname  = (_sp.get("name") or _sp.get("player_name") or "").strip()
+                _sstatus = injury_map.get(_sname.lower(), {}).get("status", "Active")
+                if not _sname or _sstatus in _SKIP_STATUSES:
+                    continue
+                _star_names_seen.add(_sname)
+                _spts = float(_sp.get("points_avg", 0) or 0)
+                _sreb = float(_sp.get("rebounds_avg", 0) or 0)
+                _sast = float(_sp.get("assists_avg", 0) or 0)
+                _sthr = float(_sp.get("threes_avg", 0) or 0)
+                _core_avgs = {
+                    "points": _spts, "rebounds": _sreb,
+                    "assists": _sast, "threes": _sthr,
+                }
+                for _platform in platforms:
+                    for _stat in _CORE_STATS:
+                        _dkey = (_sname, _stat, _platform)
+                        if _dkey in seen:
+                            continue
+                        _avg = _core_avgs.get(_stat, 0)
+                        if _avg < 0.3:
+                            continue
+                        _line = round(_avg * 2) / 2
+                        if _line <= 0:
+                            continue
+                        props.append({
+                            "player_name": _sname,
+                            "team":        _t,
+                            "stat_type":   _stat,
+                            "line":        _line,
+                            "platform":    _platform,
+                            "game_date":   today_str,
+                        })
+                        seen.add(_dkey)
+    # ── End star-player safety net ────────────────────────────────
+
     for player in (players_data or []):
         name = (
             player.get("name") or player.get("player_name") or ""

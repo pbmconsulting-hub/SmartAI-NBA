@@ -433,7 +433,7 @@ button[kind="primary"] {
     box-shadow: 0 0 8px rgba(0,240,255,0.15);
 }
 .position-tag {
-    color: #8a9bb8;
+    color: #b0bec5;
     font-size: 0.82rem;
     margin-left: 8px;
     vertical-align: middle;
@@ -514,7 +514,7 @@ button[kind="primary"] {
 .verdict-label-risky { color: #ff5e00; text-shadow: 0 0 10px rgba(255,94,0,0.6); }
 .verdict-confidence {
     font-size: 0.8rem;
-    color: #8a9bb8;
+    color: #b0bec5;
     font-family: 'Courier New', Courier, monospace;
     margin-top: 4px;
 }
@@ -544,7 +544,7 @@ button[kind="primary"] {
     background: rgba(0,200,255,0.10);
 }
 .stat-readout-label {
-    color: #8a9bb8;
+    color: #b0bec5;
     font-size: 0.8rem;
     text-transform: uppercase;
     letter-spacing: 0.07em;
@@ -556,7 +556,7 @@ button[kind="primary"] {
     text-shadow: 0 0 6px rgba(0,240,255,0.5);
 }
 .stat-readout-context {
-    color: #8a9bb8;
+    color: #b0bec5;
     font-size: 0.75rem;
     margin-left: 10px;
 }
@@ -604,7 +604,7 @@ button[kind="primary"] {
 }
 .progress-ring-label {
     font-size: 0.72rem;
-    color: #8a9bb8;
+    color: #b0bec5;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-family: 'Courier New', Courier, monospace;
@@ -630,7 +630,7 @@ button[kind="primary"] {
 }
 .signal-strength-label {
     font-size: 0.72rem;
-    color: #8a9bb8;
+    color: #b0bec5;
     font-family: 'Courier New', Courier, monospace;
     margin-left: 6px;
     vertical-align: middle;
@@ -696,7 +696,7 @@ button[kind="primary"] {
 .stat-chip:hover {
     background: rgba(0,240,255,0.14);
 }
-.stat-label { color: #8a9bb8; font-size: 0.72rem; }
+.stat-label { color: #b0bec5; font-size: 0.72rem; }
 
 /* ─── Probability Gauge ───────────────────────────────────── */
 .prob-gauge-wrap {
@@ -779,7 +779,7 @@ button[kind="primary"] {
 .dist-p50  { color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 800; font-family: 'Courier New', Courier, monospace; }
 .dist-p90  { color: #00f0ff; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
 .dist-sep  { color: #4a5568; font-size: 0.82rem; margin: 0 3px; }
-.dist-label { color: #8a9bb8; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
+.dist-label { color: #b0bec5; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
 
 /* ─── Form Dots ───────────────────────────────────────────── */
 .form-dot-over  { display:inline-block; width:11px; height:11px; border-radius:50%;
@@ -815,7 +815,7 @@ button[kind="primary"] {
 }
 .summary-label {
     font-size: 0.75rem;
-    color: #8a9bb8;
+    color: #b0bec5;
     text-transform: uppercase;
     letter-spacing: 1.2px;
     margin-top: 5px;
@@ -1075,7 +1075,7 @@ def get_force_bar_html(over_strength, under_strength, over_count, under_count):
   <div class="force-bar-over" style="width:{over_pct}%;"></div>
   <div class="force-bar-under" style="width:{under_pct}%;"></div>
 </div>
-<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#8a9bb8;margin-top:3px;">
+<div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#b0bec5;margin-top:3px;">
   <span>⬆️ OVER ({over_count})</span>
   <span>UNDER ({under_count}) ⬇️</span>
 </div>"""
@@ -1220,13 +1220,13 @@ def get_player_card_html(result):
 
     # Opponent
     opponent = result.get("opponent", "")
-    matchup_html = f'<span style="color:#8a9bb8;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+    matchup_html = f'<span style="color:#b0bec5;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
 
     # Line context
     line_vs_avg = result.get("line_vs_avg_pct", 0)
     if line_vs_avg != 0:
         line_ctx = f"Line is {abs(line_vs_avg):.0f}% {'above' if line_vs_avg > 0 else 'below'} season avg"
-        line_ctx_html = f'<span style="color:#8a9bb8;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
+        line_ctx_html = f'<span style="color:#b0bec5;font-size:0.78rem;font-style:italic;">{line_ctx}</span>'
     else:
         line_ctx_html = ""
 
@@ -1243,7 +1243,7 @@ def get_player_card_html(result):
             dot_cls = "form-dot-over" if val >= line else "form-dot-under"
             dots += f'<span class="{dot_cls}"></span>'
         form_html = f"""<div style="margin-right:16px;">
-      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
+      <div style="color:#b0bec5;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Last 5</div>
       {dots}
     </div>"""
 
@@ -1268,7 +1268,7 @@ def get_player_card_html(result):
   <!-- Subheader: Platform + stat + line + matchup -->
   <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
-    <span style="color:#8a9bb8;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:rgba(255,255,255,0.95);">{line}</strong></span>
+    <span style="color:#b0bec5;font-size:0.9rem;">{stat} &nbsp;·&nbsp; Line: <strong style="color:rgba(255,255,255,0.95);">{line}</strong></span>
     {matchup_html}
     {line_ctx_html}
   </div>
@@ -1282,7 +1282,7 @@ def get_player_card_html(result):
       <span class="{dir_class}">{direction_arrow} {direction}</span>
       <span class="prob-value">{prob_pct:.1f}%</span>
       {edge_html}
-      <span style="color:#8a9bb8;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
+      <span style="color:#b0bec5;font-size:0.82rem;">Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong></span>
     </div>
     <div class="prob-gauge-wrap">
       <div class="{fill_class}" style="width:{bar_width}%;"></div>
@@ -1293,11 +1293,11 @@ def get_player_card_html(result):
   <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     {form_html}
     <div style="flex:1;min-width:160px;">
-      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
+      <div style="color:#b0bec5;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
       {force_bar}
     </div>
     <div style="min-width:110px;">
-      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
+      <div style="color:#b0bec5;font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Range</div>
       {dist_range}
     </div>
   </div>
@@ -1345,8 +1345,8 @@ def get_best_bets_section_html(best_bets):
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;">
     <div>
       <strong style="color:rgba(255,255,255,0.95);font-size:1.05rem;">{player}</strong>
-      <span style="color:#8a9bb8;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
-      <span style="color:#8a9bb8;font-size:0.8rem;margin-left:6px;">{platform}</span>
+      <span style="color:#b0bec5;font-size:0.88rem;margin-left:8px;">{stat} {line}</span>
+      <span style="color:#b0bec5;font-size:0.8rem;margin-left:6px;">{platform}</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
       <span class="{dir_class}">{arrow} {direction}</span>
@@ -1356,7 +1356,7 @@ def get_best_bets_section_html(best_bets):
   <div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
     <span style="color:rgba(255,255,255,0.95);font-weight:700;font-family:'Courier New',monospace;">{prob_pct:.1f}%</span>
     <span style="color:#00ff9d;font-size:0.82rem;font-family:'Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
-    <span style="color:#8a9bb8;font-size:0.82rem;font-style:italic;">{rec}</span>
+    <span style="color:#b0bec5;font-size:0.82rem;font-style:italic;">{rec}</span>
   </div>
 </div>
 """)
@@ -1369,7 +1369,7 @@ def get_best_bets_section_html(best_bets):
             box-shadow:0 0 20px rgba(0,240,255,0.08),0 4px 24px rgba(0,0,0,0.4);">
   <div style="font-size:1.15rem;font-weight:800;color:rgba(255,255,255,0.95);margin-bottom:14px;font-family:'Orbitron',sans-serif;letter-spacing:0.05em;">
     🏆 Best Bets Today
-    <span style="font-size:0.8rem;font-weight:400;color:#8a9bb8;margin-left:10px;font-family:'Montserrat',sans-serif;">Ranked by confidence score</span>
+    <span style="font-size:0.8rem;font-weight:400;color:#b0bec5;margin-left:10px;font-family:'Montserrat',sans-serif;">Ranked by confidence score</span>
   </div>
   {cards_html}
 </div>
@@ -1460,12 +1460,12 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
             box-shadow:0 0 18px rgba(0,240,255,0.07),0 4px 16px rgba(0,0,0,0.4);">
   <div style="font-size:1rem;font-weight:700;color:rgba(255,255,255,0.95);margin-bottom:12px;">
     🧬 Roster Health Check
-    <span style="font-size:0.8rem;font-weight:400;color:#8a9bb8;margin-left:8px;">
+    <span style="font-size:0.8rem;font-weight:400;color:#b0bec5;margin-left:8px;">
       {len(matched) + len(fuzzy_matched)}/{total} matched ({match_pct}%)
     </span>
   </div>
   {inner}
-  <div style="font-size:0.75rem;color:#8a9bb8;margin-top:4px;">
+  <div style="font-size:0.75rem;color:#b0bec5;margin-top:4px;">
     💡 Add fuzzy-matched names to the alias map for exact matching next time.
     Unmatched props use the prop line as the baseline projection.
   </div>
@@ -1661,7 +1661,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
     dist_range = get_distribution_range_html(p10, p50, p90)
 
     opponent = result.get("opponent", "")
-    matchup_html = f'<span style="color:#8a9bb8;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
+    matchup_html = f'<span style="color:#b0bec5;font-size:0.82rem;">vs {opponent}</span>' if opponent else ""
 
     add_btn = (
         '<button class="add-to-slip-btn">＋ Add to Slip</button>'
@@ -1686,7 +1686,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
   </div>
   <div style="margin-top:9px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <span class="platform-badge" style="background:{plat_color};color:#fff;">{platform}</span>
-    <span style="color:#8a9bb8;font-size:0.9rem;">{stat} &nbsp;·&nbsp;
+    <span style="color:#b0bec5;font-size:0.9rem;">{stat} &nbsp;·&nbsp;
       Line: <strong style="color:rgba(255,255,255,0.95);">{line}</strong></span>
     {matchup_html}
   </div>
@@ -1697,7 +1697,7 @@ def get_player_analysis_card_html(result, show_add_button=True):
       <span class="{dir_class}">{direction_arrow} {direction}</span>
       <span class="prob-value">{prob_pct:.1f}%</span>
       {edge_html}
-      <span style="color:#8a9bb8;font-size:0.82rem;">
+      <span style="color:#b0bec5;font-size:0.82rem;">
         Confidence: <strong style="color:{conf_color};">{confidence:.0f}/100</strong>
       </span>
     </div>
@@ -1707,12 +1707,12 @@ def get_player_analysis_card_html(result, show_add_button=True):
   </div>
   <div style="margin-top:12px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
     <div style="flex:1;min-width:160px;">
-      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;
+      <div style="color:#b0bec5;font-size:0.72rem;text-transform:uppercase;
                   letter-spacing:1px;margin-bottom:3px;">Over/Under Forces</div>
       {force_bar}
     </div>
     <div style="min-width:110px;">
-      <div style="color:#8a9bb8;font-size:0.72rem;text-transform:uppercase;
+      <div style="color:#b0bec5;font-size:0.72rem;text-transform:uppercase;
                   letter-spacing:1px;margin-bottom:3px;">Range</div>
       {dist_range}
     </div>
@@ -1903,7 +1903,7 @@ _QDS_REPORT_CSS = """
   --qds-accent: #00b4ff;
   --qds-accent-light: rgba(0,180,255,0.15);
   --qds-text-light: #f0f4ff;
-  --qds-text-muted: #a0b4d0;
+  --qds-text-muted: #b0bec5;
   --qds-text-dark: #0a101f;
   --qds-success: #00ff88;
   --qds-warning: #ffcc00;
@@ -2424,30 +2424,30 @@ def get_game_report_html(game=None, analysis_results=None):
     <div style="color:#ff5e00;font-weight:600;font-size:0.8rem;margin-bottom:10px;">📊 Distribution</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
       <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
-        <div style="color:#8b949e;font-size:0.7rem;">10th pct</div>
+        <div style="color:#b0bec5;font-size:0.7rem;">10th pct</div>
         <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_10", 0):.1f}</div>
       </div>
       <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
-        <div style="color:#8b949e;font-size:0.7rem;">Median</div>
+        <div style="color:#b0bec5;font-size:0.7rem;">Median</div>
         <div style="color:var(--qds-primary);font-weight:700;font-size:0.85rem;">{pick.get("percentile_50", 0):.1f}</div>
       </div>
       <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
-        <div style="color:#8b949e;font-size:0.7rem;">90th pct</div>
+        <div style="color:#b0bec5;font-size:0.7rem;">90th pct</div>
         <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_90", 0):.1f}</div>
       </div>
       <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
-        <div style="color:#8b949e;font-size:0.7rem;">Std Dev</div>
+        <div style="color:#b0bec5;font-size:0.7rem;">Std Dev</div>
         <div style="color:white;font-weight:700;font-size:0.85rem;">{pick.get("simulated_std", 0):.1f}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div style="padding:8px;background:rgba(0,240,255,0.04);border-radius:5px;border-left:2px solid var(--qds-primary);">
         <div style="color:var(--qds-primary);font-size:0.75rem;font-weight:600;margin-bottom:4px;">🔵 Forces OVER</div>
-        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("over_forces") else '<span style="color:#8b949e;font-size:0.75rem;">None detected</span>'}
+        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("over_forces") else '<span style="color:#b0bec5;font-size:0.75rem;">None detected</span>'}
       </div>
       <div style="padding:8px;background:rgba(255,94,0,0.04);border-radius:5px;border-left:2px solid #ff5e00;">
         <div style="color:#ff5e00;font-size:0.75rem;font-weight:600;margin-bottom:4px;">🔴 Forces UNDER</div>
-        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("under_forces") else '<span style="color:#8b949e;font-size:0.75rem;">None detected</span>'}
+        {_force_items(pick, max_n=2) if pick.get("forces", {}).get("under_forces") else '<span style="color:#b0bec5;font-size:0.75rem;">None detected</span>'}
       </div>
     </div>
   </div>

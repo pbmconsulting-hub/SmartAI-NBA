@@ -27,6 +27,79 @@ st.title("⚙️ Settings")
 st.markdown("Configure the SmartBetPro NBA prediction engine.")
 st.divider()
 
+# ============================================================
+# SECTION: Preset Profiles
+# ============================================================
+
+st.subheader("⚡ Quick Start — Preset Profiles")
+st.markdown(
+    "Apply a pre-configured profile to instantly tune all settings for your strategy."
+)
+
+_PROFILES = {
+    "🛡️ Conservative": {
+        "description": "Fewer, higher-confidence picks. Lower risk, steadier returns.",
+        "simulation_depth": 2000,
+        "minimum_edge_threshold": 8.0,
+        "entry_fee": 10.0,
+        "selected_platforms": ["PrizePicks"],
+        "home_court_boost": 0.02,
+        "blowout_sensitivity": 1.5,
+        "fatigue_sensitivity": 1.5,
+        "pace_sensitivity": 1.0,
+    },
+    "⚖️ Balanced": {
+        "description": "Recommended defaults. Good mix of volume and confidence.",
+        "simulation_depth": 1000,
+        "minimum_edge_threshold": 5.0,
+        "entry_fee": 10.0,
+        "selected_platforms": ["PrizePicks", "Underdog", "DraftKings"],
+        "home_court_boost": 0.025,
+        "blowout_sensitivity": 1.0,
+        "fatigue_sensitivity": 1.0,
+        "pace_sensitivity": 1.0,
+    },
+    "🚀 Aggressive": {
+        "description": "More picks, lower edge threshold. High volume, higher variance.",
+        "simulation_depth": 500,
+        "minimum_edge_threshold": 2.0,
+        "entry_fee": 25.0,
+        "selected_platforms": ["PrizePicks", "Underdog", "DraftKings"],
+        "home_court_boost": 0.03,
+        "blowout_sensitivity": 0.5,
+        "fatigue_sensitivity": 0.5,
+        "pace_sensitivity": 1.5,
+    },
+}
+
+_prof_cols = st.columns(3)
+for _ci, (_pname, _pdata) in enumerate(_PROFILES.items()):
+    with _prof_cols[_ci]:
+        st.markdown(
+            f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+            f'border:1px solid rgba(0,240,255,0.18);margin-bottom:8px;">'
+            f'<div style="font-size:1rem;font-weight:700;color:#ff5e00;">{_pname}</div>'
+            f'<div style="color:#b0bec5;font-size:0.82rem;margin-top:4px;">{_pdata["description"]}</div>'
+            f'<div style="color:#8b949e;font-size:0.75rem;margin-top:6px;">'
+            f'Edge ≥ {_pdata["minimum_edge_threshold"]}% · '
+            f'{_pdata["simulation_depth"]:,} sims · '
+            f'{len(_pdata["selected_platforms"])} platform(s)</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button(f"Apply {_pname}", key=f"profile_{_ci}", use_container_width=True):
+            for _k, _v in _pdata.items():
+                if _k != "description":
+                    st.session_state[_k] = _v
+            st.success(f"✅ {_pname} profile applied!")
+            st.rerun()
+
+st.divider()
+
+# ============================================================
+# END SECTION: Preset Profiles
+# ============================================================
+
 st.markdown(get_education_box_html(
     "📖 What Do These Settings Do?",
     """

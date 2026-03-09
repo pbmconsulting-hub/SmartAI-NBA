@@ -149,6 +149,79 @@ live_games = _fetch_live_scores()
 
 st.subheader("🏀 Live Scoreboard")
 
+
+def _fetch_quarter_scores(game_id: str) -> dict:
+    """
+    Attempt to fetch per-quarter (period) line score for a given game_id.
+
+    Returns dict with keys 'away_q' and 'home_q' each being a list of
+    quarter scores (indices 0-3 = Q1-Q4, index 4 = OT if present).
+    """
+    result = {"away_q": [], "home_q": []}
+    try:
+        from nba_api.stats.endpoints import boxscoresummaryv2
+        bs = boxscoresummaryv2.BoxScoreSummaryV2(game_id=game_id, timeout=8)
+        ls = bs.line_score.get_data_frame()
+        if ls.empty:
+            return result
+        teams = ls["TEAM_ABBREVIATION"].tolist()
+        for prefix, col_list in [("away_q", "away"), ("home_q", "home")]:
+            idx = 0 if len(teams) >= 1 else None
+            if prefix == "home_q" and len(teams) >= 2:
+                idx = 1
+            if idx is None:
+                continue
+            row = ls.iloc[idx]
+            quarters = []
+            for q_col in ["PTS_QTR1", "PTS_QTR2", "PTS_QTR3", "PTS_QTR4",
+                          "PTS_OT1", "PTS_OT2"]:
+                v = row.get(q_col, None)
+                if v is not None and str(v) not in ("", "nan", "None"):
+                    try:
+                        quarters.append(int(float(v)))
+                    except Exception:
+                        break
+                else:
+                    break
+            result[prefix] = quarters
+    except Exception:
+        pass
+    return result
+
+
+def _quarter_table_html(away: str, home: str, away_q: list, home_q: list,
+                        away_total: int, home_total: int) -> str:
+    """Build a compact quarter-by-quarter score table as HTML."""
+    max_q = max(len(away_q), len(home_q), 4)
+    header_cells = "".join(
+        f'<th style="padding:4px 8px;color:#8a9bb8;font-size:0.75rem;">'
+        f'{"OT" if i >= 4 else f"Q{i+1}"}</th>'
+        for i in range(max_q)
+    ) + '<th style="padding:4px 10px;color:#ff5e00;font-size:0.8rem;font-weight:700;">TOT</th>'
+
+    def _cells(scores, total, opp_total):
+        cells = ""
+        for i in range(max_q):
+            v = scores[i] if i < len(scores) else "–"
+            cells += f'<td style="padding:4px 8px;color:#c0d0e8;font-size:0.78rem;text-align:center;">{v}</td>'
+        c = "#00ff9d" if total > opp_total else ("#ff6b6b" if total < opp_total else "#c0d0e8")
+        cells += f'<td style="padding:4px 10px;color:{c};font-weight:700;font-size:0.85rem;text-align:center;">{total}</td>'
+        return cells
+
+    rows = (
+        f'<tr><td style="padding:4px 10px;color:#c0d0e8;font-weight:700;font-size:0.8rem;">{away}</td>'
+        f'{_cells(away_q, away_total, home_total)}</tr>'
+        f'<tr><td style="padding:4px 10px;color:#c0d0e8;font-weight:700;font-size:0.8rem;">{home}</td>'
+        f'{_cells(home_q, home_total, away_total)}</tr>'
+    )
+    return (
+        f'<table style="width:100%;border-collapse:collapse;margin-top:8px;'
+        f'background:rgba(0,0,0,0.2);border-radius:6px;">'
+        f'<thead><tr><th style="padding:4px 10px;"></th>{header_cells}</tr></thead>'
+        f'<tbody>{rows}</tbody></table>'
+    )
+
+
 if live_games:
     cols = st.columns(min(len(live_games), 3))
     for idx, game in enumerate(live_games):
@@ -166,6 +239,16 @@ if live_games:
 
             score_color_home = "#00ff9d" if h_pts > a_pts else "#c8d8f0"
             score_color_away = "#00ff9d" if a_pts > h_pts else "#c8d8f0"
+
+            # Fetch quarter-by-quarter scores if game_id available
+            game_id = game.get("game_id", "")
+            quarter_html = ""
+            if game_id:
+                qscores = _fetch_quarter_scores(game_id)
+                away_q = qscores.get("away_q", [])
+                home_q = qscores.get("home_q", [])
+                if away_q or home_q:
+                    quarter_html = _quarter_table_html(away, home, away_q, home_q, a_pts, h_pts)
 
             st.markdown(
                 f"""
@@ -190,6 +273,7 @@ if live_games:
                         </div>
                     </div>
                     {f'<div style="font-size:0.8rem;color:#00f0ff;margin-top:6px;">{clock_txt}</div>' if clock_txt else ''}
+                    {quarter_html}
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -345,6 +429,119 @@ else:
 
 # ============================================================
 # END SECTION: Season Leaders
+# ============================================================
+
+st.divider()
+
+# ============================================================
+# SECTION: Prop Tracker Widget
+# Shows how active props from tonight are tracking vs their lines
+# based on live box-score stats.
+# ============================================================
+
+st.subheader("📌 Live Prop Tracker")
+st.caption(
+    "See how tonight's active props are tracking against their lines in real time. "
+    "Go to **🔬 Prop Scanner** and **⚡ Neural Analysis** to set up your props first."
+)
+
+_active_props = st.session_state.get("analysis_results", [])
+_analysis_top = [p for p in _active_props if not p.get("should_avoid", False)][:20]
+
+if not live_games:
+    st.info("📡 Prop tracker activates once live games are in progress.")
+elif not _analysis_top:
+    st.info(
+        "📌 No active props to track yet. "
+        "Run **⚡ Neural Analysis** to generate top picks, then come back here to monitor them live."
+    )
+else:
+    # Build a lookup: player_name → box-score stats from live games
+    _live_player_stats: dict = {}
+    try:
+        from nba_api.live.nba.endpoints import boxscore as _live_bs
+        for _g in live_games[:6]:
+            _gid = _g.get("game_id", "")
+            if not _gid:
+                continue
+            try:
+                _bs = _live_bs.BoxScore(game_id=_gid)
+                for _tk in ["homeTeam", "awayTeam"]:
+                    for _pl in _bs.game.get_dict().get(_tk, {}).get("players", []):
+                        _pn = f"{_pl.get('firstName','')} {_pl.get('familyName','')}".strip()
+                        _st = _pl.get("statistics", {})
+                        _live_player_stats[_pn.lower()] = {
+                            "points": int(_st.get("points", 0)),
+                            "rebounds": int(_st.get("reboundsTotal", 0)),
+                            "assists": int(_st.get("assists", 0)),
+                            "threes": int(_st.get("threePointersMade", 0)),
+                            "steals": int(_st.get("steals", 0)),
+                            "blocks": int(_st.get("blocks", 0)),
+                        }
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    _tracked = 0
+    _tracker_html = ""
+    for _prop in _analysis_top:
+        _pname = _prop.get("player_name", "")
+        _stat = _prop.get("stat_type", "").lower()
+        _line = float(_prop.get("line", 0))
+        _dir = _prop.get("direction", "OVER")
+        _tier = _prop.get("tier_emoji", "") + _prop.get("tier", "")
+
+        _live = _live_player_stats.get(_pname.lower(), {})
+        _cur = _live.get(_stat, None)
+        if _cur is None:
+            continue
+
+        _tracked += 1
+        _diff = _cur - _line
+        if _dir == "OVER":
+            _hitting = _cur > _line
+            _status_txt = f"ON TRACK ↑" if _hitting else "BEHIND ↓"
+            _status_clr = "#00ff9d" if _hitting else "#ff6b6b"
+        else:
+            _hitting = _cur < _line
+            _status_txt = f"ON TRACK ↓" if _hitting else "OVER PACE ↑"
+            _status_clr = "#00ff9d" if _hitting else "#ff6b6b"
+
+        # progress bar: pct of line reached
+        _pct = min(100, round((_cur / _line * 100) if _line > 0 else 0))
+        _bar_color = "#00ff9d" if _hitting else "#ff6b6b"
+        import html as _html_mod
+        _tracker_html += (
+            f'<div style="background:#14192b;border-radius:6px;padding:10px 14px;'
+            f'margin-bottom:8px;border-left:3px solid {_bar_color};">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+            f'<div><span style="color:#c0d0e8;font-weight:700;">{_html_mod.escape(_pname)}</span>'
+            f'&nbsp;<span style="color:#8a9bb8;font-size:0.8rem;">{_stat.title()} {_dir} {_line}</span>'
+            f'&nbsp;<span style="color:#8a9bb8;font-size:0.75rem;">{_tier}</span></div>'
+            f'<div style="color:{_bar_color};font-weight:700;font-size:0.9rem;">{_status_txt}</div>'
+            f'</div>'
+            f'<div style="display:flex;align-items:center;gap:10px;margin-top:6px;">'
+            f'<div style="flex:1;height:6px;background:#1a2035;border-radius:3px;">'
+            f'<div style="width:{_pct}%;height:6px;background:{_bar_color};border-radius:3px;"></div></div>'
+            f'<div style="color:#c0d0e8;font-size:0.85rem;white-space:nowrap;">'
+            f'<strong style="color:{_bar_color};">{_cur}</strong> / {_line} '
+            f'({_diff:+.1f})</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    if _tracked == 0:
+        st.info(
+            "📊 No live box-score data found for your active props yet. "
+            "Stats appear once games tip off."
+        )
+    else:
+        st.markdown(f"Tracking **{_tracked}** active prop(s) from tonight's analysis:")
+        st.markdown(_tracker_html, unsafe_allow_html=True)
+
+# ============================================================
+# END SECTION: Prop Tracker Widget
 # ============================================================
 
 
