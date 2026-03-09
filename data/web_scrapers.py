@@ -472,7 +472,7 @@ def fetch_multi_source_injury_status(todays_games=None):
     try:
         from data.roster_engine import RosterEngine
         engine = RosterEngine()
-        # refresh() without team_abbrevs fetches only the CDN injury feeds
+        # refresh() without team_abbrevs fetches injury + CommonAllPlayers data via nba_api
         engine.refresh()
         raw = engine.get_injury_report()
 
@@ -488,7 +488,7 @@ def fetch_multi_source_injury_status(todays_games=None):
                 "team":        entry.get("team", ""),
                 "return_date": entry.get("return_date", ""),
                 "comment":     entry.get("injury", ""),
-                "source":      entry.get("source", "NBA-CDN"),
+                "source":      entry.get("source", "nba_api"),
             }
 
         total     = len(merged)

@@ -388,6 +388,91 @@ def sample_from_normal_distribution(mean, standard_deviation):
     return max(0.0, raw_sample)
 
 
+def sample_skew_normal(mean, standard_deviation, skew_param=0.0):
+    """
+    Draw a single random sample from a skew-normal distribution.
+
+    NBA stats are right-skewed (hard floor at 0, occasional explosion games
+    that pull the distribution right). Standard normal sampling underestimates
+    the probability of big games and overestimates the floor.
+
+    This implementation uses the standard composition method:
+        1. Draw two independent standard normals u, v
+        2. If skew_param == 0, return the standard normal (reduces to Gaussian)
+        3. Else, compute the skew-normal variate using the sign trick
+
+    Reference: Azzalini (1985) — "A class of distributions which includes
+    the normal ones", Scandinavian Journal of Statistics.
+
+    Args:
+        mean (float): Center of the distribution (projected stat average)
+        standard_deviation (float): Spread of the distribution
+        skew_param (float): Skewness parameter α.
+            0.0  = symmetric normal (no skew)
+            > 0  = right skew (long tail toward larger values — NBA typical)
+            < 0  = left skew (rare for sports stats)
+            Practical range for NBA: 0.5–1.5
+
+    Returns:
+        float: A random sample, clamped to ≥ 0.0 (stats can't be negative)
+
+    Example:
+        Points: sample_skew_normal(22.0, 5.5, skew_param=0.8)
+        Threes: sample_skew_normal(2.5, 1.5, skew_param=1.2)
+    """
+    if standard_deviation <= 0:
+        return max(0.0, mean)
+
+    if abs(skew_param) < 1e-9:
+        # No skew: fall back to standard normal
+        return max(0.0, random.gauss(mean, standard_deviation))
+
+    # Skew-normal composition:
+    # delta = skew_param / sqrt(1 + skew_param^2)
+    # Compute two independent standard normals
+    delta = skew_param / math.sqrt(1.0 + skew_param * skew_param)
+    u0 = random.gauss(0.0, 1.0)
+    v  = random.gauss(0.0, 1.0)
+
+    # The skew-normal variate z (zero mean, unit variance):
+    z = delta * abs(u0) + math.sqrt(1.0 - delta * delta) * v
+
+    # Scale to the desired mean and std
+    # Note: The skew-normal mean is mu + omega * delta * sqrt(2/pi)
+    # We shift so that the output is centred at `mean` exactly.
+    skew_mean_shift = delta * math.sqrt(2.0 / math.pi)
+    raw_sample = mean + standard_deviation * (z - skew_mean_shift)
+
+    return max(0.0, raw_sample)
+
+
+# Default skew parameters by NBA stat type (C5)
+# These reflect the right-skewed nature of each stat category.
+# Higher skew_param = more right-skewed = more explosion-game probability.
+STAT_SKEW_PARAMS = {
+    "points":    0.8,   # Moderate right skew (star can always go nuclear)
+    "rebounds":  0.6,   # Moderate skew (rebounding is position-dependent)
+    "assists":   0.5,   # Mild skew (playmakers are somewhat consistent)
+    "threes":    1.2,   # Highly right-skewed (shooting is very streaky)
+    "steals":    1.0,   # Right-skewed (rare stat, can spike)
+    "blocks":    1.0,   # Right-skewed (rare stat, can spike)
+    "turnovers": 0.4,   # Mild skew (more predictable for high-usage players)
+}
+
+
+def get_stat_skew_param(stat_type):
+    """
+    Return the default skew parameter for a given stat type. (C5)
+
+    Args:
+        stat_type (str): e.g. 'points', 'threes', 'rebounds'
+
+    Returns:
+        float: Skew parameter α for sample_skew_normal()
+    """
+    return STAT_SKEW_PARAMS.get(stat_type.lower() if stat_type else "", 0.6)
+
+
 # ============================================================
 # END SECTION: Edge and Probability Utilities
 # ============================================================

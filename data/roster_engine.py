@@ -1,18 +1,19 @@
 # ============================================================
 # FILE: data/roster_engine.py
 # PURPOSE: Centralised active-roster and injury resolution engine.
-#          Aggregates data from official free sources and applies
-#          consistent filtering rules.
+#          Uses nba_api as the single authoritative data source for
+#          both roster and injury data.
 #
 # DATA SOURCES (in priority order):
-#   1. NBA.com CDN JSON       — static injury feed (no rate-limit, free)
-#   2. Live Injury JSON       — cdn.nba.com daily injury file (free)
-#   3. nba_api CommonTeamRoster — official roster + G-League/two-way status
+#   1. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
+#   2. nba_api CommonAllPlayers   — active player validation (IsOnlyCurrentSeason=1)
+#   3. nba_api live Injuries      — daily injury designations
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
 #   - Flag (keep with warning): GTD / Day-to-Day / Questionable / Probable
 #   - Active: everything else
+#   - Two-way / G-League assigned players are always excluded from rosters
 #
 # USAGE:
 #   from data.roster_engine import RosterEngine
@@ -24,55 +25,12 @@
 
 import re
 import time
-import json
 import datetime
-import os
-from pathlib import Path
 from typing import Optional
-
-try:
-    import requests
-    _REQUESTS_AVAILABLE = True
-except ImportError:
-    _REQUESTS_AVAILABLE = False
 
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
-
-# CDN / API endpoints
-NBA_CDN_SCHEDULE_URL = (
-    "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json"
-)
-NBA_STATS_TEAM_ROSTER_URL = (
-    "https://stats.nba.com/stats/commonteamroster"
-)
-NBA_HTML_INJURY_URL = "https://www.nba.com/players/injuries"
-
-# Daily live-injury CDN file (YYYYMMDD)
-def _today_cdn_injury_url():
-    date_str = datetime.date.today().strftime("%Y%m%d")
-    return f"https://cdn.nba.com/static/json/liveData/injuries/injuries_{date_str}.json"
-
-# HTTP headers
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/json,*/*;q=0.9",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://www.google.com/",
-}
-_NBA_STATS_HEADERS = {
-    **_HEADERS,
-    "Host": "stats.nba.com",
-    "Origin": "https://www.nba.com",
-    "Referer": "https://www.nba.com/",
-    "x-nba-stats-origin": "stats",
-    "x-nba-stats-token": "true",
-}
 
 REQUEST_TIMEOUT = 15
 MAX_RETRIES = 3
@@ -177,25 +135,6 @@ def _severity(status: str) -> int:
     return _SEVERITY.get(status, 0)
 
 
-def _get_with_retry(url, params=None, headers=None, timeout=REQUEST_TIMEOUT):
-    """HTTP GET with exponential-backoff retry.  Returns Response or None."""
-    if not _REQUESTS_AVAILABLE:
-        return None
-    hdrs = headers or _HEADERS
-    for attempt in range(MAX_RETRIES):
-        try:
-            resp = requests.get(url, params=params, headers=hdrs, timeout=timeout)
-            if resp.status_code == 200:
-                return resp
-            if resp.status_code == 429:
-                time.sleep(5 * (attempt + 1))
-        except requests.RequestException as exc:
-            wait = 2 ** attempt
-            print(f"RosterEngine: GET {url} attempt {attempt + 1} failed: {exc}. Retry in {wait}s")
-            time.sleep(wait)
-    return None
-
-
 def _merge_entry(target: dict, incoming: dict) -> dict:
     """Merge *incoming* into *target*, keeping the more-severe status."""
     if not target:
@@ -288,36 +227,35 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from official free sources.
+        Fetch fresh data from nba_api — the single authoritative source.
 
         Sources used (in order):
-            1. NBA.com CDN static injury JSON  — no rate-limit, always free
-            2. Live daily CDN injury JSON      — no rate-limit, always free
-            3. nba_api CommonTeamRoster        — official roster + status filter
+            1. nba_api live Injuries endpoint — daily injury designations
+            2. nba_api CommonAllPlayers       — active-season player validation
+            3. nba_api CommonTeamRoster       — official roster + two-way status
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
-                          If None, only the injury data sources are refreshed.
+                          If None, only the injury / all-players data is refreshed.
         """
-        print("RosterEngine.refresh() — starting data pull")
+        print("RosterEngine.refresh() — starting data pull (nba_api sources only)")
         merged: dict = {}
 
-        # ── Source 1: NBA.com CDN static injury JSON ───────────────
-        src1 = self._fetch_nba_cdn_injury()
+        # ── Source 1: nba_api live Injuries endpoint ──────────────
+        src1 = self._fetch_nba_api_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 1 (NBA CDN):      {len(src1)} players")
+        print(f"  Source 1 (nba_api live injuries): {len(src1)} players")
 
-        # ── Source 2: Live daily CDN injury file ──────────────────
-        src2 = self._fetch_live_cdn_injury()
+        # ── Source 2: nba_api CommonAllPlayers active validation ───
+        src2 = self._fetch_nba_api_active_players()
         for k, v in src2.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 2 (Live CDN):     {len(src2)} players")
+        print(f"  Source 2 (nba_api CommonAllPlayers): {len(src2)} players")
 
         self._injury_map = merged
 
-        # ── Source 3: nba_api CommonTeamRoster (primary) ──────────
-        # Fetches official rosters and also flags G-League / two-way players.
+        # ── Source 3: nba_api CommonTeamRoster (primary roster) ───
         if team_abbrevs:
             self._fetch_nba_api_rosters(team_abbrevs)
 
@@ -326,82 +264,35 @@ class RosterEngine:
         self._last_refresh = datetime.datetime.now()
         out_count = sum(1 for v in self._injury_map.values() if v.get("status") in EXCLUDE_STATUSES)
         print(
-            f"RosterEngine.refresh() complete: {len(self._injury_map)} injured players "
+            f"RosterEngine.refresh() complete: {len(self._injury_map)} injured/flagged players "
             f"({out_count} hard-excluded)"
         )
 
     # ----------------------------------------------------------
-    # Source 1: NBA.com CDN static injury JSON
+    # Source 1: nba_api live Injuries endpoint
     # ----------------------------------------------------------
 
-    def _fetch_nba_cdn_injury(self) -> dict:
+    def _fetch_nba_api_injuries(self) -> dict:
+        """
+        Fetch today's injury report via nba_api.live.nba.endpoints.injuries.
+
+        This accesses the official NBA live injury feed through the nba_api
+        package, which handles rate-limiting and proper NBA API headers.
+        """
         result: dict = {}
         try:
-            resp = _get_with_retry(
-                "https://cdn.nba.com/static/json/staticData/InjuryReport.json",
-                headers=_HEADERS,
-            )
-            if not resp:
-                return {}
-            data = resp.json()
-            # The InjuryReport JSON has different possible shapes depending on feed version
-            # Try multiple common shapes
-            report = data if isinstance(data, dict) else {}
-            injury_list = (
-                report.get("InjuryList", [])
-                or report.get("players", [])
-                or (report.get("resultSets", [{}])[0].get("rowSet", []) if report.get("resultSets") else [])
-            )
-            for item in injury_list:
-                if isinstance(item, dict):
-                    name = item.get("Name", item.get("PLAYER_NAME", item.get("playerName", "")))
-                    status = _normalize_status(
-                        item.get("Status", item.get("PLAYER_STATUS", item.get("status", "")))
-                    )
-                    injury = item.get("Comment", item.get("Injury", item.get("injury", "")))
-                    team = item.get("TeamAbbreviation", item.get("TEAM_ABBREVIATION", item.get("team", "")))
-                elif isinstance(item, list):
-                    # rowSet format: [team_abbrev, ..., player_name, ..., status]
-                    name   = item[2] if len(item) > 2 else ""
-                    status = _normalize_status(item[4] if len(item) > 4 else "")
-                    injury = item[5] if len(item) > 5 else ""
-                    team   = item[0] if len(item) > 0 else ""
-                else:
-                    continue
+            from nba_api.live.nba.endpoints import injuries as live_injuries
+            inj_report = live_injuries.Injuries()
+            data = inj_report.get_dict()
 
-                if not name:
-                    continue
-                key = _normalize_name(name)
-                result[key] = {
-                    "status":      status,
-                    "injury":      str(injury or ""),
-                    "team":        str(team or ""),
-                    "return_date": "",
-                    "source":      "NBA-CDN",
-                }
-        except Exception as exc:
-            print(f"RosterEngine._fetch_nba_cdn_injury: {exc}")
-        return result
-
-    # ----------------------------------------------------------
-    # Source 2: Live daily CDN injury file
-    # ----------------------------------------------------------
-
-    def _fetch_live_cdn_injury(self) -> dict:
-        result: dict = {}
-        try:
-            url = _today_cdn_injury_url()
-            resp = _get_with_retry(url, headers=_HEADERS)
-            if not resp:
-                return {}
-            data = resp.json()
-            # Shape: {"injuryReport": {"injuredPlayers": [...]}}
-            injured = (
-                data.get("injuryReport", {}).get("injuredPlayers", [])
+            # The live injuries endpoint returns:
+            # {"injuries": {"injuredPlayers": [...]}}  or similar shape
+            injured_list = (
+                data.get("injuries", {}).get("injuredPlayers", [])
                 or data.get("injuredPlayers", [])
                 or data.get("players", [])
             )
-            for item in (injured or []):
+            for item in (injured_list or []):
                 name   = item.get("playerName", item.get("name", ""))
                 status = _normalize_status(item.get("status", item.get("playerStatus", "")))
                 injury = item.get("injuryDescription", item.get("injury", item.get("comment", "")))
@@ -414,10 +305,57 @@ class RosterEngine:
                     "injury":      str(injury or ""),
                     "team":        str(team or ""),
                     "return_date": "",
-                    "source":      "NBA-Live-CDN",
+                    "source":      "nba_api-live-injuries",
                 }
         except Exception as exc:
-            print(f"RosterEngine._fetch_live_cdn_injury: {exc}")
+            print(f"RosterEngine._fetch_nba_api_injuries: {exc}")
+        return result
+
+    # ----------------------------------------------------------
+    # Source 2: nba_api CommonAllPlayers — active player validation
+    # ----------------------------------------------------------
+
+    def _fetch_nba_api_active_players(self) -> dict:
+        """
+        Validate active players using CommonAllPlayers with IsOnlyCurrentSeason=1.
+
+        Players returned by this endpoint are confirmed to be on an active
+        NBA roster for the current season. Players NOT returned but who appear
+        in injury data are flagged as inactive (waived/released).
+        """
+        result: dict = {}
+        try:
+            from nba_api.stats.endpoints import commonallplayers
+            time.sleep(1.0)
+            response = commonallplayers.CommonAllPlayers(
+                is_only_current_season=1,
+                league_id="00",
+                season="2024-25",
+            )
+            df = response.get_data_frames()[0]
+
+            for _, row in df.iterrows():
+                name = row.get("DISPLAY_FIRST_LAST", "") or row.get("DISPLAY_LAST_COMMA_FIRST", "")
+                roster_status = str(row.get("ROSTERSTATUS", "")).strip()
+                team_id = row.get("TEAM_ID", 0)
+
+                if not name:
+                    continue
+
+                key = _normalize_name(name)
+
+                # ROSTERSTATUS = 0 means NOT on active NBA roster
+                # (waived, retired, G-League only, etc.)
+                if str(roster_status) == "0" or team_id == 0:
+                    result[key] = {
+                        "status":      "Inactive",
+                        "injury":      "Not on active NBA roster",
+                        "team":        "",
+                        "return_date": "",
+                        "source":      "nba_api-CommonAllPlayers",
+                    }
+        except Exception as exc:
+            print(f"RosterEngine._fetch_nba_api_active_players: {exc}")
         return result
 
     # ----------------------------------------------------------
