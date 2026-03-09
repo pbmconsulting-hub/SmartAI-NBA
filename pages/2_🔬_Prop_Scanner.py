@@ -22,6 +22,7 @@ from data.data_manager import (
     validate_props_against_roster,
     get_player_status,
     load_injury_status,
+    generate_props_for_todays_players,
 )
 from data.platform_mappings import (
     normalize_stat_type,
@@ -299,6 +300,95 @@ else:
 
 # ============================================================
 # END SECTION: Current Props Table
+# ============================================================
+
+st.divider()
+
+# ============================================================
+# SECTION: Auto-Generate Props for Tonight's Games
+# ============================================================
+
+st.subheader("🤖 Auto-Generate Props for Tonight's Games")
+st.markdown(
+    "Generate prop entries for **all active players** on tonight's teams across all "
+    "three platforms — **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick 6**. "
+    "Prop lines are derived from each player's season averages (rounded to nearest 0.5)."
+)
+
+todays_games_for_gen = st.session_state.get("todays_games", [])
+if not todays_games_for_gen:
+    st.info(
+        "💡 No games loaded yet. Load tonight's games on the **📡 Live Games** page first "
+        "so only tonight's players are included. You can still auto-generate props for "
+        "all players in the database by clicking the button below."
+    )
+else:
+    st.success(
+        f"✅ {len(todays_games_for_gen)} game(s) loaded for tonight — "
+        "props will be generated for those teams only."
+    )
+
+_ag_col1, _ag_col2 = st.columns([2, 3])
+with _ag_col1:
+    _ag_platforms = st.multiselect(
+        "Platforms to generate for:",
+        options=["PrizePicks", "Underdog", "DraftKings"],
+        default=st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]),
+        key="autogen_platforms",
+        help="Choose which platforms to generate props for.",
+    )
+with _ag_col2:
+    _ag_replace = st.radio(
+        "How to add generated props:",
+        ["Replace all existing props", "Append to existing props"],
+        horizontal=True,
+        key="autogen_mode",
+    )
+
+if st.button(
+    "🤖 Auto-Generate All Props for Tonight",
+    type="primary",
+    use_container_width=False,
+    disabled=not _ag_platforms,
+):
+    with st.spinner("Generating props for tonight's active roster players…"):
+        _gen_props = generate_props_for_todays_players(
+            players_data=players_data,
+            todays_games=todays_games_for_gen,
+            platforms=_ag_platforms,
+        )
+
+    if _gen_props:
+        # Summary by platform
+        _by_plat = {}
+        for _gp in _gen_props:
+            _plat = _gp.get("platform", "—")
+            _by_plat[_plat] = _by_plat.get(_plat, 0) + 1
+
+        if _ag_replace == "Replace all existing props":
+            save_props_to_session(_gen_props, st.session_state)
+            st.success(
+                f"✅ Replaced props with **{len(_gen_props)}** auto-generated entries: "
+                + " · ".join(f"{p}: {n}" for p, n in sorted(_by_plat.items()))
+            )
+        else:
+            _existing = load_props_from_session(st.session_state)
+            _combined = _existing + _gen_props
+            save_props_to_session(_combined, st.session_state)
+            st.success(
+                f"✅ Added **{len(_gen_props)}** auto-generated props "
+                f"(total: {len(_combined)}): "
+                + " · ".join(f"{p}: {n}" for p, n in sorted(_by_plat.items()))
+            )
+        st.rerun()
+    else:
+        st.warning(
+            "⚠️ No props generated. Make sure player data is loaded and tonight's games are set. "
+            "Try loading tonight's games on the **📡 Live Games** page."
+        )
+
+# ============================================================
+# END SECTION: Auto-Generate Props for Tonight's Games
 # ============================================================
 
 st.divider()

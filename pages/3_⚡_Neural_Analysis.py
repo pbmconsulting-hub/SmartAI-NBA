@@ -689,9 +689,22 @@ status_col, settings_col = st.columns([2, 1])
 
 with status_col:
     if current_props:
-        st.info(f"📋 **{len(current_props)} props** loaded and ready for analysis.")
+        # Show per-platform breakdown of loaded props
+        _prerun_plat_counts: dict = {}
+        for _pp in current_props:
+            _plat = _pp.get("platform", "Unknown")
+            _prerun_plat_counts[_plat] = _prerun_plat_counts.get(_plat, 0) + 1
+        _plat_detail = " · ".join(
+            f"**{_pl}**: {_n}" for _pl, _n in sorted(_prerun_plat_counts.items())
+        )
+        st.info(
+            f"📋 **{len(current_props)} props** loaded and ready for analysis — {_plat_detail}."
+        )
     else:
-        st.warning("⚠️ No props loaded. Go to **📥 Import Props** first.")
+        st.warning(
+            "⚠️ No props loaded. Go to **🔬 Prop Scanner** → "
+            "**🤖 Auto-Generate Props for Tonight's Games** or import props manually."
+        )
 
     if todays_games:
         st.success(f"🏟️ **{len(todays_games)} game(s)** configured for tonight.")
@@ -725,6 +738,8 @@ with status_col:
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
     st.caption(f"⚙️ Min Edge: **{minimum_edge}%**")
+    _shown_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
+    st.caption(f"⚙️ Platforms: **{', '.join(_shown_platforms)}**")
     st.caption("Change on the ⚙️ Settings page")
 
 # ============================================================
@@ -833,6 +848,36 @@ if run_analysis:
         inj_skipped = before_inj - len(props_to_analyze)
         if inj_skipped > 0:
             st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
+
+    # ── Filter to selected platforms (from ⚙️ Settings) ──────────────
+    _selected_platforms = st.session_state.get(
+        "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
+    )
+    if _selected_platforms:
+        before_plat = len(props_to_analyze)
+        props_to_analyze = [
+            p for p in props_to_analyze
+            if not p.get("platform", "").strip()          # include props with no platform
+            or p.get("platform", "") in _selected_platforms
+        ]
+        plat_skipped = before_plat - len(props_to_analyze)
+        if plat_skipped > 0:
+            st.info(
+                f"ℹ️ Skipping **{plat_skipped}** prop(s) for platforms not in your "
+                f"selection ({', '.join(_selected_platforms)}). "
+                "Change platforms on the ⚙️ Settings page."
+            )
+
+    # ── Show per-platform prop count summary ─────────────────────────
+    if props_to_analyze:
+        _plat_counts = {}
+        for _p in props_to_analyze:
+            _plat = _p.get("platform", "Unknown")
+            _plat_counts[_plat] = _plat_counts.get(_plat, 0) + 1
+        _plat_summary = " · ".join(
+            f"**{_plat}**: {_n}" for _plat, _n in sorted(_plat_counts.items())
+        )
+        st.caption(f"📊 Analyzing: {_plat_summary}")
 
     total_props_count    = len(props_to_analyze)
     if total_props_count == 0:
