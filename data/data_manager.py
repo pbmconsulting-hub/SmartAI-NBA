@@ -775,14 +775,15 @@ def find_players_by_team(players_list, team_abbrev):
 
 def get_todays_active_players(players_list, todays_games):
     """
-    Return only players whose team is playing today.
+    Return only players whose team is playing today and who are not
+    flagged as injured/inactive by the saved injury status data.
 
     Args:
         players_list (list of dict): Loaded player data
         todays_games (list of dict): Tonight's games (from session state)
 
     Returns:
-        list of dict: Players on teams playing today
+        list of dict: Players on teams playing today who are available
     """
     if not todays_games:
         return players_list  # Fall back to all players if no games set
@@ -794,7 +795,23 @@ def get_todays_active_players(players_list, todays_games):
         playing_teams.add(game.get("away_team", "").upper())
     playing_teams.discard("")
 
-    return [p for p in players_list if p.get("team", "").upper() in playing_teams]
+    # Step 1: filter by team membership
+    on_tonight = [p for p in players_list if p.get("team", "").upper() in playing_teams]
+
+    # Step 2: apply injury filtering using saved status (best-effort)
+    try:
+        from data.roster_engine import EXCLUDE_STATUSES as _EXCL
+        injury_map = load_injury_status()
+        if injury_map:
+            def _is_available(p):
+                key = p.get("player_name", "").lower().strip()
+                entry = injury_map.get(key, {})
+                return entry.get("status", "Active") not in _EXCL
+            return [p for p in on_tonight if _is_available(p)]
+    except Exception:
+        pass  # If injury data is unavailable, return team-filtered list
+
+    return on_tonight
 
 
 def get_player_status(player_name, status_map):

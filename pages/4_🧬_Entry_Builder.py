@@ -94,6 +94,61 @@ if len(qualifying_picks) < 2:
     )
     st.stop()
 
+# ── 🎯 Strongly Suggested Parlays (auto-populated at top) ────────
+_top_picks = sorted(
+    [r for r in qualifying_picks
+     if not r.get("player_is_out", False)
+     and abs(r.get("edge_percentage", 0)) >= 5.0],
+    key=lambda r: r.get("confidence_score", 0),
+    reverse=True,
+)
+if len(_top_picks) >= 2:
+    st.markdown(
+        '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
+        'border:2px solid #ff5e00;border-radius:10px;padding:14px 18px;margin-bottom:16px;">'
+        '<h3 style="color:#ff5e00;margin:0 0 4px;font-family:Orbitron,sans-serif;">🎯 Strongly Suggested Parlays</h3>'
+        '<p style="color:#a0b4d0;font-size:0.84rem;margin:0;">Auto-populated from tonight\'s highest-edge picks</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    import html as _html_eb
+    _PARLAY_CONFIGS = [
+        (2, "⭐ Best 2-Leg Parlay"),
+        (3, "⭐⭐ Best 3-Leg Parlay"),
+        (5, "⭐⭐⭐ Best 5-Leg Parlay"),
+    ]
+    for _n, _lbl in _PARLAY_CONFIGS:
+        if len(_top_picks) < _n:
+            continue
+        _legs = _top_picks[:_n]
+        _avg_c = round(sum(r.get("confidence_score", 0) for r in _legs) / _n, 1)
+        _combined = 1.0
+        for _r in _legs:
+            _combined *= max(0.01, min(0.99, _r.get("confidence_score", 50) / 100.0))
+        _combined_pct = round(_combined * 100, 1)
+        _avg_edge = round(sum(r.get("edge_percentage", 0) for r in _legs) / _n, 1)
+        _picks_str = " + ".join(
+            f"{_html_eb.escape(r.get('player_name',''))} "
+            f"{r.get('direction','OVER')} {r.get('line','')} {r.get('stat_type','').title()}"
+            for r in _legs
+        )
+        st.markdown(
+            f'<div style="background:#14192b;border-radius:8px;padding:12px 16px;'
+            f'margin-bottom:10px;border-left:4px solid #ff5e00;'
+            f'box-shadow:0 0 10px rgba(255,94,0,0.25);">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+            f'<span style="color:#ff5e00;font-weight:700;">{_lbl}</span>'
+            f'<span style="background:#ff5e00;color:#0a0f1a;padding:2px 8px;border-radius:4px;'
+            f'font-size:0.78rem;font-weight:700;">SAFE {_avg_c}/100</span>'
+            f'</div>'
+            f'<div style="color:#c0d0e8;font-size:0.85rem;margin-top:6px;">{_picks_str}</div>'
+            f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+            f'Combined prob: {_combined_pct:.1f}% · Avg edge: {_avg_edge:+.1f}%</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    st.divider()
+
 # ============================================================
 # END SECTION: Check for Analysis Results
 # ============================================================

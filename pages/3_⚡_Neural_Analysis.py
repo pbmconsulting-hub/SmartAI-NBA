@@ -7,6 +7,7 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
+import streamlit.components.v1 as _components  # For Full Breakdown iframe rendering
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
@@ -325,14 +326,14 @@ def _render_qds_full_breakdown_html(result):
     inside the existing dark-card visual context without a plain Streamlit
     expander frame breaking the design.
 
-    Rendered via st.markdown(html, unsafe_allow_html=True) — all HTML
-    is built with fully inline styles so no external CSS is needed.
+    Rendered via streamlit.components.v1.html() to avoid st.markdown
+    stripping complex inline styles or mis-rendering grid/flex containers.
 
     Args:
         result (dict): Full analysis result from the simulation loop.
 
     Returns:
-        str: Safe HTML string ready for st.markdown(unsafe_allow_html=True).
+        str: Full standalone HTML document ready for components.html().
     """
     player = _html.escape(str(result.get("player_name", "Unknown")))
     stat   = _html.escape(str(result.get("stat_type", "points")).title())
@@ -481,19 +482,30 @@ def _render_qds_full_breakdown_html(result):
     # ── Full breakdown wrapped in <details>/<summary> ────────────
     inner_content = dist_html + forces_html + avoid_html + breakdown_html + explain_html
 
-    return (
-        '<details style="margin-top:10px;">'
+    body_html = (
+        '<details style="margin-top:4px;">'
         '<summary style="cursor:pointer;padding:10px 14px;'
         'background:#14192b;border:1px solid rgba(255,94,0,0.2);border-radius:6px;'
         'color:#ff5e00;font-weight:600;font-size:0.9rem;list-style:none;'
         'user-select:none;">'
-        '📊 Full Breakdown — ' + player + ' ' + stat +
+        '&#128202; Full Breakdown &#8212; ' + player + ' ' + stat +
         '</summary>'
         '<div style="padding:14px 15px 16px;background:#0f1424;border:1px solid rgba(255,94,0,0.15);'
         'border-top:none;border-radius:0 0 6px 6px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">'
         + inner_content +
         '</div>'
         '</details>'
+    )
+
+    # Wrap in a full standalone HTML document so components.html() renders it correctly.
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        '<style>'
+        'body{margin:0;padding:0;background:transparent;font-family:Montserrat,sans-serif;}'
+        'details summary::-webkit-details-marker{display:none;}'
+        '</style></head><body>'
+        + body_html +
+        '</body></html>'
     )
 
 
@@ -600,8 +612,10 @@ def display_prop_analysis_card_qds(result):
         })
         st.rerun()
 
-    # ── Full Breakdown (QDS-styled HTML, matching Game Report design) ─
-    st.markdown(_render_qds_full_breakdown_html(result), unsafe_allow_html=True)
+    # ── Full Breakdown (QDS-styled HTML rendered via iframe to avoid st.markdown stripping) ─
+    breakdown_html = _render_qds_full_breakdown_html(result)
+    # Estimate height: collapsed summary bar ~50px + expanded content ~350px
+    _components.html(breakdown_html, height=420, scrolling=False)
 
 
 # ============================================================
@@ -1146,57 +1160,8 @@ if run_analysis:
 
     # ── Auto-log all qualifying picks to the Bet Tracker ────────
     try:
-        from tracking.bet_tracker import log_new_bet as _log_bet
-        from tracking.database import load_all_bets as _load_bets
-        import datetime as _dt
-
-        _existing_bets = _load_bets(limit=500)
-        _today_str = _dt.date.today().isoformat()
-        _existing_keys = {
-            (
-                b.get("player_name", "").lower(),
-                b.get("stat_type", ""),
-                float(b.get("prop_line", 0) or 0),
-                b.get("direction", "OVER"),
-                b.get("bet_date", ""),
-            )
-            for b in _existing_bets
-        }
-
-        _auto_logged = 0
-        for _res in analysis_results_list:
-            if _res.get("edge_percentage", 0) < minimum_edge:
-                continue
-            if _res.get("player_is_out", False):
-                continue
-            _key = (
-                _res.get("player_name", "").lower(),
-                _res.get("stat_type", ""),
-                float(_res.get("line", 0) or 0),
-                _res.get("direction", "OVER"),
-                _today_str,
-            )
-            if _key in _existing_keys:
-                continue  # don't double-log
-            _ok, _msg = _log_bet(
-                player_name=_res.get("player_name", ""),
-                stat_type=_res.get("stat_type", "points"),
-                prop_line=float(_res.get("line", 0) or 0),
-                direction=_res.get("direction", "OVER"),
-                platform="SmartAI-Auto",
-                confidence_score=float(_res.get("confidence_score", 0) or 0),
-                probability_over=float(_res.get("probability_over", 0.5) or 0.5),
-                edge_percentage=float(_res.get("edge_percentage", 0) or 0),
-                tier=_res.get("tier", "Bronze"),
-                team=_res.get("player_team", _res.get("team", "")),
-                notes=(
-                    f"Auto-logged by SmartAI. "
-                    f"SAFE Score: {_res.get('confidence_score', 0):.0f}"
-                ),
-            )
-            if _ok:
-                _auto_logged += 1
-
+        from tracking.bet_tracker import auto_log_analysis_bets as _auto_log
+        _auto_logged = _auto_log(analysis_results_list, minimum_edge=minimum_edge)
         if _auto_logged > 0:
             st.info(
                 f"📊 Auto-logged **{_auto_logged}** qualifying pick(s) to the Bet Tracker."
@@ -1267,6 +1232,72 @@ if analysis_results:
             + ", ".join(unmatched_names)
             + " — results may be less accurate."
         )
+
+    st.divider()
+
+    # ── 🎯 Strongly Suggested Parlays (at TOP for maximum visibility) ─
+    strategy_entries = _build_entry_strategy(displayed_results)
+    if strategy_entries:
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
+            'border:2px solid #ff5e00;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+            '<h3 style="color:#ff5e00;font-family:Orbitron,sans-serif;margin:0 0 6px;">🎯 Strongly Suggested Parlays</h3>'
+            '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Optimized multi-leg combos ranked by combined EDGE Score™</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        _PARLAY_STARS = {2: "⭐", 3: "⭐⭐", 4: "⭐⭐⭐", 5: "⭐⭐⭐", 6: "⭐⭐⭐"}
+        _PARLAY_LABEL = {
+            2: "Best 2-Leg Parlay",
+            3: "Best 3-Leg Parlay",
+            4: "Best 4-Leg Parlay",
+            5: "Best 5-Leg Parlay",
+            6: "Max Entry (6-Leg)",
+        }
+        for _i, entry in enumerate(strategy_entries):
+            _num     = entry.get("num_legs", 0)
+            _label   = _PARLAY_LABEL.get(_num, entry.get("combo_type", ""))
+            _star    = _PARLAY_STARS.get(_num, "")
+            # Top 2 entries get a glow border
+            _glow = "box-shadow:0 0 14px rgba(255,94,0,0.45);" if _i < 2 else ""
+            picks_html = ""
+            for pick_str in entry.get("picks", []):
+                parts = pick_str.split(" ", 1)
+                pname = _html.escape(parts[0]) if parts else ""
+                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
+                picks_html += (
+                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
+                    f'<span style="color:#c0d0e8;">{rest}</span>'
+                    f'</div>'
+                )
+            reasons = entry.get("reasons", [])
+            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
+            combined = entry.get("combined_prob", 0)
+            avg_edge = entry.get("avg_edge", 0)
+            avg_conf = entry.get("safe_avg", "—")
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:8px;padding:15px 18px;'
+                f'margin-bottom:14px;border-left:4px solid #ff5e00;{_glow}">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+                f'<h4 style="color:#ff5e00;margin:0;font-family:Orbitron,sans-serif;">'
+                f'{_star} {_label}</h4>'
+                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 10px;border-radius:4px;'
+                f'font-size:0.8rem;font-weight:700;">SAFE: {avg_conf}/100</span>'
+                f'</div>'
+                f'{picks_html}'
+                f'<div style="margin-top:10px;padding:7px 10px;background:rgba(20,25,43,0.7);border-radius:4px;">'
+                f'<span style="color:#00c8ff;font-size:0.82rem;">💡 {reason_text}</span>'
+                f'</div>'
+                f'<div style="display:flex;gap:18px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
+                f'<span>Combined prob: {combined:.1f}%</span>'
+                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
 
     st.divider()
 
@@ -1356,54 +1387,6 @@ if analysis_results:
     for result in displayed_results:
         display_prop_analysis_card_qds(result)
         st.markdown("---")
-
-    # ── Entry Strategy Matrix ─────────────────────────────────────
-    st.divider()
-    st.markdown("## 🎰 ENTRY STRATEGY MATRIX")
-    st.markdown("Optimized parlay combinations ranked by combined EDGE Score™")
-
-    strategy_entries = _build_entry_strategy(displayed_results)
-    if not strategy_entries:
-        st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
-    else:
-        for entry in strategy_entries:
-            picks_html = ""
-            for pick_str in entry.get("picks", []):
-                parts = pick_str.split(" ", 1)
-                pname = _html.escape(parts[0]) if parts else ""
-                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
-                picks_html += (
-                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
-                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
-                    f'<span style="color:#c0d0e8;">{rest}</span>'
-                    f'</div>'
-                )
-            reasons = entry.get("reasons", [])
-            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
-            avg_conf    = entry.get("safe_avg", "—")
-            combined    = entry.get("combined_prob", 0)
-            avg_edge    = entry.get("avg_edge", 0)
-            num_legs    = entry.get("num_legs", 0)
-            combo_type  = _html.escape(entry.get("combo_type", ""))
-            st.markdown(
-                f'<div style="background:#14192b;border-radius:8px;padding:15px;margin-bottom:15px;'
-                f'border-left:3px solid #ff5e00;">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-                f'<h4 style="color:#ff5e00;margin:0;">🎲 {combo_type}</h4>'
-                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 8px;border-radius:4px;'
-                f'font-size:0.8rem;font-weight:700;">Avg EDGE: {avg_conf}/100</span>'
-                f'</div>'
-                f'{picks_html}'
-                f'<div style="margin-top:10px;padding:8px;background:rgba(20,25,43,0.7);border-radius:4px;">'
-                f'<span style="color:#00c8ff;font-size:0.85rem;">💡 {reason_text}</span>'
-                f'</div>'
-                f'<div style="display:flex;gap:15px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
-                f'<span>Combined prob: {combined:.1f}%</span>'
-                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
-                f'</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()

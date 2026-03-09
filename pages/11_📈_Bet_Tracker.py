@@ -33,6 +33,28 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 # Ensure DB is initialised
 initialize_database()
 
+# ── Auto-resolve bets older than 24 hours on page load ───────
+_auto_resolved_on_load = False
+try:
+    import datetime as _dt
+    _yesterday = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+    _all_bets_check = load_all_bets(limit=500)
+    _pending_old = [
+        b for b in _all_bets_check
+        if not b.get("result") and b.get("bet_date", "") <= _yesterday
+    ]
+    if _pending_old:
+        _dates_to_resolve = sorted({b.get("bet_date", "") for b in _pending_old if b.get("bet_date")})
+        _total_resolved = 0
+        for _d in _dates_to_resolve:
+            _cnt, _ = auto_resolve_bet_results(date_str=_d)
+            _total_resolved += _cnt
+        if _total_resolved > 0:
+            _auto_resolved_on_load = True
+            st.toast(f"🤖 Auto-resolved {_total_resolved} past bet(s) on page load.")
+except Exception as _ar_err:
+    pass  # Auto-resolve on load is best-effort
+
 st.title("📈 Bet Tracker & Performance Predictor")
 st.markdown(
     "Log your picks, mark results, and see forward-looking performance predictions "
@@ -266,7 +288,7 @@ with tab_ai_picks:
     st.subheader("📊 AI Picks — Auto-Logged by SmartAI")
     st.markdown(
         "These bets were automatically logged by the Neural Analysis engine "
-        "for all qualifying picks (edge ≥ minimum threshold)."
+        "for all qualifying picks (edge > 0%)."
     )
 
     all_bets_for_ai = load_all_bets(limit=500)
@@ -284,48 +306,78 @@ with tab_ai_picks:
             "will be logged here automatically."
         )
     else:
-        _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄", None: "⏳", "": "⏳"}
-        ai_display = []
-        for b in ai_bets:
-            res = b.get("result") or ""
-            ai_display.append({
-                "ID":        b.get("bet_id", ""),
-                "Date":      b.get("bet_date", ""),
-                "Player":    b.get("player_name", ""),
-                "Team":      b.get("team", ""),
-                "Stat":      b.get("stat_type", "").title(),
-                "Line":      b.get("prop_line", 0),
-                "Dir":       b.get("direction", ""),
-                "Tier":      b.get("tier", ""),
-                "Conf":      round(b.get("confidence_score", 0), 1),
-                "Edge%":     round(b.get("edge_percentage", 0), 1),
-                "Result":    f"{_RESULT_EMOJI.get(res, '⏳')} {res}" if res else "⏳ Pending",
-                "Actual":    b.get("actual_value", "—"),
-                "Notes":     b.get("notes", ""),
-            })
-
-        st.dataframe(
-            ai_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Line": st.column_config.NumberColumn(format="%.1f"),
-                "Conf": st.column_config.NumberColumn(format="%.1f"),
-                "Edge%": st.column_config.NumberColumn(format="%.1f"),
-            },
-        )
-
-        # Summary metrics for AI picks
+        # ── Overall model accuracy ────────────────────────────────────
         ai_resolved = [b for b in ai_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
         ai_wins     = sum(1 for b in ai_resolved if b.get("result") == "WIN")
+        ai_losses   = sum(1 for b in ai_resolved if b.get("result") == "LOSS")
+        ai_pushes   = sum(1 for b in ai_resolved if b.get("result") == "PUSH")
         ai_total    = len(ai_resolved)
         ai_rate     = round(ai_wins / ai_total * 100, 1) if ai_total > 0 else 0.0
 
-        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1, mc2, mc3, mc4, mc5 = st.columns(5)
         mc1.metric("AI Picks (Total)", len(ai_bets))
         mc2.metric("Resolved",         ai_total)
-        mc3.metric("Wins",             ai_wins)
-        mc4.metric("Win Rate",         f"{ai_rate:.1f}%" if ai_total > 0 else "—")
+        mc3.metric("✅ Wins",          ai_wins)
+        mc4.metric("❌ Losses",        ai_losses)
+        mc5.metric("🎯 Win Rate",      f"{ai_rate:.1f}%" if ai_total > 0 else "—",
+                   help="Model predicted X/Y correctly")
+
+        if ai_total > 0:
+            st.success(
+                f"🎯 **Model accuracy:** Predicted **{ai_wins}/{ai_total}** correctly "
+                f"(**{ai_rate:.1f}%**) — {ai_pushes} push(es)"
+            )
+
+        st.divider()
+
+        # ── Daily performance breakdown ───────────────────────────────
+        _by_date = {}
+        for b in ai_bets:
+            _d = b.get("bet_date", "Unknown")
+            _by_date.setdefault(_d, []).append(b)
+
+        for _date in sorted(_by_date.keys(), reverse=True):
+            _day_bets  = _by_date[_date]
+            _day_res   = [b for b in _day_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
+            _day_wins  = sum(1 for b in _day_res if b.get("result") == "WIN")
+            _day_total = len(_day_res)
+            _day_rate  = round(_day_wins / _day_total * 100, 1) if _day_total > 0 else None
+
+            _day_label = (
+                f"📅 {_date} — {len(_day_bets)} picks"
+                + (f" · {_day_wins}/{_day_total} correct ({_day_rate:.0f}%)" if _day_rate is not None else " · pending")
+            )
+            with st.expander(_day_label, expanded=(_date == sorted(_by_date.keys())[-1])):
+                _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄"}
+                _day_display = []
+                for b in _day_bets:
+                    res = b.get("result") or ""
+                    _day_display.append({
+                        "Player":    b.get("player_name", ""),
+                        "Team":      b.get("team", ""),
+                        "Stat":      b.get("stat_type", "").title(),
+                        "Line":      b.get("prop_line", 0),
+                        "Direction": b.get("direction", ""),
+                        "Tier":      b.get("tier", ""),
+                        "Conf":      round(b.get("confidence_score", 0), 1),
+                        "Edge%":     round(b.get("edge_percentage", 0), 1),
+                        "Result":    f"{_RESULT_EMOJI.get(res, '⏳')} {res}" if res else "⏳ Pending",
+                        "Actual":    b.get("actual_value", "—"),
+                        "Correct?":  (
+                            "✅ Yes" if res == "WIN"
+                            else ("❌ No" if res == "LOSS" else ("🔄 Push" if res == "PUSH" else "—"))
+                        ),
+                    })
+                st.dataframe(
+                    _day_display,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Line":  st.column_config.NumberColumn(format="%.1f"),
+                        "Conf":  st.column_config.NumberColumn(format="%.1f"),
+                        "Edge%": st.column_config.NumberColumn(format="%.1f"),
+                    },
+                )
 
 # ============================================================
 # END SECTION: AI Picks
