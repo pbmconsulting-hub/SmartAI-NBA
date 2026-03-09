@@ -148,43 +148,72 @@ if not NBA_API_AVAILABLE:
 st.subheader("📅 Data Status")
 
 # Load the timestamps from the JSON file
-# BEGINNER NOTE: load_last_updated() reads last_updated.json
-# and returns a dict like {'players': '2026-03-06T14:30:00', ...}
 timestamps = load_last_updated()
 
-# Display status in three columns (one for each data type)
-col_players_status, col_teams_status, col_games_status = st.columns(3)
+# ── Staleness helpers ──────────────────────────────────────────
+def _staleness_badge(timestamp_str: str | None, warn_hours: float = 4.0, error_hours: float = 24.0):
+    """Return (badge_html, age_hours) for a data timestamp."""
+    if not timestamp_str:
+        return '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">NEVER</span>', None
+    try:
+        dt = datetime.datetime.fromisoformat(timestamp_str)
+        age_h = (datetime.datetime.now() - dt).total_seconds() / 3600
+        if age_h < warn_hours:
+            color, label = "#276749", f"FRESH ({age_h:.0f}h ago)"
+            text_color = "#9ae6b4"
+        elif age_h < error_hours:
+            color, label = "#744210", f"AGING ({age_h:.0f}h ago)"
+            text_color = "#fbd38d"
+        else:
+            color, label = "#742a2a", f"STALE ({age_h:.1f}h ago)"
+            text_color = "#feb2b2"
+        badge = f'<span style="background:{color};color:{text_color};padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">{label}</span>'
+        return badge, age_h
+    except Exception:
+        return '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">UNKNOWN</span>', None
 
-with col_players_status:
-    # Show when player stats were last updated
-    player_timestamp = timestamps.get("players", None)  # None = never updated
-    if player_timestamp:
-        # Parse the ISO format string back into a datetime object
-        dt = datetime.datetime.fromisoformat(player_timestamp)
-        # Format as human-readable string
-        formatted_time = dt.strftime("%b %d, %Y at %I:%M %p")
-        st.success(f"✅ **Players**\nLast updated: {formatted_time}")
-    else:
-        # No timestamp = using sample data
-        st.warning("⚠️ **Players**\nUsing sample data")
 
-with col_teams_status:
-    # Show when team stats were last updated
-    team_timestamp = timestamps.get("teams", None)
-    if team_timestamp:
-        dt = datetime.datetime.fromisoformat(team_timestamp)
-        formatted_time = dt.strftime("%b %d, %Y at %I:%M %p")
-        st.success(f"✅ **Teams**\nLast updated: {formatted_time}")
+def _health_bar(age_h: float | None, max_age: float = 24.0) -> str:
+    """Return a colored health bar HTML string."""
+    if age_h is None:
+        pct, color = 0, "#742a2a"
     else:
-        st.warning("⚠️ **Teams**\nUsing sample data")
+        freshness = max(0.0, 1.0 - age_h / max_age)
+        pct = round(freshness * 100)
+        color = "#00ff9d" if pct > 70 else ("#ffcc00" if pct > 30 else "#ff4444")
+    return (
+        f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
+        f'<div style="height:6px;width:{pct}%;background:{color};border-radius:3px;'
+        f'transition:width 0.4s ease;"></div>'
+        f'</div>'
+        f'<div style="font-size:0.72rem;color:#b0bec5;">Health: {pct}%</div>'
+    )
 
-with col_games_status:
-    # Show tonight's game count from session state
-    todays_games = st.session_state.get("todays_games", [])  # Get from session
-    if todays_games:
-        st.success(f"✅ **Tonight's Games**\n{len(todays_games)} game(s) loaded")
-    else:
-        st.warning("⚠️ **Tonight's Games**\nNo games loaded yet")
+# ── Data health cards ──────────────────────────────────────────
+todays_games = st.session_state.get("todays_games", [])
+
+_data_sources = [
+    ("👤 Players",       timestamps.get("players"),  6.0,  "player stats / game logs"),
+    ("🏟️ Teams",        timestamps.get("teams"),     12.0, "team stats / defensive ratings"),
+    ("🏀 Tonight's Games", None if not todays_games else datetime.datetime.now().isoformat(), 4.0, f"{len(todays_games)} game(s) in session"),
+    ("🏥 Injuries",      timestamps.get("injuries"),  4.0,  "injury report / roster status"),
+]
+
+_health_cols = st.columns(4)
+for _ci, (_label, _ts, _warn_h, _desc) in enumerate(_data_sources):
+    with _health_cols[_ci]:
+        badge_html, age_h = _staleness_badge(_ts, warn_hours=_warn_h)
+        health_html = _health_bar(age_h, max_age=24.0)
+        st.markdown(
+            f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+            f'border:1px solid rgba(0,240,255,0.15);">'
+            f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">{_label}</div>'
+            f'{badge_html}'
+            f'{health_html}'
+            f'<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">{_desc}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 st.divider()
 
