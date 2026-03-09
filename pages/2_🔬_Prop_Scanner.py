@@ -395,10 +395,13 @@ if _display_props_enriched:
             st.session_state["analysis_results"] = []
             st.rerun()
     with col_load_sample:
-        if st.button("📦 Load Sample Props"):
-            sample_props = load_props_data()
-            save_props_to_session(sample_props, st.session_state)
-            st.success(f"Loaded {len(sample_props)} sample props!")
+        if st.button("📦 Load Props from CSV"):
+            saved_props = load_props_data()
+            if saved_props:
+                save_props_to_session(saved_props, st.session_state)
+                st.success(f"Loaded {len(saved_props)} props from props.csv!")
+            else:
+                st.info("No props found. Go to **📡 Data Feed** to fetch live data first.")
             st.rerun()
 
     # Roster validation table

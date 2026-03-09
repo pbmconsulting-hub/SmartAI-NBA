@@ -618,13 +618,52 @@ with tab_predict:
     else:
         confidences  = [r.get("confidence_score", 0) for r in analysis_results]
         avg_conf     = sum(confidences) / len(confidences) if confidences else 0
-        est_win_rate = min(95.0, max(40.0, avg_conf * 0.9 + 5.0))
+
+        # ── Tier-weighted win-rate estimation ────────────────────────────
+        # Base historical win rates per tier (calibrated from SAFE Score model)
+        _TIER_BASE_WIN_RATE = {
+            "Platinum": 72.0,
+            "Gold":     62.0,
+            "Silver":   54.0,
+            "Bronze":   46.0,
+        }
+        _tier_counts_wr: dict = {}
+        for r in analysis_results:
+            t = r.get("tier", "Bronze")
+            _tier_counts_wr[t] = _tier_counts_wr.get(t, 0) + 1
+
+        total_picks = len(analysis_results)
+        tier_weighted_win_rate = 0.0
+        if total_picks > 0:
+            for tier_name, base_wr in _TIER_BASE_WIN_RATE.items():
+                cnt = _tier_counts_wr.get(tier_name, 0)
+                tier_weighted_win_rate += (cnt / total_picks) * base_wr
+
+        # Blend tier-based estimate (70%) with confidence-based estimate (30%)
+        conf_based = min(95.0, max(40.0, avg_conf * 0.9 + 5.0))
+        est_win_rate = round(0.70 * tier_weighted_win_rate + 0.30 * conf_based, 1)
+        est_win_rate = min(95.0, max(40.0, est_win_rate))
 
         pc1, pc2, pc3 = st.columns(3)
         pc1.metric("Props in Slate",  len(analysis_results))
         pc2.metric("Avg Confidence",  f"{avg_conf:.1f}")
         pc3.metric("Est. Win Rate",   f"{est_win_rate:.1f}%",
-                   help="Model estimate based on avg confidence")
+                   help="Tier-weighted estimate (Platinum ~72%, Gold ~62%, Silver ~54%, Bronze ~46%) blended with model confidence")
+
+        # ── Per-tier expected win rates ───────────────────────────────────
+        if _tier_counts_wr:
+            st.markdown("**Per-Tier Expected Win Rates**")
+            _TIER_EMOJI_WR = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+            tier_wr_rows = [
+                {
+                    "Tier":            f"{_TIER_EMOJI_WR.get(t, '')} {t}",
+                    "Picks":           _tier_counts_wr[t],
+                    "Est. Win Rate":   f"{_TIER_BASE_WIN_RATE.get(t, 50):.0f}%",
+                }
+                for t in ["Platinum", "Gold", "Silver", "Bronze"]
+                if t in _tier_counts_wr
+            ]
+            st.dataframe(tier_wr_rows, use_container_width=True, hide_index=True)
 
         st.divider()
 

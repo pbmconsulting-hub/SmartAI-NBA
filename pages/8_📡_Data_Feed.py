@@ -38,14 +38,8 @@ from data.live_data_fetcher import (
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
-# Import nba_api injury fetcher for the injury report refresh button.
-# Available whenever nba_api is installed (listed in requirements.txt).
-_web_scraper_available = False
-try:
-    from data.web_scraper import fetch_all_injury_data  # noqa: F401
-    _web_scraper_available = True
-except ImportError:
-    pass
+# RosterEngine is the single source for injury data (replaces web_scraper/web_scrapers).
+# It is available whenever nba_api is installed — set after the nba_api availability check below.
 
 # ============================================================
 # SECTION: Page Setup
@@ -78,8 +72,8 @@ st.markdown(get_education_box_html(
     10x faster than Full Update — use this before each session.<br><br>
     <strong>Full Update</strong>: Fetches all 450+ NBA players. Takes 5-10 minutes. 
     Use once a week to keep historical averages current.<br><br>
-    <strong>Live vs Sample data</strong>: Live data = real current season stats from NBA.com. 
-    Sample data = pre-loaded example data for demonstration.<br><br>
+    <strong>Live data</strong>: Real current season stats from NBA.com, saved to players.csv and teams.csv. 
+    Fetch live data before each session for accurate predictions.<br><br>
     <strong>Rate limiting</strong>: We wait 1.5 seconds between API calls to respect NBA.com's limits.
     """
 ), unsafe_allow_html=True)
@@ -137,6 +131,9 @@ if not NBA_API_AVAILABLE:
 # ============================================================
 # END SECTION: Check if nba_api is Installed
 # ============================================================
+
+# RosterEngine is available when nba_api is installed (guaranteed at this point).
+_roster_engine_available = True
 
 
 # ============================================================
@@ -346,7 +343,7 @@ st.markdown("""
 
 injury_btn_col1, injury_btn_col2 = st.columns([1, 3])
 with injury_btn_col1:
-    _injury_btn_disabled = not _web_scraper_available
+    _injury_btn_disabled = not _roster_engine_available
     if st.button(
         "🔄 Refresh Injury Report",
         use_container_width=True,
@@ -356,7 +353,7 @@ with injury_btn_col1:
         st.session_state["update_action"] = "injury_report"
 
 with injury_btn_col2:
-    if _web_scraper_available:
+    if _roster_engine_available:
         # Show last-fetched timestamp if available
         _last_scraped = st.session_state.get("injury_report_last_scraped")
         if _last_scraped:
@@ -599,7 +596,7 @@ if current_action:
                     })
 
                 st.dataframe(players_display, use_container_width=True, hide_index=True)
-                st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to sample_players.csv")
+                st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
         else:
             # Fetch failed
             st.error(
@@ -724,7 +721,7 @@ if current_action:
             st.metric(
                 label="👤 Players Updated",
                 value=len(updated_players),
-                help="Players now in sample_players.csv"
+                help="Players now in players.csv"
             )
 
         if teams_ok:
@@ -765,14 +762,10 @@ if current_action:
 
         with st.spinner("Fetching injury data from NBA API…"):
             try:
-                from data.web_scraper import fetch_all_injury_data
-                scraped_data = fetch_all_injury_data()
-            except ImportError:
-                scraped_data = {}
-                st.error(
-                    "❌ **Missing dependencies.** "
-                    "Run `pip install nba_api` then restart the app."
-                )
+                from data.roster_engine import RosterEngine as _RE
+                _re = _RE()
+                _re.refresh()
+                scraped_data = _re.get_injury_report()
             except Exception as scrape_exc:
                 scraped_data = {}
                 st.error(f"❌ **Fetch failed:** {scrape_exc}")
@@ -931,10 +924,9 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     ---
 
-    **Q: I see 'sample data' even after updating. Why?**
-    A: The sample_players.csv file gets **overwritten** with live data when you
-    click Update. If you still see "sample data" in the status, try refreshing
-    the page or running the update again.
+    **Q: I see 'no data yet' even after updating. Why?**
+    A: The players.csv file gets written when you click Update. If you still see "no data"
+    in the status, try refreshing the page or running the update again.
     """)
 
 # ============================================================

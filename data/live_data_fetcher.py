@@ -30,7 +30,7 @@ from pathlib import Path  # Modern, cross-platform file path handling
 DATA_DIRECTORY = Path(__file__).parent
 
 # Paths to each CSV file we will write
-PLAYERS_CSV_PATH = DATA_DIRECTORY / "sample_players.csv"       # Player stats output
+PLAYERS_CSV_PATH = DATA_DIRECTORY / "players.csv"             # Player stats output
 TEAMS_CSV_PATH = DATA_DIRECTORY / "teams.csv"                   # Team stats output
 DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"  # Defensive ratings output
 
@@ -1073,18 +1073,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         else:
             if not injury_data:
                 try:
-                    from data.web_scraper import fetch_all_injury_data
-                    scraped_injuries = fetch_all_injury_data()
-                    if scraped_injuries:
-                        injury_data = scraped_injuries
-                except Exception as _inj_err:
-                    print(f"  Injury fetch (nba_api) failed in fetch_todays_players_only: {_inj_err}")
-                    try:
-                        if INJURY_STATUS_JSON_PATH.exists():
-                            with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                                injury_data = json.load(_jf)
-                    except Exception as _cache_err:
-                        print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+                    if INJURY_STATUS_JSON_PATH.exists():
+                        with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
+                            injury_data = json.load(_jf)
+                except Exception as _cache_err:
+                    print(f"  WARNING: Cached injury data unavailable: {_cache_err}")
 
         if injury_data:
             before_count = len(formatted_players)
@@ -1524,8 +1517,10 @@ def fetch_player_stats(progress_callback=None):
         # before writing to CSV.
         # --------------------------------------------------------
         try:
-            from data.web_scraper import fetch_all_injury_data
-            scraped_injuries = fetch_all_injury_data()
+            from data.roster_engine import RosterEngine as _RE
+            _inj_engine = _RE()
+            _inj_engine.refresh()
+            scraped_injuries = _inj_engine.get_injury_report()
             if scraped_injuries:
                 before_count = len(formatted_players)
                 formatted_players = [
@@ -1541,9 +1536,9 @@ def fetch_player_stats(progress_callback=None):
                         f"from player stats ({len(formatted_players)} remain)"
                     )
         except Exception as _inj_err:
-            # nba_api injury fetch failed — fall back to the cached injury_status.json
+            # RosterEngine injury fetch failed — fall back to the cached injury_status.json
             # written by a previous fetch_player_injury_status() run.
-            print(f"  Injury fetch (nba_api) failed in fetch_player_stats: {_inj_err}")
+            print(f"  Injury fetch (RosterEngine) failed in fetch_player_stats: {_inj_err}")
             try:
                 cached_injuries = {}
                 if INJURY_STATUS_JSON_PATH.exists():
@@ -1564,7 +1559,7 @@ def fetch_player_stats(progress_callback=None):
                     )
                 else:
                     print(
-                        "  WARNING: Web scraper failed and no cached injury data "
+                        "  WARNING: RosterEngine failed and no cached injury data "
                         "available — no injury filter applied"
                     )
             except Exception as _cache_err:
@@ -1577,7 +1572,7 @@ def fetch_player_stats(progress_callback=None):
         # Step 6: Write the CSV file
         # --------------------------------------------------------
 
-        # Define the column order (must match sample_players.csv exactly)
+        # Define the column order (must match players.csv exactly)
         fieldnames = [
             "player_id", "name", "team", "position", "minutes_avg",
             "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
@@ -2518,14 +2513,10 @@ def fetch_player_injury_status(todays_games=None):
         # --------------------------------------------------------
         print("fetch_player_injury_status: Layer 5 — nba_api injury data (via RosterEngine)")
         try:
-            # Prefer the consolidated multi-source fetcher (web_scrapers.py);
-            # fall back to the original single-module fetcher if unavailable.
-            try:
-                from data.web_scrapers import fetch_multi_source_injury_status
-                scraped = fetch_multi_source_injury_status(todays_games=todays_games)
-            except ImportError:
-                from data.web_scraper import fetch_all_injury_data
-                scraped = fetch_all_injury_data()
+            from data.roster_engine import RosterEngine as _RE5
+            _engine5 = _RE5()
+            _engine5.refresh()
+            scraped = _engine5.get_injury_report()
 
             if scraped:
                 overrides = 0

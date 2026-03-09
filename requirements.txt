@@ -1,5 +1,2 @@
 streamlit
 nba_api
-requests
-beautifulsoup4
-lxml
