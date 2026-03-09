@@ -1069,17 +1069,17 @@ if run_analysis:
 
         if stat_type in COMBO_STAT_TYPES:
             # Build component projections from the per-stat projection outputs
-            _components = COMBO_STATS.get(stat_type, [])
+            _combo_stat_components = COMBO_STATS.get(stat_type, [])
             _comp_proj = {
                 s: projection_result.get(
                     f"projected_{s}",
                     float(player_data.get(f"{s}_avg", 0) or 0),
                 )
-                for s in _components
+                for s in _combo_stat_components
             }
             _comp_std = {
                 s: get_stat_standard_deviation(player_data, s)
-                for s in _components
+                for s in _combo_stat_components
             }
             simulation_output = simulate_combo_stat(
                 component_projections=_comp_proj,
@@ -1382,6 +1382,23 @@ if analysis_results:
         key=lambda r: r.get("confidence_score", 0),
         reverse=True,
     )
+
+    # ── Deduplicate by (player_name, stat_type, line, direction) ──
+    # Prevents duplicate player cards and duplicate Streamlit element keys
+    # when the same prop appears multiple times (e.g. from multiple platforms).
+    _seen_result_keys: set = set()
+    _deduped: list = []
+    for _r in displayed_results:
+        _rkey = (
+            _r.get("player_name", ""),
+            _r.get("stat_type", ""),
+            _r.get("line", 0),
+            _r.get("direction", "OVER"),
+        )
+        if _rkey not in _seen_result_keys:
+            _seen_result_keys.add(_rkey)
+            _deduped.append(_r)
+    displayed_results = _deduped
 
     # ── Summary metrics ────────────────────────────────────────
     total_analyzed   = len(analysis_results)
