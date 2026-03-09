@@ -517,60 +517,33 @@ def fetch_multi_source_injury_status(todays_games=None):
 
 def fetch_verified_rosters(team_abbrevs, todays_games=None):
     """
-    Fetch rosters for a list of team abbreviations using nba_api.
+    Fetch rosters for a list of team abbreviations via RosterEngine.
 
-    Primary source: nba_api CommonTeamRoster (official, always free)
-    Two-way / G-League assigned players are excluded automatically using
-    the PLAYER_TYPE and HOW_ACQUIRED columns from the roster endpoint.
+    Delegates to RosterEngine which uses nba_api CommonTeamRoster as the
+    authoritative source.  Two-way / G-League assigned players are excluded
+    automatically by RosterEngine's injury pipeline.
 
     Args:
         team_abbrevs (list[str]): Team abbreviations, e.g. ["LAL", "BOS"]
-        todays_games (list|None): Tonight's games (optional context).
+        todays_games (list|None): Tonight's games (optional, unused — kept for
+                                  backward-compatibility).
 
     Returns:
         dict: {team_abbrev: [player_name, ...]}
               Two-way / G-League assigned players are excluded.
     """
-    verified = {}
-
     try:
-        from nba_api.stats.endpoints import CommonTeamRoster
-        from nba_api.stats.static import teams as nba_static_teams
-        import time as _time
-
-        all_nba_teams = {t["abbreviation"]: t["id"] for t in nba_static_teams.get_teams()}
-
+        from data.roster_engine import RosterEngine
+        engine = RosterEngine()
+        engine.refresh(list(team_abbrevs or []))
+        verified = {}
         for abbrev in (team_abbrevs or []):
-            team_id = all_nba_teams.get(abbrev)
-            if not team_id:
-                continue
-            try:
-                _time.sleep(1.0)  # respect nba_api rate limits
-                roster_resp = CommonTeamRoster(team_id=team_id)
-                roster_df = roster_resp.get_data_frames()[0]
-
-                active_players = []
-                for _, row in roster_df.iterrows():
-                    player_name = row.get("PLAYER", "")
-                    if not player_name:
-                        continue
-                    # Skip two-way / G-League assigned players
-                    player_type  = str(row.get("PLAYER_TYPE",  "") or "").lower()
-                    how_acquired = str(row.get("HOW_ACQUIRED", "") or "").lower()
-                    if "two-way" in player_type or "two-way" in how_acquired:
-                        print(f"  fetch_verified_rosters: skipping two-way {player_name} ({abbrev})")
-                        continue
-                    active_players.append(player_name)
-
-                verified[abbrev] = active_players
-                print(f"fetch_verified_rosters: {abbrev} → {len(active_players)} players via nba_api")
-            except Exception as exc:
-                print(f"fetch_verified_rosters: nba_api failed for {abbrev}: {exc}")
-                verified[abbrev] = []
-    except ImportError:
-        print("fetch_verified_rosters: nba_api not available")
-
-    return verified
+            verified[abbrev] = engine.get_active_roster(abbrev)
+            print(f"fetch_verified_rosters: {abbrev} → {len(verified[abbrev])} players via RosterEngine")
+        return verified
+    except Exception as exc:
+        print(f"fetch_verified_rosters: RosterEngine failed: {exc}")
+        return {abbrev: [] for abbrev in (team_abbrevs or [])}
 
 # ============================================================
 # END SECTION: Consolidated Roster Fetcher

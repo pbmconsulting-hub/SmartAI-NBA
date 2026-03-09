@@ -10,6 +10,7 @@ import streamlit as st  # Main UI framework
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
+import streamlit.components.v1 as _st_components  # For rendering complex HTML
 
 # Import our engine modules
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
@@ -314,7 +315,37 @@ def _build_entry_strategy(results):
     return entries
 
 
-def _render_qds_full_breakdown_html(result):
+def _estimate_breakdown_height(result):
+    """Estimate the pixel height needed to display the full breakdown block.
+
+    Used to size the st.components.v1.html() iframe without clipping content.
+
+    Args:
+        result (dict): Full analysis result dict from the simulation loop.
+
+    Returns:
+        int: Estimated height in pixels.
+    """
+    over_forces  = result.get("forces", {}).get("over_forces",  [])
+    under_forces = result.get("forces", {}).get("under_forces", [])
+    breakdown    = result.get("score_breakdown", {}) or {}
+    explanation  = result.get("explanation") or {}
+    avoid        = result.get("should_avoid", False) and result.get("avoid_reasons")
+
+    base              = 160   # header + distribution grid + padding
+    forces_height     = 80 + 40 * max(len(over_forces), len(under_forces), 1)
+    avoid_height      = 50 if avoid else 0
+    breakdown_height  = (60 + 35 * len(breakdown)) if breakdown else 0
+    _explain_keys     = [
+        "average_vs_line", "matchup_explanation", "pace_explanation",
+        "home_away_explanation", "rest_explanation", "vegas_explanation",
+    ]
+    explain_height    = 70 * sum(1 for k in _explain_keys if explanation.get(k))
+
+    return base + forces_height + avoid_height + breakdown_height + explain_height + 30
+
+
+
     """Generate QDS-styled HTML for the full breakdown section.
 
     Uses the same colour palette as the Game Report's QDS dark-card CSS:
@@ -439,7 +470,6 @@ def _render_qds_full_breakdown_html(result):
   </div>
   <div style="padding:12px 15px 15px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
 
-    <!-- Distribution grid -->
     <div style="margin-bottom:15px;">
       <h4 style="color:#ff5e00;font-size:0.9rem;margin-bottom:8px;">📊 Distribution</h4>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
@@ -462,7 +492,6 @@ def _render_qds_full_breakdown_html(result):
       </div>
     </div>
 
-    <!-- Forces grid (2 columns side by side) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">
       <div style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;
           border-left:3px solid #00f0ff;">
@@ -588,7 +617,11 @@ def display_prop_analysis_card_qds(result):
         st.rerun()
 
     # ── Full Breakdown (QDS-styled HTML, matching Game Report design) ─
-    st.markdown(_render_qds_full_breakdown_html(result), unsafe_allow_html=True)
+    # Rendered via st.components.v1.html() to ensure complex inline-styled
+    # HTML (CSS grid, flexbox, custom colour palette) is reliably displayed.
+    _breakdown_html = _render_qds_full_breakdown_html(result)
+    _breakdown_height = _estimate_breakdown_height(result)
+    _st_components.html(_breakdown_html, height=_breakdown_height, scrolling=False)
 
 
 # ============================================================

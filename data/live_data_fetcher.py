@@ -756,8 +756,8 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
     Instead of pulling all ~500 NBA players, this function:
     1. Identifies the teams playing today from todays_games
-    2. Uses CommonTeamRoster to get the CURRENT roster for each team
-       (reflects all trades and signings — no stale player assignments)
+    2. Uses RosterEngine (backed by nba_api CommonTeamRoster) to get the
+       CURRENT roster for each team (reflects all trades and signings)
     3. Fetches PlayerGameLog for each active player to get recent stats
        and calculate standard deviations
 
@@ -766,20 +766,17 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
     Args:
         todays_games (list of dict): Tonight's games from fetch_todays_games()
         progress_callback (callable, optional): Called with (current, total, msg)
-        precomputed_injury_map (dict, optional): Pre-fetched injury map from
-            fetch_player_injury_status().  When supplied, this is used directly
-            for the Step 5 injury filter instead of calling the web scraper,
-            ensuring the most accurate data is applied before the CSV is written.
+        precomputed_injury_map (dict, optional): Unused — kept for backward
+            compatibility.  RosterEngine now supplies the injury data directly.
 
     Returns:
         bool: True if successful, False if the fetch failed.
     """
     try:
-        from nba_api.stats.endpoints import commonteamroster
         from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import teams as nba_teams_static
+        from data.roster_engine import RosterEngine
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        print("ERROR: nba_api or roster_engine is not available")
         return False
 
     if not todays_games:
@@ -802,76 +799,37 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             progress_callback(0, 10, f"Found {len(playing_team_abbrevs)} teams playing today. Fetching rosters...")
 
         # --------------------------------------------------------
-        # Step 2: Build a team abbreviation → team ID mapping from nba_api
+        # Steps 2-3: Use RosterEngine to fetch current rosters via
+        # nba_api CommonTeamRoster — the single authoritative source.
+        # Two-way / G-League players are flagged automatically.
         # --------------------------------------------------------
-        all_nba_teams = nba_teams_static.get_teams()
-        team_abbrev_to_id = {}
-        for team in all_nba_teams:
-            abbrev = team.get("abbreviation", "")
-            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
-            team_abbrev_to_id[abbrev] = team.get("id")
+        _roster_engine = RosterEngine()
+        _roster_engine.refresh(list(playing_team_abbrevs))
 
-        # --------------------------------------------------------
-        # Step 3: Fetch current roster for each playing team
-        # --------------------------------------------------------
         all_roster_players = []  # Will hold (player_id, player_name, team_abbrev, position)
 
-        teams_fetched = 0
         for abbrev in sorted(playing_team_abbrevs):
-            team_id = team_abbrev_to_id.get(abbrev)
-            if not team_id:
-                print(f"  Could not find team ID for {abbrev} — skipping")
+            if progress_callback:
+                progress_callback(1, 10, f"Processing roster for {abbrev}...")
+
+            details = _roster_engine.get_full_roster_details(abbrev)
+            if not details:
+                print(f"  No roster details for {abbrev} from RosterEngine")
                 continue
 
-            if progress_callback:
-                progress_callback(1 + teams_fetched, 10, f"Fetching current roster for {abbrev}...")
+            for entry in details:
+                player_id   = entry.get("player_id")
+                player_name = entry.get("player_name", "")
+                position    = entry.get("position", "SF")
+                if player_id and player_name:
+                    all_roster_players.append({
+                        "player_id":   player_id,
+                        "player_name": player_name,
+                        "team":        abbrev,
+                        "position":    position,
+                    })
 
-            try:
-                roster_endpoint = commonteamroster.CommonTeamRoster(
-                    team_id=team_id,
-                )
-                roster_df = roster_endpoint.get_data_frames()[0]
-                roster_rows = roster_df.to_dict("records")
-                time.sleep(API_DELAY_SECONDS)
-
-                for player_row in roster_rows:
-                    player_id = player_row.get("PLAYER_ID")
-                    player_name = player_row.get("PLAYER", "")
-                    position = player_row.get("POSITION", "")
-
-                    # ── Filter out two-way / G-League assigned players ────────
-                    # CommonTeamRoster includes two-way players on G-League
-                    # assignment who won't play in tonight's NBA game.
-                    player_type  = str(player_row.get("PLAYER_TYPE",  "") or "").lower()
-                    how_acquired = str(player_row.get("HOW_ACQUIRED", "") or "").lower()
-                    if (player_type and "two-way" in player_type) or (
-                        how_acquired and "two-way" in how_acquired
-                    ):
-                        print(f"  Skipping two-way player: {player_name}")
-                        continue
-
-                    # Normalize position
-                    position_map = {
-                        "G": "PG", "F": "SF", "C": "C",
-                        "G-F": "SF", "F-G": "SG", "F-C": "PF", "C-F": "PF",
-                        "PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF",
-                        "": "SF",
-                    }
-                    mapped_position = position_map.get(position, position if position else "SF")
-
-                    if player_id and player_name:
-                        all_roster_players.append({
-                            "player_id": player_id,
-                            "player_name": player_name,
-                            "team": abbrev,
-                            "position": mapped_position,
-                        })
-
-                teams_fetched += 1
-                print(f"  {abbrev}: {len(roster_rows)} players on roster")
-
-            except Exception as roster_error:
-                print(f"  Error fetching roster for {abbrev}: {roster_error}")
+            print(f"  {abbrev}: {len(details)} players on roster")
 
         print(f"Total players on today's rosters: {len(all_roster_players)}")
 
@@ -1037,23 +995,15 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
         # --------------------------------------------------------
         # Step 5: Filter out injured / inactive players
-        # Use precomputed_injury_map when available (passed from
-        # fetch_all_todays_data after injury detection runs first).
-        # Fall back to web scraper → cached JSON when not available.
-        # --------------------------------------------------------
-        # ── Step 5: Injury filter via RosterEngine (primary) ──────────
-        # Use RosterEngine as the authoritative multi-source injury pipeline.
+        # Reuse the RosterEngine already refreshed in steps 2-3.
         # Fall back to precomputed_injury_map → web_scraper → cached JSON.
-        injury_data = precomputed_injury_map or {}
-        _engine = None
-        try:
-            from data.roster_engine import RosterEngine
-            _engine = RosterEngine()
-            _engine.refresh(list(playing_team_abbrevs))
-            injury_data = _engine.get_injury_report()
-            print(f"  RosterEngine supplied {len(injury_data)} injury entries")
-        except Exception as _re_err:
-            print(f"  RosterEngine failed: {_re_err} — falling back to legacy sources")
+        # --------------------------------------------------------
+        injury_data = _roster_engine.get_injury_report()
+        print(f"  RosterEngine supplied {len(injury_data)} injury entries")
+
+        if not injury_data:
+            # Fallback chain when RosterEngine has no injury data
+            injury_data = precomputed_injury_map or {}
             if not injury_data:
                 try:
                     from data.web_scraper import fetch_all_injury_data
@@ -1071,22 +1021,13 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
         if injury_data:
             before_count = len(formatted_players)
-            # Cross-check each player against RosterEngine.is_player_active() when available,
-            # otherwise fall back to the simpler status-key lookup.
-            if _engine is not None:
-                filtered = []
-                for p in formatted_players:
-                    is_active, _reason = _engine.is_player_active(p["name"])
-                    if is_active:
-                        filtered.append(p)
-                formatted_players = filtered
-            else:
-                formatted_players = [
-                    p for p in formatted_players
-                    if injury_data.get(
-                        p["name"].lower().strip(), {}
-                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                ]
+            # Cross-check each player against RosterEngine.is_player_active().
+            filtered = []
+            for p in formatted_players:
+                is_active, _reason = _roster_engine.is_player_active(p["name"])
+                if is_active:
+                    filtered.append(p)
+            formatted_players = filtered
             removed_count = before_count - len(formatted_players)
             if removed_count:
                 print(
@@ -2146,8 +2087,9 @@ def fetch_all_todays_data(progress_callback=None):
 
 # ============================================================
 # SECTION: Team Roster Cache
-# In-memory cache mapping team abbreviation → active player list.
-# Populated by fetch_active_rosters() to avoid repeated API calls.
+# Delegated to RosterEngine — the single source of truth for
+# roster and injury data.  TEAM_ROSTER_CACHE is kept for
+# backward-compatibility but is populated via RosterEngine.
 # ============================================================
 
 # Module-level cache (lives as long as the Python process runs)
@@ -2156,10 +2098,11 @@ TEAM_ROSTER_CACHE = {}  # {team_abbrev: [player_name, ...]}
 
 def fetch_active_rosters(team_abbrevs=None, progress_callback=None):
     """
-    Fetch current active rosters for the given teams and populate TEAM_ROSTER_CACHE.
+    Fetch current active rosters for the given teams via RosterEngine.
 
-    Uses CommonTeamRoster to get the up-to-date roster for each team,
-    reflecting all recent trades and signings.
+    Delegates to RosterEngine which calls nba_api CommonTeamRoster
+    as the authoritative source.  Results are also stored in the
+    module-level TEAM_ROSTER_CACHE for backward-compatibility.
 
     Args:
         team_abbrevs (list of str, optional): Team abbreviations to fetch.
@@ -2170,38 +2113,30 @@ def fetch_active_rosters(team_abbrevs=None, progress_callback=None):
         dict: {team_abbrev: [player_name, ...]} — the populated cache.
     """
     try:
-        from nba_api.stats.endpoints import commonteamroster
+        from data.roster_engine import RosterEngine
         from nba_api.stats.static import teams as nba_teams_static
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        print("ERROR: nba_api or roster_engine is not available")
         return TEAM_ROSTER_CACHE
 
-    all_nba_teams = nba_teams_static.get_teams()
-    team_abbrev_to_id = {
-        NBA_API_ABBREV_TO_OURS.get(t["abbreviation"], t["abbreviation"]): t["id"]
-        for t in all_nba_teams
-    }
-
     if team_abbrevs is None:
-        team_abbrevs = list(team_abbrev_to_id.keys())
+        all_nba_teams = nba_teams_static.get_teams()
+        team_abbrevs = [
+            NBA_API_ABBREV_TO_OURS.get(t["abbreviation"], t["abbreviation"])
+            for t in all_nba_teams
+        ]
 
     total = len(team_abbrevs)
+    if progress_callback:
+        progress_callback(0, total, "Initialising RosterEngine…")
+
+    engine = RosterEngine()
+    engine.refresh(list(team_abbrevs))
+
     for idx, abbrev in enumerate(sorted(team_abbrevs)):
         if progress_callback:
-            progress_callback(idx, total, f"Fetching roster for {abbrev}...")
-
-        team_id = team_abbrev_to_id.get(abbrev)
-        if not team_id:
-            continue
-
-        try:
-            roster_endpoint = commonteamroster.CommonTeamRoster(team_id=team_id)
-            roster_df = roster_endpoint.get_data_frames()[0]
-            player_names = roster_df["PLAYER"].tolist()
-            TEAM_ROSTER_CACHE[abbrev] = player_names
-            time.sleep(API_DELAY_SECONDS)
-        except Exception as err:
-            print(f"  Could not fetch roster for {abbrev}: {err}")
+            progress_callback(idx, total, f"Processing roster for {abbrev}…")
+        TEAM_ROSTER_CACHE[abbrev] = engine.get_active_roster(abbrev)
 
     return TEAM_ROSTER_CACHE
 

@@ -775,14 +775,18 @@ def find_players_by_team(players_list, team_abbrev):
 
 def get_todays_active_players(players_list, todays_games):
     """
-    Return only players whose team is playing today.
+    Return only players whose team is playing today and who are not injured.
+
+    Uses RosterEngine to apply injury/availability filtering in addition to
+    the team-based filter so that Out/IR/Doubtful players are excluded.
+    Falls back to team-only filtering when RosterEngine is unavailable.
 
     Args:
         players_list (list of dict): Loaded player data
         todays_games (list of dict): Tonight's games (from session state)
 
     Returns:
-        list of dict: Players on teams playing today
+        list of dict: Active players on teams playing today
     """
     if not todays_games:
         return players_list  # Fall back to all players if no games set
@@ -794,7 +798,22 @@ def get_todays_active_players(players_list, todays_games):
         playing_teams.add(game.get("away_team", "").upper())
     playing_teams.discard("")
 
-    return [p for p in players_list if p.get("team", "").upper() in playing_teams]
+    # Step 1: Filter by team membership
+    todays_players = [p for p in players_list if p.get("team", "").upper() in playing_teams]
+
+    # Step 2: Apply injury filter via RosterEngine
+    try:
+        from data.roster_engine import RosterEngine
+        engine = RosterEngine()
+        engine.refresh(list(playing_teams))
+        todays_players = [
+            p for p in todays_players
+            if engine.is_player_active(p.get("name", p.get("player_name", "")))[0]
+        ]
+    except Exception as _re_err:
+        print(f"get_todays_active_players: RosterEngine unavailable ({_re_err}) — using team filter only")
+
+    return todays_players
 
 
 def get_player_status(player_name, status_map):
