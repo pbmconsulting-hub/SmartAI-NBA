@@ -38,9 +38,8 @@ from data.live_data_fetcher import (
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
-# Import web scraper for the Layer 5 injury report refresh button.
-# Import lazily inside the button handler to avoid ImportError when
-# requests/beautifulsoup4 are not yet installed.
+# Import nba_api injury fetcher for the injury report refresh button.
+# Available whenever nba_api is installed (listed in requirements.txt).
 _web_scraper_available = False
 try:
     from data.web_scraper import fetch_all_injury_data  # noqa: F401
@@ -308,11 +307,10 @@ st.markdown("---")
 # ─── Injury Report Section ──────────────────────────────────
 st.markdown("""
 <div style="background:linear-gradient(135deg,#1a0a2e,#0f1a2e); border:1px solid #c800ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
-  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report (Layer 5)</div>
+  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Scrapes <strong>RotoWire</strong> and the <strong>NBA.com official injury report</strong> for
-    real-time GTD/Out/Doubtful designations, specific injury details, and expected return dates.
-    Overrides stale nba_api data when authoritative sources report a player as injured or inactive.
+    Fetches live injury designations from the <strong>official NBA API</strong> —
+    real-time GTD/Out/Doubtful status, specific injury details, and expected return dates.
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -323,23 +321,23 @@ with injury_btn_col1:
     if st.button(
         "🔄 Refresh Injury Report",
         use_container_width=True,
-        help="Scrape RotoWire + NBA.com for live GTD/Out/injury data (requires requests & beautifulsoup4)",
+        help="Fetch live GTD/Out/injury data from the official NBA API (requires nba_api)",
         disabled=_injury_btn_disabled,
     ):
         st.session_state["update_action"] = "injury_report"
 
 with injury_btn_col2:
     if _web_scraper_available:
-        # Show last-scraped timestamp if available
+        # Show last-fetched timestamp if available
         _last_scraped = st.session_state.get("injury_report_last_scraped")
         if _last_scraped:
-            st.caption(f"Last scraped: {_last_scraped}")
+            st.caption(f"Last fetched: {_last_scraped}")
         else:
-            st.caption("Click to pull real-time injury designations from RotoWire and NBA.com.")
+            st.caption("Click to pull real-time injury designations from the NBA API.")
     else:
         st.caption(
-            "⚠️ `requests` and `beautifulsoup4` are required. "
-            "Run `pip install requests beautifulsoup4 lxml` to enable this feature."
+            "⚠️ `nba_api` is required. "
+            "Run `pip install nba_api` to enable this feature."
         )
 
 # ============================================================
@@ -723,20 +721,20 @@ if current_action:
             st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
 
     # --------------------------------------------------------
-    # Action: Refresh Injury Report (Layer 5 web scraping)
+    # Action: Refresh Injury Report (nba_api)
     # --------------------------------------------------------
     elif current_action == "injury_report":
         st.subheader("🏥 Refreshing Injury Report…")
 
         st.info(
-            "Fetching real-time injury data from **RotoWire** and **NBA.com**. "
+            "Fetching real-time injury data from **NBA API** (official source). "
             "This typically takes 5–15 seconds."
         )
 
         # Clear the action flag immediately so a page reload doesn't re-run it
         st.session_state["update_action"] = None
 
-        with st.spinner("Scraping injury data…"):
+        with st.spinner("Fetching injury data from NBA API…"):
             try:
                 from data.web_scraper import fetch_all_injury_data
                 scraped_data = fetch_all_injury_data()
@@ -744,11 +742,11 @@ if current_action:
                 scraped_data = {}
                 st.error(
                     "❌ **Missing dependencies.** "
-                    "Run `pip install requests beautifulsoup4 lxml` then restart the app."
+                    "Run `pip install nba_api` then restart the app."
                 )
             except Exception as scrape_exc:
                 scraped_data = {}
-                st.error(f"❌ **Scraping failed:** {scrape_exc}")
+                st.error(f"❌ **Fetch failed:** {scrape_exc}")
 
         if scraped_data:
             # Record the timestamp
@@ -771,11 +769,10 @@ if current_action:
             )
 
             # Show a summary table
-            st.markdown("### 📋 Scraped Injury Data")
+            st.markdown("### 📋 NBA API Injury Data")
             st.caption(
-                "Showing players with a non-Active designation from external sources. "
-                "This data supplements but does not replace the nba_api pipeline — "
-                "run a Smart Update or Full Setup to apply these overrides to the "
+                "Showing players with a non-Active designation from the NBA API. "
+                "Run a Smart Update or Full Setup to apply these to the "
                 "full injury_status.json."
             )
 

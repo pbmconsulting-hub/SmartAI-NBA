@@ -46,11 +46,24 @@ assert abs(_ALL_WEIGHTS - 1.0) < 1e-9, (
     "Check the WEIGHT_* constants in confidence.py."
 )
 
-# Tier thresholds (0-100 scale)
-PLATINUM_TIER_MINIMUM_SCORE = 80  # Top-tier picks
-GOLD_TIER_MINIMUM_SCORE = 65      # Strong picks
-SILVER_TIER_MINIMUM_SCORE = 50    # Moderate picks
-# Anything below 50 = Bronze (lower confidence)
+# Tier thresholds (0-100 scale) — Phase 1 C3: Raised from 80/65/50 to 85/72/58
+PLATINUM_TIER_MINIMUM_SCORE = 85  # Top-tier picks  (was 80)
+GOLD_TIER_MINIMUM_SCORE = 72      # Strong picks    (was 65)
+SILVER_TIER_MINIMUM_SCORE = 58    # Moderate picks  (was 50)
+# Anything below 58 = Bronze (lower confidence)
+
+# Minimum edge gate (C3): picks below these thresholds get auto-demoted
+PLATINUM_MIN_EDGE_PCT = 10.0   # Platinum requires ≥10% edge
+GOLD_MIN_EDGE_PCT = 7.0        # Gold requires ≥7% edge
+SILVER_MIN_EDGE_PCT = 4.0      # Silver requires ≥4% edge
+LOW_EDGE_THRESHOLD = 4.0       # Below 4% → add "Low edge" to avoid reasons
+
+# Hard kill-switch probability thresholds (C2)
+PLATINUM_MIN_PROBABILITY = 0.60   # No Platinum below 60% win probability
+GOLD_MIN_PROBABILITY = 0.55       # No Gold below 55% win probability
+
+# Auto-AVOID: coefficient of variation above this → automatically avoid
+AUTO_AVOID_CV_THRESHOLD = 0.50    # CV > 0.50 → auto-AVOID (C2)
 
 # ============================================================
 # END SECTION: Confidence Score Constants
@@ -84,6 +97,12 @@ def calculate_confidence_score(
     Post-scoring penalties for line sharpness (W1), trap lines (W5),
     calibration (W7), and injury status are applied additively.
 
+    Phase 1 C2/C3 additions:
+    - Hard kill switches (C2): override tier after scoring based on
+      probability and CV thresholds.
+    - Raised tier thresholds + min edge gate (C3): higher bars for
+      Platinum/Gold/Silver, and low-edge picks auto-flagged as avoid.
+
     Args:
         probability_over (float): P(over line), from simulation
         edge_percentage (float): How far from 50% in percentage
@@ -116,6 +135,8 @@ def calculate_confidence_score(
             'score_breakdown': dict with individual factor scores,
             'direction': str ('OVER' or 'UNDER'),
             'recommendation': str (e.g., "Strong OVER play"),
+            'should_avoid': bool (C2: auto-AVOID flag),
+            'avoid_reasons': list of str (C2/C3: reasons for avoid flag),
         }
 
     Example:
@@ -212,16 +233,50 @@ def calculate_confidence_score(
     else:
         bet_direction = "UNDER"
 
-    # Assign tier based on score thresholds
-    if final_score >= PLATINUM_TIER_MINIMUM_SCORE:
+    # Effective probability in the recommended direction (always ≥ 0.5)
+    prob_in_direction = probability_over if bet_direction == "OVER" else (1.0 - probability_over)
+    abs_edge = abs(edge_percentage)
+
+    # ── C2: Hard Kill Switches (applied AFTER weighted score) ────
+    # These are non-negotiable overrides that fire regardless of the score.
+    should_avoid = False
+    avoid_reasons = []
+
+    # Kill switch 1: coefficient of variation > 0.50 → auto-AVOID
+    if stat_average > 0:
+        cv = stat_standard_deviation / stat_average
+        if cv > AUTO_AVOID_CV_THRESHOLD:
+            should_avoid = True
+            avoid_reasons.append(f"High variance (CV={cv:.2f} > {AUTO_AVOID_CV_THRESHOLD})")
+
+    # Kill switch 2: edge < SILVER_MIN_EDGE_PCT → auto-Bronze
+    # (Force the score down to Bronze range if edge is too small to warrant higher tier)
+    # Uses SILVER_MIN_EDGE_PCT (4%) to be consistent with tier gating logic.
+    if abs_edge < SILVER_MIN_EDGE_PCT:
+        final_score = min(final_score, SILVER_TIER_MINIMUM_SCORE - 1)
+
+    # ── C3: Min Edge Gate — Low edge flag ────────────────────────
+    if abs_edge < LOW_EDGE_THRESHOLD:
+        avoid_reasons.append(f"Low edge ({abs_edge:.1f}% < {LOW_EDGE_THRESHOLD}% minimum)")
+
+    # ── Assign tier with C3 raised thresholds + edge gates ───────
+    if (
+        final_score >= PLATINUM_TIER_MINIMUM_SCORE
+        and prob_in_direction >= PLATINUM_MIN_PROBABILITY  # C2: min 60%
+        and abs_edge >= PLATINUM_MIN_EDGE_PCT              # C3: min 10% edge
+    ):
         tier_name = "Platinum"
         tier_emoji = "💎"
         recommendation = f"Elite {bet_direction} play — highest confidence"
-    elif final_score >= GOLD_TIER_MINIMUM_SCORE:
+    elif (
+        final_score >= GOLD_TIER_MINIMUM_SCORE
+        and prob_in_direction >= GOLD_MIN_PROBABILITY      # C2: min 55%
+        and abs_edge >= GOLD_MIN_EDGE_PCT                  # C3: min 7% edge
+    ):
         tier_name = "Gold"
         tier_emoji = "🥇"
         recommendation = f"Strong {bet_direction} play — good confidence"
-    elif final_score >= SILVER_TIER_MINIMUM_SCORE:
+    elif final_score >= SILVER_TIER_MINIMUM_SCORE and abs_edge >= SILVER_MIN_EDGE_PCT:
         tier_name = "Silver"
         tier_emoji = "🥈"
         recommendation = f"Moderate {bet_direction} lean — use with others"
@@ -229,6 +284,20 @@ def calculate_confidence_score(
         tier_name = "Bronze"
         tier_emoji = "🥉"
         recommendation = f"Weak {bet_direction} signal — consider avoiding"
+
+    # ── C2: Kill switch — downgrade Platinum/Gold below probability floor ─
+    # If the tier is Platinum but probability is below 60%, force to Gold.
+    # If the tier is Gold but probability is below 55%, force to Silver.
+    if tier_name == "Platinum" and prob_in_direction < PLATINUM_MIN_PROBABILITY:
+        tier_name = "Gold"
+        tier_emoji = "🥇"
+        recommendation = f"Strong {bet_direction} play — good confidence"
+        avoid_reasons.append(f"Downgraded Platinum→Gold (prob {prob_in_direction:.1%} < {PLATINUM_MIN_PROBABILITY:.0%})")
+    if tier_name == "Gold" and prob_in_direction < GOLD_MIN_PROBABILITY:
+        tier_name = "Silver"
+        tier_emoji = "🥈"
+        recommendation = f"Moderate {bet_direction} lean — use with others"
+        avoid_reasons.append(f"Downgraded Gold→Silver (prob {prob_in_direction:.1%} < {GOLD_MIN_PROBABILITY:.0%})")
 
     # ============================================================
     # END SECTION: Assign Tier and Direction
@@ -240,6 +309,8 @@ def calculate_confidence_score(
         "tier_emoji": tier_emoji,
         "direction": bet_direction,
         "recommendation": recommendation,
+        "should_avoid": should_avoid,
+        "avoid_reasons": avoid_reasons,
         "score_breakdown": {
             "probability_score": round(probability_score, 1),
             "edge_score": round(edge_score, 1),

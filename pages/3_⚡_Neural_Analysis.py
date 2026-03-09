@@ -13,11 +13,13 @@ import datetime         # For analysis result freshness timestamps
 
 # Import our engine modules
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
-from engine.projections import build_player_projection, get_stat_standard_deviation
+from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
+from engine.calibration import get_calibration_adjustment   # C10: historical calibration
+from engine.clv_tracker import store_opening_line            # C12: closing line value tracking
 
 # Import data loading functions
 from data.data_manager import (
@@ -319,9 +321,12 @@ def _render_qds_full_breakdown_html(result):
 
     Uses the same colour palette as the Game Report's QDS dark-card CSS:
     background #14192b, primary #ff5e00, cyan #00f0ff, text #c0d0e8.
-    Rendered as a native <details>/<summary> element so it collapses
+    Wrapped in a native <details>/<summary> element so it collapses
     inside the existing dark-card visual context without a plain Streamlit
     expander frame breaking the design.
+
+    Rendered via st.markdown(html, unsafe_allow_html=True) — all HTML
+    is built with fully inline styles so no external CSS is needed.
 
     Args:
         result (dict): Full analysis result from the simulation loop.
@@ -337,64 +342,69 @@ def _render_qds_full_breakdown_html(result):
     p90 = result.get("percentile_90", 0) or 0
     std = result.get("simulated_std", result.get("std_dev", 0)) or 0
 
-    over_forces  = result.get("forces", {}).get("over_forces",  [])
-    under_forces = result.get("forces", {}).get("under_forces", [])
+    over_forces  = result.get("forces", {}).get("over_forces",  []) or []
+    under_forces = result.get("forces", {}).get("under_forces", []) or []
     breakdown    = result.get("score_breakdown", {}) or {}
     explanation  = result.get("explanation") or {}
     should_avoid = result.get("should_avoid", False)
-    avoid_reasons = result.get("avoid_reasons", [])
+    avoid_reasons = result.get("avoid_reasons", []) or []
 
     # ── Forces HTML ──────────────────────────────────────────────
     def _forces_html(forces):
         if not forces:
-            return '<span style="color:#8b949e;">None detected</span>'
+            return '<span style="color:#8b949e;font-size:0.85rem;">None detected</span>'
         parts = []
-        for f in forces:
-            stars = "⭐" * max(1, round(f.get("strength", 1)))
-            name  = _html.escape(str(f.get("name", "")))
-            desc  = _html.escape(str(f.get("description", "")))
+        for f in (forces or []):
+            if not isinstance(f, dict):
+                continue
+            stars = "⭐" * max(1, min(5, round(float(f.get("strength", 1) or 1))))
+            name  = _html.escape(str(f.get("name", "") or ""))
+            desc  = _html.escape(str(f.get("description", "") or ""))
             parts.append(
-                f'<div style="margin-bottom:6px;">'
-                f'<span style="color:#00f0ff;">{stars}</span> '
-                f'<strong style="color:#ff5e00;">{name}</strong><br>'
-                f'<span style="color:#c0d0e8;font-size:0.8rem;">{desc}</span>'
-                f'</div>'
+                '<div style="margin-bottom:6px;padding:4px 0;">'
+                '<span style="color:#00f0ff;">' + stars + '</span> '
+                '<strong style="color:#ff5e00;">' + name + '</strong><br>'
+                '<span style="color:#c0d0e8;font-size:0.8rem;">' + desc + '</span>'
+                '</div>'
             )
-        return "".join(parts)
+        return "".join(parts) if parts else '<span style="color:#8b949e;font-size:0.85rem;">None detected</span>'
 
     # ── Score-breakdown bars ─────────────────────────────────────
-    breakdown_html = ""
+    breakdown_rows = []
     if breakdown:
-        rows = []
         for factor, score in breakdown.items():
             label = _html.escape(
                 factor.replace("_score", "").replace("_", " ").title()
             )
             bar_w = min(100, max(0, float(score or 0)))
-            bar_c = "#00f0ff" if bar_w >= 70 else "#ff5e00" if bar_w >= 40 else "#ff4444"
-            rows.append(
-                f'<div style="margin-bottom:8px;">'
-                f'<div style="display:flex;justify-content:space-between;'
-                f'font-size:0.8rem;color:#c0d0e8;margin-bottom:3px;">'
-                f'<span>{label}</span>'
-                f'<span style="color:#ff5e00;font-weight:600;">{score:.0f}/100</span>'
-                f'</div>'
-                f'<div style="height:6px;background:#1a2035;border-radius:3px;overflow:hidden;">'
-                f'<div style="height:100%;width:{bar_w}%;'
-                f'background:linear-gradient(90deg,{bar_c},{bar_c}88);'
-                f'border-radius:3px;"></div>'
-                f'</div></div>'
+            if bar_w >= 70:
+                bar_c = "#00f0ff"
+            elif bar_w >= 40:
+                bar_c = "#ff5e00"
+            else:
+                bar_c = "#ff4444"
+            bar_c_fade = bar_c + "88"
+            breakdown_rows.append(
+                '<div style="margin-bottom:8px;">'
+                '<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#c0d0e8;margin-bottom:3px;">'
+                '<span>' + label + '</span>'
+                '<span style="color:#ff5e00;font-weight:600;">' + f"{score:.0f}" + '/100</span>'
+                '</div>'
+                '<div style="height:6px;background:#1a2035;border-radius:3px;">'
+                '<div style="height:6px;width:' + f"{bar_w:.1f}" + '%;background:linear-gradient(90deg,' + bar_c + ',' + bar_c_fade + ');border-radius:3px;"></div>'
+                '</div></div>'
             )
+    breakdown_html = ""
+    if breakdown_rows:
         breakdown_html = (
-            "<div style='margin-bottom:15px;'>"
-            "<h4 style='color:#ff5e00;font-size:0.9rem;margin-bottom:10px;'>"
-            "🔬 Confidence Score Breakdown</h4>"
-            + "".join(rows)
-            + "</div>"
+            '<div style="margin-bottom:15px;">'
+            '<div style="color:#ff5e00;font-weight:600;font-size:0.9rem;margin-bottom:10px;">🔬 Confidence Score Breakdown</div>'
+            + "".join(breakdown_rows)
+            + '</div>'
         )
 
     # ── Explanation sections ─────────────────────────────────────
-    explain_html = ""
+    explain_parts = []
     if explanation:
         sections = [
             ("📊 Season Avg vs Line",  "average_vs_line"),
@@ -407,81 +417,84 @@ def _render_qds_full_breakdown_html(result):
         for label, key in sections:
             text = explanation.get(key, "")
             if text:
-                explain_html += (
-                    f'<div style="margin-bottom:8px;padding:8px;'
-                    f'background:rgba(20,25,43,0.5);border-radius:4px;'
-                    f'border-left:2px solid #ff5e00;">'
-                    f'<span style="color:#ff5e00;font-weight:600;font-size:0.8rem;">'
-                    f'{label}</span>'
-                    f'<p style="color:#c0d0e8;font-size:0.85rem;margin:4px 0 0 0;">'
-                    f'{_html.escape(str(text))}</p>'
-                    f'</div>'
+                explain_parts.append(
+                    '<div style="margin-bottom:8px;padding:8px;background:rgba(20,25,43,0.5);border-radius:4px;border-left:2px solid #ff5e00;">'
+                    '<div style="color:#ff5e00;font-weight:600;font-size:0.8rem;">' + label + '</div>'
+                    '<div style="color:#c0d0e8;font-size:0.85rem;margin-top:4px;">' + _html.escape(str(text)) + '</div>'
+                    '</div>'
                 )
+    explain_html = "".join(explain_parts)
 
     # ── Avoid warning ────────────────────────────────────────────
     avoid_html = ""
     if should_avoid and avoid_reasons:
-        reasons_str = _html.escape(" | ".join(avoid_reasons))
+        reasons_str = _html.escape(" | ".join(str(r) for r in avoid_reasons))
         avoid_html = (
-            f'<div style="margin-bottom:10px;padding:8px 12px;'
-            f'background:rgba(255,68,68,0.1);border-radius:6px;'
-            f'border-left:3px solid #ff4444;color:#ff4444;font-size:0.85rem;">'
-            f'⚠️ <strong>Avoid List:</strong> {reasons_str}</div>'
+            '<div style="margin-bottom:10px;padding:8px 12px;background:rgba(255,68,68,0.1);border-radius:6px;border-left:3px solid #ff4444;color:#ff4444;font-size:0.85rem;">'
+            '⚠️ <strong>Avoid List:</strong> ' + reasons_str +
+            '</div>'
         )
 
-    return f"""
-<div style="background:#14192b;border-radius:8px;padding:0;margin-top:10px;
-    border:1px solid rgba(255,94,0,0.15);">
-  <div style="padding:12px 15px;border-bottom:1px solid rgba(255,94,0,0.1);">
-    <span style="color:#ff5e00;font-weight:600;font-size:0.9rem;">
-      📊 Full Breakdown — {player} {stat}
-    </span>
-  </div>
-  <div style="padding:12px 15px 15px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">
+    # ── Distribution grid (table-based for universal compatibility) ─
+    dist_html = (
+        '<div style="margin-bottom:15px;">'
+        '<div style="color:#ff5e00;font-weight:600;font-size:0.9rem;margin-bottom:8px;">📊 Distribution</div>'
+        '<table style="width:100%;border-collapse:separate;border-spacing:4px;">'
+        '<tr>'
+        '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
+        '<div style="color:#8b949e;font-size:0.75rem;">10th pct</div>'
+        '<div style="color:#ff5e00;font-weight:700;font-size:1rem;">' + f"{p10:.1f}" + '</div>'
+        '</td>'
+        '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
+        '<div style="color:#8b949e;font-size:0.75rem;">Median</div>'
+        '<div style="color:#00f0ff;font-weight:700;font-size:1rem;">' + f"{p50:.1f}" + '</div>'
+        '</td>'
+        '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
+        '<div style="color:#8b949e;font-size:0.75rem;">90th pct</div>'
+        '<div style="color:#ff5e00;font-weight:700;font-size:1rem;">' + f"{p90:.1f}" + '</div>'
+        '</td>'
+        '<td style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;width:25%;">'
+        '<div style="color:#8b949e;font-size:0.75rem;">Std Dev</div>'
+        '<div style="color:#ffffff;font-weight:700;font-size:1rem;">' + f"{std:.1f}" + '</div>'
+        '</td>'
+        '</tr>'
+        '</table>'
+        '</div>'
+    )
 
-    <!-- Distribution grid -->
-    <div style="margin-bottom:15px;">
-      <h4 style="color:#ff5e00;font-size:0.9rem;margin-bottom:8px;">📊 Distribution</h4>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
-          <div style="color:#8b949e;font-size:0.75rem;">10th pct</div>
-          <div style="color:#ff5e00;font-weight:700;">{p10:.1f}</div>
-        </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
-          <div style="color:#8b949e;font-size:0.75rem;">Median</div>
-          <div style="color:#00f0ff;font-weight:700;">{p50:.1f}</div>
-        </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
-          <div style="color:#8b949e;font-size:0.75rem;">90th pct</div>
-          <div style="color:#ff5e00;font-weight:700;">{p90:.1f}</div>
-        </div>
-        <div style="text-align:center;padding:8px;background:rgba(20,25,43,0.7);border-radius:6px;">
-          <div style="color:#8b949e;font-size:0.75rem;">Std Dev</div>
-          <div style="color:white;font-weight:700;">{std:.1f}</div>
-        </div>
-      </div>
-    </div>
+    # ── Forces grid (table-based for universal compatibility) ────
+    forces_html = (
+        '<table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:15px;">'
+        '<tr>'
+        '<td style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;border-left:3px solid #00f0ff;vertical-align:top;width:50%;">'
+        '<div style="color:#00f0ff;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔵 Forces OVER</div>'
+        + _forces_html(over_forces) +
+        '</td>'
+        '<td style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;border-left:3px solid #ff5e00;vertical-align:top;width:50%;">'
+        '<div style="color:#ff5e00;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔴 Forces UNDER</div>'
+        + _forces_html(under_forces) +
+        '</td>'
+        '</tr>'
+        '</table>'
+    )
 
-    <!-- Forces grid (2 columns side by side) -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:15px;">
-      <div style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;
-          border-left:3px solid #00f0ff;">
-        <h4 style="color:#00f0ff;font-size:0.85rem;margin-bottom:8px;">🔵 Forces OVER</h4>
-        {_forces_html(over_forces)}
-      </div>
-      <div style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;
-          border-left:3px solid #ff5e00;">
-        <h4 style="color:#ff5e00;font-size:0.85rem;margin-bottom:8px;">🔴 Forces UNDER</h4>
-        {_forces_html(under_forces)}
-      </div>
-    </div>
+    # ── Full breakdown wrapped in <details>/<summary> ────────────
+    inner_content = dist_html + forces_html + avoid_html + breakdown_html + explain_html
 
-    {avoid_html}
-    {breakdown_html}
-    {explain_html}
-  </div>
-</div>
-"""
+    return (
+        '<details style="margin-top:10px;">'
+        '<summary style="cursor:pointer;padding:10px 14px;'
+        'background:#14192b;border:1px solid rgba(255,94,0,0.2);border-radius:6px;'
+        'color:#ff5e00;font-weight:600;font-size:0.9rem;list-style:none;'
+        'user-select:none;">'
+        '📊 Full Breakdown — ' + player + ' ' + stat +
+        '</summary>'
+        '<div style="padding:14px 15px 16px;background:#0f1424;border:1px solid rgba(255,94,0,0.15);'
+        'border-top:none;border-radius:0 0 6px 6px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">'
+        + inner_content +
+        '</div>'
+        '</details>'
+    )
 
 
 def display_prop_analysis_card_qds(result):
@@ -889,6 +902,16 @@ if run_analysis:
         game_context = find_game_context_for_player(player_team, todays_games)
 
         recent_form_games  = prop.get("recent_form_results", [])
+
+        # ── C4: Teammate-Out Usage Adjustment ────────────────────
+        # Check if a high-usage teammate is OUT and boost this player's
+        # projection accordingly (+8% primary option, +5% secondary, cap +15%).
+        teammate_boost, teammate_boost_notes = calculate_teammate_out_boost(
+            player_data=player_data,
+            injury_status_map=injury_map,
+            teammates_data=players_data,
+        )
+
         projection_result  = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=game_context.get("opponent", ""),
@@ -899,6 +922,8 @@ if run_analysis:
             teams_data=teams_data,
             recent_form_games=recent_form_games if recent_form_games else None,
             vegas_spread=game_context.get("vegas_spread", 0.0),
+            minutes_adjustment_factor=teammate_boost,
+            teammate_out_notes=teammate_boost_notes,
         )
 
         stat_std      = get_stat_standard_deviation(player_data, stat_type)
@@ -906,6 +931,25 @@ if run_analysis:
             f"projected_{stat_type}",
             float(player_data.get(f"{stat_type}_avg", prop_line))
         )
+
+        # ── C8: Minutes-Stat Correlation — pass projected_minutes to sim ─
+        # ── C11: KDE from Game Logs — pass recent_game_logs to sim ──────
+        # Build stat-specific game log list from recent_form_games for KDE.
+        # Maps stat_type keys to the game-log column names.
+        _stat_log_key_map = {
+            "points": "pts", "rebounds": "reb", "assists": "ast",
+            "threes": "fg3m", "steals": "stl", "blocks": "blk",
+            "turnovers": "tov",
+        }
+        _log_key = _stat_log_key_map.get(stat_type, stat_type)
+        recent_game_log_values = []
+        for _g in (recent_form_games or []):
+            _v = _g.get(_log_key, _g.get(stat_type))
+            if _v is not None:
+                try:
+                    recent_game_log_values.append(float(_v))
+                except (TypeError, ValueError):
+                    pass
 
         simulation_output = run_monte_carlo_simulation(
             projected_stat_average=projected_stat,
@@ -917,6 +961,10 @@ if run_analysis:
             matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
             home_away_adjustment=projection_result.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
+            stat_type=stat_type,
+            projected_minutes=projection_result.get("projected_minutes"),
+            minutes_std=4.0,
+            recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
         )
 
         forces_result = analyze_directional_forces(
@@ -951,6 +999,11 @@ if run_analysis:
         probability_over  = simulation_output.get("probability_over", 0.5)
         edge_pct          = calculate_edge_percentage(probability_over)
 
+        # C10: Historical calibration — adjust confidence score based on
+        # how well-calibrated the model has been historically at this
+        # probability level.  Returns 0.0 on cold start (no history yet).
+        calibration_adj = get_calibration_adjustment(probability_over)
+
         confidence_output = calculate_confidence_score(
             probability_over=probability_over,
             edge_percentage=edge_pct,
@@ -963,7 +1016,26 @@ if run_analysis:
             recent_form_ratio=projection_result.get("recent_form_ratio"),
             line_sharpness_penalty=line_sharpness_penalty,
             trap_line_penalty=trap_line_penalty,
+            calibration_adjustment=calibration_adj,  # C10
         )
+
+        # C12: Closing Line Value — record the model's opening projection and
+        # recommendation at analysis time.  Callers can later call
+        # engine.clv_tracker.update_closing_line() with the final closing line
+        # to compute CLV and validate the model's edge.
+        try:
+            store_opening_line(
+                player_name=player_name,
+                stat_type=stat_type,
+                opening_line=prop_line,
+                model_projection=projected_stat,
+                model_direction=confidence_output.get("direction", "OVER"),
+                confidence_score=confidence_output.get("confidence_score", 0.0),
+                tier=confidence_output.get("tier", "Bronze"),
+                edge_percentage=edge_pct,
+            )
+        except Exception:
+            pass  # CLV recording is non-critical; never block analysis
 
         should_avoid_flag, avoid_reasons = should_avoid_prop(
             probability_over=probability_over,
@@ -972,6 +1044,14 @@ if run_analysis:
             stat_standard_deviation=stat_std,
             stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
         )
+
+        # Merge kill-switch flags from confidence engine (C2/C3) with
+        # should_avoid_prop() results so all sources are surfaced in the UI.
+        if confidence_output.get("should_avoid"):
+            should_avoid_flag = True
+        for extra_reason in confidence_output.get("avoid_reasons", []):
+            if extra_reason and extra_reason not in avoid_reasons:
+                avoid_reasons.append(extra_reason)
 
         histogram_data = build_histogram_from_results(
             simulation_output.get("simulated_results", []),

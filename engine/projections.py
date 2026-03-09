@@ -80,6 +80,51 @@ TEAM_BLOWOUT_TENDENCY = {
 # END SECTION: Team Blowout Tendency Dictionary
 # ============================================================
 
+
+# ============================================================
+# SECTION: Bayesian Positional Priors (C6)
+# When a player has fewer than 25 games, blend their stats
+# toward these positional league averages.
+# ============================================================
+
+BAYESIAN_SMALL_SAMPLE_THRESHOLD = 25  # games played below which to blend
+
+POSITION_PRIORS = {
+    "PG": {"points": 18.5, "rebounds": 4.0, "assists": 6.5, "threes": 2.2,
+           "steals": 1.3, "blocks": 0.4, "turnovers": 2.5},
+    "SG": {"points": 17.0, "rebounds": 3.8, "assists": 4.0, "threes": 2.0,
+           "steals": 1.1, "blocks": 0.4, "turnovers": 1.8},
+    "SF": {"points": 16.0, "rebounds": 5.5, "assists": 3.5, "threes": 1.5,
+           "steals": 1.0, "blocks": 0.6, "turnovers": 1.5},
+    "PF": {"points": 15.5, "rebounds": 7.0, "assists": 3.0, "threes": 1.0,
+           "steals": 0.8, "blocks": 0.8, "turnovers": 1.5},
+    "C":  {"points": 14.0, "rebounds": 9.0, "assists": 2.5, "threes": 0.5,
+           "steals": 0.7, "blocks": 1.4, "turnovers": 1.8},
+}
+# Default prior for unknown positions
+_DEFAULT_POSITION_PRIOR = POSITION_PRIORS["SF"]
+
+# ============================================================
+# END SECTION: Bayesian Positional Priors
+# ============================================================
+
+
+# ============================================================
+# SECTION: Teammate-Out Usage Adjustment Constants (C4)
+# When a high-usage teammate is OUT, remaining players absorb
+# that usage. These bumps are applied before the simulation.
+# ============================================================
+
+# Bump factors for teammate absence
+TEAMMATE_OUT_PRIMARY_BUMP = 0.08    # +8% for primary option (top scorer/assister) out
+TEAMMATE_OUT_SECONDARY_BUMP = 0.05  # +5% for secondary option out
+TEAMMATE_OUT_MAX_BOOST = 0.15       # Cap total teammate-out boost at +15%
+
+# ============================================================
+# END SECTION: Teammate-Out Usage Adjustment Constants
+# ============================================================
+
+
 def build_player_projection(
     player_data,
     opponent_team_abbreviation,
@@ -93,6 +138,7 @@ def build_player_projection(
     minutes_adjustment_factor=1.0,
     teammate_out_notes=None,
     played_yesterday=False,
+    rolling_defensive_data=None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -105,7 +151,9 @@ def build_player_projection(
     - Vegas total (high total = projected to be high-scoring game)
     - Vegas spread (used for smart blowout risk calculation)
     - Recent form: last 5 game averages weighted more heavily
-    - Minutes adjustment for teammate injuries (W8)
+    - Minutes adjustment for teammate injuries (W8/C4)
+    - Rolling opponent defensive window (C9): blends 10-game rolling
+      defensive data with season averages when available
 
     Args:
         player_data (dict): Player row from sample_players.csv
@@ -133,6 +181,14 @@ def build_player_projection(
         played_yesterday (bool, optional): True if this is a back-to-back
             game (player played yesterday). Applies a 0.94 fatigue multiplier
             to the rest adjustment factor. Default False.
+        rolling_defensive_data (dict, optional): Rolling 10-game defensive
+            window data keyed by team abbreviation. (C9)
+            Format: {team_abbrev: {position: rolling_factor}}
+            e.g., {"BOS": {"PG": 0.88, "SG": 0.91, ...}}
+            When provided, blends rolling factor with season average factor:
+              defense_factor = 0.5 * season_factor + 0.5 * rolling_factor
+            When None or opponent not found, falls back to season average
+            from defensive_ratings_data (current default behavior).
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -143,6 +199,7 @@ def build_player_projection(
             - 'projected_steals': float
             - 'projected_blocks': float
             - 'projected_turnovers': float
+            - 'projected_minutes': float (C1: estimated minutes for tonight)
             - 'pace_factor': float (multiplier, ~0.9-1.1)
             - 'defense_factor': float (multiplier, ~0.88-1.12)
             - 'home_away_factor': float (small +/-)
@@ -151,8 +208,9 @@ def build_player_projection(
             - 'overall_adjustment': float (combined multiplier)
             - 'recent_form_ratio': float or None (last5_avg / season_avg)
             - 'minutes_adjustment_factor': float (W8: teammate injury impact)
-            - 'teammate_out_notes': list of str (W8: teammate impact notes)
+            - 'teammate_out_notes': list of str (W8/C4: teammate impact notes)
             - 'notes': list of str (game-context warnings, e.g. back-to-back)
+            - 'bayesian_shrinkage_applied': bool (C6: True if sample < 25 games)
 
     Example:
         LeBron at home vs weak defense + fast pace →
@@ -171,9 +229,38 @@ def build_player_projection(
     season_blocks_average = float(player_data.get("blocks_avg", 0))
     season_turnovers_average = float(player_data.get("turnovers_avg", 0))
     player_position = player_data.get("position", "SF")  # Default to SF if missing
+    games_played = int(player_data.get("games_played", player_data.get("gp", 82)) or 82)
+    season_minutes_average = float(player_data.get("minutes_avg", player_data.get("min", 30.0)) or 30.0)
 
     # ============================================================
     # END SECTION: Extract Player's Season Averages
+    # ============================================================
+
+    # ============================================================
+    # SECTION: Bayesian Shrinkage for Small Samples (C6)
+    # When games_played < 25, blend player stats toward positional
+    # league averages to avoid over-fitting to a small sample.
+    # ============================================================
+
+    bayesian_shrinkage_applied = False
+    if games_played < BAYESIAN_SMALL_SAMPLE_THRESHOLD:
+        # Weight formula: w = min(games_played / 25, 1.0)
+        # At 0 games: 0% player, 100% prior
+        # At 25+ games: 100% player, 0% prior
+        w = min(games_played / BAYESIAN_SMALL_SAMPLE_THRESHOLD, 1.0)
+        prior = POSITION_PRIORS.get(player_position, _DEFAULT_POSITION_PRIOR)
+
+        season_points_average   = w * season_points_average   + (1 - w) * prior["points"]
+        season_rebounds_average = w * season_rebounds_average + (1 - w) * prior["rebounds"]
+        season_assists_average  = w * season_assists_average  + (1 - w) * prior["assists"]
+        season_threes_average   = w * season_threes_average   + (1 - w) * prior["threes"]
+        season_steals_average   = w * season_steals_average   + (1 - w) * prior["steals"]
+        season_blocks_average   = w * season_blocks_average   + (1 - w) * prior["blocks"]
+        season_turnovers_average= w * season_turnovers_average+ (1 - w) * prior["turnovers"]
+        bayesian_shrinkage_applied = True
+
+    # ============================================================
+    # END SECTION: Bayesian Shrinkage for Small Samples
     # ============================================================
 
     # ============================================================
@@ -240,13 +327,27 @@ def build_player_projection(
     # SECTION: Calculate Adjustment Factors
     # ============================================================
 
-    # --- Factor 1: Opponent Defensive Rating ---
-    # How well does the opponent defend this player's position?
-    defense_factor = _get_defense_adjustment_factor(
+    # --- Factor 1: Opponent Defensive Rating (C9: Rolling Window blend) ---
+    # Season-long defensive factor from defensive_ratings.csv
+    season_defense_factor = _get_defense_adjustment_factor(
         opponent_team_abbreviation,
         player_position,
         defensive_ratings_data,
     )
+
+    # C9: If rolling_defensive_data is provided, blend 50/50 with season avg.
+    # This captures teams on hot/cold defensive streaks over their last 10 games.
+    # If rolling data is unavailable, fall back to season average (unchanged behavior).
+    rolling_defense_factor = _get_rolling_defense_factor(
+        opponent_team_abbreviation,
+        player_position,
+        rolling_defensive_data,
+    )
+    if rolling_defense_factor is not None:
+        # 50% season-long, 50% rolling (last-10 game) defensive factor
+        defense_factor = 0.5 * season_defense_factor + 0.5 * rolling_defense_factor
+    else:
+        defense_factor = season_defense_factor  # Fall back to season average
 
     # --- Factor 2: Game Pace ---
     # Faster game = more possessions = more stat opportunities
@@ -308,11 +409,39 @@ def build_player_projection(
     # ============================================================
 
     # ============================================================
+    # SECTION: Per-Minute Rate Decomposition (C1)
+    # Project tonight's minutes, then derive stats as
+    #   projected_stat = per_minute_rate × projected_minutes × matchup_factor × pace_factor
+    # This is more physically meaningful than applying a flat multiplier
+    # to season averages, and enables the C8 minutes-first simulation.
+    # ============================================================
+
+    # Project tonight's minutes
+    # Base: season average minutes, adjusted by rest/back-to-back, blowout risk,
+    # and spread (potential blowout → reduced minutes for starters).
+    spread_minutes_factor = 1.0
+    if abs(vegas_spread) > 12:
+        # High spread → genuine blowout risk → starters may sit garbage time
+        spread_minutes_factor = 0.94
+    elif abs(vegas_spread) > 8:
+        spread_minutes_factor = 0.97
+
+    projected_minutes = round(
+        season_minutes_average
+        * rest_factor                # Back-to-back reduces minutes too
+        * minutes_adjustment_factor  # Teammate injury (W8): more/fewer mins
+        * spread_minutes_factor,     # Blowout risk (C1)
+        1
+    )
+    # Clamp to realistic range
+    projected_minutes = max(5.0, min(44.0, projected_minutes))
+
+    # ============================================================
     # SECTION: Apply Adjustments to Get Tonight's Projections
     # ============================================================
 
     # Combine all factors into one multiplier for offensive stats
-    # W8: minutes_adjustment_factor boosts projections when a key
+    # W8/C1: minutes_adjustment_factor boosts projections when a key
     # teammate is OUT (more usage) or applies a slight discount when
     # the player themselves is on a restriction.
     offensive_stat_multiplier = (
@@ -321,7 +450,7 @@ def build_player_projection(
         * game_total_factor
         * (1.0 + home_away_factor)
         * rest_factor
-        * minutes_adjustment_factor  # W8: teammate injury / minutes restriction
+        * minutes_adjustment_factor  # W8/C4: teammate injury / minutes restriction
     )
 
     # Project each stat by applying the combined multiplier
@@ -345,6 +474,8 @@ def build_player_projection(
         "projected_steals": round(projected_steals, 1),
         "projected_blocks": round(projected_blocks, 1),
         "projected_turnovers": round(projected_turnovers, 1),
+        # C1: Projected minutes for tonight (used by C8 minutes-first sim)
+        "projected_minutes": projected_minutes,
         # Store all factors for transparency (shown in app)
         "pace_factor": round(pace_factor, 4),
         "defense_factor": round(defense_factor, 4),
@@ -354,10 +485,13 @@ def build_player_projection(
         "blowout_risk": round(blowout_risk, 4),
         "overall_adjustment": round(offensive_stat_multiplier, 4),
         "recent_form_ratio": recent_form_ratio,
-        # W8: Minutes adjustment factors for injury/restriction transparency
+        # W8/C4: Minutes adjustment factors for injury/restriction transparency
         "minutes_adjustment_factor": round(minutes_adjustment_factor, 4),
         "teammate_out_notes": teammate_out_notes or [],
         "notes": notes,
+        # C6: Bayesian shrinkage metadata
+        "bayesian_shrinkage_applied": bayesian_shrinkage_applied,
+        "games_played": games_played,
     }
 
     return projections
@@ -401,6 +535,57 @@ def _get_defense_adjustment_factor(
 
     # If opponent not found, return 1.0 (neutral)
     return 1.0
+
+
+def _get_rolling_defense_factor(
+    opponent_team_abbreviation,
+    player_position,
+    rolling_defensive_data,
+):
+    """
+    Look up the rolling 10-game defensive factor for an opponent. (C9)
+
+    This captures teams on hot/cold defensive streaks that the season-long
+    rating doesn't reflect. For example, if a team has been defending PGs
+    much better over the last 10 games, this factor will be < 1.0.
+
+    Falls back gracefully (returns None) when:
+    - rolling_defensive_data is None (caller will use season average)
+    - The opponent is not found in the rolling data
+    - The position is not in the rolling data
+
+    Args:
+        opponent_team_abbreviation (str): 3-letter team code
+        player_position (str): PG, SG, SF, PF, or C
+        rolling_defensive_data (dict or None): Rolling data dict.
+            Format: {team_abbrev: {position_key: factor}}
+            Supported position key formats:
+              - Simple: {"BOS": {"PG": 0.88, "SG": 0.92}}
+              - CSV-style: {"BOS": {"vs_PG_pts": 0.88, "vs_SG_pts": 0.92}}
+            Both formats are handled transparently.
+            When None, always returns None.
+
+    Returns:
+        float or None: Rolling defensive factor, or None if unavailable.
+    """
+    if not rolling_defensive_data:
+        return None
+
+    team_rolling = rolling_defensive_data.get(opponent_team_abbreviation)
+    if not team_rolling:
+        return None
+
+    # Support both direct position key and full column key
+    factor = team_rolling.get(player_position)
+    if factor is None:
+        factor = team_rolling.get(f"vs_{player_position}_pts")
+    if factor is None:
+        return None
+
+    try:
+        return float(factor)
+    except (TypeError, ValueError):
+        return None
 
 
 def _get_pace_adjustment_factor(
@@ -685,6 +870,92 @@ def _get_dynamic_cv(stat_type, stat_avg):
 
 # ============================================================
 # END SECTION: Individual Adjustment Factor Functions
+# ============================================================
+
+
+# ============================================================
+# SECTION: Teammate-Out Usage Adjustment (C4)
+# When a high-usage teammate is OUT, boost the current player's
+# projection by a configurable usage bump factor.
+# ============================================================
+
+def calculate_teammate_out_boost(
+    player_data,
+    injury_status_map,
+    teammates_data=None,
+):
+    """
+    Calculate a usage-boost multiplier for when key teammates are OUT. (C4)
+
+    Checks the injury status map for teammates on the same team.
+    If a high-usage teammate is OUT (top 3 scorer/assist leader),
+    boosts the current player's projection.
+
+    Args:
+        player_data (dict): Current player's data row.
+        injury_status_map (dict): {player_name_lower: {status, ...}}
+            Typically from RosterEngine.get_injury_report() or session state.
+        teammates_data (list of dict, optional): Rows of all players on the
+            same team from players CSV. When None, no teammate analysis is done.
+
+    Returns:
+        tuple: (boost_multiplier: float, notes: list of str)
+            boost_multiplier: 1.0 (no boost) to 1.15 (max +15%)
+            notes: Human-readable explanations of any boosts applied
+    """
+    if not teammates_data or not injury_status_map:
+        return 1.0, []
+
+    player_name = player_data.get("name", "").lower()
+    player_team = player_data.get("team", "").upper()
+
+    # Find teammates on the same team
+    team_players = [
+        p for p in (teammates_data or [])
+        if p.get("team", "").upper() == player_team
+        and p.get("name", "").lower() != player_name
+    ]
+
+    if not team_players:
+        return 1.0, []
+
+    # Sort teammates by points average (primary usage metric)
+    team_players_sorted = sorted(
+        team_players,
+        key=lambda p: float(p.get("points_avg", 0) or 0),
+        reverse=True,
+    )
+
+    # Check top 3 scorers / assist leaders for OUT status
+    top_options = team_players_sorted[:3]
+    total_boost = 0.0
+    notes = []
+
+    for rank, teammate in enumerate(top_options):
+        t_name = teammate.get("name", "")
+        t_name_lower = t_name.lower()
+        t_status_entry = injury_status_map.get(t_name_lower, {})
+        t_status = t_status_entry.get("status", "Active")
+
+        if t_status in ("Out", "Injured Reserve", "IR", "Inactive"):
+            if rank == 0:
+                bump = TEAMMATE_OUT_PRIMARY_BUMP    # +8%
+                tier_label = "primary option"
+            else:
+                bump = TEAMMATE_OUT_SECONDARY_BUMP  # +5%
+                tier_label = "secondary option"
+
+            total_boost = min(total_boost + bump, TEAMMATE_OUT_MAX_BOOST)
+            notes.append(
+                f"📈 {t_name} ({tier_label}, {t_status}) OUT → "
+                f"+{bump*100:.0f}% usage boost"
+            )
+
+    boost_multiplier = 1.0 + total_boost
+    return round(boost_multiplier, 4), notes
+
+# ============================================================
+# END SECTION: Teammate-Out Usage Adjustment
 # ============================================================
 
 

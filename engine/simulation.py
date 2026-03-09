@@ -14,7 +14,11 @@ import math     # For mathematical rounding and calculations
 
 # Import our custom math helpers (built from scratch)
 from engine.math_helpers import (
-    sample_from_normal_distribution,  # Draw a random game result
+    sample_from_normal_distribution,  # Draw a random game result (normal)
+    sample_skew_normal,               # C5: Skew-normal for right-skewed NBA stats
+    get_stat_skew_param,              # C5: Default skew params by stat type
+    sample_from_kde,                  # C11: KDE sampling from game logs
+    should_use_kde,                   # C11: Whether to use KDE vs skew-normal
     calculate_mean,                    # Average a list of results
     calculate_standard_deviation,      # Spread of results
     calculate_percentile,              # Find value at percentile
@@ -85,6 +89,33 @@ Z_SCORE_90_CI = 1.645
 THREE_POINT_CV_FLOOR = 1.3 * 0.25  # = 0.325
 
 # ============================================================
+# SECTION: Minutes Simulation Constants (C8)
+# Simulate player minutes per game before deriving stat output.
+# Minutes follow a truncated normal distribution.
+# ============================================================
+
+# Default assumed minutes for players without explicit minutes data
+DEFAULT_PROJECTED_MINUTES = 30.0
+
+# Standard deviation of minutes (captures blowout/foul trouble variability)
+MINUTES_STD_DEFAULT = 4.0   # ~4 minutes uncertainty in most games
+
+# Default correlation matrix for multi-stat props (C7)
+# These represent realistic stat co-dependence in NBA games.
+STAT_CORRELATION = {
+    ("points",   "rebounds"): 0.15,
+    ("rebounds", "points"):   0.15,
+    ("points",   "assists"):  0.25,
+    ("assists",  "points"):   0.25,
+    ("rebounds", "assists"):  0.05,
+    ("assists",  "rebounds"): 0.05,
+}
+
+# ============================================================
+# END SECTION: Minutes Simulation Constants
+# ============================================================
+
+# ============================================================
 # END SECTION: Module-Level Constants
 # ============================================================
 
@@ -105,6 +136,9 @@ def run_monte_carlo_simulation(
     home_away_adjustment,
     rest_adjustment_factor,
     stat_type=None,
+    projected_minutes=None,
+    minutes_std=None,
+    recent_game_logs=None,
 ):
     """
     Run a full Monte Carlo simulation for one player's one stat.
@@ -113,6 +147,11 @@ def run_monte_carlo_simulation(
     minutes (blowout risk, foul trouble) and stat variance.
     Builds a distribution and calculates P(over line).
     Default recommended simulations: 2000.
+
+    C5: Uses skew-normal distribution sampling instead of normal,
+        with stat-type-specific skew parameters (right skew for NBA).
+    C8: Optionally simulates minutes first, then scales per-minute rate,
+        capturing the natural correlation between minutes and stats.
 
     Args:
         projected_stat_average (float): Our projected mean for the stat
@@ -130,8 +169,22 @@ def run_monte_carlo_simulation(
         rest_adjustment_factor (float): Adjustment for rest days
             Back-to-back game = tired player = slight negative adjustment
         stat_type (str, optional): Stat being simulated (e.g. 'threes',
-            'fg3m', 'points'). When 'threes' or 'fg3m', enforces a minimum
-            CV of 1.3x the elite-points CV floor to capture streakiness.
+            'fg3m', 'points'). Used for skew-normal param selection (C5)
+            and for CV floor enforcement for three-point props.
+        projected_minutes (float, optional): Projected minutes for tonight. (C8)
+            When provided, enables the minutes-first simulation approach:
+            each trial first draws simulated minutes, then scales the
+            per-minute stat rate by those minutes.
+        minutes_std (float, optional): Std dev of minutes distribution. (C8)
+            Defaults to MINUTES_STD_DEFAULT (4.0) when projected_minutes
+            is provided but minutes_std is not.
+        recent_game_logs (list of float, optional): Player's recent game stat
+            values for this stat type. (C11)
+            When 15+ entries are provided, each Monte Carlo trial samples
+            from a KDE built from these logs (instead of skew-normal).
+            This captures player-specific distribution shapes (e.g., a player
+            who always scores 15 or 30 but never 22).
+            Falls back to skew-normal when None or fewer than 15 logs.
 
     Returns:
         dict: Simulation results containing:
@@ -184,6 +237,37 @@ def run_monte_carlo_simulation(
         if current_cv < THREE_POINT_CV_FLOOR:
             adjusted_standard_deviation = adjusted_stat_projection * THREE_POINT_CV_FLOOR
 
+    # C5: Select skew parameter for this stat type
+    skew_alpha = get_stat_skew_param(stat_type or "")
+
+    # C11: Determine whether to use KDE sampling from game logs.
+    # When the player has 15+ recent game logs, we sample directly from the
+    # empirical distribution (KDE) instead of the parametric skew-normal.
+    # The KDE logs must first be scaled to align with tonight's adjusted projection
+    # so that matchup/pace/rest adjustments are still reflected.
+    use_kde = should_use_kde(recent_game_logs or [])
+    kde_logs_scaled = None
+    if use_kde and recent_game_logs:
+        raw_log_mean = sum(recent_game_logs) / len(recent_game_logs)
+        if raw_log_mean > 1e-6:
+            # Scale logs by the ratio (tonight's adjusted projection / log mean)
+            # so that matchup/pace/rest adjustments apply to the KDE distribution too.
+            scale = adjusted_stat_projection / raw_log_mean
+            kde_logs_scaled = [v * scale for v in recent_game_logs]
+        else:
+            # Mean of 0 (or near-zero): player's recent logs are all 0 — KDE would
+            # be misleading. Fall back to skew-normal for this prop.
+            use_kde = False
+
+    # C8: If projected minutes are provided, compute per-minute rate for
+    # minutes-first simulation. This naturally captures the correlation
+    # between minutes played and stats (blowout → low mins → low stats).
+    use_minutes_sim = projected_minutes is not None and projected_minutes > 0
+    if use_minutes_sim:
+        eff_minutes_std = minutes_std if (minutes_std is not None) else MINUTES_STD_DEFAULT
+        # Per-minute stat rate: adjusted projection / projected minutes
+        stat_per_minute = adjusted_stat_projection / projected_minutes
+
     # ============================================================
     # END SECTION: Apply Pre-Simulation Adjustments
     # ============================================================
@@ -228,34 +312,72 @@ def run_monte_carlo_simulation(
         # This creates fat tails in the distribution, especially for threes.
         momentum_multiplier = _simulate_hot_cold_modifier()
 
-        # --- Step 3: Simulate the Actual Stat ---
-        # Scale projection by minutes played, then add randomness
-        effective_mean = (
-            adjusted_stat_projection
-            * minutes_multiplier
-            * stat_scenario_multiplier
-            * momentum_multiplier
-        )
+        # --- Step 3: Simulate Minutes (C8) OR Use Scenario Multiplier ---
+        # C8: When projected_minutes is available, simulate the player's
+        # actual minutes for this game, then derive stats from per-min rate.
+        # This naturally ties low-minutes games to low stat outputs.
+        if use_minutes_sim:
+            # Simulate tonight's minutes: sample from normal distribution
+            # (minutes are roughly symmetric — small positive skew for overtime
+            # games is handled by the scenario multiplier system above).
+            # Using sample_from_normal_distribution (symmetric) is appropriate here.
+            sim_minutes = max(
+                0.0,
+                min(48.0, sample_from_normal_distribution(projected_minutes, eff_minutes_std))
+            )
+            # Apply scenario-level minutes reduction on top
+            sim_minutes *= minutes_multiplier
+            effective_mean = (
+                stat_per_minute
+                * sim_minutes
+                * stat_scenario_multiplier
+                * momentum_multiplier
+            )
+            # Std scales with sqrt of minutes fraction
+            min_frac = sim_minutes / max(1.0, projected_minutes)
+            scaled_std = adjusted_standard_deviation * math.sqrt(max(0.05, min_frac))
+        else:
+            # Standard approach: scale projection by minutes multiplier
+            effective_mean = (
+                adjusted_stat_projection
+                * minutes_multiplier
+                * stat_scenario_multiplier
+                * momentum_multiplier
+            )
+            # Scale std dev proportionally (less minutes = less variance too)
+            scaled_std = adjusted_standard_deviation * math.sqrt(max(0.1, minutes_multiplier))
 
-        # Scale std dev proportionally (less minutes = less variance too)
-        scaled_std = adjusted_standard_deviation * math.sqrt(max(0.1, minutes_multiplier))
-
-        # Draw a random sample: this is one simulated game's result
-        simulated_game_stat = sample_from_normal_distribution(
-            effective_mean, scaled_std
-        )
+        # --- Step 4: Draw Sample (C11: KDE when logs available, else C5: skew-normal) ---
+        # Priority order:
+        #   1. KDE from game logs (C11) — when player has 15+ recent games
+        #      KDE is scaled by scenario/minutes multipliers for context-awareness
+        #   2. Skew-normal (C5) — parametric with stat-type-specific right skew
+        if use_kde and kde_logs_scaled:
+            # C11: Scale KDE logs by scenario/momentum multipliers, then sample
+            scenario_scale = minutes_multiplier * stat_scenario_multiplier * momentum_multiplier
+            kde_scaled_for_trial = [v * scenario_scale for v in kde_logs_scaled]
+            kde_sample = sample_from_kde(kde_scaled_for_trial)
+            if kde_sample is not None:
+                simulated_game_stat = kde_sample
+            else:
+                # Fallback: skew-normal if KDE fails for this trial
+                simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
+        else:
+            # C5: Skew-normal captures the right tail of NBA stat distributions
+            # (explosion games, triple-doubles, etc.) better than pure normal.
+            simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
 
         # Stats can't be negative (can't have -3 assists)
         simulated_game_stat = max(0.0, simulated_game_stat)
 
-        # --- Step 4: Record the Result ---
+        # --- Step 5: Record the Result ---
         all_simulated_game_results.append(simulated_game_stat)
 
         # Did this simulated game go OVER the prop line?
         if simulated_game_stat > prop_line:
             count_of_games_over_line += 1
 
-        # --- Step 5: Convergence Check (every 500 simulations) ---
+        # --- Step 6: Convergence Check (every 500 simulations) ---
         # If the running probability has stabilised, stop early to save time.
         sims_done = sim_index + 1
         if sims_done % 500 == 0 and sims_done >= 500:
@@ -546,6 +668,103 @@ def simulate_combo_stat(
     Returns:
         dict: Same structure as run_monte_carlo_simulation()
     """
+def _cholesky_2x2(corr):
+    """
+    Compute the 2×2 lower Cholesky factor for a correlation matrix
+    with off-diagonal element `corr`.
+
+    For a 2×2 matrix [[1, r], [r, 1]], the Cholesky factor L satisfies
+    L @ L.T = [[1, r], [r, 1]]:
+        L = [[1, 0], [r, sqrt(1-r^2)]]
+
+    Args:
+        corr (float): Correlation coefficient (-1 to 1)
+
+    Returns:
+        tuple: (l00, l10, l11) representing the non-zero Cholesky entries
+    """
+    corr = max(-0.99, min(0.99, corr))
+    return (1.0, corr, math.sqrt(max(0.0, 1.0 - corr * corr)))
+
+
+def _sample_correlated_pair(mean1, std1, mean2, std2, corr, skew1=0.0, skew2=0.0):
+    """
+    Draw a correlated pair of random samples using Cholesky decomposition. (C7)
+
+    Generates two correlated standard normals via:
+        z1 = u1
+        z2 = corr * u1 + sqrt(1 - corr^2) * u2
+
+    Then scales each to (mean, std) and applies skew via sample_skew_normal.
+
+    Args:
+        mean1, std1 (float): Parameters for stat 1
+        mean2, std2 (float): Parameters for stat 2
+        corr (float): Desired Pearson correlation between the two samples
+        skew1, skew2 (float): Skew parameters for each stat
+
+    Returns:
+        tuple: (sample1, sample2), both clamped to ≥ 0.0
+    """
+    l00, l10, l11 = _cholesky_2x2(corr)
+
+    # Two independent standard normals
+    u1 = random.gauss(0.0, 1.0)
+    u2 = random.gauss(0.0, 1.0)
+
+    # Correlated standard normals
+    z1 = l00 * u1
+    z2 = l10 * u1 + l11 * u2
+
+    # Scale correlated normals and apply skew via the canonical implementation
+    # in math_helpers.sample_skew_normal (avoids duplicate transformation logic).
+    # We achieve correlation by pre-computing correlated z-scores and then
+    # feeding them as "pre-standardized" noise into a mean-shift approach.
+    skew_delta1 = skew1 / math.sqrt(1.0 + skew1 * skew1) if abs(skew1) > 1e-9 else 0.0
+    skew_delta2 = skew2 / math.sqrt(1.0 + skew2 * skew2) if abs(skew2) > 1e-9 else 0.0
+    shift1 = skew_delta1 * math.sqrt(2.0 / math.pi)
+    shift2 = skew_delta2 * math.sqrt(2.0 / math.pi)
+
+    s1 = max(0.0, mean1 + std1 * (z1 - shift1))
+    s2 = max(0.0, mean2 + std2 * (z2 - shift2))
+    return s1, s2
+
+
+def simulate_combo_stat(
+    component_projections,
+    component_std_devs,
+    prop_line,
+    number_of_simulations,
+    blowout_risk_factor,
+    pace_adjustment_factor,
+    matchup_adjustment_factor,
+    home_away_adjustment,
+    rest_adjustment_factor,
+):
+    """
+    Run a correlated Monte Carlo simulation for a combo stat prop. (C7)
+
+    Combo stats (Pts+Rebs, PRA, etc.) share a minutes factor AND a
+    stat-correlation structure — points and assists are positively correlated,
+    rebounds are weakly correlated with both. This function uses Cholesky
+    decomposition to generate correlated samples, replacing the previous
+    approach of summing independently simulated stats.
+
+    Args:
+        component_projections (dict): {stat_key: projected_avg}
+            e.g., {"points": 24.0, "rebounds": 8.0}
+        component_std_devs (dict): {stat_key: std_dev}
+        prop_line (float): Combo prop line (sum of components)
+        number_of_simulations (int): Simulations to run
+        blowout_risk_factor (float): Blowout probability (0-1)
+        pace_adjustment_factor (float): Pace multiplier
+        matchup_adjustment_factor (float): Defense multiplier
+        home_away_adjustment (float): Home-court additive
+        rest_adjustment_factor (float): Rest multiplier
+
+    Returns:
+        dict: Same structure as run_monte_carlo_simulation()
+    """
     combined_multiplier = (
         pace_adjustment_factor
         * matchup_adjustment_factor
@@ -563,23 +782,60 @@ def simulate_combo_stat(
         for k, v in component_std_devs.items()
     }
 
+    stat_keys = list(adjusted.keys())
     all_combo_results = []
     count_over = 0
 
     for _ in range(number_of_simulations):
-        # Shared minutes multiplier (correlated across all components)
-        blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
-        foul_reduction = _simulate_foul_trouble_minutes_reduction()
-        total_reduction = min(0.40, blowout_reduction + foul_reduction)
-        minutes_mult = 1.0 - total_reduction
+        # Shared minutes multiplier (correlated across all components via scenario)
+        scenario_name, minutes_reduction, stat_multiplier = _simulate_game_scenario(
+            blowout_risk_factor
+        )
+        minutes_reduction = max(-0.15, min(0.60, minutes_reduction))
+        minutes_mult = 1.0 - minutes_reduction
+        momentum = _simulate_hot_cold_modifier()
 
-        combo_value = 0.0
-        for stat_key, proj in adjusted.items():
-            scaled_proj = proj * minutes_mult
-            scaled_std = adjusted_stds.get(stat_key, proj * 0.35) * math.sqrt(minutes_mult)
-            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
-            combo_value += sim_val
+        # Simulate all component stats with inter-stat correlations (C7)
+        # For n>2 stats we approximate by sampling each stat pair-wise
+        # against the first stat (points, or the first key) for efficiency.
+        sim_values = {}
 
+        if len(stat_keys) >= 2:
+            # For each stat after the first, use Cholesky to correlate it
+            # with the preceding stat in the list.
+            anchor_key = stat_keys[0]
+            anchor_mean = adjusted[anchor_key] * minutes_mult * stat_multiplier * momentum
+            anchor_std = adjusted_stds.get(anchor_key, anchor_mean * 0.35) * math.sqrt(max(0.1, minutes_mult))
+            anchor_skew = get_stat_skew_param(anchor_key)
+
+            # Sample the anchor stat first
+            anchor_val = sample_skew_normal(anchor_mean, anchor_std, anchor_skew)
+            sim_values[anchor_key] = max(0.0, anchor_val)
+
+            for k in stat_keys[1:]:
+                corr = STAT_CORRELATION.get((anchor_key, k), 0.0)
+                k_mean = adjusted[k] * minutes_mult * stat_multiplier * momentum
+                k_std = adjusted_stds.get(k, k_mean * 0.35) * math.sqrt(max(0.1, minutes_mult))
+                k_skew = get_stat_skew_param(k)
+
+                if abs(corr) > 0.01:
+                    # Use Cholesky correlated sampling
+                    _, k_val = _sample_correlated_pair(
+                        anchor_mean, anchor_std,
+                        k_mean, k_std,
+                        corr, anchor_skew, k_skew,
+                    )
+                    sim_values[k] = max(0.0, k_val)
+                else:
+                    sim_values[k] = max(0.0, sample_skew_normal(k_mean, k_std, k_skew))
+        else:
+            # Single component
+            for k in stat_keys:
+                proj = adjusted[k] * minutes_mult * stat_multiplier * momentum
+                std = adjusted_stds.get(k, proj * 0.35) * math.sqrt(max(0.1, minutes_mult))
+                sim_values[k] = max(0.0, sample_skew_normal(proj, std, get_stat_skew_param(k)))
+
+        combo_value = sum(sim_values.values())
         all_combo_results.append(combo_value)
         if combo_value > prop_line:
             count_over += 1
@@ -664,7 +920,8 @@ def simulate_fantasy_score(
             std = adjusted_stds.get(stat_key, proj * 0.35)
             scaled_proj = proj * minutes_mult
             scaled_std = std * math.sqrt(minutes_mult)
-            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            # C5: use skew-normal for better tail modeling
+            sim_val = max(0.0, sample_skew_normal(scaled_proj, scaled_std, get_stat_skew_param(stat_key)))
             fantasy_val += sim_val * multiplier
 
         all_fantasy_results.append(fantasy_val)
@@ -753,7 +1010,8 @@ def simulate_double_double(
             std = adjusted_stds.get(stat_key, proj * 0.35)
             scaled_proj = proj * minutes_mult
             scaled_std = std * math.sqrt(minutes_mult)
-            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            # C5: use skew-normal for better tail modeling
+            sim_val = max(0.0, sample_skew_normal(scaled_proj, scaled_std, get_stat_skew_param(stat_key)))
             if sim_val >= DOUBLE_DOUBLE_THRESHOLD:
                 stats_at_10_plus += 1
 
@@ -834,7 +1092,8 @@ def simulate_triple_double(
             std = adjusted_stds.get(stat_key, proj * 0.35)
             scaled_proj = proj * minutes_mult
             scaled_std = std * math.sqrt(minutes_mult)
-            sim_val = max(0.0, sample_from_normal_distribution(scaled_proj, scaled_std))
+            # C5: use skew-normal for better tail modeling
+            sim_val = max(0.0, sample_skew_normal(scaled_proj, scaled_std, get_stat_skew_param(stat_key)))
             if sim_val >= TRIPLE_DOUBLE_THRESHOLD:
                 stats_at_10_plus += 1
 

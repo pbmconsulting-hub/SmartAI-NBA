@@ -768,8 +768,9 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         progress_callback (callable, optional): Called with (current, total, msg)
         precomputed_injury_map (dict, optional): Pre-fetched injury map from
             fetch_player_injury_status().  When supplied, this is used directly
-            for the Step 5 injury filter instead of calling the web scraper,
-            ensuring the most accurate data is applied before the CSV is written.
+            for the Step 5 injury filter instead of calling the nba_api injury
+            fetcher, ensuring the most accurate data is applied before the CSV
+            is written.
 
     Returns:
         bool: True if successful, False if the fetch failed.
@@ -1039,11 +1040,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         # Step 5: Filter out injured / inactive players
         # Use precomputed_injury_map when available (passed from
         # fetch_all_todays_data after injury detection runs first).
-        # Fall back to web scraper → cached JSON when not available.
+        # Fall back to nba_api (via RosterEngine) → cached JSON.
         # --------------------------------------------------------
         # ── Step 5: Injury filter via RosterEngine (primary) ──────────
         # Use RosterEngine as the authoritative multi-source injury pipeline.
-        # Fall back to precomputed_injury_map → web_scraper → cached JSON.
+        # Fall back to precomputed_injury_map → nba_api → cached JSON.
         injury_data = precomputed_injury_map or {}
         _engine = None
         try:
@@ -1061,7 +1062,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                     if scraped_injuries:
                         injury_data = scraped_injuries
                 except Exception as _inj_err:
-                    print(f"  Injury web scrape failed in fetch_todays_players_only: {_inj_err}")
+                    print(f"  Injury fetch (nba_api) failed in fetch_todays_players_only: {_inj_err}")
                     try:
                         if INJURY_STATUS_JSON_PATH.exists():
                             with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
@@ -1502,8 +1503,8 @@ def fetch_player_stats(progress_callback=None):
 
         # --------------------------------------------------------
         # Step 5b: Filter out injured / inactive players
-        # Cross-reference with web-scraped injury data (RotoWire +
-        # NBA.com) to remove players confirmed as Out or on IR
+        # Cross-reference with nba_api injury data (via RosterEngine)
+        # to remove players confirmed as Out or on IR
         # before writing to CSV.
         # --------------------------------------------------------
         try:
@@ -1524,9 +1525,9 @@ def fetch_player_stats(progress_callback=None):
                         f"from player stats ({len(formatted_players)} remain)"
                     )
         except Exception as _inj_err:
-            # Web scraper failed — fall back to the cached injury_status.json
+            # nba_api injury fetch failed — fall back to the cached injury_status.json
             # written by a previous fetch_player_injury_status() run.
-            print(f"  Injury web scrape failed in fetch_player_stats: {_inj_err}")
+            print(f"  Injury fetch (nba_api) failed in fetch_player_stats: {_inj_err}")
             try:
                 cached_injuries = {}
                 if INJURY_STATUS_JSON_PATH.exists():
@@ -2524,14 +2525,14 @@ def fetch_player_injury_status(todays_games=None):
                         entry["injury_note"] = "Not on current team roster"
 
         # --------------------------------------------------------
-        # Layer 5: External web scraping (RotoWire + NBA.com)
-        # Provides real-time GTD/Out/Doubtful designations, specific
-        # injury details, and expected return dates that nba_api cannot
-        # supply.  Runs AFTER the nba_api layers so it can OVERRIDE
-        # stale nba_api data when authoritative scraped data is available.
-        # If ALL scrapers fail the status_map is left untouched.
+        # Layer 5: nba_api injury data (via RosterEngine)
+        # Provides real-time GTD/Out/Doubtful designations and injury
+        # details using the official NBA API.  Runs AFTER the nba_api
+        # stat layers so it can OVERRIDE stale data with the latest
+        # injury designations.  If the API call fails the status_map
+        # is left untouched.
         # --------------------------------------------------------
-        print("fetch_player_injury_status: Layer 5 — external web scraping (RotoWire + NBA.com + ESPN)")
+        print("fetch_player_injury_status: Layer 5 — nba_api injury data (via RosterEngine)")
         try:
             # Prefer the consolidated multi-source fetcher (web_scrapers.py);
             # fall back to the original single-module fetcher if unavailable.
