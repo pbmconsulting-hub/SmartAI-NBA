@@ -13,7 +13,15 @@ import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 
 # Import our engine modules
-from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
+from engine.simulation import (
+    run_monte_carlo_simulation,
+    build_histogram_from_results,
+    simulate_combo_stat,
+    simulate_fantasy_score,
+    simulate_double_double,
+    simulate_triple_double,
+)
+from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
 from engine.confidence import calculate_confidence_score, get_tier_color
@@ -52,6 +60,8 @@ from styles.theme import (
     get_qds_final_verdict_html,
     GLOSSARY,
 )
+
+from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 
 # ============================================================
 # SECTION: Page Setup
@@ -1010,21 +1020,114 @@ if run_analysis:
                 except (TypeError, ValueError):
                     pass
 
-        simulation_output = run_monte_carlo_simulation(
-            projected_stat_average=projected_stat,
-            stat_standard_deviation=stat_std,
-            prop_line=prop_line,
-            number_of_simulations=simulation_depth,
+        # ── Simulation dispatch: use specialist functions for combo/fantasy/yesno ──
+        # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
+        # Fantasy score stats use the platform-specific weighted-sum formula.
+        # Double/triple-double props use threshold-counting simulation.
+        # Simple stats fall back to the standard Monte Carlo path.
+        _sim_kwargs = dict(
             blowout_risk_factor=projection_result.get("blowout_risk", 0.15),
             pace_adjustment_factor=projection_result.get("pace_factor", 1.0),
             matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
             home_away_adjustment=projection_result.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
-            stat_type=stat_type,
-            projected_minutes=projection_result.get("projected_minutes"),
-            minutes_std=4.0,
-            recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
         )
+
+        if stat_type in COMBO_STAT_TYPES:
+            # Build component projections from the per-stat projection outputs
+            _components = COMBO_STATS.get(stat_type, [])
+            _comp_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _components
+            }
+            _comp_std = {
+                s: get_stat_standard_deviation(player_data, s)
+                for s in _components
+            }
+            simulation_output = simulate_combo_stat(
+                component_projections=_comp_proj,
+                component_std_devs=_comp_std,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+            # Update projected_stat to the adjusted combo sum for edge calc
+            projected_stat = simulation_output.get("adjusted_projection", sum(_comp_proj.values()))
+
+        elif stat_type in FANTASY_STAT_TYPES:
+            # Use the platform's weighted-sum fantasy formula
+            _formula = FANTASY_SCORING.get(stat_type, {})
+            _stat_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _formula
+            }
+            _stat_std = {
+                s: get_stat_standard_deviation(player_data, s)
+                for s in _formula
+            }
+            simulation_output = simulate_fantasy_score(
+                stat_projections=_stat_proj,
+                stat_std_devs=_stat_std,
+                fantasy_formula=_formula,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+            projected_stat = simulation_output.get("adjusted_projection", projected_stat)
+
+        elif stat_type == "double_double":
+            _dd_stats = ["points", "rebounds", "assists", "blocks", "steals"]
+            _dd_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _dd_stats
+            }
+            _dd_std = {s: get_stat_standard_deviation(player_data, s) for s in _dd_stats}
+            simulation_output = simulate_double_double(
+                stat_projections=_dd_proj,
+                stat_std_devs=_dd_std,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+
+        elif stat_type == "triple_double":
+            _td_stats = ["points", "rebounds", "assists"]
+            _td_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _td_stats
+            }
+            _td_std = {s: get_stat_standard_deviation(player_data, s) for s in _td_stats}
+            simulation_output = simulate_triple_double(
+                stat_projections=_td_proj,
+                stat_std_devs=_td_std,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+
+        else:
+            # Simple stat: standard Monte Carlo simulation (C5 skew-normal, C8 minutes, C11 KDE)
+            simulation_output = run_monte_carlo_simulation(
+                projected_stat_average=projected_stat,
+                stat_standard_deviation=stat_std,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                stat_type=stat_type,
+                projected_minutes=projection_result.get("projected_minutes"),
+                minutes_std=4.0,
+                recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
+                **_sim_kwargs,
+            )
 
         forces_result = analyze_directional_forces(
             player_data=player_data,

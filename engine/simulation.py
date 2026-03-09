@@ -635,39 +635,6 @@ def build_histogram_from_results(simulated_results, prop_line, number_of_buckets
 # props (Pts+Rebs, PRA, etc.) and fantasy score props.
 # ============================================================
 
-def simulate_combo_stat(
-    component_projections,
-    component_std_devs,
-    prop_line,
-    number_of_simulations,
-    blowout_risk_factor,
-    pace_adjustment_factor,
-    matchup_adjustment_factor,
-    home_away_adjustment,
-    rest_adjustment_factor,
-):
-    """
-    Run a correlated Monte Carlo simulation for a combo stat prop.
-
-    Combo stats (Pts+Rebs, PRA, etc.) share a minutes factor —
-    a blowout or foul trouble affects ALL component stats together.
-    This correlated approach avoids over-counting variance.
-
-    Args:
-        component_projections (dict): {stat_key: projected_avg}
-            e.g., {"points": 24.0, "rebounds": 8.0}
-        component_std_devs (dict): {stat_key: std_dev}
-        prop_line (float): Combo prop line (sum of components)
-        number_of_simulations (int): Simulations to run
-        blowout_risk_factor (float): Blowout probability (0-1)
-        pace_adjustment_factor (float): Pace multiplier
-        matchup_adjustment_factor (float): Defense multiplier
-        home_away_adjustment (float): Home-court additive
-        rest_adjustment_factor (float): Rest multiplier
-
-    Returns:
-        dict: Same structure as run_monte_carlo_simulation()
-    """
 def _cholesky_2x2(corr):
     """
     Compute the 2×2 lower Cholesky factor for a correlation matrix
