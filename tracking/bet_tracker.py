@@ -62,6 +62,7 @@ def log_new_bet(
     entry_fee=0.0,
     team="",
     notes="",
+    auto_logged=0,
 ):
     """
     Log a new bet to track its outcome later.
@@ -81,6 +82,7 @@ def log_new_bet(
         entry_fee (float): Dollar amount (default 0)
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
+        auto_logged (int): 1 if logged automatically by the engine, 0 if manual
 
     Returns:
         tuple: (success: bool, message: str)
@@ -142,6 +144,7 @@ def log_new_bet(
         "tier": tier,
         "entry_fee": float(entry_fee),
         "notes": notes.strip(),
+        "auto_logged": int(auto_logged),
     }
 
     # Save to database
@@ -370,6 +373,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=0.0):
                 f"Auto-logged by SmartAI. "
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}"
             ),
+            auto_logged=1,
         )
         if ok:
             existing_keys.add(dedup_key)

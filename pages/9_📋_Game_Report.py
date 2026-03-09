@@ -56,6 +56,19 @@ except Exception:
 
 _LEAGUE_AVG_DRTG = 113.0  # typical NBA league-average defensive rating
 
+# Load sample player data for key-player matchup display
+try:
+    from data.data_manager import load_players_data as _load_players
+    _players_raw = _load_players()
+    # Build {team_abbrev_upper: [player_dict, ...]} for fast lookup
+    PLAYERS_BY_TEAM: dict = {}
+    for _p in _players_raw:
+        _t = _p.get("team", "").upper().strip()
+        if _t:
+            PLAYERS_BY_TEAM.setdefault(_t, []).append(_p)
+except Exception:
+    PLAYERS_BY_TEAM = {}
+
 # ── Build expanded team alias set for stale-result filtering ──────
 # Covers common NBA abbreviation variants (e.g. "GS" ↔ "GSW", "NY" ↔ "NYK").
 _ABBREV_ALIASES = {
@@ -349,6 +362,56 @@ def _render_game_team_stats(game, game_pred):
         )
 
 
+def _render_key_players(team_abbrev, label):
+    """
+    Show the top 3 scorers and top rebounder from sample_players.csv for a team.
+    Falls back gracefully if no data is available.
+    """
+    players = PLAYERS_BY_TEAM.get(team_abbrev.upper(), [])
+    if not players:
+        st.caption(f"No player data available for {team_abbrev}.")
+        return
+
+    # Sort by points avg, take top 4
+    top_by_pts = sorted(players, key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)[:4]
+    # Top rebounder (may already be in top_by_pts)
+    top_reb = max(players, key=lambda p: float(p.get("rebounds_avg", 0) or 0), default=None)
+
+    # Combine without duplicates
+    shown = {p.get("name", p.get("player_name", "")) for p in top_by_pts}
+    key_players = list(top_by_pts)
+    if top_reb:
+        top_reb_name = top_reb.get("name", top_reb.get("player_name", ""))
+        if top_reb_name and top_reb_name not in shown:
+            key_players.append(top_reb)
+
+    st.markdown(f"**{label} Key Players** (season averages)")
+    rows = []
+    for p in key_players:
+        name = p.get("name", p.get("player_name", "Unknown"))
+        rows.append({
+            "Player": name,
+            "Pos":    p.get("position", "—"),
+            "PTS":    float(p.get("points_avg", 0) or 0),
+            "REB":    float(p.get("rebounds_avg", 0) or 0),
+            "AST":    float(p.get("assists_avg", 0) or 0),
+            "3PM":    float(p.get("threes_avg", 0) or 0),
+            "MIN":    float(p.get("minutes_avg", 0) or 0),
+        })
+    st.dataframe(
+        rows,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "PTS": st.column_config.NumberColumn(format="%.1f"),
+            "REB": st.column_config.NumberColumn(format="%.1f"),
+            "AST": st.column_config.NumberColumn(format="%.1f"),
+            "3PM": st.column_config.NumberColumn(format="%.1f"),
+            "MIN": st.column_config.NumberColumn(format="%.1f"),
+        },
+    )
+
+
 # ── Determine which games to display ────────────────────────
 _games_to_show = [selected_game] if selected_game else todays_games
 
@@ -415,9 +478,16 @@ if _games_to_show:
                 card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
                 components.html(html_content, height=card_height, scrolling=True)
             else:
+                # ── Key player matchups from sample_players.csv ────────
+                kp_col1, kp_col2 = st.columns(2)
+                with kp_col1:
+                    _render_key_players(away, away)
+                with kp_col2:
+                    _render_key_players(home, home)
                 st.info(
-                    "📭 No props analyzed for this matchup yet. "
-                    "Run **⚡ Neural Analysis** with props for these teams to see full prop predictions."
+                    "📭 No props analyzed for this game yet — "
+                    "run **⚡ Neural Analysis** with props for these teams "
+                    "to see full prop predictions and parlay suggestions."
                 )
 
     # ── Overall Entry Strategy Matrix (cross-game) ────────────────────

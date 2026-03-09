@@ -70,11 +70,11 @@ st.divider()
 # SECTION: Tabs
 # ============================================================
 
-tab_log, tab_bets, tab_ai_picks, tab_auto_resolve, tab_predict = st.tabs([
-    "➕ Log a Bet",
-    "📋 My Bets",
+tab_ai_picks, tab_auto_resolve, tab_bets, tab_log, tab_predict = st.tabs([
     "📊 AI Picks",
     "🤖 Auto-Resolve",
+    "📋 My Bets",
+    "➕ Log a Bet",
     "🔮 Performance Predictor",
 ])
 

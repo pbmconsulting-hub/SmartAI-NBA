@@ -756,10 +756,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
     Instead of pulling all ~500 NBA players, this function:
     1. Identifies the teams playing today from todays_games
-    2. Uses CommonTeamRoster to get the CURRENT roster for each team
+    2. Uses RosterEngine to get the CURRENT full roster for each team
        (reflects all trades and signings — no stale player assignments)
-    3. Fetches PlayerGameLog for each active player to get recent stats
+    3. Fetches PlayerGameLog for each player to get recent stats
        and calculate standard deviations
+    4. Applies injury filtering via RosterEngine (Out / IR / Doubtful players removed)
 
     This runs in ~1-2 minutes instead of 10-15 minutes.
 
@@ -777,7 +778,6 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
     """
     try:
         from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import teams as nba_teams_static
     except ImportError:
         print("ERROR: nba_api is not installed. Run: pip install nba_api")
         return False
@@ -800,16 +800,6 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
         if progress_callback:
             progress_callback(0, 10, f"Found {len(playing_team_abbrevs)} teams playing today. Fetching rosters...")
-
-        # --------------------------------------------------------
-        # Step 2: Build a team abbreviation → team ID mapping from nba_api
-        # --------------------------------------------------------
-        all_nba_teams = nba_teams_static.get_teams()
-        team_abbrev_to_id = {}
-        for team in all_nba_teams:
-            abbrev = team.get("abbreviation", "")
-            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
-            team_abbrev_to_id[abbrev] = team.get("id")
 
         # --------------------------------------------------------
         # Step 3: Fetch current roster for each playing team via RosterEngine
