@@ -7,12 +7,21 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
+import streamlit.components.v1 as _components  # For Full Breakdown iframe rendering
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 
 # Import our engine modules
-from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
+from engine.simulation import (
+    run_monte_carlo_simulation,
+    build_histogram_from_results,
+    simulate_combo_stat,
+    simulate_fantasy_score,
+    simulate_double_double,
+    simulate_triple_double,
+)
+from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
 from engine.confidence import calculate_confidence_score, get_tier_color
@@ -51,6 +60,8 @@ from styles.theme import (
     get_qds_final_verdict_html,
     GLOSSARY,
 )
+
+from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 
 # ============================================================
 # SECTION: Page Setup
@@ -325,14 +336,14 @@ def _render_qds_full_breakdown_html(result):
     inside the existing dark-card visual context without a plain Streamlit
     expander frame breaking the design.
 
-    Rendered via st.markdown(html, unsafe_allow_html=True) — all HTML
-    is built with fully inline styles so no external CSS is needed.
+    Rendered via streamlit.components.v1.html() to avoid st.markdown
+    stripping complex inline styles or mis-rendering grid/flex containers.
 
     Args:
         result (dict): Full analysis result from the simulation loop.
 
     Returns:
-        str: Safe HTML string ready for st.markdown(unsafe_allow_html=True).
+        str: Full standalone HTML document ready for components.html().
     """
     player = _html.escape(str(result.get("player_name", "Unknown")))
     stat   = _html.escape(str(result.get("stat_type", "points")).title())
@@ -481,19 +492,30 @@ def _render_qds_full_breakdown_html(result):
     # ── Full breakdown wrapped in <details>/<summary> ────────────
     inner_content = dist_html + forces_html + avoid_html + breakdown_html + explain_html
 
-    return (
-        '<details style="margin-top:10px;">'
+    body_html = (
+        '<details style="margin-top:4px;">'
         '<summary style="cursor:pointer;padding:10px 14px;'
         'background:#14192b;border:1px solid rgba(255,94,0,0.2);border-radius:6px;'
         'color:#ff5e00;font-weight:600;font-size:0.9rem;list-style:none;'
         'user-select:none;">'
-        '📊 Full Breakdown — ' + player + ' ' + stat +
+        '&#128202; Full Breakdown &#8212; ' + player + ' ' + stat +
         '</summary>'
         '<div style="padding:14px 15px 16px;background:#0f1424;border:1px solid rgba(255,94,0,0.15);'
         'border-top:none;border-radius:0 0 6px 6px;color:#c0d0e8;font-size:0.85rem;line-height:1.7;">'
         + inner_content +
         '</div>'
         '</details>'
+    )
+
+    # Wrap in a full standalone HTML document so components.html() renders it correctly.
+    return (
+        '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        '<style>'
+        'body{margin:0;padding:0;background:transparent;font-family:Montserrat,sans-serif;}'
+        'details summary::-webkit-details-marker{display:none;}'
+        '</style></head><body>'
+        + body_html +
+        '</body></html>'
     )
 
 
@@ -600,8 +622,10 @@ def display_prop_analysis_card_qds(result):
         })
         st.rerun()
 
-    # ── Full Breakdown (QDS-styled HTML, matching Game Report design) ─
-    st.markdown(_render_qds_full_breakdown_html(result), unsafe_allow_html=True)
+    # ── Full Breakdown (QDS-styled HTML rendered via iframe to avoid st.markdown stripping) ─
+    breakdown_html = _render_qds_full_breakdown_html(result)
+    # Estimate height: collapsed summary bar ~50px + expanded content ~350px
+    _components.html(breakdown_html, height=420, scrolling=False)
 
 
 # ============================================================
@@ -675,9 +699,22 @@ status_col, settings_col = st.columns([2, 1])
 
 with status_col:
     if current_props:
-        st.info(f"📋 **{len(current_props)} props** loaded and ready for analysis.")
+        # Show per-platform breakdown of loaded props
+        _prerun_plat_counts: dict = {}
+        for _pp in current_props:
+            _plat = _pp.get("platform", "Unknown")
+            _prerun_plat_counts[_plat] = _prerun_plat_counts.get(_plat, 0) + 1
+        _plat_detail = " · ".join(
+            f"**{_pl}**: {_n}" for _pl, _n in sorted(_prerun_plat_counts.items())
+        )
+        st.info(
+            f"📋 **{len(current_props)} props** loaded and ready for analysis — {_plat_detail}."
+        )
     else:
-        st.warning("⚠️ No props loaded. Go to **📥 Import Props** first.")
+        st.warning(
+            "⚠️ No props loaded. Go to **🔬 Prop Scanner** → "
+            "**🤖 Auto-Generate Props for Tonight's Games** or import props manually."
+        )
 
     if todays_games:
         st.success(f"🏟️ **{len(todays_games)} game(s)** configured for tonight.")
@@ -711,6 +748,8 @@ with status_col:
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
     st.caption(f"⚙️ Min Edge: **{minimum_edge}%**")
+    _shown_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
+    st.caption(f"⚙️ Platforms: **{', '.join(_shown_platforms)}**")
     st.caption("Change on the ⚙️ Settings page")
 
 # ============================================================
@@ -819,6 +858,36 @@ if run_analysis:
         inj_skipped = before_inj - len(props_to_analyze)
         if inj_skipped > 0:
             st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
+
+    # ── Filter to selected platforms (from ⚙️ Settings) ──────────────
+    _selected_platforms = st.session_state.get(
+        "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
+    )
+    if _selected_platforms:
+        before_plat = len(props_to_analyze)
+        props_to_analyze = [
+            p for p in props_to_analyze
+            if not p.get("platform", "").strip()          # include props with no platform
+            or p.get("platform", "") in _selected_platforms
+        ]
+        plat_skipped = before_plat - len(props_to_analyze)
+        if plat_skipped > 0:
+            st.info(
+                f"ℹ️ Skipping **{plat_skipped}** prop(s) for platforms not in your "
+                f"selection ({', '.join(_selected_platforms)}). "
+                "Change platforms on the ⚙️ Settings page."
+            )
+
+    # ── Show per-platform prop count summary ─────────────────────────
+    if props_to_analyze:
+        _plat_counts = {}
+        for _p in props_to_analyze:
+            _plat = _p.get("platform", "Unknown")
+            _plat_counts[_plat] = _plat_counts.get(_plat, 0) + 1
+        _plat_summary = " · ".join(
+            f"**{_plat}**: {_n}" for _plat, _n in sorted(_plat_counts.items())
+        )
+        st.caption(f"📊 Analyzing: {_plat_summary}")
 
     total_props_count    = len(props_to_analyze)
     if total_props_count == 0:
@@ -951,21 +1020,114 @@ if run_analysis:
                 except (TypeError, ValueError):
                     pass
 
-        simulation_output = run_monte_carlo_simulation(
-            projected_stat_average=projected_stat,
-            stat_standard_deviation=stat_std,
-            prop_line=prop_line,
-            number_of_simulations=simulation_depth,
+        # ── Simulation dispatch: use specialist functions for combo/fantasy/yesno ──
+        # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
+        # Fantasy score stats use the platform-specific weighted-sum formula.
+        # Double/triple-double props use threshold-counting simulation.
+        # Simple stats fall back to the standard Monte Carlo path.
+        _sim_kwargs = dict(
             blowout_risk_factor=projection_result.get("blowout_risk", 0.15),
             pace_adjustment_factor=projection_result.get("pace_factor", 1.0),
             matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
             home_away_adjustment=projection_result.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
-            stat_type=stat_type,
-            projected_minutes=projection_result.get("projected_minutes"),
-            minutes_std=4.0,
-            recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
         )
+
+        if stat_type in COMBO_STAT_TYPES:
+            # Build component projections from the per-stat projection outputs
+            _components = COMBO_STATS.get(stat_type, [])
+            _comp_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _components
+            }
+            _comp_std = {
+                s: get_stat_standard_deviation(player_data, s)
+                for s in _components
+            }
+            simulation_output = simulate_combo_stat(
+                component_projections=_comp_proj,
+                component_std_devs=_comp_std,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+            # Update projected_stat to the adjusted combo sum for edge calc
+            projected_stat = simulation_output.get("adjusted_projection", sum(_comp_proj.values()))
+
+        elif stat_type in FANTASY_STAT_TYPES:
+            # Use the platform's weighted-sum fantasy formula
+            _formula = FANTASY_SCORING.get(stat_type, {})
+            _stat_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _formula
+            }
+            _stat_std = {
+                s: get_stat_standard_deviation(player_data, s)
+                for s in _formula
+            }
+            simulation_output = simulate_fantasy_score(
+                stat_projections=_stat_proj,
+                stat_std_devs=_stat_std,
+                fantasy_formula=_formula,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+            projected_stat = simulation_output.get("adjusted_projection", projected_stat)
+
+        elif stat_type == "double_double":
+            _dd_stats = ["points", "rebounds", "assists", "blocks", "steals"]
+            _dd_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _dd_stats
+            }
+            _dd_std = {s: get_stat_standard_deviation(player_data, s) for s in _dd_stats}
+            simulation_output = simulate_double_double(
+                stat_projections=_dd_proj,
+                stat_std_devs=_dd_std,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+
+        elif stat_type == "triple_double":
+            _td_stats = ["points", "rebounds", "assists"]
+            _td_proj = {
+                s: projection_result.get(
+                    f"projected_{s}",
+                    float(player_data.get(f"{s}_avg", 0) or 0),
+                )
+                for s in _td_stats
+            }
+            _td_std = {s: get_stat_standard_deviation(player_data, s) for s in _td_stats}
+            simulation_output = simulate_triple_double(
+                stat_projections=_td_proj,
+                stat_std_devs=_td_std,
+                number_of_simulations=simulation_depth,
+                **_sim_kwargs,
+            )
+
+        else:
+            # Simple stat: standard Monte Carlo simulation (C5 skew-normal, C8 minutes, C11 KDE)
+            simulation_output = run_monte_carlo_simulation(
+                projected_stat_average=projected_stat,
+                stat_standard_deviation=stat_std,
+                prop_line=prop_line,
+                number_of_simulations=simulation_depth,
+                stat_type=stat_type,
+                projected_minutes=projection_result.get("projected_minutes"),
+                minutes_std=4.0,
+                recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
+                **_sim_kwargs,
+            )
 
         forces_result = analyze_directional_forces(
             player_data=player_data,
@@ -1146,57 +1308,8 @@ if run_analysis:
 
     # ── Auto-log all qualifying picks to the Bet Tracker ────────
     try:
-        from tracking.bet_tracker import log_new_bet as _log_bet
-        from tracking.database import load_all_bets as _load_bets
-        import datetime as _dt
-
-        _existing_bets = _load_bets(limit=500)
-        _today_str = _dt.date.today().isoformat()
-        _existing_keys = {
-            (
-                b.get("player_name", "").lower(),
-                b.get("stat_type", ""),
-                float(b.get("prop_line", 0) or 0),
-                b.get("direction", "OVER"),
-                b.get("bet_date", ""),
-            )
-            for b in _existing_bets
-        }
-
-        _auto_logged = 0
-        for _res in analysis_results_list:
-            if _res.get("edge_percentage", 0) < minimum_edge:
-                continue
-            if _res.get("player_is_out", False):
-                continue
-            _key = (
-                _res.get("player_name", "").lower(),
-                _res.get("stat_type", ""),
-                float(_res.get("line", 0) or 0),
-                _res.get("direction", "OVER"),
-                _today_str,
-            )
-            if _key in _existing_keys:
-                continue  # don't double-log
-            _ok, _msg = _log_bet(
-                player_name=_res.get("player_name", ""),
-                stat_type=_res.get("stat_type", "points"),
-                prop_line=float(_res.get("line", 0) or 0),
-                direction=_res.get("direction", "OVER"),
-                platform="SmartAI-Auto",
-                confidence_score=float(_res.get("confidence_score", 0) or 0),
-                probability_over=float(_res.get("probability_over", 0.5) or 0.5),
-                edge_percentage=float(_res.get("edge_percentage", 0) or 0),
-                tier=_res.get("tier", "Bronze"),
-                team=_res.get("player_team", _res.get("team", "")),
-                notes=(
-                    f"Auto-logged by SmartAI. "
-                    f"SAFE Score: {_res.get('confidence_score', 0):.0f}"
-                ),
-            )
-            if _ok:
-                _auto_logged += 1
-
+        from tracking.bet_tracker import auto_log_analysis_bets as _auto_log
+        _auto_logged = _auto_log(analysis_results_list, minimum_edge=minimum_edge)
         if _auto_logged > 0:
             st.info(
                 f"📊 Auto-logged **{_auto_logged}** qualifying pick(s) to the Bet Tracker."
@@ -1267,6 +1380,72 @@ if analysis_results:
             + ", ".join(unmatched_names)
             + " — results may be less accurate."
         )
+
+    st.divider()
+
+    # ── 🎯 Strongly Suggested Parlays (at TOP for maximum visibility) ─
+    strategy_entries = _build_entry_strategy(displayed_results)
+    if strategy_entries:
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
+            'border:2px solid #ff5e00;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+            '<h3 style="color:#ff5e00;font-family:Orbitron,sans-serif;margin:0 0 6px;">🎯 Strongly Suggested Parlays</h3>'
+            '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Optimized multi-leg combos ranked by combined EDGE Score™</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        _PARLAY_STARS = {2: "⭐", 3: "⭐⭐", 4: "⭐⭐⭐", 5: "⭐⭐⭐", 6: "⭐⭐⭐"}
+        _PARLAY_LABEL = {
+            2: "Best 2-Leg Parlay",
+            3: "Best 3-Leg Parlay",
+            4: "Best 4-Leg Parlay",
+            5: "Best 5-Leg Parlay",
+            6: "Max Entry (6-Leg)",
+        }
+        for _i, entry in enumerate(strategy_entries):
+            _num     = entry.get("num_legs", 0)
+            _label   = _PARLAY_LABEL.get(_num, entry.get("combo_type", ""))
+            _star    = _PARLAY_STARS.get(_num, "")
+            # Top 2 entries get a glow border
+            _glow = "box-shadow:0 0 14px rgba(255,94,0,0.45);" if _i < 2 else ""
+            picks_html = ""
+            for pick_str in entry.get("picks", []):
+                parts = pick_str.split(" ", 1)
+                pname = _html.escape(parts[0]) if parts else ""
+                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
+                picks_html += (
+                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
+                    f'<span style="color:#c0d0e8;">{rest}</span>'
+                    f'</div>'
+                )
+            reasons = entry.get("reasons", [])
+            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
+            combined = entry.get("combined_prob", 0)
+            avg_edge = entry.get("avg_edge", 0)
+            avg_conf = entry.get("safe_avg", "—")
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:8px;padding:15px 18px;'
+                f'margin-bottom:14px;border-left:4px solid #ff5e00;{_glow}">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+                f'<h4 style="color:#ff5e00;margin:0;font-family:Orbitron,sans-serif;">'
+                f'{_star} {_label}</h4>'
+                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 10px;border-radius:4px;'
+                f'font-size:0.8rem;font-weight:700;">SAFE: {avg_conf}/100</span>'
+                f'</div>'
+                f'{picks_html}'
+                f'<div style="margin-top:10px;padding:7px 10px;background:rgba(20,25,43,0.7);border-radius:4px;">'
+                f'<span style="color:#00c8ff;font-size:0.82rem;">💡 {reason_text}</span>'
+                f'</div>'
+                f'<div style="display:flex;gap:18px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
+                f'<span>Combined prob: {combined:.1f}%</span>'
+                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
 
     st.divider()
 
@@ -1357,54 +1536,6 @@ if analysis_results:
         display_prop_analysis_card_qds(result)
         st.markdown("---")
 
-    # ── Entry Strategy Matrix ─────────────────────────────────────
-    st.divider()
-    st.markdown("## 🎰 ENTRY STRATEGY MATRIX")
-    st.markdown("Optimized parlay combinations ranked by combined EDGE Score™")
-
-    strategy_entries = _build_entry_strategy(displayed_results)
-    if not strategy_entries:
-        st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
-    else:
-        for entry in strategy_entries:
-            picks_html = ""
-            for pick_str in entry.get("picks", []):
-                parts = pick_str.split(" ", 1)
-                pname = _html.escape(parts[0]) if parts else ""
-                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
-                picks_html += (
-                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">'
-                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
-                    f'<span style="color:#c0d0e8;">{rest}</span>'
-                    f'</div>'
-                )
-            reasons = entry.get("reasons", [])
-            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
-            avg_conf    = entry.get("safe_avg", "—")
-            combined    = entry.get("combined_prob", 0)
-            avg_edge    = entry.get("avg_edge", 0)
-            num_legs    = entry.get("num_legs", 0)
-            combo_type  = _html.escape(entry.get("combo_type", ""))
-            st.markdown(
-                f'<div style="background:#14192b;border-radius:8px;padding:15px;margin-bottom:15px;'
-                f'border-left:3px solid #ff5e00;">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-                f'<h4 style="color:#ff5e00;margin:0;">🎲 {combo_type}</h4>'
-                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 8px;border-radius:4px;'
-                f'font-size:0.8rem;font-weight:700;">Avg EDGE: {avg_conf}/100</span>'
-                f'</div>'
-                f'{picks_html}'
-                f'<div style="margin-top:10px;padding:8px;background:rgba(20,25,43,0.7);border-radius:4px;">'
-                f'<span style="color:#00c8ff;font-size:0.85rem;">💡 {reason_text}</span>'
-                f'</div>'
-                f'<div style="display:flex;gap:15px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
-                f'<span>Combined prob: {combined:.1f}%</span>'
-                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
-                f'</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
     with st.expander("🏁 Final Verdict", expanded=True):
@@ -1459,7 +1590,21 @@ elif not run_analysis:
     if current_props:
         st.info("👆 Click **Run Analysis** to analyze all loaded props.")
     else:
-        st.warning("⚠️ No props loaded. Go to **📥 Import Props** to add props first.")
+        _has_games = bool(st.session_state.get("todays_games"))
+        if _has_games:
+            st.warning(
+                "⚠️ No props loaded yet. "
+                "Go to **🔬 Prop Scanner** and click **🤖 Auto-Generate Props for Tonight** "
+                "to instantly create props for all active players on tonight's teams — "
+                "or click **🔄 Auto-Load Tonight's Games** on the **📡 Live Games** page "
+                "to reload games and auto-generate props in one step."
+            )
+        else:
+            st.warning(
+                "⚠️ No props loaded and no games found. "
+                "Start on the **📡 Live Games** page — click **🔄 Auto-Load Tonight's Games** "
+                "to fetch tonight's schedule and auto-generate props for all active players."
+            )
 
 # ============================================================
 # END SECTION: Display Analysis Results

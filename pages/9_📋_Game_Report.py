@@ -46,6 +46,29 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 todays_games     = st.session_state.get("todays_games",     [])
 analysis_results = st.session_state.get("analysis_results", [])
 
+# Load team stats for game predictions (pace, ortg, drtg)
+try:
+    from data.data_manager import load_teams_data as _load_teams
+    _teams_list = _load_teams()
+    TEAMS_DATA = {t.get("abbreviation", "").upper(): t for t in _teams_list if t.get("abbreviation")}
+except Exception:
+    TEAMS_DATA = {}
+
+_LEAGUE_AVG_DRTG = 113.0  # typical NBA league-average defensive rating
+
+# Load sample player data for key-player matchup display
+try:
+    from data.data_manager import load_players_data as _load_players
+    _players_raw = _load_players()
+    # Build {team_abbrev_upper: [player_dict, ...]} for fast lookup
+    PLAYERS_BY_TEAM: dict = {}
+    for _p in _players_raw:
+        _t = _p.get("team", "").upper().strip()
+        if _t:
+            PLAYERS_BY_TEAM.setdefault(_t, []).append(_p)
+except Exception:
+    PLAYERS_BY_TEAM = {}
+
 # ── Build expanded team alias set for stale-result filtering ──────
 # Covers common NBA abbreviation variants (e.g. "GS" ↔ "GSW", "NY" ↔ "NYK").
 _ABBREV_ALIASES = {
@@ -147,13 +170,13 @@ if todays_games:
             f"{g.get('away_team','?')} @ {g.get('home_team','?')}"
             for g in todays_games
         ]
-        options = ["— All available props —"] + game_labels
+        options = ["— All games tonight —"] + game_labels
         sel_idx = st.selectbox(
             "🏟️ Select Matchup",
             range(len(options)),
             format_func=lambda i: options[i],
-            index=0,  # default to "All available props"
-            help="Filter the report to a single game, or show all analysed props.",
+            index=0,
+            help="Filter to a specific game, or show all games tonight.",
         )
         if sel_idx > 0:
             selected_game = todays_games[sel_idx - 1]
@@ -164,17 +187,15 @@ if todays_games:
         st.metric("Analysed Props",  n_props)
         st.metric("High-Conf Picks", n_picks, help="Picks with confidence ≥ 70")
 
-    # ── "Generate Full Report" button — always visible ─────────────
-    # Shows a report for ALL analysis results regardless of game filter.
-    full_report_btn = st.button(
-        "📋 Generate Full Report for ALL Props",
-        use_container_width=True,
-        help="Render a complete QDS breakdown for every analysed prop, ignoring the game filter.",
-    )
-    if full_report_btn:
+    if not analysis_results:
+        st.info(
+            "💡 Games loaded. Run **⚡ Neural Analysis** to add prop predictions to each report — "
+            "team stats and game predictions are shown below for all matchups."
+        )
+
+elif not todays_games and analysis_results:
+    if st.button("📋 Generate Full Report for All Props", use_container_width=True):
         st.session_state["game_report_show_all"] = True
-    else:
-        st.session_state.setdefault("game_report_show_all", False)
 
 elif not todays_games and not analysis_results:
     st.info(
@@ -182,28 +203,6 @@ elif not todays_games and not analysis_results:
         "Go to **📡 Live Games** to fetch tonight's NBA slate, "
         "then run **⚡ Neural Analysis** to generate prop predictions."
     )
-
-    # Still allow generating a report if there are analysis results without games
-    if analysis_results:
-        if st.button("📋 Generate Full Report for All Props", use_container_width=True):
-            st.session_state["game_report_show_all"] = True
-
-elif todays_games and not analysis_results:
-    st.warning(
-        "⚡ **Run Neural Analysis first, then return here.**\n\n"
-        "Games are loaded but no analysis results were found. "
-        "Go to the **⚡ Neural Analysis** page and click **Run Analysis**, "
-        "then come back here for the full QDS breakdown."
-    )
-else:
-    st.info(
-        "💡 No games loaded yet. "
-        "Go to **📡 Live Games** to fetch tonight's NBA slate, "
-        "then run **⚡ Neural Analysis** to generate prop predictions."
-    )
-    if analysis_results:
-        if st.button("📋 Generate Full Report for All Props", use_container_width=True):
-            st.session_state["game_report_show_all"] = True
 
 # ============================================================
 # END SECTION: Matchup Selector
@@ -217,7 +216,6 @@ else:
 if selected_game and analysis_results:
     home = selected_game.get("home_team", "").upper().strip()
     away = selected_game.get("away_team", "").upper().strip()
-    # Build alias-expanded set for the selected game's teams
     game_teams = _expand_teams({home, away} - {""})
     filtered = [
         r for r in analysis_results
@@ -288,81 +286,233 @@ def _build_entry_strategy(results):
     return entries
 
 
-if not selected_game and len(todays_games) > 1 and report_results:
-    # ── Multiple matchups: per-game collapsible Streamlit expanders ──
-    for game in todays_games:
+def _predict_game(home_abbrev, away_abbrev):
+    """
+    Return a simple game score prediction using team ortg/drtg/pace from teams.csv.
+
+    Returns:
+        dict with keys: home_score, away_score, predicted_total,
+                        predicted_winner, predicted_margin
+        or None if team data is unavailable.
+    """
+    home_t = TEAMS_DATA.get(home_abbrev.upper(), {})
+    away_t = TEAMS_DATA.get(away_abbrev.upper(), {})
+    if not home_t or not away_t:
+        return None
+
+    try:
+        home_ortg  = float(home_t.get("ortg",  113.0) or 113.0)
+        home_drtg  = float(home_t.get("drtg",  113.0) or 113.0)
+        home_pace  = float(home_t.get("pace",  100.0) or 100.0)
+        away_ortg  = float(away_t.get("ortg",  113.0) or 113.0)
+        away_drtg  = float(away_t.get("drtg",  113.0) or 113.0)
+        away_pace  = float(away_t.get("pace",  100.0) or 100.0)
+
+        avg_pace = (home_pace + away_pace) / 2.0
+
+        # Score ≈ ortg * (avg_pace/100) adjusted for opponent's defense
+        home_score = round(home_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / away_drtg), 1)
+        away_score = round(away_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / home_drtg), 1)
+        predicted_total  = round(home_score + away_score, 1)
+        predicted_margin = round(abs(home_score - away_score), 1)
+        predicted_winner = home_abbrev if home_score > away_score else away_abbrev
+
+        return {
+            "home_score":       home_score,
+            "away_score":       away_score,
+            "predicted_total":  predicted_total,
+            "predicted_winner": predicted_winner,
+            "predicted_margin": predicted_margin,
+            "home_ortg":  home_ortg, "home_drtg":  home_drtg, "home_pace":  home_pace,
+            "away_ortg":  away_ortg, "away_drtg":  away_drtg, "away_pace":  away_pace,
+        }
+    except Exception:
+        return None
+
+
+def _render_game_team_stats(game, game_pred):
+    """Render a compact team-stats comparison + game prediction row."""
+    home = game.get("home_team", "?").upper()
+    away = game.get("away_team", "?").upper()
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f"**{away}** (away)")
+    c2.markdown(f"**{home}** (home)")
+
+    if game_pred:
+        c3.markdown(
+            f"**Predicted:** {away} {game_pred['away_score']:.0f} — "
+            f"{home} {game_pred['home_score']:.0f}"
+        )
+        c4.markdown(
+            f"**Total:** {game_pred['predicted_total']:.0f} · "
+            f"**Winner:** {game_pred['predicted_winner']} by {game_pred['predicted_margin']:.0f}"
+        )
+
+    # Team stats mini-table
+    ht = TEAMS_DATA.get(home, {})
+    at = TEAMS_DATA.get(away, {})
+    if ht or at:
+        st.markdown(
+            f"| Stat | {away} | {home} |\n"
+            f"|------|-------|--------|\n"
+            f"| Pace | {at.get('pace','—')} | {ht.get('pace','—')} |\n"
+            f"| ORtg | {at.get('ortg','—')} | {ht.get('ortg','—')} |\n"
+            f"| DRtg | {at.get('drtg','—')} | {ht.get('drtg','—')} |"
+        )
+
+
+def _render_key_players(team_abbrev, label):
+    """
+    Show the top 3 scorers and top rebounder from sample_players.csv for a team.
+    Falls back gracefully if no data is available.
+    """
+    players = PLAYERS_BY_TEAM.get(team_abbrev.upper(), [])
+    if not players:
+        st.caption(f"No player data available for {team_abbrev}.")
+        return
+
+    # Sort by points avg, take top 4
+    top_by_pts = sorted(players, key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)[:4]
+    # Top rebounder (may already be in top_by_pts)
+    top_reb = max(players, key=lambda p: float(p.get("rebounds_avg", 0) or 0), default=None)
+
+    # Combine without duplicates
+    shown = {p.get("name", p.get("player_name", "")) for p in top_by_pts}
+    key_players = list(top_by_pts)
+    if top_reb:
+        top_reb_name = top_reb.get("name", top_reb.get("player_name", ""))
+        if top_reb_name and top_reb_name not in shown:
+            key_players.append(top_reb)
+
+    st.markdown(f"**{label} Key Players** (season averages)")
+    rows = []
+    for p in key_players:
+        name = p.get("name", p.get("player_name", "Unknown"))
+        rows.append({
+            "Player": name,
+            "Pos":    p.get("position", "—"),
+            "PTS":    float(p.get("points_avg", 0) or 0),
+            "REB":    float(p.get("rebounds_avg", 0) or 0),
+            "AST":    float(p.get("assists_avg", 0) or 0),
+            "3PM":    float(p.get("threes_avg", 0) or 0),
+            "MIN":    float(p.get("minutes_avg", 0) or 0),
+        })
+    st.dataframe(
+        rows,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "PTS": st.column_config.NumberColumn(format="%.1f"),
+            "REB": st.column_config.NumberColumn(format="%.1f"),
+            "AST": st.column_config.NumberColumn(format="%.1f"),
+            "3PM": st.column_config.NumberColumn(format="%.1f"),
+            "MIN": st.column_config.NumberColumn(format="%.1f"),
+        },
+    )
+
+
+# ── Determine which games to display ────────────────────────
+_games_to_show = [selected_game] if selected_game else todays_games
+
+if _games_to_show:
+    for game in _games_to_show:
         home = game.get("home_team", "").upper().strip()
         away = game.get("away_team", "").upper().strip()
+        game_teams_expanded = _expand_teams({home, away} - {""})
         game_results = [
             r for r in report_results
-            if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
+            if r.get("player_team", r.get("team", "")).upper().strip() in game_teams_expanded
         ]
         n_game_props = len(game_results)
         n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
+
+        # Always show every game — even when no props have been analyzed
         expander_label = (
-            f"🏀 {away} @ {home} — "
-            f"{n_game_props} props · {n_conf} high-confidence"
+            f"🏀 {away} @ {home}"
+            + (f" — {n_game_props} props · {n_conf} high-conf" if n_game_props else " — no props analyzed")
         )
 
         with st.expander(expander_label, expanded=True):
+            game_pred = _predict_game(home, away)
+
+            # ── Always show team stats + game prediction ───────────
+            st.markdown("#### 📊 Team Stats & Game Prediction")
+            _render_game_team_stats(game, game_pred)
+
+            if game_pred:
+                st.caption(
+                    f"🔮 Predicted: **{away} {game_pred['away_score']:.0f}** vs "
+                    f"**{home} {game_pred['home_score']:.0f}** · "
+                    f"Total: **{game_pred['predicted_total']:.0f}** · "
+                    f"Predicted winner: **{game_pred['predicted_winner']}** "
+                    f"by **{game_pred['predicted_margin']:.0f}**"
+                )
+
+            st.divider()
+
             if game_results:
+                # ── Suggested Parlays for this game ───────────────
+                game_strategy = _build_entry_strategy(game_results)
+                if game_strategy:
+                    st.markdown("#### 🎯 Suggested Parlays")
+                    for _e in game_strategy[:3]:
+                        _picks_str = " + ".join(_e.get("picks", []))
+                        st.markdown(
+                            f'<div style="background:#14192b;border-radius:6px;padding:10px 14px;'
+                            f'margin-bottom:8px;border-left:3px solid #ff5e00;">'
+                            f'<span style="color:#ff5e00;font-weight:600;">'
+                            f'{_e.get("combo_type","")}</span>'
+                            f'<span style="color:#8b949e;font-size:0.8rem;margin:0 8px;">SAFE {_e.get("safe_avg","")}/100</span>'
+                            f'<div style="color:#c0d0e8;font-size:0.85rem;margin-top:4px;">{_picks_str}</div>'
+                            f'</div>',
+                            unsafe_allow_html=True,
+                        )
+                    st.divider()
+
+                # ── Full QDS prop card report ──────────────────────
                 html_content = get_game_report_html(
                     game=game,
                     analysis_results=game_results,
                 )
-                # Adjust height: ~2000px per prop card + base sections
                 card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
                 components.html(html_content, height=card_height, scrolling=True)
             else:
+                # ── Key player matchups from sample_players.csv ────────
+                kp_col1, kp_col2 = st.columns(2)
+                with kp_col1:
+                    _render_key_players(away, away)
+                with kp_col2:
+                    _render_key_players(home, home)
                 st.info(
-                    "No analysis results for this matchup yet. "
-                    "Run **⚡ Neural Analysis** first."
+                    "📭 No props analyzed for this game yet — "
+                    "run **⚡ Neural Analysis** with props for these teams "
+                    "to see full prop predictions and parlay suggestions."
                 )
 
-    # ── Overall Entry Strategy Matrix ─────────────────────────────────
-    strategy_entries = _build_entry_strategy(report_results)
-    if strategy_entries:
-        st.divider()
-        st.subheader("📊 Overall Entry Strategy Matrix")
-        st.markdown(
-            "Optimal multi-leg combinations ranked by SAFE Score™ across all tonight's matchups.",
-            help="Based on the highest-confidence, non-avoided props from all games.",
-        )
-        st.markdown(get_qds_strategy_table_html(strategy_entries), unsafe_allow_html=True)
-
-elif st.session_state.get("game_report_show_all") and todays_games and analysis_results:
-    # ── "Generate Report for ALL Games Tonight" was clicked ───────────
-    st.session_state["game_report_show_all"] = False
-    for game in todays_games:
-        home = game.get("home_team", "").upper().strip()
-        away = game.get("away_team", "").upper().strip()
-        game_results = [
-            r for r in analysis_results
-            if r.get("player_team", r.get("team", "")).upper().strip() in (home, away)
-        ]
-        n_game_props = len(game_results)
-        n_conf = len([r for r in game_results if r.get("confidence_score", 0) >= 70])
-        st.subheader(f"🏀 {away} @ {home}")
-        st.caption(f"{n_game_props} props analysed · {n_conf} high-confidence picks")
-        if game_results:
-            html_content = get_game_report_html(
-                game=game,
-                analysis_results=game_results,
+    # ── Overall Entry Strategy Matrix (cross-game) ────────────────────
+    if report_results and not selected_game and len(todays_games) > 1:
+        all_strategy = _build_entry_strategy(report_results)
+        if all_strategy:
+            st.divider()
+            st.subheader("📊 Cross-Game Entry Strategy Matrix")
+            st.markdown(
+                "Best multi-leg combinations across ALL tonight's matchups, "
+                "ranked by SAFE Score™.",
             )
-            card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
-            components.html(html_content, height=card_height, scrolling=True)
-        else:
-            st.info("No analysis results for this matchup. Run **⚡ Neural Analysis** first.")
-        st.divider()
+            st.markdown(get_qds_strategy_table_html(all_strategy), unsafe_allow_html=True)
 
-else:
-    # ── Single game or "All" with a selected matchup ──────────────────
+elif analysis_results and not todays_games:
+    # No games loaded — but analysis results exist from a previous session
     html_content = get_game_report_html(
-        game=selected_game,
+        game=None,
         analysis_results=report_results,
     )
-    # Render in a scrollable iframe — height covers ~3 prop cards + all sections
     components.html(html_content, height=6200, scrolling=True)
+else:
+    st.info(
+        "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."
+    )
 
 # ============================================================
 # END SECTION: Render QDS Game Report

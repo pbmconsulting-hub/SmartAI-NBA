@@ -62,6 +62,7 @@ def log_new_bet(
     entry_fee=0.0,
     team="",
     notes="",
+    auto_logged=0,
 ):
     """
     Log a new bet to track its outcome later.
@@ -81,6 +82,7 @@ def log_new_bet(
         entry_fee (float): Dollar amount (default 0)
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
+        auto_logged (int): 1 if logged automatically by the engine, 0 if manual
 
     Returns:
         tuple: (success: bool, message: str)
@@ -142,6 +144,7 @@ def log_new_bet(
         "tier": tier,
         "entry_fee": float(entry_fee),
         "notes": notes.strip(),
+        "auto_logged": int(auto_logged),
     }
 
     # Save to database
@@ -284,8 +287,105 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 
 
 # ============================================================
-# SECTION: Auto-Resolve
+# SECTION: Auto-Log Analysis Results
 # ============================================================
+
+def auto_log_analysis_bets(analysis_results, minimum_edge=0.0):
+    """
+    Automatically log bet records for analysis results that have a positive
+    edge in the model's recommended direction.
+
+    Call this after Neural Analysis completes to populate the Bet Tracker
+    with tonight's picks without any manual entry.
+
+    Deduplication: a bet for the same (player, stat, line, direction, date)
+    that was already logged today is skipped so re-running analysis does
+    not create duplicate rows.  Only today's bets are loaded for the
+    deduplication check to keep the query fast regardless of history size.
+
+    Args:
+        analysis_results (list[dict]): Full analysis result list from the
+            Neural Analysis engine (as stored in session_state).
+        minimum_edge (float): Skip picks whose edge_percentage is below
+            this value.  Defaults to 0.0.  Only picks with edge > 0
+            (model favours the recommended direction) are ever logged.
+
+    Returns:
+        int: Number of new bets logged.
+    """
+    import datetime as _dt
+    import sqlite3 as _sqlite3
+    from tracking.database import DB_FILE_PATH as _DB_PATH
+
+    if not analysis_results:
+        return 0
+
+    today_str = _dt.date.today().isoformat()
+
+    # Build today-scoped deduplication set using a direct, date-filtered query
+    # to avoid loading the entire bet history.
+    existing_keys: set = set()
+    try:
+        with _sqlite3.connect(str(_DB_PATH)) as _conn:
+            _rows = _conn.execute(
+                "SELECT player_name, stat_type, prop_line, direction FROM bets WHERE bet_date = ?",
+                (today_str,),
+            ).fetchall()
+        existing_keys = {
+            (row[0].lower(), row[1], float(row[2] or 0), row[3])
+            for row in _rows
+        }
+    except Exception:
+        pass  # If query fails, log without dedup (safe — unique constraint absent)
+
+    logged = 0
+    for res in analysis_results:
+        edge = res.get("edge_percentage", 0)
+        # Only log picks where the model has a positive edge in its recommended direction
+        if edge <= 0:
+            continue
+        if edge < minimum_edge:
+            continue
+        if res.get("player_is_out", False):
+            continue
+
+        dedup_key = (
+            res.get("player_name", "").lower(),
+            res.get("stat_type", ""),
+            float(res.get("line", 0) or 0),
+            res.get("direction", "OVER"),
+        )
+        if dedup_key in existing_keys:
+            continue
+
+        ok, _msg = log_new_bet(
+            player_name=res.get("player_name", ""),
+            stat_type=res.get("stat_type", "points"),
+            prop_line=float(res.get("line", 0) or 0),
+            direction=res.get("direction", "OVER"),
+            platform="SmartAI-Auto",
+            confidence_score=float(res.get("confidence_score", 0) or 0),
+            probability_over=float(res.get("probability_over", 0.5) or 0.5),
+            edge_percentage=float(edge),
+            tier=res.get("tier", "Bronze"),
+            team=res.get("player_team", res.get("team", "")),
+            notes=(
+                f"Auto-logged by SmartAI. "
+                f"SAFE Score: {res.get('confidence_score', 0):.0f}"
+            ),
+            auto_logged=1,
+        )
+        if ok:
+            existing_keys.add(dedup_key)
+            logged += 1
+
+    return logged
+
+# ============================================================
+# END SECTION: Auto-Log Analysis Results
+# ============================================================
+
+
 
 def auto_resolve_bet_results(date_str=None):
     """

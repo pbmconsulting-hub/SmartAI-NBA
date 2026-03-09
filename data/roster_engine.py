@@ -197,6 +197,22 @@ class RosterEngine:
     # Public API
     # ----------------------------------------------------------
 
+    def get_full_roster(self, team_abbrev: str) -> list:
+        """Return ALL player names on a team's roster, regardless of injury status.
+
+        Unlike get_active_roster(), this includes players who are Out, IR,
+        or otherwise unavailable.  Use this when you need the complete roster
+        for a team (e.g., to fetch stats for every player before injury
+        filtering is applied as a separate step).
+
+        Args:
+            team_abbrev (str): 3-letter team abbreviation (e.g., 'LAL').
+
+        Returns:
+            list[str]: All player names on the roster.
+        """
+        return list(self._full_rosters.get(team_abbrev.upper().strip(), []))
+
     def get_active_roster(self, team_abbrev: str) -> list:
         """Return ONLY confirmed-active player names for a team."""
         team = team_abbrev.upper().strip()

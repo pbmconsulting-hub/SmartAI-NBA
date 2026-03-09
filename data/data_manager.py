@@ -775,14 +775,15 @@ def find_players_by_team(players_list, team_abbrev):
 
 def get_todays_active_players(players_list, todays_games):
     """
-    Return only players whose team is playing today.
+    Return only players whose team is playing today and who are not
+    flagged as injured/inactive by the saved injury status data.
 
     Args:
         players_list (list of dict): Loaded player data
         todays_games (list of dict): Tonight's games (from session state)
 
     Returns:
-        list of dict: Players on teams playing today
+        list of dict: Players on teams playing today who are available
     """
     if not todays_games:
         return players_list  # Fall back to all players if no games set
@@ -794,7 +795,23 @@ def get_todays_active_players(players_list, todays_games):
         playing_teams.add(game.get("away_team", "").upper())
     playing_teams.discard("")
 
-    return [p for p in players_list if p.get("team", "").upper() in playing_teams]
+    # Step 1: filter by team membership
+    on_tonight = [p for p in players_list if p.get("team", "").upper() in playing_teams]
+
+    # Step 2: apply injury filtering using saved status (best-effort)
+    try:
+        from data.roster_engine import EXCLUDE_STATUSES as _EXCL
+        injury_map = load_injury_status()
+        if injury_map:
+            def _is_available(p):
+                key = p.get("player_name", "").lower().strip()
+                entry = injury_map.get(key, {})
+                return entry.get("status", "Active") not in _EXCL
+            return [p for p in on_tonight if _is_available(p)]
+    except Exception:
+        pass  # If injury data is unavailable, return team-filtered list
+
+    return on_tonight
 
 
 def get_player_status(player_name, status_map):
@@ -1008,6 +1025,187 @@ def load_props_from_session(session_state):
 
     # Fall back to sample props from the CSV
     return load_props_data()
+
+
+def generate_props_for_todays_players(players_data, todays_games, platforms=None):
+    """
+    Auto-generate prop entries for all active players on tonight's teams.
+
+    For each active player whose team is playing tonight, this function
+    creates prop entries for the primary stat types offered by each
+    selected platform.  Prop lines are derived from the player's season
+    averages and rounded to the nearest 0.5.
+
+    Stat types generated per platform:
+        PrizePicks  — points, rebounds, assists, threes, steals, blocks, fantasy_score_pp
+        DraftKings  — points, rebounds, assists, threes, fantasy_score_dk
+        Underdog    — points, rebounds, assists, threes, steals, blocks, fantasy_score_ud
+
+    Players with < 15 minutes average or with Out/IR/Doubtful status are skipped.
+
+    Args:
+        players_data (list[dict]): Loaded player rows from players.csv / sample_players.csv.
+        todays_games (list[dict]): Tonight's games, each with home_team / away_team keys.
+        platforms (list[str] | None): Platforms to generate for.  Defaults to all three.
+
+    Returns:
+        list[dict]: Auto-generated prop dicts ready for session-state storage.
+    """
+    if platforms is None:
+        platforms = ["PrizePicks", "Underdog", "DraftKings"]
+
+    # ── Build set of tonight's teams (with abbreviation variants) ────
+    # NBA CDN, nba_api, and prop platforms sometimes use different three-
+    # letter codes for the same franchise (e.g. "GS" vs "GSW").  We store
+    # canonical → variant(s) pairs and add all of them to tonight_teams so
+    # no player is silently dropped by a formatting mismatch.
+    # Each tuple is (canonical, *variants).
+    _ABBREV_VARIANT_GROUPS = [
+        ("GSW", "GS"),        # Golden State Warriors
+        ("NYK", "NY"),        # New York Knicks
+        ("NOP", "NO"),        # New Orleans Pelicans
+        ("SAS", "SA"),        # San Antonio Spurs
+        ("UTA", "UTAH"),      # Utah Jazz
+        ("WAS", "WSH"),       # Washington Wizards
+        ("BKN", "BRK"),       # Brooklyn Nets
+        ("PHX", "PHO"),       # Phoenix Suns
+        ("CHA", "CHO"),       # Charlotte Hornets
+        # Historical: New Jersey Nets (relocated to Brooklyn 2012); some legacy
+        # CSV exports or third-party data sources still use "NJ".
+        ("BKN", "NJ"),
+    ]
+    # Build a flat lookup: any variant → frozenset of all siblings in its group
+    _alias_lookup: dict = {}
+    for group in _ABBREV_VARIANT_GROUPS:
+        siblings = frozenset(group)
+        for code in group:
+            _alias_lookup[code] = siblings
+
+    tonight_teams: set = set()
+    for game in (todays_games or []):
+        for key in ("home_team", "away_team"):
+            abbrev = game.get(key, "").upper().strip()
+            if abbrev:
+                tonight_teams.add(abbrev)
+                # Add all known variants for this abbreviation
+                tonight_teams.update(_alias_lookup.get(abbrev, ()))
+
+    # ── Load persisted injury map (best-effort, no API call) ──
+    injury_map = load_injury_status()
+    _SKIP_STATUSES = frozenset({
+        "Out", "Inactive", "IR", "Injured Reserve", "Doubtful", "Suspended",
+        "Not With Team", "G League - Two-Way", "G League - On Assignment", "G League",
+    })
+
+    # ── Per-platform stat types to generate ────────────────────
+    _PLATFORM_STATS = {
+        "PrizePicks": [
+            "points", "rebounds", "assists", "threes",
+            "steals", "blocks", "fantasy_score_pp",
+        ],
+        "DraftKings": [
+            "points", "rebounds", "assists", "threes",
+            "fantasy_score_dk",
+        ],
+        "Underdog": [
+            "points", "rebounds", "assists", "threes",
+            "steals", "blocks", "fantasy_score_ud",
+        ],
+    }
+
+    # ── Simple stat → CSV column name ─────────────────────────
+    _STAT_AVG_COL = {
+        "points":    "points_avg",
+        "rebounds":  "rebounds_avg",
+        "assists":   "assists_avg",
+        "threes":    "threes_avg",
+        "steals":    "steals_avg",
+        "blocks":    "blocks_avg",
+        "turnovers": "turnovers_avg",
+    }
+
+    def _pp_ud_fantasy_score(pts, reb, ast, stl, blk, tov):
+        """PrizePicks / Underdog Fantasy scoring formula."""
+        return pts + 1.2*reb + 1.5*ast + 3.0*stl + 3.0*blk - tov
+
+    today_str = datetime.date.today().isoformat()
+    props = []
+    seen = set()  # (player_name, stat_type, platform) dedup
+
+    for player in (players_data or []):
+        name = (
+            player.get("name") or player.get("player_name") or ""
+        ).strip()
+        team = player.get("team", "").upper().strip()
+        if not name:
+            continue
+
+        # Filter to tonight's teams (or all players if no games are loaded)
+        if tonight_teams and team not in tonight_teams:
+            continue
+
+        # Filter out injured / inactive players
+        pstatus = injury_map.get(name.lower(), {}).get("status", "Active")
+        if pstatus in _SKIP_STATUSES:
+            continue
+
+        # Filter out bench / DNP players  (< 15 min average)
+        minutes = float(player.get("minutes_avg", 0) or 0)
+        if minutes < 15.0:
+            continue
+
+        # Pre-fetch averages once per player
+        pts = float(player.get("points_avg",    0) or 0)
+        reb = float(player.get("rebounds_avg",  0) or 0)
+        ast = float(player.get("assists_avg",   0) or 0)
+        thr = float(player.get("threes_avg",    0) or 0)
+        stl = float(player.get("steals_avg",    0) or 0)
+        blk = float(player.get("blocks_avg",    0) or 0)
+        tov = float(player.get("turnovers_avg", 0) or 0)
+
+        for platform in platforms:
+            stat_types = _PLATFORM_STATS.get(platform, [])
+            for stat_type in stat_types:
+                dedup_key = (name, stat_type, platform)
+                if dedup_key in seen:
+                    continue
+
+                # ── Derive prop line from season average ──────
+                if stat_type in _STAT_AVG_COL:
+                    avg_val = float(player.get(_STAT_AVG_COL[stat_type], 0) or 0)
+                    if avg_val < 0.3:
+                        continue  # Skip effectively 0 averages
+                    prop_line = round(avg_val * 2) / 2  # Round to nearest 0.5
+                elif stat_type in ("fantasy_score_pp", "fantasy_score_ud"):
+                    avg_val = _pp_ud_fantasy_score(pts, reb, ast, stl, blk, tov)
+                    if avg_val < 5.0:
+                        continue
+                    prop_line = round(avg_val * 2) / 2
+                elif stat_type == "fantasy_score_dk":
+                    avg_val = (
+                        pts + 1.25*reb + 1.5*ast + 2.0*stl + 2.0*blk
+                        - 0.5*tov + 0.5*thr
+                    )
+                    if avg_val < 5.0:
+                        continue
+                    prop_line = round(avg_val * 2) / 2
+                else:
+                    continue  # Unknown stat type — skip
+
+                if prop_line <= 0:
+                    continue
+
+                props.append({
+                    "player_name": name,
+                    "team":        team,
+                    "stat_type":   stat_type,
+                    "line":        prop_line,
+                    "platform":    platform,
+                    "game_date":   today_str,
+                })
+                seen.add(dedup_key)
+
+    return props
 
 
 def parse_props_from_csv_text(csv_text):
