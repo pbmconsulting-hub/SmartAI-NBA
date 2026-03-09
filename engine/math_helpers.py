@@ -474,6 +474,100 @@ def get_stat_skew_param(stat_type):
 
 
 # ============================================================
+# SECTION: KDE Sampling from Game Logs (C11)
+# When a player has 15+ recent game log entries, build a
+# non-parametric Kernel Density Estimate and sample from it
+# instead of using the parametric skew-normal distribution.
+# This captures player-specific distribution shapes — e.g., a
+# player who tends to score either 15 or 30 but never 22.
+# ============================================================
+
+# Minimum game log entries required to use KDE instead of skew-normal
+KDE_MIN_GAME_LOGS = 15
+
+
+def _kde_bandwidth(data):
+    """
+    Estimate KDE bandwidth using Silverman's rule of thumb.
+
+    Bandwidth h = 1.06 * std * n^(-1/5)
+    This is a standard automatic bandwidth selector for unimodal data.
+
+    Args:
+        data (list of float): Sample data points
+
+    Returns:
+        float: Bandwidth h (always > 0)
+    """
+    n = len(data)
+    if n < 2:
+        return 1.0
+    try:
+        std = statistics.stdev(data)
+    except statistics.StatisticsError:
+        std = 1.0
+    if std < 1e-6:
+        return 0.5
+    return 1.06 * std * (n ** (-0.2))
+
+
+def sample_from_kde(game_log_values, bandwidth=None):
+    """
+    Draw a single sample from a Kernel Density Estimate built from game logs. (C11)
+
+    Algorithm (simple KDE sampling):
+    1. Pick a random data point from the game logs (uniform selection)
+    2. Add Gaussian noise with std = bandwidth
+    3. Clamp result to >= 0.0 (stats can't be negative)
+
+    This preserves the empirical distribution shape — if a player has a
+    bimodal distribution (either goes big or goes quiet), the KDE captures
+    that, unlike a parametric normal/skew-normal which would smooth it out.
+
+    Args:
+        game_log_values (list of float): Recent game stat values
+            e.g., [22.0, 15.0, 31.0, 8.0, 27.0, ...]
+            Must have at least KDE_MIN_GAME_LOGS (15) entries.
+        bandwidth (float, optional): KDE bandwidth (kernel width).
+            When None, computed automatically via Silverman's rule.
+
+    Returns:
+        float: A sampled value >= 0.0, or None if insufficient data.
+
+    Example:
+        Player has recent logs [8, 15, 32, 11, 28, 14, 9, 33, 12, 27, 10, 30, 13, 25, 16]
+        → sample_from_kde(...) might return ~10.8 or ~29.3 (bimodal-shaped)
+    """
+    if not game_log_values or len(game_log_values) < KDE_MIN_GAME_LOGS:
+        return None  # Caller should fall back to skew-normal
+
+    if bandwidth is None:
+        bandwidth = _kde_bandwidth(game_log_values)
+
+    # Pick a random kernel center from the data, then perturb
+    center = random.choice(game_log_values)
+    noise = random.gauss(0.0, bandwidth)
+    return max(0.0, center + noise)
+
+
+def should_use_kde(game_log_values):
+    """
+    Return True if there are enough game logs to use KDE sampling. (C11)
+
+    Args:
+        game_log_values (list of float): Recent game stat values
+
+    Returns:
+        bool: True if len(game_log_values) >= KDE_MIN_GAME_LOGS
+    """
+    return bool(game_log_values) and len(game_log_values) >= KDE_MIN_GAME_LOGS
+
+# ============================================================
+# END SECTION: KDE Sampling from Game Logs
+# ============================================================
+
+
+# ============================================================
 # END SECTION: Edge and Probability Utilities
 # ============================================================
 

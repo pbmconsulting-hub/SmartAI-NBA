@@ -138,6 +138,7 @@ def build_player_projection(
     minutes_adjustment_factor=1.0,
     teammate_out_notes=None,
     played_yesterday=False,
+    rolling_defensive_data=None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -150,7 +151,9 @@ def build_player_projection(
     - Vegas total (high total = projected to be high-scoring game)
     - Vegas spread (used for smart blowout risk calculation)
     - Recent form: last 5 game averages weighted more heavily
-    - Minutes adjustment for teammate injuries (W8)
+    - Minutes adjustment for teammate injuries (W8/C4)
+    - Rolling opponent defensive window (C9): blends 10-game rolling
+      defensive data with season averages when available
 
     Args:
         player_data (dict): Player row from sample_players.csv
@@ -178,6 +181,14 @@ def build_player_projection(
         played_yesterday (bool, optional): True if this is a back-to-back
             game (player played yesterday). Applies a 0.94 fatigue multiplier
             to the rest adjustment factor. Default False.
+        rolling_defensive_data (dict, optional): Rolling 10-game defensive
+            window data keyed by team abbreviation. (C9)
+            Format: {team_abbrev: {position: rolling_factor}}
+            e.g., {"BOS": {"PG": 0.88, "SG": 0.91, ...}}
+            When provided, blends rolling factor with season average factor:
+              defense_factor = 0.5 * season_factor + 0.5 * rolling_factor
+            When None or opponent not found, falls back to season average
+            from defensive_ratings_data (current default behavior).
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -316,13 +327,27 @@ def build_player_projection(
     # SECTION: Calculate Adjustment Factors
     # ============================================================
 
-    # --- Factor 1: Opponent Defensive Rating ---
-    # How well does the opponent defend this player's position?
-    defense_factor = _get_defense_adjustment_factor(
+    # --- Factor 1: Opponent Defensive Rating (C9: Rolling Window blend) ---
+    # Season-long defensive factor from defensive_ratings.csv
+    season_defense_factor = _get_defense_adjustment_factor(
         opponent_team_abbreviation,
         player_position,
         defensive_ratings_data,
     )
+
+    # C9: If rolling_defensive_data is provided, blend 50/50 with season avg.
+    # This captures teams on hot/cold defensive streaks over their last 10 games.
+    # If rolling data is unavailable, fall back to season average (unchanged behavior).
+    rolling_defense_factor = _get_rolling_defense_factor(
+        opponent_team_abbreviation,
+        player_position,
+        rolling_defensive_data,
+    )
+    if rolling_defense_factor is not None:
+        # 50% season-long, 50% rolling (last-10 game) defensive factor
+        defense_factor = 0.5 * season_defense_factor + 0.5 * rolling_defense_factor
+    else:
+        defense_factor = season_defense_factor  # Fall back to season average
 
     # --- Factor 2: Game Pace ---
     # Faster game = more possessions = more stat opportunities
@@ -510,6 +535,57 @@ def _get_defense_adjustment_factor(
 
     # If opponent not found, return 1.0 (neutral)
     return 1.0
+
+
+def _get_rolling_defense_factor(
+    opponent_team_abbreviation,
+    player_position,
+    rolling_defensive_data,
+):
+    """
+    Look up the rolling 10-game defensive factor for an opponent. (C9)
+
+    This captures teams on hot/cold defensive streaks that the season-long
+    rating doesn't reflect. For example, if a team has been defending PGs
+    much better over the last 10 games, this factor will be < 1.0.
+
+    Falls back gracefully (returns None) when:
+    - rolling_defensive_data is None (caller will use season average)
+    - The opponent is not found in the rolling data
+    - The position is not in the rolling data
+
+    Args:
+        opponent_team_abbreviation (str): 3-letter team code
+        player_position (str): PG, SG, SF, PF, or C
+        rolling_defensive_data (dict or None): Rolling data dict.
+            Format: {team_abbrev: {position_key: factor}}
+            Supported position key formats:
+              - Simple: {"BOS": {"PG": 0.88, "SG": 0.92}}
+              - CSV-style: {"BOS": {"vs_PG_pts": 0.88, "vs_SG_pts": 0.92}}
+            Both formats are handled transparently.
+            When None, always returns None.
+
+    Returns:
+        float or None: Rolling defensive factor, or None if unavailable.
+    """
+    if not rolling_defensive_data:
+        return None
+
+    team_rolling = rolling_defensive_data.get(opponent_team_abbreviation)
+    if not team_rolling:
+        return None
+
+    # Support both direct position key and full column key
+    factor = team_rolling.get(player_position)
+    if factor is None:
+        factor = team_rolling.get(f"vs_{player_position}_pts")
+    if factor is None:
+        return None
+
+    try:
+        return float(factor)
+    except (TypeError, ValueError):
+        return None
 
 
 def _get_pace_adjustment_factor(

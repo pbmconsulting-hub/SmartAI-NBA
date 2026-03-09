@@ -13,7 +13,7 @@ import datetime         # For analysis result freshness timestamps
 
 # Import our engine modules
 from engine.simulation import run_monte_carlo_simulation, build_histogram_from_results
-from engine.projections import build_player_projection, get_stat_standard_deviation
+from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
@@ -900,6 +900,16 @@ if run_analysis:
         game_context = find_game_context_for_player(player_team, todays_games)
 
         recent_form_games  = prop.get("recent_form_results", [])
+
+        # ── C4: Teammate-Out Usage Adjustment ────────────────────
+        # Check if a high-usage teammate is OUT and boost this player's
+        # projection accordingly (+8% primary option, +5% secondary, cap +15%).
+        teammate_boost, teammate_boost_notes = calculate_teammate_out_boost(
+            player_data=player_data,
+            injury_status_map=injury_map,
+            teammates_data=players_data,
+        )
+
         projection_result  = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=game_context.get("opponent", ""),
@@ -910,6 +920,8 @@ if run_analysis:
             teams_data=teams_data,
             recent_form_games=recent_form_games if recent_form_games else None,
             vegas_spread=game_context.get("vegas_spread", 0.0),
+            minutes_adjustment_factor=teammate_boost,
+            teammate_out_notes=teammate_boost_notes,
         )
 
         stat_std      = get_stat_standard_deviation(player_data, stat_type)
@@ -917,6 +929,25 @@ if run_analysis:
             f"projected_{stat_type}",
             float(player_data.get(f"{stat_type}_avg", prop_line))
         )
+
+        # ── C8: Minutes-Stat Correlation — pass projected_minutes to sim ─
+        # ── C11: KDE from Game Logs — pass recent_game_logs to sim ──────
+        # Build stat-specific game log list from recent_form_games for KDE.
+        # Maps stat_type keys to the game-log column names.
+        _stat_log_key_map = {
+            "points": "pts", "rebounds": "reb", "assists": "ast",
+            "threes": "fg3m", "steals": "stl", "blocks": "blk",
+            "turnovers": "tov",
+        }
+        _log_key = _stat_log_key_map.get(stat_type, stat_type)
+        recent_game_log_values = []
+        for _g in (recent_form_games or []):
+            _v = _g.get(_log_key, _g.get(stat_type))
+            if _v is not None:
+                try:
+                    recent_game_log_values.append(float(_v))
+                except (TypeError, ValueError):
+                    pass
 
         simulation_output = run_monte_carlo_simulation(
             projected_stat_average=projected_stat,
@@ -928,6 +959,10 @@ if run_analysis:
             matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
             home_away_adjustment=projection_result.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
+            stat_type=stat_type,
+            projected_minutes=projection_result.get("projected_minutes"),
+            minutes_std=4.0,
+            recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
         )
 
         forces_result = analyze_directional_forces(

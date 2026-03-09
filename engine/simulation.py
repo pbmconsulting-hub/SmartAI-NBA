@@ -17,6 +17,8 @@ from engine.math_helpers import (
     sample_from_normal_distribution,  # Draw a random game result (normal)
     sample_skew_normal,               # C5: Skew-normal for right-skewed NBA stats
     get_stat_skew_param,              # C5: Default skew params by stat type
+    sample_from_kde,                  # C11: KDE sampling from game logs
+    should_use_kde,                   # C11: Whether to use KDE vs skew-normal
     calculate_mean,                    # Average a list of results
     calculate_standard_deviation,      # Spread of results
     calculate_percentile,              # Find value at percentile
@@ -136,6 +138,7 @@ def run_monte_carlo_simulation(
     stat_type=None,
     projected_minutes=None,
     minutes_std=None,
+    recent_game_logs=None,
 ):
     """
     Run a full Monte Carlo simulation for one player's one stat.
@@ -175,6 +178,13 @@ def run_monte_carlo_simulation(
         minutes_std (float, optional): Std dev of minutes distribution. (C8)
             Defaults to MINUTES_STD_DEFAULT (4.0) when projected_minutes
             is provided but minutes_std is not.
+        recent_game_logs (list of float, optional): Player's recent game stat
+            values for this stat type. (C11)
+            When 15+ entries are provided, each Monte Carlo trial samples
+            from a KDE built from these logs (instead of skew-normal).
+            This captures player-specific distribution shapes (e.g., a player
+            who always scores 15 or 30 but never 22).
+            Falls back to skew-normal when None or fewer than 15 logs.
 
     Returns:
         dict: Simulation results containing:
@@ -229,6 +239,25 @@ def run_monte_carlo_simulation(
 
     # C5: Select skew parameter for this stat type
     skew_alpha = get_stat_skew_param(stat_type or "")
+
+    # C11: Determine whether to use KDE sampling from game logs.
+    # When the player has 15+ recent game logs, we sample directly from the
+    # empirical distribution (KDE) instead of the parametric skew-normal.
+    # The KDE logs must first be scaled to align with tonight's adjusted projection
+    # so that matchup/pace/rest adjustments are still reflected.
+    use_kde = should_use_kde(recent_game_logs or [])
+    kde_logs_scaled = None
+    if use_kde and recent_game_logs:
+        raw_log_mean = sum(recent_game_logs) / len(recent_game_logs)
+        if raw_log_mean > 1e-6:
+            # Scale logs by the ratio (tonight's adjusted projection / log mean)
+            # so that matchup/pace/rest adjustments apply to the KDE distribution too.
+            scale = adjusted_stat_projection / raw_log_mean
+            kde_logs_scaled = [v * scale for v in recent_game_logs]
+        else:
+            # Mean of 0 (or near-zero): player's recent logs are all 0 — KDE would
+            # be misleading. Fall back to skew-normal for this prop.
+            use_kde = False
 
     # C8: If projected minutes are provided, compute per-minute rate for
     # minutes-first simulation. This naturally captures the correlation
@@ -318,10 +347,25 @@ def run_monte_carlo_simulation(
             # Scale std dev proportionally (less minutes = less variance too)
             scaled_std = adjusted_standard_deviation * math.sqrt(max(0.1, minutes_multiplier))
 
-        # --- Step 4: Draw Sample (C5: skew-normal instead of normal) ---
-        # Skew-normal captures the right tail of NBA stat distributions
-        # (explosion games, triple-doubles, etc.) better than pure normal.
-        simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
+        # --- Step 4: Draw Sample (C11: KDE when logs available, else C5: skew-normal) ---
+        # Priority order:
+        #   1. KDE from game logs (C11) — when player has 15+ recent games
+        #      KDE is scaled by scenario/minutes multipliers for context-awareness
+        #   2. Skew-normal (C5) — parametric with stat-type-specific right skew
+        if use_kde and kde_logs_scaled:
+            # C11: Scale KDE logs by scenario/momentum multipliers, then sample
+            scenario_scale = minutes_multiplier * stat_scenario_multiplier * momentum_multiplier
+            kde_scaled_for_trial = [v * scenario_scale for v in kde_logs_scaled]
+            kde_sample = sample_from_kde(kde_scaled_for_trial)
+            if kde_sample is not None:
+                simulated_game_stat = kde_sample
+            else:
+                # Fallback: skew-normal if KDE fails for this trial
+                simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
+        else:
+            # C5: Skew-normal captures the right tail of NBA stat distributions
+            # (explosion games, triple-doubles, etc.) better than pure normal.
+            simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
 
         # Stats can't be negative (can't have -3 assists)
         simulated_game_stat = max(0.0, simulated_game_stat)
