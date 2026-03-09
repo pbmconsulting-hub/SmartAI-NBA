@@ -249,9 +249,10 @@ def calculate_confidence_score(
             should_avoid = True
             avoid_reasons.append(f"High variance (CV={cv:.2f} > {AUTO_AVOID_CV_THRESHOLD})")
 
-    # Kill switch 2: edge < 5% → auto-Bronze
+    # Kill switch 2: edge < SILVER_MIN_EDGE_PCT → auto-Bronze
     # (Force the score down to Bronze range if edge is too small to warrant higher tier)
-    if abs_edge < 5.0:
+    # Uses SILVER_MIN_EDGE_PCT (4%) to be consistent with tier gating logic.
+    if abs_edge < SILVER_MIN_EDGE_PCT:
         final_score = min(final_score, SILVER_TIER_MINIMUM_SCORE - 1)
 
     # ── C3: Min Edge Gate — Low edge flag ────────────────────────

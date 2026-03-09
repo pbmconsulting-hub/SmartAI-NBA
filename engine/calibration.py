@@ -86,12 +86,12 @@ def _build_calibration_curve(records):
     if not records:
         return {}
 
-    # Initialize buckets
+    # Initialize buckets: [0.50-0.60), [0.60-0.70), ..., [0.90-1.00)
     buckets = {}
-    for b in range(5, 10):  # 0.50-0.55, 0.55-0.60, ..., 0.95-1.00
+    for b in range(5, 10):  # b=5 → [0.50-0.60), ..., b=9 → [0.90-1.00)
         low = b * CALIBRATION_BUCKET_WIDTH
-        mid = low + CALIBRATION_BUCKET_WIDTH / 2.0
-        buckets[round(mid, 3)] = {"predicted": mid, "actual_sum": 0, "count": 0}
+        mid = round(low + CALIBRATION_BUCKET_WIDTH / 2.0, 3)
+        buckets[mid] = {"predicted": mid, "actual_sum": 0, "count": 0}
 
     # Fill buckets
     for record in records:

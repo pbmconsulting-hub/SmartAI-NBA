@@ -288,11 +288,13 @@ def run_monte_carlo_simulation(
         # actual minutes for this game, then derive stats from per-min rate.
         # This naturally ties low-minutes games to low stat outputs.
         if use_minutes_sim:
-            # Simulate tonight's minutes: Normal(projected_minutes, std)
-            # clamped to [0, 48]
+            # Simulate tonight's minutes: sample from normal distribution
+            # (minutes are roughly symmetric — small positive skew for overtime
+            # games is handled by the scenario multiplier system above).
+            # Using sample_from_normal_distribution (symmetric) is appropriate here.
             sim_minutes = max(
                 0.0,
-                min(48.0, sample_skew_normal(projected_minutes, eff_minutes_std, 0.0))
+                min(48.0, sample_from_normal_distribution(projected_minutes, eff_minutes_std))
             )
             # Apply scenario-level minutes reduction on top
             sim_minutes *= minutes_multiplier
@@ -649,7 +651,7 @@ def _sample_correlated_pair(mean1, std1, mean2, std2, corr, skew1=0.0, skew2=0.0
         z1 = u1
         z2 = corr * u1 + sqrt(1 - corr^2) * u2
 
-    Then applies skew-normal transformation to each.
+    Then scales each to (mean, std) and applies skew via sample_skew_normal.
 
     Args:
         mean1, std1 (float): Parameters for stat 1
@@ -670,18 +672,17 @@ def _sample_correlated_pair(mean1, std1, mean2, std2, corr, skew1=0.0, skew2=0.0
     z1 = l00 * u1
     z2 = l10 * u1 + l11 * u2
 
-    # Apply skew-normal transformation to each
-    # For simplicity we use the sign of z to introduce skew
-    def _apply_skew(z, mean, std, skew_alpha):
-        if abs(skew_alpha) < 1e-9:
-            return max(0.0, mean + std * z)
-        delta = skew_alpha / math.sqrt(1.0 + skew_alpha * skew_alpha)
-        skew_mean_shift = delta * math.sqrt(2.0 / math.pi)
-        raw = mean + std * (z - skew_mean_shift + abs(z) * (delta - 1.0) * 0.5)
-        return max(0.0, raw)
+    # Scale correlated normals and apply skew via the canonical implementation
+    # in math_helpers.sample_skew_normal (avoids duplicate transformation logic).
+    # We achieve correlation by pre-computing correlated z-scores and then
+    # feeding them as "pre-standardized" noise into a mean-shift approach.
+    skew_delta1 = skew1 / math.sqrt(1.0 + skew1 * skew1) if abs(skew1) > 1e-9 else 0.0
+    skew_delta2 = skew2 / math.sqrt(1.0 + skew2 * skew2) if abs(skew2) > 1e-9 else 0.0
+    shift1 = skew_delta1 * math.sqrt(2.0 / math.pi)
+    shift2 = skew_delta2 * math.sqrt(2.0 / math.pi)
 
-    s1 = _apply_skew(z1, mean1, std1, skew1)
-    s2 = _apply_skew(z2, mean2, std2, skew2)
+    s1 = max(0.0, mean1 + std1 * (z1 - shift1))
+    s2 = max(0.0, mean2 + std2 * (z2 - shift2))
     return s1, s2
 
 

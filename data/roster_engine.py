@@ -35,6 +35,22 @@ from typing import Optional
 REQUEST_TIMEOUT = 15
 MAX_RETRIES = 3
 
+
+def _current_nba_season():
+    """
+    Return the current NBA season string in 'YYYY-YY' format.
+
+    The NBA season starts in October. If the current month is October or later,
+    the season is current_year-(current_year+1). Otherwise it's (current_year-1)-current_year.
+    Example: October 2024 → '2024-25'; April 2025 → '2024-25'.
+    """
+    now = datetime.datetime.now()
+    if now.month >= 10:
+        start_year = now.year
+    else:
+        start_year = now.year - 1
+    return f"{start_year}-{str(start_year + 1)[-2:]}"
+
 # ── Exclusion/flag status sets ────────────────────────────────────
 
 # Players with these statuses are fully removed from the active roster
@@ -330,7 +346,7 @@ class RosterEngine:
             response = commonallplayers.CommonAllPlayers(
                 is_only_current_season=1,
                 league_id="00",
-                season="2024-25",
+                season=_current_nba_season(),
             )
             df = response.get_data_frames()[0]
 
