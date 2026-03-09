@@ -159,7 +159,7 @@ if len(_top_picks) >= 2:
 
 st.subheader("⚙️ Entry Settings")
 
-settings_col1, settings_col2, settings_col3, settings_col4 = st.columns(4)
+settings_col1, settings_col2, settings_col3, settings_col4, settings_col5 = st.columns(5)
 
 with settings_col1:
     selected_platform = st.selectbox(
@@ -187,6 +187,17 @@ with settings_col3:
     )
 
 with settings_col4:
+    session_budget = st.number_input(
+        "Session Budget ($)",
+        min_value=0.0,
+        max_value=10000.0,
+        value=st.session_state.get("session_budget", 50.0),
+        step=10.0,
+        help="Total amount you're willing to spend this session. Set to 0 to disable.",
+    )
+    st.session_state["session_budget"] = session_budget
+
+with settings_col5:
     max_entries = st.number_input(
         "Show Top N Entries",
         min_value=1,
@@ -195,6 +206,50 @@ with settings_col4:
         step=1,
         help="How many top entries to display?",
     )
+
+# ── Session Budget Summary ────────────────────────────────────────
+if session_budget > 0 and entry_fee > 0:
+    _max_affordable = int(session_budget // entry_fee)
+    _budget_pct = min(100, round(_max_affordable / max(max_entries, 1) * 100))
+    _budget_color = "#00ff9d" if _max_affordable >= max_entries else ("#ffcc00" if _max_affordable > 0 else "#ff4444")
+    st.markdown(
+        f'<div style="background:#14192b;border-radius:6px;padding:10px 16px;'
+        f'border-left:3px solid {_budget_color};margin-top:4px;">'
+        f'<span style="color:#8a9bb8;font-size:0.82rem;">💰 Budget:</span> '
+        f'<strong style="color:{_budget_color};">${session_budget:.0f}</strong> total · '
+        f'<strong style="color:#c0d0e8;">{_max_affordable}</strong> entries @ ${entry_fee:.0f} each · '
+        f'<span style="color:{_budget_color};">'
+        f'{"✅ Enough for " + str(min(_max_affordable, int(max_entries))) + " entries" if _max_affordable >= 1 else "⚠️ Budget too low for even 1 entry"}'
+        f'</span></div>',
+        unsafe_allow_html=True,
+    )
+    if int(max_entries) > _max_affordable > 0:
+        st.warning(
+            f"⚠️ Budget allows **{_max_affordable}** entries at ${entry_fee:.0f} each, "
+            f"but you requested {int(max_entries)}. Consider raising your budget or lowering entry fee."
+        )
+
+# ── Lock/Unlock Legs ─────────────────────────────────────────────
+if "locked_legs" not in st.session_state:
+    st.session_state["locked_legs"] = set()
+
+with st.expander("🔒 Lock / Unlock Legs (force picks into every entry)", expanded=False):
+    st.markdown(
+        "Locked legs are **forced into every generated entry**. "
+        "Use this to anchor your highest-conviction picks."
+    )
+    _lock_names = [f"{p.get('player_name','')} — {p.get('stat_type','').title()} {p.get('direction','OVER')} {p.get('line',0)}"
+                   for p in qualifying_picks[:20]]
+    _locked = st.multiselect(
+        "Select legs to lock:",
+        options=_lock_names,
+        default=[n for n in _lock_names if n.split(" — ")[0] in st.session_state.get("locked_legs", set())],
+        key="locked_legs_select",
+    )
+    # Store locked player names
+    st.session_state["locked_legs"] = {n.split(" — ")[0] for n in _locked}
+    if _locked:
+        st.success(f"🔒 {len(_locked)} leg(s) locked into every entry.")
 
 # ============================================================
 # END SECTION: Entry Builder Controls
@@ -366,24 +421,71 @@ if build_button:
         )
 
     if optimal_entries:
-        st.success(f"✅ Built {len(optimal_entries)} optimal entries!")
+        _effective_max = int(session_budget // entry_fee) if session_budget > 0 else len(optimal_entries)
+        _show_entries = optimal_entries[:_effective_max] if session_budget > 0 else optimal_entries
+        st.success(f"✅ Built {len(_show_entries)} optimal entries!"
+                   + (f" (budget-limited to {_effective_max})" if session_budget > 0 and _effective_max < len(optimal_entries) else ""))
 
-        for entry_rank, entry in enumerate(optimal_entries, start=1):
+        for entry_rank, entry in enumerate(_show_entries, start=1):
             picks = entry["picks"]
             ev_result = entry["ev_result"]
             confidence = entry["combined_confidence"]
             ev_display = format_ev_display(ev_result, entry_fee)
 
-            # Color-code by EV (green = positive, red = negative)
             ev_color = "green" if ev_display["is_positive_ev"] else "red"
             ev_label = ev_display["ev_label"]
             roi_label = ev_display["roi_label"]
 
-            # Entry header
-            st.markdown(f"### Entry #{entry_rank} | EV: :{ev_color}[{ev_label}] | ROI: {roi_label}")
-            st.caption(f"Combined confidence: {confidence:.0f}/100")
+            # ── Visual Parlay Card ────────────────────────────────────────
+            _card_border = "#00ff9d" if ev_display["is_positive_ev"] else "#ff4444"
+            _pick_cells = ""
+            for _pick in picks:
+                _pdir = _pick.get("direction", "OVER")
+                _parrow = "⬆️" if _pdir == "OVER" else "⬇️"
+                _ptier = _pick.get("tier_emoji", "🥉")
+                _pprob = _pick.get("probability_over", 0.5)
+                _pdisp_prob = (_pprob if _pdir == "OVER" else 1.0 - _pprob) * 100
+                _pname = _pick.get("player_name", "")
+                _pstat = _pick.get("stat_type", "").title()
+                _pline = _pick.get("line", 0)
+                _pedge = _pick.get("edge_percentage", 0)
+                _pteam = _pick.get("team", "")
+                _is_locked = _pname in st.session_state.get("locked_legs", set())
+                _lock_badge = ' <span style="background:#c800ff;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.68rem;">🔒 LOCKED</span>' if _is_locked else ""
+                _prob_color = "#00ff9d" if _pdisp_prob >= 60 else ("#ffcc00" if _pdisp_prob >= 55 else "#ff6b6b")
+                import html as _html_eb
+                _pick_cells += (
+                    f'<div style="flex:1;min-width:120px;background:rgba(0,0,0,0.3);border-radius:8px;'
+                    f'padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.08);">'
+                    f'<div style="font-size:0.75rem;color:#8a9bb8;">{_html_eb.escape(_pteam)}</div>'
+                    f'<div style="font-size:0.88rem;font-weight:700;color:#c0d0e8;margin:4px 0;">'
+                    f'{_html_eb.escape(_pname)}{_lock_badge}</div>'
+                    f'<div style="font-size:1.1rem;color:{_prob_color};font-weight:800;">'
+                    f'{_parrow} {_pdir}</div>'
+                    f'<div style="font-size:0.8rem;color:#8a9bb8;">{_pstat} {_pline}</div>'
+                    f'<div style="font-size:0.85rem;color:{_prob_color};font-weight:700;">{_pdisp_prob:.0f}%</div>'
+                    f'<div style="font-size:0.72rem;color:#8a9bb8;">{_ptier} Edge: {_pedge:+.1f}%</div>'
+                    f'</div>'
+                )
 
-            # W2: Correlation risk warnings
+            import html as _html_eb2
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:10px;padding:16px 20px;'
+                f'margin-bottom:16px;border-top:3px solid {_card_border};">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+                f'<div style="font-family:Orbitron,sans-serif;font-size:1rem;color:{_card_border};font-weight:700;">'
+                f'Entry #{entry_rank}</div>'
+                f'<div style="display:flex;gap:16px;font-size:0.85rem;">'
+                f'<span style="color:{_card_border};font-weight:700;">EV: {_html_eb2.escape(ev_label)}</span>'
+                f'<span style="color:#8a9bb8;">ROI: {_html_eb2.escape(roi_label)}</span>'
+                f'<span style="color:#8a9bb8;">Confidence: {confidence:.0f}/100</span>'
+                f'</div></div>'
+                f'<div style="display:flex;gap:8px;flex-wrap:wrap;">{_pick_cells}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # Correlation risk warnings
             corr_risk = entry.get("correlation_risk", {})
             corr_warnings = corr_risk.get("warnings", [])
             if corr_warnings:
@@ -393,7 +495,7 @@ if build_button:
                 discount_pct = round((1.0 - corr_risk.get("discount_multiplier", 1.0)) * 100)
                 st.caption(f"📉 Correlation discount applied: −{discount_pct}% EV adjustment")
 
-            # W9: Weakest link warning + swap suggestion
+            # Weakest link warning + swap suggestion
             weakest = entry.get("weakest_link")
             weakest_label = entry.get("weakest_link_label", "")
             weakest_prob = entry.get("weakest_link_probability", 0.5)
@@ -406,30 +508,6 @@ if build_button:
                     )
                 else:
                     st.caption(f"⚠️ Weakest leg: {weakest_label}")
-
-            # Show each pick in this entry
-            pick_cols = st.columns(len(picks))
-            for i, (pick, pick_col) in enumerate(zip(picks, pick_cols)):
-                with pick_col:
-                    direction = pick.get("direction", "OVER")
-                    arrow = "⬆️" if direction == "OVER" else "⬇️"
-                    tier_emoji = pick.get("tier_emoji", "🥉")
-                    prob = pick.get("probability_over", 0.5)
-                    if direction == "UNDER":
-                        display_prob = (1.0 - prob) * 100
-                    else:
-                        display_prob = prob * 100
-
-                    st.metric(
-                        label=f"{pick.get('player_name', '')}",
-                        value=f"{arrow} {direction}",
-                        delta=f"{pick.get('stat_type','').capitalize()} {pick.get('line',0)} | {display_prob:.0f}%",
-                    )
-                    st.caption(f"{tier_emoji} {pick.get('tier','')} | Edge: {pick.get('edge_percentage',0):.1f}%")
-                    # Show trap line warning inline if present
-                    trap = pick.get("trap_line_result", {})
-                    if trap and trap.get("is_trap"):
-                        st.caption(f"⚠️ {trap.get('warning_message','Trap line')}")
 
             # Show payout breakdown
             with st.expander(f"💰 Entry #{entry_rank} Payout Breakdown"):

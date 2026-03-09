@@ -129,6 +129,44 @@ with col_dark_horse:
         help="Scan ALL tonight's players and rank by upside vs season average",
     )
 
+# ── Mode toggle ────────────────────────────────────────────────
+_sim_mode = st.radio(
+    "Mode",
+    options=["🔮 Standard Simulation", "📊 Compare Mode", "🎛️ Scenario Builder"],
+    horizontal=True,
+    key="sim_mode_radio",
+)
+_compare_mode = "Compare" in _sim_mode
+_scenario_mode = "Scenario" in _sim_mode
+
+# ── Scenario Builder controls ──────────────────────────────────
+_scenario_overrides: dict = {}
+if _scenario_mode and selected_names:
+    with st.expander("🎛️ Scenario Builder — Adjust Game Parameters", expanded=True):
+        st.markdown(
+            "Override the default game environment for this simulation. "
+            "Useful for 'what if' analysis (e.g., if the pace is faster, or a star opponent is out)."
+        )
+        _sc1, _sc2, _sc3, _sc4 = st.columns(4)
+        with _sc1:
+            _sce_total = st.slider("Game O/U Total", 195.0, 260.0, 220.0, 0.5, key="sce_total")
+        with _sc2:
+            _sce_spread = st.slider("Home Spread", -20.0, 20.0, 0.0, 0.5, key="sce_spread")
+        with _sc3:
+            _sce_rest = st.selectbox("Rest Days", [0, 1, 2, 3, 4], index=2, key="sce_rest")
+        with _sc4:
+            _sce_def_adj = st.slider("Opponent Defense Adj (%)", -30, 30, 0, 1, key="sce_def")
+        _scenario_overrides = {
+            "game_total": _sce_total,
+            "vegas_spread": _sce_spread,
+            "rest_days": _sce_rest,
+            "def_adj": _sce_def_adj / 100.0,
+        }
+        st.caption(
+            f"Scenario: O/U {_sce_total} | Spread {_sce_spread:+.1f} | "
+            f"Rest {_sce_rest}d | Def {_sce_def_adj:+d}%"
+        )
+
 run_sim = st.button(
     "🚀 Run Simulation",
     type="primary",
@@ -140,10 +178,17 @@ st.divider()
 
 
 # ─── Simulation runner ───────────────────────────────────────
-def _simulate_player(player_data: dict, sim_depth: int, todays_games: list) -> dict:
+def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
+                     scenario_overrides: dict | None = None) -> dict:
     """Run simulation for all stat types for one player."""
     team = player_data.get("team", "")
     ctx = _find_game_context(team, todays_games)
+    # Apply scenario overrides if provided
+    if scenario_overrides:
+        ctx = dict(ctx)
+        for k in ("game_total", "vegas_spread", "rest_days"):
+            if k in scenario_overrides:
+                ctx[k] = scenario_overrides[k]
     results = {}
     for stat in _STAT_TYPES:
         projection = build_player_projection(
@@ -160,6 +205,9 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list) -> d
             f"projected_{stat}",
             float(player_data.get(f"{stat}_avg", 0) or 0),
         )
+        # Apply scenario defense adjustment
+        if scenario_overrides and "def_adj" in scenario_overrides:
+            projected_val = projected_val * (1.0 + scenario_overrides["def_adj"])
         stat_std = get_stat_standard_deviation(player_data, stat)
         sim_out = run_monte_carlo_simulation(
             projected_stat_average=projected_val,
@@ -302,15 +350,70 @@ def _render_sim_card(sim_result: dict):
 
 # ─── Run simulation for selected players ────────────────────
 if run_sim and selected_names:
-    st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s)")
+    _mode_label = " (Scenario)" if _scenario_mode else (" (Compare)" if _compare_mode else "")
+    st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
+
     with st.spinner("🔮 Running Monte Carlo simulations…"):
+        _all_sim_results = []
         for pname in selected_names:
             pdata = next((p for p in tonight_players if p.get("name") == pname), None)
             if pdata is None:
                 st.warning(f"⚠️ Could not find data for **{pname}**.")
                 continue
-            sim_result = _simulate_player(pdata, sim_depth, todays_games)
+            sim_result = _simulate_player(
+                pdata, sim_depth, todays_games,
+                scenario_overrides=_scenario_overrides if _scenario_mode else None,
+            )
+            _all_sim_results.append(sim_result)
+
+    if _compare_mode and len(_all_sim_results) >= 2:
+        # ── Compare Mode: side-by-side table for all selected players ──
+        st.markdown("**📊 Compare Mode — Side-by-Side Stat Projections**")
+        _cmp_header = ["Stat"] + [r["player"].get("name", "") for r in _all_sim_results]
+        _cmp_rows = []
+        for _stat in _STAT_TYPES:
+            _row = {"Stat": f"{_STAT_EMOJI.get(_stat, '📊')} {_stat.title()}"}
+            for _r in _all_sim_results:
+                _s = _r["stats"].get(_stat, {})
+                _row[_r["player"].get("name", "")] = (
+                    f"{_s.get('projected', 0)} "
+                    f"({_s.get('p10', 0)}–{_s.get('p90', 0)})"
+                )
+            _cmp_rows.append(_row)
+        st.dataframe(_cmp_rows, use_container_width=True, hide_index=True)
+        st.caption("Format: Projected (10th pct – 90th pct)")
+
+        # Also render individual cards
+        for sim_result in _all_sim_results:
             _render_sim_card(sim_result)
+    else:
+        # Standard / Scenario: render full cards + game log overlay
+        for sim_result in _all_sim_results:
+            _render_sim_card(sim_result)
+
+            # ── Historical Game Log Overlay ────────────────────────────
+            _pdata = sim_result["player"]
+            _pname_log = _pdata.get("name", "")
+            _recent_games = _pdata.get("recent_form_games", [])
+            if _recent_games:
+                with st.expander(f"📅 {_pname_log} — Last {len(_recent_games)} Game Log", expanded=False):
+                    _log_rows = []
+                    for _gi, _g in enumerate(_recent_games[:10], start=1):
+                        _log_rows.append({
+                            "Game": f"G-{_gi}",
+                            "PTS": _g.get("pts", "—"),
+                            "REB": _g.get("reb", "—"),
+                            "AST": _g.get("ast", "—"),
+                            "3PM": _g.get("fg3m", "—"),
+                            "STL": _g.get("stl", "—"),
+                            "BLK": _g.get("blk", "—"),
+                        })
+                    st.dataframe(_log_rows, use_container_width=True, hide_index=True)
+            elif _scenario_mode:
+                st.caption(
+                    f"ℹ️ No recent game log stored for {_pname_log}. "
+                    "Scenario simulation uses season averages + your overrides."
+                )
 
 
 # ─── Dark Horse Finder ───────────────────────────────────────

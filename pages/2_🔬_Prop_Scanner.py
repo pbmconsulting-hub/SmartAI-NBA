@@ -179,6 +179,130 @@ else:
 
 st.subheader(f"📋 Current Props ({len(_display_props_enriched)} displayed / {len(current_props)} total)")
 
+# ── Smart Scan Pre-Filter Bar ─────────────────────────────────────
+if _display_props_enriched:
+    with st.expander("🔍 Smart Scan — Pre-Filter Props", expanded=False):
+        st.markdown(
+            "Narrow down to the most promising props before running Neural Analysis. "
+            "Filters apply to the table below and carry into the analysis run."
+        )
+        _sf1, _sf2, _sf3, _sf4 = st.columns(4)
+        with _sf1:
+            _filter_platform = st.multiselect(
+                "Platform",
+                options=["PrizePicks", "Underdog", "DraftKings"],
+                default=[],
+                placeholder="All platforms",
+                key="scan_platform_filter",
+            )
+        with _sf2:
+            _filter_stat = st.multiselect(
+                "Stat Type",
+                options=sorted({p.get("stat_type", "").capitalize() for p in _display_props_enriched if p.get("stat_type")}),
+                default=[],
+                placeholder="All stats",
+                key="scan_stat_filter",
+            )
+        with _sf3:
+            _filter_line_max = st.slider(
+                "Max Line Value",
+                min_value=0.0,
+                max_value=60.0,
+                value=60.0,
+                step=0.5,
+                key="scan_line_max",
+            )
+        with _sf4:
+            _filter_healthy_only = st.toggle(
+                "Healthy Players Only",
+                value=True,
+                key="scan_healthy_filter",
+                help="Hide GTD/Out players from Smart Scan results",
+            )
+
+        # Apply Smart Scan filters
+        _scanned = _display_props_enriched
+        if _filter_platform:
+            _scanned = [p for p in _scanned if p.get("platform", "") in _filter_platform]
+        if _filter_stat:
+            _scanned = [p for p in _scanned if p.get("stat_type", "").capitalize() in _filter_stat]
+        _scanned = [p for p in _scanned if float(p.get("line", 0)) <= _filter_line_max]
+        if _filter_healthy_only:
+            _healthy_names = {p.get("player_name", "") for p, _, _ in _healthy_props}
+            _scanned = [p for p in _scanned if p.get("player_name", "") in _healthy_names]
+
+        st.caption(f"**Smart Scan result: {len(_scanned)} props** match your filters (out of {len(_display_props_enriched)} displayed).")
+        if _scanned:
+            # Line comparison visual: show line vs season avg as a bar
+            _cmp_rows = []
+            for _sp in _scanned[:30]:
+                _sn = _sp.get("player_name", "")
+                _st_t = _sp.get("stat_type", "").capitalize()
+                _ln = float(_sp.get("line", 0))
+                _sa_map = {
+                    "Points": _sp.get("season_pts_avg", 0),
+                    "Rebounds": _sp.get("season_reb_avg", 0),
+                    "Assists": _sp.get("season_ast_avg", 0),
+                }
+                _avg = float(_sa_map.get(_st_t, 0) or 0)
+                _diff_pct = round((_ln - _avg) / _avg * 100, 1) if _avg > 0 else 0
+                _vs = f"+{_diff_pct:.1f}%" if _diff_pct >= 0 else f"{_diff_pct:.1f}%"
+                _cmp_rows.append({
+                    "Player": _sn,
+                    "Stat": _st_t,
+                    "Line": _ln,
+                    "Season Avg": round(_avg, 1) if _avg else "—",
+                    "Line vs Avg": _vs,
+                    "Platform": _sp.get("platform", ""),
+                })
+            st.dataframe(
+                _cmp_rows,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Line": st.column_config.NumberColumn(format="%.1f"),
+                    "Season Avg": st.column_config.NumberColumn(format="%.1f"),
+                    "Line vs Avg": st.column_config.TextColumn(),
+                },
+            )
+
+            # Bulk edit: update lines for scanned props
+            with st.expander("✏️ Bulk Edit Lines", expanded=False):
+                st.markdown("Adjust prop lines for the Smart Scan results in bulk:")
+                _bulk_adjustments = {}
+                for _bi, _bp in enumerate(_scanned[:10]):
+                    _bname = _bp.get("player_name", "")
+                    _bstat = _bp.get("stat_type", "")
+                    _bline = float(_bp.get("line", 0))
+                    _bc1, _bc2, _bc3 = st.columns([3, 2, 1])
+                    with _bc1:
+                        st.markdown(f"**{_bname}** — {_bstat.title()}")
+                    with _bc2:
+                        _new_line = st.number_input(
+                            "Line",
+                            min_value=0.0,
+                            max_value=100.0,
+                            value=_bline,
+                            step=0.5,
+                            key=f"bulk_line_{_bi}",
+                            label_visibility="collapsed",
+                        )
+                    with _bc3:
+                        if _new_line != _bline:
+                            _bulk_adjustments[(_bname, _bstat)] = _new_line
+
+                if _bulk_adjustments and st.button("💾 Apply Bulk Edits", type="primary", key="bulk_apply"):
+                    _updated = []
+                    for _raw in current_props:
+                        _k = (_raw.get("player_name", ""), _raw.get("stat_type", ""))
+                        if _k in _bulk_adjustments:
+                            _raw = dict(_raw)
+                            _raw["line"] = _bulk_adjustments[_k]
+                        _updated.append(_raw)
+                    save_props_to_session(_updated, st.session_state)
+                    st.success(f"✅ Updated {len(_bulk_adjustments)} prop line(s)!")
+                    st.rerun()
+
 if _display_props_enriched:
     # Build display rows with season averages, line context, and injury status
     display_rows = []

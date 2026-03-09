@@ -349,10 +349,58 @@ def _render_game_team_stats(game, game_pred):
             f"**Winner:** {game_pred['predicted_winner']} by {game_pred['predicted_margin']:.0f}"
         )
 
-    # Team stats mini-table
+    # ── Head-to-Head Visualization ───────────────────────────────────
     ht = TEAMS_DATA.get(home, {})
     at = TEAMS_DATA.get(away, {})
     if ht or at:
+        # Numeric stats to visualize
+        _h2h_stats = [
+            ("Pace",  float(at.get("pace", 100) or 100), float(ht.get("pace", 100) or 100), 85, 115),
+            ("ORtg",  float(at.get("ortg", 113) or 113), float(ht.get("ortg", 113) or 113), 105, 125),
+            ("DRtg",  float(at.get("drtg", 113) or 113), float(ht.get("drtg", 113) or 113), 105, 125),
+        ]
+        _h2h_rows = ""
+        for _h2h_item in _h2h_stats:
+            _label, _av, _hv, _lo, _hi = _h2h_item
+            _rng = max(_hi - _lo, 1)
+            _a_pct = round(max(0, min(100, (_av - _lo) / _rng * 100)))
+            _h_pct = round(max(0, min(100, (_hv - _lo) / _rng * 100)))
+            # For DRtg, lower is better (flip colors)
+            _flip = _label == "DRtg"
+            _a_better = (_av < _hv) if _flip else (_av > _hv)
+            _a_c = "#00ff9d" if _a_better else "#8b949e"
+            _h_c = "#00ff9d" if not _a_better else "#8b949e"
+            import html as _h2h_html
+            _h2h_rows += (
+                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+                f'<div style="width:40px;text-align:right;font-size:0.75rem;color:#8a9bb8;">{_h2h_html.escape(away)}</div>'
+                f'<div style="flex:1;display:flex;align-items:center;gap:4px;">'
+                f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;position:relative;">'
+                f'<div style="position:absolute;right:0;width:{_a_pct}%;height:10px;background:{_a_c};border-radius:3px;"></div>'
+                f'</div>'
+                f'<div style="width:40px;text-align:center;font-size:0.78rem;font-weight:700;color:#c0d0e8;">{_label}</div>'
+                f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;">'
+                f'<div style="width:{_h_pct}%;height:10px;background:{_h_c};border-radius:3px;"></div>'
+                f'</div>'
+                f'</div>'
+                f'<div style="width:40px;font-size:0.75rem;color:#8a9bb8;">{_h2h_html.escape(home)}</div>'
+                f'</div>'
+                f'<div style="display:flex;gap:8px;margin-bottom:4px;font-size:0.72rem;color:#8b949e;">'
+                f'<div style="width:40px;text-align:right;color:{_a_c};">{_av:.1f}</div>'
+                f'<div style="flex:1;text-align:center;"></div>'
+                f'<div style="text-align:left;color:{_h_c};">{_hv:.1f}</div>'
+                f'</div>'
+            )
+
+        st.markdown(
+            f'<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px 18px;margin-top:8px;">'
+            f'<div style="font-size:0.78rem;color:#8a9bb8;font-weight:600;margin-bottom:10px;'
+            f'letter-spacing:0.5px;">⚡ HEAD-TO-HEAD</div>'
+            f'{_h2h_rows}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
         st.markdown(
             f"| Stat | {away} | {home} |\n"
             f"|------|-------|--------|\n"
