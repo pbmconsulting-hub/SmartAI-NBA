@@ -297,10 +297,14 @@ if platform_props_clicked:
         pp_status.text("⏳ 3/5 — Running Neural Analysis engine on platform props…")
         pp_bar.progress(40)
 
-        from engine.projections import build_player_projection
+        from engine.projections import build_player_projection, get_stat_standard_deviation
         from engine.simulation import run_monte_carlo_simulation
         from engine.edge_detection import analyze_directional_forces, should_avoid_prop
         from engine.confidence import calculate_confidence_score
+        from data.data_manager import load_defensive_ratings_data, load_teams_data as _load_teams
+
+        _defensive_ratings = load_defensive_ratings_data()
+        _teams_data = _load_teams()
 
         analyzed_props: list = []
         games_context = st.session_state.get("todays_games", [])
@@ -328,39 +332,72 @@ if platform_props_clicked:
                 if not player_data:
                     continue
 
-                # Build game context
+                # Build game context — find this player's game in tonight's slate
                 player_team = player_data.get("team", "")
-                game_ctx: dict = {"vegas_spread": 0.0, "game_total": 220.0, "is_home": True}
+                game_ctx: dict = {
+                    "opponent": "",
+                    "vegas_spread": 0.0,
+                    "game_total": 220.0,
+                    "is_home": True,
+                    "rest_days": 2,
+                }
                 for g in games_context:
-                    if player_team in (g.get("home_team", ""), g.get("away_team", "")):
+                    home_team = g.get("home_team", "")
+                    away_team = g.get("away_team", "")
+                    if player_team in (home_team, away_team):
+                        is_home = player_team == home_team
                         game_ctx = {
+                            "opponent": away_team if is_home else home_team,
                             "vegas_spread": float(g.get("vegas_spread", 0) or 0),
                             "game_total": float(g.get("game_total", 220) or 220),
-                            "is_home": player_team == g.get("home_team", ""),
+                            "is_home": is_home,
+                            "rest_days": 2,
                         }
                         break
 
-                # Projection
+                # Projection — use proper signature matching build_player_projection
                 proj = build_player_projection(
                     player_data=player_data,
-                    stat_type=stat_type,
-                    game_context=game_ctx,
-                    injury_status_map=injury_map,
+                    opponent_team_abbreviation=game_ctx.get("opponent", ""),
+                    is_home_game=game_ctx.get("is_home", True),
+                    rest_days=game_ctx.get("rest_days", 2),
+                    game_total=game_ctx.get("game_total", 220.0),
+                    defensive_ratings_data=_defensive_ratings,
+                    teams_data=_teams_data,
+                    vegas_spread=game_ctx.get("vegas_spread", 0.0),
                 )
-                projected_value = proj.get("projected_value", 0)
+
+                # Get stat-specific projected value (e.g., projected_points, projected_rebounds)
+                projected_value = proj.get(
+                    f"projected_{stat_type}",
+                    float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+                )
+                try:
+                    projected_value = float(projected_value)
+                except (TypeError, ValueError):
+                    projected_value = float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+
                 if projected_value <= 0:
                     continue
 
-                std_dev = proj.get("standard_deviation", projected_value * 0.25)
+                std_dev = get_stat_standard_deviation(player_data, stat_type)
+                if not std_dev or std_dev <= 0:
+                    std_dev = projected_value * 0.25
                 blowout_risk = proj.get("blowout_risk_factor", 0.1)
 
                 # Simulation
                 sim = run_monte_carlo_simulation(
-                    projected_stat_value=projected_value,
+                    projected_stat_average=projected_value,
                     stat_standard_deviation=std_dev,
                     prop_line=prop_line,
+                    number_of_simulations=1000,
                     blowout_risk_factor=blowout_risk,
-                    num_simulations=1000,
+                    pace_adjustment_factor=proj.get("pace_factor", 1.0),
+                    matchup_adjustment_factor=proj.get("defense_factor", 1.0),
+                    home_away_adjustment=proj.get("home_away_factor", 0.0),
+                    rest_adjustment_factor=proj.get("rest_factor", 1.0),
+                    stat_type=stat_type,
+                    projected_minutes=proj.get("projected_minutes"),
                 )
                 prob_over = sim.get("probability_over", 0.5)
                 raw_edge = sim.get("edge_percentage", 0.0)
