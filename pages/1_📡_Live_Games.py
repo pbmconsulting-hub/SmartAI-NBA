@@ -218,7 +218,7 @@ if auto_load_clicked:
     status_text = st.empty()
 
     try:
-        status_text.text("⏳ Step 1/4 — Fetching tonight's games...")
+        status_text.text("⏳ Step 1/3 — Fetching tonight's games...")
         progress_bar.progress(10)
         games = fetch_todays_games()
 
@@ -235,30 +235,29 @@ if auto_load_clicked:
         else:
             st.session_state["todays_games"] = games
 
-            status_text.text(f"⏳ Step 2/4 — Loading team rosters for {len(games)} game(s)...")
+            status_text.text(f"⏳ Step 2/3 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
             progress_bar.progress(35)
 
-            from data.live_data_fetcher import fetch_player_injury_status
+            players_ok = fetch_todays_players_only(games)
+
+            # Load the injury map written by fetch_todays_players_only
             injury_map = {}
-            try:
-                injury_map = fetch_player_injury_status(todays_games=games)
-                st.session_state["injury_status_map"] = injury_map
-            except Exception as _inj_err:
-                print(f"Auto-load: injury fetch failed: {_inj_err}")
+            if players_ok:
+                try:
+                    from data.data_manager import load_injury_status as _load_inj
+                    injury_map = _load_inj()
+                    st.session_state["injury_status_map"] = injury_map
+                except Exception as _inj_load_err:
+                    print(f"Auto-load: could not load injury map: {_inj_load_err}")
 
-            status_text.text("⏳ Step 3/4 — Refreshing injury reports...")
-            progress_bar.progress(65)
-
-            players_ok = fetch_todays_players_only(games, precomputed_injury_map=injury_map)
-
-            # ── Step 5 (bonus): Auto-generate props for all 3 platforms ──────────
+            # ── Step 3: Auto-generate props for all 3 platforms ──────────
             # Do this *after* fetch_todays_players_only so the freshly-written
             # players.csv is available for reading.  This ensures every game has
             # props ready to analyze without requiring a separate manual step.
             props_msg = "Props: ⏭️ skipped (player fetch failed)"
             if players_ok:
                 try:
-                    status_text.text("⏳ Step 4/4 — Auto-generating props for tonight's players…")
+                    status_text.text("⏳ Step 3/3 — Auto-generating props for tonight's players…")
                     progress_bar.progress(80)
                     from data.data_manager import (
                         load_players_data as _load_players,

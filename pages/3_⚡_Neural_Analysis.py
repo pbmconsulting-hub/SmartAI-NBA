@@ -84,23 +84,50 @@ if "injury_status_map" not in st.session_state:
     st.session_state["injury_status_map"] = load_injury_status()
 
 # ─── Auto-refresh injury data if empty or stale (>4 hours) ──
+# Use a 30-minute in-session cooldown to avoid re-fetching on every
+# page navigation, while still updating when data is genuinely stale.
 _INJURY_STALE_HOURS = 4
+_INJURY_REFRESH_COOLDOWN_SECS = 1800  # 30 minutes
+
 _should_auto_refresh_injuries = not st.session_state["injury_status_map"]
 if not _should_auto_refresh_injuries:
-    try:
-        import datetime as _dt
-        from pathlib import Path as _Path
-        _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
-        if _inj_json_path.exists():
-            _inj_age_hours = (
-                _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
-            ) / 3600.0
-            _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
-    except Exception:
-        pass  # Staleness check is best-effort
+    # Check if we already refreshed recently in this session
+    _last_refresh_ts = st.session_state.get("_injury_last_refreshed_at")
+    if _last_refresh_ts is not None:
+        import time as _time_mod
+        _mins_since = (_time_mod.time() - _last_refresh_ts) / 60
+        if _mins_since < 30:
+            _should_auto_refresh_injuries = False
+        else:
+            # Been 30+ minutes since last refresh — re-check file age
+            try:
+                import datetime as _dt
+                from pathlib import Path as _Path
+                _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
+                if _inj_json_path.exists():
+                    _inj_age_hours = (
+                        _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
+                    ) / 3600.0
+                    _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
+            except Exception:
+                pass
+    else:
+        # No record of a refresh this session — check file age
+        try:
+            import datetime as _dt
+            from pathlib import Path as _Path
+            _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
+            if _inj_json_path.exists():
+                _inj_age_hours = (
+                    _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
+                ) / 3600.0
+                _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
+        except Exception:
+            pass  # Staleness check is best-effort
 
 if _should_auto_refresh_injuries:
     try:
+        import time as _time_mod
         from data.roster_engine import RosterEngine as _RosterEngine
         _re = _RosterEngine()
         _re.refresh()
@@ -121,6 +148,8 @@ if _should_auto_refresh_injuries:
                 for _k, _v in _scraped_inj.items()
             }
             st.session_state["injury_status_map"] = _auto_status_map
+        # Record this refresh so subsequent page navigations skip it
+        st.session_state["_injury_last_refreshed_at"] = _time_mod.time()
     except Exception:
         pass  # Non-fatal — analysis page works without auto-refresh
 
