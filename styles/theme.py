@@ -3861,3 +3861,372 @@ def get_qds_final_verdict_html(summary_text, recommendations):
 # ============================================================
 # END SECTION: QDS Neural Analysis HTML Generators
 # ============================================================
+
+
+# ============================================================
+# SECTION: Bet Tracker Card CSS & HTML Generators
+# ============================================================
+
+_BET_CARD_CSS = """
+<style>
+/* ─── Bet Card Base ───────────────────────────────────────── */
+.bet-card {
+    background: linear-gradient(135deg, #0d1117 0%, #0f1923 100%);
+    border: 1px solid rgba(0,240,255,0.18);
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 18px rgba(0,0,0,0.45);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.bet-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 28px rgba(0,240,255,0.12);
+}
+.bet-card-win  { border-color: rgba(0,255,157,0.45); box-shadow: 0 0 18px rgba(0,255,157,0.12); }
+.bet-card-loss { border-color: rgba(239,68,68,0.45);  box-shadow: 0 0 18px rgba(239,68,68,0.12);  }
+.bet-card-push { border-color: rgba(160,180,210,0.35); }
+.bet-card-pending {
+    border-color: rgba(255,200,0,0.30);
+    animation: betCardPulse 2.8s ease-in-out infinite;
+}
+@keyframes betCardPulse {
+    0%,100% { box-shadow: 0 0 6px rgba(255,200,0,0.08); }
+    50%      { box-shadow: 0 0 18px rgba(255,200,0,0.22); }
+}
+
+/* ─── Card Header ─────────────────────────────────────────── */
+.bet-card-player {
+    font-size: 1.1rem;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    color: #e8f0ff;
+    letter-spacing: 0.04em;
+}
+.bet-card-team {
+    font-size: 0.8rem;
+    color: #8a9bb8;
+    margin-left: 8px;
+}
+.bet-card-divider {
+    height: 1px;
+    background: rgba(0,240,255,0.10);
+    margin: 10px 0;
+}
+
+/* ─── Direction ───────────────────────────────────────────── */
+.direction-over {
+    color: #00ff9d;
+    font-weight: 900;
+    font-size: 1.0rem;
+    text-shadow: 0 0 8px rgba(0,255,157,0.5);
+}
+.direction-under {
+    color: #ff6b6b;
+    font-weight: 900;
+    font-size: 1.0rem;
+    text-shadow: 0 0 8px rgba(255,107,107,0.5);
+}
+
+/* ─── Confidence Bar ──────────────────────────────────────── */
+.confidence-bar-wrap { margin: 10px 0 6px 0; }
+.confidence-bar-track {
+    height: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.confidence-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+.confidence-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #8a9bb8;
+    margin-bottom: 3px;
+}
+
+/* ─── Platform Badges ─────────────────────────────────────── */
+.platform-badge-pp { background: #00c853; color: #fff; padding: 2px 9px; border-radius: 5px; font-size: 0.78rem; font-weight: 700; }
+.platform-badge-ud { background: #7c4dff; color: #fff; padding: 2px 9px; border-radius: 5px; font-size: 0.78rem; font-weight: 700; }
+.platform-badge-dk { background: #2196f3; color: #fff; padding: 2px 9px; border-radius: 5px; font-size: 0.78rem; font-weight: 700; }
+
+/* ─── Tier Badges (compact) ───────────────────────────────── */
+.tier-badge-platinum { color: #00f0ff; font-weight: 800; }
+.tier-badge-gold     { color: #ff9d00; font-weight: 800; }
+.tier-badge-silver   { color: #c0d0e8; font-weight: 800; }
+.tier-badge-bronze   { color: #ff7c3a; font-weight: 800; }
+.tier-badge-avoid    { color: #ff4444; font-weight: 800; }
+
+/* ─── Result Badges ───────────────────────────────────────── */
+.result-win  { color: #00ff9d; font-weight: 800; font-size: 0.95rem; text-shadow: 0 0 8px rgba(0,255,157,0.6); }
+.result-loss { color: #ff4444; font-weight: 800; font-size: 0.95rem; text-shadow: 0 0 8px rgba(255,68,68,0.6); }
+.result-push { color: #b0bec5; font-weight: 700; font-size: 0.95rem; }
+.result-pending {
+    color: #ffcc00;
+    font-weight: 700;
+    font-size: 0.95rem;
+    animation: resultPulse 1.8s ease-in-out infinite;
+}
+@keyframes resultPulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
+
+/* ─── Live Status ─────────────────────────────────────────── */
+.live-status-winning { color: #00ff9d; font-weight: 700; }
+.live-status-losing  { color: #ff4444; font-weight: 700; }
+.live-status-pending { color: #ffcc00; font-weight: 700; }
+.live-status-final   { color: #8a9bb8; font-weight: 600; }
+.live-status-not-started { color: #5a6880; font-weight: 600; }
+
+/* ─── Summary Cards Row ───────────────────────────────────── */
+.summary-card {
+    background: linear-gradient(135deg, #0d1117, #0f1923);
+    border: 1px solid rgba(0,240,255,0.18);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+}
+.summary-card-value {
+    font-size: 1.8rem;
+    font-weight: 900;
+    font-family: 'Orbitron', sans-serif;
+    color: #00f0ff;
+    text-shadow: 0 0 12px rgba(0,240,255,0.4);
+}
+.summary-card-label {
+    font-size: 0.75rem;
+    color: #8a9bb8;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 4px;
+}
+
+/* ─── Filter Pills ────────────────────────────────────────── */
+.filter-pill {
+    display: inline-block;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid rgba(0,240,255,0.25);
+    background: rgba(0,240,255,0.05);
+    color: #8a9bb8;
+    margin: 3px 4px;
+    transition: all 0.18s ease;
+}
+.filter-pill:hover, .filter-pill-active {
+    background: rgba(0,240,255,0.15);
+    color: #00f0ff;
+    border-color: rgba(0,240,255,0.5);
+}
+
+/* ─── Day Timeline Cards ──────────────────────────────────── */
+.day-card-green {
+    border-left: 4px solid #00ff9d;
+    background: rgba(0,255,157,0.04);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.day-card-red {
+    border-left: 4px solid #ff4444;
+    background: rgba(255,68,68,0.04);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.day-card-yellow {
+    border-left: 4px solid #ffcc00;
+    background: rgba(255,200,0,0.04);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+</style>
+"""
+
+
+def get_bet_card_css():
+    """Return CSS for bet tracker cards."""
+    return _BET_CARD_CSS
+
+
+def get_bet_card_html(bet, show_live_status=False):
+    """
+    Render a single bet as a styled HTML card.
+
+    Args:
+        bet (dict): Bet record from the database.
+        show_live_status (bool): Whether to show live game status.
+
+    Returns:
+        str: HTML string.
+    """
+    import html as _h
+
+    player   = _h.escape(str(bet.get("player_name") or "Unknown Player"))
+    team     = _h.escape(str(bet.get("team") or ""))
+    stat     = _h.escape(str(bet.get("stat_type") or "").replace("_", " ").title())
+    line     = bet.get("prop_line") or bet.get("line") or 0
+    direction = str(bet.get("direction") or "OVER").upper()
+    projected = bet.get("projected_value") or bet.get("projected") or ""
+    edge_pct = bet.get("edge_percentage") or bet.get("edge") or 0
+    confidence = float(bet.get("confidence_score") or 0)
+    tier     = str(bet.get("tier") or "Bronze")
+    platform = str(bet.get("platform") or "")
+    result   = str(bet.get("result") or "").upper()
+    actual   = bet.get("actual_value")
+    bet_date = _h.escape(str(bet.get("bet_date") or ""))
+
+    # Direction styling
+    dir_class = "direction-over" if direction == "OVER" else "direction-under"
+    dir_arrow = "↑" if direction == "OVER" else "↓"
+
+    # Card class by result
+    if result == "WIN":
+        card_class = "bet-card bet-card-win"
+        result_html = '<span class="result-win">✅ WIN</span>'
+    elif result == "LOSS":
+        card_class = "bet-card bet-card-loss"
+        result_html = '<span class="result-loss">❌ LOSS</span>'
+    elif result == "PUSH":
+        card_class = "bet-card bet-card-push"
+        result_html = '<span class="result-push">🔄 PUSH</span>'
+    else:
+        card_class = "bet-card bet-card-pending"
+        result_html = '<span class="result-pending">⏳ PENDING</span>'
+
+    # Platform badge
+    plat_lower = platform.lower()
+    if "prize" in plat_lower or "pp" in plat_lower:
+        plat_html = f'<span class="platform-badge-pp">🟢 PrizePicks</span>'
+    elif "underdog" in plat_lower or "ud" in plat_lower:
+        plat_html = f'<span class="platform-badge-ud">🟣 Underdog</span>'
+    elif "draftkings" in plat_lower or "dk" in plat_lower:
+        plat_html = f'<span class="platform-badge-dk">🔵 DraftKings</span>'
+    else:
+        safe_plat = _h.escape(platform)
+        plat_html = f'<span class="platform-badge">{safe_plat}</span>'
+
+    # Tier badge
+    tier_lower = tier.lower()
+    tier_emojis = {"platinum": "💎", "gold": "🥇", "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
+    tier_emoji = tier_emojis.get(tier_lower, "🏅")
+    tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
+
+    # Confidence bar
+    conf_pct = max(0.0, min(100.0, confidence))
+    if conf_pct >= 80:
+        bar_color = "linear-gradient(90deg,#00ffd5,#00f0ff)"
+    elif conf_pct >= 65:
+        bar_color = "linear-gradient(90deg,#ff9d00,#ffcc00)"
+    elif conf_pct >= 50:
+        bar_color = "linear-gradient(90deg,#2196f3,#00b4ff)"
+    else:
+        bar_color = "linear-gradient(90deg,#5a6880,#8a9bb8)"
+
+    conf_bar = (
+        f'<div class="confidence-bar-wrap">'
+        f'<div class="confidence-bar-label">'
+        f'<span>Confidence</span><span style="color:#e8f0ff;font-weight:700;">{conf_pct:.0f}%</span>'
+        f'</div>'
+        f'<div class="confidence-bar-track">'
+        f'<div class="confidence-bar-fill" style="width:{conf_pct}%;background:{bar_color};"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
+    # Projected & edge
+    proj_text = f"📊 Projected: {float(projected):.1f}" if projected else ""
+    edge_text = f"· Edge: +{float(edge_pct):.1f}%" if edge_pct else ""
+    actual_text = ""
+    if actual is not None and result in ("WIN", "LOSS", "PUSH"):
+        actual_text = f'<div style="margin-top:6px;font-size:0.82rem;color:#8a9bb8;">Actual: <strong style="color:#e8f0ff;">{actual}</strong></div>'
+
+    # Live status
+    live_html = ""
+    if show_live_status:
+        live_status = str(bet.get("live_status") or "🕐 Not Started")
+        current_val = bet.get("current_value")
+        if current_val is not None:
+            live_html = (
+                f'<div style="margin-top:6px;font-size:0.82rem;">'
+                f'Live: <strong>{current_val}</strong> · {_h.escape(live_status)}'
+                f'</div>'
+            )
+        else:
+            live_html = f'<div style="margin-top:6px;font-size:0.82rem;">{_h.escape(live_status)}</div>'
+
+    team_display = f'<span class="bet-card-team">· {team}</span>' if team else ""
+
+    return (
+        f'<div class="{card_class}">'
+        f'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+        f'<div>'
+        f'<span class="bet-card-player">🏀 {player}</span>{team_display}'
+        f'</div>'
+        f'{result_html}'
+        f'</div>'
+        f'<div class="bet-card-divider"></div>'
+        f'<div style="font-size:0.9rem;color:rgba(255,255,255,0.85);">'
+        f'<span class="{dir_class}">{direction} {dir_arrow}</span>'
+        f' &nbsp;{stat} &nbsp;·&nbsp; Line: <strong>{line}</strong>'
+        f'</div>'
+        f'<div style="font-size:0.82rem;color:#8a9bb8;margin-top:4px;">'
+        f'{proj_text} {edge_text}'
+        f'</div>'
+        f'{conf_bar}'
+        f'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">'
+        f'{plat_html} &nbsp; {tier_html}'
+        f'</div>'
+        f'{actual_text}'
+        f'{live_html}'
+        f'</div>'
+    )
+
+
+def get_summary_cards_html(total, wins, losses, pushes, pending, win_rate, streak=0, best_platform=""):
+    """Render the summary metrics row at the top of the Bet Tracker."""
+    import html as _h
+
+    streak_label = (
+        f"🔥 W{streak}" if streak > 0
+        else f"❄️ L{abs(streak)}" if streak < 0
+        else "—"
+    )
+    streak_color = "#00ff9d" if streak > 0 else "#ff4444" if streak < 0 else "#8a9bb8"
+    win_color = "#00ff9d" if win_rate >= 55 else "#ff4444" if win_rate < 45 else "#ffcc00"
+
+    def _card(value, label, color="#00f0ff"):
+        v = _h.escape(str(value))
+        l = _h.escape(str(label))
+        return (
+            f'<div class="summary-card" style="flex:1;min-width:130px;">'
+            f'<div class="summary-card-value" style="color:{color};">{v}</div>'
+            f'<div class="summary-card-label">{l}</div>'
+            f'</div>'
+        )
+
+    cards = (
+        _card(f"{win_rate:.1f}%", "Win Rate", win_color)
+        + _card(total, "Total Bets")
+        + _card(f"✅{wins} ❌{losses}", "W / L")
+        + _card(streak_label, "Streak", streak_color)
+        + _card(pending, "Pending", "#ffcc00" if pending > 0 else "#8a9bb8")
+    )
+    if best_platform:
+        cards += _card(_h.escape(best_platform), "Best Platform", "#7c4dff")
+
+    return (
+        f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">{cards}</div>'
+    )
+
+# ============================================================
+# END SECTION: Bet Tracker Card CSS & HTML Generators
+# ============================================================
