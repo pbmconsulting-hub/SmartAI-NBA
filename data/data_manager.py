@@ -1020,20 +1020,27 @@ def load_props_from_session(session_state):
     """
     Load props from Streamlit's session state.
 
-    Returns sample props if no props have been entered yet,
-    so the user sees something immediately.
+    Checks keys in priority order:
+      1. ``current_props``  — user-entered or platform-filtered props
+      2. ``platform_props`` — live-fetched platform props (fallback)
+      3. Sample CSV         — last resort (stale / demo data)
 
     Args:
         session_state: Streamlit's st.session_state object
 
     Returns:
-        list of dict: Current props (entered or sample)
+        list of dict: Current props (entered, platform-fetched, or sample)
     """
-    # Check if user has entered their own props
-    if "current_props" in session_state and session_state["current_props"]:
+    # 1. Check user/filtered props
+    if session_state.get("current_props"):
         return session_state["current_props"]
 
-    # Fall back to sample props from the CSV
+    # 2. Fall back to live-fetched platform props saved by Live Games /
+    #    Data Feed pages so Neural Analysis always finds real data.
+    if session_state.get("platform_props"):
+        return session_state["platform_props"]
+
+    # 3. Last resort — stale sample CSV
     return load_props_data()
 
 
@@ -1194,6 +1201,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                             "line":        _line,
                             "platform":    _platform,
                             "game_date":   today_str,
+                            "_synthetic":  True,
                         })
                         seen.add(_dkey)
     # ── End star-player safety net ────────────────────────────────
@@ -1268,6 +1276,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                     "line":        prop_line,
                     "platform":    platform,
                     "game_date":   today_str,
+                    "_synthetic":  True,
                 })
                 seen.add(dedup_key)
 

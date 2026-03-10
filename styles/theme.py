@@ -4356,6 +4356,108 @@ def get_summary_cards_html(total, wins, losses, pushes, pending, win_rate, strea
         f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">{cards}</div>'
     )
 
+
+# ============================================================
+# SECTION: Styled Stats Table HTML
+# ============================================================
+
+def get_styled_stats_table_html(rows, columns, title=""):
+    """
+    Render a list of dicts as a dark-glass styled HTML table.
+
+    Args:
+        rows (list[dict]):   Data rows — each dict maps column header → value.
+        columns (list[str]): Column headers in display order.
+        title (str):         Optional table title shown above the table.
+
+    Returns:
+        str: Self-contained HTML string safe for ``st.markdown(..., unsafe_allow_html=True)``.
+    """
+    import html as _h
+
+    _TIER_EMOJI = {
+        "platinum": "💎",
+        "gold":     "🥇",
+        "silver":   "🥈",
+        "bronze":   "🥉",
+    }
+
+    def _win_rate_color(val_str):
+        """Return a CSS color based on a win-rate string like '63.0%'."""
+        try:
+            pct = float(str(val_str).replace("%", "").strip())
+            if pct >= 60:
+                return "#00ff9d"
+            if pct >= 50:
+                return "#ffcc00"
+            return "#ff4444"
+        except (ValueError, TypeError):
+            return "#e8f0ff"
+
+    header_cells = "".join(
+        f'<th style="padding:8px 14px;text-align:left;color:#00f0ff;'
+        f'font-family:Montserrat,sans-serif;font-size:0.82rem;'
+        f'text-transform:uppercase;letter-spacing:0.5px;'
+        f'border-bottom:1px solid rgba(0,240,255,0.18);">'
+        f'{_h.escape(str(c))}</th>'
+        for c in columns
+    )
+
+    body_rows = []
+    for i, row in enumerate(rows):
+        row_bg = "rgba(255,255,255,0.03)" if i % 2 == 0 else "transparent"
+        cells = []
+        for col in columns:
+            raw_val = row.get(col, "")
+            display_val = str(raw_val)
+
+            # Tier column — add emoji prefix
+            if col.lower() == "tier":
+                emoji = _TIER_EMOJI.get(display_val.lower(), "")
+                display_val = f"{emoji} {display_val}" if emoji else display_val
+                cell_color = "#e8f0ff"
+            elif "win rate" in col.lower() or "win%" in col.lower():
+                cell_color = _win_rate_color(display_val)
+            elif col.lower() in ("wins", "w"):
+                cell_color = "#00ff9d"
+            elif col.lower() in ("losses", "l"):
+                cell_color = "#ff4444"
+            else:
+                cell_color = "rgba(255,255,255,0.85)"
+
+            cells.append(
+                f'<td style="padding:7px 14px;color:{cell_color};'
+                f'font-family:Montserrat,sans-serif;font-size:0.88rem;'
+                f'border-bottom:1px solid rgba(255,255,255,0.05);">'
+                f'{_h.escape(display_val)}</td>'
+            )
+        body_rows.append(
+            f'<tr style="background:{row_bg};">{"".join(cells)}</tr>'
+        )
+
+    title_html = (
+        f'<div style="color:#00f0ff;font-family:Orbitron,sans-serif;'
+        f'font-size:0.95rem;font-weight:700;margin-bottom:8px;">'
+        f'{_h.escape(title)}</div>'
+        if title else ""
+    )
+
+    return (
+        f'{title_html}'
+        f'<div style="overflow-x:auto;border-radius:10px;'
+        f'border:1px solid rgba(0,240,255,0.14);'
+        f'background:linear-gradient(135deg,rgba(13,18,40,0.97),rgba(11,18,35,0.99));'
+        f'box-shadow:0 0 18px rgba(0,240,255,0.07);">'
+        f'<table style="width:100%;border-collapse:collapse;">'
+        f'<thead><tr>{header_cells}</tr></thead>'
+        f'<tbody>{"".join(body_rows)}</tbody>'
+        f'</table></div>'
+    )
+
+# ============================================================
+# END SECTION: Styled Stats Table HTML
+# ============================================================
+
 # ============================================================
 # END SECTION: Bet Tracker Card CSS & HTML Generators
 # ============================================================

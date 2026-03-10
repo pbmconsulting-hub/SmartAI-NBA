@@ -40,6 +40,7 @@ from styles.theme import (
     get_bet_card_css,
     get_bet_card_html,
     get_summary_cards_html,
+    get_styled_stats_table_html,
 )
 
 # ============================================================
@@ -294,7 +295,13 @@ with tab_model_health:
                 }
                 for t in tier_order if t in tier_perf
             ]
-            st.dataframe(tier_rows, use_container_width=True, hide_index=True)
+            st.markdown(
+                get_styled_stats_table_html(
+                    tier_rows,
+                    ["Tier", "Total", "Wins", "Losses", "Win Rate"],
+                ),
+                unsafe_allow_html=True,
+            )
 
         # Win rate by platform
         st.subheader("🎰 Win Rate by Platform")
@@ -309,7 +316,13 @@ with tab_model_health:
                 }
                 for p, d in plat_perf.items()
             ]
-            st.dataframe(plat_rows, use_container_width=True, hide_index=True)
+            st.markdown(
+                get_styled_stats_table_html(
+                    plat_rows,
+                    ["Platform", "Total", "Wins", "Win Rate"],
+                ),
+                unsafe_allow_html=True,
+            )
 
         # Win rate by stat type
         st.subheader("📐 Win Rate by Stat Type")
@@ -324,7 +337,13 @@ with tab_model_health:
                 }
                 for s, d in sorted(stat_perf.items())
             ]
-            st.dataframe(stat_rows, use_container_width=True, hide_index=True)
+            st.markdown(
+                get_styled_stats_table_html(
+                    stat_rows,
+                    ["Stat Type", "Total", "Wins", "Win Rate"],
+                ),
+                unsafe_allow_html=True,
+            )
 
 # ============================================================
 # END SECTION: Model Health Tab
@@ -845,7 +864,13 @@ with tab_predict:
                 for t in ["Platinum", "Gold", "Silver", "Bronze"]
                 if t in _tier_counts_wr
             ]
-            st.dataframe(tier_wr_rows, use_container_width=True, hide_index=True)
+            st.markdown(
+                get_styled_stats_table_html(
+                    tier_wr_rows,
+                    ["Tier", "Picks", "Est. Win Rate"],
+                ),
+                unsafe_allow_html=True,
+            )
 
         st.divider()
 
@@ -876,7 +901,13 @@ with tab_predict:
                     "Per Pick ($)":  f"${alloc_amt / max(cnt, 1):.2f}",
                 })
         if alloc_rows:
-            st.dataframe(alloc_rows, use_container_width=True, hide_index=True)
+            st.markdown(
+                get_styled_stats_table_html(
+                    alloc_rows,
+                    ["Tier", "Picks", "Allocation %", "Amount ($)", "Per Pick ($)"],
+                ),
+                unsafe_allow_html=True,
+            )
         else:
             st.info("No tier data found in tonight's analysis results.")
 

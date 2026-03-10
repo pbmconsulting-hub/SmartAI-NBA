@@ -398,7 +398,6 @@ if platform_props_clicked:
             include_draftkings=_include_dk,
             odds_api_key=odds_api_key or None,
         )
-        st.session_state["platform_analyzed_props"] = all_platform_props
 
         raw_count = len(all_platform_props)
         pp_status.text(f"⏳ 2/5 — Fetched {raw_count:,} props. Applying Smart Filter…")
@@ -433,12 +432,42 @@ if platform_props_clicked:
             props_to_analyze = all_platform_props
             st.info(f"ℹ️ Smart Filter is OFF. Analyzing all **{raw_count:,}** props.")
 
+        # ── Persist filtered props to both session state keys and disk ──
+        # Save filtered (not raw) props so Neural Analysis always finds real data.
+        try:
+            from data.data_manager import (
+                save_props_to_session as _save_current,
+                save_platform_props_to_csv as _save_csv,
+            )
+            from data.data_manager import save_platform_props_to_session as _save_platform
+            _save_current(props_to_analyze, st.session_state)
+            _save_platform(props_to_analyze, st.session_state)
+            _save_csv(props_to_analyze)
+        except Exception as _save_err:
+            # Best-effort — don't abort analysis if save fails (e.g. closed WS)
+            try:
+                print(f"Live Games: non-fatal save error: {_save_err}")
+            except Exception:
+                pass
+
         pp_status.text(f"⏳ 3/5 — Loading player data for {len(props_to_analyze):,} props…")
         pp_bar.progress(25)
 
         # ── Step 3: Load player data for analysis ─────────────────────
         from data.data_manager import load_players_data as _lp
         players_data_for_analysis = _lp()
+
+        # Fix 7: Enrich platform names → CSV canonical names before analysis
+        # (e.g. "Nic Claxton" → "Nicolas Claxton" so stats look-up succeeds)
+        try:
+            from data.platform_fetcher import enrich_props_with_csv_names as _enrich
+            props_to_analyze = _enrich(props_to_analyze, players_data_for_analysis)
+        except Exception as _enrich_err:
+            try:
+                print(f"Live Games: enrichment step failed (non-fatal): {_enrich_err}")
+            except Exception:
+                pass
+
         player_lookup: dict = {}
         for p in players_data_for_analysis:
             _n = str(p.get("name", "")).lower().strip()
@@ -750,11 +779,20 @@ if platform_props_clicked:
     except Exception as _platform_err:
         pp_bar.empty()
         pp_status.empty()
-        st.error(
-            f"❌ Platform props pipeline failed: {_platform_err}\n\n"
-            "This is usually caused by missing API access. "
-            "You can still use Auto-Load + Neural Analysis for model-generated props."
-        )
+        # Silently ignore WebSocket/stream errors caused by user navigating away
+        # mid-fetch — these are not real failures, just closed connections.
+        _err_str = str(_platform_err)
+        if "WebSocketClosedError" in _err_str or "StreamClosedError" in _err_str:
+            pass  # Connection closed — user navigated away; nothing to show
+        else:
+            try:
+                st.error(
+                    f"❌ Platform props pipeline failed: {_platform_err}\n\n"
+                    "This is usually caused by missing API access. "
+                    "You can still use Auto-Load + Neural Analysis for model-generated props."
+                )
+            except Exception:
+                pass  # Swallow any secondary UI error from closed WebSocket
 
 # ============================================================
 # END SECTION: Platform Props & Analyze Button
