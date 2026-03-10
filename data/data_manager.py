@@ -1360,6 +1360,111 @@ def get_csv_template():
 
 
 # ============================================================
+# SECTION: Platform Props — Save / Load helpers
+# These functions save and load live props fetched from betting
+# platforms (PrizePicks, Underdog, DraftKings) to/from both
+# session state and an optional CSV file on disk.
+# ============================================================
+
+# Path for saving live platform-fetched props (separate from sample_props)
+LIVE_PROPS_CSV_PATH = DATA_DIRECTORY / "live_props.csv"
+
+# CSV columns for platform props
+_PLATFORM_PROPS_COLUMNS = [
+    "player_name", "team", "stat_type", "line", "platform", "game_date", "fetched_at",
+]
+
+
+def save_platform_props_to_session(props_list, session_state):
+    """
+    Save platform-fetched props to Streamlit session state.
+
+    These are separate from the user-entered "current_props" so that
+    platform-fetched data can be used for cross-platform comparison
+    without overwriting manually entered props.
+
+    Args:
+        props_list (list[dict]): Props from fetch_all_platform_props().
+        session_state: Streamlit's st.session_state object.
+    """
+    session_state["platform_props"] = props_list
+
+
+def load_platform_props_from_session(session_state):
+    """
+    Load platform-fetched props from Streamlit session state.
+
+    Args:
+        session_state: Streamlit's st.session_state object.
+
+    Returns:
+        list[dict]: Previously fetched platform props, or [].
+    """
+    return session_state.get("platform_props", [])
+
+
+def save_platform_props_to_csv(props_list, file_path=None):
+    """
+    Save platform-fetched props to a CSV file on disk.
+
+    Overwrites the existing file each time. This is intentional —
+    platform props are always "today's live data", so old data
+    should be replaced.
+
+    Args:
+        props_list (list[dict]): Props from fetch_all_platform_props().
+        file_path (Path, optional): Where to save. Defaults to
+            data/live_props.csv.
+
+    Returns:
+        bool: True if saved successfully, False on error.
+    """
+    if file_path is None:
+        file_path = LIVE_PROPS_CSV_PATH
+
+    if not props_list:
+        return False  # Nothing to save
+
+    try:
+        with open(file_path, "w", newline="", encoding="utf-8") as csv_file:
+            writer = csv.DictWriter(
+                csv_file,
+                fieldnames=_PLATFORM_PROPS_COLUMNS,
+                extrasaction="ignore",  # Ignore extra keys in prop dicts
+            )
+            writer.writeheader()
+            writer.writerows(props_list)
+        return True
+    except Exception as error:
+        print(f"Warning: Could not save platform props to CSV: {error}")
+        return False
+
+
+def load_platform_props_from_csv(file_path=None):
+    """
+    Load platform-fetched props from a CSV file on disk.
+
+    Args:
+        file_path (Path, optional): Where to read from. Defaults to
+            data/live_props.csv.
+
+    Returns:
+        list[dict]: Props loaded from file, or [] if file not found.
+    """
+    if file_path is None:
+        file_path = LIVE_PROPS_CSV_PATH
+
+    if not Path(file_path).exists():
+        return []  # File not yet created
+
+    return _load_csv_file(file_path)
+
+# ============================================================
+# END SECTION: Platform Props — Save / Load helpers
+# ============================================================
+
+
+# ============================================================
 # SECTION: Live Data Detection Functions
 # Check if live data has been loaded, and when it was last updated.
 # ============================================================

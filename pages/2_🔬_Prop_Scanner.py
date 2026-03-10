@@ -63,7 +63,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🔬 Prop Scanner")
-st.markdown("Enter prop lines manually or upload a CSV. Sample props are pre-loaded!")
+st.markdown("Enter prop lines manually, upload a CSV, or **fetch live lines** directly from the platforms!")
 st.divider()
 
 st.markdown(get_education_box_html(
@@ -99,8 +99,180 @@ valid_stat_types = (
 )
 valid_platforms = ["PrizePicks", "Underdog", "DraftKings"]
 
+# ── Import platform fetcher (optional — app works without it) ──
+try:
+    from data.platform_fetcher import (
+        fetch_all_platform_props,
+        build_cross_platform_comparison,
+        recommend_best_platform,
+        summarize_props_by_platform,
+    )
+    from data.data_manager import (
+        save_platform_props_to_session,
+        load_platform_props_from_session,
+        save_platform_props_to_csv,
+    )
+    _PLATFORM_FETCHER_AVAILABLE = True
+except ImportError:
+    _PLATFORM_FETCHER_AVAILABLE = False
+
 # ============================================================
 # END SECTION: Load Available Data
+# ============================================================
+
+# ============================================================
+# SECTION: Fetch Live Props
+# One-click button to pull live lines from PrizePicks, Underdog,
+# and DraftKings (via The Odds API) and populate the prop list.
+# ============================================================
+
+st.subheader("🔄 Fetch Live Props")
+
+if _PLATFORM_FETCHER_AVAILABLE:
+    _pp_on = st.session_state.get("fetch_prizepicks_enabled", True)
+    _ud_on = st.session_state.get("fetch_underdog_enabled", True)
+    _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
+    _dk_key = st.session_state.get("odds_api_key", "").strip()
+
+    # Show which platforms are enabled
+    _enabled_names = []
+    if _pp_on:
+        _enabled_names.append("PrizePicks")
+    if _ud_on:
+        _enabled_names.append("Underdog")
+    if _dk_on and _dk_key:
+        _enabled_names.append("DraftKings")
+
+    st.markdown(
+        f"Fetch tonight's live prop lines from: **{', '.join(_enabled_names) if _enabled_names else 'no platforms enabled'}**. "
+        "Configure platforms on the [⚙️ Settings](/Settings) page."
+    )
+
+    _live_col1, _live_col2 = st.columns([2, 3])
+
+    with _live_col1:
+        _do_fetch = st.button(
+            "🔄 Fetch Live Props",
+            type="primary",
+            use_container_width=True,
+            help="Pull tonight's live prop lines from all enabled platforms.",
+            disabled=not _enabled_names,
+        )
+
+    with _live_col2:
+        # Show cached platform props info if available
+        _cached = load_platform_props_from_session(st.session_state)
+        if _cached:
+            _cached_summary = summarize_props_by_platform(_cached)
+            _fetched_at = _cached[0].get("fetched_at", "unknown time") if _cached else ""
+            st.info(
+                f"📦 **{len(_cached)} props cached** "
+                f"({', '.join(f'{p}: {c}' for p, c in _cached_summary.items())}) "
+                f"— fetched at {_fetched_at[:16] if _fetched_at else 'unknown'}"
+            )
+
+    if _do_fetch:
+        _pb = st.progress(0, text="Starting platform fetch...")
+
+        def _scanner_progress(current, total, msg):
+            pct = int((current / max(total, 1)) * 100)
+            _pb.progress(pct, text=msg)
+
+        with st.spinner("Fetching live props..."):
+            _live_props = fetch_all_platform_props(
+                include_prizepicks=_pp_on,
+                include_underdog=_ud_on,
+                include_draftkings=_dk_on and bool(_dk_key),
+                odds_api_key=_dk_key or None,
+                progress_callback=_scanner_progress,
+            )
+
+        _pb.progress(100, text="Done!")
+
+        if _live_props:
+            save_platform_props_to_session(_live_props, st.session_state)
+            save_platform_props_to_csv(_live_props)
+            save_props_to_session(_live_props, st.session_state)
+            _lsummary = summarize_props_by_platform(_live_props)
+            st.success(
+                f"✅ Loaded **{len(_live_props)} live props**: "
+                + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
+            )
+            st.rerun()  # Refresh so the current_props table shows the new data
+        else:
+            st.warning(
+                "⚠️ No live props fetched. Check your internet connection. "
+                "PrizePicks and Underdog APIs should work without a key."
+            )
+
+    # ── Cross-Platform Comparison Table ───────────────────────────
+    _platform_props = load_platform_props_from_session(st.session_state)
+    if _platform_props:
+        comparison = build_cross_platform_comparison(_platform_props)
+        # Only show players that appear on 2+ platforms (most useful to compare)
+        multi_platform = {
+            key: lines for key, lines in comparison.items()
+            if len(lines) >= 2
+        }
+
+        if multi_platform:
+            with st.expander(
+                f"📊 Cross-Platform Line Comparison ({len(multi_platform)} player+stat combos)",
+                expanded=False,
+            ):
+                st.markdown(
+                    "Lines available on **multiple platforms** — compare to find the best bet. "
+                    "**OVER**: lower line is better. **UNDER**: higher line is better."
+                )
+
+                # Build comparison table rows
+                _comp_rows = []
+                for (player_name, stat_type), lines in sorted(multi_platform.items()):
+                    row = {
+                        "Player": player_name,
+                        "Stat": stat_type,
+                    }
+                    # Add columns for each platform
+                    row["PrizePicks"] = lines.get("PrizePicks", "—")
+                    row["Underdog"] = lines.get("Underdog", "—")
+                    row["DraftKings"] = lines.get("DraftKings", "—")
+
+                    # Calculate spread (max - min line)
+                    numeric_lines = [v for v in lines.values() if isinstance(v, (int, float))]
+                    if len(numeric_lines) >= 2:
+                        spread = round(max(numeric_lines) - min(numeric_lines), 1)
+                        row["Spread"] = spread
+                        # Best for OVER = lowest line
+                        best_over_plat = min(lines, key=lambda p: lines[p])
+                        row["Best OVER"] = f"{best_over_plat} ({lines[best_over_plat]})"
+                        # Best for UNDER = highest line
+                        best_under_plat = max(lines, key=lambda p: lines[p])
+                        row["Best UNDER"] = f"{best_under_plat} ({lines[best_under_plat]})"
+                    else:
+                        row["Spread"] = "—"
+                        row["Best OVER"] = "—"
+                        row["Best UNDER"] = "—"
+
+                    _comp_rows.append(row)
+
+                if _comp_rows:
+                    st.dataframe(_comp_rows, use_container_width=True, hide_index=True)
+                    st.caption(
+                        "💡 **Best OVER** = platform with the lowest line (easiest to beat). "
+                        "**Best UNDER** = platform with the highest line (most room). "
+                        "**Spread** = difference between highest and lowest line."
+                    )
+
+else:
+    st.info(
+        "ℹ️ Live prop fetching requires the `requests` library. "
+        "Run `pip install requests` to enable this feature."
+    )
+
+st.divider()
+
+# ============================================================
+# END SECTION: Fetch Live Props
 # ============================================================
 
 # ============================================================

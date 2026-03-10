@@ -343,6 +343,126 @@ with st.expander("Advanced Adjustment Factors"):
 st.divider()
 
 # ============================================================
+# SECTION: API Keys
+# Configure API keys needed for platform prop fetching.
+# PrizePicks and Underdog have free public APIs (no key needed).
+# DraftKings requires The Odds API key (free tier: 500 req/month).
+# ============================================================
+
+st.subheader("🔑 API Keys")
+
+st.markdown(get_education_box_html(
+    "📖 API Keys for Live Prop Fetching",
+    """
+    <strong>PrizePicks</strong> and <strong>Underdog Fantasy</strong> have free public APIs — 
+    no key needed. Just click "Fetch Live Props" on the Prop Scanner page.<br><br>
+    <strong>DraftKings Pick6</strong> lines are fetched via 
+    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">The Odds API</a> 
+    (free tier: 500 requests/month). Enter your key below — it's stored only in this 
+    browser session and never saved to disk or sent anywhere else.
+    """
+), unsafe_allow_html=True)
+
+with st.expander("🔑 Configure The Odds API Key (DraftKings)", expanded=False):
+    st.markdown(
+        "Get your free API key at "
+        "[https://the-odds-api.com](https://the-odds-api.com) — free tier gives you "
+        "500 requests/month, which is plenty for daily prop fetching."
+    )
+
+    # Show the current key status (masked) without revealing the full key
+    current_key = st.session_state.get("odds_api_key", "")
+    if current_key:
+        masked = current_key[:4] + "••••••••" + current_key[-4:] if len(current_key) > 8 else "••••••••"
+        st.success(f"✅ API key configured: `{masked}`")
+    else:
+        st.info("ℹ️ No Odds API key set. DraftKings props will be skipped.")
+
+    # Text input for the key — uses password type to hide it from screen
+    new_key = st.text_input(
+        "The Odds API Key",
+        value=current_key,
+        type="password",
+        placeholder="e.g., a1b2c3d4e5f6...",
+        help="Your Odds API key from the-odds-api.com. Stored in this session only.",
+        key="odds_api_key_input",
+    )
+
+    col_save_key, col_clear_key = st.columns([1, 1])
+    with col_save_key:
+        if st.button("💾 Save API Key", use_container_width=True):
+            st.session_state["odds_api_key"] = new_key.strip()
+            if new_key.strip():
+                st.success("✅ API key saved for this session!")
+            else:
+                st.info("API key cleared.")
+            st.rerun()
+    with col_clear_key:
+        if st.button("🗑️ Clear API Key", use_container_width=True):
+            st.session_state["odds_api_key"] = ""
+            st.info("API key cleared.")
+            st.rerun()
+
+st.divider()
+
+# ============================================================
+# SECTION: Platform Fetch Toggles
+# Enable or disable fetching from each platform.
+# These are used by the "Fetch Live Props" button on the Prop Scanner
+# and the "Fetch Platform Props" section on the Data Feed page.
+# ============================================================
+
+st.subheader("🏀 Platform Fetch Settings")
+
+st.markdown("Control which platforms are included when fetching live prop lines.")
+
+toggle_col1, toggle_col2, toggle_col3 = st.columns(3)
+
+with toggle_col1:
+    pp_enabled = st.toggle(
+        "✅ PrizePicks",
+        value=st.session_state.get("fetch_prizepicks_enabled", True),
+        help="Fetch props from PrizePicks (free public API, no key required).",
+    )
+    st.session_state["fetch_prizepicks_enabled"] = pp_enabled
+    st.markdown(
+        '<div style="color:#9ae6b4;font-size:0.78rem;">No API key needed</div>',
+        unsafe_allow_html=True,
+    )
+
+with toggle_col2:
+    ud_enabled = st.toggle(
+        "✅ Underdog Fantasy",
+        value=st.session_state.get("fetch_underdog_enabled", True),
+        help="Fetch props from Underdog Fantasy (free public API, no key required).",
+    )
+    st.session_state["fetch_underdog_enabled"] = ud_enabled
+    st.markdown(
+        '<div style="color:#d6bcfa;font-size:0.78rem;">No API key needed</div>',
+        unsafe_allow_html=True,
+    )
+
+with toggle_col3:
+    dk_enabled = st.toggle(
+        "✅ DraftKings Pick6",
+        value=st.session_state.get("fetch_draftkings_enabled", True),
+        help="Fetch DraftKings lines via The Odds API. Requires a free API key.",
+    )
+    st.session_state["fetch_draftkings_enabled"] = dk_enabled
+    has_dk_key = bool(st.session_state.get("odds_api_key", "").strip())
+    st.markdown(
+        f'<div style="color:{"#bee3f8" if has_dk_key else "#ff6b6b"};font-size:0.78rem;">'
+        f'{"API key ✓" if has_dk_key else "⚠️ Needs API key"}</div>',
+        unsafe_allow_html=True,
+    )
+
+st.divider()
+
+# ============================================================
+# END SECTION: Platform Fetch Settings
+# ============================================================
+
+# ============================================================
 # SECTION: Display Current Settings Summary
 # ============================================================
 
@@ -357,6 +477,10 @@ settings_summary = {
     "Blowout Sensitivity": f"{st.session_state.get('blowout_sensitivity', 1.0):.1f}x",
     "Fatigue Sensitivity": f"{st.session_state.get('fatigue_sensitivity', 1.0):.1f}x",
     "Pace Sensitivity": f"{st.session_state.get('pace_sensitivity', 1.0):.1f}x",
+    "PrizePicks Fetch": "Enabled" if st.session_state.get("fetch_prizepicks_enabled", True) else "Disabled",
+    "Underdog Fetch": "Enabled" if st.session_state.get("fetch_underdog_enabled", True) else "Disabled",
+    "DraftKings Fetch": "Enabled" if st.session_state.get("fetch_draftkings_enabled", True) else "Disabled",
+    "Odds API Key": "Configured ✓" if st.session_state.get("odds_api_key", "") else "Not set",
 }
 
 summary_rows = [{"Setting": k, "Value": v} for k, v in settings_summary.items()]
@@ -370,6 +494,7 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
         "simulation_depth", "minimum_edge_threshold", "entry_fee",
         "selected_platforms", "home_court_boost", "blowout_sensitivity",
         "fatigue_sensitivity", "pace_sensitivity",
+        "fetch_prizepicks_enabled", "fetch_underdog_enabled", "fetch_draftkings_enabled",
     ]
     for key in settings_keys_to_clear:
         if key in st.session_state:

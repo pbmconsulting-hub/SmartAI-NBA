@@ -1,0 +1,959 @@
+# ============================================================
+# FILE: data/platform_fetcher.py
+# PURPOSE: Fetch live player prop lines from betting platforms:
+#          PrizePicks, Underdog Fantasy, and DraftKings Pick6
+#          (via The Odds API). Also provides cross-platform
+#          comparison logic and best-platform recommendation.
+#
+# PLATFORMS:
+#   - PrizePicks  : public JSON API, no key required
+#   - Underdog    : public JSON API, no key required
+#   - DraftKings  : via The Odds API (free key, 500 req/month)
+#
+# USAGE:
+#   from data.platform_fetcher import fetch_all_platform_props
+#   props = fetch_all_platform_props()
+#
+# RETURN FORMAT for every prop dict:
+#   {
+#       "player_name": "LeBron James",
+#       "team":        "LAL",
+#       "stat_type":   "points",          # internal key (normalized)
+#       "line":        24.5,
+#       "platform":    "PrizePicks",
+#       "game_date":   "2026-03-10",
+#       "fetched_at":  "2026-03-10T01:00:00",
+#   }
+#
+# DESIGN PRINCIPLES:
+#   - Graceful degradation: if one platform fails, others still run
+#   - Rate limiting: 1-2 second delays between calls (polite to APIs)
+#   - Session caching: callers should store result in session state
+#   - Beginner-friendly comments throughout
+# ============================================================
+
+# Standard library imports (built into Python — no install needed)
+import time       # For delays between API calls (rate limiting)
+import datetime   # For timestamps on fetched props
+import os         # For reading environment variables (API keys)
+
+# Third-party HTTP library — must be installed (pip install requests)
+# 'requests' is used by roster_engine.py already and listed in requirements.
+try:
+    import requests
+    REQUESTS_AVAILABLE = True
+except ImportError:
+    REQUESTS_AVAILABLE = False
+
+# Import our platform stat-name normalizer
+# This converts "3-Point Made" → "threes", "Pts+Rebs" → "points_rebounds", etc.
+from data.platform_mappings import normalize_stat_type
+
+# ============================================================
+# SECTION: Module-level constants
+# ============================================================
+
+# How long to wait between calls to the same platform (seconds).
+# BEGINNER NOTE: APIs block you if you call too fast. 1.5s is polite
+# and mirrors the pattern in live_data_fetcher.py.
+API_DELAY_SECONDS = 1.5
+
+# HTTP timeout for platform API requests (seconds).
+REQUEST_TIMEOUT_SECONDS = 15
+
+# Browser-like User-Agent header so APIs don't block automated requests.
+# BEGINNER NOTE: Web servers often reject requests without a User-Agent.
+# This mimics a real Chrome browser on Windows.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/122.0.0.0 Safari/537.36"
+)
+
+# Shared headers used for every platform request
+_BASE_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Connection": "keep-alive",
+}
+
+# PrizePicks public projections endpoint (no API key required)
+PRIZEPICKS_URL = "https://api.prizepicks.com/projections"
+
+# Underdog Fantasy public over/under lines endpoint (no API key required)
+UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
+
+# The Odds API base URL — used to fetch DraftKings player props
+# Documentation: https://the-odds-api.com/liveapi/guides/v4/
+ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
+
+# ============================================================
+# END SECTION: Module-level constants
+# ============================================================
+
+
+# ============================================================
+# SECTION: Helper — today's date string
+# ============================================================
+
+def _today_str():
+    """Return today's date as an ISO string ('YYYY-MM-DD')."""
+    return datetime.date.today().isoformat()
+
+
+def _now_str():
+    """Return the current datetime as an ISO string."""
+    return datetime.datetime.now().isoformat(timespec="seconds")
+
+# ============================================================
+# END SECTION: Helper — today's date string
+# ============================================================
+
+
+# ============================================================
+# SECTION: PrizePicks Fetcher
+# ============================================================
+
+def fetch_prizepicks_props(league="NBA"):
+    """
+    Fetch live player prop lines from PrizePicks.
+
+    Uses PrizePicks' public JSON API — no API key required.
+    Filters to NBA only and normalizes stat types to our internal keys.
+
+    Args:
+        league (str): Sport league filter. Default "NBA".
+
+    Returns:
+        list[dict]: List of prop dicts (see module header for format).
+                    Returns [] on any error.
+
+    Example:
+        props = fetch_prizepicks_props()
+        # → [{"player_name": "LeBron James", "stat_type": "points",
+        #      "line": 24.5, "platform": "PrizePicks", ...}, ...]
+    """
+    if not REQUESTS_AVAILABLE:
+        print("Warning: 'requests' library not installed. Cannot fetch PrizePicks props.")
+        return []
+
+    # PrizePicks requires Referer header in addition to the base headers
+    headers = dict(_BASE_HEADERS)
+    headers["Referer"] = "https://app.prizepicks.com/"
+
+    print(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
+
+    try:
+        response = requests.get(
+            PRIZEPICKS_URL,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            params={"league_id": 7, "per_page": 250, "single_stat": "true"},
+            # BEGINNER NOTE: league_id=7 is NBA on PrizePicks.
+            # per_page=250 gets more projections in one call.
+        )
+        response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
+        data = response.json()
+
+    except requests.exceptions.Timeout:
+        print("[PrizePicks] Request timed out. Skipping.")
+        return []
+    except requests.exceptions.ConnectionError as err:
+        print(f"[PrizePicks] Connection error: {err}. Skipping.")
+        return []
+    except Exception as err:
+        print(f"[PrizePicks] Unexpected error: {err}. Skipping.")
+        return []
+
+    # ── Parse the response ────────────────────────────────────
+    # PrizePicks returns two arrays:
+    #   "data"     → list of projection objects (each has stat_type, line_score, etc.)
+    #   "included" → list of player objects referenced by projections
+
+    projections = data.get("data", [])
+    included = data.get("included", [])
+
+    # Build a lookup dict: player_id → player info dict
+    # BEGINNER NOTE: Each projection links to a player via "relationships.new_player.data.id"
+    player_lookup = {}
+    for item in included:
+        if item.get("type") == "new_player":
+            pid = item.get("id", "")
+            attrs = item.get("attributes", {})
+            player_lookup[pid] = {
+                "name": attrs.get("name", ""),
+                "team": attrs.get("team", attrs.get("team_name", "")),
+            }
+
+    # Parse each projection into our standard prop format
+    props = []
+    today = _today_str()
+    fetched_at = _now_str()
+
+    for proj in projections:
+        # Only process PrizePicks "projection" type objects
+        if proj.get("type") != "projection":
+            continue
+
+        attrs = proj.get("attributes", {})
+
+        # Filter to NBA only
+        league_name = attrs.get("league", attrs.get("league_name", "")).upper()
+        if league.upper() not in league_name and league_name != "":
+            # Some projections don't have league on the projection itself;
+            # we'll include them and rely on the player lookup for filtering
+            if league_name:
+                continue
+
+        # Get the player id from the relationship link
+        relationships = proj.get("relationships", {})
+        player_rel = relationships.get("new_player", {}).get("data", {})
+        player_id = player_rel.get("id", "")
+        player_info = player_lookup.get(player_id, {})
+
+        player_name = player_info.get("name", attrs.get("description", "")).strip()
+        team = player_info.get("team", "").strip().upper()
+
+        if not player_name:
+            continue  # Skip projections with no player name
+
+        # Normalize the stat type to our internal key
+        raw_stat = attrs.get("stat_type", "")
+        stat_type = normalize_stat_type(raw_stat, "PrizePicks")
+
+        # The line value (the threshold to bet over/under)
+        try:
+            line = float(attrs.get("line_score", 0))
+        except (ValueError, TypeError):
+            continue  # Skip if line is not a valid number
+
+        if line <= 0:
+            continue  # Skip invalid lines
+
+        props.append({
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": line,
+            "platform": "PrizePicks",
+            "game_date": today,
+            "fetched_at": fetched_at,
+        })
+
+    print(f"[PrizePicks] Fetched {len(props)} NBA props.")
+    return props
+
+# ============================================================
+# END SECTION: PrizePicks Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Underdog Fantasy Fetcher
+# ============================================================
+
+def fetch_underdog_props(league="NBA"):
+    """
+    Fetch live player prop lines from Underdog Fantasy.
+
+    Uses Underdog's public JSON API — no API key required.
+    Filters to NBA only and normalizes stat types.
+
+    Args:
+        league (str): Sport league filter. Default "NBA".
+
+    Returns:
+        list[dict]: List of prop dicts in standard format.
+                    Returns [] on any error.
+
+    Example:
+        props = fetch_underdog_props()
+        # → [{"player_name": "Stephen Curry", "stat_type": "threes",
+        #      "line": 3.5, "platform": "Underdog", ...}, ...]
+    """
+    if not REQUESTS_AVAILABLE:
+        print("Warning: 'requests' library not installed. Cannot fetch Underdog props.")
+        return []
+
+    print(f"[Underdog] Fetching NBA props from {UNDERDOG_URL} ...")
+
+    try:
+        response = requests.get(
+            UNDERDOG_URL,
+            headers=_BASE_HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    except requests.exceptions.Timeout:
+        print("[Underdog] Request timed out. Skipping.")
+        return []
+    except requests.exceptions.ConnectionError as err:
+        print(f"[Underdog] Connection error: {err}. Skipping.")
+        return []
+    except Exception as err:
+        print(f"[Underdog] Unexpected error: {err}. Skipping.")
+        return []
+
+    # ── Parse the response ────────────────────────────────────
+    # Underdog returns a flat list in "over_under_lines"
+    # Each entry has: title (player name), display_stat, stat_value,
+    #                 sport_id, etc.
+
+    lines = data.get("over_under_lines", [])
+
+    # Also build a player lookup from "appearances" or "players" if present
+    # (some Underdog responses include more player details)
+    appearances = {}
+    for ap in data.get("appearances", []):
+        ap_id = ap.get("id", "")
+        appearances[ap_id] = ap
+
+    props = []
+    today = _today_str()
+    fetched_at = _now_str()
+
+    for line_item in lines:
+        # Underdog uses "sport_id" or similar for league filtering
+        # Common values: "NBA", "nba", etc.
+        sport_id = str(line_item.get("sport_id", line_item.get("sport", ""))).upper()
+        if league.upper() not in sport_id and sport_id:
+            continue  # Skip non-NBA lines
+
+        # Player name is in "over_under" → "appearance" relationship, or directly
+        # in "title". Structure varies slightly by API version.
+        player_name = line_item.get("title", "").strip()
+
+        # Try to get team from the appearance object
+        ap_id = line_item.get("appearance_id", "")
+        ap_data = appearances.get(ap_id, {})
+        team = ap_data.get("team_abbreviation", ap_data.get("team", "")).strip().upper()
+
+        if not player_name:
+            continue  # Skip entries with no player name
+
+        # Normalize stat type
+        raw_stat = line_item.get("display_stat", line_item.get("stat_type", ""))
+        stat_type = normalize_stat_type(raw_stat, "Underdog")
+
+        # The line value
+        try:
+            line = float(line_item.get("stat_value", line_item.get("o_u_value", 0)))
+        except (ValueError, TypeError):
+            continue  # Skip invalid lines
+
+        if line <= 0:
+            continue
+
+        props.append({
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": line,
+            "platform": "Underdog",
+            "game_date": today,
+            "fetched_at": fetched_at,
+        })
+
+    print(f"[Underdog] Fetched {len(props)} NBA props.")
+    return props
+
+# ============================================================
+# END SECTION: Underdog Fantasy Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: DraftKings (via The Odds API) Fetcher
+# ============================================================
+
+def fetch_draftkings_props(api_key=None):
+    """
+    Fetch DraftKings Pick6 player prop lines via The Odds API.
+
+    The Odds API aggregates DraftKings player props.
+    Free tier: 500 requests/month. Get your key at https://the-odds-api.com
+
+    The API key is looked up in this order:
+      1. api_key argument (passed directly)
+      2. st.session_state["odds_api_key"] (set on Settings page)
+      3. ODDS_API_KEY environment variable
+
+    Args:
+        api_key (str, optional): The Odds API key. If None, reads from
+            session state or environment variable.
+
+    Returns:
+        list[dict]: List of prop dicts in standard format.
+                    Returns [] if no API key or on any error.
+
+    Example:
+        props = fetch_draftkings_props(api_key="your_key_here")
+        # → [{"player_name": "Giannis Antetokounmpo", "stat_type": "points",
+        #      "line": 28.5, "platform": "DraftKings", ...}, ...]
+    """
+    if not REQUESTS_AVAILABLE:
+        print("Warning: 'requests' library not installed. Cannot fetch DraftKings props.")
+        return []
+
+    # ── Resolve API key ────────────────────────────────────────
+    # Try session state first (set via Settings page)
+    if api_key is None:
+        try:
+            import streamlit as st
+            api_key = st.session_state.get("odds_api_key", "").strip() or None
+        except Exception:
+            pass  # streamlit may not be available in some contexts
+
+    # Try environment variable as final fallback
+    if not api_key:
+        api_key = os.environ.get("ODDS_API_KEY", "").strip() or None
+
+    if not api_key:
+        print(
+            "[DraftKings] No Odds API key configured. "
+            "Add your key on the Settings page or set ODDS_API_KEY env var. "
+            "Get a free key at https://the-odds-api.com"
+        )
+        return []
+
+    print("[DraftKings] Fetching NBA events via The Odds API ...")
+
+    # ── Step 1: Get list of today's NBA events ─────────────────
+    events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
+    try:
+        events_resp = requests.get(
+            events_url,
+            headers=_BASE_HEADERS,
+            params={"apiKey": api_key},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        events_resp.raise_for_status()
+        events = events_resp.json()
+
+    except requests.exceptions.HTTPError as err:
+        # HTTPError is raised by raise_for_status() — events_resp is guaranteed to exist
+        status_code = events_resp.status_code
+        if status_code == 401:
+            print("[DraftKings] Invalid API key. Check your Odds API key on the Settings page.")
+        elif status_code == 422:
+            print("[DraftKings] API quota exceeded for the month.")
+        else:
+            print(f"[DraftKings] HTTP error fetching events: {err}")
+        return []
+    except Exception as err:
+        print(f"[DraftKings] Error fetching events: {err}. Skipping.")
+        return []
+
+    if not events:
+        print("[DraftKings] No NBA events found today.")
+        return []
+
+    print(f"[DraftKings] Found {len(events)} NBA events. Fetching player props...")
+
+    # ── Step 2: Fetch player props for each event ──────────────
+    # BEGINNER NOTE: The Odds API charges per request, so we request
+    # all common prop markets in one call per event to minimize API usage.
+    # Markets: player_points, player_rebounds, player_assists, player_threes,
+    #          player_blocks, player_steals, player_turnovers
+    MARKETS = ",".join([
+        "player_points",
+        "player_rebounds",
+        "player_assists",
+        "player_threes",
+        "player_blocks",
+        "player_steals",
+        "player_turnovers",
+        "player_points_rebounds_assists",
+        "player_points_rebounds",
+        "player_points_assists",
+    ])
+
+    # Internal mapping from Odds API market keys → our internal stat types
+    _MARKET_TO_STAT = {
+        "player_points": "points",
+        "player_rebounds": "rebounds",
+        "player_assists": "assists",
+        "player_threes": "threes",
+        "player_blocks": "blocks",
+        "player_steals": "steals",
+        "player_turnovers": "turnovers",
+        "player_points_rebounds_assists": "points_rebounds_assists",
+        "player_points_rebounds": "points_rebounds",
+        "player_points_assists": "points_assists",
+    }
+
+    props = []
+    today = _today_str()
+    fetched_at = _now_str()
+
+    for event in events:
+        event_id = event.get("id", "")
+        if not event_id:
+            continue
+
+        # Add a short delay between event requests to stay polite
+        time.sleep(0.5)
+
+        props_url = (
+            f"{ODDS_API_BASE_URL}/sports/basketball_nba/events/{event_id}/odds"
+        )
+        try:
+            props_resp = requests.get(
+                props_url,
+                headers=_BASE_HEADERS,
+                params={
+                    "apiKey": api_key,
+                    "regions": "us",
+                    "markets": MARKETS,
+                    "bookmakers": "draftkings",
+                    "oddsFormat": "american",
+                },
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            props_resp.raise_for_status()
+            event_data = props_resp.json()
+
+        except requests.exceptions.HTTPError as err:
+            # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
+            if props_resp.status_code == 422:
+                print("[DraftKings] API quota exceeded. Stopping early.")
+                break
+            print(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
+            continue
+        except Exception as err:
+            print(f"[DraftKings] Error for event {event_id}: {err}. Skipping.")
+            continue
+
+        # ── Parse bookmaker data ───────────────────────────────
+        for bookmaker in event_data.get("bookmakers", []):
+            if bookmaker.get("key", "") != "draftkings":
+                continue
+
+            for market in bookmaker.get("markets", []):
+                market_key = market.get("key", "")
+                stat_type = _MARKET_TO_STAT.get(market_key)
+                if not stat_type:
+                    continue  # Skip markets we don't track
+
+                for outcome in market.get("outcomes", []):
+                    # The Odds API player props have:
+                    #   name     → player name (e.g., "LeBron James")
+                    #   point    → the line value (e.g., 24.5)
+                    #   description → "Over" or "Under"
+
+                    # Only record "Over" outcomes (one line per player/stat)
+                    if outcome.get("description", "").lower() != "over":
+                        continue
+
+                    player_name = outcome.get("name", "").strip()
+                    if not player_name:
+                        continue
+
+                    try:
+                        line = float(outcome.get("point", 0))
+                    except (ValueError, TypeError):
+                        continue
+
+                    if line <= 0:
+                        continue
+
+                    props.append({
+                        "player_name": player_name,
+                        "team": "",  # Odds API doesn't include team in player props
+                        "stat_type": stat_type,
+                        "line": line,
+                        "platform": "DraftKings",
+                        "game_date": today,
+                        "fetched_at": fetched_at,
+                    })
+
+    print(f"[DraftKings] Fetched {len(props)} NBA props.")
+    return props
+
+# ============================================================
+# END SECTION: DraftKings Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Master Fetch Function
+# ============================================================
+
+def fetch_all_platform_props(
+    include_prizepicks=True,
+    include_underdog=True,
+    include_draftkings=True,
+    odds_api_key=None,
+    progress_callback=None,
+):
+    """
+    Fetch live prop lines from all enabled platforms.
+
+    Calls each enabled platform fetcher in sequence, aggregates results,
+    and stamps each prop with a fetched_at timestamp. If one platform
+    fails, the others still run (graceful degradation).
+
+    Args:
+        include_prizepicks (bool): Fetch from PrizePicks. Default True.
+        include_underdog (bool): Fetch from Underdog Fantasy. Default True.
+        include_draftkings (bool): Fetch from DraftKings via The Odds API. Default True.
+        odds_api_key (str, optional): The Odds API key for DraftKings. If None,
+            reads from session state or ODDS_API_KEY env var.
+        progress_callback (callable, optional): Called as
+            progress_callback(current, total, message) to update a UI progress bar.
+
+    Returns:
+        list[dict]: All fetched props from all enabled platforms,
+                    each with a "fetched_at" timestamp.
+
+    Example:
+        props = fetch_all_platform_props()
+        # → 100+ props from PrizePicks + Underdog + DraftKings combined
+    """
+    all_props = []
+    platforms_to_fetch = []
+
+    # Build list of enabled platforms for progress tracking
+    if include_prizepicks:
+        platforms_to_fetch.append("PrizePicks")
+    if include_underdog:
+        platforms_to_fetch.append("Underdog")
+    if include_draftkings:
+        platforms_to_fetch.append("DraftKings")
+
+    total_steps = len(platforms_to_fetch)
+    current_step = 0
+
+    # ── PrizePicks ─────────────────────────────────────────────
+    if include_prizepicks:
+        current_step += 1
+        if progress_callback:
+            progress_callback(current_step, total_steps, "Fetching PrizePicks props...")
+        try:
+            pp_props = fetch_prizepicks_props()
+            all_props.extend(pp_props)
+            print(f"[Master] PrizePicks: {len(pp_props)} props added.")
+        except Exception as err:
+            print(f"[Master] PrizePicks fetch failed: {err}")
+
+        # Be polite to APIs — wait before the next call
+        if include_underdog or include_draftkings:
+            time.sleep(API_DELAY_SECONDS)
+
+    # ── Underdog Fantasy ───────────────────────────────────────
+    if include_underdog:
+        current_step += 1
+        if progress_callback:
+            progress_callback(current_step, total_steps, "Fetching Underdog Fantasy props...")
+        try:
+            ud_props = fetch_underdog_props()
+            all_props.extend(ud_props)
+            print(f"[Master] Underdog: {len(ud_props)} props added.")
+        except Exception as err:
+            print(f"[Master] Underdog fetch failed: {err}")
+
+        # Rate limiting delay
+        if include_draftkings:
+            time.sleep(API_DELAY_SECONDS)
+
+    # ── DraftKings (via The Odds API) ──────────────────────────
+    if include_draftkings:
+        current_step += 1
+        if progress_callback:
+            progress_callback(current_step, total_steps, "Fetching DraftKings props...")
+        try:
+            dk_props = fetch_draftkings_props(api_key=odds_api_key)
+            all_props.extend(dk_props)
+            print(f"[Master] DraftKings: {len(dk_props)} props added.")
+        except Exception as err:
+            print(f"[Master] DraftKings fetch failed: {err}")
+
+    if progress_callback:
+        progress_callback(total_steps, total_steps, f"Done! {len(all_props)} props fetched.")
+
+    print(f"[Master] Total props fetched: {len(all_props)}")
+    return all_props
+
+# ============================================================
+# END SECTION: Master Fetch Function
+# ============================================================
+
+
+# ============================================================
+# SECTION: Cross-Platform Comparison
+# ============================================================
+
+def build_cross_platform_comparison(all_props):
+    """
+    Build a cross-platform line comparison from a list of props.
+
+    Groups props by (player_name, stat_type) and stores the line
+    from each platform side-by-side so you can compare them at a glance.
+
+    Args:
+        all_props (list[dict]): All fetched props (from fetch_all_platform_props).
+
+    Returns:
+        dict: Keyed by (player_name, stat_type) tuples.
+              Value is a dict mapping platform → line value.
+
+    Example:
+        comparison = build_cross_platform_comparison(props)
+        # → {
+        #     ("LeBron James", "points"): {
+        #         "PrizePicks": 24.5,
+        #         "Underdog": 25.5,
+        #         "DraftKings": 24.5,
+        #     },
+        #     ...
+        # }
+    """
+    comparison = {}
+
+    for prop in all_props:
+        player_name = prop.get("player_name", "").strip()
+        stat_type = prop.get("stat_type", "").strip()
+        platform = prop.get("platform", "").strip()
+        line = prop.get("line")
+
+        if not player_name or not stat_type or not platform or line is None:
+            continue  # Skip incomplete props
+
+        key = (player_name, stat_type)
+
+        # Initialize this player+stat entry if it's new
+        if key not in comparison:
+            comparison[key] = {}
+
+        # Store the line for this platform.
+        # BEGINNER NOTE: If the same player+stat appears twice on one platform
+        # (e.g., different game slates), we keep the first one we see.
+        if platform not in comparison[key]:
+            comparison[key][platform] = line
+
+    return comparison
+
+
+def recommend_best_platform(comparison, projected_value, direction):
+    """
+    Recommend the best platform to bet on for a given player+stat.
+
+    Logic:
+    - OVER bets: best platform has the LOWEST line (easiest to clear)
+    - UNDER bets: best platform has the HIGHEST line (most room to fall under)
+
+    Args:
+        comparison (dict): Platform → line dict for one (player, stat_type) key.
+            e.g., {"PrizePicks": 24.5, "Underdog": 25.5, "DraftKings": 24.5}
+        projected_value (float): Model's projected stat value for this player.
+        direction (str): "OVER" or "UNDER" (case-insensitive).
+
+    Returns:
+        dict: {
+            "platform": "PrizePicks",    # Best platform name
+            "line": 24.5,                # Best line on that platform
+            "edge": 0.3,                 # projected_value - line (OVER) or line - projected_value (UNDER)
+            "all_lines": {...}           # All platform lines for reference
+        }
+        Returns None if comparison is empty.
+
+    Example:
+        recommend_best_platform(
+            {"PrizePicks": 24.5, "Underdog": 25.5},
+            projected_value=25.8,
+            direction="OVER"
+        )
+        # → {"platform": "PrizePicks", "line": 24.5, "edge": 1.3, ...}
+    """
+    if not comparison:
+        return None
+
+    direction_upper = direction.upper()
+
+    # Find the best platform based on direction
+    if direction_upper == "OVER":
+        # For OVER: lowest line = easiest to beat = best value
+        best_platform = min(comparison, key=lambda p: comparison[p])
+    else:
+        # For UNDER: highest line = most room to fall under = best value
+        best_platform = max(comparison, key=lambda p: comparison[p])
+
+    best_line = comparison[best_platform]
+
+    # Calculate the edge: how much cushion does the best line give us?
+    if direction_upper == "OVER":
+        edge = round(float(projected_value) - float(best_line), 2)
+    else:
+        edge = round(float(best_line) - float(projected_value), 2)
+
+    return {
+        "platform": best_platform,
+        "line": best_line,
+        "edge": edge,
+        "all_lines": dict(comparison),
+    }
+
+# ============================================================
+# END SECTION: Cross-Platform Comparison
+# ============================================================
+
+
+# ============================================================
+# SECTION: Player Name Matching
+# ============================================================
+
+def match_platform_player_to_csv(platform_name, players_data):
+    """
+    Match a player name from a betting platform to our CSV player database.
+
+    Platforms often use shortened or alternate names (e.g., "Nic Claxton"
+    instead of "Nicolas Claxton"). This function uses the existing fuzzy
+    matching from data_manager.py to find the canonical name.
+
+    Args:
+        platform_name (str): Player name as returned by a platform API.
+        players_data (list[dict]): Player list from load_players_data().
+
+    Returns:
+        str or None: Canonical player name from our CSV, or None if not found.
+
+    Example:
+        match_platform_player_to_csv("Nic Claxton", players_data)
+        → "Nicolas Claxton"
+    """
+    if not platform_name or not players_data:
+        return None
+
+    # Use the fuzzy name matcher from data_manager.py
+    # BEGINNER NOTE: We import here to avoid circular imports at module level.
+    try:
+        from data.data_manager import find_player_by_name_fuzzy
+        player = find_player_by_name_fuzzy(players_data, platform_name)
+        if player:
+            return player.get("name", None)
+    except Exception as err:
+        print(f"[NameMatch] Error matching '{platform_name}': {err}")
+
+    return None
+
+
+def enrich_props_with_csv_names(props, players_data):
+    """
+    Enrich fetched props by matching platform player names to CSV canonical names.
+
+    Also fills in team abbreviation from the CSV if the platform didn't return one.
+
+    Args:
+        props (list[dict]): Props from fetch_all_platform_props().
+        players_data (list[dict]): Player list from load_players_data().
+
+    Returns:
+        list[dict]: Same props with "player_name" replaced by canonical CSV name
+                    where a match was found, and "team" filled in if missing.
+    """
+    enriched = []
+    for prop in props:
+        prop = dict(prop)  # Copy so we don't mutate the original
+        platform_name = prop.get("player_name", "")
+
+        try:
+            from data.data_manager import find_player_by_name_fuzzy
+            player = find_player_by_name_fuzzy(players_data, platform_name)
+            if player:
+                prop["player_name"] = player.get("name", platform_name)
+                # Fill in team from CSV if missing
+                if not prop.get("team"):
+                    prop["team"] = player.get("team", "")
+        except Exception:
+            pass  # Keep original name if matching fails
+
+        enriched.append(prop)
+
+    return enriched
+
+# ============================================================
+# END SECTION: Player Name Matching
+# ============================================================
+
+
+# ============================================================
+# SECTION: Roster Inference from Props
+# ============================================================
+
+def find_new_players_from_props(props, players_data):
+    """
+    Identify players from platform props who are NOT in our CSV database.
+
+    Since betting platforms only list active players who are playing tonight,
+    any player on a platform but NOT in our CSV is either new, traded, or
+    a player we haven't fetched yet. These are flagged for a data update.
+
+    Args:
+        props (list[dict]): Props from fetch_all_platform_props().
+        players_data (list[dict]): Player list from load_players_data().
+
+    Returns:
+        list[str]: List of platform player names not found in our CSV.
+
+    Example:
+        new_players = find_new_players_from_props(props, players_data)
+        # → ["Marcus Morris Sr.", "Patrick Baldwin Jr."]
+    """
+    if not props or not players_data:
+        return []
+
+    try:
+        from data.data_manager import find_player_by_name_fuzzy
+    except Exception:
+        return []
+
+    not_found = []
+    seen = set()  # Avoid duplicate names in the output
+
+    for prop in props:
+        player_name = prop.get("player_name", "").strip()
+        if not player_name or player_name in seen:
+            continue
+        seen.add(player_name)
+
+        match = find_player_by_name_fuzzy(players_data, player_name)
+        if not match:
+            not_found.append(player_name)
+
+    return not_found
+
+# ============================================================
+# END SECTION: Roster Inference from Props
+# ============================================================
+
+
+# ============================================================
+# SECTION: Per-Platform Summary Helper
+# ============================================================
+
+def summarize_props_by_platform(props):
+    """
+    Count how many props were fetched per platform.
+
+    Args:
+        props (list[dict]): All fetched props.
+
+    Returns:
+        dict: Platform name → count of props.
+
+    Example:
+        summarize_props_by_platform(props)
+        # → {"PrizePicks": 84, "Underdog": 76, "DraftKings": 32}
+    """
+    summary = {}
+    for prop in props:
+        platform = prop.get("platform", "Unknown")
+        summary[platform] = summary.get(platform, 0) + 1
+    return summary
+
+# ============================================================
+# END SECTION: Per-Platform Summary Helper
+# ============================================================
