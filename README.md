@@ -61,7 +61,7 @@ SmartAI-NBA/
 │   ├── 3_🏆_Analysis.py               # Run analysis + see top picks
 │   ├── 4_🎰_Entry_Builder.py          # Build optimal parlays
 │   ├── 5_🚫_Avoid_List.py             # What NOT to bet
-│   ├── 6_📊_Model_Health.py           # Track performance
+│   ├── 11_📈_Bet_Tracker.py          # Bet Tracker & Model Health (unified)
 │   ├── 7_⚙️_Settings.py              # Configure settings
 │   └── 8_🔄_Update_Data.py           # Fetch live NBA data ← NEW!
 │
@@ -137,11 +137,14 @@ Shows which props to skip and explains exactly WHY:
 - "Conflicting forces" = model is uncertain, both sides nearly equal
 - "Blowout risk" = player may not play full minutes
 
-### 📊 Page 6: Model Health
+### 📈 Page 11: Bet Tracker & Model Health
 After games, log your results here. The app tracks:
 - Overall win rate
 - Win rate by tier (Platinum should beat Gold, Gold should beat Silver, etc.)
 - Win rate by platform and stat type
+- AI-auto-logged picks from Neural Analysis
+- Auto-resolve: fetch actual stats and mark WIN/LOSS/PUSH automatically
+- Performance predictor and bankroll allocation
 - Helps you see if the model is working!
 
 ### ⚙️ Page 7: Settings

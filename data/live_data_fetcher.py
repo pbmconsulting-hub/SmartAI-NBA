@@ -84,16 +84,6 @@ INJURED_RESERVE_GAMES_THRESHOLD = 20
 QUESTIONABLE_GP_RATIO = 0.60
 # Game count gap above this → possibly injured (Questionable)
 QUESTIONABLE_GAMES_THRESHOLD = 10
-# Days without a game → "Out (no recent games)"
-OUT_DAYS_THRESHOLD = 30
-# Days without a game → "Questionable"
-QUESTIONABLE_DAYS_THRESHOLD = 14
-# Days without a game → "Day-to-Day"
-DAY_TO_DAY_DAYS_THRESHOLD = 7
-# Number of recent games to fetch for recency check (Layer 3)
-RECENT_GAMES_WINDOW = 15
-# Maximum players to do a game-log check for (cap to limit API calls)
-MAX_GAMELOG_CHECKS = 30
 
 # ============================================================
 # Game fetcher defaults (placeholder values used until live odds are added)
@@ -2210,8 +2200,8 @@ def get_cached_roster(team_abbrev):
 # Multi-signal player availability detection using four layers:
 #   Layer 1: CommonAllPlayers ROSTER_STATUS filter
 #   Layer 2: LeagueDashPlayerStats GP vs Team GP ratio
-#   Layer 3: Recent game log check (last 15 games) for recency
-#   Layer 4: Cross-reference with CommonTeamRoster for today's teams
+#   Layer 3: Cross-reference with CommonTeamRoster for today's teams
+#   Layer 4: nba_api injury data (via RosterEngine)
 # ============================================================
 
 
@@ -2247,28 +2237,28 @@ def fetch_player_injury_status(todays_games=None):
     Layer 2: LeagueDashPlayerStats GP vs Team GP ratio
         For each team, the maximum GP across all players approximates
         the total games the team has played. A player whose GP is
-        significantly lower than that maximum (< 60% or >= 10 games
-        behind) is flagged as Questionable / Injured Reserve.
+        significantly lower than that maximum is flagged:
+        - GP ratio < 0.40 or >= 20 games behind → "Injured Reserve"
+        - GP ratio < 0.60 or >= 10 games behind → "Questionable"
+        - Otherwise → "Active"
 
-    Layer 3: PlayerGameLog recency check (last 15 games)
-        For players flagged in Layer 2, the last game date is checked.
-        - No games in last 30 days → "Out (No Recent Games)"
-        - No games in last 14 days → "Questionable"
-        - No games in last 7 days  → "Day-to-Day"
-        API calls are capped to 30 players (higher-priority players
-        on today's teams are checked first).
-
-    Layer 4: CommonTeamRoster cross-reference (optional)
+    Layer 3: CommonTeamRoster cross-reference (optional)
         When todays_games is supplied, each playing team's current
         roster is fetched. A player from the stats database who is
         NOT on the current roster for their team is flagged "Out".
+
+    Layer 4: nba_api injury data (via RosterEngine)
+        Provides real-time GTD/Out/Doubtful designations and injury
+        details using the official NBA API.  Runs AFTER the nba_api
+        stat layers so it can OVERRIDE stale data with the latest
+        injury designations.
 
     Results are saved to INJURY_STATUS_JSON_PATH for session reuse.
 
     Args:
         todays_games (list of dict, optional): Tonight's games from
-            fetch_todays_games(). When provided, Layer 4 runs and
-            Layer 3 prioritises players on today's teams.
+            fetch_todays_games(). When provided, Layer 3 runs and
+            cross-references today's active rosters.
 
     Returns:
         dict: player_name_lower -> {
@@ -2284,7 +2274,6 @@ def fetch_player_injury_status(todays_games=None):
         from nba_api.stats.endpoints import (
             commonallplayers,
             leaguedashplayerstats,
-            playergamelog,
             commonteamroster,
         )
         from nba_api.stats.static import teams as nba_teams_static
@@ -2333,11 +2322,10 @@ def fetch_player_injury_status(todays_games=None):
             if team and gp > team_max_gp.get(team, 0):
                 team_max_gp[team] = gp
 
-        # Build initial status map; identify players needing Layer 3 check
+        # Build initial status map
         status_map = {}
-        needs_gamelog_check = []   # [(priority_score, player_id, name_key)]
 
-        # Determine today's playing teams to prioritise Layer 3 checks
+        # Determine today's playing teams for Layer 3 roster cross-reference
         today_team_abbrevs = set()
         if todays_games:
             for game in todays_games:
@@ -2361,7 +2349,7 @@ def fetch_player_injury_status(todays_games=None):
             # Layer 1 verdict
             on_current_roster = roster_status_by_id.get(pid, 1) == 1 if pid else True
 
-            # Layer 2 verdict — GP vs team max GP
+            # Layer 2 verdict — GP vs team max GP (final determination)
             team_total = team_max_gp.get(row.get("TEAM_ABBREVIATION", ""), gp)
             games_missed = max(0, team_total - gp)
             gp_ratio = gp / team_total if team_total > 0 else 1.0
@@ -2373,17 +2361,11 @@ def fetch_player_injury_status(todays_games=None):
                 status = "Out"
                 note = "0 games played this season"
             elif gp_ratio < INJURED_RESERVE_GP_RATIO or games_missed >= INJURED_RESERVE_GAMES_THRESHOLD:
-                # Very likely long-term out — needs recency confirmation
                 status = "Injured Reserve"
                 note = f"Only {gp_ratio:.0%} of team games played ({gp}/{team_total})"
-                priority = 2 if team in today_team_abbrevs else 1
-                needs_gamelog_check.append((priority, pid, key))
             elif gp_ratio < QUESTIONABLE_GP_RATIO or games_missed >= QUESTIONABLE_GAMES_THRESHOLD:
-                # Suspicious absence — may be recent injury
                 status = "Questionable"
                 note = f"Missed {games_missed} of {team_total} team games"
-                priority = 2 if team in today_team_abbrevs else 1
-                needs_gamelog_check.append((priority, pid, key))
             else:
                 status = "Active"
                 note = ""
@@ -2395,77 +2377,16 @@ def fetch_player_injury_status(todays_games=None):
                 "return_date": "",
                 "last_game_date": "",
                 "gp_ratio": round(gp_ratio, 3),
-                "_player_id_int": pid,  # internal — used by Layer 3/4, stripped later
+                "_player_id_int": pid,  # internal — stripped before returning
             }
 
         # --------------------------------------------------------
-        # Layer 3: PlayerGameLog — recency check for flagged players
-        # Cap at MAX_GAMELOG_CHECKS API calls; prioritise today's team players
-        # --------------------------------------------------------
-        print(f"fetch_player_injury_status: Layer 3 — GameLog recency ({len(needs_gamelog_check)} flagged)")
-        needs_gamelog_check.sort(key=lambda x: x[0], reverse=True)  # high priority first
-        checked = 0
-        for priority, pid, name_key in needs_gamelog_check:
-            if checked >= MAX_GAMELOG_CHECKS or pid is None:
-                break
-            try:
-                log_ep = playergamelog.PlayerGameLog(
-                    player_id=pid,
-                    season_type_all_star="Regular Season",
-                    last_n_games=RECENT_GAMES_WINDOW,
-                )
-                time.sleep(API_DELAY_SECONDS)
-                log_data = log_ep.get_data_frames()[0].to_dict("records")
-                checked += 1
-
-                if not log_data:
-                    # No games at all in recent log → definitively Out
-                    if name_key in status_map:
-                        status_map[name_key]["status"] = "Out"
-                        status_map[name_key]["injury_note"] = "No games in recent game log"
-                    continue
-
-                # Parse the last game date (nba_api format: "MMM DD, YYYY" or "YYYY-MM-DD")
-                last_date = None
-                game_date_str = log_data[0].get("GAME_DATE", "")
-                for fmt in ("%b %d, %Y", "%Y-%m-%d", "%B %d, %Y"):
-                    try:
-                        last_date = _dt.datetime.strptime(game_date_str, fmt).date()
-                        break
-                    except ValueError:
-                        continue
-
-                if last_date and name_key in status_map:
-                    status_map[name_key]["last_game_date"] = str(last_date)
-                    days_ago = (today - last_date).days
-                    entry = status_map[name_key]
-                    if days_ago >= OUT_DAYS_THRESHOLD:
-                        entry["status"] = "Out"
-                        entry["injury_note"] = f"No games in last {days_ago} days"
-                    elif days_ago >= QUESTIONABLE_DAYS_THRESHOLD:
-                        # Downgrade Injured Reserve to Questionable when recency is moderate
-                        if entry["status"] == "Injured Reserve":
-                            entry["status"] = "Questionable"
-                        entry["injury_note"] = f"Last played {days_ago} days ago"
-                    elif days_ago >= DAY_TO_DAY_DAYS_THRESHOLD:
-                        if entry["status"] in ("Injured Reserve", "Questionable"):
-                            entry["status"] = "Day-to-Day"
-                        entry["injury_note"] = f"Last played {days_ago} days ago"
-                    else:
-                        # Played within DAY_TO_DAY_DAYS_THRESHOLD → Active despite low GP ratio
-                        entry["status"] = "Active"
-                        entry["injury_note"] = f"Last played {days_ago} days ago (low game count)"
-
-            except Exception as log_err:
-                print(f"  Layer 3 game log check failed for player_id={pid}: {log_err}")
-
-        # --------------------------------------------------------
-        # Layer 4: CommonTeamRoster cross-reference (today's teams only)
+        # Layer 3: CommonTeamRoster cross-reference (today's teams only)
         # Players whose listed team is playing today but who are NOT
         # on the current roster are marked Out.
         # --------------------------------------------------------
         if todays_games and today_team_abbrevs:
-            print(f"fetch_player_injury_status: Layer 4 — Roster cross-reference ({len(today_team_abbrevs)} teams)")
+            print(f"fetch_player_injury_status: Layer 3 — Roster cross-reference ({len(today_team_abbrevs)} teams)")
             all_nba_teams = nba_teams_static.get_teams()
             abbrev_to_id = {
                 NBA_API_ABBREV_TO_OURS.get(t["abbreviation"], t["abbreviation"]): t["id"]
@@ -2504,14 +2425,14 @@ def fetch_player_injury_status(todays_games=None):
                         entry["injury_note"] = "Not on current team roster"
 
         # --------------------------------------------------------
-        # Layer 5: nba_api injury data (via RosterEngine)
+        # Layer 4: nba_api injury data (via RosterEngine)
         # Provides real-time GTD/Out/Doubtful designations and injury
         # details using the official NBA API.  Runs AFTER the nba_api
         # stat layers so it can OVERRIDE stale data with the latest
         # injury designations.  If the API call fails the status_map
         # is left untouched.
         # --------------------------------------------------------
-        print("fetch_player_injury_status: Layer 5 — nba_api injury data (via RosterEngine)")
+        print("fetch_player_injury_status: Layer 4 — nba_api injury data (via RosterEngine)")
         try:
             from data.roster_engine import RosterEngine as _RE5
             _engine5 = _RE5()
@@ -2593,15 +2514,15 @@ def fetch_player_injury_status(todays_games=None):
                         entry["gtd"] = True
 
                 print(
-                    f"fetch_player_injury_status Layer 5: {overrides} overrides, "
+                    f"fetch_player_injury_status Layer 4: {overrides} overrides, "
                     f"{new_entries} new entries from web scraping"
                 )
             else:
-                print("fetch_player_injury_status Layer 5: no scraped data returned — keeping nba_api results")
+                print("fetch_player_injury_status Layer 4: no scraped data returned — keeping nba_api results")
 
-        except Exception as layer5_err:
-            # Layer 5 failure must never break the existing pipeline
-            print(f"fetch_player_injury_status Layer 5 error (ignored): {layer5_err}")
+        except Exception as layer4_err:
+            # Layer 4 failure must never break the existing pipeline
+            print(f"fetch_player_injury_status Layer 4 error (ignored): {layer4_err}")
 
         # Strip the internal helper field before returning / saving
         for entry in status_map.values():

@@ -411,6 +411,34 @@ button[kind="primary"] {
     box-shadow: 0 0 8px rgba(0,240,255,0.9);
 }
 
+/* ─── Smart Pick Pro Hero Header ─────────────────────────── */
+/* Used on the main app.py page to display logo + app name.  */
+.spp-hero-header {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    text-align: left;
+}
+/* Logo circle thumbnail inside the hero header */
+.spp-hero-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(0,240,255,0.35), 0 0 8px rgba(200,16,46,0.25);
+    flex-shrink: 0;
+}
+/* "NBA EDITION" red label shown below "Smart Pick Pro" */
+.nba-edition-label {
+    font-size: 1.05rem;
+    letter-spacing: 0.22em;
+    color: #C8102E;
+    font-family: 'Bebas Neue', 'Oswald', monospace;
+    font-weight: 700;
+    margin-top: 4px;
+    text-shadow: 0 0 10px rgba(200,16,46,0.45);
+}
+
 /* ─── Player Name & Team Pill ─────────────────────────────── */
 .player-name {
     font-size: 1.3rem;
@@ -979,6 +1007,463 @@ button[kind="primary"] {
 .add-to-slip-btn:hover {
     opacity: 0.88;
     transform: scale(1.03);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NBA THEME PRESENCE — Authentic NBA look layered on top of
+   the Quantum Edge dark theme. Adds sports-broadcast energy
+   without replacing any existing QDS styling.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── NBA Sports Fonts ─────────────────────────────────────
+   Bebas Neue gives the ESPN/TNT scoreboard feel for numbers.
+   Used via class .nba-stat-number or .nba-score-display.   */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;600;700&display=swap');
+
+/* ─── NBA Keyframe Animations ─────────────────────────────── */
+@keyframes nba-live-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,16,46,0.7); opacity: 1; }
+    50%       { box-shadow: 0 0 0 8px rgba(200,16,46,0); opacity: 0.85; }
+}
+@keyframes nba-shimmer-platinum {
+    0%   { background-position: -300% center; }
+    100% { background-position: 300% center; }
+}
+@keyframes nba-gold-gleam {
+    0%, 80%, 100% { filter: brightness(1); }
+    40%            { filter: brightness(1.35) drop-shadow(0 0 6px #FFD700); }
+}
+@keyframes nba-silver-sheen {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+@keyframes nba-bronze-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(205,127,50,0.30); }
+    50%       { box-shadow: 0 0 18px rgba(205,127,50,0.65); }
+}
+@keyframes analysis-spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes data-stream {
+    0%   { background-position: 0 0; }
+    100% { background-position: 0 -100px; }
+}
+@keyframes card-flip-in {
+    0%   { opacity: 0; transform: rotateY(-90deg) scale(0.95); }
+    100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+@keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in-left {
+    from { opacity: 0; transform: translateX(-24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes count-up-glow {
+    0%   { text-shadow: 0 0 0 transparent; }
+    50%  { text-shadow: 0 0 16px rgba(0,240,255,0.7); }
+    100% { text-shadow: 0 0 6px rgba(0,240,255,0.3); }
+}
+@keyframes freshness-pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,157,0.6); }
+    50%       { box-shadow: 0 0 0 5px rgba(0,255,157,0); }
+}
+@keyframes freshness-pulse-yellow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,200,0,0.6); }
+    50%       { box-shadow: 0 0 0 5px rgba(255,200,0,0); }
+}
+@keyframes freshness-pulse-red {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,16,46,0.6); }
+    50%       { box-shadow: 0 0 0 5px rgba(200,16,46,0); }
+}
+
+/* ─── NBA Game-Day Banner ─────────────────────────────────── */
+/* Usage: <div class="nba-game-day-banner">GAME DAY</div>      */
+.nba-game-day-banner {
+    border-top: 3px solid transparent;
+    border-image: linear-gradient(90deg, #C8102E 0%, #FFFFFF 33%, #1D428A 66%, #C8102E 100%) 1;
+    background: rgba(10,15,26,0.92);
+    border-radius: 0 0 10px 10px;
+    padding: 12px 24px;
+    text-align: center;
+    font-family: 'Bebas Neue', 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.25em;
+    color: #FFFFFF;
+    text-shadow: 0 0 12px rgba(200,16,46,0.8), 0 0 24px rgba(29,66,138,0.5);
+    position: relative;
+    overflow: hidden;
+}
+.nba-game-day-banner::before {
+    content: '🏀';
+    margin-right: 12px;
+}
+.nba-game-day-banner::after {
+    content: '🏀';
+    margin-left: 12px;
+}
+
+/* ─── NBA Stat Highlight Card ─────────────────────────────── */
+/* Usage: <div class="nba-stat-highlight"><span class="nba-stat-number">24.5</span><span class="nba-stat-label">PPG</span></div> */
+.nba-stat-highlight {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    border-left: 4px solid #C8102E;
+    padding: 8px 16px 8px 14px;
+    background: rgba(200,16,46,0.06);
+    border-radius: 0 10px 10px 0;
+    margin: 4px 8px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.nba-stat-highlight:hover {
+    border-color: #00f0ff;
+    background: rgba(0,240,255,0.06);
+}
+.nba-stat-number {
+    font-family: 'Bebas Neue', 'Oswald', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    line-height: 1;
+    letter-spacing: 0.03em;
+}
+.nba-stat-label {
+    font-family: 'Oswald', 'Montserrat', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgba(192,208,232,0.75);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+/* ─── LIVE Game Badge ─────────────────────────────────────── */
+/* Usage: <span class="game-live-badge">LIVE</span>            */
+.game-live-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #C8102E;
+    color: #FFFFFF;
+    font-family: 'Bebas Neue', 'Orbitron', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    padding: 3px 10px;
+    border-radius: 4px;
+    animation: nba-live-pulse 1.5s ease-in-out infinite;
+    vertical-align: middle;
+}
+.game-live-badge::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    animation: live-dot-pulse 1.2s ease-in-out infinite;
+}
+
+/* ─── Sidebar NBA Branding ────────────────────────────────── */
+/* Adds "🏀 Smart Pick Pro — NBA Edition" below the   */
+/* existing "⚡ Powered by JM5 Neural Engine" text.           */
+[data-testid="stSidebar"]::before {
+    content: "🏀 Smart Pick Pro · NBA Edition";
+    display: block;
+    position: fixed;
+    bottom: 44px;
+    left: 0;
+    width: 100%;
+    padding: 0 20px;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 0.62rem;
+    font-family: 'Bebas Neue', 'Oswald', 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(200,16,46,0.80) !important;
+    pointer-events: none;
+    text-shadow: 0 0 8px rgba(200,16,46,0.35);
+}
+
+/* ─── Half-Court Arc Watermark ────────────────────────────── */
+/* Subtle basketball court arc on main content background     */
+.stApp::after {
+    content: '';
+    display: block;
+    position: fixed;
+    bottom: -120px;
+    right: -120px;
+    width: 360px;
+    height: 360px;
+    border-radius: 50%;
+    border: 40px solid rgba(200,16,46,0.04);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PREMIUM ENHANCEMENTS — State-of-the-art UI polish
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Enhanced Tier Badges ────────────────────────────────── */
+/* Platinum — holographic shimmer */
+.tier-platinum {
+    background: linear-gradient(
+        135deg,
+        #1a2035 0%, #2a3555 30%, #1e3050 50%, #2a3555 70%, #1a2035 100%
+    ) !important;
+    background-size: 300% 100% !important;
+    animation: pulse-platinum 2.5s infinite, nba-shimmer-platinum 3.5s linear infinite !important;
+}
+/* Gold — gleam sweep */
+.tier-gold {
+    animation: pulse-gold 2.8s infinite, nba-gold-gleam 4s ease-in-out infinite !important;
+}
+/* Silver — metallic sheen */
+.tier-silver {
+    background: linear-gradient(
+        105deg,
+        #1a1f30 0%, #252b40 40%, #3a4060 50%, #252b40 60%, #1a1f30 100%
+    ) !important;
+    background-size: 300% 100% !important;
+    animation: nba-silver-sheen 3s linear infinite !important;
+}
+/* Bronze — warm pulse */
+.tier-bronze {
+    animation: nba-bronze-pulse 2.5s ease-in-out infinite !important;
+}
+
+/* ─── Analysis Loading Animation ─────────────────────────── */
+/* Usage: <div class="analysis-loading"></div>                */
+.analysis-loading {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 4px solid rgba(0,240,255,0.15);
+    border-top-color: #00f0ff;
+    border-radius: 50%;
+    animation: analysis-spin 0.9s linear infinite;
+    vertical-align: middle;
+    margin: 0 10px;
+}
+
+/* ─── Data Stream Effect ──────────────────────────────────── */
+.data-stream {
+    background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,240,255,0.03) 3px,
+        rgba(0,240,255,0.03) 4px
+    );
+    background-size: 100% 100px;
+    animation: data-stream 2s linear infinite;
+}
+
+/* ─── Pick Reveal Animation ───────────────────────────────── */
+.pick-reveal {
+    animation: card-flip-in 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    perspective: 800px;
+}
+
+/* ─── Fade / Slide Page Transitions ─────────────────────────
+   Apply these classes to content sections for smooth entry.  */
+.fade-in-up    { animation: fade-in-up    0.4s ease both; }
+.slide-in-left  { animation: slide-in-left  0.35s ease both; }
+.slide-in-right { animation: slide-in-right 0.35s ease both; }
+
+/* ─── Premium Metric Card ────────────────────────────────── */
+/* Usage: <div class="premium-metric-card">...</div>          */
+.premium-metric-card {
+    background: rgba(20,25,43,0.90);
+    border: 1px solid rgba(0,240,255,0.18);
+    border-radius: 16px;
+    padding: 22px 26px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+        0 0 0 1px rgba(0,240,255,0.06) inset,
+        0 0 24px rgba(0,240,255,0.10),
+        0 8px 32px rgba(0,0,0,0.45);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    animation: count-up-glow 1.5s ease 0.2s both;
+    position: relative;
+    overflow: hidden;
+}
+.premium-metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, #C8102E, #00f0ff, #1D428A, #00ff9d, #C8102E);
+    background-size: 200% 100%;
+    animation: headerShimmer 3s ease infinite;
+}
+.premium-metric-card:hover {
+    transform: translateY(-6px) scale(1.012);
+    border-color: rgba(0,240,255,0.38);
+    box-shadow:
+        0 0 0 1px rgba(0,240,255,0.10) inset,
+        0 0 36px rgba(0,240,255,0.20),
+        0 12px 40px rgba(0,0,0,0.55);
+}
+
+/* ─── Smart Tooltip ───────────────────────────────────────── */
+/* Usage: <span class="smart-tooltip-wrap">hover<span class="smart-tooltip">tip text</span></span> */
+.smart-tooltip-wrap {
+    position: relative;
+    cursor: help;
+}
+.smart-tooltip {
+    visibility: hidden;
+    opacity: 0;
+    max-width: 300px;
+    min-width: 140px;
+    background: rgba(10,15,26,0.97);
+    border: 1px solid rgba(0,240,255,0.35);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #c8d8f0;
+    line-height: 1.5;
+    position: absolute;
+    z-index: 9999;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    box-shadow: 0 0 16px rgba(0,240,255,0.18), 0 4px 20px rgba(0,0,0,0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: opacity 0.18s ease, visibility 0.18s ease, transform 0.18s ease;
+    pointer-events: none;
+}
+.smart-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(0,240,255,0.35);
+}
+.smart-tooltip-wrap:hover .smart-tooltip {
+    visibility: visible;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Data Freshness Badge ────────────────────────────────── */
+/* Usage (HTML): <span class="data-freshness-badge fresh">● FRESH</span>
+   Usage (HTML): <span class="data-freshness-badge stale">● STALE</span>
+   Usage (HTML): <span class="data-freshness-badge outdated">● OUTDATED</span>
+   In page files: inject via st.markdown(f'<span class="data-freshness-badge fresh">● FRESH</span>', unsafe_allow_html=True) */
+.data-freshness-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-family: 'Oswald', 'Courier New', monospace;
+    letter-spacing: 0.10em;
+    padding: 3px 10px;
+    border-radius: 20px;
+    vertical-align: middle;
+}
+.data-freshness-badge.fresh {
+    background: rgba(0,255,157,0.10);
+    color: #00ff9d;
+    border: 1px solid rgba(0,255,157,0.35);
+    animation: freshness-pulse-green 2s ease-in-out infinite;
+}
+.data-freshness-badge.stale {
+    background: rgba(255,200,0,0.10);
+    color: #ffc800;
+    border: 1px solid rgba(255,200,0,0.35);
+    animation: freshness-pulse-yellow 2.5s ease-in-out infinite;
+}
+.data-freshness-badge.outdated {
+    background: rgba(200,16,46,0.10);
+    color: #ff4d6a;
+    border: 1px solid rgba(200,16,46,0.35);
+    animation: freshness-pulse-red 1.8s ease-in-out infinite;
+}
+
+/* ─── Enhanced Scrollbar ──────────────────────────────────── */
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track {
+    background: rgba(10,15,26,0.95);
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(0,240,255,0.50), rgba(200,16,46,0.35));
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(0,240,255,0.80), rgba(200,16,46,0.55));
+}
+/* Custom text selection colors */
+::selection {
+    background: rgba(0,240,255,0.25);
+    color: #ffffff;
+}
+::-moz-selection {
+    background: rgba(0,240,255,0.25);
+    color: #ffffff;
+}
+/* Focus styles for inputs */
+input:focus, textarea:focus, select:focus,
+[data-testid="stTextInput"] input:focus,
+[data-testid="stTextArea"] textarea:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(0,240,255,0.40) !important;
+    border-color: rgba(0,240,255,0.55) !important;
+}
+
+/* ─── Print-Ready Styles ──────────────────────────────────── */
+@media print {
+    /* Hide sidebar, navigation, and interactive controls */
+    [data-testid="stSidebar"],
+    [data-testid="stHeader"],
+    [data-testid="stToolbar"],
+    .stButton, .stDownloadButton,
+    [data-testid="stSidebarNav"] { display: none !important; }
+    /* Light background + dark text for paper readability */
+    html, body, .stApp, [class*="css"] {
+        background: #ffffff !important;
+        color: #111111 !important;
+    }
+    .smartai-card, .premium-metric-card {
+        background: #f5f5f5 !important;
+        border: 1px solid #cccccc !important;
+        box-shadow: none !important;
+    }
+    /* Expand all content area */
+    section[data-testid="stMain"], .main .block-container {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+}
+
+/* ─── Responsive — Mobile Touch-Ups ──────────────────────── */
+@media (max-width: 768px) {
+    html, body, [class*="css"] { font-size: 14px !important; }
+    .neural-header-title { font-size: 1.4rem !important; }
+    .smartai-card, .premium-metric-card { padding: 14px 16px !important; }
+    .nba-stat-number { font-size: 1.7rem !important; }
+    /* Larger touch targets for buttons */
+    button, .stButton > button {
+        min-height: 44px !important;
+        padding: 10px 16px !important;
+    }
+    /* Stack metrics in fewer columns on small screens */
+    [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
 }
 </style>
 """
