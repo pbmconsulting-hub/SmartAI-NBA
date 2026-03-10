@@ -4243,16 +4243,19 @@ def get_bet_card_html(bet, show_live_status=False):
         try:
             actual_float = float(actual)
             actual_str = f"{actual_float:.1f}"
-            if proj_float is not None:
+            if proj_float is not None and abs(proj_float) > 0.1:
                 diff = actual_float - proj_float
-                diff_pct = abs(diff / proj_float * 100) if proj_float else 0
+                diff_pct = abs(diff / proj_float * 100)
                 if diff_pct <= 10:
-                    actual_class = "actual-hit"
-                    diff_label = f"(±{abs(diff):.1f} — close)"
+                    # Close to projection — neutral success indicator
+                    actual_class = "actual-close"
+                    diff_label = f"(±{abs(diff):.1f} — on target)"
                 elif diff > 0:
+                    # Exceeded projection
                     actual_class = "actual-hit"
-                    diff_label = f"(+{diff:.1f} over proj)"
+                    diff_label = f"(+{diff:.1f} above proj)"
                 else:
+                    # Below projection
                     actual_class = "actual-miss"
                     diff_label = f"({diff:.1f} below proj)"
                 actual_html = (

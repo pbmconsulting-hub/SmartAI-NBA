@@ -249,8 +249,10 @@ def calculate_confidence_score(
     if recent_form_ratio is not None:
         form_deviation_abs = abs(recent_form_ratio - 1.0)
         if form_deviation_abs > 0.25:
-            # Regression penalty: 2 pts per 10% deviation beyond the 25% threshold.
-            # E.g., ratio=1.40 → 15% excess → 3 point penalty
+            # Penalty: 20 points per 1.0 (100%) deviation beyond the 25% threshold.
+            # Equivalently, 2 pts per 10% excess deviation.
+            # E.g., ratio=1.40 → excess=0.15 → 20*0.15 = 3.0 point penalty
+            #        ratio=1.60 → excess=0.35 → 20*0.35 = 7.0 point penalty (capped at 8)
             excess = form_deviation_abs - 0.25
             regression_penalty = min(8.0, excess * 20.0)
             combined_score -= regression_penalty
