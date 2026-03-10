@@ -1042,9 +1042,17 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
 
         # --------------------------------------------------------
-        # Step 5: Filter out injured / inactive players
-        # Reuse the RosterEngine instance from Step 3 — no second API call needed.
-        # Fall back to precomputed_injury_map → cached JSON if Step 3 engine unavailable.
+        # Step 5: Store injury data but do NOT remove players from CSV.
+        # RATIONALE: Betting platforms (PrizePicks, Underdog, DraftKings)
+        # list props for all active players. If we remove "Questionable" or
+        # even "Out" players from the CSV, the platform props pipeline can't
+        # find them and silently skips their props. Instead, we:
+        #   1. Save ALL players to CSV (full roster stats)
+        #   2. Store injury status in a separate JSON file
+        #   3. Let the analysis engine decide what to do with injured players
+        #
+        # The injury_status_map in session state is the single source of truth
+        # for availability. The CSV is purely for stats.
         # --------------------------------------------------------
         injury_data = precomputed_injury_map or {}
         _engine = _roster_engine  # Reuse engine populated in Step 3
@@ -1069,35 +1077,19 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                 except Exception as _cache_err:
                     print(f"  WARNING: Cached injury data unavailable: {_cache_err}")
 
+        # Save injury data to JSON for other modules to read
         if injury_data:
-            before_count = len(formatted_players)
-            # Cross-check each player against RosterEngine.is_player_active() when available,
-            # otherwise fall back to the simpler status-key lookup.
-            if _engine is not None:
-                filtered = []
-                for p in formatted_players:
-                    is_active, _reason = _engine.is_player_active(p["name"])
-                    if is_active:
-                        filtered.append(p)
-                formatted_players = filtered
-            else:
-                formatted_players = [
-                    p for p in formatted_players
-                    if injury_data.get(
-                        p["name"].lower().strip(), {}
-                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                ]
-            removed_count = before_count - len(formatted_players)
-            if removed_count:
-                print(
-                    f"  Injury filter: removed {removed_count} inactive players "
-                    f"(Out/IR/Doubtful/Suspended/G-League/etc.) "
-                    f"from today's roster ({len(formatted_players)} remain)"
-                )
-        else:
-            print(
-                "  WARNING: No injury data available — no injury filter applied"
-            )
+            try:
+                with open(INJURY_STATUS_JSON_PATH, "w", encoding="utf-8") as _jf:
+                    json.dump(injury_data, _jf, indent=2, default=str)
+                print(f"  Saved {len(injury_data)} injury entries to {INJURY_STATUS_JSON_PATH}")
+            except Exception as _save_err:
+                print(f"  WARNING: Could not save injury data: {_save_err}")
+
+        # Do NOT filter formatted_players by injury status.
+        # All players stay in the CSV so platform props can match them.
+        print(f"  Keeping all {len(formatted_players)} players in CSV for platform prop compatibility")
+        print(f"  Injury data stored separately: {len(injury_data)} entries")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
