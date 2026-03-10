@@ -411,6 +411,34 @@ button[kind="primary"] {
     box-shadow: 0 0 8px rgba(0,240,255,0.9);
 }
 
+/* ─── Smart Pick Pro Hero Header ─────────────────────────── */
+/* Used on the main app.py page to display logo + app name.  */
+.spp-hero-header {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    text-align: left;
+}
+/* Logo circle thumbnail inside the hero header */
+.spp-hero-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(0,240,255,0.35), 0 0 8px rgba(200,16,46,0.25);
+    flex-shrink: 0;
+}
+/* "NBA EDITION" red label shown below "Smart Pick Pro" */
+.nba-edition-label {
+    font-size: 1.05rem;
+    letter-spacing: 0.22em;
+    color: #C8102E;
+    font-family: 'Bebas Neue', 'Oswald', monospace;
+    font-weight: 700;
+    margin-top: 4px;
+    text-shadow: 0 0 10px rgba(200,16,46,0.45);
+}
+
 /* ─── Player Name & Team Pill ─────────────────────────────── */
 .player-name {
     font-size: 1.3rem;
@@ -1144,10 +1172,10 @@ button[kind="primary"] {
 }
 
 /* ─── Sidebar NBA Branding ────────────────────────────────── */
-/* Adds "🏀 NBA Analytics Powered by SmartBetPro" below the   */
+/* Adds "🏀 Smart Pick Pro — NBA Edition" below the   */
 /* existing "⚡ Powered by JM5 Neural Engine" text.           */
 [data-testid="stSidebar"]::before {
-    content: "🏀 NBA Analytics · SmartBetPro";
+    content: "🏀 Smart Pick Pro · NBA Edition";
     display: block;
     position: fixed;
     bottom: 44px;

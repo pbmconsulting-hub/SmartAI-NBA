@@ -9,25 +9,42 @@
 import streamlit as st
 import datetime
 import os
+import base64
 
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.live_data_fetcher import load_last_updated
 from tracking.database import initialize_database
-from styles.theme import get_global_css, get_neural_header_html
+from styles.theme import get_global_css
 
 # ============================================================
 # SECTION: Page Configuration
 # ============================================================
 
 st.set_page_config(
-    page_title="SmartBetPro NBA",
-    page_icon="🧠",
+    page_title="Smart Pick Pro — NBA Edition",
+    page_icon="🏀",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ─── App Logo — Smart Pick Pro ───────────────────────────────
+# Displayed in the sidebar top and as the brand identity.
+_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
+if os.path.exists(_LOGO_PATH):
+    st.logo(_LOGO_PATH, size="large")
+
+
+@st.cache_data(show_spinner=False)
+def _load_logo_b64(path: str) -> str:
+    """Read the logo PNG and return a base64-encoded string (cached per session)."""
+    try:
+        with open(path, "rb") as _f:
+            return base64.b64encode(_f.read()).decode()
+    except Exception:
+        return ""
 
 # ─── Quantum Edge Theme CSS — page-level overrides ───────────
 st.markdown("""
@@ -175,10 +192,23 @@ todays_games = st.session_state.get("todays_games", [])
 game_count = len(todays_games)
 game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if game_count else "No games loaded yet"
 
-st.markdown(get_neural_header_html(
-    title="🧠 SmartBetPro NBA",
-    subtitle="Engineered by JM5",
-), unsafe_allow_html=True)
+# Embed logo using cached base64 load
+_logo_b64 = _load_logo_b64(_LOGO_PATH) if os.path.exists(_LOGO_PATH) else ""
+
+_logo_img_tag = (
+    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" />'
+    if _logo_b64 else ""
+)
+
+st.markdown(f"""
+<div class="neural-header spp-hero-header">
+  {_logo_img_tag}
+  <div>
+    <div class="neural-header-title">Smart Pick Pro</div>
+    <div class="nba-edition-label">NBA EDITION</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="hero-banner">
@@ -376,11 +406,11 @@ st.divider()
 # SECTION: How It Works
 # ============================================================
 
-with st.expander("📖 How Does SmartBetPro NBA Work?", expanded=False):
+with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
     st.markdown("""
     ### The Engine Under the Hood
 
-    SmartBetPro NBA uses **Monte Carlo simulation** to predict player stat outcomes.
+    Smart Pick Pro — NBA Edition uses **Monte Carlo simulation** to predict player stat outcomes.
     Here's what happens when you click "Run Analysis":
 
     ---
@@ -425,6 +455,6 @@ with st.expander("📖 How Does SmartBetPro NBA Work?", expanded=False):
 
 st.divider()
 st.caption(
-    f"SmartBetPro NBA | Engineered by JM5 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
+    f"Smart Pick Pro — NBA Edition | Powered by JM5 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
     f"{len(players_data)} players, {len(teams_data)} teams"
 )
