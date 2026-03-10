@@ -3878,22 +3878,41 @@ _BET_CARD_CSS = """
     margin-bottom: 14px;
     box-shadow: 0 2px 18px rgba(0,0,0,0.45);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
+    border-left: 4px solid rgba(0,240,255,0.35);
 }
 .bet-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 28px rgba(0,240,255,0.12);
 }
-.bet-card-win  { border-color: rgba(0,255,157,0.45); box-shadow: 0 0 18px rgba(0,255,157,0.12); }
-.bet-card-loss { border-color: rgba(239,68,68,0.45);  box-shadow: 0 0 18px rgba(239,68,68,0.12);  }
-.bet-card-push { border-color: rgba(160,180,210,0.35); }
+.bet-card-win  {
+    border-color: rgba(0,255,157,0.45);
+    border-left: 4px solid #00ff9d;
+    box-shadow: 0 0 20px rgba(0,255,157,0.14);
+}
+.bet-card-loss {
+    border-color: rgba(239,68,68,0.45);
+    border-left: 4px solid #ff4444;
+    box-shadow: 0 0 20px rgba(239,68,68,0.14);
+}
+.bet-card-push {
+    border-color: rgba(160,180,210,0.35);
+    border-left: 4px solid #b0bec5;
+}
 .bet-card-pending {
     border-color: rgba(255,200,0,0.30);
+    border-left: 4px solid #ffcc00;
     animation: betCardPulse 2.8s ease-in-out infinite;
 }
 @keyframes betCardPulse {
     0%,100% { box-shadow: 0 0 6px rgba(255,200,0,0.08); }
-    50%      { box-shadow: 0 0 18px rgba(255,200,0,0.22); }
+    50%      { box-shadow: 0 0 22px rgba(255,200,0,0.28); }
 }
+
+/* ─── Tier-specific card glows ────────────────────────────── */
+.bet-card-tier-platinum { box-shadow: 0 0 22px rgba(0,240,255,0.18), 0 2px 18px rgba(0,0,0,0.45); }
+.bet-card-tier-gold     { box-shadow: 0 0 22px rgba(255,170,0,0.18), 0 2px 18px rgba(0,0,0,0.45); }
+.bet-card-tier-silver   { box-shadow: 0 0 14px rgba(192,208,232,0.14), 0 2px 18px rgba(0,0,0,0.45); }
+.bet-card-tier-bronze   { box-shadow: 0 0 14px rgba(255,124,58,0.14), 0 2px 18px rgba(0,0,0,0.45); }
 
 /* ─── Card Header ─────────────────────────────────────────── */
 .bet-card-player {
@@ -3955,26 +3974,70 @@ _BET_CARD_CSS = """
 .platform-badge-dk { background: #2196f3; color: #fff; padding: 2px 9px; border-radius: 5px; font-size: 0.78rem; font-weight: 700; }
 
 /* ─── Tier Badges (compact) ───────────────────────────────── */
-.tier-badge-platinum { color: #00f0ff; font-weight: 800; }
-.tier-badge-gold     { color: #ff9d00; font-weight: 800; }
+.tier-badge-platinum { color: #00f0ff; font-weight: 800; text-shadow: 0 0 6px rgba(0,240,255,0.5); }
+.tier-badge-gold     { color: #ffaa00; font-weight: 800; text-shadow: 0 0 6px rgba(255,170,0,0.5); }
 .tier-badge-silver   { color: #c0d0e8; font-weight: 800; }
 .tier-badge-bronze   { color: #ff7c3a; font-weight: 800; }
 .tier-badge-avoid    { color: #ff4444; font-weight: 800; }
 
-/* ─── Result Badges ───────────────────────────────────────── */
-.result-win  { color: #00ff9d; font-weight: 800; font-size: 0.95rem; text-shadow: 0 0 8px rgba(0,255,157,0.6); }
-.result-loss { color: #ff4444; font-weight: 800; font-size: 0.95rem; text-shadow: 0 0 8px rgba(255,68,68,0.6); }
-.result-push { color: #b0bec5; font-weight: 700; font-size: 0.95rem; }
+/* ─── Result Badges — larger & more prominent ─────────────── */
+.result-win  {
+    color: #fff;
+    background: linear-gradient(90deg, #00c853, #00ff9d);
+    font-weight: 900;
+    font-size: 0.88rem;
+    padding: 3px 12px;
+    border-radius: 20px;
+    text-shadow: none;
+    box-shadow: 0 0 10px rgba(0,255,157,0.45);
+    letter-spacing: 0.05em;
+}
+.result-loss {
+    color: #fff;
+    background: linear-gradient(90deg, #c62828, #ff4444);
+    font-weight: 900;
+    font-size: 0.88rem;
+    padding: 3px 12px;
+    border-radius: 20px;
+    text-shadow: none;
+    box-shadow: 0 0 10px rgba(255,68,68,0.45);
+    letter-spacing: 0.05em;
+}
+.result-push {
+    color: #0d1117;
+    background: #b0bec5;
+    font-weight: 800;
+    font-size: 0.88rem;
+    padding: 3px 12px;
+    border-radius: 20px;
+}
 .result-pending {
-    color: #ffcc00;
-    font-weight: 700;
-    font-size: 0.95rem;
+    color: #0d1117;
+    background: linear-gradient(90deg, #ff8f00, #ffcc00);
+    font-weight: 800;
+    font-size: 0.88rem;
+    padding: 3px 12px;
+    border-radius: 20px;
     animation: resultPulse 1.8s ease-in-out infinite;
 }
 @keyframes resultPulse {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.55; }
+    0%,100% { opacity: 1; box-shadow: 0 0 6px rgba(255,200,0,0.3); }
+    50%      { opacity: 0.80; box-shadow: 0 0 14px rgba(255,200,0,0.7); }
 }
+
+/* ─── Projected vs Actual Comparison ─────────────────────── */
+.proj-vs-actual {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 0.82rem;
+}
+.proj-label { color: #8a9bb8; }
+.proj-value { color: #e8f0ff; font-weight: 700; }
+.actual-hit { color: #00ff9d; font-weight: 700; }
+.actual-miss { color: #ff6b6b; font-weight: 700; }
+.actual-close { color: #ffcc00; font-weight: 700; }
 
 /* ─── Live Status ─────────────────────────────────────────── */
 .live-status-winning { color: #00ff9d; font-weight: 700; }
@@ -4088,22 +4151,43 @@ def get_bet_card_html(bet, show_live_status=False):
     dir_class = "direction-over" if direction == "OVER" else "direction-under"
     dir_arrow = "↑" if direction == "OVER" else "↓"
 
-    # Card class by result
+    # Platform left-border color
+    plat_lower = platform.lower()
+    if "prize" in plat_lower or "pp" in plat_lower:
+        platform_border_color = "#00c853"
+    elif "underdog" in plat_lower or "ud" in plat_lower:
+        platform_border_color = "#7c4dff"
+    elif "draftkings" in plat_lower or "dk" in plat_lower:
+        platform_border_color = "#2196f3"
+    else:
+        platform_border_color = "rgba(0,240,255,0.35)"
+
+    # Card class by result + tier glow
+    tier_lower = tier.lower()
+    tier_glow_class = f" bet-card-tier-{tier_lower}" if tier_lower in ("platinum", "gold", "silver", "bronze") else ""
     if result == "WIN":
-        card_class = "bet-card bet-card-win"
+        card_class = f"bet-card bet-card-win{tier_glow_class}"
         result_html = '<span class="result-win">✅ WIN</span>'
     elif result == "LOSS":
-        card_class = "bet-card bet-card-loss"
+        card_class = f"bet-card bet-card-loss{tier_glow_class}"
         result_html = '<span class="result-loss">❌ LOSS</span>'
     elif result == "PUSH":
-        card_class = "bet-card bet-card-push"
+        card_class = f"bet-card bet-card-push{tier_glow_class}"
         result_html = '<span class="result-push">🔄 PUSH</span>'
     else:
-        card_class = "bet-card bet-card-pending"
+        card_class = f"bet-card bet-card-pending{tier_glow_class}"
         result_html = '<span class="result-pending">⏳ PENDING</span>'
 
+    # Override platform border color for resolved cards (keep result color as left border)
+    if result == "WIN":
+        platform_border_color = "#00ff9d"
+    elif result == "LOSS":
+        platform_border_color = "#ff4444"
+    elif result == "PUSH":
+        platform_border_color = "#b0bec5"
+    # PENDING keeps the platform color
+
     # Platform badge
-    plat_lower = platform.lower()
     if "prize" in plat_lower or "pp" in plat_lower:
         plat_html = f'<span class="platform-badge-pp">🟢 PrizePicks</span>'
     elif "underdog" in plat_lower or "ud" in plat_lower:
@@ -4115,7 +4199,6 @@ def get_bet_card_html(bet, show_live_status=False):
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'
 
     # Tier badge
-    tier_lower = tier.lower()
     tier_emojis = {"platinum": "💎", "gold": "🥇", "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
     tier_emoji = tier_emojis.get(tier_lower, "🏅")
     tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
@@ -4142,18 +4225,54 @@ def get_bet_card_html(bet, show_live_status=False):
         f'</div>'
     )
 
-    # Projected & edge
+    # Projected & edge — and visual projected vs actual comparison
     try:
-        proj_text = f"📊 Projected: {float(projected):.1f}" if projected else ""
+        proj_float = float(projected) if projected else None
+        proj_text = f"📊 Proj: <strong>{proj_float:.1f}</strong>" if proj_float else ""
     except (TypeError, ValueError):
+        proj_float = None
         proj_text = ""
     try:
-        edge_text = f"· Edge: +{float(edge_pct):.1f}%" if edge_pct else ""
+        edge_text = f"· Edge: <strong style='color:#00f0ff;'>+{float(edge_pct):.1f}%</strong>" if edge_pct else ""
     except (TypeError, ValueError):
         edge_text = ""
-    actual_text = ""
+
+    # Projected vs Actual comparison (visual indicator)
+    actual_html = ""
     if actual is not None and result in ("WIN", "LOSS", "PUSH"):
-        actual_text = f'<div style="margin-top:6px;font-size:0.82rem;color:#8a9bb8;">Actual: <strong style="color:#e8f0ff;">{actual}</strong></div>'
+        try:
+            actual_float = float(actual)
+            actual_str = f"{actual_float:.1f}"
+            if proj_float is not None and abs(proj_float) > 0.1:
+                diff = actual_float - proj_float
+                diff_pct = abs(diff / proj_float * 100)
+                if diff_pct <= 10:
+                    # Close to projection — neutral success indicator
+                    actual_class = "actual-close"
+                    diff_label = f"(±{abs(diff):.1f} — on target)"
+                elif diff > 0:
+                    # Exceeded projection
+                    actual_class = "actual-hit"
+                    diff_label = f"(+{diff:.1f} above proj)"
+                else:
+                    # Below projection
+                    actual_class = "actual-miss"
+                    diff_label = f"({diff:.1f} below proj)"
+                actual_html = (
+                    f'<div class="proj-vs-actual">'
+                    f'<span class="proj-label">Actual:</span>'
+                    f'<span class="{actual_class}">{actual_str}</span>'
+                    f'<span style="color:#5a6880;font-size:0.76rem;">{_h.escape(diff_label)}</span>'
+                    f'</div>'
+                )
+            else:
+                actual_html = (
+                    f'<div style="margin-top:6px;font-size:0.82rem;color:#8a9bb8;">'
+                    f'Actual: <strong style="color:#e8f0ff;">{actual_str}</strong>'
+                    f'</div>'
+                )
+        except (TypeError, ValueError):
+            pass
 
     # Live status
     live_html = ""
@@ -4170,14 +4289,18 @@ def get_bet_card_html(bet, show_live_status=False):
             live_html = f'<div style="margin-top:6px;font-size:0.82rem;">{_h.escape(live_status)}</div>'
 
     team_display = f'<span class="bet-card-team">· {team}</span>' if team else ""
+    date_display = f'<span style="font-size:0.74rem;color:#5a6880;">{bet_date}</span>' if bet_date else ""
 
     return (
-        f'<div class="{card_class}">'
+        f'<div class="{card_class}" style="border-left-color:{platform_border_color};">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
         f'<div>'
         f'<span class="bet-card-player">🏀 {player}</span>{team_display}'
         f'</div>'
+        f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">'
         f'{result_html}'
+        f'{date_display}'
+        f'</div>'
         f'</div>'
         f'<div class="bet-card-divider"></div>'
         f'<div style="font-size:0.9rem;color:rgba(255,255,255,0.85);">'
@@ -4191,7 +4314,7 @@ def get_bet_card_html(bet, show_live_status=False):
         f'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">'
         f'{plat_html} &nbsp; {tier_html}'
         f'</div>'
-        f'{actual_text}'
+        f'{actual_html}'
         f'{live_html}'
         f'</div>'
     )

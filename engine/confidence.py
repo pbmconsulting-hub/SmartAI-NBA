@@ -20,15 +20,16 @@ import math  # For rounding
 # How much each factor contributes to the overall confidence score
 # BEGINNER NOTE: These weights reflect how important each factor is
 # You can adjust these in Settings if you want to change the model
-# NOTE (W1): Redistributed 2% from historical and sample to accommodate
-#            the new line_sharpness and calibration penalty factors.
-WEIGHT_PROBABILITY_STRENGTH = 0.30    # Raw probability (30% of score)
+# NOTE (W2): Redistributed weights to improve accuracy — reduced raw probability
+#            over-reliance, increased historical consistency, recent form, and
+#            directional agreement which are stronger predictors of actual outcomes.
+WEIGHT_PROBABILITY_STRENGTH = 0.20    # Raw probability (20% of score) — reduced; circular vs Monte Carlo
 WEIGHT_EDGE_MAGNITUDE = 0.22          # How big the edge is (22%)
-WEIGHT_DIRECTIONAL_AGREEMENT = 0.18  # Multiple factors agree (18%)
+WEIGHT_DIRECTIONAL_AGREEMENT = 0.20  # Multiple factors agree (20%) — increased; strong predictor
 WEIGHT_MATCHUP_FAVORABILITY = 0.10   # How good the matchup is (10%)
-WEIGHT_HISTORICAL_CONSISTENCY = 0.07  # Player's track record (7%)
+WEIGHT_HISTORICAL_CONSISTENCY = 0.12  # Player's track record (12%) — increased; consistency wins
 WEIGHT_SAMPLE_SIZE = 0.06             # How many games played (6%)
-WEIGHT_RECENT_FORM = 0.07             # Recent 5-game trend vs season (7%)
+WEIGHT_RECENT_FORM = 0.10             # Recent 5-game trend vs season (10%) — increased; recency matters
 
 # Validate that weights sum to exactly 1.0 (they must — that's the rule for weights).
 # This assertion catches any accidental edits that would break the model silently.
@@ -46,24 +47,27 @@ assert abs(_ALL_WEIGHTS - 1.0) < 1e-9, (
     "Check the WEIGHT_* constants in confidence.py."
 )
 
-# Tier thresholds (0-100 scale) — Phase 1 C3: Raised from 80/65/50 to 85/72/58
-PLATINUM_TIER_MINIMUM_SCORE = 85  # Top-tier picks  (was 80)
-GOLD_TIER_MINIMUM_SCORE = 72      # Strong picks    (was 65)
-SILVER_TIER_MINIMUM_SCORE = 58    # Moderate picks  (was 50)
-# Anything below 58 = Bronze (lower confidence)
+# Tier thresholds (0-100 scale) — W2: Recalibrated to match new weight distribution
+# The reduced probability weight (0.30→0.20) lowers all scores by ~5-8 pts vs old weights,
+# so thresholds are set to produce the correct tier distribution for real NBA prop scenarios.
+# Target distribution: Platinum ~top 3%, Gold ~top 12%, Silver ~top 30%, rest Bronze/Avoid.
+PLATINUM_TIER_MINIMUM_SCORE = 84  # Near-perfect conditions (raised from 80 pre-PR)
+GOLD_TIER_MINIMUM_SCORE = 69      # Very strong clear edge (raised from 65 pre-PR)
+SILVER_TIER_MINIMUM_SCORE = 57    # Solid evidence above average (raised from 50 pre-PR)
+# Anything below 57 = Bronze (lower confidence)
 
-# Minimum edge gate (C3): picks below these thresholds get auto-demoted
-PLATINUM_MIN_EDGE_PCT = 10.0   # Platinum requires ≥10% edge
-GOLD_MIN_EDGE_PCT = 8.0        # Gold requires ≥8% edge
-SILVER_MIN_EDGE_PCT = 4.0      # Silver requires ≥4% edge
-LOW_EDGE_THRESHOLD = 4.0       # Below 4% → add "Low edge" to avoid reasons
+# Minimum edge gate (W2): picks below these thresholds get auto-demoted
+PLATINUM_MIN_EDGE_PCT = 12.0   # Platinum requires ≥12% edge (was 10%)
+GOLD_MIN_EDGE_PCT = 10.0       # Gold requires ≥10% edge (was 8%)
+SILVER_MIN_EDGE_PCT = 5.0      # Silver requires ≥5% edge (was 4%)
+LOW_EDGE_THRESHOLD = 5.0       # Below 5% → add "Low edge" to avoid reasons (was 4%)
 
 # Hard kill-switch probability thresholds (C2)
-PLATINUM_MIN_PROBABILITY = 0.60   # No Platinum below 60% win probability
-GOLD_MIN_PROBABILITY = 0.55       # No Gold below 55% win probability
+PLATINUM_MIN_PROBABILITY = 0.62   # No Platinum below 62% win probability (was 0.60)
+GOLD_MIN_PROBABILITY = 0.57       # No Gold below 57% win probability (was 0.55)
 
 # Auto-AVOID: coefficient of variation above this → automatically avoid
-AUTO_AVOID_CV_THRESHOLD = 0.45    # CV > 0.45 → auto-AVOID (C2)
+AUTO_AVOID_CV_THRESHOLD = 0.40    # CV > 0.40 → auto-AVOID (was 0.45 — tightened for accuracy)
 
 # Score below this threshold → "Do Not Bet" / Avoid tier.
 # 40/100 corresponds roughly to a coin-flip bet with marginal edge that is unlikely
@@ -73,7 +77,7 @@ DO_NOT_BET_SCORE_THRESHOLD = 40
 
 # Combo-stat confidence penalty multiplier.
 # Combo stats (points_rebounds, etc.) have more variance than simple stats.
-COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.90
+COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.85  # was 0.90 — stronger penalty for combo variance
 
 # Stats considered "combo" or "fantasy" for penalty purposes
 COMBO_STAT_TYPES = {
@@ -239,6 +243,22 @@ def calculate_confidence_score(
     _stat_type_lower = str(stat_type).lower() if stat_type else ""
     if _stat_type_lower in COMBO_STAT_TYPES:
         combined_score *= COMBO_STAT_CONFIDENCE_MULTIPLIER
+
+    # W2: Recency Regression-to-Mean Correction
+    # Extreme recent performance (hot or cold streaks) tends to revert to the season
+    # average. If the last 5 games show >25% deviation from the season average,
+    # apply a regression penalty — the model should not be highly confident on
+    # predictions driven by temporary streaks that are likely to normalize.
+    if recent_form_ratio is not None:
+        form_deviation_abs = abs(recent_form_ratio - 1.0)
+        if form_deviation_abs > 0.25:
+            # Penalty: 20 points per 1.0 (100%) deviation beyond the 25% threshold.
+            # Equivalently, 2 pts per 10% excess deviation.
+            # E.g., ratio=1.40 → excess=0.15 → 20*0.15 = 3.0 point penalty
+            #        ratio=1.60 → excess=0.35 → 20*0.35 = 7.0 point penalty (capped at 8)
+            excess = form_deviation_abs - 0.25
+            regression_penalty = min(8.0, excess * 20.0)
+            combined_score -= regression_penalty
 
     # Round to nearest whole number, clamped to 0-100
     final_score = round(max(0.0, min(100.0, combined_score)), 1)

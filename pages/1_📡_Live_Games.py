@@ -90,8 +90,33 @@ st.title("📡 Live Games")
 st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight's NBA Slate")
 
 # ============================================================
-# SECTION: Auto-Load Tonight's Games
+# SECTION: Action Buttons — Two Independent Workflows
+# ─────────────────────────────────────────────────────────────
+# BUTTON 1 — Auto-Load Tonight's Games:
+#   Fetches the schedule, rosters, player/team stats from NBA API,
+#   then auto-generates SYNTHETIC props from season averages.
+#   Use this as a first step or to refresh data.
+#
+# BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
+#   Fetches REAL live prop lines from PrizePicks, Underdog, and
+#   DraftKings APIs, runs them through Neural Analysis, and shows
+#   the best bets grouped by platform. Does NOT depend on Auto-Load.
 # ============================================================
+
+# ── Visual separator card ───────────────────────────────────────────────────
+st.markdown("""
+<div style="background:linear-gradient(90deg,rgba(0,240,255,0.06),rgba(200,0,255,0.04));
+            border:1px solid rgba(0,240,255,0.14);border-radius:10px;
+            padding:12px 18px;margin-bottom:14px;">
+  <span style="color:#00f0ff;font-weight:700;font-size:0.95rem;">
+    ⚡ Two independent data pipelines — choose based on your goal:
+  </span><br>
+  <span style="color:#8a9bb8;font-size:0.84rem;">
+    <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats + synthetic props from season averages &nbsp;|&nbsp;
+    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from PrizePicks / Underdog / DraftKings → Neural Analysis
+  </span>
+</div>
+""", unsafe_allow_html=True)
 
 auto_col, fetch_col, info_col = st.columns([1, 1, 2])
 
@@ -100,7 +125,7 @@ with auto_col:
         "🔄 Auto-Load Tonight's Games",
         width="stretch",
         type="primary",
-        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
+        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats + auto-generate props from season averages",
     )
 
 with fetch_col:
@@ -112,14 +137,25 @@ with fetch_col:
 
 with info_col:
     st.caption(
-        "**Auto-Load** = games + rosters + stats. "
-        "**Fetch Players Only** = refresh player data. "
-        "**Fetch Platform Props** = select platforms below → Neural Analysis → best bets."
+        "**Auto-Load** = games + rosters + stats (generates synthetic props from averages). "
+        "**Fetch Players Only** = refresh player data only."
     )
 
-# ── Platform Selector + Smart Filter Controls ──────────────────────────────
+# ── Platform Selector + Fetch Platform Props button ────────────────────────
 st.markdown("---")
-st.markdown("### 📊 Fetch Platform Props & Analyze")
+
+# Platform Props row — visually distinct section
+st.markdown("""
+<div style="margin-bottom:6px;">
+  <span style="color:#c800ff;font-size:1.05rem;font-weight:800;font-family:'Orbitron',sans-serif;
+               text-shadow:0 0 10px rgba(200,0,255,0.5);">
+    📊 Fetch Live Platform Props & Analyze
+  </span>
+  <span style="color:#8a9bb8;font-size:0.82rem;margin-left:10px;">
+    — Fetches <em>real</em> prop lines from live APIs, not season-average estimates
+  </span>
+</div>
+""", unsafe_allow_html=True)
 
 _pp_col, _ud_col, _dk_col, _fetch_btn_col = st.columns([1, 1, 1, 2])
 
@@ -167,10 +203,10 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
 with _fetch_btn_col:
     _any_platform_selected = _include_pp or _include_ud or _include_dk
     platform_props_clicked = st.button(
-        "📊 Fetch Platform Props & Analyze",
+        "📊 Fetch Live Props & Analyze",
         width="stretch",
         type="primary",
-        help="Fetch live props from selected platforms, then run full Neural Analysis on them.",
+        help="Fetch REAL live prop lines from selected platforms, then run full Neural Analysis. Works independently — no need to Auto-Load first.",
         disabled=not _any_platform_selected,
         key="platform_props_btn",
     )
