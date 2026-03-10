@@ -156,7 +156,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
         _do_fetch = st.button(
             "🔄 Fetch Live Props",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             help="Pull tonight's live prop lines from all enabled platforms.",
             disabled=not _enabled_names,
         )
@@ -678,7 +678,7 @@ with _ag_col2:
 if st.button(
     "🤖 Auto-Generate All Props for Tonight",
     type="primary",
-    use_container_width=False,
+    width="content",
     disabled=not _ag_platforms,
 ):
     with st.spinner("Generating props for tonight's active roster players…"):
@@ -764,7 +764,7 @@ with st.form("manual_prop_entry", clear_on_submit=True):
 
     add_prop_button = st.form_submit_button(
         "➕ Add Prop",
-        use_container_width=True,
+        width="stretch",
         type="primary",
     )
 

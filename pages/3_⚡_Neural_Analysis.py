@@ -808,7 +808,7 @@ with run_col:
     run_analysis = st.button(
         "🚀 Run Analysis",
         type="primary",
-        use_container_width=True,
+        width="stretch",
         disabled=(len(current_props) == 0),
         help="Analyze all loaded props with Monte Carlo simulation",
     )

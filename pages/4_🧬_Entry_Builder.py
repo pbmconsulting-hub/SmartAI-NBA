@@ -407,7 +407,7 @@ st.divider()
 build_button = st.button(
     f"🔨 Build Top {max_entries} {selected_platform} {entry_size}-Pick Entries",
     type="primary",
-    use_container_width=True,
+    width="stretch",
 )
 
 if build_button:
