@@ -44,18 +44,18 @@ RECENT_FORM_WEIGHT = 0.40 # weight of simple recent avg when 5–9 games
 # Exponential decay factor for recency weighting.
 # Decay of 0.85 means each additional game back is weighted 15% less than the game
 # immediately after it.  A value of 1.0 would give equal weight to all games.
-RECENCY_DECAY = 0.85
+RECENCY_DECAY = 0.80
 
 # Streak detection constants.
 # If the last STREAK_WINDOW games are all above/below the weighted recent average
 # by more than STREAK_THRESHOLD, apply a small multiplier to the projection.
 STREAK_WINDOW    = 3     # consecutive games to confirm a streak
-STREAK_THRESHOLD = 0.15  # 15% above/below triggers streak detection
-STREAK_MULTIPLIER_HOT  = 1.04  # +4% for a confirmed hot streak
-STREAK_MULTIPLIER_COLD = 0.96  # −4% for a confirmed cold streak
+STREAK_THRESHOLD = 0.12  # 12% above/below triggers streak detection
+STREAK_MULTIPLIER_HOT  = 1.05  # +5% for a confirmed hot streak
+STREAK_MULTIPLIER_COLD = 0.95  # −5% for a confirmed cold streak
 
 # Back-to-back fatigue: applied to rest_factor when player played yesterday.
-BACK_TO_BACK_FATIGUE_MULTIPLIER = 0.94  # 6% performance reduction
+BACK_TO_BACK_FATIGUE_MULTIPLIER = 0.95  # 5% performance reduction
 
 # Spread threshold above which a blowout minutes-risk note is added.
 BLOWOUT_SPREAD_THRESHOLD = 10  # points
@@ -502,10 +502,10 @@ def build_player_projection(
     rest_factor = _get_rest_adjustment_factor(rest_days)
 
     # Back-to-back override: if the player literally played yesterday, apply
-    # an additional 6% fatigue reduction on top of the rest-day factor.
+    # an additional 5% fatigue reduction on top of the rest-day factor.
     notes = []
     if played_yesterday:
-        rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER  # 6% fatigue penalty for back-to-back
+        rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER  # 5% fatigue penalty for back-to-back
         notes.append("⚠️ Back-to-back game — fatigue factor applied")
 
     # --- Factor 5: Game Total / Scoring Environment ---

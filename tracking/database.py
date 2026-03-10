@@ -86,6 +86,27 @@ CREATE TABLE IF NOT EXISTS prediction_history (
 );
 """
 
+# SQL to create the daily_snapshots table for per-day performance tracking.
+# Stores aggregated bet outcomes, win rates, and breakdowns per day.
+CREATE_DAILY_SNAPSHOTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS daily_snapshots (
+    snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    snapshot_date TEXT NOT NULL UNIQUE,
+    total_picks INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    pushes INTEGER DEFAULT 0,
+    pending INTEGER DEFAULT 0,
+    win_rate REAL DEFAULT 0.0,
+    platform_breakdown TEXT,
+    tier_breakdown TEXT,
+    stat_type_breakdown TEXT,
+    best_pick TEXT,
+    worst_pick TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -121,6 +142,7 @@ def initialize_database():
             cursor.execute(CREATE_BETS_TABLE_SQL)
             cursor.execute(CREATE_ENTRIES_TABLE_SQL)
             cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
+            cursor.execute(CREATE_DAILY_SNAPSHOTS_TABLE_SQL)      # daily performance tracking
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -579,6 +601,290 @@ def get_calibration_report():
 
 # ============================================================
 # END SECTION: Prediction History & Calibration
+# ============================================================
+
+# ============================================================
+# SECTION: Daily Snapshots
+# ============================================================
+
+def save_daily_snapshot(date_str=None):
+    """
+    Aggregate all bets for *date_str* and write/update the daily_snapshots row.
+
+    Args:
+        date_str (str | None): ISO date string (YYYY-MM-DD). Defaults to today.
+
+    Returns:
+        bool: True on success, False on error.
+    """
+    import json
+    import datetime as _dt
+
+    if date_str is None:
+        date_str = _dt.date.today().isoformat()
+
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+
+        # Fetch all bets for that date
+        cursor.execute(
+            "SELECT * FROM bets WHERE bet_date = ?",
+            (date_str,),
+        )
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+        bets = [dict(zip(cols, row)) for row in rows]
+
+        total = len(bets)
+        wins = sum(1 for b in bets if b.get("result") == "WIN")
+        losses = sum(1 for b in bets if b.get("result") == "LOSS")
+        pushes = sum(1 for b in bets if b.get("result") == "PUSH")
+        pending = sum(1 for b in bets if not b.get("result"))
+        # win_rate is 0.0 when there are no resolved bets (wins + losses == 0)
+        win_rate = round(wins / (wins + losses) * 100, 2) if (wins + losses) > 0 else 0.0
+
+        # Platform breakdown
+        platform_breakdown: dict = {}
+        for b in bets:
+            p = b.get("platform") or "Unknown"
+            if p not in platform_breakdown:
+                platform_breakdown[p] = {"wins": 0, "losses": 0, "pushes": 0, "pending": 0}
+            res = b.get("result")
+            if res == "WIN":
+                platform_breakdown[p]["wins"] += 1
+            elif res == "LOSS":
+                platform_breakdown[p]["losses"] += 1
+            elif res == "PUSH":
+                platform_breakdown[p]["pushes"] += 1
+            else:
+                platform_breakdown[p]["pending"] += 1
+
+        # Tier breakdown
+        tier_breakdown: dict = {}
+        for b in bets:
+            t = b.get("tier") or "Unknown"
+            if t not in tier_breakdown:
+                tier_breakdown[t] = {"wins": 0, "losses": 0, "pushes": 0, "pending": 0}
+            res = b.get("result")
+            if res == "WIN":
+                tier_breakdown[t]["wins"] += 1
+            elif res == "LOSS":
+                tier_breakdown[t]["losses"] += 1
+            elif res == "PUSH":
+                tier_breakdown[t]["pushes"] += 1
+            else:
+                tier_breakdown[t]["pending"] += 1
+
+        # Stat-type breakdown
+        stat_type_breakdown: dict = {}
+        for b in bets:
+            s = b.get("stat_type") or "Unknown"
+            if s not in stat_type_breakdown:
+                stat_type_breakdown[s] = {"wins": 0, "losses": 0, "pushes": 0, "pending": 0}
+            res = b.get("result")
+            if res == "WIN":
+                stat_type_breakdown[s]["wins"] += 1
+            elif res == "LOSS":
+                stat_type_breakdown[s]["losses"] += 1
+            elif res == "PUSH":
+                stat_type_breakdown[s]["pushes"] += 1
+            else:
+                stat_type_breakdown[s]["pending"] += 1
+
+        # Best / worst pick (by edge_percentage, resolved only)
+        resolved = [b for b in bets if b.get("result") in ("WIN", "LOSS")]
+        best_pick = ""
+        worst_pick = ""
+        if resolved:
+            best = max(resolved, key=lambda b: float(b.get("edge_percentage") or 0))
+            worst = min(resolved, key=lambda b: float(b.get("edge_percentage") or 0))
+            best_pick = json.dumps({
+                "player": best.get("player_name", ""),
+                "stat": best.get("stat_type", ""),
+                "edge": best.get("edge_percentage", 0),
+                "result": best.get("result", ""),
+            })
+            worst_pick = json.dumps({
+                "player": worst.get("player_name", ""),
+                "stat": worst.get("stat_type", ""),
+                "edge": worst.get("edge_percentage", 0),
+                "result": worst.get("result", ""),
+            })
+
+        cursor.execute(
+            """
+            INSERT INTO daily_snapshots
+                (snapshot_date, total_picks, wins, losses, pushes, pending,
+                 win_rate, platform_breakdown, tier_breakdown, stat_type_breakdown,
+                 best_pick, worst_pick)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(snapshot_date) DO UPDATE SET
+                total_picks        = excluded.total_picks,
+                wins               = excluded.wins,
+                losses             = excluded.losses,
+                pushes             = excluded.pushes,
+                pending            = excluded.pending,
+                win_rate           = excluded.win_rate,
+                platform_breakdown = excluded.platform_breakdown,
+                tier_breakdown     = excluded.tier_breakdown,
+                stat_type_breakdown = excluded.stat_type_breakdown,
+                best_pick          = excluded.best_pick,
+                worst_pick         = excluded.worst_pick
+            """,
+            (
+                date_str,
+                total,
+                wins,
+                losses,
+                pushes,
+                pending,
+                win_rate,
+                json.dumps(platform_breakdown),
+                json.dumps(tier_breakdown),
+                json.dumps(stat_type_breakdown),
+                best_pick,
+                worst_pick,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as exc:
+        print(f"[database] save_daily_snapshot error: {exc}")
+        return False
+
+
+def load_daily_snapshots(days=14):
+    """Return the last *days* rows from daily_snapshots, newest first.
+
+    Returns:
+        list[dict]
+    """
+    import json
+
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT * FROM daily_snapshots
+            ORDER BY snapshot_date DESC
+            LIMIT ?
+            """,
+            (days,),
+        )
+        rows = cursor.fetchall()
+        cols = [d[0] for d in cursor.description]
+        conn.close()
+        snapshots = []
+        for row in rows:
+            s = dict(zip(cols, row))
+            for field in ("platform_breakdown", "tier_breakdown", "stat_type_breakdown"):
+                try:
+                    s[field] = json.loads(s.get(field) or "{}")
+                except Exception:
+                    s[field] = {}
+            for field in ("best_pick", "worst_pick"):
+                try:
+                    s[field] = json.loads(s.get(field) or "{}")
+                except Exception:
+                    s[field] = {}
+            snapshots.append(s)
+        return snapshots
+    except Exception as exc:
+        print(f"[database] load_daily_snapshots error: {exc}")
+        return []
+
+
+def purge_old_snapshots(days=30):
+    """Delete snapshots older than *days* days.
+
+    Returns:
+        int: Number of rows deleted.
+    """
+    import datetime as _dt
+
+    cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM daily_snapshots WHERE snapshot_date < ?",
+            (cutoff,),
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return deleted
+    except Exception as exc:
+        print(f"[database] purge_old_snapshots error: {exc}")
+        return 0
+
+
+def get_rolling_stats(days=14):
+    """Compute rolling win rate, current streak, best/worst day from snapshots.
+
+    Returns:
+        dict with keys: total_bets, total_wins, total_losses, total_pushes,
+                        win_rate, streak (int, positive=win streak, negative=loss streak),
+                        best_day (dict), worst_day (dict), snapshots (list)
+    """
+    snapshots = load_daily_snapshots(days)
+    if not snapshots:
+        return {
+            "total_bets": 0,
+            "total_wins": 0,
+            "total_losses": 0,
+            "total_pushes": 0,
+            "win_rate": 0.0,
+            "streak": 0,
+            "best_day": {},
+            "worst_day": {},
+            "snapshots": [],
+        }
+
+    total_bets = sum(s.get("total_picks", 0) for s in snapshots)
+    total_wins = sum(s.get("wins", 0) for s in snapshots)
+    total_losses = sum(s.get("losses", 0) for s in snapshots)
+    total_pushes = sum(s.get("pushes", 0) for s in snapshots)
+    win_rate = round(total_wins / max(total_wins + total_losses, 1) * 100, 1)
+
+    # Current streak: walk from most recent snapshot backward
+    streak = 0
+    for snap in snapshots:
+        w = snap.get("wins", 0)
+        l = snap.get("losses", 0)
+        if w + l == 0:
+            continue
+        day_wr = w / (w + l)
+        if streak == 0:
+            streak = 1 if day_wr >= 0.5 else -1
+        elif streak > 0 and day_wr >= 0.5:
+            streak += 1
+        elif streak < 0 and day_wr < 0.5:
+            streak -= 1
+        else:
+            break
+
+    resolved = [s for s in snapshots if (s.get("wins", 0) + s.get("losses", 0)) > 0]
+    best_day = max(resolved, key=lambda s: s.get("win_rate", 0)) if resolved else {}
+    worst_day = min(resolved, key=lambda s: s.get("win_rate", 0)) if resolved else {}
+
+    return {
+        "total_bets": total_bets,
+        "total_wins": total_wins,
+        "total_losses": total_losses,
+        "total_pushes": total_pushes,
+        "win_rate": win_rate,
+        "streak": streak,
+        "best_day": best_day,
+        "worst_day": worst_day,
+        "snapshots": snapshots,
+    }
+
+# ============================================================
+# END SECTION: Daily Snapshots
 # ============================================================
 
 # ============================================================

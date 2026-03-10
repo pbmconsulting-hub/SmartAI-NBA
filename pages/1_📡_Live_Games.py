@@ -93,7 +93,7 @@ st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight'
 # SECTION: Auto-Load Tonight's Games
 # ============================================================
 
-auto_col, fetch_col, info_col = st.columns([1, 1, 2])
+auto_col, fetch_col, platform_col, info_col = st.columns([1, 1, 1, 1])
 
 with auto_col:
     auto_load_clicked = st.button(
@@ -110,10 +110,18 @@ with fetch_col:
         help="Re-fetch player stats for tonight's teams (games must already be loaded)",
     )
 
+with platform_col:
+    platform_props_clicked = st.button(
+        "📊 Fetch Platform Props & Analyze",
+        use_container_width=True,
+        help="Fetch live props from PrizePicks, Underdog Fantasy & DraftKings, then run full Neural Analysis on them",
+    )
+
 with info_col:
     st.caption(
-        "**Auto-Load** = one click does everything: games + rosters + player stats. "
-        "Use **Fetch Players Only** to refresh player data when games are already loaded."
+        "**Auto-Load** = games + rosters + stats. "
+        "**Fetch Players Only** = refresh player data. "
+        "**Fetch Platform Props** = live props from all platforms → Neural Analysis → best bets."
     )
 
 
@@ -239,6 +247,345 @@ if fetch_players_clicked:
                 "❌ Could not fetch player stats. Check your internet connection "
                 "or try the Update Data page."
             )
+
+# ============================================================
+# SECTION: Platform Props & Analyze Button (INDEPENDENT PIPELINE)
+# This is completely separate from Auto-Load. It:
+# 1. Fetches live props from PrizePicks, Underdog, DraftKings
+# 2. Runs each prop through the full Neural Analysis engine
+# 3. Displays best bets grouped by platform
+# 4. Auto-logs top picks to the Bet Tracker
+# ============================================================
+
+if platform_props_clicked:
+    st.divider()
+    st.subheader("📊 Platform Props & Neural Analysis")
+    st.markdown("Fetching live props from all platforms and running Neural Analysis…")
+
+    pp_bar = st.progress(0)
+    pp_status = st.empty()
+
+    try:
+        # ── Step 1: Fetch props from all platforms ──────────────────────
+        pp_status.text("⏳ 1/5 — Fetching PrizePicks props…")
+        pp_bar.progress(10)
+
+        from data.platform_fetcher import (
+            fetch_prizepicks_props,
+            fetch_underdog_props,
+            fetch_draftkings_props,
+            fetch_all_platform_props,
+        )
+
+        odds_api_key = st.session_state.get("odds_api_key") or ""
+        all_platform_props = fetch_all_platform_props(odds_api_key=odds_api_key or None)
+        st.session_state["platform_analysis_props"] = all_platform_props
+
+        pp_status.text(f"⏳ 2/5 — Fetched {len(all_platform_props)} prop(s) across platforms. Loading player data…")
+        pp_bar.progress(25)
+
+        # ── Step 2: Load player data for analysis ───────────────────────
+        from data.data_manager import load_players_data as _lp
+        players_data_for_analysis = _lp()
+        player_lookup: dict = {}
+        for p in players_data_for_analysis:
+            _n = str(p.get("name", "")).lower().strip()
+            if _n:
+                player_lookup[_n] = p
+
+        # ── Step 3: Run Neural Analysis on fetched props ─────────────────
+        pp_status.text("⏳ 3/5 — Running Neural Analysis engine on platform props…")
+        pp_bar.progress(40)
+
+        from engine.projections import build_player_projection, get_stat_standard_deviation
+        from engine.simulation import run_monte_carlo_simulation
+        from engine.edge_detection import analyze_directional_forces, should_avoid_prop
+        from engine.confidence import calculate_confidence_score
+        from data.data_manager import load_defensive_ratings_data, load_teams_data as _load_teams
+
+        _defensive_ratings = load_defensive_ratings_data()
+        _teams_data = _load_teams()
+
+        analyzed_props: list = []
+        games_context = st.session_state.get("todays_games", [])
+        injury_map = st.session_state.get("injury_status_map", {})
+
+        _PLATFORM_STAT_MAP = {
+            "pts": "points", "reb": "rebounds", "ast": "assists",
+            "stl": "steals", "blk": "blocks", "to": "turnovers", "tov": "turnovers",
+            "3pm": "threes", "fg3m": "threes", "pts+reb": "points_rebounds",
+            "pts+ast": "points_assists", "reb+ast": "rebounds_assists",
+            "pts+reb+ast": "points_rebounds_assists",
+        }
+
+        for prop in all_platform_props:
+            try:
+                player_name = str(prop.get("player_name") or "").strip()
+                raw_stat = str(prop.get("stat_type") or prop.get("stat") or "").lower().strip()
+                stat_type = _PLATFORM_STAT_MAP.get(raw_stat, raw_stat)
+                prop_line = float(prop.get("line") or prop.get("prop_line") or 0)
+                platform_name = str(prop.get("platform") or "Unknown")
+                if not player_name or not stat_type or prop_line <= 0:
+                    continue
+
+                player_data = player_lookup.get(player_name.lower())
+                if not player_data:
+                    continue
+
+                # Build game context — find this player's game in tonight's slate
+                player_team = player_data.get("team", "")
+                game_ctx: dict = {
+                    "opponent": "",
+                    "vegas_spread": 0.0,
+                    "game_total": 220.0,
+                    "is_home": True,
+                    "rest_days": 2,
+                }
+                for g in games_context:
+                    home_team = g.get("home_team", "")
+                    away_team = g.get("away_team", "")
+                    if player_team in (home_team, away_team):
+                        is_home = player_team == home_team
+                        game_ctx = {
+                            "opponent": away_team if is_home else home_team,
+                            "vegas_spread": float(g.get("vegas_spread", 0) or 0),
+                            "game_total": float(g.get("game_total", 220) or 220),
+                            "is_home": is_home,
+                            "rest_days": 2,
+                        }
+                        break
+
+                # Projection — use proper signature matching build_player_projection
+                proj = build_player_projection(
+                    player_data=player_data,
+                    opponent_team_abbreviation=game_ctx.get("opponent", ""),
+                    is_home_game=game_ctx.get("is_home", True),
+                    rest_days=game_ctx.get("rest_days", 2),
+                    game_total=game_ctx.get("game_total", 220.0),
+                    defensive_ratings_data=_defensive_ratings,
+                    teams_data=_teams_data,
+                    vegas_spread=game_ctx.get("vegas_spread", 0.0),
+                )
+
+                # Get stat-specific projected value (e.g., projected_points, projected_rebounds)
+                projected_value = proj.get(
+                    f"projected_{stat_type}",
+                    float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+                )
+                try:
+                    projected_value = float(projected_value)
+                except (TypeError, ValueError):
+                    projected_value = float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+
+                if projected_value <= 0:
+                    continue
+
+                std_dev = get_stat_standard_deviation(player_data, stat_type)
+                if not std_dev or std_dev <= 0:
+                    std_dev = projected_value * 0.25
+                blowout_risk = proj.get("blowout_risk_factor", 0.1)
+
+                # Simulation
+                sim = run_monte_carlo_simulation(
+                    projected_stat_average=projected_value,
+                    stat_standard_deviation=std_dev,
+                    prop_line=prop_line,
+                    number_of_simulations=1000,
+                    blowout_risk_factor=blowout_risk,
+                    pace_adjustment_factor=proj.get("pace_factor", 1.0),
+                    matchup_adjustment_factor=proj.get("defense_factor", 1.0),
+                    home_away_adjustment=proj.get("home_away_factor", 0.0),
+                    rest_adjustment_factor=proj.get("rest_factor", 1.0),
+                    stat_type=stat_type,
+                    projected_minutes=proj.get("projected_minutes"),
+                )
+                prob_over = sim.get("probability_over", 0.5)
+                raw_edge = sim.get("edge_percentage", 0.0)
+
+                if raw_edge is None:
+                    raw_edge = 0.0
+
+                # Edge analysis
+                forces = analyze_directional_forces(
+                    player_data=player_data,
+                    prop_line=prop_line,
+                    stat_type=stat_type,
+                    projection_result=proj,
+                    game_context=game_ctx,
+                )
+                should_skip, avoid_reasons = should_avoid_prop(
+                    probability_over=prob_over,
+                    directional_forces_result=forces,
+                    edge_percentage=raw_edge,
+                    stat_standard_deviation=std_dev,
+                    stat_average=projected_value,
+                    stat_type=stat_type,
+                )
+                if should_skip:
+                    continue
+
+                # Confidence
+                conf = calculate_confidence_score(
+                    probability_over=prob_over,
+                    edge_percentage=raw_edge,
+                    directional_forces=forces,
+                    defense_factor=proj.get("defense_factor", 1.0),
+                    stat_standard_deviation=std_dev,
+                    stat_average=projected_value,
+                    simulation_results=sim,
+                    games_played=int(player_data.get("games_played", 10) or 10),
+                    stat_type=stat_type,
+                )
+                confidence_score = conf.get("confidence_score", 0)
+                tier = conf.get("tier", "Bronze")
+                direction = conf.get("direction", "OVER")
+
+                if tier == "Avoid":
+                    continue
+
+                analyzed_props.append({
+                    "player_name": player_name,
+                    "team": player_data.get("team", ""),
+                    "stat_type": stat_type,
+                    "prop_line": prop_line,
+                    "projected_value": round(projected_value, 1),
+                    "edge_percentage": round(raw_edge, 1),
+                    "confidence_score": confidence_score,
+                    "tier": tier,
+                    "tier_emoji": conf.get("tier_emoji", "🥉"),
+                    "direction": direction,
+                    "platform": platform_name,
+                })
+            except Exception as _prop_err:
+                pass  # Skip props that fail analysis
+
+        # Sort by confidence descending
+        analyzed_props.sort(key=lambda x: x["confidence_score"], reverse=True)
+
+        pp_status.text(f"⏳ 4/5 — Analysis complete: {len(analyzed_props)} qualifying pick(s). Auto-logging top picks…")
+        pp_bar.progress(75)
+
+        # ── Step 4: Auto-log top picks to Bet Tracker ───────────────────
+        if analyzed_props:
+            try:
+                from tracking.database import initialize_database, insert_bet
+                initialize_database()
+                import datetime as _dt2
+                _today = _dt2.date.today().isoformat()
+                _logged = 0
+                # Log top 5 per platform
+                _by_plat: dict = {}
+                for _ap in analyzed_props:
+                    _pl = _ap["platform"]
+                    _by_plat.setdefault(_pl, []).append(_ap)
+                for _pl, _picks in _by_plat.items():
+                    for _pick in _picks[:5]:
+                        insert_bet({
+                            "player_name": _pick["player_name"],
+                            "team": _pick.get("team", ""),
+                            "stat_type": _pick["stat_type"],
+                            "prop_line": _pick["prop_line"],
+                            "direction": _pick["direction"],
+                            "projected_value": _pick["projected_value"],
+                            "edge_percentage": _pick["edge_percentage"],
+                            "confidence_score": _pick["confidence_score"],
+                            "tier": _pick["tier"],
+                            "platform": _pl,
+                            "bet_date": _today,
+                            "auto_logged": 1,
+                            "notes": f"Auto-logged from Platform Props & Analyze",
+                        })
+                        _logged += 1
+                if _logged:
+                    st.toast(f"📊 Auto-logged {_logged} platform prop pick(s) to Bet Tracker.")
+            except Exception as _log_err:
+                st.toast(f"⚠️ Could not auto-log picks: {_log_err}")
+
+        pp_status.text("✅ 5/5 — Done!")
+        pp_bar.progress(100)
+        time.sleep(0.5)
+        pp_bar.empty()
+        pp_status.empty()
+
+        # ── Step 5: Display results grouped by platform ──────────────────
+        if not analyzed_props:
+            st.warning(
+                "⚠️ No qualifying picks found from platform props. "
+                "This may mean:\n"
+                "- Platform APIs returned no data (they may require API keys or be temporarily unavailable)\n"
+                "- All props were filtered out by the Neural Analysis edge/confidence gates\n"
+                "- No player data loaded — try clicking **Auto-Load Tonight's Games** first"
+            )
+        else:
+            from styles.theme import get_bet_card_css, get_bet_card_html, get_summary_cards_html
+            st.markdown(get_bet_card_css(), unsafe_allow_html=True)
+
+            # Summary
+            total_picks = len(analyzed_props)
+            plat_count  = sum(1 for p in analyzed_props if p["tier"] == "Platinum")
+            gold_count  = sum(1 for p in analyzed_props if p["tier"] == "Gold")
+            st.success(
+                f"✅ **{total_picks} qualifying picks** found across platforms | "
+                f"💎 {plat_count} Platinum · 🥇 {gold_count} Gold"
+            )
+
+            # Group by platform
+            platforms_order = ["PrizePicks", "Underdog", "DraftKings"]
+            all_platforms = sorted({p["platform"] for p in analyzed_props})
+            # Show known platforms first, then any others
+            ordered_platforms = [pl for pl in platforms_order if pl in all_platforms]
+            ordered_platforms += [pl for pl in all_platforms if pl not in platforms_order]
+
+            for platform_name in ordered_platforms:
+                plat_picks = [p for p in analyzed_props if p["platform"] == platform_name]
+                if not plat_picks:
+                    continue
+
+                plat_lower = platform_name.lower()
+                if "prize" in plat_lower:
+                    icon = "🟢"
+                    badge_color = "#00c853"
+                elif "underdog" in plat_lower:
+                    icon = "🟣"
+                    badge_color = "#7c4dff"
+                elif "draft" in plat_lower:
+                    icon = "🔵"
+                    badge_color = "#2196f3"
+                else:
+                    icon = "🎰"
+                    badge_color = "#607d8b"
+
+                st.markdown(
+                    f'<h3 style="color:{badge_color};margin-top:20px;">'
+                    f'{icon} {platform_name} — {len(plat_picks)} Pick(s)</h3>',
+                    unsafe_allow_html=True,
+                )
+
+                # Two-column grid of bet cards
+                col_a, col_b = st.columns(2)
+                for idx, pick in enumerate(plat_picks):
+                    # Only show picks with positive edge
+                    if pick["edge_percentage"] <= 0:
+                        continue
+                    col = col_a if idx % 2 == 0 else col_b
+                    with col:
+                        st.markdown(
+                            get_bet_card_html(pick),
+                            unsafe_allow_html=True,
+                        )
+
+    except Exception as _platform_err:
+        pp_bar.empty()
+        pp_status.empty()
+        st.error(
+            f"❌ Platform props pipeline failed: {_platform_err}\n\n"
+            "This is usually caused by missing API access. "
+            "You can still use Auto-Load + Neural Analysis for model-generated props."
+        )
+
+# ============================================================
+# END SECTION: Platform Props & Analyze Button
+# ============================================================
 
 st.divider()
 
