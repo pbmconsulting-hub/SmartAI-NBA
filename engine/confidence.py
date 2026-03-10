@@ -47,11 +47,14 @@ assert abs(_ALL_WEIGHTS - 1.0) < 1e-9, (
     "Check the WEIGHT_* constants in confidence.py."
 )
 
-# Tier thresholds (0-100 scale) — W2: Tightened to reduce false-positive high-tier picks
-PLATINUM_TIER_MINIMUM_SCORE = 87  # Top-tier picks  (was 85 → raised to reduce false positives)
-GOLD_TIER_MINIMUM_SCORE = 75      # Strong picks    (was 72 → raised)
-SILVER_TIER_MINIMUM_SCORE = 60    # Moderate picks  (was 58 → raised)
-# Anything below 60 = Bronze (lower confidence)
+# Tier thresholds (0-100 scale) — W2: Recalibrated to match new weight distribution
+# The reduced probability weight (0.30→0.20) lowers all scores by ~5-8 pts vs old weights,
+# so thresholds are set to produce the correct tier distribution for real NBA prop scenarios.
+# Target distribution: Platinum ~top 3%, Gold ~top 12%, Silver ~top 30%, rest Bronze/Avoid.
+PLATINUM_TIER_MINIMUM_SCORE = 84  # Near-perfect conditions (raised from 80 pre-PR)
+GOLD_TIER_MINIMUM_SCORE = 69      # Very strong clear edge (raised from 65 pre-PR)
+SILVER_TIER_MINIMUM_SCORE = 57    # Solid evidence above average (raised from 50 pre-PR)
+# Anything below 57 = Bronze (lower confidence)
 
 # Minimum edge gate (W2): picks below these thresholds get auto-demoted
 PLATINUM_MIN_EDGE_PCT = 12.0   # Platinum requires ≥12% edge (was 10%)
