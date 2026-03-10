@@ -37,7 +37,7 @@ DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"
 LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
 
 # Path to the persisted injury/availability status cache written by
-# fetch_player_injury_status() in live_data_fetcher.py.
+# fetch_todays_players_only() via RosterEngine in live_data_fetcher.py.
 INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 
 # ============================================================
@@ -113,10 +113,10 @@ def load_injury_status():
     """
     Load the persisted player injury/availability status map from disk.
 
-    The status map is written by ``fetch_player_injury_status()`` in
-    ``live_data_fetcher.py`` after each data-update cycle. This function
-    provides a fast, no-API-call way for the Analysis and Prop Scanner
-    pages to check player availability on startup.
+    The status map is written by ``fetch_todays_players_only()`` via
+    RosterEngine in ``live_data_fetcher.py`` after each data-update cycle.
+    This function provides a fast, no-API-call way for the Analysis and
+    Prop Scanner pages to check player availability on startup.
 
     Returns:
         dict: player_name_lower → {
@@ -834,7 +834,8 @@ def get_player_status(player_name, status_map):
     Args:
         player_name (str): Player name to look up
         status_map (dict): Map from normalize_player_name -> status_dict
-                           (as returned by fetch_player_injury_status).
+                           (as returned by RosterEngine.get_injury_report() via
+                           fetch_todays_players_only).
                            Pass an empty dict or None to auto-load from disk.
 
     Returns:

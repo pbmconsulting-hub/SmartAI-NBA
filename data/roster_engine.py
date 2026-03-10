@@ -263,12 +263,11 @@ class RosterEngine:
 
         Sources used (in order):
             1. nba_api live Injuries endpoint — daily injury designations
-            2. nba_api CommonAllPlayers       — active-season player validation
-            3. nba_api CommonTeamRoster       — official roster + two-way status
+            2. nba_api CommonTeamRoster       — official roster + two-way status
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
-                          If None, only the injury / all-players data is refreshed.
+                          If None, only the injury data is refreshed.
         """
         print("RosterEngine.refresh() — starting data pull (nba_api sources only)")
         merged: dict = {}
@@ -279,15 +278,9 @@ class RosterEngine:
             merged[k] = _merge_entry(merged.get(k, {}), v)
         print(f"  Source 1 (nba_api live injuries): {len(src1)} players")
 
-        # ── Source 2: nba_api CommonAllPlayers active validation ───
-        src2 = self._fetch_nba_api_active_players()
-        for k, v in src2.items():
-            merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 2 (nba_api CommonAllPlayers): {len(src2)} players")
-
         self._injury_map = merged
 
-        # ── Source 3: nba_api CommonTeamRoster (primary roster) ───
+        # ── Source 2: nba_api CommonTeamRoster (primary roster) ───
         if team_abbrevs:
             self._fetch_nba_api_rosters(team_abbrevs)
 
@@ -344,54 +337,7 @@ class RosterEngine:
         return result
 
     # ----------------------------------------------------------
-    # Source 2: nba_api CommonAllPlayers — active player validation
-    # ----------------------------------------------------------
-
-    def _fetch_nba_api_active_players(self) -> dict:
-        """
-        Validate active players using CommonAllPlayers with IsOnlyCurrentSeason=1.
-
-        Players returned by this endpoint are confirmed to be on an active
-        NBA roster for the current season. Players NOT returned but who appear
-        in injury data are flagged as inactive (waived/released).
-        """
-        result: dict = {}
-        try:
-            from nba_api.stats.endpoints import commonallplayers
-            time.sleep(1.0)
-            response = commonallplayers.CommonAllPlayers(
-                is_only_current_season=1,
-                league_id="00",
-                season=_current_nba_season(),
-            )
-            df = response.get_data_frames()[0]
-
-            for _, row in df.iterrows():
-                name = row.get("DISPLAY_FIRST_LAST", "") or row.get("DISPLAY_LAST_COMMA_FIRST", "")
-                roster_status = str(row.get("ROSTERSTATUS", "")).strip()
-                team_id = row.get("TEAM_ID", 0)
-
-                if not name:
-                    continue
-
-                key = _normalize_name(name)
-
-                # ROSTERSTATUS = 0 means NOT on active NBA roster
-                # (waived, retired, G-League only, etc.)
-                if str(roster_status) == "0" or team_id == 0:
-                    result[key] = {
-                        "status":      "Inactive",
-                        "injury":      "Not on active NBA roster",
-                        "team":        "",
-                        "return_date": "",
-                        "source":      "nba_api-CommonAllPlayers",
-                    }
-        except Exception as exc:
-            print(f"RosterEngine._fetch_nba_api_active_players: {exc}")
-        return result
-
-    # ----------------------------------------------------------
-    # Source 3: nba_api CommonTeamRoster (primary roster source)
+    # Source 2: nba_api CommonTeamRoster (primary roster source)
     # ----------------------------------------------------------
 
     def _fetch_nba_api_rosters(self, team_abbrevs: list):
@@ -419,7 +365,7 @@ class RosterEngine:
                 print(f"  RosterEngine: no team_id for {abbrev}")
                 continue
             try:
-                time.sleep(1.0)
+                time.sleep(0.4)
                 resp = CommonTeamRoster(team_id=team_id)
                 df = resp.get_data_frames()[0]
 
