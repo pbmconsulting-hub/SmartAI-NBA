@@ -125,7 +125,7 @@ with col_depth:
 with col_dark_horse:
     run_dark_horse = st.button(
         "🌑 Dark Horse Finder",
-        use_container_width=True,
+        width="stretch",
         help="Scan ALL tonight's players and rank by upside vs season average",
     )
 
@@ -170,7 +170,7 @@ if _scenario_mode and selected_names:
 run_sim = st.button(
     "🚀 Run Simulation",
     type="primary",
-    use_container_width=False,
+    width="content",
     disabled=not selected_names,
 )
 

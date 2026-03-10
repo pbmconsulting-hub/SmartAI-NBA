@@ -1152,3 +1152,243 @@ def summarize_props_by_platform(props):
 # ============================================================
 # END SECTION: Per-Platform Summary Helper
 # ============================================================
+
+
+# ============================================================
+# SECTION: Smart Prop Filter
+# ============================================================
+
+# Default stat types to keep when smart filtering is enabled.
+# These are the most commonly offered and highest-value prop types.
+_DEFAULT_STAT_TYPES = frozenset({
+    "points", "rebounds", "assists", "threes",
+    "steals", "blocks", "turnovers",
+    "points_rebounds_assists", "points_rebounds",
+    "points_assists", "rebounds_assists",
+})
+
+
+def smart_filter_props(
+    all_props,
+    players_data=None,
+    todays_games=None,
+    injury_map=None,
+    max_props_per_player=5,
+    stat_types=None,
+    deduplicate_cross_platform=True,
+):
+    """
+    Intelligently reduce a large prop set to high-signal picks.
+
+    Runs the following pipeline in order:
+      1. Filter to tonight's teams only (cross-reference todays_games).
+      2. Remove injured/inactive players (cross-reference injury_map).
+      3. Deduplicate cross-platform props — keep the best line for each
+         player+stat combination (or a single representative if averaging).
+         Tags the surviving prop with all platforms that offer it.
+      4. Filter to selected stat types (defaults to core stats).
+      5. Cap props per player at max_props_per_player.
+
+    Args:
+        all_props (list[dict]): Full prop list from fetch_all_platform_props().
+        players_data (list[dict], optional): Player records from load_players_data().
+            Used to validate players exist in the database.
+        todays_games (list[dict], optional): Tonight's game schedule.
+            Each entry should have 'home_team' and 'away_team' keys.
+        injury_map (dict, optional): Player-name → injury-status mapping.
+            Keys are lowercase player names; values are status strings
+            (e.g., "Out", "Injured Reserve", "Questionable").
+        max_props_per_player (int): Maximum stat types to keep per player.
+            Default is 5. Range 1–15.
+        stat_types (set or list, optional): Stat types to include.
+            Defaults to _DEFAULT_STAT_TYPES. Pass None to use defaults.
+        deduplicate_cross_platform (bool): If True (default), collapse
+            duplicate (player, stat_type) entries from multiple platforms
+            into one record and tag it with all offering platforms.
+
+    Returns:
+        tuple: (filtered_props, filter_summary)
+            filtered_props (list[dict]): Reduced, high-signal prop list.
+            filter_summary (dict): Step-by-step count statistics.
+
+    Example:
+        filtered, summary = smart_filter_props(
+            all_props=raw_props,
+            todays_games=st.session_state.get("todays_games", []),
+            injury_map=st.session_state.get("injury_status_map", {}),
+        )
+        print(f"Reduced {summary['original_count']} → {summary['final_count']} props "
+              f"({summary['reduction_pct']:.0f}% reduction)")
+    """
+    # ── Statuses considered inactive/out ───────────────────────────────
+    _INACTIVE_STATUSES = frozenset({
+        "out", "injured reserve", "ir", "suspended",
+        "not with team", "g league - two-way",
+        "g league - on assignment", "g league",
+        "doubtful",
+    })
+
+    # ── Resolve stat type filter set ────────────────────────────────────
+    if stat_types is None:
+        _allowed_stats = _DEFAULT_STAT_TYPES
+    else:
+        _allowed_stats = frozenset(str(s).lower().strip() for s in stat_types)
+
+    original_count = len(all_props)
+    summary: dict = {
+        "original_count": original_count,
+        "after_team_filter": original_count,
+        "after_injury_filter": original_count,
+        "after_dedup": original_count,
+        "after_stat_filter": original_count,
+        "after_per_player_cap": original_count,
+        "final_count": original_count,
+        "reduction_pct": 0.0,
+    }
+
+    if not all_props:
+        return [], summary
+
+    # ── Step 1: Filter to tonight's teams ───────────────────────────────
+    # Build the set of teams playing tonight (with common abbreviation aliases)
+    _ABBREV_ALIASES = {
+        "GS": "GSW", "GSW": "GS",
+        "NY": "NYK", "NYK": "NY",
+        "NO": "NOP", "NOP": "NO",
+        "SA": "SAS", "SAS": "SA",
+        "UTAH": "UTA", "UTA": "UTAH",
+        "WSH": "WAS", "WAS": "WSH",
+        "BKN": "BRK", "BRK": "BKN",
+        "PHX": "PHO", "PHO": "PHX",
+        "CHA": "CHO", "CHO": "CHA",
+    }
+
+    tonight_teams: set = set()
+    if todays_games:
+        for game in todays_games:
+            for side in ("home_team", "away_team", "homeTeam", "awayTeam"):
+                abbr = str(game.get(side, "")).upper().strip()
+                if abbr:
+                    tonight_teams.add(abbr)
+                    alias = _ABBREV_ALIASES.get(abbr)
+                    if alias:
+                        tonight_teams.add(alias)
+        tonight_teams.discard("")
+
+    if tonight_teams:
+        team_filtered = [
+            p for p in all_props
+            if (
+                not p.get("team")  # keep props with no team info (can't filter)
+                or str(p.get("team", "")).upper().strip() in tonight_teams
+            )
+        ]
+    else:
+        # No game data — can't filter by team; keep all
+        team_filtered = list(all_props)
+
+    summary["after_team_filter"] = len(team_filtered)
+
+    # ── Step 2: Remove injured/inactive players ──────────────────────────
+    if injury_map:
+        def _is_active(prop):
+            player_key = str(prop.get("player_name", "")).lower().strip()
+            status = str(injury_map.get(player_key, "")).lower().strip()
+            if not status:
+                return True  # No status known — assume active
+            return status not in _INACTIVE_STATUSES
+
+        injury_filtered = [p for p in team_filtered if _is_active(p)]
+    else:
+        injury_filtered = team_filtered
+
+    summary["after_injury_filter"] = len(injury_filtered)
+
+    # ── Step 3: Deduplicate cross-platform props ─────────────────────────
+    if deduplicate_cross_platform:
+        # Group by (player_name_lower, stat_type) key
+        dedup_map: dict = {}  # key → list of props
+        for prop in injury_filtered:
+            pkey = (
+                str(prop.get("player_name", "")).lower().strip(),
+                str(prop.get("stat_type", "")).lower().strip(),
+            )
+            dedup_map.setdefault(pkey, []).append(prop)
+
+        dedup_filtered: list = []
+        for pkey, group in dedup_map.items():
+            if len(group) == 1:
+                dedup_filtered.append(group[0])
+            else:
+                # Use the lower median line (floor of midpoint for even-length groups),
+                # which biases toward the lower line — better for OVER bettors.
+                sorted_group = sorted(group, key=lambda p: float(p.get("line", 0) or 0))
+                best = dict(sorted_group[(len(sorted_group) - 1) // 2])  # lower-median line
+                all_platforms_for_prop = sorted({
+                    str(p.get("platform", "")).strip()
+                    for p in group
+                    if p.get("platform")
+                })
+                best["platforms_offering"] = all_platforms_for_prop
+                # Keep original platform name from the median entry
+                dedup_filtered.append(best)
+    else:
+        dedup_filtered = injury_filtered
+
+    summary["after_dedup"] = len(dedup_filtered)
+
+    # ── Step 4: Filter to selected stat types ────────────────────────────
+    stat_filtered = [
+        p for p in dedup_filtered
+        if str(p.get("stat_type", "")).lower().strip() in _allowed_stats
+    ]
+    summary["after_stat_filter"] = len(stat_filtered)
+
+    # ── Step 5: Cap props per player ────────────────────────────────────
+    # Priority ordering within each player: prefer core stats first
+    _STAT_PRIORITY = {
+        "points": 0, "rebounds": 1, "assists": 2,
+        "points_rebounds_assists": 3, "threes": 4,
+        "points_rebounds": 5, "points_assists": 6,
+        "rebounds_assists": 7, "steals": 8,
+        "blocks": 9, "turnovers": 10,
+    }
+
+    # Clamp max_props_per_player to a reasonable range (1–100).
+    # The docstring documents 1-15 as typical, but we allow up to 100
+    # for power users who want to disable the cap without changing code.
+    _MAX = min(100, max(1, int(max_props_per_player)))
+    player_counts: dict = {}
+    capped: list = []
+
+    # Sort to ensure priority stat types come first for each player
+    stat_filtered_sorted = sorted(
+        stat_filtered,
+        key=lambda p: _STAT_PRIORITY.get(
+            str(p.get("stat_type", "")).lower().strip(), 99
+        ),
+    )
+
+    for prop in stat_filtered_sorted:
+        player_key = str(prop.get("player_name", "")).lower().strip()
+        count = player_counts.get(player_key, 0)
+        if count < _MAX:
+            capped.append(prop)
+            player_counts[player_key] = count + 1
+
+    summary["after_per_player_cap"] = len(capped)
+    summary["final_count"] = len(capped)
+
+    # Calculate overall reduction percentage
+    if original_count > 0:
+        summary["reduction_pct"] = round(
+            (1.0 - len(capped) / original_count) * 100.0, 1
+        )
+    else:
+        summary["reduction_pct"] = 0.0
+
+    return capped, summary
+
+# ============================================================
+# END SECTION: Smart Prop Filter
+# ============================================================

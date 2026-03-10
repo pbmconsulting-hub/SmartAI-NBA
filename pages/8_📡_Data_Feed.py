@@ -241,7 +241,7 @@ one_click_col1, one_click_col2 = st.columns([1, 3])
 with one_click_col1:
     if st.button(
         "🏀 One-Click Full Setup",
-        use_container_width=True,
+        width="stretch",
         type="primary",
         help="Games + rosters + player stats + team stats — all in one click",
     ):
@@ -271,7 +271,7 @@ smart_col1, smart_col2 = st.columns([1, 3])
 with smart_col1:
     if st.button(
         "⚡ Smart Update (Today's Teams Only)",
-        use_container_width=True,
+        width="stretch",
         help="Fastest: fetches only players on teams playing tonight using current rosters",
     ):
         st.session_state["update_action"] = "smart"
@@ -299,7 +299,7 @@ if "update_action" not in st.session_state:
 with btn_col1:
     if st.button(
         "🏟️ Fetch Tonight's Games",
-        use_container_width=True,
+        width="stretch",
         help="Pull tonight's real NBA matchups automatically",
     ):
         st.session_state["update_action"] = "games"
@@ -307,7 +307,7 @@ with btn_col1:
 with btn_col2:
     if st.button(
         "👤 Update Player Stats (All — Slow)",
-        use_container_width=True,
+        width="stretch",
         help="Pull current season averages for ALL NBA players (~500, 5-15 min)",
     ):
         st.session_state["update_action"] = "players"
@@ -315,7 +315,7 @@ with btn_col2:
 with btn_col3:
     if st.button(
         "🏆 Update Team Stats",
-        use_container_width=True,
+        width="stretch",
         help="Pull team pace, offensive rating, and defensive rating",
     ):
         st.session_state["update_action"] = "teams"
@@ -323,7 +323,7 @@ with btn_col3:
 with btn_col4:
     if st.button(
         "🔄 Update Everything (Full)",
-        use_container_width=True,
+        width="stretch",
         help="Update all data: games, all players, and teams (slow)",
     ):
         st.session_state["update_action"] = "all"
@@ -346,7 +346,7 @@ with injury_btn_col1:
     _injury_btn_disabled = not _roster_engine_available
     if st.button(
         "🔄 Refresh Injury Report",
-        use_container_width=True,
+        width="stretch",
         help="Fetch live GTD/Out/injury data from the official NBA API (requires nba_api)",
         disabled=_injury_btn_disabled,
     ):
@@ -976,28 +976,28 @@ if _PLATFORM_FETCHER_AVAILABLE:
         _fetch_pp = st.button(
             "🟢 Fetch PrizePicks",
             disabled=not _pp_on,
-            use_container_width=True,
+            width="stretch",
             help="Fetch live prop lines from PrizePicks (no key required).",
         )
     with _fetch_col2:
         _fetch_ud = st.button(
             "🟣 Fetch Underdog",
             disabled=not _ud_on,
-            use_container_width=True,
+            width="stretch",
             help="Fetch live prop lines from Underdog Fantasy (no key required).",
         )
     with _fetch_col3:
         _fetch_dk = st.button(
             "🔵 Fetch DraftKings",
             disabled=not (_dk_on and _dk_key),
-            use_container_width=True,
+            width="stretch",
             help="Fetch DraftKings lines via The Odds API (key required).",
         )
     with _fetch_col4:
         _fetch_all = st.button(
             "🔄 Refresh All Props",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             help="Fetch from all enabled platforms at once.",
         )
 

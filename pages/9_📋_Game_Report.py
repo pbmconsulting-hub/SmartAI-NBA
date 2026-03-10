@@ -194,7 +194,7 @@ if todays_games:
         )
 
 elif not todays_games and analysis_results:
-    if st.button("📋 Generate Full Report for All Props", use_container_width=True):
+    if st.button("📋 Generate Full Report for All Props", width="stretch"):
         st.session_state["game_report_show_all"] = True
 
 elif not todays_games and not analysis_results:

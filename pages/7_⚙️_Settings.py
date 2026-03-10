@@ -87,7 +87,7 @@ for _ci, (_pname, _pdata) in enumerate(_PROFILES.items()):
             f'</div>',
             unsafe_allow_html=True,
         )
-        if st.button(f"Apply {_pname}", key=f"profile_{_ci}", use_container_width=True):
+        if st.button(f"Apply {_pname}", key=f"profile_{_ci}", width="stretch"):
             for _k, _v in _pdata.items():
                 if _k != "description":
                     st.session_state[_k] = _v
@@ -390,7 +390,7 @@ with st.expander("🔑 Configure The Odds API Key (DraftKings)", expanded=False)
 
     col_save_key, col_clear_key = st.columns([1, 1])
     with col_save_key:
-        if st.button("💾 Save API Key", use_container_width=True):
+        if st.button("💾 Save API Key", width="stretch"):
             st.session_state["odds_api_key"] = new_key.strip()
             if new_key.strip():
                 st.success("✅ API key saved for this session!")
@@ -398,7 +398,7 @@ with st.expander("🔑 Configure The Odds API Key (DraftKings)", expanded=False)
                 st.info("API key cleared.")
             st.rerun()
     with col_clear_key:
-        if st.button("🗑️ Clear API Key", use_container_width=True):
+        if st.button("🗑️ Clear API Key", width="stretch"):
             st.session_state["odds_api_key"] = ""
             st.info("API key cleared.")
             st.rerun()

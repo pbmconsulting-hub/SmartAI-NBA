@@ -93,12 +93,12 @@ st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight'
 # SECTION: Auto-Load Tonight's Games
 # ============================================================
 
-auto_col, fetch_col, platform_col, info_col = st.columns([1, 1, 1, 1])
+auto_col, fetch_col, info_col = st.columns([1, 1, 2])
 
 with auto_col:
     auto_load_clicked = st.button(
         "🔄 Auto-Load Tonight's Games",
-        use_container_width=True,
+        width="stretch",
         type="primary",
         help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
     )
@@ -106,24 +106,76 @@ with auto_col:
 with fetch_col:
     fetch_players_clicked = st.button(
         "⚡ Fetch Players Only",
-        use_container_width=True,
+        width="stretch",
         help="Re-fetch player stats for tonight's teams (games must already be loaded)",
-    )
-
-with platform_col:
-    platform_props_clicked = st.button(
-        "📊 Fetch Platform Props & Analyze",
-        use_container_width=True,
-        help="Fetch live props from PrizePicks, Underdog Fantasy & DraftKings, then run full Neural Analysis on them",
     )
 
 with info_col:
     st.caption(
         "**Auto-Load** = games + rosters + stats. "
         "**Fetch Players Only** = refresh player data. "
-        "**Fetch Platform Props** = live props from all platforms → Neural Analysis → best bets."
+        "**Fetch Platform Props** = select platforms below → Neural Analysis → best bets."
     )
 
+# ── Platform Selector + Smart Filter Controls ──────────────────────────────
+st.markdown("---")
+st.markdown("### 📊 Fetch Platform Props & Analyze")
+
+_pp_col, _ud_col, _dk_col, _fetch_btn_col = st.columns([1, 1, 1, 2])
+
+with _pp_col:
+    _include_pp = st.checkbox("🟢 PrizePicks", value=True, key="platform_pp_checkbox")
+with _ud_col:
+    _include_ud = st.checkbox("🟣 Underdog", value=True, key="platform_ud_checkbox")
+with _dk_col:
+    _include_dk = st.checkbox("🔵 DraftKings", value=True, key="platform_dk_checkbox")
+
+# Smart Filter controls (collapsible)
+with st.expander("🧠 Smart Filter Settings", expanded=False):
+    _sf_col1, _sf_col2, _sf_col3 = st.columns(3)
+    with _sf_col1:
+        _smart_filter_on = st.toggle(
+            "🧠 Smart Filter",
+            value=True,
+            key="smart_filter_toggle",
+            help="Deduplicate cross-platform props, filter to tonight's players, remove injured players, and cap props per player.",
+        )
+    with _sf_col2:
+        _max_per_player = st.slider(
+            "Max props per player",
+            min_value=1, max_value=15, value=5,
+            key="smart_filter_max_per_player",
+            help="Cap the number of stat types analyzed per player.",
+        )
+    with _sf_col3:
+        _all_stat_types = [
+            "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+            "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
+            "fantasy_score", "double_double", "triple_double",
+        ]
+        _selected_stats = st.multiselect(
+            "Stat types to include",
+            options=_all_stat_types,
+            default=[
+                "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+                "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
+            ],
+            key="smart_filter_stat_types",
+            help="Only analyze these stat types. Deselect to include all.",
+        )
+
+with _fetch_btn_col:
+    _any_platform_selected = _include_pp or _include_ud or _include_dk
+    platform_props_clicked = st.button(
+        "📊 Fetch Platform Props & Analyze",
+        width="stretch",
+        type="primary",
+        help="Fetch live props from selected platforms, then run full Neural Analysis on them.",
+        disabled=not _any_platform_selected,
+        key="platform_props_btn",
+    )
+
+st.markdown("---")
 
 if auto_load_clicked:
     progress_bar = st.progress(0)
@@ -251,40 +303,84 @@ if fetch_players_clicked:
 # ============================================================
 # SECTION: Platform Props & Analyze Button (INDEPENDENT PIPELINE)
 # This is completely separate from Auto-Load. It:
-# 1. Fetches live props from PrizePicks, Underdog, DraftKings
-# 2. Runs each prop through the full Neural Analysis engine
-# 3. Displays best bets grouped by platform
-# 4. Auto-logs top picks to the Bet Tracker
+# 1. Fetches live props from selected platforms
+# 2. Applies Smart Filter to reduce prop count
+# 3. Runs each prop through the full Neural Analysis engine
+# 4. Displays best bets grouped by platform
+# 5. Auto-logs top picks to the Bet Tracker
 # ============================================================
 
 if platform_props_clicked:
     st.divider()
     st.subheader("📊 Platform Props & Neural Analysis")
-    st.markdown("Fetching live props from all platforms and running Neural Analysis…")
+
+    _platforms_label = ", ".join(filter(None, [
+        "PrizePicks" if _include_pp else "",
+        "Underdog" if _include_ud else "",
+        "DraftKings" if _include_dk else "",
+    ]))
+    st.markdown(f"Fetching live props from **{_platforms_label}** and running Neural Analysis…")
 
     pp_bar = st.progress(0)
     pp_status = st.empty()
 
     try:
-        # ── Step 1: Fetch props from all platforms ──────────────────────
-        pp_status.text("⏳ 1/5 — Fetching PrizePicks props…")
+        # ── Step 1: Fetch props from selected platforms ────────────────
+        pp_status.text("⏳ 1/5 — Fetching props from selected platforms…")
         pp_bar.progress(10)
 
         from data.platform_fetcher import (
-            fetch_prizepicks_props,
-            fetch_underdog_props,
-            fetch_draftkings_props,
             fetch_all_platform_props,
+            smart_filter_props,
         )
 
         odds_api_key = st.session_state.get("odds_api_key") or ""
-        all_platform_props = fetch_all_platform_props(odds_api_key=odds_api_key or None)
-        st.session_state["platform_analysis_props"] = all_platform_props
+        all_platform_props = fetch_all_platform_props(
+            include_prizepicks=_include_pp,
+            include_underdog=_include_ud,
+            include_draftkings=_include_dk,
+            odds_api_key=odds_api_key or None,
+        )
+        st.session_state["platform_analyzed_props"] = all_platform_props
 
-        pp_status.text(f"⏳ 2/5 — Fetched {len(all_platform_props)} prop(s) across platforms. Loading player data…")
+        raw_count = len(all_platform_props)
+        pp_status.text(f"⏳ 2/5 — Fetched {raw_count:,} props. Applying Smart Filter…")
+        pp_bar.progress(20)
+
+        # ── Step 2: Smart Filter (optional) ───────────────────────────
+        # Read controls from the UI (already rendered above)
+        _smart_enabled = st.session_state.get("smart_filter_toggle", True)
+        _max_pp = st.session_state.get("smart_filter_max_per_player", 5)
+        _stat_sel = st.session_state.get("smart_filter_stat_types") or None
+
+        if _smart_enabled:
+            _todays_games = st.session_state.get("todays_games", [])
+            _injury_map = st.session_state.get("injury_status_map", {})
+            props_to_analyze, _filter_summary = smart_filter_props(
+                all_props=all_platform_props,
+                todays_games=_todays_games if _todays_games else None,
+                injury_map=_injury_map if _injury_map else None,
+                max_props_per_player=_max_pp,
+                stat_types=_stat_sel if _stat_sel else None,
+            )
+            st.info(
+                f"🧠 **Smart Filter:** Fetched **{raw_count:,}** props → "
+                f"reduced to **{_filter_summary['final_count']:,}** high-signal props "
+                f"(**{_filter_summary['reduction_pct']:.0f}% reduction**) | "
+                f"After team filter: {_filter_summary['after_team_filter']:,} · "
+                f"After injury filter: {_filter_summary['after_injury_filter']:,} · "
+                f"After dedup: {_filter_summary['after_dedup']:,} · "
+                f"After stat filter: {_filter_summary['after_stat_filter']:,} · "
+                f"After player cap: {_filter_summary['after_per_player_cap']:,}"
+            )
+        else:
+            props_to_analyze = all_platform_props
+            st.info(f"ℹ️ Smart Filter is OFF. Analyzing all **{raw_count:,}** props.")
+
+        pp_status.text(f"⏳ 3/5 — Loading player data for {len(props_to_analyze):,} props…")
         pp_bar.progress(25)
 
-        # ── Step 2: Load player data for analysis ───────────────────────
+        # ── Step 3: Load player data for analysis ─────────────────────
         from data.data_manager import load_players_data as _lp
         players_data_for_analysis = _lp()
         player_lookup: dict = {}
@@ -293,8 +389,8 @@ if platform_props_clicked:
             if _n:
                 player_lookup[_n] = p
 
-        # ── Step 3: Run Neural Analysis on fetched props ─────────────────
-        pp_status.text("⏳ 3/5 — Running Neural Analysis engine on platform props…")
+        # ── Step 4: Run Neural Analysis on filtered props ──────────────
+        pp_status.text(f"⏳ 4/5 — Running Neural Analysis on {len(props_to_analyze):,} props…")
         pp_bar.progress(40)
 
         from engine.projections import build_player_projection, get_stat_standard_deviation
@@ -318,7 +414,7 @@ if platform_props_clicked:
             "pts+reb+ast": "points_rebounds_assists",
         }
 
-        for prop in all_platform_props:
+        for prop in props_to_analyze:
             try:
                 player_name = str(prop.get("player_name") or "").strip()
                 raw_stat = str(prop.get("stat_type") or prop.get("stat") or "").lower().strip()
@@ -462,10 +558,10 @@ if platform_props_clicked:
         # Sort by confidence descending
         analyzed_props.sort(key=lambda x: x["confidence_score"], reverse=True)
 
-        pp_status.text(f"⏳ 4/5 — Analysis complete: {len(analyzed_props)} qualifying pick(s). Auto-logging top picks…")
+        pp_status.text(f"⏳ 5/5 — Analysis complete: {len(analyzed_props)} qualifying pick(s). Auto-logging top picks…")
         pp_bar.progress(75)
 
-        # ── Step 4: Auto-log top picks to Bet Tracker ───────────────────
+        # ── Step 5: Auto-log top picks to Bet Tracker ─────────────────
         if analyzed_props:
             try:
                 from tracking.database import initialize_database, insert_bet
@@ -877,7 +973,7 @@ with st.expander("➕ Manually Add Games", expanded=not bool(current_games)):
 
         submit_games_button = st.form_submit_button(
             "✅ Save Tonight's Games",
-            use_container_width=True,
+            width="stretch",
             type="primary",
         )
 
