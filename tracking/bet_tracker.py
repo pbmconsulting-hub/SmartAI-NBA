@@ -620,7 +620,9 @@ def resolve_todays_bets():
     Resolve today's pending bets by checking live game status via nba_api.
 
     Only resolves bets where the game has a FINAL status.
-    Fetches actual stats from PlayerGameLog for resolved games.
+    Uses comprehensive player matching (exact → normalized → fuzzy) and
+    handles combo stats, fantasy scoring, and platform name mismatches —
+    ported from ``auto_resolve_bet_results()``.
 
     Returns:
         dict: {
@@ -636,7 +638,6 @@ def resolve_todays_bets():
     from tracking.database import (
         load_all_bets,
         update_bet_result,
-        get_database_connection,
         save_daily_snapshot,
     )
 
@@ -656,6 +657,35 @@ def resolve_todays_bets():
     if not todays_pending:
         return summary
 
+    # Try to use nba_api; bail early if unavailable
+    try:
+        from nba_api.stats.endpoints import PlayerGameLog
+        from nba_api.stats.static import players as nba_players_static
+        import time as _time
+    except ImportError:
+        summary["errors"].append("nba_api not available — cannot resolve bets")
+        summary["pending"] = len(todays_pending)
+        return summary
+
+    # Import combo/fantasy stat definitions
+    try:
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+    except ImportError:
+        COMBO_STATS = {}
+        FANTASY_SCORING = {}
+
+    # Normalizer for fuzzy matching
+    try:
+        from data.data_manager import normalize_player_name as _normalize_name
+    except ImportError:
+        def _normalize_name(n):
+            return str(n).lower().strip()
+
+    # Build name → player_id maps once (exact and normalized)
+    _all_nba_players = nba_players_static.get_players()
+    _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_nba_players}
+    _norm_to_id = {_normalize_name(p["full_name"]): p["id"] for p in _all_nba_players}
+
     # Try to use nba_api live scoreboard to find final games
     final_game_ids: set = set()
     try:
@@ -664,7 +694,6 @@ def resolve_todays_bets():
         games_data = sb.get_dict().get("scoreboard", {}).get("games", [])
         for g in games_data:
             status = g.get("gameStatus", 0)
-            # gameStatus 3 = Final
             if status == 3 or str(g.get("gameStatusText", "")).strip().lower() == "final":
                 gid = str(g.get("gameId", ""))
                 if gid:
@@ -685,38 +714,92 @@ def resolve_todays_bets():
         except Exception as exc2:
             summary["errors"].append(f"ScoreboardV2 unavailable: {exc2}")
 
-    # Attempt to resolve each pending bet
+    # Current NBA season string (e.g. "2024-25")
+    _now = _dt.date.today()
+    _year = _now.year
+    season_str = (
+        f"{_year - 1}-{str(_year)[2:]}"
+        if _now.month < 10
+        else f"{_year}-{str(_year + 1)[2:]}"
+    )
+
+    # Pre-build month abbreviation map once for date parsing
+    import calendar as _cal
+    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
+
+    def _parse_game_date(date_val):
+        s = str(date_val).strip()
+        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
+            try:
+                return _dt.datetime.strptime(s, fmt).date()
+            except ValueError:
+                pass
+        try:
+            parts = s.replace(",", "").split()
+            if len(parts) == 3:
+                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
+                if month_num:
+                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
+        except Exception:
+            pass
+        return None
+
+    # Primary stat column map
+    _STAT_COL = {
+        "points":    "PTS",
+        "rebounds":  "REB",
+        "assists":   "AST",
+        "threes":    "FG3M",
+        "steals":    "STL",
+        "blocks":    "BLK",
+        "turnovers": "TOV",
+        "three_pointers": "FG3M",
+        "minutes":   "MIN",
+    }
+
+    target_date = _dt.datetime.strptime(today_str, "%Y-%m-%d").date()
+
     for bet in todays_pending:
+        bet_id      = bet.get("id") or bet.get("bet_id")
         player_name = bet.get("player_name", "")
-        stat_type   = bet.get("stat_type", "")
+        stat_type   = str(bet.get("stat_type", "")).lower()
         prop_line   = float(bet.get("prop_line") or 0)
         direction   = str(bet.get("direction") or "OVER").upper()
-        bet_id      = bet.get("id")
+
+        is_combo   = stat_type in COMBO_STATS
+        is_fantasy = stat_type in FANTASY_SCORING
+        stat_col   = _STAT_COL.get(stat_type)
+
+        if not stat_col and not is_combo and not is_fantasy:
+            summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
+            summary["pending"] += 1
+            continue
+
+        # ── Comprehensive player lookup: exact → normalized → fuzzy ──
+        player_id = _name_to_id.get(player_name.lower())
+        if not player_id:
+            player_id = _norm_to_id.get(_normalize_name(player_name))
+        if not player_id:
+            norm_search = _normalize_name(player_name)
+            parts = norm_search.split()
+            if len(parts) >= 2:
+                player_id = next(
+                    (
+                        pid
+                        for norm_name, pid in _norm_to_id.items()
+                        if parts[0] in norm_name and parts[-1] in norm_name
+                    ),
+                    None,
+                )
+        if not player_id:
+            summary["errors"].append(f"#{bet_id} {player_name}: player not found in nba_api")
+            summary["pending"] += 1
+            continue
 
         try:
-            from nba_api.stats.endpoints import PlayerGameLog
-            from nba_api.stats.static import players as nba_players_static
-            import datetime as _dt2
-
-            # Dynamically determine current NBA season (e.g., "2024-25")
-            _now = _dt2.date.today()
-            _year = _now.year
-            # NBA season starts in October; if before October, season started last year
-            if _now.month < 10:
-                _season_str = f"{_year - 1}-{str(_year)[2:]}"
-            else:
-                _season_str = f"{_year}-{str(_year + 1)[2:]}"
-
-            # Find player id
-            matches = nba_players_static.find_players_by_full_name(player_name)
-            if not matches:
-                summary["pending"] += 1
-                continue
-            player_id = matches[0]["id"]
-
             gl = PlayerGameLog(
                 player_id=player_id,
-                season=_season_str,
+                season=season_str,
                 season_type_all_star="Regular Season",
             )
             logs = gl.get_normalized_dict().get("PlayerGameLog", [])
@@ -724,56 +807,49 @@ def resolve_todays_bets():
                 summary["pending"] += 1
                 continue
 
-            # Most recent game
-            latest = logs[0]
-            game_date_str = str(latest.get("GAME_DATE", ""))
+            # Find the game log entry for today
+            latest = None
+            for log_row in logs:
+                log_date = _parse_game_date(log_row.get("GAME_DATE", ""))
+                if log_date == target_date:
+                    latest = log_row
+                    break
 
-            # Only use if game was today or the log is fresh
-            try:
-                log_date = _dt2.datetime.strptime(game_date_str, "%b %d, %Y").date()
-            except Exception:
-                log_date = None
-
-            if log_date != _dt2.date.today():
+            if latest is None:
                 summary["pending"] += 1
                 continue
 
-            # Get actual value for the stat
-            STAT_MAP = {
-                "points": "PTS",
-                "rebounds": "REB",
-                "assists": "AST",
-                "steals": "STL",
-                "blocks": "BLK",
-                "turnovers": "TOV",
-                "threes": "FG3M",
-                "three_pointers": "FG3M",
-                "minutes": "MIN",
-                "points_rebounds": None,
-                "points_assists": None,
-                "rebounds_assists": None,
-                "points_rebounds_assists": None,
-            }
-            stat_key = STAT_MAP.get(stat_type.lower())
-            if stat_key:
-                actual_value = float(latest.get(stat_key) or 0)
-            elif stat_type.lower() == "points_rebounds":
-                actual_value = float(latest.get("PTS") or 0) + float(latest.get("REB") or 0)
-            elif stat_type.lower() == "points_assists":
-                actual_value = float(latest.get("PTS") or 0) + float(latest.get("AST") or 0)
-            elif stat_type.lower() == "rebounds_assists":
-                actual_value = float(latest.get("REB") or 0) + float(latest.get("AST") or 0)
-            elif stat_type.lower() == "points_rebounds_assists":
+            # ── Compute actual value ─────────────────────────────────
+            if is_combo:
+                # COMBO_STATS maps stat_type → list of component stat keys
+                component_keys = COMBO_STATS.get(stat_type, [])
+                actual_value = sum(
+                    float(latest.get(_STAT_COL.get(k, k.upper()), 0) or 0)
+                    for k in component_keys
+                )
+            elif is_fantasy:
+                # FANTASY_SCORING maps stat_type → {col: multiplier}
+                scoring_weights = FANTASY_SCORING.get(stat_type, {})
+                actual_value = sum(
+                    float(latest.get(_STAT_COL.get(col, col.upper()), 0) or 0) * mult
+                    for col, mult in scoring_weights.items()
+                )
+            elif stat_type == "points_rebounds":
+                actual_value = float(latest.get("PTS", 0) or 0) + float(latest.get("REB", 0) or 0)
+            elif stat_type == "points_assists":
+                actual_value = float(latest.get("PTS", 0) or 0) + float(latest.get("AST", 0) or 0)
+            elif stat_type == "rebounds_assists":
+                actual_value = float(latest.get("REB", 0) or 0) + float(latest.get("AST", 0) or 0)
+            elif stat_type == "points_rebounds_assists":
                 actual_value = (
-                    float(latest.get("PTS") or 0)
-                    + float(latest.get("REB") or 0)
-                    + float(latest.get("AST") or 0)
+                    float(latest.get("PTS", 0) or 0)
+                    + float(latest.get("REB", 0) or 0)
+                    + float(latest.get("AST", 0) or 0)
                 )
             else:
-                summary["pending"] += 1
-                continue
+                actual_value = float(latest.get(stat_col, 0) or 0)
 
-            # Determine WIN/LOSS/PUSH
+            # ── Determine WIN / LOSS / PUSH ──────────────────────────
             if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                 result = "PUSH"
             elif direction == "OVER":
@@ -801,7 +877,7 @@ def resolve_todays_bets():
         except Exception:
             pass
 
-    # Count truly unresolved
+    # Count remaining unresolved bets
     try:
         remaining = load_all_bets(limit=500)
         summary["pending"] = sum(
