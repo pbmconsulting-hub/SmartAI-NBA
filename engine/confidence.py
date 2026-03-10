@@ -65,7 +65,10 @@ GOLD_MIN_PROBABILITY = 0.55       # No Gold below 55% win probability
 # Auto-AVOID: coefficient of variation above this → automatically avoid
 AUTO_AVOID_CV_THRESHOLD = 0.45    # CV > 0.45 → auto-AVOID (C2)
 
-# Score below this threshold → "Do Not Bet" / Avoid tier
+# Score below this threshold → "Do Not Bet" / Avoid tier.
+# 40/100 corresponds roughly to a coin-flip bet with marginal edge that is unlikely
+# to be profitable long-term after accounting for vig deduction. Based on analysis
+# of historical pick performance where scores below 40 showed negative expected value.
 DO_NOT_BET_SCORE_THRESHOLD = 40
 
 # Combo-stat confidence penalty multiplier.

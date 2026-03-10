@@ -351,9 +351,11 @@ def should_avoid_prop(
     else:
         effective_edge = vig_adjusted_edge
     if effective_edge < MIN_EDGE_AFTER_VIG:
+        _vig_adj_display = max(0.0, vig_adjusted_edge)  # show 0 if negative to avoid confusion
         avoid_reasons.append(
-            f"Insufficient edge after vig ({edge_percentage:.1f}% raw, "
-            f"{vig_adjusted_edge:.1f}% after vig) — below {MIN_EDGE_AFTER_VIG}% minimum"
+            f"Insufficient edge after vig ({edge_percentage:.1f}% raw → "
+            f"{_vig_adj_display:.1f}% after {VIG_ADJUSTMENT_PCT}% vig) — "
+            f"below {MIN_EDGE_AFTER_VIG}% minimum"
         )
 
     # Reason 2: High variance relative to line (too unpredictable)

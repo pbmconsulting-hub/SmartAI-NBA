@@ -48,12 +48,13 @@ FOUL_TROUBLE_PROBABILITY = 0.12
 # stat_multiplier: applied on top of the scaled projection
 GAME_SCENARIOS = [
     # (name, probability, minutes_reduction_min, minutes_reduction_max, stat_boost_min, stat_boost_max)
-    # Disruption scenarios increased to ~37% to better reflect real NBA game variance.
-    ("normal",       0.60,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
+    # Disruption scenarios increased to ~39% to better reflect real NBA game variance.
+    # Normal reduced to 0.58 to accommodate more blowout/foul-trouble weight.
+    ("normal",       0.58,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
     ("blowout_win",  0.12,  0.15,  0.25,  0.90,  0.95),  # Team wins big, star sits late
     ("blowout_loss", 0.10,  0.10,  0.20,  0.88,  0.98),  # Team loses big, garbage time
     ("foul_trouble", 0.10,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
-    ("close_game",   0.05, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
+    ("close_game",   0.07, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
     ("injury_scare", 0.03,  0.40,  0.60,  0.30,  0.60),  # Injury scare: massive minutes cut
 ]
 

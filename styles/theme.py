@@ -4143,8 +4143,14 @@ def get_bet_card_html(bet, show_live_status=False):
     )
 
     # Projected & edge
-    proj_text = f"📊 Projected: {float(projected):.1f}" if projected else ""
-    edge_text = f"· Edge: +{float(edge_pct):.1f}%" if edge_pct else ""
+    try:
+        proj_text = f"📊 Projected: {float(projected):.1f}" if projected else ""
+    except (TypeError, ValueError):
+        proj_text = ""
+    try:
+        edge_text = f"· Edge: +{float(edge_pct):.1f}%" if edge_pct else ""
+    except (TypeError, ValueError):
+        edge_text = ""
     actual_text = ""
     if actual is not None and result in ("WIN", "LOSS", "PUSH"):
         actual_text = f'<div style="margin-top:6px;font-size:0.82rem;color:#8a9bb8;">Actual: <strong style="color:#e8f0ff;">{actual}</strong></div>'

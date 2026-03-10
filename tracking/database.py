@@ -641,7 +641,8 @@ def save_daily_snapshot(date_str=None):
         losses = sum(1 for b in bets if b.get("result") == "LOSS")
         pushes = sum(1 for b in bets if b.get("result") == "PUSH")
         pending = sum(1 for b in bets if not b.get("result"))
-        win_rate = round(wins / max(wins + losses, 1) * 100, 2)
+        # win_rate is 0.0 when there are no resolved bets (wins + losses == 0)
+        win_rate = round(wins / (wins + losses) * 100, 2) if (wins + losses) > 0 else 0.0
 
         # Platform breakdown
         platform_breakdown: dict = {}

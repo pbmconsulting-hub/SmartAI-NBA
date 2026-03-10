@@ -611,6 +611,9 @@ def auto_resolve_bet_results(date_str=None):
 # END SECTION: Auto-Resolve
 # ============================================================
 
+# Tolerance for declaring a bet result as PUSH (exact tie within float epsilon)
+PUSH_THRESHOLD_EPSILON = 0.01
+
 
 def resolve_todays_bets():
     """
@@ -693,6 +696,16 @@ def resolve_todays_bets():
         try:
             from nba_api.stats.endpoints import PlayerGameLog
             from nba_api.stats.static import players as nba_players_static
+            import datetime as _dt2
+
+            # Dynamically determine current NBA season (e.g., "2024-25")
+            _now = _dt2.date.today()
+            _year = _now.year
+            # NBA season starts in October; if before October, season started last year
+            if _now.month < 10:
+                _season_str = f"{_year - 1}-{str(_year)[2:]}"
+            else:
+                _season_str = f"{_year}-{str(_year + 1)[2:]}"
 
             # Find player id
             matches = nba_players_static.find_players_by_full_name(player_name)
@@ -703,7 +716,7 @@ def resolve_todays_bets():
 
             gl = PlayerGameLog(
                 player_id=player_id,
-                season="2024-25",
+                season=_season_str,
                 season_type_all_star="Regular Season",
             )
             logs = gl.get_normalized_dict().get("PlayerGameLog", [])
@@ -716,7 +729,6 @@ def resolve_todays_bets():
             game_date_str = str(latest.get("GAME_DATE", ""))
 
             # Only use if game was today or the log is fresh
-            import datetime as _dt2
             try:
                 log_date = _dt2.datetime.strptime(game_date_str, "%b %d, %Y").date()
             except Exception:
@@ -762,7 +774,7 @@ def resolve_todays_bets():
                 continue
 
             # Determine WIN/LOSS/PUSH
-            if abs(actual_value - prop_line) < 0.01:
+            if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                 result = "PUSH"
             elif direction == "OVER":
                 result = "WIN" if actual_value > prop_line else "LOSS"
