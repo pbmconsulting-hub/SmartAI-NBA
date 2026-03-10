@@ -661,7 +661,6 @@ def resolve_todays_bets():
     try:
         from nba_api.stats.endpoints import PlayerGameLog
         from nba_api.stats.static import players as nba_players_static
-        import time as _time
     except ImportError:
         summary["errors"].append("nba_api not available — cannot resolve bets")
         summary["pending"] = len(todays_pending)
@@ -833,18 +832,6 @@ def resolve_todays_bets():
                 actual_value = sum(
                     float(latest.get(_STAT_COL.get(col, col.upper()), 0) or 0) * mult
                     for col, mult in scoring_weights.items()
-                )
-            elif stat_type == "points_rebounds":
-                actual_value = float(latest.get("PTS", 0) or 0) + float(latest.get("REB", 0) or 0)
-            elif stat_type == "points_assists":
-                actual_value = float(latest.get("PTS", 0) or 0) + float(latest.get("AST", 0) or 0)
-            elif stat_type == "rebounds_assists":
-                actual_value = float(latest.get("REB", 0) or 0) + float(latest.get("AST", 0) or 0)
-            elif stat_type == "points_rebounds_assists":
-                actual_value = (
-                    float(latest.get("PTS", 0) or 0)
-                    + float(latest.get("REB", 0) or 0)
-                    + float(latest.get("AST", 0) or 0)
                 )
             else:
                 actual_value = float(latest.get(stat_col, 0) or 0)
