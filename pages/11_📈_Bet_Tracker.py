@@ -99,6 +99,45 @@ st.markdown(
     "auto-resolving results, and forecasting ROI."
 )
 
+# ── Prominent "Check Results Now" button — always visible at top ──────────
+_check_col, _check_info_col = st.columns([1, 3])
+with _check_col:
+    _check_now_btn = st.button(
+        "🔄 Check Results Now",
+        type="primary",
+        width="stretch",
+        help="Immediately check live NBA scoreboard for Final games and resolve today's pending bets.",
+        key="top_check_results_btn",
+    )
+with _check_info_col:
+    st.caption(
+        "Checks the live NBA scoreboard for completed games and instantly resolves today's pending bets. "
+        "Click any time — no need to wait until tomorrow."
+    )
+
+if _check_now_btn:
+    with st.spinner("Checking live NBA games and resolving today's bets…"):
+        try:
+            from tracking.bet_tracker import resolve_todays_bets as _rtr_top
+            _top_result = _rtr_top()
+            if _top_result.get("resolved", 0) > 0:
+                st.success(
+                    f"✅ Resolved **{_top_result['resolved']}** bet(s): "
+                    f"**{_top_result['wins']}** WIN · **{_top_result['losses']}** LOSS · **{_top_result['pushes']}** PUSH"
+                )
+                st.rerun()
+            else:
+                st.info(
+                    f"ℹ️ No bets resolved. Games may still be in progress or not started. "
+                    f"Pending: {_top_result.get('pending', 0)}"
+                )
+            if _top_result.get("errors"):
+                with st.expander(f"⚠️ {len(_top_result['errors'])} detail(s)"):
+                    for _e in _top_result["errors"]:
+                        st.markdown(f"- {_e}")
+        except Exception as _top_err:
+            st.error(f"❌ Could not check results: {_top_err}")
+
 # ============================================================
 # SECTION: Top-Level Platform Selector
 # ============================================================
@@ -470,6 +509,17 @@ with tab_auto_resolve:
     if auto_refresh:
         import time as _time
         _time.sleep(60)
+        # Attempt to resolve any new Final games before refreshing the display
+        try:
+            from tracking.bet_tracker import resolve_todays_bets as _rtr
+            _rtr_result = _rtr()
+            if _rtr_result.get("resolved", 0) > 0:
+                st.toast(
+                    f"🔄 Auto-resolved {_rtr_result['resolved']} bet(s) "
+                    f"({_rtr_result['wins']}W / {_rtr_result['losses']}L)"
+                )
+        except Exception:
+            pass
         st.rerun()
 
     st.divider()

@@ -48,12 +48,12 @@ FOUL_TROUBLE_PROBABILITY = 0.12
 # stat_multiplier: applied on top of the scaled projection
 GAME_SCENARIOS = [
     # (name, probability, minutes_reduction_min, minutes_reduction_max, stat_boost_min, stat_boost_max)
-    # Disruption scenarios increased to ~39% to better reflect real NBA game variance.
-    # Normal reduced to 0.58 to accommodate more blowout/foul-trouble weight.
-    ("normal",       0.58,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
-    ("blowout_win",  0.12,  0.15,  0.25,  0.90,  0.95),  # Team wins big, star sits late
-    ("blowout_loss", 0.10,  0.10,  0.20,  0.88,  0.98),  # Team loses big, garbage time
-    ("foul_trouble", 0.10,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
+    # Disruption scenarios increased to ~42% to better reflect real NBA game variance.
+    # Normal reduced to 0.55 to accommodate more blowout/foul-trouble weight.
+    ("normal",       0.55,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
+    ("blowout_win",  0.13,  0.18,  0.28,  0.88,  0.93),  # Team wins big, star sits late (stricter)
+    ("blowout_loss", 0.11,  0.12,  0.22,  0.86,  0.96),  # Team loses big, garbage time (stricter)
+    ("foul_trouble", 0.11,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
     ("close_game",   0.07, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
     ("injury_scare", 0.03,  0.40,  0.60,  0.30,  0.60),  # Injury scare: massive minutes cut
 ]
@@ -100,7 +100,7 @@ THREE_POINT_CV_FLOOR = 1.3 * 0.25  # = 0.325
 DEFAULT_PROJECTED_MINUTES = 30.0
 
 # Standard deviation of minutes (captures blowout/foul trouble variability)
-MINUTES_STD_DEFAULT = 4.0   # ~4 minutes uncertainty in most games
+MINUTES_STD_DEFAULT = 5.0   # was 4.0 — increased for more realistic variance in outcomes
 
 # Default correlation matrix for multi-stat props (C7)
 # These represent realistic stat co-dependence in NBA games.
