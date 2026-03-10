@@ -69,6 +69,20 @@ FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
 # Problem statement requires 15+ MPG for live fetch; we keep 10 for fallback.
 MIN_MINUTES_THRESHOLD = 15.0
 
+# Games-missed threshold for the recency proxy in fetch_todays_players_only().
+# If a player has missed more than this many games relative to their team's max GP,
+# they are likely on a long-term absence even if not explicitly in the injury report.
+# 12 games ≈ 2-3 weeks of absence; requires the team to have played 20+ games first.
+GP_ABSENT_THRESHOLD = 12
+MIN_TEAM_GP_FOR_RECENCY_CHECK = 20
+
+# Position map: nba_api START_POSITION codes → our position labels.
+# Defined at module level to avoid re-creating the dict on every function call.
+_POSITION_MAP = {
+    "G":   "PG", "F":   "SF", "C":  "C",
+    "G-F": "SF", "F-G": "SG", "F-C": "PF", "C-F": "PF", "": "SF",
+}
+
 # Recent-form trend thresholds: how much above/below season avg to be "hot"/"cold"
 HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
 COLD_TREND_THRESHOLD = 0.9  # Last 3 games avg ≤ 90% of recent avg = cold
@@ -774,8 +788,10 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
     Args:
         todays_games (list of dict): Tonight's games from fetch_todays_games()
         progress_callback (callable, optional): Called with (current, total, msg)
-        precomputed_injury_map (dict, optional): Ignored — kept for API compatibility.
-            Injury data is now sourced exclusively from RosterEngine.
+        precomputed_injury_map (dict, optional): Deprecated — no longer used.
+            Injury data is sourced directly from RosterEngine inside this
+            function. This parameter is kept for backward API compatibility
+            but is silently ignored.
 
     Returns:
         bool: True if successful, False if the fetch failed.
@@ -916,12 +932,6 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             except Exception as _cache_err:
                 print(f"  WARNING: Cached injury data unavailable: {_cache_err}")
 
-        # Position mapping from nba_api codes to our labels
-        _position_map = {
-            "G": "PG", "F": "SF", "C": "C",
-            "G-F": "SF", "F-G": "SG", "F-C": "PF", "C-F": "PF", "": "SF",
-        }
-
         formatted_players = []
 
         if progress_callback:
@@ -951,14 +961,13 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             player_gp = int(row.get("GP", 0) or 0)
             t_max_gp  = team_max_gp.get(api_team, player_gp)
             games_missed = max(0, t_max_gp - player_gp)
-            # 12+ games missed ≈ ~2-3 weeks absent — skip unless very early in season
-            if games_missed > 12 and t_max_gp > 20:
+            if games_missed > GP_ABSENT_THRESHOLD and t_max_gp > MIN_TEAM_GP_FOR_RECENCY_CHECK:
                 print(f"  Skipping {player_name}: missed {games_missed}/{t_max_gp} games (likely long-term out)")
                 continue
 
             # ── Extract season averages ───────────────────────────────────
             position    = row.get("START_POSITION", "SF") or "SF"
-            mapped_pos  = _position_map.get(position, position)
+            mapped_pos  = _POSITION_MAP.get(position, position)
             api_team_norm = NBA_API_ABBREV_TO_OURS.get(api_team, api_team)
 
             points_avg    = float(row.get("PTS",    0) or 0)
