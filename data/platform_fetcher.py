@@ -1320,10 +1320,10 @@ def smart_filter_props(
             if len(group) == 1:
                 dedup_filtered.append(group[0])
             else:
-                # Keep the entry with the median line value across platforms;
-                # tag it with all platform names that offer this prop.
+                # Use the lower median line (floor of midpoint for even-length groups),
+                # which biases toward the lower line — better for OVER bettors.
                 sorted_group = sorted(group, key=lambda p: float(p.get("line", 0) or 0))
-                best = dict(sorted_group[len(sorted_group) // 2])  # median line
+                best = dict(sorted_group[(len(sorted_group) - 1) // 2])  # lower-median line
                 all_platforms_for_prop = sorted({
                     str(p.get("platform", "")).strip()
                     for p in group
@@ -1354,7 +1354,10 @@ def smart_filter_props(
         "blocks": 9, "turnovers": 10,
     }
 
-    _MAX = max(1, int(max_props_per_player))
+    # Clamp max_props_per_player to a reasonable range (1–100).
+    # The docstring documents 1-15 as typical, but we allow up to 100
+    # for power users who want to disable the cap without changing code.
+    _MAX = min(100, max(1, int(max_props_per_player)))
     player_counts: dict = {}
     capped: list = []
 
