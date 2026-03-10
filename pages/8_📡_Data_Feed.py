@@ -878,6 +878,240 @@ if current_action:
 
 
 # ============================================================
+# SECTION: Fetch Platform Props
+# Pull live prop lines from PrizePicks, Underdog Fantasy,
+# and DraftKings Pick6 (via The Odds API) without needing
+# the nba_api at all. Platforms only list players who are
+# active and playing tonight, which naturally handles
+# the injury/availability problem.
+# ============================================================
+
+st.divider()
+st.subheader("📊 Fetch Platform Props")
+
+st.markdown(
+    "Pull **live prop lines** directly from the betting platforms. "
+    "Platforms only list active players playing **tonight** — so this also "
+    "acts as a real-time active roster check!"
+)
+
+st.markdown(get_education_box_html(
+    "📖 How Platform Prop Fetching Works",
+    """
+    <strong>PrizePicks & Underdog</strong>: Free public APIs — no API key required. 
+    Fetches all of tonight's NBA prop lines in seconds.<br><br>
+    <strong>DraftKings Pick6</strong>: Fetched via 
+    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">The Odds API</a> 
+    (free tier: 500 req/month). Configure your API key on the 
+    <a href="/Settings" style="color:#ff5e00;">⚙️ Settings page</a>.<br><br>
+    <strong>Cross-platform comparison</strong>: After fetching, the app shows all lines 
+    side-by-side so you can see which platform has the best line for each pick.
+    """
+), unsafe_allow_html=True)
+
+# ── Import platform fetcher ────────────────────────────────────
+try:
+    from data.platform_fetcher import (
+        fetch_all_platform_props,
+        summarize_props_by_platform,
+        find_new_players_from_props,
+        build_cross_platform_comparison,
+    )
+    from data.data_manager import (
+        save_platform_props_to_session,
+        load_platform_props_from_session,
+        save_platform_props_to_csv,
+    )
+    _PLATFORM_FETCHER_AVAILABLE = True
+except ImportError as _pf_err:
+    _PLATFORM_FETCHER_AVAILABLE = False
+    st.warning(f"⚠️ Platform fetcher not available: {_pf_err}")
+
+if _PLATFORM_FETCHER_AVAILABLE:
+
+    # ── Read current settings ──────────────────────────────────
+    _pp_on = st.session_state.get("fetch_prizepicks_enabled", True)
+    _ud_on = st.session_state.get("fetch_underdog_enabled", True)
+    _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
+    _dk_key = st.session_state.get("odds_api_key", "").strip()
+
+    # Show platform status badges
+    _badge_style = (
+        "padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;"
+        "margin-right:8px;display:inline-block;"
+    )
+    _pp_badge = (
+        f'<span style="{_badge_style}background:#1a3d2b;color:#9ae6b4;">'
+        f'{"✅" if _pp_on else "⏸️"} PrizePicks</span>'
+    )
+    _ud_badge = (
+        f'<span style="{_badge_style}background:#2d1b69;color:#d6bcfa;">'
+        f'{"✅" if _ud_on else "⏸️"} Underdog</span>'
+    )
+    _dk_badge = (
+        f'<span style="{_badge_style}background:#1a2f4d;color:#bee3f8;">'
+        f'{"✅" if _dk_on else "⏸️"} DraftKings '
+        f'{"(key ✓)" if _dk_key else "(no key)"}</span>'
+    )
+    st.markdown(
+        f'<div style="margin-bottom:12px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Enable/disable platforms and add DraftKings API key on the ⚙️ Settings page.")
+
+    # ── Check for already-fetched props in session ─────────────
+    _cached_platform_props = load_platform_props_from_session(st.session_state)
+    if _cached_platform_props:
+        _cached_summary = summarize_props_by_platform(_cached_platform_props)
+        _total_cached = sum(_cached_summary.values())
+        st.info(
+            f"📦 **{_total_cached} props cached** from last fetch: "
+            + " | ".join(f"{plat}: {cnt}" for plat, cnt in _cached_summary.items())
+        )
+
+    # ── Fetch buttons ─────────────────────────────────────────
+    _fetch_col1, _fetch_col2, _fetch_col3, _fetch_col4 = st.columns(4)
+
+    with _fetch_col1:
+        _fetch_pp = st.button(
+            "🟢 Fetch PrizePicks",
+            disabled=not _pp_on,
+            use_container_width=True,
+            help="Fetch live prop lines from PrizePicks (no key required).",
+        )
+    with _fetch_col2:
+        _fetch_ud = st.button(
+            "🟣 Fetch Underdog",
+            disabled=not _ud_on,
+            use_container_width=True,
+            help="Fetch live prop lines from Underdog Fantasy (no key required).",
+        )
+    with _fetch_col3:
+        _fetch_dk = st.button(
+            "🔵 Fetch DraftKings",
+            disabled=not (_dk_on and _dk_key),
+            use_container_width=True,
+            help="Fetch DraftKings lines via The Odds API (key required).",
+        )
+    with _fetch_col4:
+        _fetch_all = st.button(
+            "🔄 Refresh All Props",
+            type="primary",
+            use_container_width=True,
+            help="Fetch from all enabled platforms at once.",
+        )
+
+    # ── Execute fetches ────────────────────────────────────────
+    _fetch_triggered = False
+    _fetch_pp_only = False
+    _fetch_ud_only = False
+    _fetch_dk_only = False
+
+    if _fetch_all:
+        _fetch_triggered = True
+    elif _fetch_pp:
+        _fetch_triggered = True
+        _fetch_pp_only = True
+    elif _fetch_ud:
+        _fetch_triggered = True
+        _fetch_ud_only = True
+    elif _fetch_dk:
+        _fetch_triggered = True
+        _fetch_dk_only = True
+
+    if _fetch_triggered:
+        _progress_bar = st.progress(0, text="Starting fetch...")
+
+        def _progress_cb(current, total, message):
+            pct = int((current / max(total, 1)) * 100)
+            _progress_bar.progress(pct, text=message)
+
+        with st.spinner("Fetching live props from betting platforms..."):
+            _new_props = fetch_all_platform_props(
+                include_prizepicks=_pp_on and (_fetch_all or _fetch_pp_only),
+                include_underdog=_ud_on and (_fetch_all or _fetch_ud_only),
+                include_draftkings=_dk_on and bool(_dk_key) and (_fetch_all or _fetch_dk_only),
+                odds_api_key=_dk_key or None,
+                progress_callback=_progress_cb,
+            )
+
+        _progress_bar.progress(100, text="Done!")
+
+        if _new_props:
+            # Save to session state so Prop Scanner and Analysis pages can use it
+            save_platform_props_to_session(_new_props, st.session_state)
+
+            # Also save props to session as current_props so they're immediately
+            # available on the Prop Scanner page
+            from data.data_manager import save_props_to_session
+            save_props_to_session(_new_props, st.session_state)
+
+            # Auto-save to disk so data persists across page navigations
+            _saved_ok = save_platform_props_to_csv(_new_props)
+
+            # Show per-platform summary
+            _new_summary = summarize_props_by_platform(_new_props)
+            st.success(
+                f"✅ Fetched **{len(_new_props)} props** from "
+                + ", ".join(f"**{plat}** ({cnt})" for plat, cnt in _new_summary.items())
+                + (". Saved to `data/live_props.csv`." if _saved_ok else ".")
+            )
+
+            # Warn about new players not in our database
+            _players_data_for_check = load_players_data()
+            _new_players = find_new_players_from_props(_new_props, _players_data_for_check)
+            if _new_players:
+                with st.expander(
+                    f"⚠️ {len(_new_players)} players from platforms not in local database",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        "These players appear on betting platforms but are not in your "
+                        "local player database. Consider running a **Smart Update** above "
+                        "to fetch their season stats."
+                    )
+                    for _np in _new_players[:20]:
+                        st.markdown(f"- {_np}")
+                    if len(_new_players) > 20:
+                        st.caption(f"... and {len(_new_players) - 20} more")
+
+        else:
+            st.warning(
+                "⚠️ No props were returned. "
+                "Check your internet connection and platform API status. "
+                "PrizePicks and Underdog should always work without a key."
+            )
+
+    # ── Show cached props preview ──────────────────────────────
+    _display_props = load_platform_props_from_session(st.session_state)
+    if _display_props:
+        with st.expander(
+            f"📋 Preview Fetched Props ({len(_display_props)} total)",
+            expanded=False,
+        ):
+            _preview_rows = []
+            for _p in _display_props[:50]:
+                _preview_rows.append({
+                    "Player": _p.get("player_name", ""),
+                    "Team": _p.get("team", ""),
+                    "Stat": _p.get("stat_type", ""),
+                    "Line": _p.get("line", ""),
+                    "Platform": _p.get("platform", ""),
+                    "Date": _p.get("game_date", ""),
+                })
+            st.dataframe(_preview_rows, use_container_width=True, hide_index=True)
+            if len(_display_props) > 50:
+                st.caption(
+                    f"Showing first 50 of {len(_display_props)} props. "
+                    "Go to the 🔬 Prop Scanner to see all."
+                )
+
+# ============================================================
+# END SECTION: Fetch Platform Props
+# ============================================================
+
+
+# ============================================================
 # SECTION: Help and Tips
 # ============================================================
 
@@ -927,6 +1161,12 @@ with st.expander("💡 Tips & FAQ", expanded=False):
     **Q: I see 'no data yet' even after updating. Why?**
     A: The players.csv file gets written when you click Update. If you still see "no data"
     in the status, try refreshing the page or running the update again.
+
+    ---
+
+    **Q: How do I get DraftKings props?**
+    A: Get a free API key from [the-odds-api.com](https://the-odds-api.com),
+    add it on the ⚙️ Settings page, then click "Fetch DraftKings" or "Refresh All Props".
     """)
 
 # ============================================================
