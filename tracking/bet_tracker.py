@@ -610,3 +610,316 @@ def auto_resolve_bet_results(date_str=None):
 # ============================================================
 # END SECTION: Auto-Resolve
 # ============================================================
+
+
+def resolve_todays_bets():
+    """
+    Resolve today's pending bets by checking live game status via nba_api.
+
+    Only resolves bets where the game has a FINAL status.
+    Fetches actual stats from PlayerGameLog for resolved games.
+
+    Returns:
+        dict: {
+            "resolved": int,
+            "wins": int,
+            "losses": int,
+            "pushes": int,
+            "pending": int,
+            "errors": list[str],
+        }
+    """
+    import datetime as _dt
+    from tracking.database import (
+        load_all_bets,
+        update_bet_result,
+        get_database_connection,
+        save_daily_snapshot,
+    )
+
+    today_str = _dt.date.today().isoformat()
+    summary = {"resolved": 0, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "errors": []}
+
+    try:
+        all_bets = load_all_bets(limit=500)
+        todays_pending = [
+            b for b in all_bets
+            if b.get("bet_date") == today_str and not b.get("result")
+        ]
+    except Exception as exc:
+        summary["errors"].append(f"Failed to load bets: {exc}")
+        return summary
+
+    if not todays_pending:
+        return summary
+
+    # Try to use nba_api live scoreboard to find final games
+    final_game_ids: set = set()
+    try:
+        from nba_api.live.endpoints.scoreboard import ScoreBoard
+        sb = ScoreBoard()
+        games_data = sb.get_dict().get("scoreboard", {}).get("games", [])
+        for g in games_data:
+            status = g.get("gameStatus", 0)
+            # gameStatus 3 = Final
+            if status == 3 or str(g.get("gameStatusText", "")).strip().lower() == "final":
+                gid = str(g.get("gameId", ""))
+                if gid:
+                    final_game_ids.add(gid)
+    except Exception as exc:
+        summary["errors"].append(f"Live scoreboard unavailable: {exc}")
+
+    # Fall back to ScoreboardV2 if live endpoint failed
+    if not final_game_ids:
+        try:
+            from nba_api.stats.endpoints import ScoreboardV2
+            sb2 = ScoreboardV2(game_date=today_str)
+            for row in sb2.get_normalized_dict().get("GameHeader", []):
+                if str(row.get("GAME_STATUS_TEXT", "")).strip().lower() in ("final", "final/ot"):
+                    gid = str(row.get("GAME_ID", ""))
+                    if gid:
+                        final_game_ids.add(gid)
+        except Exception as exc2:
+            summary["errors"].append(f"ScoreboardV2 unavailable: {exc2}")
+
+    # Attempt to resolve each pending bet
+    for bet in todays_pending:
+        player_name = bet.get("player_name", "")
+        stat_type   = bet.get("stat_type", "")
+        prop_line   = float(bet.get("prop_line") or 0)
+        direction   = str(bet.get("direction") or "OVER").upper()
+        bet_id      = bet.get("id")
+
+        try:
+            from nba_api.stats.endpoints import PlayerGameLog
+            from nba_api.stats.static import players as nba_players_static
+
+            # Find player id
+            matches = nba_players_static.find_players_by_full_name(player_name)
+            if not matches:
+                summary["pending"] += 1
+                continue
+            player_id = matches[0]["id"]
+
+            gl = PlayerGameLog(
+                player_id=player_id,
+                season="2024-25",
+                season_type_all_star="Regular Season",
+            )
+            logs = gl.get_normalized_dict().get("PlayerGameLog", [])
+            if not logs:
+                summary["pending"] += 1
+                continue
+
+            # Most recent game
+            latest = logs[0]
+            game_date_str = str(latest.get("GAME_DATE", ""))
+
+            # Only use if game was today or the log is fresh
+            import datetime as _dt2
+            try:
+                log_date = _dt2.datetime.strptime(game_date_str, "%b %d, %Y").date()
+            except Exception:
+                log_date = None
+
+            if log_date != _dt2.date.today():
+                summary["pending"] += 1
+                continue
+
+            # Get actual value for the stat
+            STAT_MAP = {
+                "points": "PTS",
+                "rebounds": "REB",
+                "assists": "AST",
+                "steals": "STL",
+                "blocks": "BLK",
+                "turnovers": "TOV",
+                "threes": "FG3M",
+                "three_pointers": "FG3M",
+                "minutes": "MIN",
+                "points_rebounds": None,
+                "points_assists": None,
+                "rebounds_assists": None,
+                "points_rebounds_assists": None,
+            }
+            stat_key = STAT_MAP.get(stat_type.lower())
+            if stat_key:
+                actual_value = float(latest.get(stat_key) or 0)
+            elif stat_type.lower() == "points_rebounds":
+                actual_value = float(latest.get("PTS") or 0) + float(latest.get("REB") or 0)
+            elif stat_type.lower() == "points_assists":
+                actual_value = float(latest.get("PTS") or 0) + float(latest.get("AST") or 0)
+            elif stat_type.lower() == "rebounds_assists":
+                actual_value = float(latest.get("REB") or 0) + float(latest.get("AST") or 0)
+            elif stat_type.lower() == "points_rebounds_assists":
+                actual_value = (
+                    float(latest.get("PTS") or 0)
+                    + float(latest.get("REB") or 0)
+                    + float(latest.get("AST") or 0)
+                )
+            else:
+                summary["pending"] += 1
+                continue
+
+            # Determine WIN/LOSS/PUSH
+            if abs(actual_value - prop_line) < 0.01:
+                result = "PUSH"
+            elif direction == "OVER":
+                result = "WIN" if actual_value > prop_line else "LOSS"
+            else:  # UNDER
+                result = "WIN" if actual_value < prop_line else "LOSS"
+
+            update_bet_result(bet_id, result, actual_value)
+            summary["resolved"] += 1
+            if result == "WIN":
+                summary["wins"] += 1
+            elif result == "LOSS":
+                summary["losses"] += 1
+            else:
+                summary["pushes"] += 1
+
+        except Exception as exc:
+            summary["errors"].append(f"{player_name}: {exc}")
+            summary["pending"] += 1
+
+    # Auto-save daily snapshot after resolving
+    if summary["resolved"] > 0:
+        try:
+            save_daily_snapshot(today_str)
+        except Exception:
+            pass
+
+    # Count truly unresolved
+    try:
+        remaining = load_all_bets(limit=500)
+        summary["pending"] = sum(
+            1 for b in remaining
+            if b.get("bet_date") == today_str and not b.get("result")
+        )
+    except Exception:
+        pass
+
+    return summary
+
+
+def get_live_bet_status(bets_list):
+    """
+    Check live box scores for today's pending bets.
+
+    Args:
+        bets_list (list[dict]): Today's pending bets from the database.
+
+    Returns:
+        list[dict]: Each bet dict augmented with:
+            - current_value (float | None)
+            - live_status ("🟢 Winning" | "🔴 Losing" | "⏳ In Progress" |
+                           "🕐 Not Started" | "✅ Final")
+    """
+    augmented = []
+
+    # Build player_id cache
+    player_id_cache: dict = {}
+    try:
+        from nba_api.stats.static import players as nba_players_static
+        _static_players = nba_players_static.get_active_players()
+        for p in _static_players:
+            player_id_cache[p["full_name"].lower()] = p["id"]
+    except Exception:
+        pass
+
+    # Fetch live box scores
+    live_box: dict = {}  # player_name_lower → current stat totals
+    try:
+        from nba_api.live.endpoints.scoreboard import ScoreBoard
+        sb = ScoreBoard()
+        games = sb.get_dict().get("scoreboard", {}).get("games", [])
+        for g in games:
+            game_status = g.get("gameStatus", 1)
+            status_text = str(g.get("gameStatusText", "")).strip()
+            is_final = game_status == 3 or status_text.lower() == "final"
+            is_live = game_status == 2
+
+            if not (is_final or is_live):
+                continue
+
+            gid = g.get("gameId", "")
+            try:
+                from nba_api.live.endpoints.boxscore import BoxScore
+                bs = BoxScore(game_id=gid)
+                bs_data = bs.get_dict().get("game", {})
+                for team_side in ("homeTeam", "awayTeam"):
+                    team_data = bs_data.get(team_side, {})
+                    for player in team_data.get("players", []):
+                        stats = player.get("statistics", {})
+                        pname = player.get("name", "").lower()
+                        live_box[pname] = {
+                            "pts": float(stats.get("points", 0)),
+                            "reb": float(stats.get("reboundsTotal", 0)),
+                            "ast": float(stats.get("assists", 0)),
+                            "stl": float(stats.get("steals", 0)),
+                            "blk": float(stats.get("blocks", 0)),
+                            "tov": float(stats.get("turnovers", 0)),
+                            "fg3m": float(stats.get("threePointersMade", 0)),
+                            "min": str(stats.get("minutesCalculated", "PT0M")),
+                            "is_final": is_final,
+                            "is_live": is_live,
+                        }
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    STAT_TO_BOX = {
+        "points": "pts",
+        "rebounds": "reb",
+        "assists": "ast",
+        "steals": "stl",
+        "blocks": "blk",
+        "turnovers": "tov",
+        "threes": "fg3m",
+        "three_pointers": "fg3m",
+    }
+
+    for bet in bets_list:
+        bet_copy = dict(bet)
+        player_name = bet.get("player_name", "")
+        stat_type   = str(bet.get("stat_type") or "").lower()
+        prop_line   = float(bet.get("prop_line") or 0)
+        direction   = str(bet.get("direction") or "OVER").upper()
+
+        pname_lower = player_name.lower()
+        box_entry = live_box.get(pname_lower)
+
+        if box_entry is None:
+            bet_copy["current_value"] = None
+            bet_copy["live_status"] = "🕐 Not Started"
+        else:
+            box_key = STAT_TO_BOX.get(stat_type)
+            if box_key:
+                current_value = box_entry.get(box_key, 0.0)
+            elif stat_type == "points_rebounds":
+                current_value = box_entry["pts"] + box_entry["reb"]
+            elif stat_type == "points_assists":
+                current_value = box_entry["pts"] + box_entry["ast"]
+            elif stat_type == "rebounds_assists":
+                current_value = box_entry["reb"] + box_entry["ast"]
+            elif stat_type == "points_rebounds_assists":
+                current_value = box_entry["pts"] + box_entry["reb"] + box_entry["ast"]
+            else:
+                current_value = None
+
+            bet_copy["current_value"] = current_value
+
+            if box_entry.get("is_final"):
+                bet_copy["live_status"] = "✅ Final"
+            elif box_entry.get("is_live") and current_value is not None:
+                if direction == "OVER":
+                    bet_copy["live_status"] = "🟢 Winning" if current_value > prop_line else "🔴 Losing"
+                else:
+                    bet_copy["live_status"] = "🟢 Winning" if current_value < prop_line else "🔴 Losing"
+            else:
+                bet_copy["live_status"] = "⏳ In Progress"
+
+        augmented.append(bet_copy)
+
+    return augmented

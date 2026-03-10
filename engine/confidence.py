@@ -54,7 +54,7 @@ SILVER_TIER_MINIMUM_SCORE = 58    # Moderate picks  (was 50)
 
 # Minimum edge gate (C3): picks below these thresholds get auto-demoted
 PLATINUM_MIN_EDGE_PCT = 10.0   # Platinum requires ≥10% edge
-GOLD_MIN_EDGE_PCT = 7.0        # Gold requires ≥7% edge
+GOLD_MIN_EDGE_PCT = 8.0        # Gold requires ≥8% edge
 SILVER_MIN_EDGE_PCT = 4.0      # Silver requires ≥4% edge
 LOW_EDGE_THRESHOLD = 4.0       # Below 4% → add "Low edge" to avoid reasons
 
@@ -63,7 +63,20 @@ PLATINUM_MIN_PROBABILITY = 0.60   # No Platinum below 60% win probability
 GOLD_MIN_PROBABILITY = 0.55       # No Gold below 55% win probability
 
 # Auto-AVOID: coefficient of variation above this → automatically avoid
-AUTO_AVOID_CV_THRESHOLD = 0.50    # CV > 0.50 → auto-AVOID (C2)
+AUTO_AVOID_CV_THRESHOLD = 0.45    # CV > 0.45 → auto-AVOID (C2)
+
+# Score below this threshold → "Do Not Bet" / Avoid tier
+DO_NOT_BET_SCORE_THRESHOLD = 40
+
+# Combo-stat confidence penalty multiplier.
+# Combo stats (points_rebounds, etc.) have more variance than simple stats.
+COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.90
+
+# Stats considered "combo" or "fantasy" for penalty purposes
+COMBO_STAT_TYPES = {
+    "points_rebounds", "points_assists", "rebounds_assists",
+    "points_rebounds_assists", "fantasy_score", "double_double", "triple_double",
+}
 
 # ============================================================
 # END SECTION: Confidence Score Constants
@@ -88,6 +101,7 @@ def calculate_confidence_score(
     trap_line_penalty=0.0,
     calibration_adjustment=0.0,
     injury_status_penalty=0.0,
+    stat_type=None,
 ):
     """
     Calculate a 0-100 confidence score for a prop pick.
@@ -126,12 +140,14 @@ def calculate_confidence_score(
         injury_status_penalty (float, optional): Points to subtract when the
             player has a concerning injury/availability status (e.g. Questionable,
             Doubtful). Typically 0-10 points. Default 0.0 (no penalty).
+        stat_type (str, optional): The stat being evaluated (e.g. 'points',
+            'points_rebounds'). Used to apply combo-stat confidence penalty.
 
     Returns:
         dict: {
             'confidence_score': float (0-100),
-            'tier': str ('Platinum', 'Gold', 'Silver', 'Bronze'),
-            'tier_emoji': str ('💎', '🥇', '🥈', '🥉'),
+            'tier': str ('Platinum', 'Gold', 'Silver', 'Bronze', 'Avoid'),
+            'tier_emoji': str ('💎', '🥇', '🥈', '🥉', '⛔'),
             'score_breakdown': dict with individual factor scores,
             'direction': str ('OVER' or 'UNDER'),
             'recommendation': str (e.g., "Strong OVER play"),
@@ -216,6 +232,11 @@ def calculate_confidence_score(
     combined_score -= calibration_adjustment  # positive = historically overconfident
     combined_score -= injury_status_penalty
 
+    # Apply combo-stat confidence penalty — combo/fantasy stats have more variance
+    _stat_type_lower = str(stat_type).lower() if stat_type else ""
+    if _stat_type_lower in COMBO_STAT_TYPES:
+        combined_score *= COMBO_STAT_CONFIDENCE_MULTIPLIER
+
     # Round to nearest whole number, clamped to 0-100
     final_score = round(max(0.0, min(100.0, combined_score)), 1)
 
@@ -284,6 +305,14 @@ def calculate_confidence_score(
         tier_name = "Bronze"
         tier_emoji = "🥉"
         recommendation = f"Weak {bet_direction} signal — consider avoiding"
+
+    # Do Not Bet: scores below DO_NOT_BET_SCORE_THRESHOLD are explicitly flagged as Avoid
+    if final_score < DO_NOT_BET_SCORE_THRESHOLD:
+        tier_name = "Avoid"
+        tier_emoji = "⛔"
+        recommendation = f"Do not bet — very low confidence ({final_score:.0f}/100)"
+        should_avoid = True
+        avoid_reasons.append(f"Score {final_score:.0f} below Do-Not-Bet threshold ({DO_NOT_BET_SCORE_THRESHOLD})")
 
     # ── C2: Kill switch — downgrade Platinum/Gold below probability floor ─
     # If the tier is Platinum but probability is below 60%, force to Gold.

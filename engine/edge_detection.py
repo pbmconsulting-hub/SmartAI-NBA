@@ -17,8 +17,23 @@ import math  # For rounding calculations
 
 # Coefficient of variation (std / mean) above which a stat is
 # considered "too unpredictable" to bet reliably.
-# CV of 0.55 means the std is 55% of the average — very noisy.
-HIGH_VARIANCE_CV_THRESHOLD = 0.55
+# CV of 0.45 means the std is 45% of the average — very noisy.
+HIGH_VARIANCE_CV_THRESHOLD = 0.45
+
+# Sportsbook vig/juice is typically ~4.5%. We subtract 2.5% from raw edge
+# to account for this before declaring a qualifying edge.
+VIG_ADJUSTMENT_PCT = 2.5
+
+# Minimum edge required AFTER vig deduction for a pick to qualify
+MIN_EDGE_AFTER_VIG = 3.0
+
+# Low-volume stat types with inherently higher variance.
+# These require a larger raw edge to overcome uncertainty.
+LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
+
+# Uncertainty multiplier applied to low-volume stats' edge calculations.
+# 1.5x means a steal prop needs effectively 1.5x more edge to qualify.
+LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.5
 
 
 # ============================================================
@@ -299,6 +314,7 @@ def should_avoid_prop(
     edge_percentage,
     stat_standard_deviation,
     stat_average,
+    stat_type=None,
 ):
     """
     Determine whether a prop pick should be avoided.
@@ -325,10 +341,19 @@ def should_avoid_prop(
     """
     avoid_reasons = []  # Collect all reasons to avoid
 
-    # Reason 1: Edge too small (under 5%)
-    if abs(edge_percentage) < 5.0:
+    # Reason 1: Edge too small after vig adjustment
+    # Sportsbooks build in ~4.5% vig; subtract 2.5% from raw edge before evaluating.
+    stat_type_lower = str(stat_type).lower() if stat_type else ""
+    vig_adjusted_edge = abs(edge_percentage) - VIG_ADJUSTMENT_PCT
+    # Low-volume stats require a larger effective edge due to higher variance.
+    if stat_type_lower in LOW_VOLUME_STATS:
+        effective_edge = vig_adjusted_edge / LOW_VOLUME_UNCERTAINTY_MULTIPLIER
+    else:
+        effective_edge = vig_adjusted_edge
+    if effective_edge < MIN_EDGE_AFTER_VIG:
         avoid_reasons.append(
-            f"Insufficient edge ({edge_percentage:.1f}%) — coin flip territory"
+            f"Insufficient edge after vig ({edge_percentage:.1f}% raw, "
+            f"{vig_adjusted_edge:.1f}% after vig) — below {MIN_EDGE_AFTER_VIG}% minimum"
         )
 
     # Reason 2: High variance relative to line (too unpredictable)
