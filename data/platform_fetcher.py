@@ -925,6 +925,201 @@ def find_new_players_from_props(props, players_data):
 
     return not_found
 
+
+def extract_active_players_from_props(props):
+    """
+    Extract the set of active players implied by tonight's platform props.
+
+    Since betting platforms (PrizePicks, Underdog, DraftKings) only list
+    props for players who are CONFIRMED active and playing tonight, every
+    player who appears in the props list is de-facto confirmed:
+      1. Active (not injured/out)
+      2. Playing tonight
+      3. On an NBA roster
+
+    Args:
+        props (list[dict]): Props from fetch_all_platform_props().
+
+    Returns:
+        dict: Keyed by lower-cased player name.
+              Value: {"name": str, "team": str, "platforms": list[str]}
+
+    Example:
+        active = extract_active_players_from_props(props)
+        # → {
+        #     "lebron james": {"name": "LeBron James", "team": "LAL",
+        #                      "platforms": ["PrizePicks", "Underdog"]},
+        #     ...
+        # }
+    """
+    active = {}
+
+    for prop in props:
+        player_name = prop.get("player_name", "").strip()
+        if not player_name:
+            continue
+
+        team = prop.get("team", "").strip()
+        platform = prop.get("platform", "").strip()
+        key = player_name.lower()
+
+        if key not in active:
+            active[key] = {
+                "name": player_name,
+                "team": team,
+                "platforms": [],
+            }
+        else:
+            # Update team if we got a better value
+            if team and not active[key]["team"]:
+                active[key]["team"] = team
+
+        if platform and platform not in active[key]["platforms"]:
+            active[key]["platforms"].append(platform)
+
+    return active
+
+
+def cross_reference_with_player_data(platform_players, players_data):
+    """
+    Compare platform-confirmed active players against our CSV player database.
+
+    Identifies:
+      - Players the platforms have props for that we have stats for (matched)
+      - Players on platforms but NOT in our CSV (missing_from_csv) — need data update
+      - Players in our CSV but NOT on any platform tonight (in_csv_but_not_on_platforms)
+        — these players may be injured, resting, or not playing tonight
+
+    Args:
+        platform_players (dict): Output of extract_active_players_from_props().
+        players_data (list[dict]): Player records from load_players_data().
+
+    Returns:
+        dict with keys:
+          "matched"                   : list[dict] — players found in both
+          "missing_from_csv"          : list[str]  — platform names not in CSV
+          "in_csv_but_not_on_platforms": list[dict] — CSV players absent from platforms
+
+    Example:
+        result = cross_reference_with_player_data(active_players, players_data)
+        result["missing_from_csv"]  # → ["Marcus Morris Sr."]
+        result["matched"]           # → [{"name": "LeBron James", "team": "LAL", ...}]
+    """
+    try:
+        from data.data_manager import normalize_player_name as _norm
+    except ImportError:
+        def _norm(n):
+            return n.lower().strip()
+
+    # Build a normalized-name set from our CSV for fast lookup
+    csv_norm_map = {}
+    for player in players_data:
+        name = player.get("name", "").strip()
+        if name:
+            csv_norm_map[_norm(name)] = player
+
+    matched = []
+    missing_from_csv = []
+
+    for key, info in platform_players.items():
+        norm_key = _norm(info["name"])
+        if norm_key in csv_norm_map:
+            matched.append({
+                "name": info["name"],
+                "team": info["team"],
+                "platforms": info["platforms"],
+                "csv_name": csv_norm_map[norm_key].get("name", info["name"]),
+            })
+        else:
+            missing_from_csv.append(info["name"])
+
+    # Players in CSV but NOT confirmed on any platform tonight
+    platform_norm_keys = {_norm(info["name"]) for info in platform_players.values()}
+    in_csv_but_not_on_platforms = [
+        player for player in players_data
+        if _norm(player.get("name", "")) not in platform_norm_keys
+    ]
+
+    return {
+        "matched": matched,
+        "missing_from_csv": missing_from_csv,
+        "in_csv_but_not_on_platforms": in_csv_but_not_on_platforms,
+    }
+
+
+def get_platform_confirmed_injuries(platform_players, players_data, todays_games):
+    """
+    Infer potential injuries from platform props — players on tonight's teams
+    who do NOT appear in any platform's props may be out/inactive.
+
+    Since platforms only list players who are active, a player who:
+      - Is in our CSV database
+      - Plays for a team with a game tonight
+      - Does NOT appear in any platform props
+
+    ...is likely injured, resting, or sitting out (even if not yet on the
+    official injury report).
+
+    Args:
+        platform_players (dict): Output of extract_active_players_from_props().
+        players_data (list[dict]): Player records from load_players_data().
+        todays_games (list): Tonight's game list (each item has "home_team"
+                             and "away_team" or similar fields).
+
+    Returns:
+        list[dict]: Each item: {"name": str, "team": str,
+                                "reason": "Not listed on any platform props"}
+
+    Example:
+        possibly_out = get_platform_confirmed_injuries(active, players, games)
+        # → [{"name": "Damian Lillard", "team": "MIL",
+        #      "reason": "Not listed on any platform props"}, ...]
+    """
+    try:
+        from data.data_manager import normalize_player_name as _norm
+    except ImportError:
+        def _norm(n):
+            return n.lower().strip()
+
+    # Collect team abbreviations playing tonight
+    tonight_teams = set()
+    for game in todays_games:
+        home = game.get("home_team", game.get("homeTeam", ""))
+        away = game.get("away_team", game.get("awayTeam", ""))
+        if home:
+            tonight_teams.add(str(home).upper())
+        if away:
+            tonight_teams.add(str(away).upper())
+
+    if not tonight_teams:
+        return []
+
+    # Build normalized-name set from platform props (computed once)
+    platform_norm_keys = {_norm(info["name"]) for info in platform_players.values()}
+
+    # Pre-compute (name, team, norm_name) for players_data to avoid repeated normalization
+    possibly_out = []
+    for player in players_data:
+        player_name = player.get("name", "").strip()
+        player_team = str(player.get("team", "")).upper().strip()
+
+        if not player_name or not player_team:
+            continue
+
+        # Only check players on teams playing tonight
+        if player_team not in tonight_teams:
+            continue
+
+        # Flag if not seen on any platform
+        if _norm(player_name) not in platform_norm_keys:
+            possibly_out.append({
+                "name": player_name,
+                "team": player_team,
+                "reason": "Not listed on any platform props",
+            })
+
+    return possibly_out
+
 # ============================================================
 # END SECTION: Roster Inference from Props
 # ============================================================

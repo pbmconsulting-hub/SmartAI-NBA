@@ -428,10 +428,27 @@ def auto_resolve_bet_results(date_str=None):
     except ImportError:
         return 0, ["nba_api not available — cannot auto-resolve bets"]
 
-    # Build player name → nba_api player_id map (case-insensitive)
+    # Import combo/fantasy stat definitions and name normalizer
+    try:
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+    except ImportError:
+        COMBO_STATS = {}
+        FANTASY_SCORING = {}
+    try:
+        from data.data_manager import normalize_player_name as _normalize_name
+    except ImportError:
+        def _normalize_name(n):
+            return n.lower().strip()
+
+    # Build player name → nba_api player_id map (normalized for fuzzy matching)
     _all_nba_players = nba_players_static.get_players()
     _name_to_id = {
         p["full_name"].lower(): p["id"]
+        for p in _all_nba_players
+    }
+    # Also build a normalized-name → id map (handles unicode, suffixes)
+    _norm_to_id = {
+        _normalize_name(p["full_name"]): p["id"]
         for p in _all_nba_players
     }
 
@@ -452,6 +469,40 @@ def auto_resolve_bet_results(date_str=None):
     season_year = current_year if current_month >= 10 else current_year - 1
     season_str = f"{season_year}-{str(season_year + 1)[-2:]}"
 
+    # Target date as a date object (for robust date comparison)
+    target_date = _dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+
+    # Pre-build month abbreviation map once for efficient date parsing
+    import calendar as _cal
+    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
+
+    def _parse_game_date(date_val):
+        """Parse a GAME_DATE value from nba_api into a date object.
+
+        nba_api may return dates in several formats:
+          - "MAR 05, 2026" or "Mar 05, 2026"  (month-abbrev, zero-padded)
+          - "MAR 5, 2026"  or "Mar 5, 2026"   (month-abbrev, non-padded)
+          - "2026-03-05"                        (ISO format)
+        Returns None if parsing fails.
+        """
+        s = str(date_val).strip()
+        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
+            try:
+                return _dt.datetime.strptime(s, fmt).date()
+            except ValueError:
+                pass
+        # Handle uppercase month abbreviation with non-zero-padded day
+        # e.g. "MAR 5, 2026" — strptime %b is case-sensitive on some platforms
+        try:
+            parts = s.replace(",", "").split()
+            if len(parts) == 3:
+                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
+                if month_num:
+                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
+        except Exception:
+            pass
+        return None
+
     for bet in pending_bets:
         bet_id      = bet.get("bet_id")
         player_name = bet.get("player_name", "")
@@ -459,21 +510,30 @@ def auto_resolve_bet_results(date_str=None):
         prop_line   = float(bet.get("prop_line", 0) or 0)
         direction   = (bet.get("direction") or "OVER").upper()
 
-        stat_col = _STAT_COL.get(stat_type)
-        if not stat_col:
+        # Determine how to compute actual_value for this stat_type
+        is_combo   = stat_type in COMBO_STATS
+        is_fantasy = stat_type in FANTASY_SCORING
+        stat_col   = _STAT_COL.get(stat_type)
+
+        if not stat_col and not is_combo and not is_fantasy:
             errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
             continue
 
+        # --- Player lookup: exact → normalized → partial ---
         player_id = _name_to_id.get(player_name.lower())
         if not player_id:
-            # Try partial match (first + last name)
-            parts = player_name.lower().split()
+            # Try normalized match (handles unicode, Jr./III suffixes)
+            player_id = _norm_to_id.get(_normalize_name(player_name))
+        if not player_id:
+            # Try partial match on normalized names (first + last name)
+            norm_search = _normalize_name(player_name)
+            parts = norm_search.split()
             if len(parts) >= 2:
                 player_id = next(
                     (
                         pid
-                        for pname, pid in _name_to_id.items()
-                        if parts[0] in pname and parts[-1] in pname
+                        for norm_name, pid in _norm_to_id.items()
+                        if parts[0] in norm_name and parts[-1] in norm_name
                     ),
                     None,
                 )
@@ -493,32 +553,40 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
-            # Find the game on target date (GAME_DATE format: "MMM DD, YYYY" or "MMM D, YYYY")
-            df["GAME_DATE"] = df["GAME_DATE"].astype(str)
-            target_dt = _dt.datetime.strptime(date_str, "%Y-%m-%d")
-            # Zero-padded format (e.g. "Mar 08, 2025")
-            target_fmt = target_dt.strftime("%b %d, %Y")
-            # Non-zero-padded format (e.g. "Mar 8, 2025") — cross-platform approach
-            target_fmt_alt = target_fmt.replace(
-                f" 0{target_dt.day},", f" {target_dt.day},"
-            ) if target_dt.day < 10 else target_fmt
-
-            matching = df[
-                df["GAME_DATE"].str.strip() == target_fmt
-            ]
+            # Find the game on target date — parse each GAME_DATE to a date object
+            # so we're not sensitive to format differences (MAR vs Mar, padded vs not)
+            df["_parsed_date"] = df["GAME_DATE"].apply(_parse_game_date)
+            matching = df[df["_parsed_date"] == target_date]
             if matching.empty:
-                # Try alternative format
-                matching = df[
-                    df["GAME_DATE"].str.strip() == target_fmt_alt
-                ]
-            if matching.empty:
+                last_game = df["GAME_DATE"].iloc[0] if not df.empty else "N/A"
                 errors_list.append(
                     f"#{bet_id} {player_name}: no game found on {date_str} "
-                    f"(last game: {df['GAME_DATE'].iloc[0]})"
+                    f"(last game: {last_game})"
                 )
                 continue
 
-            actual_value = float(matching.iloc[0].get(stat_col, 0) or 0)
+            row = matching.iloc[0]
+
+            # Compute actual_value based on stat type
+            if is_combo:
+                # Sum the component columns (e.g. points_rebounds = PTS + REB)
+                components = COMBO_STATS[stat_type]
+                actual_value = sum(
+                    float(row.get(_STAT_COL[comp], 0) or 0)
+                    for comp in components
+                    if comp in _STAT_COL
+                )
+            elif is_fantasy:
+                # Weighted sum of individual stats using platform formula
+                formula = FANTASY_SCORING[stat_type]
+                actual_value = sum(
+                    weight * float(row.get(_STAT_COL[comp], 0) or 0)
+                    for comp, weight in formula.items()
+                    if comp in _STAT_COL
+                )
+                actual_value = round(actual_value, 2)
+            else:
+                actual_value = float(row.get(stat_col, 0) or 0)
 
             # Determine WIN / LOSS / PUSH
             if actual_value == prop_line:
