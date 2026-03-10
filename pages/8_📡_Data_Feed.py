@@ -1112,6 +1112,103 @@ if _PLATFORM_FETCHER_AVAILABLE:
 
 
 # ============================================================
+# SECTION: Platform Roster Insights
+# Cross-reference platform-confirmed active players against
+# our player database to find gaps and potential injuries.
+# ============================================================
+
+if _PLATFORM_FETCHER_AVAILABLE:
+    _roster_props = load_platform_props_from_session(st.session_state)
+    if _roster_props:
+        st.divider()
+        st.subheader("🏥 Platform Roster Insights")
+        st.markdown(
+            "Cross-reference tonight's platform props against your player database "
+            "to spot **missing players** and **potential injuries**."
+        )
+
+        try:
+            from data.platform_fetcher import (
+                extract_active_players_from_props,
+                cross_reference_with_player_data,
+                get_platform_confirmed_injuries,
+            )
+
+            _ri_players_data = load_players_data()
+            _ri_active = extract_active_players_from_props(_roster_props)
+            _ri_xref = cross_reference_with_player_data(_ri_active, _ri_players_data)
+
+            # ── Summary metrics ──────────────────────────────────────
+            _ri_col1, _ri_col2, _ri_col3 = st.columns(3)
+            with _ri_col1:
+                st.metric(
+                    "✅ Platform-Confirmed Active",
+                    len(_ri_active),
+                    help="Unique players listed on at least one platform tonight.",
+                )
+            with _ri_col2:
+                st.metric(
+                    "⚠️ Missing from Your Database",
+                    len(_ri_xref["missing_from_csv"]),
+                    help="Players on platforms but not in your local players.csv. Run a Smart Update to add them.",
+                )
+            with _ri_col3:
+                st.metric(
+                    "🔴 Potentially Out Tonight",
+                    len(_ri_xref["in_csv_but_not_on_platforms"]),
+                    help="Players in your database on tonight's teams who are NOT listed on any platform (may be injured/sitting).",
+                )
+
+            # ── Missing players warning ──────────────────────────────
+            if _ri_xref["missing_from_csv"]:
+                with st.expander(
+                    f"⚠️ {len(_ri_xref['missing_from_csv'])} players on platforms but NOT in your database",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        "These players have active props on betting platforms but their stats "
+                        "are **not in your local database**. Run a **Smart Update** above to "
+                        "fetch their season stats before analyzing their props."
+                    )
+                    for _mp in _ri_xref["missing_from_csv"][:25]:
+                        st.markdown(f"- {_mp}")
+                    if len(_ri_xref["missing_from_csv"]) > 25:
+                        st.caption(f"... and {len(_ri_xref['missing_from_csv']) - 25} more")
+
+            # ── Platform-inferred injury report ──────────────────────
+            _todays_games = st.session_state.get("todays_games", [])
+            _ri_injuries = get_platform_confirmed_injuries(
+                _ri_active, _ri_players_data, _todays_games
+            )
+            if _ri_injuries:
+                with st.expander(
+                    f"🔴 {len(_ri_injuries)} players potentially out (not on any platform)",
+                    expanded=False,
+                ):
+                    st.markdown(
+                        "These players are in your database and on a team playing tonight, "
+                        "but **no platform has props for them**. They may be injured, resting, "
+                        "or sitting out — even if not yet on the official injury report."
+                    )
+                    _inj_rows = [
+                        {"Player": p["name"], "Team": p["team"], "Status": p["reason"]}
+                        for p in _ri_injuries[:30]
+                    ]
+                    st.dataframe(_inj_rows, use_container_width=True, hide_index=True)
+                    if len(_ri_injuries) > 30:
+                        st.caption(f"... and {len(_ri_injuries) - 30} more")
+            elif _todays_games:
+                st.success("✅ All players in your database playing tonight appear on at least one platform.")
+
+        except Exception as _ri_err:
+            st.warning(f"⚠️ Could not load roster insights: {_ri_err}")
+
+# ============================================================
+# END SECTION: Platform Roster Insights
+# ============================================================
+
+
+# ============================================================
 # SECTION: Help and Tips
 # ============================================================
 

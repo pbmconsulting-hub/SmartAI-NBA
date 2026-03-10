@@ -106,6 +106,8 @@ try:
         build_cross_platform_comparison,
         recommend_best_platform,
         summarize_props_by_platform,
+        find_new_players_from_props,
+        extract_active_players_from_props,
     )
     from data.data_manager import (
         save_platform_props_to_session,
@@ -198,6 +200,15 @@ if _PLATFORM_FETCHER_AVAILABLE:
                 f"✅ Loaded **{len(_live_props)} live props**: "
                 + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
             )
+            # Warn if any props reference players not in our database
+            _missing = find_new_players_from_props(_live_props, players_data)
+            if _missing:
+                st.warning(
+                    f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
+                    f"local database: {', '.join(_missing[:5])}"
+                    + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
+                    + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+                )
             st.rerun()  # Refresh so the current_props table shows the new data
         else:
             st.warning(
