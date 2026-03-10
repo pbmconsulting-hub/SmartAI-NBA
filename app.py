@@ -349,7 +349,7 @@ with left_column:
     **Step 3** → 🧬 **Entry Builder** — Build optimal parlays with exact EV
     calculations for PrizePicks, Underdog, and DraftKings.
 
-    **Step 4** → 📊 **Model Health** — After games, log results to track
+    **Step 4** → 📈 **Bet Tracker & Model Health** — After games, log results to track
     how accurate the model is over time.
     """)
 
