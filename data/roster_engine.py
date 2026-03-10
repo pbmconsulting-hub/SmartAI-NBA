@@ -5,9 +5,8 @@
 #          both roster and injury data.
 #
 # DATA SOURCES (in priority order):
-#   1. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
-#   2. nba_api CommonAllPlayers   — active player validation (IsOnlyCurrentSeason=1)
-#   3. nba_api live Injuries      — daily injury designations
+#   1. nba_api live Injuries      — daily injury designations (Out/GTD/Doubtful)
+#   2. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
