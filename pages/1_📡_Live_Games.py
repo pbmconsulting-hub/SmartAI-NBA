@@ -325,6 +325,28 @@ if platform_props_clicked:
     pp_status = st.empty()
 
     try:
+        # ── Step 0: Auto-load games if not already loaded ──────────────
+        _todays_games = st.session_state.get("todays_games", [])
+        if not _todays_games:
+            pp_status.text("⏳ 0/5 — No games loaded. Auto-fetching tonight's schedule…")
+            pp_bar.progress(2)
+            from data.live_data_fetcher import fetch_todays_games as _auto_fetch_games
+            _todays_games = _auto_fetch_games()
+            if _todays_games:
+                st.session_state["todays_games"] = _todays_games
+                st.info(f"🏟️ Auto-loaded **{len(_todays_games)} game(s)** for tonight.")
+            else:
+                st.warning("⚠️ No games found for tonight. Platform prop analysis may be limited.")
+
+        # ── Step 0b: Auto-load player data if CSV is empty ─────────────
+        from data.data_manager import load_players_data as _lp_check
+        _check_players = _lp_check()
+        if not _check_players and _todays_games:
+            pp_status.text("⏳ 0/5 — No player data. Fetching rosters for tonight's teams…")
+            pp_bar.progress(5)
+            from data.live_data_fetcher import fetch_todays_players_only as _auto_fetch_players
+            _auto_fetch_players(_todays_games)
+
         # ── Step 1: Fetch props from selected platforms ────────────────
         pp_status.text("⏳ 1/5 — Fetching props from selected platforms…")
         pp_bar.progress(10)
@@ -354,7 +376,6 @@ if platform_props_clicked:
         _stat_sel = st.session_state.get("smart_filter_stat_types") or None
 
         if _smart_enabled:
-            _todays_games = st.session_state.get("todays_games", [])
             _injury_map = st.session_state.get("injury_status_map", {})
             props_to_analyze, _filter_summary = smart_filter_props(
                 all_props=all_platform_props,
@@ -403,7 +424,7 @@ if platform_props_clicked:
         _teams_data = _load_teams()
 
         analyzed_props: list = []
-        games_context = st.session_state.get("todays_games", [])
+        games_context = _todays_games  # Use auto-fetched games from Step 0
         injury_map = st.session_state.get("injury_status_map", {})
 
         _PLATFORM_STAT_MAP = {
@@ -426,7 +447,28 @@ if platform_props_clicked:
 
                 player_data = player_lookup.get(player_name.lower())
                 if not player_data:
-                    continue
+                    # Platform props are the source of truth for active players.
+                    # Build a minimal stub from the prop line so we can still analyze
+                    # players that are active/playing but missing from the CSV
+                    # (e.g., due to injury-filtered CSV from a previous auto-load).
+                    player_team = str(prop.get("team") or prop.get("player_team") or "")
+                    _stub: dict = {
+                        "name": player_name,
+                        "team": player_team,
+                        "position": "G",
+                        "minutes_avg": 28.0,
+                        "games_played": 10,
+                        "points_avg": prop_line if stat_type == "points" else 15.0,
+                        "rebounds_avg": prop_line if stat_type == "rebounds" else 4.5,
+                        "assists_avg": prop_line if stat_type == "assists" else 3.5,
+                        "threes_avg": prop_line if stat_type == "threes" else 1.5,
+                        "steals_avg": prop_line if stat_type == "steals" else 0.8,
+                        "blocks_avg": prop_line if stat_type == "blocks" else 0.5,
+                        "turnovers_avg": prop_line if stat_type == "turnovers" else 1.5,
+                        "usage_rate": 0.20,
+                        "ft_pct": 0.75,
+                    }
+                    player_data = _stub
 
                 # Build game context — find this player's game in tonight's slate
                 player_team = player_data.get("team", "")
