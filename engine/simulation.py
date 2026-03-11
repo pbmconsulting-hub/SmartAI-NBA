@@ -23,6 +23,9 @@ from engine.math_helpers import (
     calculate_standard_deviation,      # Spread of results
     calculate_percentile,              # Find value at percentile
     clamp_probability,                 # Keep probability in 0-1
+    sample_poisson_like,               # Feature 8: Poisson-like for steals/blocks/turnovers
+    sample_zero_inflated,              # Feature 8: Zero-inflated for threes
+    estimate_zero_probability,         # Feature 8: Estimate zero prob from logs
 )
 
 
@@ -353,7 +356,9 @@ def run_monte_carlo_simulation(
         # Priority order:
         #   1. KDE from game logs (C11) — when player has 15+ recent games
         #      KDE is scaled by scenario/minutes multipliers for context-awareness
-        #   2. Skew-normal (C5) — parametric with stat-type-specific right skew
+        #   2. Stat-specific distribution (Feature 8) — Poisson-like for low-count
+        #      discrete stats; zero-inflated for three-pointers
+        #   3. Skew-normal (C5) — parametric with stat-type-specific right skew
         if use_kde and kde_logs_scaled:
             # C11: Scale KDE logs by scenario/momentum multipliers, then sample
             scenario_scale = minutes_multiplier * stat_scenario_multiplier * momentum_multiplier
@@ -364,6 +369,16 @@ def run_monte_carlo_simulation(
             else:
                 # Fallback: skew-normal if KDE fails for this trial
                 simulated_game_stat = sample_skew_normal(effective_mean, scaled_std, skew_alpha)
+        elif stat_type in ('threes', 'fg3m'):
+            # Feature 8: Zero-inflated distribution captures the "0-three games"
+            # mass that neither KDE nor skew-normal handles cleanly.
+            zero_prob = estimate_zero_probability(recent_game_logs or [], stat_type)
+            simulated_game_stat = sample_zero_inflated(
+                effective_mean, scaled_std, zero_prob, recent_game_logs or []
+            )
+        elif stat_type in ('steals', 'blocks', 'turnovers'):
+            # Feature 8: Poisson-like discrete sampler for low-count integer stats
+            simulated_game_stat = sample_poisson_like(effective_mean, recent_game_logs or [])
         else:
             # C5: Skew-normal captures the right tail of NBA stat distributions
             # (explosion games, triple-doubles, etc.) better than pure normal.
