@@ -21,7 +21,22 @@ from engine.entry_optimizer import (
     UNDERDOG_FLEX_PAYOUT_TABLE,
     DRAFTKINGS_PICK6_PAYOUT_TABLE,
     PLATFORM_FLEX_TABLES,
+    optimize_play_type,
+    build_optimal_entries_with_play_type,
+    calculate_flex_vs_power_breakeven,
 )
+
+try:
+    from engine.bankroll import calculate_kelly_fraction, get_bankroll_allocation, get_session_risk_summary  # F5
+except ImportError:
+    calculate_kelly_fraction = None
+    get_bankroll_allocation = None
+    get_session_risk_summary = None
+
+try:
+    from engine.platform_line_compare import compare_platform_lines  # F3
+except ImportError:
+    compare_platform_lines = None
 
 # ============================================================
 # SECTION: Page Setup
@@ -205,6 +220,26 @@ with settings_col5:
         value=5,
         step=1,
         help="How many top entries to display?",
+    )
+
+# ── Kelly Bankroll Inputs ─────────────────────────────────────────
+_kelly_col1, _kelly_col2 = st.columns(2)
+with _kelly_col1:
+    bankroll_amount = st.number_input(
+        "💰 Your Bankroll ($)",
+        min_value=10.0,
+        max_value=100000.0,
+        value=float(st.session_state.get("bankroll_amount", 500.0)),
+        step=50.0,
+        help="Total bankroll for Kelly Criterion sizing",
+    )
+    st.session_state["bankroll_amount"] = bankroll_amount
+with _kelly_col2:
+    kelly_mode = st.selectbox(
+        "Kelly Sizing Mode",
+        options=["quarter", "half", "eighth", "full"],
+        index=0,
+        help="Quarter Kelly = conservative (recommended). Full Kelly = maximum growth, high risk.",
     )
 
 # ── Session Budget Summary ────────────────────────────────────────
@@ -530,7 +565,66 @@ if build_button:
                     f"on ${entry_fee:.2f} entry = **Net EV: {ev_label}**"
                 )
 
+            # Feature 5: Kelly bankroll sizing
+            try:
+                if calculate_kelly_fraction is not None and bankroll_amount > 0:
+                    _win_prob = entry.get("combined_probability", 0.5)
+                    _payout_mult = entry.get("ev_result", {}).get("best_payout_multiplier", 3.0)
+                    if _payout_mult > 0:
+                        _kelly = calculate_kelly_fraction(_win_prob, _payout_mult, kelly_mode)
+                        _recommended_bet = round(_kelly * bankroll_amount, 2)
+                        if _recommended_bet > 0:
+                            st.caption(f"💰 Kelly sizing: **${_recommended_bet:.2f}** ({_kelly*100:.1f}% of bankroll) — {kelly_mode} Kelly")
+            except Exception:
+                pass
+
+            # Feature 10: Flex vs Power recommendation
+            try:
+                if selected_platform == "PrizePicks":
+                    _entry_probs = [
+                        p.get("probability_over", 0.5) if p.get("direction") == "OVER"
+                        else 1.0 - p.get("probability_over", 0.5)
+                        for p in entry.get("picks", [])
+                    ]
+                    if len(_entry_probs) >= 2:
+                        _play_type = optimize_play_type(_entry_probs, len(_entry_probs), "PrizePicks")
+                        _pt_color = "green" if _play_type["recommended_play_type"] == "Power" else "blue"
+                        st.markdown(
+                            f"**Play Type:** :{_pt_color}[{_play_type['recommended_play_type']} recommended]** — "
+                            f"Flex EV: ${_play_type['flex_ev']:.2f} | Power EV: ${_play_type['power_ev']:.2f}<br>"
+                            f"_{_play_type['reasoning']}_",
+                            unsafe_allow_html=True,
+                        )
+            except Exception:
+                pass
+
             st.markdown("---")
+
+    # Feature 5: Session risk summary
+    try:
+        if calculate_kelly_fraction is not None and get_session_risk_summary is not None and optimal_entries and bankroll_amount > 0:
+            st.divider()
+            st.subheader("💰 Kelly Bankroll Summary")
+            _kelly_entries = []
+            for _e in optimal_entries:
+                _wp = _e.get("combined_probability", 0.5)
+                _pm = _e.get("ev_result", {}).get("best_payout_multiplier", 3.0)
+                _kf = calculate_kelly_fraction(_wp, _pm, kelly_mode)
+                _rb = round(_kf * bankroll_amount, 2)
+                _kelly_entries.append({
+                    "win_probability": _wp,
+                    "payout_multiplier": _pm,
+                    "recommended_bet": _rb,
+                    "kelly_fraction": _kf,
+                    "expected_profit": _rb * (_wp * _pm - 1.0),
+                })
+            _risk_summary = get_session_risk_summary(_kelly_entries, bankroll_amount)
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total at Risk", f"${_risk_summary['total_at_risk']:.2f}", f"{_risk_summary['total_at_risk_pct']*100:.1f}% of bankroll")
+            c2.metric("Expected Profit", f"${_risk_summary['expected_profit']:.2f}")
+            c3.metric("P(Positive Session)", f"{_risk_summary['prob_positive_session']*100:.1f}%")
+    except Exception:
+        pass
 
     else:
         st.warning(

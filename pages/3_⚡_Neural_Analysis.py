@@ -28,7 +28,18 @@ from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
 from engine.calibration import get_calibration_adjustment   # C10: historical calibration
-from engine.clv_tracker import store_opening_line            # C12: closing line value tracking
+from engine.clv_tracker import store_opening_line, get_stat_type_clv_penalties  # C12: CLV + penalties
+
+try:
+    from engine.market_movement import detect_line_movement  # F9: Sharp money
+except ImportError:
+    detect_line_movement = None
+
+try:
+    from engine.matchup_history import calculate_matchup_adjustment, get_matchup_force_signal  # F2
+except ImportError:
+    calculate_matchup_adjustment = None
+    get_matchup_force_signal = None
 
 # Import data loading functions
 from data.data_manager import (
@@ -1264,6 +1275,19 @@ if run_analysis:
         except Exception:
             pass  # CLV recording is non-critical; never block analysis
 
+        # F9: Store initial line snapshot for market movement tracking
+        try:
+            _snap_key = f"{player_name}_{stat_type}"
+            if "line_snapshots" not in st.session_state:
+                st.session_state["line_snapshots"] = {}
+            if _snap_key not in st.session_state["line_snapshots"]:
+                st.session_state["line_snapshots"][_snap_key] = {
+                    "initial_line": prop_line,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                }
+        except Exception:
+            pass
+
         should_avoid_flag, avoid_reasons = should_avoid_prop(
             probability_over=probability_over,
             directional_forces_result=forces_result,
@@ -1357,6 +1381,36 @@ if run_analysis:
             "player_status":    player_status,
             "player_status_note": player_status_info.get("injury_note", ""),
         }
+
+        # ── Feature 1: CLV stat-type penalties ───────────────────────
+        try:
+            _clv_penalties = get_stat_type_clv_penalties(days=90)
+            _clv_stat_penalty = _clv_penalties.get(stat_type, 0.0)
+            if _clv_stat_penalty > 0:
+                full_result["confidence_score"] = max(0.0, full_result["confidence_score"] - _clv_stat_penalty)
+                full_result["clv_stat_penalty"] = _clv_stat_penalty
+        except Exception:
+            pass
+
+        # ── Feature 9: Market movement adjustment ────────────────────
+        try:
+            if detect_line_movement is not None:
+                _opening_snap = st.session_state.get("line_snapshots", {}).get(
+                    f"{player_name}_{stat_type}", {}
+                )
+                if _opening_snap:
+                    _mv = detect_line_movement(
+                        player_name, stat_type,
+                        _opening_snap.get("initial_line", prop_line),
+                        prop_line,
+                        full_result.get("direction", "OVER"),
+                    )
+                    _mv_adj = _mv.get("confidence_adjustment", 0.0)
+                    if _mv_adj != 0.0:
+                        full_result["confidence_score"] = max(0.0, min(100.0, full_result["confidence_score"] + _mv_adj))
+                        full_result["market_movement"] = _mv
+        except Exception:
+            pass
 
         analysis_results_list.append(full_result)
 

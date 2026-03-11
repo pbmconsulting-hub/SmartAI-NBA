@@ -40,3 +40,16 @@ YESNO_STAT_TYPES = frozenset({
 # All supported stat types across the app.
 # This is the single source of truth — don't define this elsewhere.
 VALID_STAT_TYPES = SIMPLE_STAT_TYPES | COMBO_STAT_TYPES | FANTASY_STAT_TYPES | YESNO_STAT_TYPES
+
+# ============================================================
+# SECTION: New High-Impact Feature Modules (v8)
+# These modules are imported directly by pages; they are not
+# re-exported from __init__.py to keep the namespace clean.
+# Available modules:
+#   engine.matchup_history       — Feature 2: Player-vs-team history
+#   engine.platform_line_compare — Feature 3: Cross-platform line comparison
+#   engine.bankroll              — Feature 5: Kelly Criterion sizing
+#   engine.minutes_model         — Feature 6: Dedicated minutes projection
+#   engine.game_script           — Feature 7: Quarter-by-quarter simulation
+#   engine.market_movement       — Feature 9: Sharp money line movement
+# ============================================================
