@@ -27,6 +27,11 @@ import time
 import datetime
 from typing import Optional
 
+try:
+    import requests as _requests
+except ImportError:
+    _requests = None  # type: ignore[assignment]
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -261,21 +266,21 @@ class RosterEngine:
         Fetch fresh data from nba_api — the single authoritative source.
 
         Sources used (in order):
-            1. nba_api live Injuries endpoint — daily injury designations
+            1. NBA CDN static injury JSON     — daily injury designations
             2. nba_api CommonTeamRoster       — official roster + two-way status
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-        print("RosterEngine.refresh() — starting data pull (nba_api sources only)")
+        print("RosterEngine.refresh() — starting data pull")
         merged: dict = {}
 
-        # ── Source 1: nba_api live Injuries endpoint ──────────────
+        # ── Source 1: NBA CDN injury JSON ─────────────────────────
         src1 = self._fetch_nba_api_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 1 (nba_api live injuries): {len(src1)} players")
+        print(f"  Source 1 (NBA CDN injuries): {len(src1)} players")
 
         self._injury_map = merged
 
@@ -298,19 +303,23 @@ class RosterEngine:
 
     def _fetch_nba_api_injuries(self) -> dict:
         """
-        Fetch today's injury report via nba_api.live.nba.endpoints.injuries.
+        Fetch today's injury report from the NBA's public CDN JSON feed.
 
-        This accesses the official NBA live injury feed through the nba_api
-        package, which handles rate-limiting and proper NBA API headers.
+        Uses the NBA's static CDN endpoint which is freely accessible and
+        does not require any nba_api library endpoint that may not exist.
+        Falls back gracefully if the request fails.
         """
+        _CDN_URL = "https://cdn.nba.com/static/json/liveData/injuries/injuries_current.json"
         result: dict = {}
+        if _requests is None:
+            print("RosterEngine._fetch_nba_api_injuries: 'requests' library not available")
+            return result
         try:
-            from nba_api.live.nba.endpoints import injuries as live_injuries
-            inj_report = live_injuries.Injuries()
-            data = inj_report.get_dict()
+            resp = _requests.get(_CDN_URL, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            resp.raise_for_status()
+            data = resp.json()
 
-            # The live injuries endpoint returns:
-            # {"injuries": {"injuredPlayers": [...]}}  or similar shape
+            # Shape: {"injuries": {"injuredPlayers": [...]}}
             injured_list = (
                 data.get("injuries", {}).get("injuredPlayers", [])
                 or data.get("injuredPlayers", [])
@@ -329,8 +338,12 @@ class RosterEngine:
                     "injury":      str(injury or ""),
                     "team":        str(team or ""),
                     "return_date": "",
-                    "source":      "nba_api-live-injuries",
+                    "source":      "nba-cdn-injuries",
                 }
+        except _requests.exceptions.Timeout:
+            print(f"RosterEngine._fetch_nba_api_injuries: request timed out ({_CDN_URL})")
+        except _requests.exceptions.HTTPError as exc:
+            print(f"RosterEngine._fetch_nba_api_injuries: HTTP {exc.response.status_code} — {_CDN_URL}")
         except Exception as exc:
             print(f"RosterEngine._fetch_nba_api_injuries: {exc}")
         return result
