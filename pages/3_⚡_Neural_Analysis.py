@@ -1569,15 +1569,17 @@ if analysis_results:
                 st.info("All Gold+ picks already added.")
 
     if unmatched_count > 0:
-        unmatched_names = [
+        unmatched_names = sorted({
             r.get("player_name", "") for r in analysis_results
-            if not r.get("player_matched", True)
-        ]
-        st.warning(
-            f"⚠️ **{unmatched_count} player(s) not found** in database — "
-            + ", ".join(unmatched_names)
-            + " — results may be less accurate."
-        )
+            if not r.get("player_matched", True) and r.get("player_name", "")
+        })
+        display_names = unmatched_names[:10]
+        remainder = len(unmatched_names) - len(display_names)
+        summary = ", ".join(display_names)
+        if remainder > 0:
+            summary += f", and {remainder} more"
+        with st.expander(f"⚠️ {len(unmatched_names)} player(s) not found in database — results may be less accurate"):
+            st.write(", ".join(unmatched_names))
 
     st.divider()
 

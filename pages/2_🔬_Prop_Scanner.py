@@ -267,7 +267,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
                     _comp_rows.append(row)
 
                 if _comp_rows:
-                    st.dataframe(_comp_rows, use_container_width=True, hide_index=True)
+                    st.dataframe(_comp_rows, width="stretch", hide_index=True)
                     st.caption(
                         "💡 **Best OVER** = platform with the lowest line (easiest to beat). "
                         "**Best UNDER** = platform with the highest line (most room). "
@@ -440,7 +440,7 @@ if _display_props_enriched:
                 })
             st.dataframe(
                 _cmp_rows,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
                 column_config={
                     "Line": st.column_config.NumberColumn(format="%.1f"),
@@ -537,7 +537,7 @@ if _display_props_enriched:
 
     st.dataframe(
         display_rows,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "Line": st.column_config.NumberColumn(format="%.1f"),
@@ -876,7 +876,7 @@ if uploaded_file is not None:
             for p in enriched_preview[:10]
         ]
         st.markdown("**Preview:**")
-        st.dataframe(preview_rows, use_container_width=True, hide_index=True)
+        st.dataframe(preview_rows, width="stretch", hide_index=True)
 
         if len(parsed_props) > 10:
             st.caption(f"... and {len(parsed_props) - 10} more")
