@@ -308,7 +308,7 @@ def _build_entry_strategy(results):
         r for r in results
         if not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
-        and abs(r.get("edge_percentage", 0)) >= 5.0
+        and abs(r.get("edge_percentage", 0)) >= 3.0
         # Exclude fantasy-score composite stats from parlay legs
         and not str(r.get("stat_type", "")).startswith("fantasy_score")
     ]
@@ -1632,6 +1632,60 @@ if analysis_results:
             + ", ".join(unmatched_names)
             + " — results may be less accurate."
         )
+
+    st.divider()
+
+    # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
+    _single_bet_pool = [
+        r for r in displayed_results
+        if not r.get("should_avoid", False)
+        and not r.get("player_is_out", False)
+        and r.get("tier", "Bronze") in {"Platinum", "Gold", "Silver"}
+    ]
+    _single_bet_pool = sorted(
+        _single_bet_pool,
+        key=lambda r: (r.get("confidence_score", 0), abs(r.get("edge_percentage", 0))),
+        reverse=True,
+    )[:8]  # Show top 8
+
+    if _single_bet_pool:
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
+            'border:2px solid #00f0ff;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+            '<h3 style="color:#00f0ff;font-family:Orbitron,sans-serif;margin:0 0 6px;">🏆 Best Single Bets</h3>'
+            '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Top individual picks ranked by SAFE Score™ — Silver tier and above</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        _TIER_COLORS = {"Platinum": "#c800ff", "Gold": "#ff5e00", "Silver": "#b0c0d8"}
+        for _sb in _single_bet_pool:
+            _sb_tier = _sb.get("tier", "Bronze")
+            _sb_color = _TIER_COLORS.get(_sb_tier, "#b0c0d8")
+            _sb_name  = _html.escape(str(_sb.get("player_name", "")))
+            _sb_stat  = _html.escape(str(_sb.get("stat_type", "")).title())
+            _sb_dir   = _html.escape(str(_sb.get("direction", "OVER")))
+            _sb_line  = _sb.get("line", _sb.get("prop_line", ""))
+            _sb_conf  = _sb.get("confidence_score", 0)
+            _sb_edge  = _sb.get("edge_percentage", 0)
+            _sb_emoji = _sb.get("tier_emoji", "🥈")
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:8px;padding:12px 16px;'
+                f'margin-bottom:10px;border-left:4px solid {_sb_color};">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<div>'
+                f'<span style="color:{_sb_color};font-weight:700;font-size:1rem;">{_sb_emoji} {_sb_name}</span>'
+                f'<span style="color:#c0d0e8;font-size:0.9rem;margin-left:10px;">'
+                f'{_sb_dir} {_sb_line} {_sb_stat}</span>'
+                f'</div>'
+                f'<div style="text-align:right;">'
+                f'<span style="background:{_sb_color};color:#0a0f1a;padding:2px 8px;border-radius:4px;'
+                f'font-size:0.78rem;font-weight:700;">SAFE {_sb_conf:.0f}/100</span>'
+                f'<span style="color:#00f0ff;font-size:0.78rem;margin-left:8px;">Edge {_sb_edge:+.1f}%</span>'
+                f'</div>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 

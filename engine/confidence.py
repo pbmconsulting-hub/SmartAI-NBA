@@ -52,32 +52,32 @@ assert abs(_ALL_WEIGHTS - 1.0) < 1e-9, (
 # so thresholds are set to produce the correct tier distribution for real NBA prop scenarios.
 # Target distribution: Platinum ~top 3%, Gold ~top 12%, Silver ~top 30%, rest Bronze/Avoid.
 PLATINUM_TIER_MINIMUM_SCORE = 84  # Near-perfect conditions (raised from 80 pre-PR)
-GOLD_TIER_MINIMUM_SCORE = 69      # Very strong clear edge (raised from 65 pre-PR)
+GOLD_TIER_MINIMUM_SCORE = 65      # Very strong clear edge (lowered from 69 to increase Gold-tier picks)
 SILVER_TIER_MINIMUM_SCORE = 57    # Solid evidence above average (raised from 50 pre-PR)
 # Anything below 57 = Bronze (lower confidence)
 
 # Minimum edge gate (W2): picks below these thresholds get auto-demoted
-PLATINUM_MIN_EDGE_PCT = 12.0   # Platinum requires ≥12% edge (was 10%)
-GOLD_MIN_EDGE_PCT = 10.0       # Gold requires ≥10% edge (was 8%)
-SILVER_MIN_EDGE_PCT = 5.0      # Silver requires ≥5% edge (was 4%)
-LOW_EDGE_THRESHOLD = 5.0       # Below 5% → add "Low edge" to avoid reasons (was 4%)
+PLATINUM_MIN_EDGE_PCT = 10.0   # Platinum requires ≥10% edge (lowered from 12%)
+GOLD_MIN_EDGE_PCT = 7.0        # Gold requires ≥7% edge (lowered from 10%)
+SILVER_MIN_EDGE_PCT = 3.0      # Silver requires ≥3% edge (lowered from 5%)
+LOW_EDGE_THRESHOLD = 3.0       # Below 3% → add "Low edge" to avoid reasons (lowered from 5%)
 
 # Hard kill-switch probability thresholds (C2)
 PLATINUM_MIN_PROBABILITY = 0.62   # No Platinum below 62% win probability (was 0.60)
 GOLD_MIN_PROBABILITY = 0.57       # No Gold below 57% win probability (was 0.55)
 
 # Auto-AVOID: coefficient of variation above this → automatically avoid
-AUTO_AVOID_CV_THRESHOLD = 0.40    # CV > 0.40 → auto-AVOID (was 0.45 — tightened for accuracy)
+AUTO_AVOID_CV_THRESHOLD = 0.45    # CV > 0.45 → auto-AVOID (loosened from 0.40 to reduce over-filtering)
 
 # Score below this threshold → "Do Not Bet" / Avoid tier.
-# 40/100 corresponds roughly to a coin-flip bet with marginal edge that is unlikely
+# 35/100 corresponds roughly to a coin-flip bet with marginal edge that is unlikely
 # to be profitable long-term after accounting for vig deduction. Based on analysis
-# of historical pick performance where scores below 40 showed negative expected value.
-DO_NOT_BET_SCORE_THRESHOLD = 40
+# of historical pick performance where scores below 35 showed negative expected value.
+DO_NOT_BET_SCORE_THRESHOLD = 35
 
 # Combo-stat confidence penalty multiplier.
 # Combo stats (points_rebounds, etc.) have more variance than simple stats.
-COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.85  # was 0.90 — stronger penalty for combo variance
+COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.90  # was 0.85 — softened penalty so combo stats aren't over-penalized
 
 # Stats considered "combo" or "fantasy" for penalty purposes
 COMBO_STAT_TYPES = {
