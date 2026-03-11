@@ -25,15 +25,15 @@ HIGH_VARIANCE_CV_THRESHOLD = 0.45  # loosened from 0.40 so secondary stats (stea
 VIG_ADJUSTMENT_PCT = 2.0
 
 # Minimum edge required AFTER vig deduction for a pick to qualify
-MIN_EDGE_AFTER_VIG = 4.0  # was 3.0 — raised to filter out borderline picks more aggressively
+MIN_EDGE_AFTER_VIG = 2.0  # lowered from 4.0 (was 3.0 originally) to align with Silver 3% min edge
 
 # Low-volume stat types with inherently higher variance.
 # These require a larger raw edge to overcome uncertainty.
 LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
 
 # Uncertainty multiplier applied to low-volume stats' edge calculations.
-# 1.5x means a steal prop needs effectively 1.5x more edge to qualify.
-LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.5
+# 1.3x means a steal prop needs effectively 1.3x more edge to qualify.
+LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.3  # softened from 1.5 to reduce over-penalizing secondary stats
 
 
 # ============================================================
