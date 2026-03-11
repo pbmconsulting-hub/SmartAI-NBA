@@ -664,3 +664,145 @@ def calculate_correlation_discount(same_game_pick_count):
 # ============================================================
 # END SECTION: Flex EV and Correlation Helpers
 # ============================================================
+
+
+# ============================================================
+# SECTION: Stat-Specific Distribution Samplers (Feature 8)
+# Poisson-like sampler for low-count discrete stats (steals,
+# blocks, turnovers) and a zero-inflated sampler for three-
+# pointers — both built from first principles, no scipy.
+# ============================================================
+
+def sample_poisson_like(mean, game_log_values=None):
+    """
+    Sample from a Poisson-like discrete distribution for low-count stats.
+
+    Used for steals, blocks, and turnovers — stats where the outcome is
+    discrete (0, 1, 2, 3...) and the Poisson distribution models the
+    zero-inflated count nature better than a continuous normal.
+
+    Implements the inverse CDF method using cumulative Poisson probabilities
+    computed from first principles (no scipy needed).
+
+    Args:
+        mean (float): Expected value (lambda parameter for Poisson).
+        game_log_values (list of float, optional): Historical game log for
+            empirical calibration. If provided and mean deviates significantly
+            from log mean, the log mean takes precedence.
+
+    Returns:
+        float: A sampled integer value (as float) ≥ 0.
+
+    Example:
+        # Player averages 1.2 steals per game
+        sample_poisson_like(1.2) → might return 0.0, 1.0, 2.0, 3.0, etc.
+    """
+    # Use empirical mean from game logs when enough history is available
+    if game_log_values and len(game_log_values) >= 10:
+        lam = sum(game_log_values) / len(game_log_values)
+    else:
+        lam = float(mean)
+
+    # Clamp lambda to a sensible range (Poisson requires λ > 0)
+    lam = max(0.1, min(20.0, lam))
+
+    # Build cumulative Poisson CDF using calculate_poisson_probability()
+    # We go up to max_k to ensure the CDF reaches ≈ 1.0
+    max_k = max(20, int(lam * 3) + 10)
+    cdf = 0.0
+    u = random.random()
+
+    for k in range(max_k + 1):
+        cdf += calculate_poisson_probability(k, lam)
+        if cdf >= u:
+            return float(k)
+
+    # Fallback: return max_k if u never crossed (numerical edge case)
+    return float(max_k)
+
+
+def sample_zero_inflated(mean, std, zero_probability, game_log_values=None):
+    """
+    Sample from a zero-inflated distribution for three-pointers.
+
+    Three-pointers have a "zero mass" component — many games with 0 threes,
+    then a right-skewed tail of high-three games. This models that structure.
+
+    With probability zero_probability, returns 0 (zero-inflation component).
+    Otherwise samples from a shifted distribution representing active-three-game.
+
+    Args:
+        mean (float): Overall mean (including zero games).
+        std (float): Overall standard deviation (including zero games).
+        zero_probability (float): Fraction of games with 0 of this stat.
+        game_log_values (list of float, optional): Historical game log values.
+
+    Returns:
+        float: Sampled stat value ≥ 0 (rounded to nearest 0.5).
+
+    Example:
+        # Player averages 2.3 threes, has 0 threes in 20% of games
+        sample_zero_inflated(2.3, 1.8, 0.20) → 0, 1.5, 2.0, 3.0, 4.5, etc.
+    """
+    # Zero-inflation component: with probability zero_probability, player has 0
+    if random.random() < zero_probability:
+        return 0.0
+
+    # Non-zero game: shift the mean upward to reflect conditional distribution
+    # E[X | X > 0] = mean / P(X > 0)
+    conditional_mean = mean / max(0.001, 1.0 - zero_probability)
+
+    # Right-skewed draw for the active-three-pointer game
+    raw = sample_skew_normal(conditional_mean, std * 1.1, skew_param=2.0)
+
+    # Round to nearest 0.5 (threes are whole numbers; 0.5 granularity is fine)
+    rounded = round(raw * 2.0) / 2.0
+    return max(0.5, rounded)
+
+
+def estimate_zero_probability(game_log_values, stat_type):
+    """
+    Estimate the probability of recording 0 for a stat from game logs.
+
+    Used by the zero-inflated distribution (sample_zero_inflated) to set
+    the zero-inflation parameter from the player's actual game history.
+
+    Args:
+        game_log_values (list of float): Historical game values for this stat.
+        stat_type (str): Stat category for default fallbacks.
+            'threes'/'fg3m': higher zero probability
+            'steals'/'blocks': higher zero probability
+            Others: lower zero probability
+
+    Returns:
+        float: Estimated zero probability (0.0-1.0).
+            Minimum 0.05, maximum 0.80.
+            Returns a stat-type default if fewer than 5 game logs.
+
+    Example:
+        # Player had 0 threes in 6 of 30 games
+        estimate_zero_probability([0,2,3,0,1,4,0,2,1,3,...], 'threes') → 0.20
+    """
+    # Stat-type default fallbacks (used when insufficient game log data)
+    stat_key = (stat_type or '').lower()
+    if stat_key in ('threes', 'fg3m'):
+        default_zero_prob = 0.15
+    elif stat_key == 'steals':
+        default_zero_prob = 0.25
+    elif stat_key == 'blocks':
+        default_zero_prob = 0.30
+    else:
+        default_zero_prob = 0.05
+
+    # Use empirical rate when enough history is available
+    if game_log_values and len(game_log_values) >= 5:
+        zero_count = sum(1 for v in game_log_values if v < 0.5)
+        empirical_rate = zero_count / len(game_log_values)
+        # Clamp to reasonable bounds
+        return max(0.05, min(0.80, empirical_rate))
+
+    return default_zero_prob
+
+# ============================================================
+# END SECTION: Stat-Specific Distribution Samplers
+# ============================================================

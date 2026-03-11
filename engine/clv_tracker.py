@@ -176,8 +176,8 @@ def get_clv_summary(days=90, min_records=5):
         recent = [
             r for r in records.values()
             if r.get("closing_line") is not None
-            and r.get("opening_timestamp")
-            and datetime.datetime.fromisoformat(r["opening_timestamp"]) >= cutoff
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
         ]
 
         if not recent:
@@ -239,6 +239,332 @@ def get_clv_summary(days=90, min_records=5):
 
 # ============================================================
 # END SECTION: CLV Record Management
+# ============================================================
+
+
+# ============================================================
+# SECTION: Internal Helpers
+# ============================================================
+
+def _safe_parse_timestamp(ts_value):
+    """
+    Safely parse an ISO-format timestamp string.
+
+    Returns a datetime.datetime on success, or None on any failure
+    (missing value, empty string, malformed string, etc.).
+
+    Args:
+        ts_value: Raw value from a CLV record dict.
+
+    Returns:
+        datetime.datetime or None.
+    """
+    if not ts_value:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(str(ts_value))
+    except (ValueError, TypeError):
+        return None
+
+# ============================================================
+# END SECTION: Internal Helpers
+# ============================================================
+
+
+# ============================================================
+# SECTION: Model Edge Validation
+# ============================================================
+
+def validate_model_edge(days=90):
+    """
+    Validate model edge quality using CLV performance by tier and stat type.
+
+    Computes CLV hit rate by tier (Platinum/Gold/Silver/Bronze) and by stat
+    type. Identifies stat types the model is consistently wrong on (negative
+    CLV) and returns a stat_adjustment_factors dict to penalise those stats.
+
+    Args:
+        days (int): Number of past days to include. Default 90.
+
+    Returns:
+        dict: {
+            'clv_by_tier': {tier: {'avg_clv': float, 'positive_rate': float,
+                                   'count': int}},
+            'clv_by_stat': {stat_type: {'avg_clv': float,
+                                        'positive_rate': float, 'count': int}},
+            'stat_adjustment_factors': {stat_type: clv_adjustment_factor},
+            'interpretation': str,
+        }
+
+    Example:
+        result = validate_model_edge(days=90)
+        # result['stat_adjustment_factors']['threes'] might be 0.92 if model
+        # consistently over-rates three-point props.
+    """
+    empty_result = {
+        "clv_by_tier": {},
+        "clv_by_stat": {},
+        "stat_adjustment_factors": {},
+        "interpretation": "Insufficient data (cold start)",
+    }
+
+    try:
+        records = _load_all_clv_records()
+        if not records:
+            return empty_result
+
+        # Filter to recent records that have a closing line
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+        recent = [
+            r for r in records.values()
+            if r.get("closing_line") is not None
+            and r.get("clv") is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
+        ]
+
+        if not recent:
+            return empty_result
+
+        # ── Group by tier ────────────────────────────────────────────────────
+        tier_buckets = {}
+        for r in recent:
+            tier = r.get("tier", "Unknown")
+            tier_buckets.setdefault(tier, []).append(r["clv"])
+
+        clv_by_tier = {}
+        for tier, values in tier_buckets.items():
+            avg = sum(values) / len(values)
+            pos_rate = sum(1 for v in values if v > 0) / len(values)
+            clv_by_tier[tier] = {
+                "avg_clv":       round(avg, 3),
+                "positive_rate": round(pos_rate, 4),
+                "count":         len(values),
+            }
+
+        # ── Group by stat_type ───────────────────────────────────────────────
+        stat_buckets = {}
+        for r in recent:
+            stat = r.get("stat_type", "unknown")
+            stat_buckets.setdefault(stat, []).append(r["clv"])
+
+        clv_by_stat = {}
+        for stat, values in stat_buckets.items():
+            avg = sum(values) / len(values)
+            pos_rate = sum(1 for v in values if v > 0) / len(values)
+            clv_by_stat[stat] = {
+                "avg_clv":       round(avg, 3),
+                "positive_rate": round(pos_rate, 4),
+                "count":         len(values),
+            }
+
+        # ── Stat adjustment factors ──────────────────────────────────────────
+        # Penalise stat types where the model consistently loses CLV.
+        # avg_clv < -0.6 → 12% penalty (factor 0.88)
+        # avg_clv < -0.3 → 8%  penalty (factor 0.92)
+        # otherwise      → no penalty  (factor 1.0)
+        stat_adjustment_factors = {}
+        for stat, info in clv_by_stat.items():
+            avg_clv = info["avg_clv"]
+            if avg_clv < -0.6:
+                factor = 0.88
+            elif avg_clv < -0.3:
+                factor = 0.92
+            else:
+                factor = 1.0
+            stat_adjustment_factors[stat] = factor
+
+        # ── Overall interpretation ───────────────────────────────────────────
+        all_clv = [r["clv"] for r in recent]
+        overall_avg = sum(all_clv) / len(all_clv)
+        if overall_avg > 0.5:
+            interpretation = "✅ Strong positive CLV across stat types"
+        elif overall_avg > 0:
+            interpretation = "🟡 Marginal positive CLV — monitor by stat type"
+        elif overall_avg > -0.5:
+            interpretation = "🟠 Slightly negative CLV — model lagging market on some stats"
+        else:
+            interpretation = "❌ Negative CLV — significant model underperformance detected"
+
+        return {
+            "clv_by_tier":             clv_by_tier,
+            "clv_by_stat":             clv_by_stat,
+            "stat_adjustment_factors": stat_adjustment_factors,
+            "interpretation":          interpretation,
+        }
+
+    except Exception:
+        return empty_result
+
+
+def get_stat_type_clv_penalties(days=90):
+    """
+    Return per-stat-type confidence penalties based on historical CLV
+    performance.
+
+    Stats with consistently negative CLV get a 3-8 point confidence penalty
+    to reduce over-betting on stat types where the model underperforms.
+
+    Args:
+        days (int): Days of history to consider. Default 90.
+
+    Returns:
+        dict: {stat_type: penalty_points} where penalty_points is 0-8.
+            Returns empty dict on cold start (insufficient data).
+
+    Example:
+        penalties = get_stat_type_clv_penalties()
+        # {'threes': 5.0, 'blocks': 3.0} means reduce confidence for those stats
+    """
+    try:
+        edge_data = validate_model_edge(days=days)
+        clv_by_stat = edge_data.get("clv_by_stat", {})
+
+        if not clv_by_stat:
+            return {}
+
+        penalties = {}
+        for stat, info in clv_by_stat.items():
+            # Require at least 5 records before applying any penalty
+            if info.get("count", 0) < 5:
+                continue
+
+            avg_clv = info["avg_clv"]
+            if avg_clv < -0.6:
+                penalty = 8.0
+            elif avg_clv < -0.4:
+                penalty = 6.0
+            elif avg_clv < -0.2:
+                penalty = 4.0
+            elif avg_clv < 0.0:
+                penalty = 3.0
+            else:
+                penalty = 0.0
+
+            penalties[stat] = penalty
+
+        return penalties
+
+    except Exception:
+        return {}
+
+
+def get_tier_accuracy_report(days=90):
+    """
+    Generate an accuracy report by tier for the Model Health page.
+
+    Shows actual win rates vs predicted probabilities broken down by tier.
+    Only counts records where the bet result is stored (has closing_line AND
+    a 'bet_result' field of 1/0). CLV-only records (no bet_result) are
+    reported as CLV-stats-only without win rate.
+
+    Args:
+        days (int): Days of history to consider. Default 90.
+
+    Returns:
+        dict: {
+            'has_data': bool,
+            'by_tier': {
+                tier: {
+                    'count': int,
+                    'avg_clv': float,
+                    'positive_clv_rate': float,
+                    'avg_confidence': float,
+                    'win_rate': float or None,
+                }
+            },
+            'summary': str,
+        }
+
+    Example:
+        report = get_tier_accuracy_report()
+        # report['by_tier']['Platinum']['positive_clv_rate'] → 0.72
+    """
+    empty_result = {
+        "has_data": False,
+        "by_tier":  {},
+        "summary":  "Insufficient data (cold start)",
+    }
+
+    try:
+        records = _load_all_clv_records()
+        if not records:
+            return empty_result
+
+        # Filter to recent records that have a closing line
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=days)
+        recent = [
+            r for r in records.values()
+            if r.get("closing_line") is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
+        ]
+
+        if not recent:
+            return empty_result
+
+        # ── Group by tier ────────────────────────────────────────────────────
+        tier_buckets = {}
+        for r in recent:
+            tier = r.get("tier", "Unknown")
+            tier_buckets.setdefault(tier, []).append(r)
+
+        by_tier = {}
+        for tier, recs in tier_buckets.items():
+            clv_values = [r["clv"] for r in recs if r.get("clv") is not None]
+            confidence_values = [
+                r["confidence_score"] for r in recs
+                if r.get("confidence_score") is not None
+            ]
+
+            # Win rate only from records that carry a bet_result (0 or 1)
+            bet_result_recs = [
+                r for r in recs if r.get("bet_result") in (0, 1)
+            ]
+            win_rate = (
+                sum(r["bet_result"] for r in bet_result_recs) / len(bet_result_recs)
+                if bet_result_recs else None
+            )
+
+            avg_clv = sum(clv_values) / len(clv_values) if clv_values else 0.0
+            pos_clv_rate = (
+                sum(1 for v in clv_values if v > 0) / len(clv_values)
+                if clv_values else 0.0
+            )
+            avg_conf = (
+                sum(confidence_values) / len(confidence_values)
+                if confidence_values else 0.0
+            )
+
+            by_tier[tier] = {
+                "count":             len(recs),
+                "avg_clv":           round(avg_clv, 3),
+                "positive_clv_rate": round(pos_clv_rate, 4),
+                "avg_confidence":    round(avg_conf, 2),
+                "win_rate":          round(win_rate, 4) if win_rate is not None else None,
+            }
+
+        if not by_tier:
+            return empty_result
+
+        # ── Summary sentence ─────────────────────────────────────────────────
+        total_recs = sum(v["count"] for v in by_tier.values())
+        summary = (
+            f"Tier accuracy report: {total_recs} closed picks across "
+            f"{len(by_tier)} tier(s) in the last {days} days."
+        )
+
+        return {
+            "has_data": True,
+            "by_tier":  by_tier,
+            "summary":  summary,
+        }
+
+    except Exception:
+        return empty_result
+
+# ============================================================
+# END SECTION: Model Edge Validation
 # ============================================================
 
 

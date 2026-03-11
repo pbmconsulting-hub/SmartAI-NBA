@@ -43,6 +43,19 @@ from styles.theme import (
     get_styled_stats_table_html,
 )
 
+try:
+    from engine.clv_tracker import get_clv_summary, get_tier_accuracy_report, validate_model_edge  # F1 enhanced
+except ImportError:
+    get_clv_summary = None
+    get_tier_accuracy_report = None
+    validate_model_edge = None
+
+try:
+    from engine.calibration import get_calibration_summary, get_isotonic_calibration_curve  # F4 isotonic
+except ImportError:
+    get_calibration_summary = None
+    get_isotonic_calibration_curve = None
+
 # ============================================================
 # SECTION: Page Setup
 # ============================================================
@@ -350,6 +363,46 @@ with tab_model_health:
                 ),
                 unsafe_allow_html=True,
             )
+
+        # Feature 1: Enhanced tier accuracy report
+        try:
+            if get_tier_accuracy_report is not None:
+                st.subheader("📊 Model Tier Accuracy")
+                _tier_report = get_tier_accuracy_report(days=90)
+                if _tier_report.get("has_data"):
+                    for _tier, _stats in _tier_report.get("by_tier", {}).items():
+                        _col_a, _col_b, _col_c = st.columns(3)
+                        _col_a.metric(f"{_tier} — Avg CLV", f"{_stats.get('avg_clv', 0):.3f}")
+                        _col_b.metric(f"Positive CLV Rate", f"{_stats.get('positive_clv_rate', 0)*100:.1f}%")
+                        if _stats.get('win_rate') is not None:
+                            _col_c.metric(f"Win Rate", f"{_stats['win_rate']*100:.1f}%")
+                        else:
+                            _col_c.caption("Win rate: no bet results recorded yet")
+                else:
+                    st.info("📊 Tier accuracy report will appear after recording bets and closing lines.")
+        except Exception:
+            pass
+
+        # Feature 4: Isotonic calibration curve
+        try:
+            if get_isotonic_calibration_curve is not None:
+                st.subheader("📈 Isotonic Calibration Curve")
+                _iso_curve = get_isotonic_calibration_curve(days=90)
+                if _iso_curve.get("has_data"):
+                    st.caption(f"Based on {_iso_curve['total_records']} historical predictions | "
+                               f"{'Isotonic smoothing applied' if _iso_curve['is_isotonic'] else 'Coarse buckets (need 200+ records for isotonic)'}")
+                    for _pt in _iso_curve.get("curve", []):
+                        _gap = _pt["actual"] - _pt["predicted"]
+                        _indicator = "✅" if abs(_gap) < 0.05 else ("📈" if _gap > 0 else "📉")
+                        st.markdown(
+                            f"{_indicator} **{_pt['predicted']*100:.0f}%** predicted → "
+                            f"**{_pt['actual']*100:.1f}%** actual "
+                            f"({'n=' + str(_pt['count'])})"
+                        )
+                else:
+                    st.info("📈 Isotonic calibration curve will appear after recording enough bets (200+ for fine-grained view).")
+        except Exception:
+            pass
 
 # ============================================================
 # END SECTION: Model Health Tab

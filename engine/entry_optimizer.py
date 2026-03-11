@@ -11,6 +11,9 @@
 import math        # For combinations and calculations
 import itertools   # For generating combinations of picks
 
+# Math helpers needed for Flex EV calculation in Feature 10
+from engine.math_helpers import calculate_flex_ev   # Flex EV with partial-win probabilities
+
 
 # ============================================================
 # SECTION: Platform Payout Tables
@@ -557,4 +560,317 @@ def format_ev_display(ev_result, entry_fee):
 
 # ============================================================
 # END SECTION: Optimal Entry Builder
+# ============================================================
+
+
+# ============================================================
+# SECTION: Flex vs Power Play Optimizer (Feature 10)
+# Determines whether a Power or Flex entry maximizes EV for
+# a given set of pick probabilities on PrizePicks. Includes
+# a binary-search breakeven calculator so users know the
+# exact probability threshold where Power becomes better.
+# ============================================================
+
+def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
+    """
+    Determine whether Flex or Power play is better for a given set of picks.
+
+    Calculates EV for both Flex and Power, recommending the play type that
+    maximizes expected value given the specific pick probabilities.
+
+    Args:
+        pick_probabilities (list of float): Win probabilities for each pick (0-1).
+            Must have 2-6 elements.
+        entry_size (int): Number of picks (must match len(pick_probabilities)).
+        platform (str): Platform name. Default 'PrizePicks'.
+            Only PrizePicks supports both Flex and Power.
+
+    Returns:
+        dict: {
+            'recommended_play_type': str,  # 'Power', 'Flex', or 'Either'
+            'flex_ev': float,              # EV in dollars per $10 entry
+            'power_ev': float,             # EV in dollars per $10 entry
+            'ev_difference': float,        # power_ev - flex_ev
+            'min_probability': float,      # Lowest probability leg
+            'avg_probability': float,      # Average probability across legs
+            'reasoning': str,              # Human-readable explanation
+        }
+
+    Example:
+        optimize_play_type([0.68, 0.71, 0.65], entry_size=3, platform='PrizePicks')
+        # All probs >= 65% → Power recommended
+        # Returns: {'recommended_play_type': 'Power', 'power_ev': 2.5, ...}
+    """
+    entry_fee = 10.0   # Standardise at $10 for comparison
+
+    min_prob = min(pick_probabilities) if pick_probabilities else 0.5
+    avg_prob = sum(pick_probabilities) / len(pick_probabilities) if pick_probabilities else 0.5
+
+    # Non-PrizePicks platforms don't offer Power play
+    if platform != 'PrizePicks':
+        flex_table = PLATFORM_FLEX_TABLES.get(platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+        flex_payout_for_size = flex_table.get(entry_size, {})
+        flex_result = calculate_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
+        return {
+            'recommended_play_type': 'Flex',
+            'flex_ev':               flex_result['ev_dollars'],
+            'power_ev':              None,
+            'ev_difference':         None,
+            'min_probability':       round(min_prob, 4),
+            'avg_probability':       round(avg_prob, 4),
+            'reasoning':             f"{platform} does not offer Power play. Flex only.",
+        }
+
+    # ---- PrizePicks: compare Flex vs Power ----
+    flex_payout_for_size  = PRIZEPICKS_FLEX_PAYOUT_TABLE.get(entry_size, {})
+    power_payout_for_size = PRIZEPICKS_POWER_PAYOUT_TABLE.get(entry_size, {})
+
+    flex_result = calculate_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
+    flex_ev = flex_result['ev_dollars']
+
+    # Power EV: only paid when ALL picks hit
+    if power_payout_for_size:
+        power_multiplier = power_payout_for_size.get(entry_size, 0.0)
+        all_hit_prob = 1.0
+        for p in pick_probabilities:
+            all_hit_prob *= p
+        power_ev = round(all_hit_prob * power_multiplier * entry_fee - entry_fee, 2)
+    else:
+        power_ev = -entry_fee   # No payout table → automatic loss
+
+    ev_difference = round(power_ev - flex_ev, 2)
+
+    # ---- Recommendation rules ----
+    if min_prob >= 0.65 and power_ev > flex_ev:
+        recommended = 'Power'
+        reasoning = (
+            f"All legs ≥ 65% (min={min_prob*100:.0f}%) and Power EV "
+            f"(${power_ev:.2f}) beats Flex EV (${flex_ev:.2f}). "
+            "High-confidence lineup favours all-or-nothing payout."
+        )
+    elif avg_prob < 0.60 or min_prob < 0.55:
+        recommended = 'Flex'
+        reasoning = (
+            f"Average probability {avg_prob*100:.0f}% or min probability "
+            f"{min_prob*100:.0f}% is below threshold for Power. "
+            "Flex partial-win safety net has better EV here."
+        )
+    elif abs(ev_difference) < 0.50:
+        recommended = 'Either'
+        reasoning = (
+            f"EV difference between Power (${power_ev:.2f}) and Flex "
+            f"(${flex_ev:.2f}) is less than $0.50 — essentially a toss-up. "
+            "Either play type is defensible."
+        )
+    elif power_ev > flex_ev:
+        recommended = 'Power'
+        reasoning = (
+            f"Power EV (${power_ev:.2f}) exceeds Flex EV (${flex_ev:.2f}) "
+            f"by ${ev_difference:.2f} with avg prob {avg_prob*100:.0f}%."
+        )
+    else:
+        recommended = 'Flex'
+        reasoning = (
+            f"Flex EV (${flex_ev:.2f}) exceeds Power EV (${power_ev:.2f}). "
+            "Partial-win payouts more valuable at current probabilities."
+        )
+
+    return {
+        'recommended_play_type': recommended,
+        'flex_ev':               flex_ev,
+        'power_ev':              power_ev,
+        'ev_difference':         ev_difference,
+        'min_probability':       round(min_prob, 4),
+        'avg_probability':       round(avg_prob, 4),
+        'reasoning':             reasoning,
+    }
+
+
+def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
+    """
+    Find the probability threshold where Power becomes more +EV than Flex.
+
+    Searches for the uniform probability p where EV(Power) == EV(Flex).
+    This gives users a clear threshold: 'if all your picks are above X%,
+    Power play is better.'
+
+    Args:
+        pick_probabilities (list of float): Actual probabilities (used to
+            calibrate the search range, though breakeven is computed for
+            uniform probability scenarios).
+        entry_size (int): Number of picks.
+
+    Returns:
+        dict: {
+            'breakeven_probability': float,  # Uniform prob where Power = Flex EV
+            'current_min_prob': float,       # Actual minimum probability in entry
+            'power_better_above': float,     # Clear threshold (breakeven + buffer)
+            'interpretation': str,
+        }
+
+    Example:
+        result = calculate_flex_vs_power_breakeven([0.62, 0.67, 0.64], entry_size=3)
+        # result['breakeven_probability'] → ~0.68 for a 3-pick entry
+    """
+    entry_fee = 10.0
+
+    flex_payout  = PRIZEPICKS_FLEX_PAYOUT_TABLE.get(entry_size, {})
+    power_payout = PRIZEPICKS_POWER_PAYOUT_TABLE.get(entry_size, {})
+    power_multiplier = power_payout.get(entry_size, 0.0)
+
+    def _ev_diff(p_test):
+        """power_ev - flex_ev at uniform probability p_test."""
+        # Power EV
+        all_hit = p_test ** entry_size
+        p_ev = all_hit * power_multiplier * entry_fee - entry_fee
+        # Flex EV
+        uniform_probs = [p_test] * entry_size
+        f_ev = calculate_flex_ev(uniform_probs, flex_payout, entry_fee)['ev_dollars']
+        return p_ev - f_ev
+
+    # Binary search for breakeven in [0.50, 0.99]
+    lo, hi = 0.50, 0.99
+    breakeven = 0.75   # sensible default if search fails
+
+    for _ in range(20):
+        mid = (lo + hi) / 2.0
+        if _ev_diff(mid) < 0:
+            lo = mid   # Power still losing → need higher probability
+        else:
+            hi = mid   # Power winning → breakeven is lower
+            breakeven = mid
+
+    breakeven = round(breakeven, 4)
+    current_min_prob = min(pick_probabilities) if pick_probabilities else 0.5
+    power_better_above = min(0.99, breakeven + 0.02)   # 2% safety buffer
+
+    if current_min_prob >= power_better_above:
+        interpretation = (
+            f"Your weakest leg ({current_min_prob*100:.0f}%) is above the "
+            f"{power_better_above*100:.0f}% threshold — Power play is recommended."
+        )
+    elif current_min_prob >= breakeven:
+        interpretation = (
+            f"Your weakest leg ({current_min_prob*100:.0f}%) is near the breakeven "
+            f"({breakeven*100:.0f}%). Power play is marginal — consider Flex for safety."
+        )
+    else:
+        interpretation = (
+            f"Breakeven at {breakeven*100:.0f}% uniform probability. "
+            f"Your weakest leg ({current_min_prob*100:.0f}%) is below this — "
+            "Flex play has better expected value."
+        )
+
+    return {
+        'breakeven_probability': breakeven,
+        'current_min_prob':      round(current_min_prob, 4),
+        'power_better_above':    round(power_better_above, 4),
+        'interpretation':        interpretation,
+    }
+
+
+def build_optimal_entries_with_play_type(
+    picks,
+    entry_sizes=None,
+    platform="PrizePicks",
+    entry_fee=10.0,
+    min_edge_pct=3.0,
+    min_confidence_score=40.0,
+    max_entries_to_show=10,
+):
+    """
+    Build optimal entries and annotate each with Flex vs Power recommendation.
+
+    Wraps build_optimal_entries() and adds play-type optimization to each result.
+
+    Args:
+        picks (list of dict): Same as build_optimal_entries().
+        entry_sizes (list of int, optional): Entry sizes to consider.
+        platform (str): Platform name.
+        entry_fee (float): Entry fee per bet.
+        min_edge_pct (float): Minimum edge percentage filter.
+        min_confidence_score (float): Minimum confidence score filter.
+        max_entries_to_show (int): Maximum entries to return.
+
+    Returns:
+        list of dict: Same as build_optimal_entries() output, with additional fields:
+            'flex_ev': float,
+            'power_ev': float,
+            'recommended_play_type': str,
+            'play_type_reasoning': str,
+            'breakeven_probability': float or None,
+
+    Example:
+        entries = build_optimal_entries_with_play_type(picks, platform='PrizePicks')
+        for e in entries:
+            print(f"{e['recommended_play_type']}: Flex={e['flex_ev']:.2f}, Power={e['power_ev']:.2f}")
+    """
+    if entry_sizes is None:
+        entry_sizes = [3, 4, 5, 6]
+
+    # Filter picks to meet minimum quality thresholds before building entries
+    qualifying_picks = [
+        p for p in picks
+        if abs(p.get('edge_percentage', 0)) >= min_edge_pct
+        and p.get('confidence_score', 0) >= min_confidence_score
+    ]
+
+    all_entries = []
+
+    for size in entry_sizes:
+        raw_entries = build_optimal_entries(
+            qualifying_picks,
+            platform=platform,
+            entry_size=size,
+            entry_fee=entry_fee,
+            max_entries_to_show=max_entries_to_show,
+        )
+        all_entries.extend(raw_entries)
+
+    # Sort combined results by EV descending, then trim to max_entries_to_show
+    all_entries.sort(
+        key=lambda e: e.get('ev_result', {}).get('expected_value_dollars', 0),
+        reverse=True,
+    )
+    all_entries = all_entries[:max_entries_to_show]
+
+    # Annotate each entry with Flex vs Power recommendation
+    annotated = []
+    for entry in all_entries:
+        entry_picks = entry.get('picks', [])
+        n = len(entry_picks)
+
+        # Reconstruct per-pick win probabilities (same logic as build_optimal_entries)
+        pick_probabilities = []
+        for pick in entry_picks:
+            p = pick.get('probability_over', 0.5)
+            win_prob = p if pick.get('direction', 'OVER') == 'OVER' else 1.0 - p
+            pick_probabilities.append(win_prob)
+
+        if platform != 'PrizePicks' or n < 2:
+            # Non-PrizePicks or too few picks → Flex only
+            play_type_result = {
+                'recommended_play_type': 'Flex',
+                'flex_ev':               entry.get('ev_result', {}).get('expected_value_dollars', 0.0),
+                'power_ev':              None,
+                'reasoning':             f"{platform} does not support Power play or insufficient picks.",
+            }
+            breakeven_prob = None
+        else:
+            play_type_result = optimize_play_type(pick_probabilities, n, platform)
+            breakeven_data  = calculate_flex_vs_power_breakeven(pick_probabilities, n)
+            breakeven_prob  = breakeven_data.get('breakeven_probability')
+
+        annotated_entry = dict(entry)
+        annotated_entry['flex_ev']                = play_type_result.get('flex_ev')
+        annotated_entry['power_ev']               = play_type_result.get('power_ev')
+        annotated_entry['recommended_play_type']  = play_type_result['recommended_play_type']
+        annotated_entry['play_type_reasoning']    = play_type_result.get('reasoning', '')
+        annotated_entry['breakeven_probability']  = breakeven_prob if platform == 'PrizePicks' else None
+        annotated.append(annotated_entry)
+
+    return annotated
+
+# ============================================================
+# END SECTION: Flex vs Power Play Optimizer
 # ============================================================
