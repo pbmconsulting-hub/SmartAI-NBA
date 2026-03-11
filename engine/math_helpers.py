@@ -257,7 +257,10 @@ def calculate_percentile(numbers_list, percentile):
         float: The value at that percentile
 
     Example:
-        calculate_percentile([10,20,30,40,50], 25) → 17.5
+        calculate_percentile([10,20,30,40,50], 25) → 20
+        (position = (25/100)*(5-1) = 1.0 → exact index 1 → sorted[1] = 20)
+        calculate_percentile([10,20,30,40,50], 40) → 26
+        (position = 1.6, interpolates: 20*0.4 + 30*0.6 = 26)
 
     Edge case — single-element list:
         When the list has exactly 1 element, position = 0 for ALL
