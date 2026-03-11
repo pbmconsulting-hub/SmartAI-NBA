@@ -91,6 +91,11 @@ Z_SCORE_90_CI = 1.645
 
 # Three-point props minimum CV floor = 1.3× elite-points CV (0.25).
 # Ensures three-point simulations always model adequate shooting streakiness.
+# THREE_POINT_CV_FLOOR = 0.325 (32.5%)
+# Rationale: NBA 3PT made has inherently high variance. League-average 3PT% is ~36%
+# with a game-to-game standard deviation of roughly 30-40% of the mean.
+# A CV floor of 32.5% prevents the simulation from underestimating three-point
+# volatility for consistent shooters whose sample CV might be artificially low.
 THREE_POINT_CV_FLOOR = 1.3 * 0.25  # = 0.325
 
 # ============================================================
@@ -144,6 +149,7 @@ def run_monte_carlo_simulation(
     projected_minutes=None,
     minutes_std=None,
     recent_game_logs=None,
+    random_seed=None,
 ):
     """
     Run a full Monte Carlo simulation for one player's one stat.
@@ -190,6 +196,10 @@ def run_monte_carlo_simulation(
             This captures player-specific distribution shapes (e.g., a player
             who always scores 15 or 30 but never 22).
             Falls back to skew-normal when None or fewer than 15 logs.
+        random_seed (int, optional): Seed for the random number generator.
+            When provided, the simulation produces reproducible results
+            across runs — useful for debugging and model validation.
+            Defaults to None (non-deterministic / different each run).
 
     Returns:
         dict: Simulation results containing:
@@ -209,6 +219,10 @@ def run_monte_carlo_simulation(
         LeBron projects 25 pts, std=6, line=24.5 →
         maybe 55-60% of simulated games go over 24.5
     """
+    # Seed the RNG if requested (enables reproducible simulations)
+    if random_seed is not None:
+        random.seed(random_seed)
+
     # ============================================================
     # SECTION: Apply Pre-Simulation Adjustments
     # Adjust the base projection for tonight's specific context
@@ -724,6 +738,7 @@ def simulate_combo_stat(
     matchup_adjustment_factor,
     home_away_adjustment,
     rest_adjustment_factor,
+    random_seed=None,
 ):
     """
     Run a correlated Monte Carlo simulation for a combo stat prop. (C7)
@@ -745,10 +760,16 @@ def simulate_combo_stat(
         matchup_adjustment_factor (float): Defense multiplier
         home_away_adjustment (float): Home-court additive
         rest_adjustment_factor (float): Rest multiplier
+        random_seed (int, optional): Seed for reproducible results.
+            When provided, the simulation produces the same output
+            on every run — useful for debugging and validation.
 
     Returns:
         dict: Same structure as run_monte_carlo_simulation()
     """
+    # Seed the RNG if requested (enables reproducible simulations)
+    if random_seed is not None:
+        random.seed(random_seed)
     combined_multiplier = (
         pace_adjustment_factor
         * matchup_adjustment_factor
@@ -853,6 +874,7 @@ def simulate_fantasy_score(
     matchup_adjustment_factor,
     home_away_adjustment,
     rest_adjustment_factor,
+    random_seed=None,
 ):
     """
     Simulate a fantasy score prop using the platform's scoring formula.
@@ -872,10 +894,16 @@ def simulate_fantasy_score(
         matchup_adjustment_factor (float): Defense multiplier
         home_away_adjustment (float): Home-court additive
         rest_adjustment_factor (float): Rest multiplier
+        random_seed (int, optional): Seed for reproducible results.
+            When provided, the simulation produces the same output
+            on every run — useful for debugging and validation.
 
     Returns:
         dict: Same structure as run_monte_carlo_simulation()
     """
+    # Seed the RNG if requested (enables reproducible simulations)
+    if random_seed is not None:
+        random.seed(random_seed)
     combined_multiplier = (
         pace_adjustment_factor
         * matchup_adjustment_factor
@@ -944,6 +972,7 @@ def simulate_double_double(
     matchup_adjustment_factor,
     home_away_adjustment,
     rest_adjustment_factor,
+    random_seed=None,
 ):
     """
     Simulate P(double-double) — 2+ stats each reaching 10+ in a game.
@@ -961,11 +990,17 @@ def simulate_double_double(
         matchup_adjustment_factor (float): Defense multiplier
         home_away_adjustment (float): Home-court additive
         rest_adjustment_factor (float): Rest multiplier
+        random_seed (int, optional): Seed for reproducible results.
+            When provided, the simulation produces the same output
+            on every run — useful for debugging and validation.
 
     Returns:
         dict: Simulation results where probability_over = P(double-double).
               The "simulated_results" are 0.0/1.0 indicators.
     """
+    # Seed the RNG if requested (enables reproducible simulations)
+    if random_seed is not None:
+        random.seed(random_seed)
     combined_multiplier = (
         pace_adjustment_factor
         * matchup_adjustment_factor
@@ -1031,6 +1066,7 @@ def simulate_triple_double(
     matchup_adjustment_factor,
     home_away_adjustment,
     rest_adjustment_factor,
+    random_seed=None,
 ):
     """
     Simulate P(triple-double) — 3+ stats each reaching 10+ in a game.
@@ -1044,10 +1080,16 @@ def simulate_triple_double(
         matchup_adjustment_factor (float): Defense multiplier
         home_away_adjustment (float): Home-court additive
         rest_adjustment_factor (float): Rest multiplier
+        random_seed (int, optional): Seed for reproducible results.
+            When provided, the simulation produces the same output
+            on every run — useful for debugging and validation.
 
     Returns:
         dict: Simulation results where probability_over = P(triple-double).
     """
+    # Seed the RNG if requested (enables reproducible simulations)
+    if random_seed is not None:
+        random.seed(random_seed)
     combined_multiplier = (
         pace_adjustment_factor
         * matchup_adjustment_factor

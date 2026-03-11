@@ -163,7 +163,7 @@ def analyze_directional_forces(
     # --- Force 4: Blowout Risk ---
     # High blowout risk = stars may sit in garbage time
     if blowout_risk > 0.25:
-        strength = min(2.0, (blowout_risk - 0.15) * 10.0)
+        strength = min(2.0, (blowout_risk - 0.25) * 10.0)
         all_under_forces.append({
             "name": "Blowout Risk",
             "description": f"{blowout_risk*100:.0f}% chance of blowout — star may sit late",

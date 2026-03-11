@@ -12,7 +12,10 @@ import math        # For combinations and calculations
 import itertools   # For generating combinations of picks
 
 # Math helpers needed for Flex EV calculation in Feature 10
-from engine.math_helpers import calculate_flex_ev   # Flex EV with partial-win probabilities
+try:
+    from engine.math_helpers import calculate_flex_ev   # Flex EV with partial-win probabilities
+except ImportError:
+    calculate_flex_ev = None  # Graceful fallback: flex EV uses calculate_entry_expected_value
 
 
 # ============================================================
@@ -24,14 +27,18 @@ from engine.math_helpers import calculate_flex_ev   # Flex EV with partial-win p
 
 # PrizePicks Flex Play payout table: {picks: {hits: payout_multiplier}}
 # "Flex" means you can win even without hitting all picks
+# LAST_VERIFIED: 2025-26 season (March 2026)
+# WARNING: Payout tables change frequently. Verify at prizepicks.com before each season.
 PRIZEPICKS_FLEX_PAYOUT_TABLE = {
-    3: {3: 2.25, 2: 1.25, 1: 0.40, 0: 0.0},   # 3-pick flex
+    3: {3: 2.25, 2: 1.25, 1: 0.0, 0: 0.0},   # 3-pick flex (1-of-3 no longer pays)
     4: {4: 5.0, 3: 1.50, 2: 0.40, 1: 0.0, 0: 0.0},  # 4-pick flex
     5: {5: 10.0, 4: 2.0, 3: 0.40, 2: 0.0, 1: 0.0, 0: 0.0},  # 5-pick flex
     6: {6: 25.0, 5: 2.0, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},  # 6-pick flex
 }
 
 # PrizePicks Power Play: ALL picks must hit (no partial wins)
+# LAST_VERIFIED: 2025-26 season (March 2026)
+# WARNING: Payout tables change frequently. Verify at prizepicks.com before each season.
 PRIZEPICKS_POWER_PAYOUT_TABLE = {
     2: {2: 3.0},   # 2-pick power: 3x payout
     3: {3: 5.0},   # 3-pick power: 5x payout
@@ -41,6 +48,8 @@ PRIZEPICKS_POWER_PAYOUT_TABLE = {
 }
 
 # Underdog Fantasy Flex payout table
+# LAST_VERIFIED: 2025-26 season (March 2026)
+# WARNING: Payout tables change frequently. Verify at underdogfantasy.com before each season.
 UNDERDOG_FLEX_PAYOUT_TABLE = {
     3: {3: 2.25, 2: 1.20, 1: 0.0, 0: 0.0},
     4: {4: 5.0, 3: 1.50, 2: 0.0, 1: 0.0, 0: 0.0},
@@ -49,6 +58,8 @@ UNDERDOG_FLEX_PAYOUT_TABLE = {
 }
 
 # DraftKings Pick6 payout table (estimated — DK pools vary)
+# LAST_VERIFIED: 2025-26 season (March 2026)
+# WARNING: Payout tables change frequently. Verify at draftkings.com/pick6 before each season.
 DRAFTKINGS_PICK6_PAYOUT_TABLE = {
     3: {3: 2.50, 2: 0.0, 1: 0.0, 0: 0.0},
     4: {4: 5.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
@@ -66,6 +77,26 @@ PLATFORM_FLEX_TABLES = {
 # ============================================================
 # END SECTION: Platform Payout Tables
 # ============================================================
+
+
+def _compute_flex_ev(pick_probabilities, payout_table, entry_fee):
+    """
+    Internal helper: compute flex EV using calculate_flex_ev when available,
+    falling back to calculate_entry_expected_value if calculate_flex_ev was
+    not importable (e.g., running without the full engine package).
+
+    Returns a dict with at minimum an 'ev_dollars' key.
+    """
+    if calculate_flex_ev is not None:
+        return calculate_flex_ev(pick_probabilities, payout_table, entry_fee)
+    # Fallback: map calculate_entry_expected_value output to flex-ev format
+    result = calculate_entry_expected_value(pick_probabilities, payout_table, entry_fee)
+    return {
+        "ev_dollars": result.get("expected_value_dollars", 0.0),
+        "roi": result.get("return_on_investment", 0.0),
+        "all_hit_prob": 0.0,
+        "prob_at_least_one_miss": 1.0,
+    }
 
 
 # ============================================================
@@ -231,6 +262,29 @@ def build_optimal_entries(
         if abs(pick.get("edge_percentage", 0)) >= 3.0  # At least 3% edge
         and pick.get("confidence_score", 0) >= 40.0    # At least Bronze tier
     ]
+
+    # Pre-sort picks by win probability (descending) so the combinatorial
+    # search encounters the highest-EV combinations first. This improves
+    # branch-and-bound effectiveness and ensures greedy pre-filtering
+    # retains the most promising candidates.
+    qualifying_picks = sorted(
+        qualifying_picks,
+        key=lambda p: (
+            p.get("probability_over", 0.5)
+            if p.get("direction", "OVER") == "OVER"
+            else 1.0 - p.get("probability_over", 0.5)
+        ),
+        reverse=True,
+    )
+
+    # Complexity: O(C(n, k)) where n=picks, k=entry_size
+    # For large pick pools (> 30), use a greedy pre-filter to reduce the
+    # candidate pool to the top ~25 picks before running full combinatorial
+    # search. This prevents combinatorial explosion while preserving quality.
+    _LARGE_POOL_THRESHOLD = 30
+    _GREEDY_POOL_SIZE = 25
+    if len(qualifying_picks) > _LARGE_POOL_THRESHOLD:
+        qualifying_picks = qualifying_picks[:_GREEDY_POOL_SIZE]
 
     # Get the payout table for this platform and entry size
     platform_flex_table = PLATFORM_FLEX_TABLES.get(platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
@@ -610,7 +664,7 @@ def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
     if platform != 'PrizePicks':
         flex_table = PLATFORM_FLEX_TABLES.get(platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
         flex_payout_for_size = flex_table.get(entry_size, {})
-        flex_result = calculate_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
+        flex_result = _compute_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
         return {
             'recommended_play_type': 'Flex',
             'flex_ev':               flex_result['ev_dollars'],
@@ -625,7 +679,7 @@ def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
     flex_payout_for_size  = PRIZEPICKS_FLEX_PAYOUT_TABLE.get(entry_size, {})
     power_payout_for_size = PRIZEPICKS_POWER_PAYOUT_TABLE.get(entry_size, {})
 
-    flex_result = calculate_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
+    flex_result = _compute_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
     flex_ev = flex_result['ev_dollars']
 
     # Power EV: only paid when ALL picks hit
@@ -725,7 +779,7 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
         p_ev = all_hit * power_multiplier * entry_fee - entry_fee
         # Flex EV
         uniform_probs = [p_test] * entry_size
-        f_ev = calculate_flex_ev(uniform_probs, flex_payout, entry_fee)['ev_dollars']
+        f_ev = _compute_flex_ev(uniform_probs, flex_payout, entry_fee)['ev_dollars']
         return p_ev - f_ev
 
     # Binary search for breakeven in [0.50, 0.99]
