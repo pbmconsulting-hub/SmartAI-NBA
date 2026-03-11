@@ -151,30 +151,40 @@ def calculate_poisson_over_probability(line, average_rate):
     """
     Calculate the probability of exceeding `line` using Poisson.
 
-    Sums P(k) for all k from ceil(line)+1 to a large number.
+    Uses the complement method: P(X > line) = 1 - P(X <= floor(line)).
+    Summing from 0 to floor(line) is more efficient and numerically stable
+    than summing the upper tail, especially when line < average_rate (fewer
+    terms) and avoids the need for an arbitrary upper ceiling cutoff.
 
     Args:
         line (float): The prop line (e.g., 4.5 assists)
         average_rate (float): Player's average for this stat
 
     Returns:
-        float: Probability of exceeding the line
+        float: Probability of exceeding the line (clamped to [0.0, 1.0])
+
+    Example:
+        If a player averages 5.0 assists, what's P(X > 4.5)?
+        → calculate_poisson_over_probability(4.5, 5.0) ≈ 0.559
     """
-    # We need to check integer values above the line
-    # e.g., line = 4.5 → we need count >= 5
-    minimum_count_to_exceed = math.floor(line) + 1
+    # Guard: degenerate rate → only X = 0 is possible
+    # P(X > line) = 1.0 if line < 0, else 0.0
+    if average_rate <= 0:
+        return 1.0 if line < 0 else 0.0
 
-    # Sum up probabilities for counts from min to a large ceiling
-    # We stop at 3x the average rate + 20 to capture the tail
-    # BEGINNER NOTE: The "+20" ensures we capture rare high-count games
-    maximum_count_to_check = int(average_rate * 3) + 20
+    # Complement method: P(X > threshold) = 1 - P(X <= threshold)
+    # where threshold = floor(line)
+    # BEGINNER NOTE: Summing 0..threshold (the UNDER side) is faster when
+    # line < mean, and avoids choosing an arbitrary upper ceiling.
+    threshold = math.floor(line)
 
-    total_probability_over = 0.0  # Start with zero, add each count's prob
+    # For negative lines, threshold < 0, so range is empty → P(X <= -1) = 0
+    # → P(X > -1) = 1.0, which is correct since all Poisson values are >= 0.
+    cumulative_under = 0.0
+    for k in range(threshold + 1):
+        cumulative_under += calculate_poisson_probability(k, average_rate)
 
-    for count in range(minimum_count_to_exceed, maximum_count_to_check + 1):
-        total_probability_over += calculate_poisson_probability(count, average_rate)
-
-    return min(total_probability_over, 1.0)  # Cap at 1.0 just in case
+    return max(0.0, min(1.0, 1.0 - cumulative_under))
 
 
 # ============================================================
@@ -248,6 +258,14 @@ def calculate_percentile(numbers_list, percentile):
 
     Example:
         calculate_percentile([10,20,30,40,50], 25) → 17.5
+
+    Edge case — single-element list:
+        When the list has exactly 1 element, position = 0 for ALL
+        percentile values (0th through 100th), so both
+        calculate_percentile([42], 0) and calculate_percentile([42], 100)
+        return 42. This is mathematically correct: for a single-point
+        distribution every percentile is that one value. Do NOT
+        "fix" this behaviour — it is intentional.
     """
     if not numbers_list:
         return 0.0  # Nothing to compute

@@ -219,6 +219,40 @@ def detect_streak(game_log_values, reference_avg, threshold=STREAK_THRESHOLD):
 # ============================================================
 
 
+def compute_league_average_game_total(teams_data=None):
+    """
+    Compute league-average game total from live team data.
+    Falls back to LEAGUE_AVERAGE_GAME_TOTAL constant if data unavailable.
+
+    The league-average game total shifts as the season progresses and scoring
+    trends change. When live teams_data is available this function derives the
+    value dynamically; otherwise the hardcoded seasonal constant is returned.
+
+    Args:
+        teams_data (list of dict, optional): Team rows from teams.csv or the
+            live data feed. Each dict should contain at minimum one of:
+            - "pts" (float): team points per game (offensive)
+            - "opp_pts" or "pts_against" (float): opponent points per game
+
+    Returns:
+        float: Estimated league-average combined game total (both teams' scores).
+    """
+    if not teams_data:
+        return LEAGUE_AVERAGE_GAME_TOTAL
+    try:
+        totals = []
+        for team in teams_data:
+            ppg = float(team.get("pts", 0) or 0)
+            opp_ppg = float(team.get("opp_pts", 0) or team.get("pts_against", 0) or 0)
+            if ppg > 0 and opp_ppg > 0:
+                totals.append(ppg + opp_ppg)
+        if totals:
+            return sum(totals) / len(totals)
+    except Exception:
+        pass
+    return LEAGUE_AVERAGE_GAME_TOTAL
+
+
 def build_player_projection(
     player_data,
     opponent_team_abbreviation,
@@ -510,11 +544,13 @@ def build_player_projection(
 
     # --- Factor 5: Game Total / Scoring Environment ---
     # High-total games (230+ pts projected) are fast-paced, high scoring
-    # Neutral total is LEAGUE_AVERAGE_GAME_TOTAL; adjust proportionally
+    # Use compute_league_average_game_total() to get a dynamic league average
+    # from live team data when available, falling back to the season constant.
+    league_avg_total = compute_league_average_game_total(teams_data)
     if game_total > 0:
         # BEGINNER NOTE: This creates a small boost/penalty based on
         # how far the total is from average. Capped at ±5%
-        game_total_factor = 1.0 + ((game_total - LEAGUE_AVERAGE_GAME_TOTAL) / LEAGUE_AVERAGE_GAME_TOTAL) * 0.5
+        game_total_factor = 1.0 + ((game_total - league_avg_total) / league_avg_total) * 0.5
         game_total_factor = max(0.95, min(1.05, game_total_factor))  # Cap at ±5%
     else:
         game_total_factor = 1.0  # Neutral if no total provided

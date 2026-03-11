@@ -5,6 +5,11 @@
 # CONNECTS TO: bet_tracker.py (uses these functions)
 # CONCEPTS COVERED: SQLite, database CRUD operations,
 #                   context managers, SQL queries
+#
+# NOTE: check_same_thread=False is set on ALL connections for
+# Streamlit Server compatibility where multiple user sessions may
+# access the database concurrently. SQLite handles this safely in
+# WAL mode for read-heavy workloads (WAL mode is enabled below).
 # ============================================================
 
 # Standard library imports only
@@ -135,7 +140,10 @@ def initialize_database():
         # Connect to the SQLite database file
         # BEGINNER NOTE: sqlite3.connect() opens (or creates) the DB file
         # 'with' statement ensures the connection is properly closed
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        # check_same_thread=False: required for Streamlit Server multi-session access
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+            # Enable WAL mode for safe concurrent read access
+            connection.execute("PRAGMA journal_mode=WAL")
             cursor = connection.cursor()  # A cursor lets us run SQL commands
 
             # Create the tables
@@ -186,7 +194,10 @@ def get_database_connection():
     # Connect with row_factory so results come back as dictionaries
     # BEGINNER NOTE: row_factory makes results easier to work with —
     # instead of tuples (24, 'LeBron') you get {'points': 24, 'name': 'LeBron'}
-    connection = sqlite3.connect(str(DB_FILE_PATH))
+    # check_same_thread=False: required for Streamlit Server multi-session access
+    connection = sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False)
+    # Enable WAL mode for safe concurrent read access
+    connection.execute("PRAGMA journal_mode=WAL")
     connection.row_factory = sqlite3.Row  # Rows behave like dicts
 
     return connection
@@ -245,7 +256,7 @@ def insert_bet(bet_data):
     )
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             cursor = connection.cursor()
             cursor.execute(insert_sql, values)
             connection.commit()
@@ -275,7 +286,7 @@ def update_bet_result(bet_id, result, actual_value):
     """
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             cursor = connection.cursor()
             cursor.execute(update_sql, (result, actual_value, bet_id))
             connection.commit()
@@ -303,7 +314,7 @@ def load_all_bets(limit=200):
     """
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.cursor()
             cursor.execute(select_sql, (limit,))
@@ -340,7 +351,7 @@ def get_performance_summary():
     """
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.cursor()
             cursor.execute(summary_sql)
@@ -413,7 +424,7 @@ def insert_prediction(prediction_data):
         prediction_data.get("notes", ""),
     )
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             cursor = connection.cursor()
             cursor.execute(insert_sql, values)
             connection.commit()
@@ -441,7 +452,7 @@ def update_prediction_outcome(prediction_id, was_correct, actual_value):
     WHERE prediction_id = ?
     """
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             cursor = connection.cursor()
             cursor.execute(update_sql, (1 if was_correct else 0, actual_value, prediction_id))
             connection.commit()
@@ -499,7 +510,7 @@ def get_calibration_adjustment(stat_type=None, min_samples=20):
         params = ()
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.cursor()
             cursor.execute(query_sql, params)
@@ -558,7 +569,7 @@ def get_calibration_report():
     """
 
     try:
-        with sqlite3.connect(str(DB_FILE_PATH)) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
             connection.row_factory = sqlite3.Row
             cursor = connection.cursor()
 
