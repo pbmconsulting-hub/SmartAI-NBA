@@ -176,8 +176,8 @@ def get_clv_summary(days=90, min_records=5):
         recent = [
             r for r in records.values()
             if r.get("closing_line") is not None
-            and r.get("opening_timestamp")
-            and datetime.datetime.fromisoformat(r.get("opening_timestamp", "")) >= cutoff
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
         ]
 
         if not recent:
@@ -243,6 +243,35 @@ def get_clv_summary(days=90, min_records=5):
 
 
 # ============================================================
+# SECTION: Internal Helpers
+# ============================================================
+
+def _safe_parse_timestamp(ts_value):
+    """
+    Safely parse an ISO-format timestamp string.
+
+    Returns a datetime.datetime on success, or None on any failure
+    (missing value, empty string, malformed string, etc.).
+
+    Args:
+        ts_value: Raw value from a CLV record dict.
+
+    Returns:
+        datetime.datetime or None.
+    """
+    if not ts_value:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(str(ts_value))
+    except (ValueError, TypeError):
+        return None
+
+# ============================================================
+# END SECTION: Internal Helpers
+# ============================================================
+
+
+# ============================================================
 # SECTION: Model Edge Validation
 # ============================================================
 
@@ -290,8 +319,8 @@ def validate_model_edge(days=90):
             r for r in records.values()
             if r.get("closing_line") is not None
             and r.get("clv") is not None
-            and r.get("opening_timestamp")
-            and datetime.datetime.fromisoformat(r.get("opening_timestamp", "")) >= cutoff
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
         ]
 
         if not recent:
@@ -467,8 +496,8 @@ def get_tier_accuracy_report(days=90):
         recent = [
             r for r in records.values()
             if r.get("closing_line") is not None
-            and r.get("opening_timestamp")
-            and datetime.datetime.fromisoformat(r.get("opening_timestamp", "")) >= cutoff
+            and _safe_parse_timestamp(r.get("opening_timestamp")) is not None
+            and _safe_parse_timestamp(r.get("opening_timestamp")) >= cutoff
         ]
 
         if not recent:
