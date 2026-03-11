@@ -17,23 +17,23 @@ import math  # For rounding calculations
 
 # Coefficient of variation (std / mean) above which a stat is
 # considered "too unpredictable" to bet reliably.
-# CV of 0.40 means the std is 40% of the average — very noisy.
-HIGH_VARIANCE_CV_THRESHOLD = 0.40  # was 0.45 — tightened for accuracy
+# CV of 0.45 means the std is 45% of the average — very noisy.
+HIGH_VARIANCE_CV_THRESHOLD = 0.45  # loosened from 0.40 so secondary stats (steals, blocks, threes) aren't auto-avoided
 
-# Sportsbook vig/juice is typically ~4.5%. We subtract 2.5% from raw edge
+# Sportsbook vig/juice is typically ~4.5%. We subtract 2.0% from raw edge
 # to account for this before declaring a qualifying edge.
-VIG_ADJUSTMENT_PCT = 2.5
+VIG_ADJUSTMENT_PCT = 2.0
 
 # Minimum edge required AFTER vig deduction for a pick to qualify
-MIN_EDGE_AFTER_VIG = 4.0  # was 3.0 — raised to filter out borderline picks more aggressively
+MIN_EDGE_AFTER_VIG = 2.0  # lowered from 4.0 (was 3.0 originally) to align with Silver 3% min edge
 
 # Low-volume stat types with inherently higher variance.
 # These require a larger raw edge to overcome uncertainty.
 LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
 
 # Uncertainty multiplier applied to low-volume stats' edge calculations.
-# 1.5x means a steal prop needs effectively 1.5x more edge to qualify.
-LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.5
+# 1.3x means a steal prop needs effectively 1.3x more edge to qualify.
+LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.3  # softened from 1.5 to reduce over-penalizing secondary stats
 
 
 # ============================================================
@@ -371,7 +371,7 @@ def should_avoid_prop(
     under_strength = directional_forces_result.get("under_strength", 0)
     if over_strength > 0 and under_strength > 0:
         conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
-        if conflict_ratio > 0.70:  # Within 30% of each other = conflicting (was 25%)
+        if conflict_ratio > 0.80:  # Within 20% of each other = conflicting (raised from 0.70)
             avoid_reasons.append(
                 "Conflicting forces — OVER and UNDER signals are nearly equal"
             )
