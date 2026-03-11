@@ -298,21 +298,25 @@ class RosterEngine:
 
     def _fetch_nba_api_injuries(self) -> dict:
         """
-        Fetch today's injury report via nba_api.live.nba.endpoints.injuries.
+        Fetch today's injury report via the NBA CDN public injury JSON feed.
 
-        This accesses the official NBA live injury feed through the nba_api
-        package, which handles rate-limiting and proper NBA API headers.
+        Uses https://cdn.nba.com/static/json/liveData/injuries/injuries.json
+        which is freely available and returns the official NBA injury report.
+        Falls back to an empty dict if the HTTP request fails.
         """
+        import requests as _requests  # local import to avoid top-level dep for optional feature
+
+        NBA_INJURY_URL = "https://cdn.nba.com/static/json/liveData/injuries/injuries.json"
         result: dict = {}
         try:
-            from nba_api.live.nba.endpoints import injuries as live_injuries
-            inj_report = live_injuries.Injuries()
-            data = inj_report.get_dict()
+            resp = _requests.get(NBA_INJURY_URL, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
 
-            # The live injuries endpoint returns:
-            # {"injuries": {"injuredPlayers": [...]}}  or similar shape
+            # Structure: {"league": {"standard": [...]}}
             injured_list = (
-                data.get("injuries", {}).get("injuredPlayers", [])
+                data.get("league", {}).get("standard", [])
+                or data.get("injuries", {}).get("injuredPlayers", [])
                 or data.get("injuredPlayers", [])
                 or data.get("players", [])
             )
@@ -329,7 +333,7 @@ class RosterEngine:
                     "injury":      str(injury or ""),
                     "team":        str(team or ""),
                     "return_date": "",
-                    "source":      "nba_api-live-injuries",
+                    "source":      "nba-cdn-injuries",
                 }
         except Exception as exc:
             print(f"RosterEngine._fetch_nba_api_injuries: {exc}")

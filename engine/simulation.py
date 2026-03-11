@@ -880,7 +880,7 @@ def simulate_fantasy_score(
     for _ in range(number_of_simulations):
         blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
         foul_reduction = _simulate_foul_trouble_minutes_reduction()
-        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        total_reduction = min(0.25, (blowout_reduction * 0.6) + (foul_reduction * 0.6))
         minutes_mult = 1.0 - total_reduction
 
         fantasy_val = 0.0
@@ -971,7 +971,7 @@ def simulate_double_double(
     for _ in range(number_of_simulations):
         blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
         foul_reduction = _simulate_foul_trouble_minutes_reduction()
-        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        total_reduction = min(0.25, (blowout_reduction * 0.6) + (foul_reduction * 0.6))
         minutes_mult = 1.0 - total_reduction
 
         stats_at_10_plus = 0
@@ -1053,7 +1053,7 @@ def simulate_triple_double(
     for _ in range(number_of_simulations):
         blowout_reduction = _simulate_blowout_minutes_reduction(blowout_risk_factor)
         foul_reduction = _simulate_foul_trouble_minutes_reduction()
-        total_reduction = min(0.40, blowout_reduction + foul_reduction)
+        total_reduction = min(0.25, (blowout_reduction * 0.6) + (foul_reduction * 0.6))
         minutes_mult = 1.0 - total_reduction
 
         stats_at_10_plus = 0
