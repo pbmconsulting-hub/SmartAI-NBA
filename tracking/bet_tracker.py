@@ -344,12 +344,12 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
 
     logged = 0
     # Silver, Gold, and Platinum tiers qualify for auto-logging.
-    # Bronze qualifies only with edge >= 8% AND confidence >= 60.
+    # Bronze qualifies only with edge >= 8% AND confidence score >= 60/100.
     AUTO_LOG_TIERS = {"Gold", "Platinum", "Silver", "Bronze"}
     # Silver picks only need 3% edge; Gold/Platinum use the minimum_edge parameter
     SILVER_MIN_EDGE = 3.0
     BRONZE_MIN_EDGE = 8.0
-    BRONZE_MIN_CONFIDENCE = 60.0
+    BRONZE_MIN_CONFIDENCE = 60.0  # out of 100
 
     # Sort by confidence score descending so the highest-quality picks are logged first
     sorted_results = sorted(

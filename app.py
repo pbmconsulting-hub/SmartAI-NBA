@@ -71,19 +71,10 @@ st.markdown("""
     background-size: 200% 100%;
     animation: headerShimmer 4s ease infinite;
 }
-.hero-title {
-    font-size: 2.4rem;
-    font-weight: 800;
-    font-family: 'Orbitron', sans-serif;
-    color: #0a0f1a;
-    margin: 0;
-    letter-spacing: 0.05em;
-    text-shadow: 0 0 20px rgba(0,0,0,0.2);
-}
-.hero-subtitle {
-    font-size: 1.05rem;
-    color: rgba(10,15,26,0.85);
-    margin-top: 6px;
+.spp-hero-logo {
+    max-height: 90px;
+    max-width: 100%;
+    object-fit: contain;
 }
 .hero-date {
     font-size: 0.95rem;
@@ -199,7 +190,7 @@ game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if
 _logo_b64 = _load_logo_b64(_LOGO_PATH) if os.path.exists(_LOGO_PATH) else ""
 
 _logo_img_tag = (
-    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" style="max-height:90px;max-width:100%;object-fit:contain;" />'
+    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" alt="Smart Pick Pro logo" />'
     if _logo_b64 else ""
 )
 
