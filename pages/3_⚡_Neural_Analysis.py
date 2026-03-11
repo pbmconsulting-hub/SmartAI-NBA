@@ -1420,10 +1420,56 @@ if run_analysis:
         if idx < len(analysis_results_list):
             analysis_results_list[idx]["_correlation_warning"] = warning
 
+    # ── Auto-trigger Smart Update if >20% of players are unmatched ─
+    # Unmatched players use skeleton stats which reduces accuracy.
+    # Fetching fresh rosters resolves most mismatches without user action.
+    _unmatched_players = list(dict.fromkeys(
+        r.get("player_name", "")
+        for r in analysis_results_list
+        if not r.get("player_matched", True) and not r.get("player_is_out", False)
+    ))
+    _total_non_out = sum(
+        1 for r in analysis_results_list if not r.get("player_is_out", False)
+    )
+    _unmatched_ratio = len(_unmatched_players) / max(_total_non_out, 1)
+    if _unmatched_ratio > 0.20 and todays_games:
+        st.info(
+            f"🔄 **{len(_unmatched_players)} player(s) not found** in local database "
+            f"({_unmatched_ratio*100:.0f}% of props). Triggering Smart Roster Update…"
+        )
+        try:
+            from data.live_data_fetcher import fetch_todays_players_only as _fetch_today
+            _roster_result = _fetch_today(todays_games, progress_callback=None)
+            if _roster_result:
+                # Reload players data after the update
+                _refreshed_players = load_players_data()
+                # Re-match previously-unmatched players
+                _rematched = 0
+                for _r in analysis_results_list:
+                    if not _r.get("player_matched", True) and not _r.get("player_is_out", False):
+                        _pd = find_player_by_name(_refreshed_players, _r.get("player_name", ""))
+                        if _pd is not None:
+                            _r["player_matched"] = True
+                            _rematched += 1
+                if _rematched:
+                    st.success(f"✅ Smart Update matched {_rematched} additional player(s).")
+        except Exception as _su_err:
+            # Non-fatal — proceed with existing results
+            print(f"Smart Update error (non-fatal): {_su_err}")
+
     st.session_state["analysis_results"] = analysis_results_list
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
     progress_bar.empty()
     st.success(f"✅ Analysis complete! {len(analysis_results_list)} props analyzed.")
+
+    # ── Store ALL picks to all_analysis_picks table ──────────────
+    try:
+        from tracking.database import insert_analysis_picks as _insert_picks
+        _stored = _insert_picks(analysis_results_list)
+        if _stored > 0:
+            print(f"Stored {_stored} analysis picks to all_analysis_picks table.")
+    except Exception as _store_err:
+        print(f"Store analysis picks error (non-fatal): {_store_err}")
 
     # ── Auto-log all qualifying picks to the Bet Tracker ────────
     try:
@@ -1623,15 +1669,20 @@ if analysis_results:
                 st.info("All Gold+ picks already added.")
 
     if unmatched_count > 0:
-        unmatched_names = [
+        # Deduplicate: same player may have multiple stat types, each flagged separately.
+        # Only count and list each unique player name once.
+        unmatched_names_deduped = list(dict.fromkeys(
             r.get("player_name", "") for r in analysis_results
             if not r.get("player_matched", True)
-        ]
-        st.warning(
-            f"⚠️ **{unmatched_count} player(s) not found** in database — "
-            + ", ".join(unmatched_names)
-            + " — results may be less accurate."
-        )
+            and not r.get("player_is_out", False)  # exclude confirmed-out players
+        ))
+        unmatched_unique_count = len(unmatched_names_deduped)
+        if unmatched_unique_count > 0:
+            st.warning(
+                f"⚠️ **{unmatched_unique_count} player(s) not found** in database — "
+                + ", ".join(unmatched_names_deduped)
+                + " — results may be less accurate. Run a **Smart Update** on the Data Feed page to refresh roster data."
+            )
 
     st.divider()
 
