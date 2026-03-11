@@ -290,7 +290,7 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # SECTION: Auto-Log Analysis Results
 # ============================================================
 
-def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=10):
+def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
     """
     Automatically log bet records for analysis results that have a positive
     edge in the model's recommended direction.
@@ -308,12 +308,11 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=10):
             Neural Analysis engine (as stored in session_state).
         minimum_edge (float): Skip picks whose edge_percentage is below
             this value for Gold/Platinum tiers. Silver picks only require
-            ≥3% edge. Defaults to 5.0.  Only picks with edge > 0
+            ≥3% edge. Bronze picks require ≥8% edge AND ≥60 confidence.
+            Defaults to 5.0.  Only picks with edge > 0
             (model favours the recommended direction) are ever logged.
-            Silver, Gold, and Platinum tier picks are auto-logged;
-            Bronze picks are skipped regardless of edge.
         max_bets (int): Maximum number of new bets to log in a single
-            analysis run. Defaults to 10.
+            analysis run. Defaults to 25.
 
     Returns:
         int: Number of new bets logged.
@@ -344,10 +343,13 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=10):
         pass  # If query fails, log without dedup (safe — unique constraint absent)
 
     logged = 0
-    # Silver, Gold, and Platinum tiers qualify for auto-logging; Bronze is too noisy
-    AUTO_LOG_TIERS = {"Gold", "Platinum", "Silver"}
+    # Silver, Gold, and Platinum tiers qualify for auto-logging.
+    # Bronze qualifies only with edge >= 8% AND confidence >= 60.
+    AUTO_LOG_TIERS = {"Gold", "Platinum", "Silver", "Bronze"}
     # Silver picks only need 3% edge; Gold/Platinum use the minimum_edge parameter
     SILVER_MIN_EDGE = 3.0
+    BRONZE_MIN_EDGE = 8.0
+    BRONZE_MIN_CONFIDENCE = 60.0
 
     # Sort by confidence score descending so the highest-quality picks are logged first
     sorted_results = sorted(
@@ -361,14 +363,23 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=10):
             break
         edge = res.get("edge_percentage", 0)
         tier = res.get("tier", "Bronze")
+        confidence = res.get("confidence_score", 0)
         # Only log picks where edge is positive
         if edge <= 0:
             continue
-        # Only auto-log Silver-tier and above; skip Bronze
+        # Only auto-log recognised tiers
         if tier not in AUTO_LOG_TIERS:
             continue
-        # Apply tier-specific minimum edge: Silver needs ≥3%, Gold/Platinum use minimum_edge
-        min_required_edge = SILVER_MIN_EDGE if tier == "Silver" else minimum_edge
+        # Apply tier-specific minimum edge thresholds
+        if tier == "Silver":
+            min_required_edge = SILVER_MIN_EDGE
+        elif tier == "Bronze":
+            # Bronze needs high edge AND high confidence to qualify
+            if edge < BRONZE_MIN_EDGE or confidence < BRONZE_MIN_CONFIDENCE:
+                continue
+            min_required_edge = BRONZE_MIN_EDGE
+        else:
+            min_required_edge = minimum_edge
         if edge < min_required_edge:
             continue
         if res.get("player_is_out", False):

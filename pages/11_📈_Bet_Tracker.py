@@ -6,11 +6,12 @@
 # TABS:
 #   1. 📊 Model Health  — Overall metrics + win rate by tier/platform/stat
 #   2. 📊 AI Picks      — Auto-logged picks from Neural Analysis
-#   3. 🤖 Auto-Resolve  — Fetch actual stats and mark results
-#   4. 📋 My Bets       — Full bets as styled cards
-#   5. ➕ Log a Bet     — Manual / analysis-prefilled bet entry
-#   6. 🔮 Predictor     — Forward-looking bankroll / ROI forecasts
-#   7. 📅 History       — 2-week rolling day-by-day timeline
+#   3. 📋 All Picks     — Every pick the app outputs (complete performance record)
+#   4. 🤖 Auto-Resolve  — Fetch actual stats and mark results
+#   5. 📋 My Bets       — Full bets as styled cards
+#   6. ➕ Log a Bet     — Manual / analysis-prefilled bet entry
+#   7. 🔮 Predictor     — Forward-looking bankroll / ROI forecasts
+#   8. 📅 History       — 2-week rolling day-by-day timeline
 # CONNECTS TO: tracking/bet_tracker.py, tracking/database.py
 # ============================================================
 
@@ -32,6 +33,7 @@ from tracking.database import (
     load_daily_snapshots,
     get_rolling_stats,
     save_daily_snapshot,
+    load_all_analysis_picks,
 )
 from styles.theme import (
     get_global_css,
@@ -198,6 +200,7 @@ st.divider()
 (
     tab_model_health,
     tab_ai_picks,
+    tab_all_picks,
     tab_auto_resolve,
     tab_bets,
     tab_log,
@@ -206,6 +209,7 @@ st.divider()
 ) = st.tabs([
     "📊 Model Health",
     "📊 AI Picks",
+    "📋 All Picks",
     "🤖 Auto-Resolve",
     "📋 My Bets",
     "➕ Log a Bet",
@@ -489,6 +493,192 @@ with tab_ai_picks:
 
 # ============================================================
 # END SECTION: AI Picks Tab
+# ============================================================
+
+
+# ============================================================
+# SECTION: All Picks Tab
+# ============================================================
+
+with tab_all_picks:
+    st.subheader("📋 All Picks — Complete App Output Performance Record")
+    st.markdown(
+        "Every pick the Neural Analysis engine outputs — not just the AI-auto-logged ones. "
+        "Track the **complete** performance record of every prediction the app makes."
+    )
+
+    # ── Session-state picks (most recent run) ─────────────────────────
+    session_picks = st.session_state.get("analysis_results", [])
+    # ── Historical picks from DB (persistent) ────────────────────────
+    db_all_picks = load_all_analysis_picks(days=30)
+
+    # Prefer DB picks for historical view; session picks for live view
+    ap_source_radio = st.radio(
+        "Show:",
+        ["Today's Analysis (live session)", "30-Day History (database)"],
+        horizontal=True,
+        key="ap_source_radio",
+    )
+    if ap_source_radio == "Today's Analysis (live session)":
+        all_picks_data = session_picks
+        _date_field = None  # session picks don't have a date field
+    else:
+        all_picks_data = db_all_picks
+        _date_field = "pick_date"
+
+    if not all_picks_data:
+        st.info(
+            "📭 No picks to display. Run **Neural Analysis** to generate picks — "
+            "all outputs are automatically stored here for tracking."
+        )
+    else:
+        # ── Summary Cards ─────────────────────────────────────────────
+        _ap_total = len(all_picks_data)
+        _ap_overs = sum(1 for p in all_picks_data if p.get("direction") == "OVER")
+        _ap_unders = sum(1 for p in all_picks_data if p.get("direction") == "UNDER")
+        _ap_wins  = sum(1 for p in all_picks_data if p.get("result") == "WIN")
+        _ap_losses = sum(1 for p in all_picks_data if p.get("result") == "LOSS")
+        _ap_pushes = sum(1 for p in all_picks_data if p.get("result") == "PUSH")
+        _ap_pending = sum(1 for p in all_picks_data if not p.get("result"))
+        _ap_resolved = _ap_wins + _ap_losses
+        _ap_win_rate = round(_ap_wins / max(_ap_resolved, 1) * 100, 1) if _ap_resolved > 0 else None
+        _ap_avg_edge = (
+            sum(abs(float(p.get("edge_percentage", 0) or 0)) for p in all_picks_data) / _ap_total
+            if _ap_total > 0 else 0.0
+        )
+        _ap_avg_conf = (
+            sum(float(p.get("confidence_score", 0) or 0) for p in all_picks_data) / _ap_total
+            if _ap_total > 0 else 0.0
+        )
+
+        _tier_counts = {}
+        for _t in ("Platinum", "Gold", "Silver", "Bronze"):
+            _tier_counts[_t] = sum(1 for p in all_picks_data if p.get("tier") == _t)
+
+        # Summary metric columns
+        _apc1, _apc2, _apc3, _apc4, _apc5 = st.columns(5)
+        _apc1.metric("Total Picks", _ap_total)
+        _apc2.metric("⬆️ OVER", _ap_overs)
+        _apc3.metric("⬇️ UNDER", _ap_unders)
+        _apc4.metric("Avg Edge", f"{_ap_avg_edge:.1f}%")
+        _apc5.metric("Avg Confidence", f"{_ap_avg_conf:.0f}/100")
+
+        _apc6, _apc7, _apc8, _apc9, _apc10 = st.columns(5)
+        _apc6.metric("✅ Wins", _ap_wins)
+        _apc7.metric("❌ Losses", _ap_losses)
+        _apc8.metric("🔄 Pushes", _ap_pushes)
+        _apc9.metric("⏳ Pending", _ap_pending)
+        if _ap_win_rate is not None:
+            _apc10.metric("Win Rate", f"{_ap_win_rate:.1f}%")
+        else:
+            _apc10.metric("Win Rate", "—")
+
+        # ── Tier Distribution Bar ─────────────────────────────────────
+        _tier_bar = (
+            f'<span style="color:#c800ff;font-weight:700;">💎 {_tier_counts["Platinum"]} Platinum</span>'
+            f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {_tier_counts["Gold"]} Gold</span>'
+            f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {_tier_counts["Silver"]} Silver</span>'
+            f' &nbsp;·&nbsp; <span style="color:#cd7f32;">🥉 {_tier_counts["Bronze"]} Bronze</span>'
+        )
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);border:1px solid rgba(0,240,255,0.15);'
+            f'border-radius:8px;padding:12px 16px;margin:8px 0;">'
+            f'<div style="font-size:0.85rem;color:#8a9bb8;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">Tier Distribution</div>'
+            f'<div style="font-size:0.88rem;">{_tier_bar}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ── W/L by Tier breakdown ─────────────────────────────────────
+        st.subheader("📊 Win Rate by Tier")
+        _tier_cols = st.columns(4)
+        for _ti, _tn in enumerate(["Platinum", "Gold", "Silver", "Bronze"]):
+            _t_picks = [p for p in all_picks_data if p.get("tier") == _tn]
+            _t_w = sum(1 for p in _t_picks if p.get("result") == "WIN")
+            _t_l = sum(1 for p in _t_picks if p.get("result") == "LOSS")
+            _t_res = _t_w + _t_l
+            _t_wr = f"{_t_w / max(_t_res,1)*100:.0f}%" if _t_res > 0 else "—"
+            _t_record = f"{_t_w}-{_t_l}" if _t_res > 0 else "No results"
+            _tier_cols[_ti].metric(
+                _tn,
+                _t_wr,
+                help=f"Record: {_t_record} from {len(_t_picks)} picks",
+            )
+
+        # ── W/L by Direction ──────────────────────────────────────────
+        _dir_col1, _dir_col2 = st.columns(2)
+        with _dir_col1:
+            _ov_picks = [p for p in all_picks_data if p.get("direction") == "OVER"]
+            _ov_w = sum(1 for p in _ov_picks if p.get("result") == "WIN")
+            _ov_l = sum(1 for p in _ov_picks if p.get("result") == "LOSS")
+            _ov_res = _ov_w + _ov_l
+            _ov_wr = f"{_ov_w / max(_ov_res,1)*100:.0f}%" if _ov_res > 0 else "—"
+            st.metric("⬆️ OVER Win Rate", _ov_wr, help=f"{_ov_w}-{_ov_l} ({len(_ov_picks)} picks)")
+        with _dir_col2:
+            _un_picks = [p for p in all_picks_data if p.get("direction") == "UNDER"]
+            _un_w = sum(1 for p in _un_picks if p.get("result") == "WIN")
+            _un_l = sum(1 for p in _un_picks if p.get("result") == "LOSS")
+            _un_res = _un_w + _un_l
+            _un_wr = f"{_un_w / max(_un_res,1)*100:.0f}%" if _un_res > 0 else "—"
+            st.metric("⬇️ UNDER Win Rate", _un_wr, help=f"{_un_w}-{_un_l} ({len(_un_picks)} picks)")
+
+        # ── Win rate by stat type ─────────────────────────────────────
+        _stat_types = sorted({p.get("stat_type", "unknown") for p in all_picks_data})
+        if _stat_types:
+            st.subheader("📊 Win Rate by Stat Type")
+            _stat_cols = st.columns(min(len(_stat_types), 4))
+            for _si, _stype in enumerate(_stat_types[:4]):
+                _s_picks = [p for p in all_picks_data if p.get("stat_type") == _stype]
+                _s_w = sum(1 for p in _s_picks if p.get("result") == "WIN")
+                _s_l = sum(1 for p in _s_picks if p.get("result") == "LOSS")
+                _s_res = _s_w + _s_l
+                _s_wr = f"{_s_w / max(_s_res,1)*100:.0f}%" if _s_res > 0 else "—"
+                _stat_cols[_si].metric(
+                    _stype.title(),
+                    _s_wr,
+                    help=f"{_s_w}-{_s_l} ({len(_s_picks)} picks)",
+                )
+
+        st.divider()
+
+        # ── Per-day sections ──────────────────────────────────────────
+        if _date_field:
+            # Group DB picks by date
+            _by_date_ap: dict = {}
+            for _p in all_picks_data:
+                _d = _p.get(_date_field, "Unknown")
+                _by_date_ap.setdefault(_d, []).append(_p)
+            for _ap_date in sorted(_by_date_ap.keys(), reverse=True):
+                _day_data = _by_date_ap[_ap_date]
+                _d_w = sum(1 for p in _day_data if p.get("result") == "WIN")
+                _d_l = sum(1 for p in _day_data if p.get("result") == "LOSS")
+                _d_res = _d_w + _d_l
+                _d_wr = f" — {_d_w / max(_d_res,1)*100:.0f}% win rate" if _d_res > 0 else ""
+                with st.expander(
+                    f"📅 {_ap_date} · {len(_day_data)} picks · ✅{_d_w} ❌{_d_l}{_d_wr}"
+                ):
+                    _ca, _cb = st.columns(2)
+                    for _idx, _pick in enumerate(_day_data):
+                        # Remap pick_date → bet_date so get_bet_card_html renders date correctly
+                        _pick_card = dict(_pick)
+                        if "bet_date" not in _pick_card:
+                            _pick_card["bet_date"] = _pick_card.get("pick_date", "")
+                        _col = _ca if _idx % 2 == 0 else _cb
+                        with _col:
+                            st.markdown(
+                                get_bet_card_html(_pick_card),
+                                unsafe_allow_html=True,
+                            )
+        else:
+            # Session picks: show all in two-column grid
+            _col_a, _col_b = st.columns(2)
+            for _idx, _pick in enumerate(all_picks_data):
+                _col = _col_a if _idx % 2 == 0 else _col_b
+                with _col:
+                    st.markdown(get_bet_card_html(_pick), unsafe_allow_html=True)
+
+# ============================================================
+# END SECTION: All Picks Tab
 # ============================================================
 
 

@@ -31,8 +31,11 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── App Logo — Smart Pick Pro ───────────────────────────────
-# Displayed in the sidebar top and as the brand identity.
-_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
+# Use the root-level original logo (1.7MB, high-resolution user asset).
+# Falls back to the assets/ copy if the root-level file is missing.
+_ROOT_LOGO_PATH   = os.path.join(os.path.dirname(__file__), "Smart_Pick_Pro_Logo.png")
+_ASSETS_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
+_LOGO_PATH = _ROOT_LOGO_PATH if os.path.exists(_ROOT_LOGO_PATH) else _ASSETS_LOGO_PATH
 if os.path.exists(_LOGO_PATH):
     st.logo(_LOGO_PATH, size="large")
 
@@ -192,27 +195,22 @@ todays_games = st.session_state.get("todays_games", [])
 game_count = len(todays_games)
 game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if game_count else "No games loaded yet"
 
-# Embed logo using cached base64 load
+# Embed logo using cached base64 load — root-level high-res version
 _logo_b64 = _load_logo_b64(_LOGO_PATH) if os.path.exists(_LOGO_PATH) else ""
 
 _logo_img_tag = (
-    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" />'
+    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" style="max-height:90px;max-width:100%;object-fit:contain;" />'
     if _logo_b64 else ""
 )
 
 st.markdown(f"""
-<div class="neural-header spp-hero-header">
+<div class="neural-header spp-hero-header" style="display:flex;align-items:center;justify-content:center;padding:18px 36px;">
   {_logo_img_tag}
-  <div>
-    <div class="neural-header-title">Smart Pick Pro</div>
-    <div class="nba-edition-label">NBA EDITION</div>
-  </div>
 </div>
 """, unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="hero-banner">
-  <div class="hero-subtitle">Neural Prediction Engine v1.0 — Powered by JM5</div>
   <div class="hero-date">📅 {today_str} &nbsp;•&nbsp; 🏟️ {game_count_text}</div>
 </div>
 """, unsafe_allow_html=True)
@@ -455,6 +453,6 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
 
 st.divider()
 st.caption(
-    f"Smart Pick Pro — NBA Edition | Powered by JM5 | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
+    f"© Smart Pick Pro | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
     f"{len(players_data)} players, {len(teams_data)} teams"
 )

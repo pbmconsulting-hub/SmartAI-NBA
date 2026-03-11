@@ -112,6 +112,30 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
 );
 """
 
+# SQL to create the all_analysis_picks table.
+# Stores EVERY pick output by Neural Analysis (not just AI-auto-logged ones)
+# so users can track the complete performance record of the app's predictions.
+CREATE_ALL_ANALYSIS_PICKS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS all_analysis_picks (
+    pick_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    pick_date TEXT NOT NULL,
+    player_name TEXT NOT NULL,
+    team TEXT,
+    stat_type TEXT NOT NULL,
+    prop_line REAL NOT NULL,
+    direction TEXT NOT NULL,
+    platform TEXT,
+    confidence_score REAL,
+    probability_over REAL,
+    edge_percentage REAL,
+    tier TEXT,
+    result TEXT,
+    actual_value REAL,
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -151,6 +175,7 @@ def initialize_database():
             cursor.execute(CREATE_ENTRIES_TABLE_SQL)
             cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
             cursor.execute(CREATE_DAILY_SNAPSHOTS_TABLE_SQL)      # daily performance tracking
+            cursor.execute(CREATE_ALL_ANALYSIS_PICKS_TABLE_SQL)   # all Neural Analysis outputs
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -896,6 +921,114 @@ def get_rolling_stats(days=14):
 
 # ============================================================
 # END SECTION: Daily Snapshots
+# ============================================================
+
+# ============================================================
+# SECTION: All Analysis Picks — Store and Load
+# ============================================================
+
+def insert_analysis_picks(analysis_results):
+    """
+    Persist all Neural Analysis output picks to the all_analysis_picks table.
+
+    Deduplicates by (pick_date, player_name, stat_type, prop_line, direction)
+    so re-running analysis does not create duplicate rows.
+
+    Args:
+        analysis_results (list[dict]): Full list of analysis result dicts from
+            Neural Analysis (as stored in st.session_state["analysis_results"]).
+
+    Returns:
+        int: Number of new rows inserted.
+    """
+    if not analysis_results:
+        return 0
+
+    import datetime as _dt
+    today_str = _dt.date.today().isoformat()
+    inserted = 0
+
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            # Load today's existing keys to deduplicate
+            existing = set()
+            for row in conn.execute(
+                "SELECT player_name, stat_type, prop_line, direction "
+                "FROM all_analysis_picks WHERE pick_date = ?",
+                (today_str,),
+            ).fetchall():
+                existing.add((row[0].lower(), row[1], float(row[2] or 0), row[3]))
+
+            for r in analysis_results:
+                key = (
+                    r.get("player_name", "").lower(),
+                    r.get("stat_type", ""),
+                    float(r.get("line", 0) or 0),
+                    r.get("direction", "OVER"),
+                )
+                if key in existing:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO all_analysis_picks
+                        (pick_date, player_name, team, stat_type, prop_line,
+                         direction, platform, confidence_score, probability_over,
+                         edge_percentage, tier, result, actual_value, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+                    """,
+                    (
+                        today_str,
+                        r.get("player_name", ""),
+                        r.get("player_team", r.get("team", "")),
+                        r.get("stat_type", ""),
+                        float(r.get("line", 0) or 0),
+                        r.get("direction", "OVER"),
+                        r.get("platform", ""),
+                        float(r.get("confidence_score", 0) or 0),
+                        float(r.get("probability_over", 0.5) or 0.5),
+                        float(r.get("edge_percentage", 0) or 0),
+                        r.get("tier", "Bronze"),
+                        f"Auto-stored by SmartAI. SAFE Score: {r.get('confidence_score', 0):.0f}",
+                    ),
+                )
+                existing.add(key)
+                inserted += 1
+            conn.commit()
+    except Exception as err:
+        print(f"insert_analysis_picks error (non-fatal): {err}")
+
+    return inserted
+
+
+def load_all_analysis_picks(days=30):
+    """
+    Load all Neural Analysis output picks from the database.
+
+    Args:
+        days (int): Number of days of history to load. Defaults to 30.
+
+    Returns:
+        list[dict]: List of pick dicts with columns as keys.
+    """
+    import datetime as _dt
+    cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    rows = []
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM all_analysis_picks WHERE pick_date >= ? ORDER BY pick_date DESC, confidence_score DESC",
+                (cutoff,),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+    except Exception as err:
+        print(f"load_all_analysis_picks error (non-fatal): {err}")
+    return rows
+
+# ============================================================
+# END SECTION: All Analysis Picks
 # ============================================================
 
 # ============================================================
