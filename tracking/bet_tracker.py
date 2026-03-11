@@ -290,7 +290,7 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # SECTION: Auto-Log Analysis Results
 # ============================================================
 
-def auto_log_analysis_bets(analysis_results, minimum_edge=0.0):
+def auto_log_analysis_bets(analysis_results, minimum_edge=5.0):
     """
     Automatically log bet records for analysis results that have a positive
     edge in the model's recommended direction.
@@ -307,8 +307,10 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=0.0):
         analysis_results (list[dict]): Full analysis result list from the
             Neural Analysis engine (as stored in session_state).
         minimum_edge (float): Skip picks whose edge_percentage is below
-            this value.  Defaults to 0.0.  Only picks with edge > 0
+            this value.  Defaults to 5.0.  Only picks with edge > 0
             (model favours the recommended direction) are ever logged.
+            Only Gold-tier picks or above (Gold, Platinum) are auto-logged;
+            Silver and Bronze are skipped regardless of edge.
 
     Returns:
         int: Number of new bets logged.
@@ -339,12 +341,16 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=0.0):
         pass  # If query fails, log without dedup (safe — unique constraint absent)
 
     logged = 0
+    # Only Gold-tier and above qualify for auto-logging (Silver/Bronze are too noisy)
+    AUTO_LOG_TIERS = {"Gold", "Platinum"}
+
     for res in analysis_results:
         edge = res.get("edge_percentage", 0)
-        # Only log picks where the model has a positive edge in its recommended direction
-        if edge <= 0:
+        # Only log picks where edge is positive and meets the minimum threshold
+        if edge <= 0 or edge < minimum_edge:
             continue
-        if edge < minimum_edge:
+        # Only auto-log Gold-tier and above; skip Silver and Bronze (too noisy)
+        if res.get("tier", "Bronze") not in AUTO_LOG_TIERS:
             continue
         if res.get("player_is_out", False):
             continue
@@ -688,7 +694,7 @@ def resolve_todays_bets():
     # Try to use nba_api live scoreboard to find final games
     final_game_ids: set = set()
     try:
-        from nba_api.live.endpoints.scoreboard import ScoreBoard
+        from nba_api.live.nba.endpoints.scoreboard import ScoreBoard
         sb = ScoreBoard()
         games_data = sb.get_dict().get("scoreboard", {}).get("games", [])
         for g in games_data:
@@ -905,7 +911,7 @@ def get_live_bet_status(bets_list):
     # Fetch live box scores
     live_box: dict = {}  # player_name_lower → current stat totals
     try:
-        from nba_api.live.endpoints.scoreboard import ScoreBoard
+        from nba_api.live.nba.endpoints.scoreboard import ScoreBoard
         sb = ScoreBoard()
         games = sb.get_dict().get("scoreboard", {}).get("games", [])
         for g in games:
@@ -919,7 +925,7 @@ def get_live_bet_status(bets_list):
 
             gid = g.get("gameId", "")
             try:
-                from nba_api.live.endpoints.boxscore import BoxScore
+                from nba_api.live.nba.endpoints.boxscore import BoxScore
                 bs = BoxScore(game_id=gid)
                 bs_data = bs.get_dict().get("game", {})
                 for team_side in ("homeTeam", "awayTeam"):

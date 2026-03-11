@@ -332,11 +332,16 @@ def _predict_game(home_abbrev, away_abbrev):
         avg_pace = (home_pace + away_pace) / 2.0
 
         # Score ≈ ortg * (avg_pace/100) adjusted for opponent's defense
-        home_score = round(home_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / away_drtg), 1)
-        away_score = round(away_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / home_drtg), 1)
+        # Apply a ~1.2% home-court advantage (NBA home teams win ~58% of games)
+        _HOME_ADV = 1.012
+        home_score = round(home_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / away_drtg) * _HOME_ADV, 1)
+        away_score = round(away_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / home_drtg) / _HOME_ADV, 1)
+        # NBA games cannot end in a tie — add 1 pt to home team if scores are equal
+        if home_score == away_score:
+            home_score += 1.0
         predicted_total  = round(home_score + away_score, 1)
         predicted_margin = round(abs(home_score - away_score), 1)
-        predicted_winner = home_abbrev if home_score > away_score else away_abbrev
+        predicted_winner = home_abbrev if home_score >= away_score else away_abbrev
 
         return {
             "home_score":       home_score,
