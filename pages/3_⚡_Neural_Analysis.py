@@ -91,6 +91,10 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user
+try:
+    from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
+except Exception:
+    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
 _FREE_ANALYSIS_LIMIT = 3   # Free users can analyze up to 3 props
 _user_is_premium = _is_premium_user()
 if "selected_picks" not in st.session_state:
@@ -1006,7 +1010,7 @@ if run_analysis:
         st.warning(
             f"⚠️ **Free plan** is limited to **{_FREE_ANALYSIS_LIMIT} props** per analysis run. "
             f"Analyzing the first {_FREE_ANALYSIS_LIMIT} props. "
-            "[**Upgrade to Premium**](/6_%F0%9F%92%8E_Premium) for unlimited analysis. 💎"
+            f"[**Upgrade to Premium**]({_PREM_PATH}) for unlimited analysis. 💎"
         )
         props_to_analyze  = props_to_analyze[:_FREE_ANALYSIS_LIMIT]
         total_props_count = _FREE_ANALYSIS_LIMIT

@@ -18,6 +18,10 @@
 import streamlit as st
 
 from utils.auth import is_premium_user
+try:
+    from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
+except Exception:
+    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
 
 
 # ============================================================
@@ -203,10 +207,10 @@ def premium_gate(feature_name: str) -> bool:
             st.switch_page("pages/6_💎_Premium.py")
 
     st.markdown(
-        '<p class="gate-disclaimer" style="text-align:center;">'
-        "Already subscribed? "
-        '<a href="?restore=1" style="color:#00f0ff;">Restore your access →</a>'
-        "</p>",
+        f'<p class="gate-disclaimer" style="text-align:center;">'
+        f"Already subscribed? "
+        f'<a href="{_PREM_PATH}?restore=1" style="color:#00f0ff;">Restore your access →</a>'
+        f"</p>",
         unsafe_allow_html=True,
     )
 

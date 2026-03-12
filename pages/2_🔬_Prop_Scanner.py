@@ -47,6 +47,10 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Premium Status (partial gate — some features restricted) ──
 from utils.auth import is_premium_user as _is_premium_user
+try:
+    from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
+except Exception:
+    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
 _FREE_PROP_LIMIT = 5   # Free users can manually enter up to 5 props
 _user_is_premium = _is_premium_user()
 
@@ -165,8 +169,8 @@ if not _user_is_premium:
         '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
         'border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
         '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
-        ' — Live platform fetching (PrizePicks, Underdog, DraftKings) requires a '
-        '<a href="/6_%F0%9F%92%8E_Premium" style="color:#ff5e00;font-weight:700;">Premium subscription</a>. '
+        f' — Live platform fetching (PrizePicks, Underdog, DraftKings) requires a '
+        f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>. '
         'You can still enter up to 5 props manually below.</div>',
         unsafe_allow_html=True,
     )
@@ -843,7 +847,7 @@ if add_prop_button:
         if not _user_is_premium and len(current_props_for_update) >= _FREE_PROP_LIMIT:
             st.warning(
                 f"⚠️ Free plan is limited to **{_FREE_PROP_LIMIT} props**. "
-                "Remove a prop first, or [**upgrade to Premium**](/6_%F0%9F%92%8E_Premium) "
+                f"Remove a prop first, or [**upgrade to Premium**]({_PREM_PATH}) "
                 "for unlimited props."
             )
         else:
@@ -870,8 +874,8 @@ if not _user_is_premium:
         '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
         'border-radius:10px;padding:12px 16px;">'
         '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
-        ' — CSV upload requires a '
-        '<a href="/6_%F0%9F%92%8E_Premium" style="color:#ff5e00;font-weight:700;">Premium subscription</a>.'
+        f' — CSV upload requires a '
+        f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>.'
         '</div>',
         unsafe_allow_html=True,
     )

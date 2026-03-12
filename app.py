@@ -163,11 +163,13 @@ initialize_database()
 # session state so it won't make Stripe API calls on every rerun.
 try:
     from utils.auth import is_premium_user as _is_premium, handle_checkout_redirect as _handle_checkout
+    from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
     # Handle checkout redirects even on the home page
     _handle_checkout()
     _user_is_premium = _is_premium()
 except Exception:
     _user_is_premium = True  # Fail open — don't block the home page
+    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
 
 with st.sidebar:
     if _user_is_premium:
@@ -180,12 +182,12 @@ with st.sidebar:
         )
     else:
         st.markdown(
-            '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
-            'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
-            '<span style="color:#a0b4d0;font-size:0.85rem;">⭐ Free Plan</span><br>'
-            '<a href="/6_%F0%9F%92%8E_Premium" style="color:#ff5e00;font-size:0.78rem;'
-            'font-weight:600;text-decoration:none;">Upgrade to Premium →</a>'
-            '</div>',
+            f'<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
+            f'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
+            f'<span style="color:#a0b4d0;font-size:0.85rem;">⭐ Free Plan</span><br>'
+            f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-size:0.78rem;'
+            f'font-weight:600;text-decoration:none;">Upgrade to Premium →</a>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 

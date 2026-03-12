@@ -53,6 +53,10 @@ APP_URL                = os.environ.get("APP_URL", "http://localhost:8501")
 # Remove trailing slash from APP_URL so URL construction is clean
 APP_URL = APP_URL.rstrip("/")
 
+# Path to the Premium page (URL-encoded emoji in page name).
+# Used in redirect URLs passed to Stripe.
+_PREMIUM_PAGE_PATH = "/6_%F0%9F%92%8E_Premium"
+
 # ── Configure Stripe SDK with our secret key ─────────────────
 # This must be done before any Stripe API calls.
 def _configure_stripe():
@@ -113,8 +117,8 @@ def create_checkout_session(customer_email: str = "") -> dict:
         # Build success and cancel URLs
         # success_url includes {CHECKOUT_SESSION_ID} which Stripe replaces
         # with the actual session ID after payment — so we can verify it.
-        success_url = f"{APP_URL}/6_%F0%9F%92%8E_Premium?session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url  = f"{APP_URL}/6_%F0%9F%92%8E_Premium?cancelled=true"
+        success_url = f"{APP_URL}{_PREMIUM_PAGE_PATH}?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url  = f"{APP_URL}{_PREMIUM_PAGE_PATH}?cancelled=true"
 
         # Build session parameters
         session_params = {
@@ -500,7 +504,7 @@ def create_customer_portal_session(customer_id: str) -> dict:
         }
 
     try:
-        return_url = f"{APP_URL}/6_%F0%9F%92%8E_Premium"
+        return_url = f"{APP_URL}{_PREMIUM_PAGE_PATH}"
         portal_session = _stripe.billing_portal.Session.create(
             customer=customer_id,
             return_url=return_url,
