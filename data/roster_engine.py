@@ -162,6 +162,33 @@ def _merge_entry(target: dict, incoming: dict) -> dict:
     target["return_date"] = target.get("return_date") or incoming.get("return_date", "")
     return target
 
+
+def _parse_injured_list(injured_list: list, source_name: str) -> dict:
+    """
+    Convert a raw list of player injury dicts (from any source) into the
+    canonical {normalized_name: {status, injury, team, return_date, source}} format.
+
+    The function handles several field-name variants used across NBA CDN,
+    stats.nba.com, and nba_api response formats.
+    """
+    result: dict = {}
+    for item in (injured_list or []):
+        name   = item.get("playerName", item.get("name", ""))
+        status = _normalize_status(item.get("status", item.get("playerStatus", "")))
+        injury = item.get("injuryDescription", item.get("injury", item.get("comment", "")))
+        team   = item.get("teamAbbreviation", item.get("teamTricode", item.get("team", "")))
+        if not name:
+            continue
+        key = _normalize_name(name)
+        result[key] = {
+            "status":      status,
+            "injury":      str(injury or ""),
+            "team":        str(team or ""),
+            "return_date": "",
+            "source":      source_name,
+        }
+    return result
+
 # ============================================================
 # END SECTION: Internal helpers
 # ============================================================
@@ -309,25 +336,8 @@ class RosterEngine:
         """
         import requests as _requests  # local import to avoid top-level dep for optional feature
 
-        def _parse_injured_list(injured_list, source_name):
-            result: dict = {}
-            for item in (injured_list or []):
-                name   = item.get("playerName", item.get("name", ""))
-                status = _normalize_status(item.get("status", item.get("playerStatus", "")))
-                injury = item.get("injuryDescription", item.get("injury", item.get("comment", "")))
-                team   = item.get("teamAbbreviation", item.get("teamTricode", item.get("team", "")))
-                if not name:
-                    continue
-                key = _normalize_name(name)
-                result[key] = {
-                    "status":      status,
-                    "injury":      str(injury or ""),
-                    "team":        str(team or ""),
-                    "return_date": "",
-                    "source":      source_name,
-                }
-            return result
-
+        # User-Agent kept generic enough to work across NBA endpoints;
+        # update the Chrome version string if NBA API starts rejecting requests.
         _NBA_HEADERS = {
             "Host": "stats.nba.com",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

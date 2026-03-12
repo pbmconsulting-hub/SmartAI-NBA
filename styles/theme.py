@@ -1545,9 +1545,11 @@ def get_premium_footer_html() -> str:
         <span style="color:#ff6b6b;">Not financial advice. Bet responsibly. 21+</span>
     </p>
     <p style="color:#5a6b8a;font-size:0.7rem;margin:4px 0 0 0;">
-        Problem gambling help: <strong>1-800-GAMBLER</strong> | 
-        <a href="https://www.ncpgambling.org" target="_blank" style="color:#8a9bb8;">ncpgambling.org</a> | 
-        <a href="https://www.begambleaware.org" target="_blank" style="color:#8a9bb8;">begambleaware.org</a>
+        Problem gambling help: <strong>1-800-GAMBLER (1-800-426-2537)</strong> |
+        <a href="https://www.ncpgambling.org" target="_blank" rel="noopener noreferrer"
+           aria-label="National Council on Problem Gambling" style="color:#8a9bb8;">National Council on Problem Gambling</a> |
+        <a href="https://www.begambleaware.org" target="_blank" rel="noopener noreferrer"
+           aria-label="BeGambleAware organisation" style="color:#8a9bb8;">BeGambleAware</a>
     </p>
 </div>'''
 

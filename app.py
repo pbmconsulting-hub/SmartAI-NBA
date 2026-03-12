@@ -404,14 +404,15 @@ with st.expander("⚠️ Important Legal Disclaimer — Please Read", expanded=F
     - 💰 Sports betting involves significant financial risk — **never bet more than you can afford to lose**
     - 🔞 You must be **21+** (or legal age in your jurisdiction) to participate in sports betting
     - ⚠️ This tool is **not affiliated** with the NBA, PrizePicks, Underdog Fantasy, or DraftKings
-    - 🆘 Always gamble responsibly. If you or someone you know has a gambling problem, call **1-800-GAMBLER**
+    - 🆘 Always gamble responsibly. If you or someone you know has a gambling problem, call **1-800-GAMBLER (1-800-426-2537)**
     
     **By using this application, you acknowledge that all betting decisions are your own responsibility.**
     
     ---
     
     **Responsible Gaming Resources:**
-    - 📞 National Council on Problem Gambling: **1-800-522-4700**
+    - 📞 **National Problem Gambling Helpline: 1-800-GAMBLER (1-800-426-2537)** — 24/7 confidential support
+    - 📞 National Council on Problem Gambling: **1-800-522-4700** — crisis counseling & referrals
     - 🌐 [www.ncpgambling.org](https://www.ncpgambling.org)
     - 🌐 [www.begambleaware.org](https://www.begambleaware.org)
     """)
