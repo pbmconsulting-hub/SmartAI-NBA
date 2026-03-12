@@ -1579,6 +1579,49 @@ if analysis_results:
             _deduped.append(_r)
     displayed_results = _deduped
 
+    # ── Tier & Stat-Type Filters ────────────────────────────────
+    # Let users narrow the visible results to specific confidence tiers
+    # (Platinum / Gold / Silver / Bronze) and/or specific stat types.
+    _all_tiers_in_results = [
+        t for t in ("Platinum", "Gold", "Silver", "Bronze")
+        if any(r.get("tier") == t for r in displayed_results)
+    ]
+    _all_stat_types_in_results = sorted({
+        r.get("stat_type", "").lower()
+        for r in displayed_results
+        if r.get("stat_type") and not r.get("player_is_out", False)
+    })
+    _filter_col_tier, _filter_col_stat = st.columns(2)
+    with _filter_col_tier:
+        _tier_filter = st.multiselect(
+            "🏅 Filter by Tier",
+            options=_all_tiers_in_results,
+            default=[],
+            placeholder="All tiers shown",
+            key="na_tier_filter",
+            help="Show only Platinum, Gold, Silver, and/or Bronze picks.",
+        )
+    with _filter_col_stat:
+        _stat_filter = st.multiselect(
+            "📊 Filter by Prop / Stat Type",
+            options=[s.title() for s in _all_stat_types_in_results],
+            default=[],
+            placeholder="All stat types shown",
+            key="na_stat_filter",
+            help="Show only the selected stat types (e.g. Points, Rebounds).",
+        )
+
+    # Apply tier filter
+    if _tier_filter:
+        displayed_results = [r for r in displayed_results if r.get("tier") in _tier_filter]
+    # Apply stat type filter (compare lowercase)
+    if _stat_filter:
+        _stat_filter_lower = {s.lower() for s in _stat_filter}
+        displayed_results = [
+            r for r in displayed_results
+            if r.get("stat_type", "").lower() in _stat_filter_lower
+        ]
+
     # ── Summary metrics ────────────────────────────────────────
     total_analyzed   = len(analysis_results)
     total_over_picks = sum(1 for r in displayed_results if r.get("direction") == "OVER")
