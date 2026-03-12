@@ -121,6 +121,31 @@ st.markdown(
     "auto-resolving results, and forecasting ROI."
 )
 
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Bet Tracker — Logging and Tracking Your Bets
+    
+    **Logging Bets:**
+    - Bets are **auto-logged** when you run Neural Analysis (top picks are saved)
+    - You can also manually log bets using the "Add Bet" form
+    - Each bet records: player, stat, line, direction (over/under), confidence tier
+    
+    **Auto-Resolve:**
+    - Click "Check Results Now" to automatically resolve today's bets
+    - The system fetches actual game stats from NBA API and marks bets as Won/Lost
+    - Player name matching uses fuzzy logic to handle name variations
+    
+    **Reading Stats:**
+    - **Win Rate**: % of resolved bets that won
+    - **ROI**: Return on investment (positive = profitable)
+    - **CLV**: Closing Line Value — did you beat the closing line?
+    
+    💡 **Pro Tips:**
+    - Run "Check Results Now" after games finish (usually 11 PM ET)
+    - Check the "Model Health" section to see which tiers perform best
+    - Use filters to analyze performance by platform or stat type
+    """)
+
 # ── Prominent "Check Results Now" button — always visible at top ──────────
 _check_col, _check_info_col = st.columns([1, 3])
 with _check_col:

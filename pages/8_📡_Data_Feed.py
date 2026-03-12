@@ -784,11 +784,18 @@ if current_action:
             )
             total_count = len(scraped_data)
 
-            st.success(
-                f"✅ **Injury report refreshed** ({_now_str})  \n"
-                f"Found **{total_count}** players — "
-                f"**{out_count}** Out, **{gtd_count}** GTD/Questionable/Doubtful"
-            )
+            if total_count == 0:
+                st.warning(
+                    "⚠️ **0 injuries found** — all data sources returned empty results. "
+                    "The NBA CDN feed and stats.nba.com may be temporarily unavailable. "
+                    "Try again in a few minutes."
+                )
+            else:
+                st.success(
+                    f"✅ **Injury report refreshed** ({_now_str})  \n"
+                    f"Found **{total_count}** players — "
+                    f"**{out_count}** Out, **{gtd_count}** GTD/Questionable/Doubtful"
+                )
 
             # Show a summary table
             st.markdown("### 📋 NBA API Injury Data")

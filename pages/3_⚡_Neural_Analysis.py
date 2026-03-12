@@ -738,6 +738,31 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Neural Analysis — Understanding Your Results
+    
+    **Running Analysis:**
+    1. Ensure props are loaded (from Prop Scanner or Live Games page)
+    2. Click "▶️ Run Analysis" to start Monte Carlo simulation
+    3. Each prop is simulated 1,000+ times to calculate probability
+    
+    **Reading Results:**
+    - **Probability**: % chance the stat goes OVER the line (>55% = meaningful edge)
+    - **Edge**: How much better than 50/50 your edge is (higher = better value)
+    - **Confidence Score**: 0-100 composite score (70+ = high confidence)
+    - **Tier**: Platinum (85+) > Gold (70+) > Silver (55+) > Bronze
+    
+    **Directional Forces:**
+    - Green arrows = factors pushing OVER (weak defense, fast pace, etc.)
+    - Red arrows = factors pushing UNDER (tough defense, injury risk, etc.)
+    
+    💡 **Pro Tips:**
+    - Focus on Platinum and Gold tier picks for best results
+    - Avoid picks with ⚠️ "should avoid" flags
+    - Select picks to send to Entry Builder for parlay optimization
+    """)
+
 # ── Matchup header (shown when games are configured) ──────────
 if len(todays_games) == 1:
     g = todays_games[0]

@@ -89,6 +89,29 @@ st.markdown("""
 st.title("📡 Live Games")
 st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight's NBA Slate")
 
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Live Games — Two Independent Workflows
+    
+    **🔄 Auto-Load Tonight's Games** (recommended first step):
+    1. Click this button to fetch tonight's NBA schedule
+    2. It automatically pulls current rosters, player stats, and team stats
+    3. Props are auto-generated from season averages for all active players
+    4. Takes ~30-60 seconds depending on the number of games
+    
+    **📊 Fetch Live Platform Props & Analyze** (for real prop lines):
+    1. Select which platforms to include (PrizePicks, Underdog, DraftKings)
+    2. Optionally configure Smart Filter settings
+    3. Click the button to fetch REAL live prop lines from those platforms
+    4. The engine automatically runs Neural Analysis on all fetched props
+    5. Results are merged with any props from Auto-Load
+    
+    💡 **Pro Tips:**
+    - Use Auto-Load first, then Fetch Platform Props for the most complete analysis
+    - Smart Filter reduces noise by deduplicating props and removing injured players
+    - Props from both sources are merged — no data is lost
+    """)
+
 # ============================================================
 # SECTION: Action Buttons — Two Independent Workflows
 # ─────────────────────────────────────────────────────────────
@@ -433,14 +456,32 @@ if platform_props_clicked:
             st.info(f"ℹ️ Smart Filter is OFF. Analyzing all **{raw_count:,}** props.")
 
         # ── Persist filtered props to both session state keys and disk ──
-        # Save filtered (not raw) props so Neural Analysis always finds real data.
+        # Merge new platform props with existing props (don't replace).
+        def _merge_props(existing: list, new_props: list) -> list:
+            """Merge new_props into existing, deduplicating by player_name+stat_type+platform."""
+            seen = set()
+            merged = []
+            for p in existing:
+                key = (str(p.get("player_name","")).lower(), str(p.get("stat_type","")).lower(), str(p.get("platform","")).lower())
+                if key not in seen:
+                    seen.add(key)
+                    merged.append(p)
+            for p in new_props:
+                key = (str(p.get("player_name","")).lower(), str(p.get("stat_type","")).lower(), str(p.get("platform","")).lower())
+                if key not in seen:
+                    seen.add(key)
+                    merged.append(p)
+            return merged
+
         try:
             from data.data_manager import (
                 save_props_to_session as _save_current,
                 save_platform_props_to_csv as _save_csv,
             )
             from data.data_manager import save_platform_props_to_session as _save_platform
-            _save_current(props_to_analyze, st.session_state)
+            _existing_props = list(st.session_state.get("current_props", []))
+            _merged_props = _merge_props(_existing_props, props_to_analyze)
+            _save_current(_merged_props, st.session_state)
             _save_platform(props_to_analyze, st.session_state)
             _save_csv(props_to_analyze)
         except Exception as _save_err:
@@ -719,6 +760,7 @@ if platform_props_clicked:
                 "- No player data loaded — try clicking **Auto-Load Tonight's Games** first"
             )
         else:
+            st.success("✅ Props fetched and merged! Go to ⚡ Neural Analysis to run analysis on all loaded props.")
             from styles.theme import get_bet_card_css, get_bet_card_html, get_summary_cards_html
             st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 

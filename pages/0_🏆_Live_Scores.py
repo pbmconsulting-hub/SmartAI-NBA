@@ -158,7 +158,62 @@ def _fetch_quarter_scores(game_id: str) -> dict:
     quarter scores (indices 0-3 = Q1-Q4, index 4 = OT if present).
     """
     result = {"away_q": [], "home_q": []}
+
+    def _parse_v3_periods(response):
+        """Parse V3 normalized dict into (away_q, home_q) lists."""
+        game = response.get("game", {})
+        away_periods = game.get("awayTeam", {}).get("periods", [])
+        home_periods = game.get("homeTeam", {}).get("periods", [])
+        away_q = [int(p.get("score", 0)) for p in away_periods
+                  if p.get("periodType", "REGULAR") == "REGULAR"]
+        home_q = [int(p.get("score", 0)) for p in home_periods
+                  if p.get("periodType", "REGULAR") == "REGULAR"]
+        return away_q, home_q
+
+    # ── Attempt 1: BoxScoreSummaryV3 via nba_api ──────────────
     try:
+        from nba_api.stats.endpoints import boxscoresummaryv3
+        bs3 = boxscoresummaryv3.BoxScoreSummaryV3(game_id=game_id, timeout=8)
+        v3_dict = bs3.get_normalized_dict()
+        away_q, home_q = _parse_v3_periods(v3_dict)
+        if away_q or home_q:
+            result["away_q"] = away_q
+            result["home_q"] = home_q
+            return result
+    except Exception:
+        pass
+
+    # ── Attempt 2: Direct requests call to V3 endpoint ────────
+    try:
+        import requests as _req
+        _headers = {
+            "Host": "stats.nba.com",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "x-nba-stats-origin": "stats",
+            "x-nba-stats-token": "true",
+            "Connection": "keep-alive",
+            "Referer": "https://www.nba.com/",
+            "Origin": "https://www.nba.com",
+        }
+        _url = f"https://stats.nba.com/stats/boxscoresummaryv3?GameID={game_id}"
+        _resp = _req.get(_url, headers=_headers, timeout=8)
+        _resp.raise_for_status()
+        _data = _resp.json()
+        away_q, home_q = _parse_v3_periods(_data)
+        if away_q or home_q:
+            result["away_q"] = away_q
+            result["home_q"] = home_q
+            return result
+    except Exception:
+        pass
+
+    # ── Attempt 3: BoxScoreSummaryV2 fallback ─────────────────
+    try:
+        import warnings
+        warnings.filterwarnings("ignore")
         from nba_api.stats.endpoints import boxscoresummaryv2
         bs = boxscoresummaryv2.BoxScoreSummaryV2(game_id=game_id, timeout=8)
         ls = bs.line_score.get_data_frame()

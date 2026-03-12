@@ -1465,12 +1465,94 @@ input:focus, textarea:focus, select:focus,
     /* Stack metrics in fewer columns on small screens */
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
 }
+
+/* ─── Premium animated gradient border — Neural Header ─── */
+.neural-header {
+    position: relative;
+}
+.neural-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
+    background-size: 200% 100%;
+    animation: headerShimmer 4s ease infinite;
+}
+
+/* ─── Enhanced glassmorphism card ─────────────────────── */
+.glass-card {
+    background: rgba(13, 18, 40, 0.75);
+    border: 1px solid rgba(0,240,255,0.20);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 18px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(0,240,255,0.06);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.glass-card:hover {
+    border-color: rgba(0,240,255,0.40);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 36px rgba(0,240,255,0.14);
+    transform: translateY(-4px);
+}
+
+/* ─── AI Processing Spinner ───────────────────────────── */
+@keyframes aiSpin {
+    0% { transform: rotate(0deg); filter: hue-rotate(0deg); }
+    100% { transform: rotate(360deg); filter: hue-rotate(360deg); }
+}
+.ai-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid rgba(0,240,255,0.1);
+    border-top: 3px solid #00f0ff;
+    border-radius: 50%;
+    animation: aiSpin 1s linear infinite;
+    margin: 0 auto;
+}
+
+/* ─── Platinum Tier Shimmer ───────────────────────────── */
+@keyframes platinumShimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+.tier-platinum {
+    background: linear-gradient(90deg, #e5e4e2, #ffffff, #c0c0c0, #ffffff, #e5e4e2);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: platinumShimmer 3s linear infinite;
+}
 </style>
 """
 
 
 # ============================================================
 # END SECTION: Global CSS Theme
+# ============================================================
+
+
+# ============================================================
+# SECTION: Premium Footer HTML
+# ============================================================
+
+def get_premium_footer_html() -> str:
+    """Return a premium footer HTML block with responsible gambling info."""
+    return '''<div style="text-align:center;padding:16px 0 8px 0;margin-top:24px;border-top:1px solid rgba(0,240,255,0.1);">
+    <p style="color:#8a9bb8;font-size:0.75rem;margin:0;">
+        Powered by <strong style="color:#00f0ff;">SmartBetPro AI™</strong> &nbsp;|&nbsp;
+        For entertainment &amp; educational purposes only &nbsp;|&nbsp; 
+        <span style="color:#ff6b6b;">Not financial advice. Bet responsibly. 21+</span>
+    </p>
+    <p style="color:#5a6b8a;font-size:0.7rem;margin:4px 0 0 0;">
+        Problem gambling help: <strong>1-800-GAMBLER</strong> | 
+        <a href="https://www.ncpgambling.org" target="_blank" style="color:#8a9bb8;">ncpgambling.org</a> | 
+        <a href="https://www.begambleaware.org" target="_blank" style="color:#8a9bb8;">begambleaware.org</a>
+    </p>
+</div>'''
+
+# ============================================================
+# END SECTION: Premium Footer HTML
 # ============================================================
 
 

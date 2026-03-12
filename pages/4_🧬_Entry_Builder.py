@@ -57,6 +57,33 @@ if "selected_picks" not in st.session_state:
 
 st.title("🧬 Entry Builder")
 st.markdown("Build optimal parlay entries with maximum Expected Value (EV).")
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Entry Builder — Building Optimal Parlays
+    
+    **Concepts:**
+    - **Power Play**: All legs must hit to win (higher payout, higher risk)
+    - **Flex Play**: Can lose 1 leg and still win a reduced payout
+    - **EV (Expected Value)**: Average profit/loss per dollar wagered (+EV = profitable long-term)
+    
+    **How to Build an Entry:**
+    1. Select picks from Neural Analysis (use the checkboxes on prop cards)
+    2. Choose your entry size (2-6 legs)
+    3. Set your entry fee amount
+    4. Click "Build Optimal Entry" to see recommended combos
+    
+    **Reading EV:**
+    - Positive EV (+X%) = profitable bet long-term
+    - Negative EV = you lose money long-term on average
+    - Higher confidence picks dramatically improve EV
+    
+    💡 **Pro Tips:**
+    - 2-3 leg Power Plays have the best EV for high-confidence picks
+    - Never include picks below Silver tier in a parlay
+    - Flex entries are safer but pay less — use for 4-6 leg entries
+    """)
+
 st.divider()
 
 st.markdown(get_education_box_html(
