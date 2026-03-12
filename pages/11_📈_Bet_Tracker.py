@@ -80,40 +80,41 @@ initialize_database()
 # preventing repeated blocking API calls on every Streamlit rerun.
 if not st.session_state.get("_bet_tracker_auto_resolved", False):
     st.session_state["_bet_tracker_auto_resolved"] = True
-    try:
-        _today_str = datetime.date.today().isoformat()
-        _all_bets_check = load_all_bets(limit=500)
-
-        # Resolve past pending bets (yesterday and older)
-        _pending_old = [
-            b for b in _all_bets_check
-            if not b.get("result") and b.get("bet_date", "") < _today_str
-        ]
-        if _pending_old:
-            _dates_to_resolve = sorted({b.get("bet_date", "") for b in _pending_old if b.get("bet_date")})
-            _total_resolved = 0
-            for _d in _dates_to_resolve:
-                try:
-                    _cnt, _ = auto_resolve_bet_results(date_str=_d)
-                    _total_resolved += _cnt
-                except Exception:
-                    pass  # One date failed — continue with others
-            if _total_resolved > 0:
-                st.toast(f"🤖 Auto-resolved {_total_resolved} past bet(s) on page load.")
-
-        # Silently attempt to resolve today's bets where games are Final
+    with st.spinner("🤖 Auto-resolving pending bets..."):
         try:
-            from tracking.bet_tracker import resolve_todays_bets
-            _today_result = resolve_todays_bets()
-            if _today_result.get("resolved", 0) > 0:
-                st.toast(
-                    f"⚡ Auto-resolved {_today_result['resolved']} of today's bet(s) "
-                    f"({_today_result['wins']}W / {_today_result['losses']}L)."
-                )
+            _today_str = datetime.date.today().isoformat()
+            _all_bets_check = load_all_bets(limit=500)
+
+            # Resolve past pending bets (yesterday and older)
+            _pending_old = [
+                b for b in _all_bets_check
+                if not b.get("result") and b.get("bet_date", "") < _today_str
+            ]
+            if _pending_old:
+                _dates_to_resolve = sorted({b.get("bet_date", "") for b in _pending_old if b.get("bet_date")})
+                _total_resolved = 0
+                for _d in _dates_to_resolve:
+                    try:
+                        _cnt, _ = auto_resolve_bet_results(date_str=_d)
+                        _total_resolved += _cnt
+                    except Exception:
+                        pass  # One date failed — continue with others
+                if _total_resolved > 0:
+                    st.toast(f"🤖 Auto-resolved {_total_resolved} past bet(s) on page load.")
+
+            # Silently attempt to resolve today's bets where games are Final
+            try:
+                from tracking.bet_tracker import resolve_todays_bets
+                _today_result = resolve_todays_bets()
+                if _today_result.get("resolved", 0) > 0:
+                    st.toast(
+                        f"⚡ Auto-resolved {_today_result['resolved']} of today's bet(s) "
+                        f"({_today_result['wins']}W / {_today_result['losses']}L)."
+                    )
+            except Exception:
+                pass  # Not available or API error — silently skip
         except Exception:
-            pass  # Not available or API error — silently skip
-    except Exception:
-        pass  # Best-effort — never block page load
+            pass  # Best-effort — never block page load
 
 st.title("📈 Bet Tracker & Model Health")
 st.markdown(

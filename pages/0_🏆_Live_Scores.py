@@ -136,7 +136,8 @@ def _status_badge(status_text):
     return "🗓️ Scheduled"
 
 
-live_games = _fetch_live_scores()
+with st.spinner("🏆 Loading live scores..."):
+    live_games = _fetch_live_scores()
 
 # ============================================================
 # END SECTION: Fetch Live Scoreboard

@@ -11,6 +11,7 @@ import streamlit.components.v1 as _components  # For Full Breakdown iframe rende
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
+import time             # For elapsed-time measurement
 
 # Import our engine modules
 from engine.simulation import (
@@ -887,6 +888,7 @@ with filter_col:
     )
 
 if run_analysis:
+    _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
 
@@ -1485,7 +1487,11 @@ if run_analysis:
     st.session_state["analysis_results"] = analysis_results_list
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
     progress_bar.empty()
-    st.success(f"✅ Analysis complete! {len(analysis_results_list)} props analyzed.")
+    _analysis_elapsed = time.time() - _analysis_start_time
+    st.success(
+        f"✅ Analysis complete! **{len(analysis_results_list)}** props analyzed "
+        f"in **{_analysis_elapsed:.1f}s**."
+    )
 
     # ── Store ALL picks to all_analysis_picks table ──────────────
     try:

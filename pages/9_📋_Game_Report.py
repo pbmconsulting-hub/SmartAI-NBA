@@ -13,6 +13,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import datetime
+import time
 
 from styles.theme import (
     get_global_css,
@@ -20,6 +21,13 @@ from styles.theme import (
     get_qds_css,
     get_qds_strategy_table_html,
 )
+
+# Import the new state-of-the-art game prediction engine
+try:
+    from engine.game_prediction import predict_game_from_abbrevs as _engine_predict_game
+    _GAME_PREDICTION_ENGINE_AVAILABLE = True
+except ImportError:
+    _GAME_PREDICTION_ENGINE_AVAILABLE = False
 
 # ============================================================
 # SECTION: Page Configuration
@@ -316,50 +324,67 @@ def _build_entry_strategy(results):
     return entries
 
 
-def _predict_game(home_abbrev, away_abbrev):
+def _predict_game(home_abbrev, away_abbrev, vegas_spread=None, game_total=None):
     """
-    Return a simple game score prediction using team ortg/drtg/pace from teams.csv.
+    Predict a game using the multi-layer game prediction engine.
 
-    Returns:
-        dict with keys: home_score, away_score, predicted_total,
-                        predicted_winner, predicted_margin
-        or None if team data is unavailable.
+    Calls engine/game_prediction.py which implements:
+      Layer 1: Dean Oliver Four-Factor Model
+      Layer 2: Pace-Adjusted Possessions (60/40 toward faster team)
+      Layer 3: Monte Carlo Game Simulation (2000 iterations)
+      Layer 4: Vegas Bayesian Blending (55% model / 45% Vegas)
+      Layer 5: Confidence & Context Scoring
+
+    Returns the rich prediction dict from the engine, or None on failure.
+    Falls back to a lightweight formula if the engine is unavailable.
     """
+    if _GAME_PREDICTION_ENGINE_AVAILABLE:
+        try:
+            result = _engine_predict_game(
+                home_abbrev=home_abbrev,
+                away_abbrev=away_abbrev,
+                teams_data_dict=TEAMS_DATA,
+                vegas_spread=vegas_spread,
+                game_total=game_total,
+                num_simulations=2000,
+            )
+            # Cache prediction in session state for cross-page access
+            if result:
+                cache_key = f"{home_abbrev}_{away_abbrev}"
+                if "game_predictions" not in st.session_state:
+                    st.session_state["game_predictions"] = {}
+                st.session_state["game_predictions"][cache_key] = result
+            return result
+        except Exception:
+            pass  # Fall through to legacy fallback
+
+    # ── Legacy fallback (used only if engine import fails) ────
     home_t = TEAMS_DATA.get(home_abbrev.upper(), {})
     away_t = TEAMS_DATA.get(away_abbrev.upper(), {})
     if not home_t or not away_t:
         return None
-
     try:
-        home_ortg  = float(home_t.get("ortg",  113.0) or 113.0)
-        home_drtg  = float(home_t.get("drtg",  113.0) or 113.0)
-        home_pace  = float(home_t.get("pace",  100.0) or 100.0)
-        away_ortg  = float(away_t.get("ortg",  113.0) or 113.0)
-        away_drtg  = float(away_t.get("drtg",  113.0) or 113.0)
-        away_pace  = float(away_t.get("pace",  100.0) or 100.0)
-
-        avg_pace = (home_pace + away_pace) / 2.0
-
-        # Score ≈ ortg * (avg_pace/100) adjusted for opponent's defense
-        # Apply a ~1.2% home-court advantage (NBA home teams win ~58% of games)
+        home_ortg = float(home_t.get("ortg", 113.0) or 113.0)
+        home_drtg = float(home_t.get("drtg", 113.0) or 113.0)
+        home_pace = float(home_t.get("pace", 100.0) or 100.0)
+        away_ortg = float(away_t.get("ortg", 113.0) or 113.0)
+        away_drtg = float(away_t.get("drtg", 113.0) or 113.0)
+        away_pace = float(away_t.get("pace", 100.0) or 100.0)
+        avg_pace  = (home_pace + away_pace) / 2.0
         _HOME_ADV = 1.012
         home_score = round(home_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / away_drtg) * _HOME_ADV, 1)
         away_score = round(away_ortg * (avg_pace / 100.0) * (_LEAGUE_AVG_DRTG / home_drtg) / _HOME_ADV, 1)
-        # NBA games cannot end in a tie — add 1 pt to home team if scores are equal
         if home_score == away_score:
             home_score += 1.0
         predicted_total  = round(home_score + away_score, 1)
         predicted_margin = round(abs(home_score - away_score), 1)
         predicted_winner = home_abbrev if home_score >= away_score else away_abbrev
-
         return {
-            "home_score":       home_score,
-            "away_score":       away_score,
-            "predicted_total":  predicted_total,
-            "predicted_winner": predicted_winner,
+            "home_score": home_score, "away_score": away_score,
+            "predicted_total": predicted_total, "predicted_winner": predicted_winner,
             "predicted_margin": predicted_margin,
-            "home_ortg":  home_ortg, "home_drtg":  home_drtg, "home_pace":  home_pace,
-            "away_ortg":  away_ortg, "away_drtg":  away_drtg, "away_pace":  away_pace,
+            "home_ortg": home_ortg, "home_drtg": home_drtg, "home_pace": home_pace,
+            "away_ortg": away_ortg, "away_drtg": away_drtg, "away_pace": away_pace,
         }
     except Exception:
         return None
@@ -531,20 +556,71 @@ with _tab_report:
             )
 
             with st.expander(expander_label, expanded=True):
-                game_pred = _predict_game(home, away)
+                # Pass Vegas lines from the game object if available
+                _game_vs = game.get("vegas_spread")
+                _game_gt = game.get("game_total")
+                game_pred = _predict_game(
+                    home, away,
+                    vegas_spread=float(_game_vs) if _game_vs is not None else None,
+                    game_total=float(_game_gt) if _game_gt is not None else None,
+                )
 
                 # ── Always show team stats + game prediction ───────────
                 st.markdown("#### 📊 Team Stats & Game Prediction")
                 _render_game_team_stats(game, game_pred)
 
                 if game_pred:
-                    st.caption(
-                        f"🔮 Predicted: **{away} {game_pred['away_score']:.0f}** vs "
-                        f"**{home} {game_pred['home_score']:.0f}** · "
-                        f"Total: **{game_pred['predicted_total']:.0f}** · "
-                        f"Predicted winner: **{game_pred['predicted_winner']}** "
-                        f"by **{game_pred['predicted_margin']:.0f}**"
-                    )
+                    # Rich multi-metric caption if engine provided full output
+                    _home_wp  = game_pred.get("home_win_probability")
+                    _away_wp  = game_pred.get("away_win_probability")
+                    _ot_prob  = game_pred.get("overtime_probability")
+                    _conf     = game_pred.get("game_prediction_confidence")
+                    _pace_env = game_pred.get("pace_environment")
+                    _blow_p   = game_pred.get("blowout_probability")
+
+                    if _home_wp is not None:
+                        # Engine output — show full metrics in columns
+                        _pc1, _pc2, _pc3, _pc4 = st.columns(4)
+                        _pc1.metric(
+                            "Predicted Score",
+                            f"{away} {game_pred['away_score']} — {home} {game_pred['home_score']}"
+                        )
+                        _pc2.metric(
+                            "Winner",
+                            f"{game_pred['predicted_winner']} by {game_pred['predicted_margin']}",
+                            help=f"Home win prob: {_home_wp:.0%}  |  Away: {_away_wp:.0%}",
+                        )
+                        _pc3.metric(
+                            "Total / Pace",
+                            f"{game_pred['predicted_total']} pts · {_pace_env}",
+                            help=f"OT prob: {_ot_prob:.1%}  |  Blowout: {_blow_p:.1%}",
+                        )
+                        _pc4.metric(
+                            "Prediction Confidence",
+                            f"{_conf}/100",
+                            help="Based on data quality, matchup clarity, Vegas alignment, and pace.",
+                        )
+                        # Model factors detail (collapsed by default)
+                        _mf = game_pred.get("model_factors", {})
+                        if _mf:
+                            with st.expander("🔬 Model Factors", expanded=False):
+                                _mf_cols = st.columns(4)
+                                _mf_labels = [
+                                    ("4-Factor Edge",      _mf.get("four_factor_edge", "—")),
+                                    ("Pace Environment",   _mf.get("pace_edge", "—")),
+                                    ("Home Court Boost",   _mf.get("home_court_boost", "—")),
+                                    ("Vegas Blend",        _mf.get("vegas_blend", "—")),
+                                ]
+                                for _c, (_lbl, _val) in zip(_mf_cols, _mf_labels):
+                                    _c.metric(_lbl, _val)
+                    else:
+                        st.caption(
+                            f"🔮 Predicted: **{away} {game_pred['away_score']:.0f}** vs "
+                            f"**{home} {game_pred['home_score']:.0f}** · "
+                            f"Total: **{game_pred['predicted_total']:.0f}** · "
+                            f"Predicted winner: **{game_pred['predicted_winner']}** "
+                            f"by **{game_pred['predicted_margin']:.0f}**"
+                        )
 
                 st.divider()
 
@@ -642,11 +718,91 @@ with _tab_builder:
     if home_team_gb and away_team_gb and home_team_gb != away_team_gb:
         _all_players_gb = _load_players_gb()
 
+        # Minimum minutes threshold to show in the default rotation view
+        _ROTATION_MIN_THRESHOLD = 15.0   # Players averaging ≥ 15 min/game are rotation players
+
         def _get_team_players_gb(team_abbrev, all_players):
-            return [p for p in all_players if p.get("team", "").upper() == team_abbrev.upper()]
+            """Return players for a team, sorted by minutes descending."""
+            team_players = [
+                p for p in all_players
+                if p.get("team", "").upper() == team_abbrev.upper()
+            ]
+            # Sort by minutes (most minutes = stars first)
+            team_players.sort(
+                key=lambda p: float(p.get("minutes_avg", p.get("season_min_avg", 0)) or 0),
+                reverse=True,
+            )
+            return team_players
+
+        def _split_rotation_bench(players):
+            """Split player list into rotation (≥15 min) and bench (< 15 min)."""
+            rotation = [
+                p for p in players
+                if float(p.get("minutes_avg", p.get("season_min_avg", 0)) or 0) >= _ROTATION_MIN_THRESHOLD
+            ]
+            bench = [
+                p for p in players
+                if float(p.get("minutes_avg", p.get("season_min_avg", 0)) or 0) < _ROTATION_MIN_THRESHOLD
+            ]
+            return rotation, bench
+
+        def _get_injury_badge(p):
+            """Return an inline injury status badge (emoji string) for the player."""
+            inj = st.session_state.get("injury_status_map", {})
+            pname = p.get("name", "")
+            status = inj.get(pname, {}).get("status", "") if isinstance(inj.get(pname), dict) else inj.get(pname, "")
+            if not status:
+                return ""
+            s_up = str(status).upper()
+            if s_up in ("OUT", "INJURED RESERVE"):
+                return " 🚫 OUT"
+            if "GTD" in s_up or "QUESTIONABLE" in s_up or "DOUBTFUL" in s_up:
+                return " ⚠️ GTD"
+            return ""
+
+        def _render_player_row_gb(p, team_key_prefix, active_dict, minutes_dict, is_bench=False):
+            """
+            Render a single player row in the Game Builder:
+              - Checkbox (active / inactive)
+              - Name (bold rotation, muted bench) + injury badge
+              - Inline stats: MIN | PTS | REB | AST
+              - Minutes slider (only when active)
+            """
+            pname   = p.get("name", "Unknown")
+            avg_min = float(p.get("minutes_avg", p.get("season_min_avg", 0)) or 0)
+            pts     = float(p.get("points_avg",   0) or 0)
+            reb     = float(p.get("rebounds_avg", 0) or 0)
+            ast     = float(p.get("assists_avg",  0) or 0)
+            badge   = _get_injury_badge(p)
+
+            # Default checked: rotation players = True, bench = False
+            default_active = not is_bench
+
+            # Label: muted styling via non-bold for bench
+            stat_inline = f"{avg_min:.0f} min | {pts:.1f} pts | {reb:.1f} reb | {ast:.1f} ast"
+            label = f"{pname}{badge}  ·  {stat_inline}"
+
+            is_active = st.checkbox(
+                label,
+                value=default_active,
+                key=f"{team_key_prefix}_{pname}",
+            )
+            if is_active:
+                adj_min = st.slider(
+                    f"Minutes — {pname}",
+                    min_value=0,
+                    max_value=48,
+                    value=max(1, int(avg_min)),
+                    key=f"{team_key_prefix}_m_{pname}",
+                )
+                active_dict[pname] = p
+                minutes_dict[pname] = adj_min
 
         home_players_gb = _get_team_players_gb(home_team_gb, _all_players_gb)
         away_players_gb = _get_team_players_gb(away_team_gb, _all_players_gb)
+
+        home_rotation_gb, home_bench_gb = _split_rotation_bench(home_players_gb)
+        away_rotation_gb, away_bench_gb = _split_rotation_bench(away_players_gb)
 
         st.markdown("---")
         col_hp_gb, col_ap_gb = st.columns(2)
@@ -657,26 +813,50 @@ with _tab_builder:
         away_minutes_gb = {}
 
         with col_hp_gb:
-            st.markdown(f"**🏠 {home_team_gb} Roster**")
-            for p in home_players_gb:
-                pname = p.get("name", "Unknown")
-                avg_min = float(p.get("minutes_avg", p.get("season_min_avg", 28)) or 28)
-                is_active = st.checkbox(f"{pname} ({avg_min:.0f} min/g)", value=True, key=f"gb_h_{pname}")
-                if is_active:
-                    adj_min = st.slider(f"Minutes — {pname}", 0, 48, int(avg_min), key=f"gb_hm_{pname}")
-                    home_active_gb[pname] = p
-                    home_minutes_gb[pname] = adj_min
+            st.markdown(
+                f"**🏠 {home_team_gb} Rotation** "
+                f"<span style='color:#8a9bb8;font-size:0.8rem;'>({len(home_rotation_gb)} players · ≥15 min/g)</span>",
+                unsafe_allow_html=True,
+            )
+            for p in home_rotation_gb:
+                _render_player_row_gb(p, f"gb_h", home_active_gb, home_minutes_gb, is_bench=False)
+
+            if home_bench_gb:
+                _show_home_bench = st.toggle(
+                    f"📋 Show Bench ({len(home_bench_gb)} players < 15 min/g)",
+                    value=False,
+                    key="gb_show_home_bench",
+                )
+                if _show_home_bench:
+                    st.markdown(
+                        "<span style='color:#8a9bb8;font-size:0.8rem;'>📋 Bench (&lt;15 min/game)</span>",
+                        unsafe_allow_html=True,
+                    )
+                    for p in home_bench_gb:
+                        _render_player_row_gb(p, f"gb_hb", home_active_gb, home_minutes_gb, is_bench=True)
 
         with col_ap_gb:
-            st.markdown(f"**🚌 {away_team_gb} Roster**")
-            for p in away_players_gb:
-                pname = p.get("name", "Unknown")
-                avg_min = float(p.get("minutes_avg", p.get("season_min_avg", 28)) or 28)
-                is_active = st.checkbox(f"{pname} ({avg_min:.0f} min/g)", value=True, key=f"gb_a_{pname}")
-                if is_active:
-                    adj_min = st.slider(f"Minutes — {pname}", 0, 48, int(avg_min), key=f"gb_am_{pname}")
-                    away_active_gb[pname] = p
-                    away_minutes_gb[pname] = adj_min
+            st.markdown(
+                f"**🚌 {away_team_gb} Rotation** "
+                f"<span style='color:#8a9bb8;font-size:0.8rem;'>({len(away_rotation_gb)} players · ≥15 min/g)</span>",
+                unsafe_allow_html=True,
+            )
+            for p in away_rotation_gb:
+                _render_player_row_gb(p, f"gb_a", away_active_gb, away_minutes_gb, is_bench=False)
+
+            if away_bench_gb:
+                _show_away_bench = st.toggle(
+                    f"📋 Show Bench ({len(away_bench_gb)} players < 15 min/g)",
+                    value=False,
+                    key="gb_show_away_bench",
+                )
+                if _show_away_bench:
+                    st.markdown(
+                        "<span style='color:#8a9bb8;font-size:0.8rem;'>📋 Bench (&lt;15 min/game)</span>",
+                        unsafe_allow_html=True,
+                    )
+                    for p in away_bench_gb:
+                        _render_player_row_gb(p, f"gb_ab", away_active_gb, away_minutes_gb, is_bench=True)
 
         # Game settings
         st.markdown("---")
@@ -694,102 +874,169 @@ with _tab_builder:
             from engine.confidence import calculate_confidence_score
             from data.data_manager import load_defensive_ratings_data as _load_def_gb
 
-            _defensive_ratings_gb = _load_def_gb()
-            _teams_for_sim_gb = _load_teams_gb()
+            _t0_gb = time.time()
 
-            custom_results_gb = []
-            all_active_gb = list(home_active_gb.items()) + list(away_active_gb.items())
-            all_minutes_gb = {**home_minutes_gb, **away_minutes_gb}
+            with st.status("🏗️ Running Game Builder Simulation...", expanded=True) as _gb_status:
+                # Step 1: Load engine data
+                st.write("⚙️ Loading engine data...")
+                _defensive_ratings_gb = _load_def_gb()
+                _teams_for_sim_gb = _load_teams_gb()
 
-            prog_gb = st.progress(0)
-            for idx_gb, (pname_gb, pdata_gb) in enumerate(all_active_gb):
-                prog_gb.progress((idx_gb + 1) / max(len(all_active_gb), 1))
-                pdata_adj_gb = dict(pdata_gb)
-                pdata_adj_gb["minutes_avg"] = all_minutes_gb.get(pname_gb, float(pdata_gb.get("minutes_avg", 28) or 28))
-                is_home_gb = pname_gb in home_active_gb
-                opponent_gb = away_team_gb if is_home_gb else home_team_gb
-
-                for stat_gb in ["points", "rebounds", "assists", "threes"]:
-                    stat_avg_gb = float(pdata_adj_gb.get(f"{stat_gb}_avg", 0) or 0)
-                    if stat_avg_gb <= 0:
-                        continue
-                    orig_min_gb = float(pdata_gb.get("minutes_avg", 28) or 28)
-                    if orig_min_gb > 0:
-                        stat_avg_gb = stat_avg_gb * (pdata_adj_gb["minutes_avg"] / orig_min_gb)
-
+                # Step 2: Run team-level game prediction first
+                st.write(f"🔮 Generating game prediction ({home_team_gb} vs {away_team_gb})...")
+                if _GAME_PREDICTION_ENGINE_AVAILABLE:
                     try:
-                        proj_gb = build_player_projection(
-                            player_data=pdata_adj_gb,
-                            opponent_team_abbreviation=opponent_gb,
-                            is_home_game=is_home_gb,
-                            rest_days=2,
-                            game_total=gb_total,
-                            defensive_ratings_data=_defensive_ratings_gb,
-                            teams_data=_teams_for_sim_gb,
-                            vegas_spread=gb_spread if is_home_gb else -gb_spread,
+                        _gb_game_pred = _engine_predict_game(
+                            home_abbrev=home_team_gb,
+                            away_abbrev=away_team_gb,
+                            teams_data_dict=TEAMS_DATA,
+                            vegas_spread=float(gb_spread) if gb_spread else None,
+                            game_total=float(gb_total) if gb_total else None,
+                            num_simulations=2000,
                         )
-                        projected_value_gb = float(proj_gb.get(f"projected_{stat_gb}", stat_avg_gb) or stat_avg_gb)
+                        if _gb_game_pred:
+                            st.session_state["gb_game_pred"] = _gb_game_pred
                     except Exception:
-                        projected_value_gb = stat_avg_gb
+                        _gb_game_pred = None
+                else:
+                    _gb_game_pred = None
 
-                    if projected_value_gb <= 0:
-                        continue
+                custom_results_gb = []
+                all_active_gb = list(home_active_gb.items()) + list(away_active_gb.items())
+                all_minutes_gb = {**home_minutes_gb, **away_minutes_gb}
+                total_players = len(all_active_gb)
 
-                    std_dev_gb = get_stat_standard_deviation(pdata_adj_gb, stat_gb)
-                    if not std_dev_gb or std_dev_gb <= 0:
-                        std_dev_gb = projected_value_gb * 0.25
+                # Step 3: Per-player projections
+                prog_gb = st.progress(0, text="Starting player projections...")
+                for idx_gb, (pname_gb, pdata_gb) in enumerate(all_active_gb):
+                    is_home_gb = pname_gb in home_active_gb
+                    team_label = home_team_gb if is_home_gb else away_team_gb
+                    prog_text = f"Projecting {pname_gb} ({team_label}) — {idx_gb + 1}/{total_players}"
+                    prog_gb.progress((idx_gb + 1) / max(total_players, 1), text=prog_text)
+                    st.write(f"  📊 {prog_text}")
 
-                    prop_line_gb = round(projected_value_gb * 2) / 2  # Round to nearest 0.5
+                    pdata_adj_gb = dict(pdata_gb)
+                    pdata_adj_gb["minutes_avg"] = all_minutes_gb.get(pname_gb, float(pdata_gb.get("minutes_avg", 28) or 28))
+                    opponent_gb = away_team_gb if is_home_gb else home_team_gb
 
-                    try:
-                        sim_gb = run_monte_carlo_simulation(
-                            projected_stat_average=projected_value_gb,
-                            stat_standard_deviation=std_dev_gb,
-                            prop_line=prop_line_gb,
-                            number_of_simulations=gb_sims,
-                            blowout_risk_factor=proj_gb.get("blowout_risk_factor", 0.1),
-                            pace_adjustment_factor=proj_gb.get("pace_factor", 1.0),
-                            matchup_adjustment_factor=proj_gb.get("defense_factor", 1.0),
-                            home_away_adjustment=proj_gb.get("home_away_factor", 0.0),
-                            rest_adjustment_factor=proj_gb.get("rest_factor", 1.0),
-                        )
-                        over_prob_gb = sim_gb.get("over_probability", 0.5)
-                    except Exception:
-                        over_prob_gb = 0.5
+                    for stat_gb in ["points", "rebounds", "assists", "threes"]:
+                        stat_avg_gb = float(pdata_adj_gb.get(f"{stat_gb}_avg", 0) or 0)
+                        if stat_avg_gb <= 0:
+                            continue
+                        orig_min_gb = float(pdata_gb.get("minutes_avg", 28) or 28)
+                        if orig_min_gb > 0:
+                            stat_avg_gb = stat_avg_gb * (pdata_adj_gb["minutes_avg"] / orig_min_gb)
 
-                    try:
-                        conf_gb = calculate_confidence_score(
-                            over_probability=over_prob_gb,
-                            sample_size=gb_sims,
-                            edge_percentage=(over_prob_gb - 0.5) * 100,
-                            directional_forces_count=1,
-                            directional_agreement=0.6,
-                            player_consistency=0.7,
-                        )
-                        conf_score_gb = conf_gb if isinstance(conf_gb, (int, float)) else conf_gb.get("confidence_score", 0)
-                    except Exception:
-                        conf_score_gb = 0
+                        try:
+                            proj_gb = build_player_projection(
+                                player_data=pdata_adj_gb,
+                                opponent_team_abbreviation=opponent_gb,
+                                is_home_game=is_home_gb,
+                                rest_days=2,
+                                game_total=gb_total,
+                                defensive_ratings_data=_defensive_ratings_gb,
+                                teams_data=_teams_for_sim_gb,
+                                vegas_spread=gb_spread if is_home_gb else -gb_spread,
+                            )
+                            projected_value_gb = float(proj_gb.get(f"projected_{stat_gb}", stat_avg_gb) or stat_avg_gb)
+                        except Exception:
+                            projected_value_gb = stat_avg_gb
+                            proj_gb = {}
 
-                    custom_results_gb.append({
-                        "player_name": pname_gb,
-                        "team": home_team_gb if is_home_gb else away_team_gb,
-                        "stat_type": stat_gb,
-                        "prop_line": prop_line_gb,
-                        "projected": round(projected_value_gb, 1),
-                        "over_probability": over_prob_gb,
-                        "confidence_score": conf_score_gb,
-                        "minutes_used": pdata_adj_gb["minutes_avg"],
-                    })
+                        if projected_value_gb <= 0:
+                            continue
 
-            prog_gb.empty()
+                        std_dev_gb = get_stat_standard_deviation(pdata_adj_gb, stat_gb)
+                        if not std_dev_gb or std_dev_gb <= 0:
+                            std_dev_gb = projected_value_gb * 0.25
+
+                        prop_line_gb = round(projected_value_gb * 2) / 2
+
+                        try:
+                            sim_gb = run_monte_carlo_simulation(
+                                projected_stat_average=projected_value_gb,
+                                stat_standard_deviation=std_dev_gb,
+                                prop_line=prop_line_gb,
+                                number_of_simulations=gb_sims,
+                                blowout_risk_factor=proj_gb.get("blowout_risk_factor", 0.1),
+                                pace_adjustment_factor=proj_gb.get("pace_factor", 1.0),
+                                matchup_adjustment_factor=proj_gb.get("defense_factor", 1.0),
+                                home_away_adjustment=proj_gb.get("home_away_factor", 0.0),
+                                rest_adjustment_factor=proj_gb.get("rest_factor", 1.0),
+                            )
+                            over_prob_gb = sim_gb.get("over_probability", 0.5)
+                        except Exception:
+                            over_prob_gb = 0.5
+
+                        try:
+                            conf_gb = calculate_confidence_score(
+                                over_probability=over_prob_gb,
+                                sample_size=gb_sims,
+                                edge_percentage=(over_prob_gb - 0.5) * 100,
+                                directional_forces_count=1,
+                                directional_agreement=0.6,
+                                player_consistency=0.7,
+                            )
+                            conf_score_gb = conf_gb if isinstance(conf_gb, (int, float)) else conf_gb.get("confidence_score", 0)
+                        except Exception:
+                            conf_score_gb = 0
+
+                        custom_results_gb.append({
+                            "player_name": pname_gb,
+                            "team": home_team_gb if is_home_gb else away_team_gb,
+                            "stat_type": stat_gb,
+                            "prop_line": prop_line_gb,
+                            "projected": round(projected_value_gb, 1),
+                            "over_probability": over_prob_gb,
+                            "confidence_score": conf_score_gb,
+                            "minutes_used": pdata_adj_gb["minutes_avg"],
+                        })
+
+                prog_gb.empty()
+
+                _elapsed_gb = time.time() - _t0_gb
+                _gb_status.update(
+                    label=f"✅ Simulation complete — {len(all_active_gb)} players × 4 stats "
+                          f"= {len(custom_results_gb)} projections in {_elapsed_gb:.1f}s",
+                    state="complete",
+                    expanded=False,
+                )
+
             st.session_state["custom_game_analysis"] = custom_results_gb
-            st.success(
-                f"✅ Custom simulation complete! Analyzed {len(all_active_gb)} players × 4 stats "
-                f"= {len(custom_results_gb)} prop projections."
-            )
 
         # Display custom results if available
         if st.session_state.get("custom_game_analysis"):
+            # Show game-level prediction from the new engine if available
+            _gb_gp = st.session_state.get("gb_game_pred")
+            if _gb_gp:
+                st.markdown("### 🔮 Game Score Prediction")
+                _gp_c1, _gp_c2, _gp_c3, _gp_c4 = st.columns(4)
+                _gp_c1.metric(
+                    "Predicted Score",
+                    f"{away_team_gb} {_gb_gp['away_score']} — {home_team_gb} {_gb_gp['home_score']}",
+                )
+                _gp_c2.metric(
+                    "Winner",
+                    f"{_gb_gp['predicted_winner']} by {_gb_gp['predicted_margin']}",
+                    help=(
+                        f"Home win prob: {_gb_gp.get('home_win_probability', 0):.0%}  |  "
+                        f"Away: {_gb_gp.get('away_win_probability', 0):.0%}"
+                    ),
+                )
+                _gp_c3.metric(
+                    "Total / Pace",
+                    f"{_gb_gp['predicted_total']} pts · {_gb_gp.get('pace_environment', '—')}",
+                    help=(
+                        f"OT prob: {_gb_gp.get('overtime_probability', 0):.1%}  |  "
+                        f"Blowout: {_gb_gp.get('blowout_probability', 0):.1%}"
+                    ),
+                )
+                _gp_c4.metric(
+                    "Confidence",
+                    f"{_gb_gp.get('game_prediction_confidence', '—')}/100",
+                )
+                st.divider()
+
             st.markdown("### 📊 Custom Simulation Results")
             custom_res_gb = st.session_state["custom_game_analysis"]
             custom_res_sorted_gb = sorted(custom_res_gb, key=lambda x: x.get("confidence_score", 0), reverse=True)
@@ -820,7 +1067,10 @@ with _tab_builder:
 # ============================================================
 
 def _generate_game_narrative(game, _analysis_results):
-    """Generate a readable game preview narrative from analysis results."""
+    """Generate a readable game preview narrative from analysis results.
+
+    Uses the new game prediction engine for projected scores when available.
+    """
     home_team_n = game.get("home_team", "Home")
     away_team_n = game.get("away_team", "Away")
     total_n     = game.get("game_total", 220)
@@ -838,15 +1088,60 @@ def _generate_game_narrative(game, _analysis_results):
 
     narrative_n = f"## 🏀 GAME PREVIEW: {away_team_n} @ {home_team_n}\n\n"
 
-    # Projected score
-    try:
-        total_float = float(total_n or 220)
-        spread_float = float(spread_n or 0)
-        proj_home_n = round(total_float / 2 + abs(spread_float) / 2 * (-1 if spread_float > 0 else 1))
-        proj_away_n = round(total_float - proj_home_n)
-        narrative_n += f"The model projects a **{away_team_n} {proj_away_n} — {home_team_n} {proj_home_n}** final.\n\n"
-    except Exception:
-        narrative_n += f"Game Total: {total_n}\n\n"
+    # Projected score — use new engine when possible
+    _engine_pred = None
+    if _GAME_PREDICTION_ENGINE_AVAILABLE:
+        try:
+            _engine_pred = _engine_predict_game(
+                home_abbrev=home_team_n,
+                away_abbrev=away_team_n,
+                teams_data_dict=TEAMS_DATA,
+                vegas_spread=float(spread_n) if spread_n else None,
+                game_total=float(total_n) if total_n else None,
+                num_simulations=2000,
+            )
+        except Exception:
+            _engine_pred = None
+
+    if _engine_pred:
+        proj_home_n = _engine_pred["home_score"]
+        proj_away_n = _engine_pred["away_score"]
+        winner_n    = _engine_pred["predicted_winner"]
+        margin_n    = _engine_pred["predicted_margin"]
+        home_wp     = _engine_pred.get("home_win_probability", 0)
+        away_wp     = _engine_pred.get("away_win_probability", 0)
+        pace_env    = _engine_pred.get("pace_environment", "")
+        ot_prob     = _engine_pred.get("overtime_probability", 0)
+        conf_n      = _engine_pred.get("game_prediction_confidence", 0)
+
+        narrative_n += (
+            f"The model projects a **{away_team_n} {proj_away_n} — {home_team_n} {proj_home_n}** final "
+            f"(confidence: {conf_n}/100).\n\n"
+        )
+        narrative_n += (
+            f"**{winner_n}** is projected to win by **{margin_n} points**. "
+            f"Win probability: {home_team_n} {home_wp:.0%} · {away_team_n} {away_wp:.0%}. "
+            f"Overtime probability: {ot_prob:.1%}.\n\n"
+        )
+        if pace_env:
+            narrative_n += f"Expected pace environment: **{pace_env}** ({_engine_pred.get('expected_possessions', '—')} possessions).\n\n"
+        _mf = _engine_pred.get("model_factors", {})
+        if _mf:
+            narrative_n += (
+                f"*Model factors: {_mf.get('four_factor_edge','—')} four-factor edge · "
+                f"{_mf.get('home_court_boost','—')} home-court · "
+                f"{_mf.get('vegas_blend','—')}*\n\n"
+            )
+    else:
+        # Fallback: derive from Vegas lines if available
+        try:
+            total_float  = float(total_n or 220)
+            spread_float = float(spread_n or 0)
+            proj_home_n  = round(total_float / 2 + abs(spread_float) / 2 * (-1 if spread_float > 0 else 1))
+            proj_away_n  = round(total_float - proj_home_n)
+            narrative_n += f"The model projects a **{away_team_n} {proj_away_n} — {home_team_n} {proj_home_n}** final.\n\n"
+        except Exception:
+            narrative_n += f"Game Total: {total_n}\n\n"
 
     # Spread analysis
     try:
