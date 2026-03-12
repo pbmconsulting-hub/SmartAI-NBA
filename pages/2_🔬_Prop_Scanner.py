@@ -64,6 +64,30 @@ st.markdown("""
 
 st.title("🔬 Prop Scanner")
 st.markdown("Enter prop lines manually, upload a CSV, or **fetch live lines** directly from the platforms!")
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Prop Scanner — Three Ways to Load Props
+    
+    **Option 1: Manual Entry**
+    - Use the form to enter individual props (player name, stat type, line)
+    - Good for adding specific props not available on platforms
+    
+    **Option 2: CSV Upload**
+    - Download the template, fill in your props, upload the file
+    - Best for bulk entry or importing from your own research
+    
+    **Option 3: Auto-Generate from Tonight's Players**
+    - Click "🤖 Auto-Generate Props" to create props for ALL active players
+    - Lines are set to season averages (rounded to nearest 0.5)
+    - Covers all 3 platforms automatically
+    
+    💡 **Pro Tips:**
+    - Auto-Generate is the fastest way to get started
+    - Manually adjust lines after auto-generating for accuracy
+    - Use the filter/sort options to focus on specific players or stat types
+    """)
+
 st.divider()
 
 st.markdown(get_education_box_html(

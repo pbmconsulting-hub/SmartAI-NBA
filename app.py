@@ -389,6 +389,38 @@ with right_column:
 # END SECTION: Quick Start Guide
 # ============================================================
 
+# ============================================================
+# SECTION: Legal Disclaimer
+# ============================================================
+
+with st.expander("⚠️ Important Legal Disclaimer — Please Read", expanded=False):
+    st.markdown("""
+    ## ⚠️ IMPORTANT DISCLAIMER
+    
+    **SmartBetPro NBA ("Smart Pick Pro")** is an analytical tool for **entertainment and educational purposes only**. This application does NOT guarantee profits or winning outcomes.
+    
+    - 📊 Past performance does not guarantee future results
+    - 🔢 All predictions are based on statistical models that have inherent limitations  
+    - 💰 Sports betting involves significant financial risk — **never bet more than you can afford to lose**
+    - 🔞 You must be **21+** (or legal age in your jurisdiction) to participate in sports betting
+    - ⚠️ This tool is **not affiliated** with the NBA, PrizePicks, Underdog Fantasy, or DraftKings
+    - 🆘 Always gamble responsibly. If you or someone you know has a gambling problem, call **1-800-GAMBLER (1-800-426-2537)**
+    
+    **By using this application, you acknowledge that all betting decisions are your own responsibility.**
+    
+    ---
+    
+    **Responsible Gaming Resources:**
+    - 📞 **National Problem Gambling Helpline: 1-800-GAMBLER (1-800-426-2537)** — 24/7 confidential support
+    - 📞 National Council on Problem Gambling: **1-800-522-4700** — crisis counseling & referrals
+    - 🌐 [www.ncpgambling.org](https://www.ncpgambling.org)
+    - 🌐 [www.begambleaware.org](https://www.begambleaware.org)
+    """)
+
+# ============================================================
+# END SECTION: Legal Disclaimer
+# ============================================================
+
 st.divider()
 
 # ============================================================
@@ -445,5 +477,6 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
 st.divider()
 st.caption(
     f"© Smart Pick Pro | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
-    f"{len(players_data)} players, {len(teams_data)} teams"
+    f"{len(players_data)} players, {len(teams_data)} teams | "
+    "For entertainment & educational purposes only. Not financial advice. Bet responsibly. 21+"
 )

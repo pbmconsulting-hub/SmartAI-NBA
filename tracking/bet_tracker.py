@@ -8,6 +8,7 @@
 
 # Standard library imports only
 import datetime  # For getting today's date
+import time      # For retry delays in resolve_todays_bets
 
 # Import our database module (sibling file in tracking/)
 from tracking.database import (
@@ -39,6 +40,10 @@ VALID_PLATFORMS = {"PrizePicks", "Underdog", "DraftKings"}
 
 # Valid tier names
 VALID_TIERS = {"Platinum", "Gold", "Silver", "Bronze"}
+
+# Retry configuration for API calls in resolve_todays_bets
+RESOLVE_MAX_RETRIES = 3
+RESOLVE_RETRY_DELAY = 2  # seconds between retries
 
 # ============================================================
 # END SECTION: Valid Values for Validation
@@ -831,13 +836,27 @@ def resolve_todays_bets():
             summary["pending"] += 1
             continue
 
+        # Retry logic: max RESOLVE_MAX_RETRIES attempts with RESOLVE_RETRY_DELAY delay
+        logs = []
+        _last_retry_exc = None
+        for _attempt in range(RESOLVE_MAX_RETRIES):
+            try:
+                gl = PlayerGameLog(
+                    player_id=player_id,
+                    season=season_str,
+                    season_type_all_star="Regular Season",
+                )
+                logs = gl.get_normalized_dict().get("PlayerGameLog", [])
+                break  # success
+            except Exception as _retry_exc:
+                _last_retry_exc = _retry_exc
+                print(f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} failed for {player_name}: {_retry_exc}")
+                if _attempt < RESOLVE_MAX_RETRIES - 1:
+                    time.sleep(RESOLVE_RETRY_DELAY)
+                else:
+                    raise  # re-raise on final attempt
+
         try:
-            gl = PlayerGameLog(
-                player_id=player_id,
-                season=season_str,
-                season_type_all_star="Regular Season",
-            )
-            logs = gl.get_normalized_dict().get("PlayerGameLog", [])
             if not logs:
                 summary["pending"] += 1
                 continue
