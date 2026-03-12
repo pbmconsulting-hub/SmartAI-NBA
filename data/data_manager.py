@@ -1192,6 +1192,9 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                         if _avg < 0.3:
                             continue
                         _line = round(_avg * 2) / 2
+                        # Apply book-style points shade (same as main loop)
+                        if _stat == "points" and _line >= 1.0:
+                            _line = max(0.5, _line - 0.5)
                         if _line <= 0:
                             continue
                         props.append({
@@ -1250,6 +1253,12 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                     if avg_val < 0.3:
                         continue  # Skip effectively 0 averages
                     prop_line = round(avg_val * 2) / 2  # Round to nearest 0.5
+                    # Books typically shade the points line ~0.5 below a player's
+                    # average to create action on both sides (i.e. the line is
+                    # attractive as an OVER).  Apply this only to "points" props
+                    # so fantasy/combo lines are not accidentally under-set.
+                    if stat_type == "points" and prop_line >= 1.0:
+                        prop_line = max(0.5, prop_line - 0.5)
                 elif stat_type in ("fantasy_score_pp", "fantasy_score_ud"):
                     avg_val = _pp_ud_fantasy_score(pts, reb, ast, stl, blk, tov)
                     if avg_val < 5.0:

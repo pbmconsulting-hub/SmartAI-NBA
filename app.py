@@ -205,6 +205,11 @@ if "analysis_results" not in st.session_state:
     st.session_state["analysis_results"] = []
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
+# Props keys — initialized here so they survive page navigation (Bug 3 / Bug 6)
+if "current_props" not in st.session_state:
+    st.session_state["current_props"] = []
+if "platform_props" not in st.session_state:
+    st.session_state["platform_props"] = []
 
 # ============================================================
 # END SECTION: Initialize App on Startup
