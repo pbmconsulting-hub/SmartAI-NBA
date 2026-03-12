@@ -1044,6 +1044,27 @@ def load_props_from_session(session_state):
     return load_props_data()
 
 
+def _apply_book_shade(stat_type: str, line: float) -> float:
+    """
+    Apply sportsbook-style line shading for points props.
+
+    Books typically set the points line ~0.5 below the player's average
+    to create action on both sides (the OVER looks slightly more
+    attractive).  Only points props are shaded — other stats are left
+    at the nearest-0.5 rounding of the season average.
+
+    Args:
+        stat_type: e.g. 'points', 'rebounds', 'assists', etc.
+        line:      Raw line already rounded to nearest 0.5.
+
+    Returns:
+        Adjusted line (same value for non-points stats).
+    """
+    if stat_type == "points" and line >= 1.0:
+        return max(0.5, line - 0.5)
+    return line
+
+
 def generate_props_for_todays_players(players_data, todays_games, platforms=None):
     """
     Auto-generate prop entries for all active players on tonight's teams.
@@ -1144,26 +1165,6 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     def _pp_ud_fantasy_score(pts, reb, ast, stl, blk, tov):
         """PrizePicks / Underdog Fantasy scoring formula."""
         return pts + 1.2*reb + 1.5*ast + 3.0*stl + 3.0*blk - tov
-
-    def _apply_book_shade(stat_type: str, line: float) -> float:
-        """
-        Apply sportsbook-style line shading for points props.
-
-        Books typically set the points line ~0.5 below the player's average
-        to create action on both sides (the OVER looks slightly more
-        attractive).  Only points props are shaded — other stats are left
-        at the nearest-0.5 rounding of the season average.
-
-        Args:
-            stat_type: e.g. 'points', 'rebounds', 'assists', etc.
-            line:      Raw line already rounded to nearest 0.5.
-
-        Returns:
-            Adjusted line (same value for non-points stats).
-        """
-        if stat_type == "points" and line >= 1.0:
-            return max(0.5, line - 0.5)
-        return line
 
     today_str = datetime.date.today().isoformat()
     props = []

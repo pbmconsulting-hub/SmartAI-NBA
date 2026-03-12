@@ -205,7 +205,9 @@ if "analysis_results" not in st.session_state:
     st.session_state["analysis_results"] = []
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
-# Props keys — initialized here so they survive page navigation (Bug 3 / Bug 6)
+# Props keys — initialized here so they persist across page navigation.
+# Without these defaults, Streamlit only preserves keys that were set on
+# the previous page, causing props to reset whenever the user switches pages.
 if "current_props" not in st.session_state:
     st.session_state["current_props"] = []
 if "platform_props" not in st.session_state:
