@@ -28,6 +28,12 @@ from styles.theme import get_global_css, get_qds_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+# ── Premium Gate ───────────────────────────────────────────────
+from utils.premium_gate import premium_gate
+if not premium_gate("Player Simulator"):
+    st.stop()
+# ── End Premium Gate ───────────────────────────────────────────
+
 # ─── Header ─────────────────────────────────────────────────
 st.markdown(
     '<h2 style="font-family:\'Orbitron\',sans-serif;color:#00ffd5;margin-bottom:4px;">'

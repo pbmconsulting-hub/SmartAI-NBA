@@ -52,6 +52,12 @@ st.set_page_config(
 from styles.theme import get_global_css, get_neural_header_html, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+# ── Premium Gate ───────────────────────────────────────────────
+from utils.premium_gate import premium_gate
+if not premium_gate("Entry Builder"):
+    st.stop()
+# ── End Premium Gate ───────────────────────────────────────────
+
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
 

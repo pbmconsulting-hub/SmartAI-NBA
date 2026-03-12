@@ -45,6 +45,15 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+# ── Premium Status (partial gate — some features restricted) ──
+from utils.auth import is_premium_user as _is_premium_user
+try:
+    from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
+except Exception:
+    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
+_FREE_PROP_LIMIT = 5   # Free users can manually enter up to 5 props
+_user_is_premium = _is_premium_user()
+
 # ─── Custom CSS ───────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -154,7 +163,18 @@ except ImportError:
 
 st.subheader("🔄 Fetch Live Props")
 
-if _PLATFORM_FETCHER_AVAILABLE:
+# ── Free tier: disable live platform fetch ────────────────────
+if not _user_is_premium:
+    st.markdown(
+        '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
+        'border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
+        '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
+        f' — Live platform fetching (PrizePicks, Underdog, DraftKings) requires a '
+        f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>. '
+        'You can still enter up to 5 props manually below.</div>',
+        unsafe_allow_html=True,
+    )
+elif _PLATFORM_FETCHER_AVAILABLE:
     _pp_on = st.session_state.get("fetch_prizepicks_enabled", True)
     _ud_on = st.session_state.get("fetch_underdog_enabled", True)
     _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
@@ -822,10 +842,19 @@ if add_prop_button:
         }
 
         current_props_for_update = load_props_from_session(st.session_state)
-        current_props_for_update.append(new_prop)
-        save_props_to_session(current_props_for_update, st.session_state)
-        st.success(f"✅ Added: {final_player_name} ({auto_team}) | {stat_type_selection} | {prop_line_value} | {platform_selection}")
-        st.rerun()
+
+        # ── Free tier prop limit ───────────────────────────────────
+        if not _user_is_premium and len(current_props_for_update) >= _FREE_PROP_LIMIT:
+            st.warning(
+                f"⚠️ Free plan is limited to **{_FREE_PROP_LIMIT} props**. "
+                f"Remove a prop first, or [**upgrade to Premium**]({_PREM_PATH}) "
+                "for unlimited props."
+            )
+        else:
+            current_props_for_update.append(new_prop)
+            save_props_to_session(current_props_for_update, st.session_state)
+            st.success(f"✅ Added: {final_player_name} ({auto_team}) | {stat_type_selection} | {prop_line_value} | {platform_selection}")
+            st.rerun()
 
 # ============================================================
 # END SECTION: Manual Entry Form
@@ -839,87 +868,99 @@ st.divider()
 
 st.subheader("📤 Upload Props CSV")
 
-st.markdown("**Required CSV format:**")
-st.code(
-    "player_name,team,stat_type,line,platform,game_date\n"
-    "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05\n"
-    "Stephen Curry,GSW,threes,3.5,Underdog,2026-03-05",
-    language="csv",
-)
+# ── Free tier: disable CSV upload ────────────────────────────
+if not _user_is_premium:
+    st.markdown(
+        '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
+        'border-radius:10px;padding:12px 16px;">'
+        '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
+        f' — CSV upload requires a '
+        f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown("**Required CSV format:**")
+    st.code(
+        "player_name,team,stat_type,line,platform,game_date\n"
+        "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05\n"
+        "Stephen Curry,GSW,threes,3.5,Underdog,2026-03-05",
+        language="csv",
+    )
 
-template_csv = get_csv_template()
-st.download_button(
-    label="⬇️ Download CSV Template",
-    data=template_csv,
-    file_name="props_template.csv",
-    mime="text/csv",
-)
+    template_csv = get_csv_template()
+    st.download_button(
+        label="⬇️ Download CSV Template",
+        data=template_csv,
+        file_name="props_template.csv",
+        mime="text/csv",
+    )
 
-st.markdown("---")
+    st.markdown("---")
 
-uploaded_file = st.file_uploader(
-    "Upload your props CSV file",
-    type=["csv"],
-)
+    uploaded_file = st.file_uploader(
+        "Upload your props CSV file",
+        type=["csv"],
+    )
 
-if uploaded_file is not None:
-    file_content = uploaded_file.read().decode("utf-8")
-    parsed_props, parse_errors = parse_props_from_csv_text(file_content)
+    if uploaded_file is not None:
+        file_content = uploaded_file.read().decode("utf-8")
+        parsed_props, parse_errors = parse_props_from_csv_text(file_content)
 
-    if parse_errors:
-        for error in parse_errors:
-            st.warning(f"⚠️ {error}")
+        if parse_errors:
+            for error in parse_errors:
+                st.warning(f"⚠️ {error}")
 
-    if parsed_props:
-        # Auto-detect platform and normalize stat types through platform mappings
-        raw_stat_names = [p.get("stat_type", "") for p in parsed_props]
-        detected_platform = detect_platform_from_stat_names(raw_stat_names)
-        if detected_platform:
-            st.info(f"🔍 Auto-detected platform: **{detected_platform}**")
+        if parsed_props:
+            # Auto-detect platform and normalize stat types through platform mappings
+            raw_stat_names = [p.get("stat_type", "") for p in parsed_props]
+            detected_platform = detect_platform_from_stat_names(raw_stat_names)
+            if detected_platform:
+                st.info(f"🔍 Auto-detected platform: **{detected_platform}**")
 
-        for p in parsed_props:
-            raw_stat = p.get("stat_type", "")
-            platform_hint = p.get("platform", detected_platform or "")
-            normalized = normalize_stat_type(raw_stat, platform_hint)
-            if normalized != raw_stat:
-                p["stat_type"] = normalized
+            for p in parsed_props:
+                raw_stat = p.get("stat_type", "")
+                platform_hint = p.get("platform", detected_platform or "")
+                normalized = normalize_stat_type(raw_stat, platform_hint)
+                if normalized != raw_stat:
+                    p["stat_type"] = normalized
 
-        st.success(f"✅ Parsed {len(parsed_props)} props from upload!")
+            st.success(f"✅ Parsed {len(parsed_props)} props from upload!")
 
-        # Auto-enrich with player data
-        enriched_preview = [enrich_prop_with_player_data(p, players_data) for p in parsed_props]
-        preview_rows = [
-            {
-                "Player": p.get("player_name", ""),
-                "Team": p.get("player_team", p.get("team", "")),
-                "Stat": p.get("stat_type", ""),
-                "Line": p.get("line", ""),
-                "Season Avg": round(p.get("season_pts_avg", 0), 1) if p.get("stat_type") == "points" else "—",
-                "Platform": p.get("platform", ""),
-            }
-            for p in enriched_preview[:10]
-        ]
-        st.markdown("**Preview:**")
-        st.dataframe(preview_rows, use_container_width=True, hide_index=True)
+            # Auto-enrich with player data
+            enriched_preview = [enrich_prop_with_player_data(p, players_data) for p in parsed_props]
+            preview_rows = [
+                {
+                    "Player": p.get("player_name", ""),
+                    "Team": p.get("player_team", p.get("team", "")),
+                    "Stat": p.get("stat_type", ""),
+                    "Line": p.get("line", ""),
+                    "Season Avg": round(p.get("season_pts_avg", 0), 1) if p.get("stat_type") == "points" else "—",
+                    "Platform": p.get("platform", ""),
+                }
+                for p in enriched_preview[:10]
+            ]
+            st.markdown("**Preview:**")
+            st.dataframe(preview_rows, use_container_width=True, hide_index=True)
 
-        if len(parsed_props) > 10:
-            st.caption(f"... and {len(parsed_props) - 10} more")
+            if len(parsed_props) > 10:
+                st.caption(f"... and {len(parsed_props) - 10} more")
 
-        col_replace, col_add, col_cancel = st.columns([1, 1, 2])
-        with col_replace:
-            if st.button("🔄 Replace All Props", type="primary"):
-                save_props_to_session(parsed_props, st.session_state)
-                st.success(f"Replaced all props with {len(parsed_props)} from upload!")
-                st.rerun()
-        with col_add:
-            if st.button("➕ Add to Existing"):
-                existing = load_props_from_session(st.session_state)
-                combined = existing + parsed_props
-                save_props_to_session(combined, st.session_state)
-                st.success(f"Added {len(parsed_props)} props. Total: {len(combined)}")
-                st.rerun()
-    else:
-        st.error("No valid props found in the uploaded file.")
+            col_replace, col_add, col_cancel = st.columns([1, 1, 2])
+            with col_replace:
+                if st.button("🔄 Replace All Props", type="primary"):
+                    save_props_to_session(parsed_props, st.session_state)
+                    st.success(f"Replaced all props with {len(parsed_props)} from upload!")
+                    st.rerun()
+            with col_add:
+                if st.button("➕ Add to Existing"):
+                    existing = load_props_from_session(st.session_state)
+                    combined = existing + parsed_props
+                    save_props_to_session(combined, st.session_state)
+                    st.success(f"Added {len(parsed_props)} props. Total: {len(combined)}")
+                    st.rerun()
+        else:
+            st.error("No valid props found in the uploaded file.")
 
 # ============================================================
 # END SECTION: CSV Upload

@@ -72,6 +72,12 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 
+# ── Premium Gate ───────────────────────────────────────────────
+from utils.premium_gate import premium_gate
+if not premium_gate("Bet Tracker"):
+    st.stop()
+# ── End Premium Gate ───────────────────────────────────────────
+
 # Ensure DB is initialised
 initialize_database()
 
