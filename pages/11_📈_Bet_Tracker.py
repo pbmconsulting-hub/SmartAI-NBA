@@ -564,6 +564,54 @@ with tab_all_picks:
             "all outputs are automatically stored here for tracking."
         )
     else:
+        # ── Tier & Stat-Type Filters ──────────────────────────────────
+        _ap_tiers_available = [
+            t for t in ("Platinum", "Gold", "Silver", "Bronze")
+            if any(p.get("tier") == t for p in all_picks_data)
+        ]
+        _ap_stats_available = sorted({
+            p.get("stat_type", "").lower()
+            for p in all_picks_data
+            if p.get("stat_type")
+        })
+        _ap_fc1, _ap_fc2 = st.columns(2)
+        with _ap_fc1:
+            _ap_tier_filter = st.multiselect(
+                "🏅 Filter by Tier",
+                options=_ap_tiers_available,
+                default=[],
+                placeholder="All tiers shown",
+                key="ap_tier_filter",
+                help="Show only the selected confidence tiers.",
+            )
+        with _ap_fc2:
+            _ap_stat_filter = st.multiselect(
+                "📊 Filter by Prop / Stat Type",
+                options=[s.title() for s in _ap_stats_available],
+                default=[],
+                placeholder="All stat types shown",
+                key="ap_stat_filter",
+                help="Show only picks for the selected stat types.",
+            )
+
+        # Apply filters to a local variable so the source list is unchanged
+        _ap_filtered = list(all_picks_data)
+        if _ap_tier_filter:
+            _ap_filtered = [p for p in _ap_filtered if p.get("tier") in _ap_tier_filter]
+        if _ap_stat_filter:
+            _ap_stat_lower = {s.lower() for s in _ap_stat_filter}
+            _ap_filtered = [
+                p for p in _ap_filtered
+                if p.get("stat_type", "").lower() in _ap_stat_lower
+            ]
+
+        if not _ap_filtered:
+            st.info(
+                "No picks match the selected filters. "
+                "Try removing a tier or stat-type filter above."
+            )
+        else:
+            all_picks_data = _ap_filtered  # use filtered list for rest of tab
         # ── Summary Cards ─────────────────────────────────────────────
         _ap_total = len(all_picks_data)
         _ap_overs = sum(1 for p in all_picks_data if p.get("direction") == "OVER")
@@ -903,6 +951,21 @@ with tab_bets:
             label_visibility="collapsed",
         )
 
+        # ── Stat-Type Filter (complements tier/result radio above) ────
+        _mb_stats_available = sorted({
+            b.get("stat_type", "").lower()
+            for b in all_bets
+            if b.get("stat_type")
+        })
+        _mb_stat_filter = st.multiselect(
+            "📊 Filter by Prop / Stat Type",
+            options=[s.title() for s in _mb_stats_available],
+            default=[],
+            placeholder="All stat types shown",
+            key="mb_stat_filter",
+            help="Narrow bets to a specific stat type (e.g. Points, Rebounds).",
+        )
+
         def _apply_filter(bets, choice):
             if choice == "Wins Only":
                 return [b for b in bets if b.get("result") == "WIN"]
@@ -915,6 +978,14 @@ with tab_bets:
             return bets
 
         filtered_bets = _apply_filter(all_bets, filter_choice)
+
+        # Apply stat-type filter on top of the tier/result filter
+        if _mb_stat_filter:
+            _mb_stat_lower = {s.lower() for s in _mb_stat_filter}
+            filtered_bets = [
+                b for b in filtered_bets
+                if b.get("stat_type", "").lower() in _mb_stat_lower
+            ]
 
         # ── Summary Cards ─────────────────────────────────────────────
         _res_bets = [b for b in all_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
@@ -931,7 +1002,10 @@ with tab_bets:
             unsafe_allow_html=True,
         )
 
-        st.markdown(f"**Showing {len(filtered_bets)} bet(s)** (filter: {filter_choice})")
+        _filter_desc = filter_choice
+        if _mb_stat_filter:
+            _filter_desc += f" · {', '.join(_mb_stat_filter)}"
+        st.markdown(f"**Showing {len(filtered_bets)} bet(s)** (filter: {_filter_desc})")
         st.divider()
 
         # ── Mark a Result ─────────────────────────────────────────────

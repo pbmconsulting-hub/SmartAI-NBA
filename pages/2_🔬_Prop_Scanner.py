@@ -356,6 +356,46 @@ if not current_props:
                 icon="🤖",
             )
 
+# ── Bug 4: Combined status indicator — "X games loaded | Y props ready" ───────
+_status_games = st.session_state.get("todays_games", [])
+_status_props  = current_props
+_synthetic_count = sum(1 for p in _status_props if p.get("_synthetic"))
+_live_count      = len(_status_props) - _synthetic_count
+
+_games_part = (
+    f"🏟️ **{len(_status_games)} game(s) loaded**"
+    if _status_games
+    else "🏟️ No games loaded"
+)
+_props_part = (
+    f"🎯 **{len(_status_props)} props ready**"
+    if _status_props
+    else "🎯 No props loaded"
+)
+_source_parts = []
+if _live_count:
+    _source_parts.append(f"{_live_count} live")
+if _synthetic_count:
+    _source_parts.append(f"{_synthetic_count} estimated")
+_source_note = f" ({', '.join(_source_parts)})" if _source_parts else ""
+
+if _status_games and _status_props:
+    st.success(f"{_games_part} &nbsp;|&nbsp; {_props_part}{_source_note}")
+elif _status_games:
+    st.warning(f"{_games_part} &nbsp;|&nbsp; {_props_part} — click **🤖 Auto-Generate** below")
+elif _status_props:
+    st.info(f"{_games_part} &nbsp;|&nbsp; {_props_part}{_source_note}")
+
+# ── Bug 1 & 2: Disclaimer when estimated/synthetic lines are present ────────
+if _synthetic_count:
+    st.info(
+        "⚠️ **Estimated Lines Notice** — "
+        f"**{_synthetic_count} prop line(s)** are auto-generated from season averages "
+        "(rounded to nearest 0.5, points lines shaded ~0.5 below average as books do). "
+        "These are **approximations** — actual platform lines will differ. "
+        "For real lines, use **🔄 Fetch Live Props** above (PrizePicks / Underdog / DraftKings)."
+    )
+
 # Load persisted injury status for warning display (no API call needed)
 injury_status_map = load_injury_status()
 
@@ -543,6 +583,7 @@ if _display_props_enriched:
         reb = prop.get("season_reb_avg", 0)
         ast = prop.get("season_ast_avg", 0)
         line_diff = prop.get("line_vs_avg_pct", 0)
+        is_synthetic = prop.get("_synthetic", False)
 
         # Season avg for this stat type
         stat_key = stat.lower()
@@ -566,6 +607,9 @@ if _display_props_enriched:
             "Active": "🟢", "Probable": "🟢",
         }.get(player_status, "⚪")
 
+        # Bug 2: mark estimated (synthetic) lines so users can distinguish them
+        line_source = "⚡ Est." if is_synthetic else "✅ Live"
+
         display_rows.append({
             "#": i + 1,
             "Player": player_name,
@@ -573,6 +617,7 @@ if _display_props_enriched:
             "Team": team,
             "Stat": stat,
             "Line": line,
+            "Line Source": line_source,
             "Season Avg": round(season_avg, 1) if season_avg else "—",
             "Line Context": line_ctx if season_avg else "—",
             "Platform": platform,
@@ -586,6 +631,9 @@ if _display_props_enriched:
         column_config={
             "Line": st.column_config.NumberColumn(format="%.1f"),
             "Season Avg": st.column_config.NumberColumn(format="%.1f"),
+            "Line Source": st.column_config.TextColumn(
+                help="⚡ Est. = estimated from season average | ✅ Live = fetched from platform"
+            ),
         },
     )
 
