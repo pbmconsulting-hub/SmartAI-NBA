@@ -102,6 +102,40 @@ NBA_OT_BASE_PROBABILITY = 0.057   # 5.7% of games go to OT historically
 OT_CLOSE_GAME_THRESHOLD = 3      # Within 3 pts at end of Q4 = elevated OT risk
 OT_CLOSE_GAME_OT_CHANCE  = 0.30  # 30% chance of OT when within 3 pts
 OT_POINTS_PER_PERIOD = 5.5       # Average points per OT period per team
+# Minimum points per OT period per team (proportional to quarter floor below)
+OT_MIN_POINTS_PER_PERIOD = 2.5   # 5-min OT ≈ 2.5× of quarter 12-min minimum per min
+
+# ── Quarter Score Floor ───────────────────────────────────────
+# BEGINNER NOTE: NBA teams almost never score fewer than ~15 pts
+# in a single quarter (the all-time record for lowest quarter score
+# is around 3, but in modern games < 12 is extraordinary).
+# We set a floor of 10 to prevent the simulation from generating
+# statistically impossible quarter scores that would skew totals.
+# This is a data-quality safeguard, not a hard game constraint.
+QUARTER_SCORE_FLOOR = 10.0   # Minimum simulated points per team per quarter
+
+# ── Defensive Rating Floor ────────────────────────────────────
+# BEGINNER NOTE: This is a data-quality safeguard. The best NBA
+# defenses in recent history have DRtg around 105-107. A value
+# below 95 indicates missing or malformed data. This floor prevents
+# a near-zero DRtg from creating a division-by-near-zero situation
+# in the defensive adjustment formula (LEAGUE_AVG_DRTG / drtg).
+DRTG_MINIMUM_FLOOR = 95.0    # Minimum realistic DRtg (data quality guard)
+
+# ── Final Score Sanity Floor ─────────────────────────────────
+# BEGINNER NOTE: The lowest NBA team score in modern history (since
+# the shot clock era) is approximately 49 points (1998-99 lockout).
+# Modern NBA teams almost never score below 70 in normal play.
+# This floor is a sanity check — if the model predicts below 70,
+# something is likely wrong with the input data (e.g., zeroed stats).
+FINAL_SCORE_MINIMUM = 70     # Sanity floor for final predicted scores
+
+# ── Four-Factor Index Bounds ──────────────────────────────────
+# Cap the turnover index to prevent instability when tov_pct is
+# very low. With the min bound of 0.08 on tov_pct, the max
+# raw tov_idx would be 0.13/0.08=1.625. We cap at 2.0 for safety.
+TOV_IDX_MIN = 0.5
+TOV_IDX_MAX = 2.0
 
 # ── Quarter-Pace Variation ────────────────────────────────────
 # BEGINNER NOTE: NBA games have predictable quarter-by-quarter
@@ -252,7 +286,13 @@ def _derive_four_factors(ortg, drtg, pace):
     # Factor index: compare to league baseline values:
     #   League avg eFG%=0.500, TOV%=0.130, ORB%=0.255, FTR=0.245
     efg_idx = efg_pct / 0.500          # >1.0 = above-average shooting
-    tov_idx = 0.130 / max(tov_pct, 0.05)  # >1.0 = fewer TOs (good)
+
+    # BEGINNER NOTE: For TOV index, we compute the inverse (fewer turnovers
+    # = better) but cap it at TOV_IDX_MIN/TOV_IDX_MAX to prevent instability
+    # when tov_pct is very low. Without capping, a tov_pct of 0.05 would give
+    # tov_idx = 2.6, which would dramatically over-inflate the composite.
+    raw_tov_idx = 0.130 / max(tov_pct, 0.08)  # cap denominator at 0.08
+    tov_idx = max(TOV_IDX_MIN, min(TOV_IDX_MAX, raw_tov_idx))
     orb_idx = orb_pct / 0.255          # >1.0 = better offensive rebounding
     ftr_idx = ftr / 0.245              # >1.0 = gets to the line more
 
@@ -419,8 +459,9 @@ def _simulate_single_game(
         # BEGINNER NOTE: random.gauss draws from a bell curve.
         # Most results land within 1 std of the mean (~68% of the time).
         # Having a std of 6 means quarters score ±6 pts from expected ~68% of the time.
-        home_q_score = max(10.0, _sample_gauss(home_q_expected, quarter_std))
-        away_q_score = max(10.0, _sample_gauss(away_q_expected, quarter_std))
+        # QUARTER_SCORE_FLOOR is a data-quality safeguard (see module constants).
+        home_q_score = max(QUARTER_SCORE_FLOOR, _sample_gauss(home_q_expected, quarter_std))
+        away_q_score = max(QUARTER_SCORE_FLOOR, _sample_gauss(away_q_expected, quarter_std))
 
         home_score += home_q_score
         away_score += away_q_score
@@ -457,17 +498,25 @@ def _simulate_single_game(
 
         # OT has higher variance per possession (pressure, fatigue)
         ot_std = 3.5
-        home_ot = max(2.0, _sample_gauss(OT_POINTS_PER_PERIOD, ot_std))
-        away_ot = max(2.0, _sample_gauss(OT_POINTS_PER_PERIOD, ot_std))
+        # OT_MIN_POINTS_PER_PERIOD is a data-quality safeguard
+        # (proportional to QUARTER_SCORE_FLOOR for 5-min vs 12-min periods)
+        home_ot = max(OT_MIN_POINTS_PER_PERIOD, _sample_gauss(OT_POINTS_PER_PERIOD, ot_std))
+        away_ot = max(OT_MIN_POINTS_PER_PERIOD, _sample_gauss(OT_POINTS_PER_PERIOD, ot_std))
 
         home_score += home_ot
         away_score += away_ot
 
         # Safety cap: max 3 OT periods (extremely rare in NBA)
         if ot_periods >= 3:
-            # Force a decisive winner if still tied
+            # BEGINNER NOTE: After 3 OT periods, if scores are still within
+            # 0.5 pts (floating point tie), we add a small home-court boost
+            # of 1.0 to the home team. This edge-case handler is distinct
+            # from the main tie-resolution logic in predict_game() — it only
+            # activates after 3 OT periods of genuine simulation, which is
+            # statistically equivalent to a coin-flip and represents a valid
+            # home-court edge in sudden-death situations.
             if abs(home_score - away_score) < 0.5:
-                home_score += 1.0   # Only final safety tie-break
+                home_score += 1.0   # edge-case home-court tie resolution after 3 OT
             break
 
     return home_score, away_score, went_to_ot
@@ -718,7 +767,7 @@ def _calculate_game_prediction_confidence(
     Returns:
         int: Confidence score 0-100
     """
-    score = 50  # Start at neutral
+    score = 50.0  # Start at neutral (using float for smooth arithmetic)
 
     # ── Component 1: Data Quality (0-20 points) ──────────────
     # BEGINNER NOTE: With only 10 games played, averages are
@@ -726,12 +775,14 @@ def _calculate_game_prediction_confidence(
     # confidence in the team's true ratings.
     min_games = min(home_games_played, away_games_played)
     if min_games >= MIN_GAMES_FOR_FULL_CONFIDENCE:
-        score += 20
+        score += 20.0
     elif min_games >= MIN_GAMES_FOR_HALF_CONFIDENCE:
-        score += 10 + int(10 * (min_games - MIN_GAMES_FOR_HALF_CONFIDENCE) /
-                           (MIN_GAMES_FOR_FULL_CONFIDENCE - MIN_GAMES_FOR_HALF_CONFIDENCE))
+        frac = (min_games - MIN_GAMES_FOR_HALF_CONFIDENCE) / (
+            MIN_GAMES_FOR_FULL_CONFIDENCE - MIN_GAMES_FOR_HALF_CONFIDENCE
+        )
+        score += 10.0 + 10.0 * frac
     else:
-        score += max(0, int(10 * min_games / MIN_GAMES_FOR_HALF_CONFIDENCE))
+        score += max(0.0, 10.0 * min_games / MIN_GAMES_FOR_HALF_CONFIDENCE)
 
     # ── Component 2: Matchup Clarity (0-15 points) ───────────
     # BEGINNER NOTE: When teams have very similar ORtg/DRtg, it's
@@ -739,8 +790,8 @@ def _calculate_game_prediction_confidence(
     ortg_gap = abs(home_ortg - away_ortg)
     drtg_gap = abs(home_drtg - away_drtg)
     avg_gap  = (ortg_gap + drtg_gap) / 2.0
-    # Scale: 0 points for gap < 2, 15 points for gap >= 10
-    clarity_score = min(15, max(0, int((avg_gap - 2.0) / 8.0 * 15)))
+    # Scale: 0 points for gap < 2, 15 points for gap >= 10 (smooth float)
+    clarity_score = min(15.0, max(0.0, (avg_gap - 2.0) / 8.0 * 15.0))
     score += clarity_score
 
     # ── Component 3: Vegas Alignment (0-20 points) ───────────
@@ -751,25 +802,25 @@ def _calculate_game_prediction_confidence(
         total_diff  = abs(model_total - vegas_total)
         spread_diff = abs(model_spread - vegas_spread)
 
-        # Confidence points for total alignment (0-10 pts)
-        total_conf  = max(0, 10 - int(total_diff * 1.5))
-        # Confidence points for spread alignment (0-10 pts)
-        spread_conf = max(0, 10 - int(spread_diff * 2.0))
+        # Confidence points for total alignment (0-10 pts, smooth float)
+        total_conf  = max(0.0, 10.0 - total_diff * 1.5)
+        # Confidence points for spread alignment (0-10 pts, smooth float)
+        spread_conf = max(0.0, 10.0 - spread_diff * 2.0)
         score += total_conf + spread_conf
     else:
         # No Vegas lines: give partial credit for having a model at all
-        score += 5
+        score += 5.0
 
     # ── Component 4: Model Certainty (0-15 points) ───────────
     # BEGINNER NOTE: When win probability is closer to 0.5 (coin flip),
     # the game is harder to predict. When it's 0.75+, the model
     # has more conviction → higher confidence in the prediction.
     win_prob_certainty = abs(home_win_prob - 0.5)  # 0.0 = toss-up, 0.5 = sure thing
-    certainty_score = min(15, int(win_prob_certainty * 30))
+    certainty_score = min(15.0, win_prob_certainty * 30.0)
     score += certainty_score
 
-    # ── Clamp to 0-100 ───────────────────────────────────────
-    return max(0, min(100, score))
+    # ── Clamp to 0-100 and round to integer ──────────────────
+    return max(0, min(100, round(score)))
 
 
 def _classify_pace_environment(expected_possessions):
@@ -933,8 +984,9 @@ def predict_game(
 
     # Defensive adjustments: each team's scoring is tempered by
     # the opponent's defense (higher opponent DRtg = easier to score against)
-    home_def_factor = LEAGUE_AVG_DRTG / max(away_drtg, 80.0)
-    away_def_factor = LEAGUE_AVG_DRTG / max(home_drtg, 80.0)
+    # DRTG_MINIMUM_FLOOR is a data-quality safeguard — see module constants for rationale
+    home_def_factor = LEAGUE_AVG_DRTG / max(away_drtg, DRTG_MINIMUM_FLOOR)
+    away_def_factor = LEAGUE_AVG_DRTG / max(home_drtg, DRTG_MINIMUM_FLOOR)
 
     # Base scores from possession model (before home-court adjustment)
     home_base_raw = _score_from_possession_model(home_adj_ortg, expected_possessions) * home_def_factor
@@ -995,16 +1047,19 @@ def predict_game(
     home_score_int = int(round(final_home_float))
     away_score_int = int(round(final_away_float))
 
-    # Tie resolution using win probability (correct, not a hack)
+    # Apply sanity floor BEFORE tie resolution so the floor doesn't
+    # re-introduce ties that were already resolved.
+    # FINAL_SCORE_MINIMUM is a data-quality safeguard — see module constants.
+    home_score_int = max(FINAL_SCORE_MINIMUM, home_score_int)
+    away_score_int = max(FINAL_SCORE_MINIMUM, away_score_int)
+
+    # Tie resolution using win probability (correct, not a hack).
+    # This activates when rounding or the floor produces identical scores.
     if home_score_int == away_score_int:
         if mc_results['home_win_prob'] >= mc_results['away_win_prob']:
             home_score_int += 1
         else:
             away_score_int += 1
-
-    # Sanity check: NBA scores are always positive integers
-    home_score_int = max(60, home_score_int)
-    away_score_int = max(60, away_score_int)
 
     predicted_total  = home_score_int + away_score_int
     predicted_margin = abs(home_score_int - away_score_int)
