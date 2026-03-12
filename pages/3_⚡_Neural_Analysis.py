@@ -89,7 +89,10 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
-# ─── Session State Initialization ────────────────────────────
+# ── Premium Status (partial gate — free users capped at 3 props) ──
+from utils.auth import is_premium_user as _is_premium_user
+_FREE_ANALYSIS_LIMIT = 3   # Free users can analyze up to 3 props
+_user_is_premium = _is_premium_user()
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
 if "injury_status_map" not in st.session_state:
@@ -997,6 +1000,16 @@ if run_analysis:
         st.warning("⚠️ No props remain after filtering to tonight's teams / injury status. Check your games and props.")
         progress_bar.empty()
         st.stop()
+
+    # ── Free tier: cap analysis at _FREE_ANALYSIS_LIMIT props ────
+    if not _user_is_premium and total_props_count > _FREE_ANALYSIS_LIMIT:
+        st.warning(
+            f"⚠️ **Free plan** is limited to **{_FREE_ANALYSIS_LIMIT} props** per analysis run. "
+            f"Analyzing the first {_FREE_ANALYSIS_LIMIT} props. "
+            "[**Upgrade to Premium**](/6_%F0%9F%92%8E_Premium) for unlimited analysis. 💎"
+        )
+        props_to_analyze  = props_to_analyze[:_FREE_ANALYSIS_LIMIT]
+        total_props_count = _FREE_ANALYSIS_LIMIT
 
     for prop_index, prop in enumerate(props_to_analyze):
         progress_fraction = (prop_index + 1) / total_props_count

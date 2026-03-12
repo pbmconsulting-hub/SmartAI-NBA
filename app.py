@@ -158,6 +158,37 @@ st.markdown("""
 
 initialize_database()
 
+# ── Premium Status — Check and display in sidebar ─────────────
+# This runs silently on app load.  is_premium_user() is cached in
+# session state so it won't make Stripe API calls on every rerun.
+try:
+    from utils.auth import is_premium_user as _is_premium, handle_checkout_redirect as _handle_checkout
+    # Handle checkout redirects even on the home page
+    _handle_checkout()
+    _user_is_premium = _is_premium()
+except Exception:
+    _user_is_premium = True  # Fail open — don't block the home page
+
+with st.sidebar:
+    if _user_is_premium:
+        st.markdown(
+            '<div style="background:rgba(0,255,157,0.10);border:1px solid rgba(0,255,157,0.3);'
+            'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
+            '<span style="color:#00ff9d;font-weight:700;font-size:0.9rem;">💎 Premium Active</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
+            'border-radius:10px;padding:10px 14px;text-align:center;margin-bottom:8px;">'
+            '<span style="color:#a0b4d0;font-size:0.85rem;">⭐ Free Plan</span><br>'
+            '<a href="/6_%F0%9F%92%8E_Premium" style="color:#ff5e00;font-size:0.78rem;'
+            'font-weight:600;text-decoration:none;">Upgrade to Premium →</a>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
 if "simulation_depth" not in st.session_state:
     st.session_state["simulation_depth"] = 1000
 if "minimum_edge_threshold" not in st.session_state:
@@ -370,6 +401,11 @@ with left_column:
 
     **Step 4** → 📈 **Bet Tracker & Model Health** — After games, log results to track
     how accurate the model is over time.
+
+    ---
+    💎 **Premium features** (Entry Builder, Risk Shield, Game Report, Player Simulator,
+    Bet Tracker, and unlimited analysis) require a subscription.
+    Visit the **💎 Premium** page in the sidebar to unlock everything!
     """)
 
 with right_column:

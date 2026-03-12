@@ -136,6 +136,24 @@ CREATE TABLE IF NOT EXISTS all_analysis_picks (
 );
 """
 
+# SQL to create the subscriptions table.
+# Stores Stripe subscription records for premium access tracking.
+# Each row represents one subscriber; status reflects the current
+# Stripe subscription status (active, trialing, cancelled, etc.).
+CREATE_SUBSCRIPTIONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS subscriptions (
+    subscription_id TEXT PRIMARY KEY,
+    customer_id TEXT NOT NULL,
+    customer_email TEXT,
+    status TEXT NOT NULL DEFAULT 'active',
+    plan_name TEXT DEFAULT 'Premium',
+    current_period_start TEXT,
+    current_period_end TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -176,6 +194,7 @@ def initialize_database():
             cursor.execute(CREATE_PREDICTION_HISTORY_TABLE_SQL)  # W7: calibration
             cursor.execute(CREATE_DAILY_SNAPSHOTS_TABLE_SQL)      # daily performance tracking
             cursor.execute(CREATE_ALL_ANALYSIS_PICKS_TABLE_SQL)   # all Neural Analysis outputs
+            cursor.execute(CREATE_SUBSCRIPTIONS_TABLE_SQL)        # Stripe subscription records
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -191,6 +210,16 @@ def initialize_database():
             try:
                 cursor.execute(
                     "ALTER TABLE bets ADD COLUMN actual_value REAL"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            # ── Subscriptions table migration ─────────────────────────
+            # If the subscriptions table was created without updated_at
+            # (e.g., from an older version of the schema), add it now.
+            try:
+                cursor.execute(
+                    "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))"
                 )
             except sqlite3.OperationalError:
                 pass  # Column already exists — safe to ignore
