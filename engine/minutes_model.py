@@ -18,6 +18,12 @@
 
 import math
 
+try:
+    from engine.rotation_tracker import get_trending_minutes
+    _HAS_ROTATION_TRACKER = True
+except ImportError:
+    _HAS_ROTATION_TRACKER = False
+
 
 # ============================================================
 # SECTION: Minutes Model Constants
@@ -60,7 +66,7 @@ MIN_MINUTES_FLOOR = 0.0             # DNP risk — can go to 0 in extreme blowou
 # SECTION: Minutes Projection
 # ============================================================
 
-def project_player_minutes(player_data, game_context, teammate_status=None):
+def project_player_minutes(player_data, game_context, teammate_status=None, game_logs=None):
     """
     Project a player's minutes for tonight with all situational adjustments.
 
@@ -100,10 +106,23 @@ def project_player_minutes(player_data, game_context, teammate_status=None):
     adjustment_notes = []
 
     # ── Step 1: Establish base minutes ──────────────────────────────────────
-    base_minutes = (
-        player_data.get('minutes_avg')
-        or player_data.get('min_avg')
-    )
+    # Use rotation tracker trending minutes if game logs available
+    if _HAS_ROTATION_TRACKER and game_logs:
+        try:
+            trending = get_trending_minutes(player_data, game_logs)
+            base_minutes = trending if trending > 0 else None
+            if base_minutes:
+                adjustment_notes.append(f"Base: {base_minutes:.1f} min (trending avg)")
+        except Exception:
+            base_minutes = None
+    else:
+        base_minutes = None
+
+    if base_minutes is None:
+        base_minutes = (
+            player_data.get('minutes_avg')
+            or player_data.get('min_avg')
+        )
 
     if base_minutes is None:
         # Infer default from position/starter status

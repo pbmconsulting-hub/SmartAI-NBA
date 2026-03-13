@@ -1,0 +1,280 @@
+# engine/backtester.py
+# Historical backtesting engine for the SmartAI-NBA prediction model.
+# Runs the simulation/projection/edge pipeline against historical game log data.
+# Standard library only — no numpy/scipy/pandas.
+
+import math
+import statistics
+from datetime import date
+
+try:
+    from engine.simulation import run_monte_carlo_simulation
+except ImportError:
+    run_monte_carlo_simulation = None
+
+try:
+    from engine.edge_detection import calculate_edge
+except ImportError:
+    calculate_edge = None
+
+
+def _season_avg_up_to_date(game_logs, stat_key, cutoff_date_str):
+    """Compute the season average of stat_key from game logs up to (not including) cutoff_date_str."""
+    values = []
+    for g in game_logs:
+        gd = g.get("GAME_DATE", g.get("game_date", ""))
+        if gd and gd < cutoff_date_str:
+            try:
+                v = float(g.get(stat_key, 0) or 0)
+                values.append(v)
+            except (ValueError, TypeError):
+                pass
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _round_to_half(value):
+    """Round a value to the nearest 0.5 (proxy for a prop line)."""
+    return round(value * 2) / 2
+
+
+STAT_KEY_MAP = {
+    "points": "PTS",
+    "rebounds": "REB",
+    "assists": "AST",
+    "steals": "STL",
+    "blocks": "BLK",
+    "threes": "FG3M",
+    "turnovers": "TOV",
+}
+
+EDGE_BUCKETS = [
+    (0.05, 0.10, "5-10%"),
+    (0.10, 0.15, "10-15%"),
+    (0.15, 1.00, "15%+"),
+]
+
+
+def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_by_player=None):
+    """
+    Run a historical backtest.
+
+    Args:
+        season (str): NBA season string, e.g. "2024-25"
+        stat_types (list): List of stat type strings to backtest, e.g. ["points", "rebounds"]
+        min_edge (float): Minimum edge threshold (0.05 = 5%)
+        tier_filter (str or None): If set, only include picks of this tier
+        game_logs_by_player (dict or None): {player_name: [game_log_dicts]}
+            If None, returns an empty result (no data available).
+
+    Returns:
+        dict: BacktestResult with full metrics
+    """
+    if not game_logs_by_player:
+        return _empty_result("No game log data provided. Fetch player data first.")
+
+    if run_monte_carlo_simulation is None:
+        return _empty_result("Simulation engine not available.")
+
+    total_picks = 0
+    wins = 0
+    total_pnl = 0.0  # assuming -110 odds (bet 1.0 to win 0.909)
+
+    results_by_tier = {"ELITE": {"picks": 0, "wins": 0},
+                       "STRONG": {"picks": 0, "wins": 0},
+                       "VALUE": {"picks": 0, "wins": 0},
+                       "LEAN": {"picks": 0, "wins": 0}}
+    results_by_stat = {st: {"picks": 0, "wins": 0} for st in stat_types}
+    results_by_edge_bucket = {label: {"picks": 0, "wins": 0} for _, _, label in EDGE_BUCKETS}
+
+    pick_log = []
+
+    for player_name, game_logs in game_logs_by_player.items():
+        if not game_logs:
+            continue
+
+        # Sort by game date ascending
+        sorted_logs = sorted(game_logs, key=lambda g: g.get("GAME_DATE", g.get("game_date", "")))
+
+        for i, game in enumerate(sorted_logs):
+            game_date = game.get("GAME_DATE", game.get("game_date", ""))
+            if not game_date or i < 5:  # Need at least 5 prior games for meaningful avg
+                continue
+
+            for stat_type in stat_types:
+                stat_key = STAT_KEY_MAP.get(stat_type, stat_type.upper())
+                actual_value = float(game.get(stat_key, 0) or 0)
+
+                # Reconstruct prop line as season average up to this date
+                season_avg = _season_avg_up_to_date(sorted_logs, stat_key, game_date)
+                if season_avg is None or season_avg <= 0:
+                    continue
+                prop_line = _round_to_half(season_avg)
+
+                # Build minimal player_data for simulation (use only prior-game season avg)
+                avg_key = stat_type + "_avg"
+                player_data = {
+                    "name": player_name,
+                    avg_key: season_avg,
+                    "points_avg": season_avg if stat_type == "points" else float(
+                        _season_avg_up_to_date(sorted_logs, "PTS", game_date) or season_avg
+                    ),
+                    "minutes_avg": float(
+                        _season_avg_up_to_date(sorted_logs, "MIN", game_date) or 32
+                    ),
+                    "position": "G",
+                    "team": game.get("TEAM_ABBREVIATION", ""),
+                }
+
+                game_context = {
+                    "vegas_spread": 0.0,
+                    "game_total": 220.0,
+                    "rest_days": 1,
+                    "is_home": True,
+                }
+
+                try:
+                    sim_result = run_monte_carlo_simulation(
+                        player_data=player_data,
+                        stat_type=stat_type,
+                        prop_line=prop_line,
+                        game_context=game_context,
+                        num_simulations=500,
+                    )
+                except Exception:
+                    continue
+
+                if not sim_result:
+                    continue
+
+                over_prob = sim_result.get("probability_over", 0.5)
+                under_prob = sim_result.get("probability_under", 0.5)
+                edge = abs(over_prob - 0.5)
+
+                if edge < min_edge:
+                    continue
+
+                # Determine model pick
+                pick_direction = "OVER" if over_prob > under_prob else "UNDER"
+                model_prob = over_prob if pick_direction == "OVER" else under_prob
+
+                # Determine tier based on model probability
+                if model_prob >= 0.70:
+                    tier = "ELITE"
+                elif model_prob >= 0.63:
+                    tier = "STRONG"
+                elif model_prob >= 0.57:
+                    tier = "VALUE"
+                else:
+                    tier = "LEAN"
+
+                if tier_filter and tier != tier_filter:
+                    continue
+
+                # Check if pick was correct
+                if pick_direction == "OVER":
+                    correct = actual_value > prop_line
+                else:
+                    correct = actual_value < prop_line
+
+                total_picks += 1
+                if correct:
+                    wins += 1
+                    total_pnl += 0.909  # Win at -110
+                else:
+                    total_pnl -= 1.0   # Lose bet
+
+                # Update by-tier stats
+                if tier in results_by_tier:
+                    results_by_tier[tier]["picks"] += 1
+                    if correct:
+                        results_by_tier[tier]["wins"] += 1
+
+                # Update by-stat stats
+                if stat_type in results_by_stat:
+                    results_by_stat[stat_type]["picks"] += 1
+                    if correct:
+                        results_by_stat[stat_type]["wins"] += 1
+
+                # Update by-edge-bucket stats
+                for lo, hi, label in EDGE_BUCKETS:
+                    if lo <= edge < hi:
+                        results_by_edge_bucket[label]["picks"] += 1
+                        if correct:
+                            results_by_edge_bucket[label]["wins"] += 1
+                        break
+
+                pick_log.append({
+                    "player": player_name,
+                    "date": game_date,
+                    "stat": stat_type,
+                    "line": prop_line,
+                    "actual": actual_value,
+                    "direction": pick_direction,
+                    "correct": correct,
+                    "model_prob": round(model_prob, 4),
+                    "tier": tier,
+                    "edge": round(edge, 4),
+                })
+
+    win_rate = wins / total_picks if total_picks > 0 else 0.0
+    roi = (total_pnl / total_picks) if total_picks > 0 else 0.0
+
+    # Win rates by tier
+    tier_win_rates = {}
+    for tier, data in results_by_tier.items():
+        p = data["picks"]
+        w = data["wins"]
+        tier_win_rates[tier] = {"picks": p, "wins": w, "win_rate": w / p if p > 0 else 0.0}
+
+    # Win rates by stat
+    stat_win_rates = {}
+    for st, data in results_by_stat.items():
+        p = data["picks"]
+        w = data["wins"]
+        stat_win_rates[st] = {"picks": p, "wins": w, "win_rate": w / p if p > 0 else 0.0}
+
+    # Win rates by edge bucket
+    edge_win_rates = {}
+    for label, data in results_by_edge_bucket.items():
+        p = data["picks"]
+        w = data["wins"]
+        edge_win_rates[label] = {"picks": p, "wins": w, "win_rate": w / p if p > 0 else 0.0}
+
+    return {
+        "status": "ok",
+        "message": f"Backtest complete: {total_picks} picks analyzed",
+        "season": season,
+        "stat_types": stat_types,
+        "min_edge": min_edge,
+        "tier_filter": tier_filter,
+        "total_picks": total_picks,
+        "wins": wins,
+        "losses": total_picks - wins,
+        "win_rate": round(win_rate, 4),
+        "roi": round(roi, 4),
+        "total_pnl": round(total_pnl, 2),
+        "tier_win_rates": tier_win_rates,
+        "stat_win_rates": stat_win_rates,
+        "edge_win_rates": edge_win_rates,
+        "pick_log": pick_log[-200:],  # Keep last 200 for display
+    }
+
+
+def _empty_result(message):
+    """Return an empty BacktestResult dict."""
+    return {
+        "status": "no_data",
+        "message": message,
+        "total_picks": 0,
+        "wins": 0,
+        "losses": 0,
+        "win_rate": 0.0,
+        "roi": 0.0,
+        "total_pnl": 0.0,
+        "tier_win_rates": {},
+        "stat_win_rates": {},
+        "edge_win_rates": {},
+        "pick_log": [],
+    }
