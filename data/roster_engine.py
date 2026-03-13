@@ -302,14 +302,14 @@ class RosterEngine:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-_logger.info("RosterEngine.refresh() — starting data pull (nba_api sources only)")
+        _logger.info("RosterEngine.refresh() — starting data pull (nba_api sources only)")
         merged: dict = {}
 
         # ── Source 1: nba_api live Injuries endpoint ──────────────
         src1 = self._fetch_nba_api_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-_logger.info(f"  Source 1 (nba_api live injuries): {len(src1)} players")
+        _logger.info(f"  Source 1 (nba_api live injuries): {len(src1)} players")
 
         self._injury_map = merged
 

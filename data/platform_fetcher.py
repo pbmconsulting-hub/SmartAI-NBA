@@ -1262,7 +1262,7 @@ def smart_filter_props(
         )
         print(f"Reduced {summary['original_count']} → {summary['final_count']} props "
               f"({summary['reduction_pct']:.0f}% reduction)")
-    """  # noqa: E501
+    """
     # ── Statuses considered inactive/out ───────────────────────────────
     _INACTIVE_STATUSES = frozenset({
         "out", "injured reserve", "ir", "suspended",

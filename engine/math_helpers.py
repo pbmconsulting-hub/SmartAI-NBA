@@ -347,9 +347,9 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
         float: Edge in percentage points
 
     Examples:
-        calculate_edge_percentage(0.63)          → +7.62% (vs -110 breakeven)
-        calculate_edge_percentage(0.63, 0.5238)  → +10.62%
-        calculate_edge_percentage(0.63, 0.50)    → +13.0% (old behavior)
+        calculate_edge_percentage(0.63)          → +10.62% (vs -110 breakeven)
+        calculate_edge_percentage(0.63, 0.5238)  → +10.62% (explicit -110 baseline)
+        calculate_edge_percentage(0.63, 0.50)    → +13.0%  (vs 50/50 baseline)
     """
     baseline = implied_probability if implied_probability is not None else 0.5238
     edge = (probability_over - baseline) * 100.0
