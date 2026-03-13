@@ -510,7 +510,7 @@ def _render_key_players(team_abbrev, label):
         })
     st.dataframe(
         rows,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         column_config={
             "PTS": st.column_config.NumberColumn(format="%.1f"),

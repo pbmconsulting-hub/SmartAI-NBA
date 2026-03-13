@@ -249,7 +249,7 @@ if low_edge_props:
             "Tier": f"{result.get('tier_emoji','')}{result.get('tier','')}",
         })
 
-    st.dataframe(low_edge_rows, use_container_width=True, hide_index=True)
+    st.dataframe(low_edge_rows, width="stretch", hide_index=True)
 
 # ============================================================
 # END SECTION: Low Edge Warnings

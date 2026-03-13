@@ -501,7 +501,7 @@ if run_sim and selected_names:
                     f"({_s.get('p10', 0)}–{_s.get('p90', 0)})"
                 )
             _cmp_rows.append(_row)
-        st.dataframe(_cmp_rows, use_container_width=True, hide_index=True)
+        st.dataframe(_cmp_rows, width="stretch", hide_index=True)
         st.caption("Format: Projected (10th pct – 90th pct)")
 
         # Also render individual cards
@@ -546,7 +546,7 @@ if run_sim and selected_names:
                             "STL": _to_float(_g.get("stl")),
                             "BLK": _to_float(_g.get("blk")),
                         })
-                    st.dataframe(_log_rows, use_container_width=True, hide_index=True)
+                    st.dataframe(_log_rows, width="stretch", hide_index=True)
             elif _scenario_mode:
                 st.caption(
                     f"ℹ️ No recent game log stored for {_pname_log}. "

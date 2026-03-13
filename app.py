@@ -205,6 +205,10 @@ if "analysis_results" not in st.session_state:
     st.session_state["analysis_results"] = []
 if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
+if "session_props" not in st.session_state:
+    st.session_state["session_props"] = []
+if "fetched_live_picks" not in st.session_state:
+    st.session_state["fetched_live_picks"] = []
 
 # ============================================================
 # END SECTION: Initialize App on Startup

@@ -1726,11 +1726,17 @@ if analysis_results:
         ))
         unmatched_unique_count = len(unmatched_names_deduped)
         if unmatched_unique_count > 0:
+            _display_names = unmatched_names_deduped[:10]
+            _overflow = unmatched_unique_count - len(_display_names)
+            _inline = ", ".join(_display_names) + (f" and {_overflow} more" if _overflow > 0 else "")
             st.warning(
                 f"⚠️ **{unmatched_unique_count} player(s) not found** in database — "
-                + ", ".join(unmatched_names_deduped)
+                + _inline
                 + " — results may be less accurate. Run a **Smart Update** on the Data Feed page to refresh roster data."
             )
+            if _overflow > 0:
+                with st.expander(f"See all {unmatched_unique_count} unmatched players"):
+                    st.write(", ".join(unmatched_names_deduped))
 
     st.divider()
 

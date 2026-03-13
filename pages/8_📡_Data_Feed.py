@@ -520,7 +520,7 @@ if current_action:
 
             # Display as a clean table
             # BEGINNER NOTE: st.dataframe() creates a scrollable, sortable table
-            st.dataframe(games_display, use_container_width=True, hide_index=True)
+            st.dataframe(games_display, width="stretch", hide_index=True)
 
         else:
             # No games found or API error
@@ -595,7 +595,7 @@ if current_action:
                         "3PM": player.get("threes_avg", ""),
                     })
 
-                st.dataframe(players_display, use_container_width=True, hide_index=True)
+                st.dataframe(players_display, width="stretch", hide_index=True)
                 st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
         else:
             # Fetch failed
@@ -655,7 +655,7 @@ if current_action:
                         "DRTG": team.get("drtg", ""),
                     })
 
-                st.dataframe(teams_display, use_container_width=True, hide_index=True)
+                st.dataframe(teams_display, width="stretch", hide_index=True)
                 st.caption(f"All {len(updated_teams)} teams saved to teams.csv and defensive_ratings.csv")
         else:
             st.error(
@@ -1106,7 +1106,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
                     "Platform": _p.get("platform", ""),
                     "Date": _p.get("game_date", ""),
                 })
-            st.dataframe(_preview_rows, use_container_width=True, hide_index=True)
+            st.dataframe(_preview_rows, width="stretch", hide_index=True)
             if len(_display_props) > 50:
                 st.caption(
                     f"Showing first 50 of {len(_display_props)} props. "
@@ -1201,7 +1201,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
                         {"Player": p["name"], "Team": p["team"], "Status": p["reason"]}
                         for p in _ri_injuries[:30]
                     ]
-                    st.dataframe(_inj_rows, use_container_width=True, hide_index=True)
+                    st.dataframe(_inj_rows, width="stretch", hide_index=True)
                     if len(_ri_injuries) > 30:
                         st.caption(f"... and {len(_ri_injuries) - 30} more")
             elif _todays_games:
