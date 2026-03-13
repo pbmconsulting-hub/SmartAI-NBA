@@ -299,3 +299,29 @@ def get_session_risk_summary(entries, bankroll):
 # ============================================================
 # END SECTION: Session Risk Summary
 # ============================================================
+
+
+def odds_to_payout_multiplier(american_odds):
+    """
+    Convert American odds to a gross payout multiplier for Kelly sizing.
+
+    Delegates to engine.odds_engine for a single implementation.
+
+    Args:
+        american_odds (int or float): American odds (e.g. -110, +150)
+
+    Returns:
+        float: Gross payout multiplier (e.g. 1.909 for -110)
+    """
+    try:
+        from engine.odds_engine import odds_to_payout_multiplier as _impl
+        return _impl(american_odds)
+    except ImportError:
+        try:
+            odds = float(american_odds)
+            if odds < 0:
+                return round(1.0 + (100.0 / abs(odds)), 6)
+            else:
+                return round(1.0 + (odds / 100.0), 6)
+        except (ValueError, TypeError):
+            return 1.9091  # Default -110 payout

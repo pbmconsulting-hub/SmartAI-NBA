@@ -106,6 +106,36 @@ def _now_str():
     """Return the current datetime as an ISO string."""
     return datetime.datetime.now().isoformat(timespec="seconds")
 
+
+def american_odds_to_implied_probability(odds):
+    """Convert American odds to implied probability."""
+    try:
+        odds = float(odds)
+        if odds < 0:
+            return round(abs(odds) / (abs(odds) + 100.0), 6)
+        else:
+            return round(100.0 / (odds + 100.0), 6)
+    except (ValueError, TypeError):
+        return 0.5238
+
+
+def implied_probability_to_american_odds(prob):
+    """Convert implied probability to American odds."""
+    try:
+        prob = float(prob)
+        prob = max(0.001, min(0.999, prob))
+        if prob >= 0.5:
+            return round(-(prob / (1.0 - prob)) * 100.0, 1)
+        else:
+            return round(((1.0 - prob) / prob) * 100.0, 1)
+    except (ValueError, TypeError):
+        return -110.0
+
+
+def calculate_breakeven_probability(odds):
+    """Calculate breakeven probability needed to profit at these odds."""
+    return american_odds_to_implied_probability(odds)
+
 # ============================================================
 # END SECTION: Helper — today's date string
 # ============================================================

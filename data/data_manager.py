@@ -15,6 +15,8 @@ import unicodedata  # For normalizing unicode characters in names
 import re           # For regex-based suffix stripping
 from pathlib import Path  # Modern file path handling
 
+import streamlit as st
+
 
 # ============================================================
 # SECTION: File Path Constants
@@ -49,6 +51,7 @@ INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 # SECTION: CSV Loading Functions
 # ============================================================
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_players_data():
     """
     Load all player data from the players.csv file.
@@ -89,6 +92,7 @@ def load_props_data():
     return _load_csv_file(PROPS_CSV_PATH)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_teams_data():
     """
     Load all 30 NBA teams from teams.csv.
@@ -99,6 +103,7 @@ def load_teams_data():
     return _load_csv_file(TEAMS_CSV_PATH)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_defensive_ratings_data():
     """
     Load team defensive ratings by position from defensive_ratings.csv.
@@ -1586,4 +1591,121 @@ def save_last_updated_timestamp(data_type):
 
 # ============================================================
 # END SECTION: Live Data Detection Functions
+# ============================================================
+
+
+# ============================================================
+# SECTION: Cache Management & Data Health
+# ============================================================
+
+def clear_all_caches():
+    """
+    Clear all st.cache_data caches for data loading functions.
+
+    Call this after a successful data fetch to force fresh reads.
+    """
+    try:
+        load_players_data.clear()
+        load_teams_data.clear()
+        load_defensive_ratings_data.clear()
+    except Exception:
+        pass
+
+
+def get_data_health_report():
+    """
+    Return a summary of the current data health status.
+
+    Checks file existence, row counts, and data freshness.
+
+    Returns:
+        dict: {
+            'players_count': int,
+            'teams_count': int,
+            'props_count': int,
+            'is_live': bool,
+            'last_updated': str or None,
+            'days_old': int,
+            'is_stale': bool,
+            'files_present': dict,
+            'warnings': list of str,
+        }
+    """
+    warnings = []
+
+    # Check file existence
+    files_present = {
+        "players.csv": PLAYERS_CSV_PATH.exists(),
+        "teams.csv": TEAMS_CSV_PATH.exists(),
+        "props.csv": PROPS_CSV_PATH.exists(),
+        "defensive_ratings.csv": DEFENSIVE_RATINGS_CSV_PATH.exists(),
+        "last_updated.json": LAST_UPDATED_JSON_PATH.exists(),
+    }
+
+    for fname, exists in files_present.items():
+        if not exists:
+            warnings.append(f"Missing file: {fname}")
+
+    # Row counts
+    try:
+        players = load_players_data()
+        players_count = len(players)
+    except Exception:
+        players_count = 0
+        warnings.append("Could not load players.csv")
+
+    try:
+        teams = load_teams_data()
+        teams_count = len(teams)
+    except Exception:
+        teams_count = 0
+        warnings.append("Could not load teams.csv")
+
+    try:
+        props = load_props_data()
+        props_count = len(props)
+    except Exception:
+        props_count = 0
+
+    # Freshness
+    is_live = is_using_live_data()
+    last_updated = get_data_last_updated("players")
+
+    days_old = 0
+    is_stale = True
+    if last_updated:
+        try:
+            ts = datetime.datetime.fromisoformat(last_updated)
+            now_local = datetime.datetime.now()
+            # Strip tzinfo for comparison if naive
+            if ts.tzinfo is not None:
+                import datetime as _dt
+                ts = ts.replace(tzinfo=None)
+            age = now_local - ts
+            days_old = age.days
+            is_stale = days_old > 3
+            if is_stale:
+                warnings.append(f"Data is {days_old} day(s) old — consider refreshing")
+        except Exception:
+            pass
+
+    if players_count == 0:
+        warnings.append("No players loaded — run Data Feed to populate")
+    if teams_count < 30:
+        warnings.append(f"Only {teams_count}/30 teams loaded")
+
+    return {
+        "players_count": players_count,
+        "teams_count": teams_count,
+        "props_count": props_count,
+        "is_live": is_live,
+        "last_updated": last_updated,
+        "days_old": days_old,
+        "is_stale": is_stale,
+        "files_present": files_present,
+        "warnings": warnings,
+    }
+
+# ============================================================
+# END SECTION: Cache Management & Data Health
 # ============================================================

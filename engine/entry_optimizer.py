@@ -928,3 +928,206 @@ def build_optimal_entries_with_play_type(
 # ============================================================
 # END SECTION: Flex vs Power Play Optimizer
 # ============================================================
+
+
+# ============================================================
+# SECTION: Enhanced Correlation Modeling (GAP 3)
+# ============================================================
+
+def get_correlation_coefficient(player1, player2, stat1, stat2, game_info=None):
+    """
+    Calculate correlation coefficient between two player prop picks.
+
+    Models three types of correlation:
+    1. Positive: teammates in high-pace/high-total game
+    2. Negative: teammates competing for same usage (same stat type)
+    3. Independence: players in different games
+
+    Args:
+        player1 (dict): First player pick with 'team', 'player_name'
+        player2 (dict): Second player pick with 'team', 'player_name'
+        stat1 (str): Stat type for player1 (e.g. 'points')
+        stat2 (str): Stat type for player2 (e.g. 'assists')
+        game_info (dict or None): Game info with 'game_total', 'home_team', 'away_team'
+
+    Returns:
+        float: Correlation coefficient (-1 to 1)
+            0 = independent, positive = correlated, negative = anti-correlated
+    """
+    if game_info is None:
+        game_info = {}
+
+    team1 = str(player1.get("player_team", player1.get("team", ""))).upper().strip()
+    team2 = str(player2.get("player_team", player2.get("team", ""))).upper().strip()
+
+    # Cross-game picks are independent
+    if not team1 or not team2:
+        return 0.0
+
+    # Check if in the same game (same teams or opponents)
+    opponent1 = str(player1.get("opponent", "")).upper().strip()
+    opponent2 = str(player2.get("opponent", "")).upper().strip()
+
+    same_game = (
+        (team1 == team2) or
+        (team1 == opponent2) or
+        (team2 == opponent1) or
+        (opponent1 and opponent1 == opponent2)
+    )
+
+    if not same_game:
+        return 0.0  # Different games → independent
+
+    # Both players are in the same game
+    are_teammates = (team1 == team2)
+    game_total = float(game_info.get("game_total", 220.0) or 220.0)
+
+    # High-total games create positive correlation for all players in the game
+    game_total_bonus = 0.0
+    if game_total > 235:
+        game_total_bonus = 0.12
+    elif game_total > 228:
+        game_total_bonus = 0.08
+    elif game_total > 222:
+        game_total_bonus = 0.04
+
+    if are_teammates:
+        # Teammates with same stat type: usage competition → negative correlation
+        usage_stats = {"points", "assists", "field_goals_made", "threes"}
+        if stat1 in usage_stats and stat2 in usage_stats and stat1 == stat2:
+            # Same stat type for teammates: negative correlation (usage competition)
+            return round(-0.15 - game_total_bonus * 0.3, 4)
+        elif stat1 == "rebounds" and stat2 == "rebounds":
+            return round(-0.10, 4)  # Rebound competition
+        else:
+            # Different stats or complementary stats: mild positive correlation
+            return round(0.05 + game_total_bonus, 4)
+    else:
+        # Opponents: game-level correlation for counting stats
+        counting_stats = {"points", "rebounds", "assists", "threes"}
+        if stat1 in counting_stats and stat2 in counting_stats:
+            # Positive correlation from game pace/total
+            return round(game_total_bonus, 4)
+        return 0.0
+
+
+def calculate_parlay_probability_with_correlation(picks, games=None):
+    """
+    Calculate parlay win probability accounting for correlation between picks.
+
+    Adjusts the naive product P1 * P2 * P3 * ... using correlation coefficients.
+    Uses a simplified covariance adjustment (Gaussian copula approximation):
+    P_adjusted = P_naive * product(1 + rho_ij * adjustment_factor)
+
+    Args:
+        picks (list of dict): Each pick with 'win_probability', 'player_name',
+            'player_team' (or 'team'), 'opponent', 'stat_type'
+        games (list of dict or None): Today's game info list with 'game_total',
+            'home_team', 'away_team'
+
+    Returns:
+        dict: {
+            'naive_probability': float,
+            'correlated_probability': float,
+            'correlation_matrix': list of list,
+            'max_correlation': float,
+            'correlation_warnings': list of str,
+        }
+    """
+    if games is None:
+        games = []
+
+    if not picks:
+        return {
+            "naive_probability": 0.0,
+            "correlated_probability": 0.0,
+            "correlation_matrix": [],
+            "max_correlation": 0.0,
+            "correlation_warnings": [],
+        }
+
+    n = len(picks)
+
+    # Build game info lookup by team
+    game_lookup = {}
+    for g in games:
+        home = str(g.get("home_team", "")).upper()
+        away = str(g.get("away_team", "")).upper()
+        if home:
+            game_lookup[home] = g
+        if away:
+            game_lookup[away] = g
+
+    # Naive probability (independent)
+    naive_prob = 1.0
+    for p in picks:
+        naive_prob *= float(p.get("win_probability", 0.5))
+
+    if n == 1:
+        return {
+            "naive_probability": round(naive_prob, 6),
+            "correlated_probability": round(naive_prob, 6),
+            "correlation_matrix": [[1.0]],
+            "max_correlation": 0.0,
+            "correlation_warnings": [],
+        }
+
+    # Build correlation matrix and compute adjustment
+    corr_matrix = [[0.0] * n for _ in range(n)]
+    max_corr = 0.0
+    warnings = []
+    total_adjustment = 1.0
+
+    for i in range(n):
+        corr_matrix[i][i] = 1.0
+        for j in range(i + 1, n):
+            # Find game context for these two players
+            team_i = str(picks[i].get("player_team", picks[i].get("team", ""))).upper()
+            game_info = game_lookup.get(team_i, {})
+
+            rho = get_correlation_coefficient(
+                picks[i], picks[j],
+                picks[i].get("stat_type", ""),
+                picks[j].get("stat_type", ""),
+                game_info,
+            )
+            corr_matrix[i][j] = rho
+            corr_matrix[j][i] = rho
+
+            if abs(rho) > abs(max_corr):
+                max_corr = rho
+
+            # Adjust probability based on correlation
+            # Positive correlation → slight boost (correlated wins help each other)
+            # Negative correlation → penalty (anti-correlated hurts parlay)
+            p_i = float(picks[i].get("win_probability", 0.5))
+            p_j = float(picks[j].get("win_probability", 0.5))
+            # Simplified bivariate normal adjustment factor.
+            # The coefficient 4.0 scales the correlation's impact on probabilities:
+            # for p_i, p_j near 0.5, (p_i-0.5)*(p_j-0.5) ≈ 0.25 max, so
+            # 4.0 * 0.25 = 1.0 maximum adjustment per pair.
+            adjustment = 1.0 + rho * (p_i - 0.5) * (p_j - 0.5) * 4.0
+            adjustment = max(0.7, min(1.3, adjustment))
+            total_adjustment *= adjustment
+
+            if abs(rho) >= 0.10:
+                name_i = picks[i].get("player_name", "?")
+                name_j = picks[j].get("player_name", "?")
+                direction = "positively" if rho > 0 else "negatively"
+                warnings.append(
+                    f"{name_i} & {name_j} are {direction} correlated (ρ={rho:+.2f})"
+                )
+
+    correlated_prob = min(1.0, max(0.0, naive_prob * total_adjustment))
+
+    return {
+        "naive_probability": round(naive_prob, 6),
+        "correlated_probability": round(correlated_prob, 6),
+        "correlation_matrix": corr_matrix,
+        "max_correlation": round(max_corr, 4),
+        "correlation_warnings": warnings,
+    }
+
+# ============================================================
+# END SECTION: Enhanced Correlation Modeling (GAP 3)
+# ============================================================

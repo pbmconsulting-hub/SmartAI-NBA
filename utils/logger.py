@@ -1,0 +1,81 @@
+# utils/logger.py
+# Structured logging configuration for SmartAI-NBA.
+# Sets up a module-aware logger with console and rotating file handlers.
+
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
+# Ensure logs directory exists
+_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
+os.makedirs(_LOG_DIR, exist_ok=True)
+
+_LOG_FILE = os.path.join(_LOG_DIR, "smartai_nba.log")
+
+# Custom formatter
+_FORMATTER = logging.Formatter(
+    "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Module-level flag to avoid adding duplicate handlers
+_configured = False
+
+
+def _configure_root_logger():
+    """Configure root logger with console + rotating file handler (once)."""
+    global _configured
+    if _configured:
+        return
+
+    root = logging.getLogger("smartai_nba")
+    root.setLevel(logging.DEBUG)
+
+    # Console handler — INFO and above
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
+               for h in root.handlers):
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(_FORMATTER)
+        root.addHandler(console_handler)
+
+    # Rotating file handler — DEBUG and above, max 5MB, keep 3 backups
+    if not any(isinstance(h, RotatingFileHandler) for h in root.handlers):
+        try:
+            file_handler = RotatingFileHandler(
+                _LOG_FILE,
+                maxBytes=5 * 1024 * 1024,  # 5MB
+                backupCount=3,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(_FORMATTER)
+            root.addHandler(file_handler)
+        except (OSError, PermissionError):
+            # Silently skip file logging if we can't write (e.g. read-only deployment)
+            pass
+
+    _configured = True
+
+
+def get_logger(module_name):
+    """
+    Get a configured logger for a module.
+
+    Usage:
+        from utils.logger import get_logger
+        logger = get_logger(__name__)
+        logger.info("Fetching player stats...")
+        logger.warning("Rate limit approaching")
+        logger.error("API call failed: %s", error)
+
+    Args:
+        module_name (str): Module name, typically __name__
+
+    Returns:
+        logging.Logger: Configured logger instance
+    """
+    _configure_root_logger()
+    # Use a child logger under the "smartai_nba" namespace
+    name = f"smartai_nba.{module_name}" if not module_name.startswith("smartai_nba") else module_name
+    return logging.getLogger(name)

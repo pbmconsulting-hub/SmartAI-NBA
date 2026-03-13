@@ -517,6 +517,32 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
     """)
 
 st.divider()
+
+# ── System Health Dashboard ───────────────────────────────────────────────────
+try:
+    from data.data_manager import get_data_health_report
+    _health = get_data_health_report()
+
+    with st.expander("🩺 System Health", expanded=False):
+        hc1, hc2, hc3, hc4 = st.columns(4)
+        hc1.metric("👥 Players", _health["players_count"])
+        hc2.metric("🏀 Teams", _health["teams_count"])
+        hc3.metric("📋 Props", _health["props_count"])
+        _freshness_label = f"{_health['days_old']}d old" if _health.get("last_updated") else "Never"
+        hc4.metric("🕐 Data Age", _freshness_label,
+                   delta="⚠️ Stale" if _health["is_stale"] else "✅ Fresh",
+                   delta_color="inverse" if _health["is_stale"] else "normal")
+
+        if _health["warnings"]:
+            for w in _health["warnings"]:
+                st.warning(w)
+        else:
+            st.success("✅ All data files present and fresh.")
+
+        st.caption("Go to **📡 Data Feed** to refresh data.")
+except Exception:
+    pass
+
 st.caption(
     f"© Smart Pick Pro | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "
     f"{len(players_data)} players, {len(teams_data)} teams | "
