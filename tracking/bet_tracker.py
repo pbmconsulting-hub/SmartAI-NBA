@@ -1160,7 +1160,7 @@ def resolve_all_pending_bets():
     return summary
 
 
-
+def get_live_bet_status(bets_list):
     """
     Check live box scores for today's pending bets.
 
