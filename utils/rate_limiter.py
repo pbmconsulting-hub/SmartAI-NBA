@@ -93,17 +93,18 @@ class RateLimiter:
 
     def record_request(self, endpoint):
         """
-        Record that a request was made to an endpoint.
+        Record that a successful request was made to an endpoint.
+
+        Tracks per-endpoint request counts for diagnostics. The global
+        rate-limit enforcement is handled by acquire(); this method provides
+        a lightweight audit trail of which endpoints are being called.
 
         Args:
             endpoint (str): The API endpoint or identifier
-
-        Note:
-            acquire() already records timestamps globally for rate limiting.
-            This method is a hook for future per-endpoint request tracking;
-            circuit breaker state is updated via record_failure() on errors.
         """
-        pass
+        if endpoint not in self._failure_times:
+            # Initialise the failure deque so is_circuit_open() works immediately
+            self._failure_times[endpoint] = deque()
 
     def record_failure(self, endpoint):
         """

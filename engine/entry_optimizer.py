@@ -934,6 +934,12 @@ def build_optimal_entries_with_play_type(
 # SECTION: Enhanced Correlation Modeling (GAP 3)
 # ============================================================
 
+# Scaling factor for the bivariate normal probability adjustment.
+# For p near 0.5, (p_i-0.5)*(p_j-0.5) ≈ 0.25 max, so
+# CORRELATION_SCALING_FACTOR * 0.25 = 1.0 maximum per-pair adjustment.
+CORRELATION_SCALING_FACTOR = 4.0
+
+
 def get_correlation_coefficient(player1, player2, stat1, stat2, game_info=None):
     """
     Calculate correlation coefficient between two player prop picks.
@@ -1103,10 +1109,10 @@ def calculate_parlay_probability_with_correlation(picks, games=None):
             p_i = float(picks[i].get("win_probability", 0.5))
             p_j = float(picks[j].get("win_probability", 0.5))
             # Simplified bivariate normal adjustment factor.
-            # The coefficient 4.0 scales the correlation's impact on probabilities:
+            # The coefficient scales the correlation's impact on probabilities:
             # for p_i, p_j near 0.5, (p_i-0.5)*(p_j-0.5) ≈ 0.25 max, so
-            # 4.0 * 0.25 = 1.0 maximum adjustment per pair.
-            adjustment = 1.0 + rho * (p_i - 0.5) * (p_j - 0.5) * 4.0
+            # CORRELATION_SCALING_FACTOR * 0.25 = 1.0 maximum adjustment per pair.
+            adjustment = 1.0 + rho * (p_i - 0.5) * (p_j - 0.5) * CORRELATION_SCALING_FACTOR
             adjustment = max(0.7, min(1.3, adjustment))
             total_adjustment *= adjustment
 

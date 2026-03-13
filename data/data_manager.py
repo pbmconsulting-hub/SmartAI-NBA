@@ -1679,7 +1679,6 @@ def get_data_health_report():
             now_local = datetime.datetime.now()
             # Strip tzinfo for comparison if naive
             if ts.tzinfo is not None:
-                import datetime as _dt
                 ts = ts.replace(tzinfo=None)
             age = now_local - ts
             days_old = age.days
