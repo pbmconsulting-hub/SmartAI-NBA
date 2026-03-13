@@ -13,6 +13,11 @@
 # Standard library only
 import math  # For rounding and calculation helpers
 
+try:
+    from engine.rotation_tracker import get_minutes_adjustment
+    _ROTATION_TRACKER_AVAILABLE = True
+except ImportError:
+    _ROTATION_TRACKER_AVAILABLE = False
 
 # ============================================================
 # SECTION: Module-Level Constants
@@ -594,6 +599,15 @@ def build_player_projection(
         spread_minutes_factor = 0.94
     elif abs(vegas_spread) > 8:
         spread_minutes_factor = 0.97
+
+    # W4: Rotation tracker — adjust minutes based on recent trend
+    if _ROTATION_TRACKER_AVAILABLE and recent_form_games:
+        try:
+            rotation_adjustment = get_minutes_adjustment(recent_form_games)
+            if rotation_adjustment != 1.0:
+                minutes_adjustment_factor = minutes_adjustment_factor * rotation_adjustment
+        except Exception:
+            pass
 
     projected_minutes = round(
         season_minutes_average

@@ -325,26 +325,34 @@ def calculate_median(numbers_list):
 # meaningful edge percentages and labels.
 # ============================================================
 
-def calculate_edge_percentage(probability_over):
+def calculate_edge_percentage(probability_over, implied_probability=None):
     """
     Convert a probability (0-1) into an "edge" value showing
-    how much better than 50/50 our prediction is.
+    how much better than random our prediction is vs the market.
 
-    Edge = (probability - 0.5) * 100
-    So 60% probability = +10% edge (10 points better than coin flip)
+    When implied_probability is provided (e.g. 0.5238 for -110 odds),
+    edge = (probability - implied_probability) * 100.
+    When not provided, defaults to 0.5238 (the -110 breakeven standard).
+
+    BEGINNER NOTE: At -110 odds (standard American bet), you need to win
+    52.38% of the time just to break even. So the real edge is your
+    probability minus 52.38%, not minus 50%.
 
     Args:
         probability_over (float): Probability of going over (0-1)
+        implied_probability (float or None): Market implied probability.
+            If None, defaults to 0.5238 (breakeven for -110 odds).
 
     Returns:
-        float: Edge in percentage points (-50 to +50)
+        float: Edge in percentage points
 
-    Example:
-        0.63 probability → +13.0% edge (lean OVER)
-        0.42 probability → -8.0% edge (lean UNDER)
+    Examples:
+        calculate_edge_percentage(0.63)          → +7.62% (vs -110 breakeven)
+        calculate_edge_percentage(0.63, 0.5238)  → +10.62%
+        calculate_edge_percentage(0.63, 0.50)    → +13.0% (old behavior)
     """
-    # Subtract 50% baseline (fair coin flip) and multiply to percentage
-    edge = (probability_over - 0.5) * 100.0
+    baseline = implied_probability if implied_probability is not None else 0.5238
+    edge = (probability_over - baseline) * 100.0
     return edge
 
 

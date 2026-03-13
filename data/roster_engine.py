@@ -27,6 +27,13 @@ import time
 import datetime
 from typing import Optional
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -295,14 +302,14 @@ class RosterEngine:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-        print("RosterEngine.refresh() — starting data pull (nba_api sources only)")
+_logger.info("RosterEngine.refresh() — starting data pull (nba_api sources only)")
         merged: dict = {}
 
         # ── Source 1: nba_api live Injuries endpoint ──────────────
         src1 = self._fetch_nba_api_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        print(f"  Source 1 (nba_api live injuries): {len(src1)} players")
+_logger.info(f"  Source 1 (nba_api live injuries): {len(src1)} players")
 
         self._injury_map = merged
 
@@ -314,7 +321,7 @@ class RosterEngine:
         self._active_rosters = {}
         self._last_refresh = datetime.datetime.now()
         out_count = sum(1 for v in self._injury_map.values() if v.get("status") in EXCLUDE_STATUSES)
-        print(
+        _logger.info(
             f"RosterEngine.refresh() complete: {len(self._injury_map)} injured/flagged players "
             f"({out_count} hard-excluded)"
         )
@@ -367,11 +374,11 @@ class RosterEngine:
             )
             result = _parse_injured_list(injured_list, "nba-cdn-injuries")
             if result:
-                print(f"  RosterEngine._fetch_nba_api_injuries: CDN source returned {len(result)} players")
+                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CDN source returned {len(result)} players")
                 return result
-            print("  RosterEngine._fetch_nba_api_injuries: CDN returned 0 players, trying fallback")
+            _logger.info("  RosterEngine._fetch_nba_api_injuries: CDN returned 0 players, trying fallback")
         except Exception as exc:
-            print(f"  RosterEngine._fetch_nba_api_injuries CDN: {exc}")
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries CDN: {exc}")
 
         # ── Source 2: stats.nba.com leagueinjuries ────────────
         try:
@@ -393,11 +400,11 @@ class RosterEngine:
                 injured_list2 = [dict(zip(headers, row)) for row in rows]
             result2 = _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
             if result2:
-                print(f"  RosterEngine._fetch_nba_api_injuries: stats.nba.com source returned {len(result2)} players")
+                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: stats.nba.com source returned {len(result2)} players")
                 return result2
-            print("  RosterEngine._fetch_nba_api_injuries: stats.nba.com returned 0 players, trying nba_api")
+            _logger.info("  RosterEngine._fetch_nba_api_injuries: stats.nba.com returned 0 players, trying nba_api")
         except Exception as exc2:
-            print(f"  RosterEngine._fetch_nba_api_injuries stats.nba.com: {exc2}")
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries stats.nba.com: {exc2}")
 
         # ── Source 3: nba_api Injuries endpoint ───────────────
         try:
@@ -422,12 +429,12 @@ class RosterEngine:
                         "source":      "nba_api-injuries",
                     }
                 if result3:
-                    print(f"  RosterEngine._fetch_nba_api_injuries: nba_api source returned {len(result3)} players")
+                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: nba_api source returned {len(result3)} players")
                     return result3
         except Exception as exc3:
-            print(f"  RosterEngine._fetch_nba_api_injuries nba_api: {exc3}")
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries nba_api: {exc3}")
 
-        print("  RosterEngine._fetch_nba_api_injuries: all sources returned 0 players")
+        _logger.info("  RosterEngine._fetch_nba_api_injuries: all sources returned 0 players")
         return {}
 
     # ----------------------------------------------------------
@@ -448,7 +455,7 @@ class RosterEngine:
             from nba_api.stats.endpoints import CommonTeamRoster
             from nba_api.stats.static import teams as nba_static_teams
         except ImportError:
-            print("RosterEngine._fetch_nba_api_rosters: nba_api not available")
+            _logger.warning("RosterEngine._fetch_nba_api_rosters: nba_api not available")
             return
 
         all_teams = {t["abbreviation"]: t["id"] for t in nba_static_teams.get_teams()}
@@ -456,7 +463,7 @@ class RosterEngine:
         for abbrev in (team_abbrevs or []):
             team_id = all_teams.get(abbrev.upper())
             if not team_id:
-                print(f"  RosterEngine: no team_id for {abbrev}")
+                _logger.info(f"  RosterEngine: no team_id for {abbrev}")
                 continue
             try:
                 time.sleep(0.4)
@@ -485,12 +492,12 @@ class RosterEngine:
                                 "return_date": "",
                                 "source":      "nba_api",
                             }
-                        print(f"  Flagged two-way player: {player_name} ({abbrev})")
+                        _logger.info(f"  Flagged two-way player: {player_name} ({abbrev})")
 
                 self._full_rosters[abbrev.upper()] = all_players
-                print(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
+                _logger.info(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
             except Exception as exc:
-                print(f"  RosterEngine nba_api error for {abbrev}: {exc}")
+                _logger.warning(f"  RosterEngine nba_api error for {abbrev}: {exc}")
 
 # ============================================================
 # END SECTION: RosterEngine class

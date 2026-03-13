@@ -17,6 +17,12 @@ try:
 except ImportError:
     calculate_flex_ev = None  # Graceful fallback: flex EV uses calculate_entry_expected_value
 
+try:
+    from engine.correlation import build_correlation_matrix, adjust_parlay_probability, get_correlation_summary
+    _CORRELATION_AVAILABLE = True
+except ImportError:
+    _CORRELATION_AVAILABLE = False
+
 
 # ============================================================
 # SECTION: Platform Payout Tables
@@ -408,6 +414,10 @@ def calculate_correlation_risk(selected_picks):
     correlated — a blowout or overtime affects ALL of them.
     We apply a probability discount to account for this hidden risk.
 
+    When engine.correlation is available, also computes a full
+    pairwise correlation matrix and summary via build_correlation_matrix
+    and get_correlation_summary.
+
     Args:
         selected_picks (list of dict): Picks to check, each with
             'player_team' (or 'team') and 'opponent' keys.
@@ -419,6 +429,8 @@ def calculate_correlation_risk(selected_picks):
             'game_groups': dict           {game_key: [player_names]}
             'warnings': list of str       (human-readable warnings)
             'correlation_level': str      ('none', 'low', 'high')
+            'correlation_matrix': list    (n×n matrix, if available)
+            'correlation_summary': dict   (risk summary, if available)
         }
 
     Example:
@@ -477,14 +489,31 @@ def calculate_correlation_risk(selected_picks):
                 f"Same-game events (blowout, OT) affect both legs."
             )
 
-    return {
+    result = {
         "discount_multiplier": round(discount_multiplier, 4),
         "max_same_game_picks": max_same_game,
         "game_groups": {k: [p.get("player_name", "?") for p in v]
                         for k, v in game_groups.items()},
         "warnings": warnings,
         "correlation_level": correlation_level,
+        "correlation_matrix": None,
+        "correlation_summary": None,
     }
+
+    # Enhanced correlation analysis using engine.correlation when available
+    if _CORRELATION_AVAILABLE and selected_picks:
+        try:
+            corr_matrix = build_correlation_matrix(selected_picks)
+            corr_summary = get_correlation_summary(selected_picks, corr_matrix)
+            result["correlation_matrix"] = corr_matrix
+            result["correlation_summary"] = corr_summary
+            # Escalate correlation_level if the matrix analysis finds high risk
+            if corr_summary.get("risk_level") == "high" and correlation_level == "none":
+                result["correlation_level"] = "low"
+        except Exception:
+            pass  # Fallback to game-grouping result above
+
+    return result
 
 # ============================================================
 # END SECTION: Correlation Risk Calculator

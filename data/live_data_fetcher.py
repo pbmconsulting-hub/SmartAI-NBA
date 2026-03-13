@@ -21,6 +21,27 @@ import datetime     # For timestamps and date handling
 import statistics   # For calculating standard deviations
 from pathlib import Path  # Modern, cross-platform file path handling
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
+try:
+    from data.game_log_cache import save_game_logs_to_cache, load_game_logs_from_cache
+    _GAME_LOG_CACHE_AVAILABLE = True
+except ImportError:
+    _GAME_LOG_CACHE_AVAILABLE = False
+
+try:
+    from utils.rate_limiter import RateLimiter
+    _rate_limiter = RateLimiter(max_requests_per_minute=15, max_requests_per_hour=150)
+    _RATE_LIMITER_AVAILABLE = True
+except ImportError:
+    _RATE_LIMITER_AVAILABLE = False
+    _rate_limiter = None
+
 # ============================================================
 # SECTION: File Path Constants
 # Same data directory as data_manager.py
@@ -245,7 +266,7 @@ def save_last_updated(data_type):
             json.dump(existing_timestamps, json_file, indent=2)
     except Exception as error:
         # If we can't save, just print a warning — it's not critical
-        print(f"Warning: Could not save timestamp: {error}")
+        _logger.warning(f"Warning: Could not save timestamp: {error}")
 
 
 def load_last_updated():
@@ -400,7 +421,7 @@ def _fetch_team_records():
                 "conf_rank": conf_rank,
             }
     except Exception as standings_error:
-        print(f"Could not fetch standings (non-fatal): {standings_error}")
+        _logger.warning(f"Could not fetch standings (non-fatal): {standings_error}")
 
     return team_records
 
@@ -524,7 +545,7 @@ def _fetch_games_layer1_scoreboard_v2(team_records):
         return formatted_games
 
     except Exception as error:
-        print(f"Layer 1 (ScoreboardV2) failed: {error}")
+        _logger.warning(f"Layer 1 (ScoreboardV2) failed: {error}")
         return []
 
 
@@ -603,7 +624,7 @@ def _fetch_games_layer2_espn(team_records):
         return formatted_games
 
     except Exception as error:
-        print(f"Layer 2 (ESPN API) failed: {error}")
+        _logger.warning(f"Layer 2 (ESPN API) failed: {error}")
         return []
 
 
@@ -661,7 +682,7 @@ def _fetch_games_layer3_live_scoreboard(team_records):
         return formatted_games
 
     except Exception as error:
-        print(f"Layer 3 (Live ScoreBoard) failed: {error}")
+        _logger.warning(f"Layer 3 (Live ScoreBoard) failed: {error}")
         return []
 
 
@@ -719,43 +740,43 @@ def fetch_todays_games():
     # --------------------------------------------------------
     # Layer 1: ScoreboardV2
     # --------------------------------------------------------
-    print("Trying Layer 1: ScoreboardV2...")
+    _logger.info("Trying Layer 1: ScoreboardV2...")
     layer1_games = _fetch_games_layer1_scoreboard_v2(team_records)
 
     if layer1_games:
-        print(f"Layer 1 success: {len(layer1_games)} game(s) found.")
+        _logger.info(f"Layer 1 success: {len(layer1_games)} game(s) found.")
         # Cross-validate against Layer 2 — log a warning if counts disagree
         try:
             layer2_games = _fetch_games_layer2_espn(team_records)
             if layer2_games and len(layer2_games) != len(layer1_games):
-                print(
+                _logger.info(
                     f"Cross-validation warning: Layer 1 found {len(layer1_games)} game(s), "
                     f"Layer 2 found {len(layer2_games)} game(s). Using Layer 1 result."
                 )
         except Exception as cv_error:
-            print(f"Cross-validation check failed (non-fatal): {cv_error}")
+            _logger.warning(f"Cross-validation check failed (non-fatal): {cv_error}")
         return _deduplicate_games(layer1_games)
 
     # --------------------------------------------------------
     # Layer 2: ESPN Public API
     # --------------------------------------------------------
-    print("Layer 1 failed. Trying Layer 2: ESPN Public API...")
+    _logger.info("Layer 1 failed. Trying Layer 2: ESPN Public API...")
     layer2_games = _fetch_games_layer2_espn(team_records)
 
     if layer2_games:
-        print(f"Layer 2 success: {len(layer2_games)} game(s) found.")
+        _logger.info(f"Layer 2 success: {len(layer2_games)} game(s) found.")
         return _deduplicate_games(layer2_games)
 
     # --------------------------------------------------------
     # Layer 3: Live ScoreBoard
     # --------------------------------------------------------
-    print("Layer 2 failed. Trying Layer 3: Live ScoreBoard...")
+    _logger.info("Layer 2 failed. Trying Layer 3: Live ScoreBoard...")
     layer3_games = _fetch_games_layer3_live_scoreboard(team_records)
 
     if layer3_games:
-        print(f"Layer 3 success: {len(layer3_games)} game(s) found.")
+        _logger.info(f"Layer 3 success: {len(layer3_games)} game(s) found.")
     else:
-        print("All layers failed. No games available.")
+        _logger.warning("All layers failed. No games available.")
 
     return _deduplicate_games(layer3_games or [])
 
@@ -799,11 +820,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
     try:
         from nba_api.stats.endpoints import leaguedashplayerstats
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
         return False
 
     if not todays_games:
-        print("No games provided — nothing to fetch.")
+        _logger.info("No games provided — nothing to fetch.")
         return False
 
     try:
@@ -816,7 +837,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             playing_team_abbrevs.add(game.get("away_team", ""))
         playing_team_abbrevs.discard("")  # Remove empty strings
 
-        print(f"Fetching rosters for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
+        _logger.info(f"Fetching rosters for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
 
         if progress_callback:
             progress_callback(0, 10, f"Found {len(playing_team_abbrevs)} teams playing today. Fetching rosters...")
@@ -872,15 +893,15 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                         })
                         added += 1
                     else:
-                        print(f"  Could not find nba_api id for {player_name} ({abbrev}) — skipping")
+                        _logger.warning(f"  Could not find nba_api id for {player_name} ({abbrev}) — skipping")
 
                 teams_fetched += 1
-                print(f"  {abbrev}: {len(full_names)} players on roster ({added} matched by id)")
+                _logger.info(f"  {abbrev}: {len(full_names)} players on roster ({added} matched by id)")
 
         except Exception as roster_error:
-            print(f"  RosterEngine error in fetch_todays_players_only: {roster_error}")
+            _logger.warning(f"  RosterEngine error in fetch_todays_players_only: {roster_error}")
 
-        print(f"Total players on today's rosters: {len(all_roster_players)}")
+        _logger.info(f"Total players on today's rosters: {len(all_roster_players)}")
 
         if progress_callback:
             progress_callback(3, 10, f"Got {len(all_roster_players)} roster players. Fetching bulk season stats...")
@@ -910,9 +931,9 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                     gp = int(row.get("GP", 0) or 0)
                     if t_abbrev and gp > team_max_gp.get(t_abbrev, 0):
                         team_max_gp[t_abbrev] = gp
-            print(f"  Bulk stats: {len(bulk_stats)} players loaded")
+            _logger.info(f"  Bulk stats: {len(bulk_stats)} players loaded")
         except Exception as bulk_err:
-            print(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Will use zero defaults for missing players.")
+            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Will use zero defaults for missing players.")
 
         # --------------------------------------------------------
         # Step 4: Build formatted players from bulk stats.
@@ -922,7 +943,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         injury_data = {}
         if _roster_engine is not None:
             injury_data = _roster_engine.get_injury_report()
-            print(f"  RosterEngine supplied {len(injury_data)} injury entries")
+            _logger.info(f"  RosterEngine supplied {len(injury_data)} injury entries")
         else:
             # RosterEngine failed — fall back to cached JSON
             try:
@@ -930,7 +951,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                     with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
                         injury_data = json.load(_jf)
             except Exception as _cache_err:
-                print(f"  WARNING: Cached injury data unavailable: {_cache_err}")
+                _logger.warning(f"  WARNING: Cached injury data unavailable: {_cache_err}")
 
         formatted_players = []
 
@@ -962,7 +983,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             t_max_gp  = team_max_gp.get(api_team, player_gp)
             games_missed = max(0, t_max_gp - player_gp)
             if games_missed > GP_ABSENT_THRESHOLD and t_max_gp > MIN_TEAM_GP_FOR_RECENCY_CHECK:
-                print(f"  Skipping {player_name}: missed {games_missed}/{t_max_gp} games (likely long-term out)")
+                _logger.info(f"  Skipping {player_name}: missed {games_missed}/{t_max_gp} games (likely long-term out)")
                 continue
 
             # ── Extract season averages ───────────────────────────────────
@@ -1030,11 +1051,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             try:
                 with open(INJURY_STATUS_JSON_PATH, "w", encoding="utf-8") as _jf:
                     json.dump(injury_data, _jf, indent=2, default=str)
-                print(f"  Saved {len(injury_data)} injury entries to {INJURY_STATUS_JSON_PATH}")
+                _logger.info(f"  Saved {len(injury_data)} injury entries to {INJURY_STATUS_JSON_PATH}")
             except Exception as _save_err:
-                print(f"  WARNING: Could not save injury data: {_save_err}")
+                _logger.warning(f"  WARNING: Could not save injury data: {_save_err}")
 
-        print(f"  Writing {len(formatted_players)} players to CSV (injury data stored separately)")
+        _logger.info(f"  Writing {len(formatted_players)} players to CSV (injury data stored separately)")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
@@ -1058,11 +1079,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         if progress_callback:
             progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players (today's teams only)!")
 
-        print(f"Saved {len(formatted_players)} players for today's games to {PLAYERS_CSV_PATH}")
+        _logger.info(f"Saved {len(formatted_players)} players for today's games to {PLAYERS_CSV_PATH}")
         return True
 
     except Exception as error:
-        print(f"Error in fetch_todays_players_only: {error}")
+        _logger.error(f"Error in fetch_todays_players_only: {error}")
         return False
 
 # ============================================================
@@ -1165,7 +1186,7 @@ def fetch_player_recent_form(player_id, last_n_games=10):
         }
 
     except Exception as error:
-        print(f"Error fetching recent form for player {player_id}: {error}")
+        _logger.error(f"Error fetching recent form for player {player_id}: {error}")
         return {}
 
 # ============================================================
@@ -1203,7 +1224,7 @@ def fetch_player_stats(progress_callback=None):
         from nba_api.stats.endpoints import playergamelog
         from nba_api.stats.static import players as nba_players_static
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
         return False
 
     try:
@@ -1216,7 +1237,7 @@ def fetch_player_stats(progress_callback=None):
         # season_type_all_star is the parameter name in nba_api that controls
         # the season type. Despite the parameter name containing "all_star",
         # it accepts values like "Regular Season", "Playoffs", "Pre Season", etc.
-        print("Fetching player season averages from NBA API...")
+        _logger.info("Fetching player season averages from NBA API...")
 
         # Signal progress to the UI if a callback was provided
         if progress_callback:
@@ -1241,7 +1262,7 @@ def fetch_player_stats(progress_callback=None):
         if progress_callback:
             progress_callback(2, 10, f"Got stats for {len(player_stats_list)} players. Calculating standard deviations...")
 
-        print(f"Got stats for {len(player_stats_list)} players.")
+        _logger.info(f"Got stats for {len(player_stats_list)} players.")
 
         # --------------------------------------------------------
         # Step 2: Map nba_api column names to our column names
@@ -1338,19 +1359,38 @@ def fetch_player_stats(progress_callback=None):
             # This avoids wasting API calls on end-of-bench players
             if player_id and minutes_avg >= 10.0:
                 try:
-                    # Fetch the last 20 games for this player
-                    # BEGINNER NOTE: The game log shows stats game-by-game,
-                    # e.g., "March 1: 22 pts, March 3: 18 pts, March 5: 30 pts"
-                    game_log_endpoint = playergamelog.PlayerGameLog(
-                        player_id=player_id,        # Which player
-                        season_type_all_star="Regular Season",  # Only regular season
-                    )
+                    # Check cache first to avoid redundant API calls
+                    _cached_logs = None
+                    if _GAME_LOG_CACHE_AVAILABLE:
+                        _cached_logs, _is_stale = load_game_logs_from_cache(player_name)
+                        if _cached_logs and not _is_stale:
+                            game_log_data = _cached_logs
+                            recent_games = game_log_data[:20]
+                        else:
+                            _cached_logs = None  # Force fresh fetch
 
-                    # Get the game log data
-                    game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+                    if _cached_logs is None:
+                        # Fetch the last 20 games for this player
+                        # BEGINNER NOTE: The game log shows stats game-by-game,
+                        # e.g., "March 1: 22 pts, March 3: 18 pts, March 5: 30 pts"
+                        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
+                            _rate_limiter.acquire()
+                        game_log_endpoint = playergamelog.PlayerGameLog(
+                            player_id=player_id,        # Which player
+                            season_type_all_star="Regular Season",  # Only regular season
+                        )
 
-                    # Take only the last 20 games for recency
-                    recent_games = game_log_data[:20]
+                        # Get the game log data
+                        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+                        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
+                            _rate_limiter.record_request()
+
+                        # Cache the result for future calls
+                        if _GAME_LOG_CACHE_AVAILABLE and game_log_data:
+                            save_game_logs_to_cache(player_name, game_log_data)
+
+                        # Take only the last 20 games for recency
+                        recent_games = game_log_data[:20]
 
                     # Calculate std dev if we have at least 5 games
                     if len(recent_games) >= 5:
@@ -1389,7 +1429,7 @@ def fetch_player_stats(progress_callback=None):
                 except Exception as game_log_error:
                     # If game log fetch fails, use the default std devs calculated above
                     # This is not fatal — we just use less accurate std devs
-                    print(f"  Could not fetch game log for {player_name}: {game_log_error}")
+                    _logger.warning(f"  Could not fetch game log for {player_name}: {game_log_error}")
 
             # --------------------------------------------------------
             # Step 4: Build the formatted player dictionary
@@ -1458,14 +1498,14 @@ def fetch_player_stats(progress_callback=None):
                 ]
                 removed_count = before_count - len(formatted_players)
                 if removed_count:
-                    print(
+                    _logger.info(
                         f"  Injury filter: removed {removed_count} Out/IR players "
                         f"from player stats ({len(formatted_players)} remain)"
                     )
         except Exception as _inj_err:
             # RosterEngine injury fetch failed — fall back to the cached injury_status.json
             # written by a previous fetch_todays_players_only() run.
-            print(f"  Injury fetch (RosterEngine) failed in fetch_player_stats: {_inj_err}")
+            _logger.info(f"  Injury fetch (RosterEngine) failed in fetch_player_stats: {_inj_err}")
             try:
                 cached_injuries = {}
                 if INJURY_STATUS_JSON_PATH.exists():
@@ -1480,17 +1520,17 @@ def fetch_player_stats(progress_callback=None):
                         ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
                     ]
                     removed_count = before_count - len(formatted_players)
-                    print(
+                    _logger.info(
                         f"  Injury fallback (cached JSON): removed {removed_count} "
                         f"players ({len(formatted_players)} remain)"
                     )
                 else:
-                    print(
+                    _logger.info(
                         "  WARNING: RosterEngine failed and no cached injury data "
                         "available — no injury filter applied"
                     )
             except Exception as _cache_err:
-                print(f"  WARNING: All injury filter methods failed: {_cache_err}")
+                _logger.warning(f"  WARNING: All injury filter methods failed: {_cache_err}")
 
         if progress_callback:
             progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
@@ -1522,12 +1562,12 @@ def fetch_player_stats(progress_callback=None):
         if progress_callback:
             progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players!")
 
-        print(f"Successfully saved {len(formatted_players)} players to {PLAYERS_CSV_PATH}")
+        _logger.info(f"Successfully saved {len(formatted_players)} players to {PLAYERS_CSV_PATH}")
         return True  # Signal success
 
     except Exception as error:
         # Catch-all error handler — show what went wrong
-        print(f"Error fetching player stats: {error}")
+        _logger.error(f"Error fetching player stats: {error}")
         return False  # Signal failure
 
 # ============================================================
@@ -1562,7 +1602,7 @@ def fetch_team_stats(progress_callback=None):
     try:
         from nba_api.stats.endpoints import leaguedashteamstats
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
         return False
 
     try:
@@ -1795,11 +1835,11 @@ def fetch_team_stats(progress_callback=None):
         if progress_callback:
             progress_callback(6, 6, f"✅ Saved {len(formatted_teams)} teams and defensive ratings!")
 
-        print(f"Successfully saved {len(formatted_teams)} teams and defensive ratings.")
+        _logger.info(f"Successfully saved {len(formatted_teams)} teams and defensive ratings.")
         return True  # Signal success
 
     except Exception as error:
-        print(f"Error fetching team stats: {error}")
+        _logger.error(f"Error fetching team stats: {error}")
         return False  # Signal failure
 
 # ============================================================
@@ -1841,11 +1881,13 @@ def fetch_player_game_log(player_id, last_n_games=20):
     try:
         from nba_api.stats.endpoints import playergamelog
     except ImportError:
-        print("ERROR: nba_api is not installed. Run: pip install nba_api")
+        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
         return []
 
     try:
         # Fetch the player's game log
+        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
+            _rate_limiter.acquire()
         game_log_endpoint = playergamelog.PlayerGameLog(
             player_id=player_id,
             season_type_all_star="Regular Season",
@@ -1853,6 +1895,8 @@ def fetch_player_game_log(player_id, last_n_games=20):
 
         # Convert to list of dicts
         game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
+            _rate_limiter.record_request()
 
         # Add API delay
         time.sleep(API_DELAY_SECONDS)
@@ -1883,7 +1927,7 @@ def fetch_player_game_log(player_id, last_n_games=20):
         return formatted_games  # Return the list of recent games
 
     except Exception as error:
-        print(f"Error fetching game log for player {player_id}: {error}")
+        _logger.error(f"Error fetching game log for player {player_id}: {error}")
         return []  # Return empty list on failure
 
 # ============================================================
@@ -1916,7 +1960,7 @@ def fetch_all_data(progress_callback=None, targeted=False, todays_games=None):
         "teams": False,
     }
 
-    print("Starting full data update...")
+    _logger.info("Starting full data update...")
 
     # --------------------------------------------------------
     # Step 1: Fetch player stats (targeted or full)
@@ -1940,7 +1984,7 @@ def fetch_all_data(progress_callback=None, targeted=False, todays_games=None):
                 progress_callback(current, 20, f"[Players] {message}")
         results["players"] = fetch_player_stats(progress_callback=player_progress)
 
-    print("Player stats update complete. Starting team stats update...")
+    _logger.info("Player stats update complete. Starting team stats update...")
 
     # --------------------------------------------------------
     # Step 2: Fetch team stats
@@ -1955,7 +1999,7 @@ def fetch_all_data(progress_callback=None, targeted=False, todays_games=None):
     if progress_callback:
         progress_callback(20, 20, "✅ All data updated!")
 
-    print(f"Full update complete. Results: {results}")
+    _logger.info(f"Full update complete. Results: {results}")
     return results
 
 # ============================================================
@@ -2008,7 +2052,7 @@ def fetch_all_todays_data(progress_callback=None):
     results["games"] = games
 
     if not games:
-        print("fetch_all_todays_data: No games found for tonight.")
+        _logger.info("fetch_all_todays_data: No games found for tonight.")
         return results
 
     if progress_callback:
@@ -2037,7 +2081,7 @@ def fetch_all_todays_data(progress_callback=None):
             from data.data_manager import load_injury_status as _load_inj
             results["injury_status"] = _load_inj()
         except Exception as _inj_load_err:
-            print(f"fetch_all_todays_data: could not load injury map after player fetch: {_inj_load_err}")
+            _logger.info(f"fetch_all_todays_data: could not load injury map after player fetch: {_inj_load_err}")
 
     if progress_callback:
         status = "✅" if results["players_updated"] else "⚠️"
@@ -2060,7 +2104,7 @@ def fetch_all_todays_data(progress_callback=None):
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]
     games_count = len(results["games"])
-    print(f"fetch_all_todays_data complete: players_updated={players_updated}, "
+    _logger.info(f"fetch_all_todays_data complete: players_updated={players_updated}, "
           f"teams_updated={teams_updated}, games={games_count}")
     return results
 

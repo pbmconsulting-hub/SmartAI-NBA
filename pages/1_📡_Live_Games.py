@@ -286,10 +286,14 @@ if auto_load_clicked:
                         load_players_data as _load_players,
                         generate_props_for_todays_players as _gen_props,
                         save_props_to_session as _save_props,
+                        clear_all_caches as _clear_caches,
                     )
                     _selected_platforms = st.session_state.get(
                         "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
                     )
+                    # Clear cache so freshly-written players.csv is read,
+                    # not the stale cached version from before the fetch.
+                    _clear_caches()
                     _fresh_players = _load_players()
                     _auto_props = _gen_props(_fresh_players, games, platforms=_selected_platforms)
                     if _auto_props:

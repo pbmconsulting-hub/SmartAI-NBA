@@ -10,6 +10,13 @@
 import datetime  # For getting today's date
 import time      # For retry delays in resolve_todays_bets
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # Import our database module (sibling file in tracking/)
 from tracking.database import (
     insert_bet,
@@ -850,7 +857,7 @@ def resolve_todays_bets():
                 break  # success
             except Exception as _retry_exc:
                 _last_retry_exc = _retry_exc
-                print(f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} failed for {player_name}: {_retry_exc}")
+                _logger.warning(f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} failed for {player_name}: {_retry_exc}")
                 if _attempt < RESOLVE_MAX_RETRIES - 1:
                     time.sleep(RESOLVE_RETRY_DELAY)
                 else:
@@ -1281,3 +1288,94 @@ def get_live_bet_status(bets_list):
         augmented.append(bet_copy)
 
     return augmented
+
+
+# ============================================================
+# SECTION: Auto-Save Top Picks from Neural Analysis
+# ============================================================
+
+def save_top_picks_from_analysis(analysis_results):
+    """
+    Save top picks from Neural Analysis into the bet tracker as AI-logged picks.
+
+    Iterates analysis_results and inserts picks that meet the minimum quality bar
+    (tier is Platinum/Gold, probability_over >= 0.60) as PENDING bets with
+    source='AI_AUTO'. Duplicate picks (same player + stat + date) are skipped.
+
+    BEGINNER NOTE: This is how the AI Picks tab in the Bet Tracker gets populated.
+    The Neural Analysis page runs models and produces results; this function
+    automatically saves the best ones so you can track model performance over time.
+
+    Args:
+        analysis_results (list of dict): Results from Neural Analysis. Each dict
+            should have keys: player_name, stat_type, line, direction, tier,
+            probability_over, platform (optional), edge (optional).
+
+    Returns:
+        int: Number of picks successfully saved.
+    """
+    if not analysis_results:
+        return 0
+
+    AUTO_TIERS = {"Platinum", "Gold"}
+    MIN_PROBABILITY = 0.60
+
+    import datetime as _dt
+    today_str = _dt.datetime.now().strftime("%Y-%m-%d")
+
+    # Load existing bets to avoid duplicates
+    existing_bets = load_all_bets(limit=500)
+    existing_keys = set()
+    for b in existing_bets:
+        key = (
+            str(b.get("player_name", "")).lower(),
+            str(b.get("stat_type", "")).lower(),
+            str(b.get("bet_date", ""))[:10],
+        )
+        existing_keys.add(key)
+
+    saved_count = 0
+    for result in analysis_results:
+        tier = result.get("tier", "")
+        prob = float(result.get("probability_over", 0) or 0)
+
+        if tier not in AUTO_TIERS:
+            continue
+        if prob < MIN_PROBABILITY:
+            continue
+
+        player_name = str(result.get("player_name", "")).strip()
+        stat_type = str(result.get("stat_type", "")).strip().lower()
+        if not player_name or not stat_type:
+            continue
+
+        # Check for duplicate
+        dup_key = (player_name.lower(), stat_type, today_str)
+        if dup_key in existing_keys:
+            continue
+
+        direction = str(result.get("direction", "OVER")).upper()
+        line = float(result.get("line", 0) or 0)
+        platform = str(result.get("platform", "PrizePicks"))
+        edge = float(result.get("edge", 0) or 0)
+        notes = f"AI auto-logged | edge={edge:.1f}% | prob={prob:.1%}"
+
+        try:
+            insert_bet({
+                "player_name": player_name,
+                "stat_type": stat_type,
+                "line": line,
+                "direction": direction,
+                "tier": tier,
+                "platform": platform,
+                "result": "PENDING",
+                "notes": notes,
+                "source": "AI_AUTO",
+                "probability": prob,
+            })
+            existing_keys.add(dup_key)
+            saved_count += 1
+        except Exception:
+            pass
+
+    return saved_count
