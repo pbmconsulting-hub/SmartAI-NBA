@@ -1192,6 +1192,9 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                         if _avg < 0.3:
                             continue
                         _line = round(_avg * 2) / 2
+                        # Books set points lines slightly below average
+                        if _stat == "points":
+                            _line = max(0.5, _line - 0.5)
                         if _line <= 0:
                             continue
                         props.append({
@@ -1202,6 +1205,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                             "platform":    _platform,
                             "game_date":   today_str,
                             "_synthetic":  True,
+                            "line_source": "estimated",
                         })
                         seen.add(_dkey)
     # ── End star-player safety net ────────────────────────────────
@@ -1250,6 +1254,9 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                     if avg_val < 0.3:
                         continue  # Skip effectively 0 averages
                     prop_line = round(avg_val * 2) / 2  # Round to nearest 0.5
+                    # Books set points lines slightly below average
+                    if stat_type == "points":
+                        prop_line = max(0.5, prop_line - 0.5)
                 elif stat_type in ("fantasy_score_pp", "fantasy_score_ud"):
                     avg_val = _pp_ud_fantasy_score(pts, reb, ast, stl, blk, tov)
                     if avg_val < 5.0:
@@ -1277,6 +1284,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
                     "platform":    platform,
                     "game_date":   today_str,
                     "_synthetic":  True,
+                    "line_source": "estimated",
                 })
                 seen.add(dedup_key)
 

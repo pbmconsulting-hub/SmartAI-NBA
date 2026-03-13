@@ -23,6 +23,7 @@ import streamlit as st
 from tracking.bet_tracker import (
     auto_log_analysis_bets,
     auto_resolve_bet_results,
+    resolve_all_pending_bets,
     get_model_performance_stats,
     log_new_bet,
     record_bet_result,
@@ -875,6 +876,44 @@ with tab_auto_resolve:
         if errors:
             with st.expander(f"⚠️ {len(errors)} error(s) during auto-resolve"):
                 for err in errors:
+                    st.markdown(f"- {err}")
+
+    st.divider()
+    st.markdown("### 🔄 Resolve All Pending Bets")
+    st.markdown(
+        "Resolves **every** unresolved bet in your tracker — manual bets, AI picks, "
+        "and bets from any platform or date."
+    )
+    resolve_all_btn = st.button(
+        "🔄 Resolve All Pending Bets",
+        type="primary",
+        help="Fetch actual NBA stats for every pending bet regardless of date.",
+    )
+
+    if resolve_all_btn:
+        with st.spinner("Resolving all pending bets — this may take a moment…"):
+            _all_result = resolve_all_pending_bets()
+
+        _all_resolved = _all_result.get("resolved", 0)
+        _all_errors   = _all_result.get("errors", [])
+        _by_date      = _all_result.get("by_date", {})
+        if _all_resolved > 0:
+            st.success(
+                f"✅ Resolved **{_all_resolved}** bet(s) — "
+                f"{_all_result.get('wins', 0)} W / "
+                f"{_all_result.get('losses', 0)} L / "
+                f"{_all_result.get('pushes', 0)} Push"
+            )
+            if _by_date:
+                for _d, _cnt in sorted(_by_date.items()):
+                    st.markdown(f"  • **{_d}**: {_cnt} resolved")
+            st.rerun()
+        else:
+            st.info("No pending bets found to resolve, or all bets are already resolved.")
+
+        if _all_errors:
+            with st.expander(f"⚠️ {len(_all_errors)} error(s) during resolve-all"):
+                for err in _all_errors:
                     st.markdown(f"- {err}")
 
 # ============================================================

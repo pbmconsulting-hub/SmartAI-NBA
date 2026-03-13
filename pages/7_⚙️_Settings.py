@@ -484,7 +484,7 @@ settings_summary = {
 }
 
 summary_rows = [{"Setting": k, "Value": v} for k, v in settings_summary.items()]
-st.dataframe(summary_rows, use_container_width=True, hide_index=True)
+st.dataframe(summary_rows, width="stretch", hide_index=True)
 
 # Reset ALL settings button
 st.divider()
