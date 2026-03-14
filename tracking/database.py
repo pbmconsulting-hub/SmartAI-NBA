@@ -14,7 +14,9 @@
 
 # Standard library imports only
 import sqlite3    # Built-in SQLite database (no install needed!)
+import json       # For serializing/deserializing analysis session data
 import os         # For file path operations
+import datetime   # For timestamps in analysis session persistence
 from pathlib import Path  # Modern file path handling
 
 try:
@@ -1101,14 +1103,12 @@ def save_analysis_session(analysis_results, todays_games=None, selected_picks=No
     Returns:
         int: The new session_id, or -1 on error.
     """
-    import json as _json
-    import datetime as _dt
     try:
         initialize_database()
-        _ts = _dt.datetime.now().isoformat(timespec="seconds")
-        _results_json = _json.dumps(analysis_results, default=str)
-        _games_json = _json.dumps(todays_games or [], default=str)
-        _picks_json = _json.dumps(selected_picks or [], default=str)
+        _ts = datetime.datetime.now().isoformat(timespec="seconds")
+        _results_json = json.dumps(analysis_results, default=str)
+        _games_json = json.dumps(todays_games or [], default=str)
+        _picks_json = json.dumps(selected_picks or [], default=str)
         _prop_count = len(analysis_results)
         with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
@@ -1136,7 +1136,6 @@ def load_latest_analysis_session():
             'prop_count', 'created_at'
         Returns None if no session found or on error.
     """
-    import json as _json
     try:
         with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
@@ -1151,15 +1150,15 @@ def load_latest_analysis_session():
             row_dict = dict(row)
             # Deserialize JSON blobs
             try:
-                row_dict["analysis_results"] = _json.loads(row_dict.get("analysis_results_json") or "[]")
+                row_dict["analysis_results"] = json.loads(row_dict.get("analysis_results_json") or "[]")
             except Exception:
                 row_dict["analysis_results"] = []
             try:
-                row_dict["todays_games"] = _json.loads(row_dict.get("todays_games_json") or "[]")
+                row_dict["todays_games"] = json.loads(row_dict.get("todays_games_json") or "[]")
             except Exception:
                 row_dict["todays_games"] = []
             try:
-                row_dict["selected_picks"] = _json.loads(row_dict.get("selected_picks_json") or "[]")
+                row_dict["selected_picks"] = json.loads(row_dict.get("selected_picks_json") or "[]")
             except Exception:
                 row_dict["selected_picks"] = []
             return row_dict

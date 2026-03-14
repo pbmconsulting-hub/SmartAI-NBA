@@ -565,15 +565,29 @@ with tab_all_picks:
         st.caption("Auto-resolves every pending pick using live NBA stats — includes both manual and AI-logged picks.")
 
     if _resolve_all_picks_btn:
-        with st.spinner("🔄 Resolving all pending picks…"):
+        with st.spinner("🔄 Resolving all pending picks across all dates…"):
             try:
-                _rap_resolved, _rap_errors = auto_resolve_bet_results()
+                _rap_result = resolve_all_pending_bets()
+                _rap_resolved = _rap_result.get("resolved", 0)
+                _rap_wins    = _rap_result.get("wins", 0)
+                _rap_losses  = _rap_result.get("losses", 0)
+                _rap_pushes  = _rap_result.get("pushes", 0)
+                _rap_pending = _rap_result.get("pending", 0)
+                _rap_errors  = _rap_result.get("errors", [])
                 if _rap_resolved > 0:
-                    st.success(f"✅ Resolved **{_rap_resolved}** pick(s)!")
+                    st.success(
+                        f"✅ Resolved **{_rap_resolved}** pick(s): "
+                        f"✅ {_rap_wins} WIN · ❌ {_rap_losses} LOSS · 🔄 {_rap_pushes} PUSH"
+                        + (f" | ⏳ {_rap_pending} still pending" if _rap_pending > 0 else "")
+                    )
                 elif _rap_errors:
                     st.info(_rap_errors[0] if _rap_errors else "Nothing to resolve.")
                 else:
                     st.info("No pending picks found to resolve.")
+                if _rap_errors:
+                    with st.expander("⚠️ Resolution errors (click to expand)"):
+                        for _e in _rap_errors:
+                            st.caption(_e)
             except Exception as _rap_exc:
                 st.error(f"❌ Resolution failed: {_rap_exc}")
 
