@@ -332,6 +332,15 @@ try:
 except Exception:
     pass
 
+# ── Teams/Defensive Ratings Staleness Warning (Feature 11) ───────
+try:
+    from data.live_data_fetcher import get_teams_staleness_warning
+    _staleness_warn = get_teams_staleness_warning()
+    if _staleness_warn:
+        st.sidebar.warning(_staleness_warn)
+except Exception:
+    pass
+
 current_props = st.session_state.get("current_props", props_data)
 number_of_current_props = len(current_props)
 number_of_analysis_results = len(st.session_state.get("analysis_results", []))

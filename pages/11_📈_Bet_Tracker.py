@@ -404,6 +404,48 @@ with tab_model_health:
                 unsafe_allow_html=True,
             )
 
+        # Win rate by Goblin / Demon / Normal bet classification
+        bet_type_perf = performance_stats.get("by_bet_type", {})
+        if bet_type_perf:
+            st.subheader("🧌👿 Win Rate by Bet Classification")
+            _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
+            bt_rows = [
+                {
+                    "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
+                    "Total":     d.get("total", 0),
+                    "Wins":      d.get("wins", 0),
+                    "Losses":    d.get("losses", 0),
+                    "Win Rate":  f"{d.get('win_rate', 0):.1f}%",
+                }
+                for bt, d in sorted(bet_type_perf.items())
+            ]
+            st.markdown(
+                get_styled_stats_table_html(
+                    bt_rows,
+                    ["Bet Type", "Total", "Wins", "Losses", "Win Rate"],
+                ),
+                unsafe_allow_html=True,
+            )
+            # Highlight the key insight
+            _goblin_data = bet_type_perf.get("goblin", {})
+            _demon_data  = bet_type_perf.get("demon", {})
+            _cols = st.columns(2)
+            if _goblin_data.get("total", 0) > 0:
+                _cols[0].metric(
+                    "🧌 Goblin Win Rate",
+                    f"{_goblin_data.get('win_rate', 0):.1f}%",
+                    help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
+                )
+            if _demon_data.get("total", 0) > 0:
+                _demon_loss_rate = round(
+                    (_demon_data.get("losses", 0) / max(_demon_data.get("total", 1), 1)) * 100, 1
+                )
+                _cols[1].metric(
+                    "👿 Demon Loss Rate",
+                    f"{_demon_loss_rate:.1f}%",
+                    help=f"Based on {_demon_data.get('total', 0)} logged Demon bets — a high loss rate validates the system",
+                )
+
         # Feature 1: Enhanced tier accuracy report
         try:
             if get_tier_accuracy_report is not None:

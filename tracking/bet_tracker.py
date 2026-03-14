@@ -75,6 +75,8 @@ def log_new_bet(
     team="",
     notes="",
     auto_logged=0,
+    bet_type="normal",
+    std_devs_from_line=0.0,
 ):
     """
     Log a new bet to track its outcome later.
@@ -95,6 +97,8 @@ def log_new_bet(
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
         auto_logged (int): 1 if logged automatically by the engine, 0 if manual
+        bet_type (str): 'goblin', 'demon', or 'normal'
+        std_devs_from_line (float): How many std devs projection is from line
 
     Returns:
         tuple: (success: bool, message: str)
@@ -157,6 +161,8 @@ def log_new_bet(
         "entry_fee": float(entry_fee),
         "notes": notes.strip(),
         "auto_logged": int(auto_logged),
+        "bet_type": str(bet_type) if bet_type else "normal",
+        "std_devs_from_line": float(std_devs_from_line or 0.0),
     }
 
     # Save to database
@@ -238,10 +244,14 @@ def get_model_performance_stats():
     # Break down win rate by direction (OVER vs UNDER)
     direction_performance = _calculate_win_rate_by_field(all_bets, "direction")
 
+    # Break down win rate by Goblin / Demon / Normal bet classification
+    bet_type_performance = _calculate_win_rate_by_field(all_bets, "bet_type")
+
     return {
         "overall": overall_summary,
         "by_tier": tier_performance,
         "by_platform": platform_performance,
+        "by_bet_type": bet_type_performance,
         "by_stat_type": stat_performance,
         "by_direction": direction_performance,
         "all_bets": all_bets,
@@ -422,6 +432,8 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}"
             ),
             auto_logged=1,
+            bet_type=res.get("bet_type", "normal"),
+            std_devs_from_line=float(res.get("std_devs_from_line", 0.0)),
         )
         if ok:
             existing_keys.add(dedup_key)

@@ -672,3 +672,215 @@ def detect_trap_line(
 # ============================================================
 # END SECTION: Trap Line Detection
 # ============================================================
+
+
+# ============================================================
+# SECTION: Goblin / Demon Bet Classification
+# BEGINNER NOTE: "Goblin bets" are slam-dunk easy-money plays
+# where the model's projection is FAR above/below the line.
+# "Demon bets" are trap plays that LOOK good but have hidden
+# risks that make them dangerous to bet.
+# ============================================================
+
+# Thresholds for Goblin classification
+GOBLIN_MIN_STD_DEVS_FROM_LINE = 2.0   # Projection must be ≥2 std devs from line
+GOBLIN_MIN_PROBABILITY        = 0.80   # Model probability must be ≥80%
+GOBLIN_MIN_EDGE               = 25.0   # Edge must be ≥25%
+
+# Thresholds for Demon classification
+DEMON_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% of each other = conflicting
+DEMON_HIGH_VAR_MAX_EDGE        = 8.0    # High-variance stats with edge <8% = demon
+DEMON_HIGH_VAR_STATS           = {"threes", "steals", "blocks"}
+DEMON_BLOWOUT_SPREAD_THRESHOLD = 10.0   # Spread >10 pts on a back-to-back = demon
+DEMON_HOT_STREAK_RATIO         = 1.25   # Line at 125%+ of season avg = likely regressing hot streak
+
+
+def classify_bet_type(
+    probability_over,
+    edge_percentage,
+    stat_standard_deviation,
+    projected_stat,
+    prop_line,
+    stat_type,
+    directional_forces_result,
+    rest_days=1,
+    vegas_spread=0.0,
+    recent_form_ratio=None,
+    season_average=None,
+):
+    """
+    Classify a prop bet as a Goblin 🧌, Demon 👿, or Normal bet.
+
+    Goblin bets are extreme edges — the model's projection is so far
+    from the line that it represents a near-guaranteed outcome.  These
+    are the "easy money" plays that books occasionally leave open.
+
+    Demon bets are dangerous traps — they look appealing on the surface
+    but have hidden structural risks that make them likely losers.
+
+    Args:
+        probability_over (float): Model P(over), 0–1
+        edge_percentage (float): Edge %, positive = lean OVER
+        stat_standard_deviation (float): Distribution width
+        projected_stat (float): Model's projected value
+        prop_line (float): The betting line
+        stat_type (str): 'points', 'rebounds', 'threes', etc.
+        directional_forces_result (dict): Output of analyze_directional_forces
+        rest_days (int): Days since last game (0 = back-to-back)
+        vegas_spread (float): Point spread, positive = team favored
+        recent_form_ratio (float or None): Recent form (>1 = hot, <1 = cold)
+        season_average (float or None): Player's season average for this stat
+
+    Returns:
+        dict: {
+            'bet_type': 'goblin' | 'demon' | 'normal',
+            'bet_type_emoji': '🧌' | '👿' | '',
+            'bet_type_label': str,
+            'goblin': bool,
+            'demon': bool,
+            'reasons': list[str],    # Why it's a goblin/demon
+            'std_devs_from_line': float,   # How many std devs projection is from line
+        }
+
+    Example (Goblin):
+        Line 12.5 pts, projection 28 pts, std 7 → 2.2 std devs above line,
+        probability 88%, edge 38% → Goblin 🧌
+
+    Example (Demon):
+        Back-to-back + spread 14 pts → blowout + fatigue → Demon 👿
+    """
+    stat_type_lower = str(stat_type).lower() if stat_type else ""
+
+    # ── Compute how many std devs the projection is from the line ──
+    std_devs_from_line = 0.0
+    if stat_standard_deviation > 0 and prop_line > 0:
+        std_devs_from_line = (projected_stat - prop_line) / stat_standard_deviation
+
+    # ── Determine actual model direction ──
+    direction = "OVER" if edge_percentage >= 0 else "UNDER"
+    # Correct sign: if recommending UNDER, favorable distance is negative
+    favorable_std_devs = std_devs_from_line if direction == "OVER" else -std_devs_from_line
+
+    # ============================================================
+    # GOBLIN CHECK
+    # A "Goblin bet" requires ALL three conditions to be met:
+    #   1. Projection is ≥2 std devs from the line in favorable direction
+    #   2. Probability is ≥80%
+    #   3. Edge is ≥25%
+    # ============================================================
+    is_goblin = False
+    goblin_reasons = []
+
+    prob_for_direction = probability_over if direction == "OVER" else (1.0 - probability_over)
+    abs_edge = abs(edge_percentage)
+
+    if (
+        favorable_std_devs >= GOBLIN_MIN_STD_DEVS_FROM_LINE
+        and prob_for_direction >= GOBLIN_MIN_PROBABILITY
+        and abs_edge >= GOBLIN_MIN_EDGE
+    ):
+        is_goblin = True
+        goblin_reasons.append(
+            f"Projection ({projected_stat:.1f}) is {favorable_std_devs:.1f}σ "
+            f"beyond the line ({prop_line}) — extreme separation"
+        )
+        goblin_reasons.append(
+            f"Model probability: {prob_for_direction*100:.0f}% "
+            f"(threshold: {GOBLIN_MIN_PROBABILITY*100:.0f}%)"
+        )
+        goblin_reasons.append(
+            f"Edge: {abs_edge:.1f}% (threshold: {GOBLIN_MIN_EDGE:.0f}%)"
+        )
+
+    if is_goblin:
+        return {
+            "bet_type":        "goblin",
+            "bet_type_emoji":  "🧌",
+            "bet_type_label":  "Goblin Bet — Easy Money",
+            "goblin":          True,
+            "demon":           False,
+            "reasons":         goblin_reasons,
+            "std_devs_from_line": round(std_devs_from_line, 2),
+        }
+
+    # ============================================================
+    # DEMON CHECK
+    # A "Demon bet" qualifies if ANY of the four risk patterns apply.
+    # ============================================================
+    demon_reasons = []
+
+    # Pattern 1: Conflicting directional forces (nearly 50/50 split)
+    over_strength  = directional_forces_result.get("over_strength",  0)
+    under_strength = directional_forces_result.get("under_strength", 0)
+    if over_strength > 0 and under_strength > 0:
+        conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
+        if conflict_ratio >= DEMON_CONFLICT_RATIO_THRESHOLD:
+            demon_reasons.append(
+                f"Conflicting forces: OVER ({over_strength:.1f}) vs UNDER ({under_strength:.1f}) "
+                f"are nearly balanced ({conflict_ratio*100:.0f}% overlap) — no clear edge direction"
+            )
+
+    # Pattern 2: High-variance stat type with low edge
+    if stat_type_lower in DEMON_HIGH_VAR_STATS and abs_edge < DEMON_HIGH_VAR_MAX_EDGE:
+        demon_reasons.append(
+            f"{stat_type_lower.title()} is a high-variance stat with only {abs_edge:.1f}% edge "
+            f"(threshold: {DEMON_HIGH_VAR_MAX_EDGE:.0f}%) — too unpredictable to bet with low edge"
+        )
+
+    # Pattern 3: Back-to-back with large blowout spread
+    is_back_to_back = rest_days == 0
+    abs_spread = abs(vegas_spread)
+    if is_back_to_back and abs_spread > DEMON_BLOWOUT_SPREAD_THRESHOLD:
+        demon_reasons.append(
+            f"Back-to-back game (rest_days=0) with a {abs_spread:.0f}-pt spread — "
+            "blowout + fatigue combo is a significant risk for missing this stat"
+        )
+
+    # Pattern 4: Line set at recent hot streak value likely to regress
+    # If recent form ratio is very high (player on hot streak) AND the line
+    # is already pushed up to match that hot streak, regression is likely.
+    if (
+        recent_form_ratio is not None
+        and recent_form_ratio >= DEMON_HOT_STREAK_RATIO
+        and season_average is not None
+        and season_average > 0
+        and prop_line > 0
+    ):
+        # The line is inflated to match the hot streak — but the hot streak
+        # itself makes it a regression candidate
+        line_vs_avg_ratio = prop_line / season_average if season_average > 0 else 1.0
+        if line_vs_avg_ratio >= DEMON_HOT_STREAK_RATIO:
+            demon_reasons.append(
+                f"Line ({prop_line}) inflated to match recent hot streak "
+                f"(recent form {recent_form_ratio:.2f}x, season avg {season_average:.1f}) — "
+                f"hot streaks regress; line is priced at peak, not true average"
+            )
+
+    is_demon = len(demon_reasons) > 0
+
+    if is_demon:
+        return {
+            "bet_type":        "demon",
+            "bet_type_emoji":  "👿",
+            "bet_type_label":  "Demon Bet — Dangerous Trap",
+            "goblin":          False,
+            "demon":           True,
+            "reasons":         demon_reasons,
+            "std_devs_from_line": round(std_devs_from_line, 2),
+        }
+
+    # Normal bet — no special classification
+    return {
+        "bet_type":        "normal",
+        "bet_type_emoji":  "",
+        "bet_type_label":  "Normal Bet",
+        "goblin":          False,
+        "demon":           False,
+        "reasons":         [],
+        "std_devs_from_line": round(std_devs_from_line, 2),
+    }
+
+
+# ============================================================
+# END SECTION: Goblin / Demon Bet Classification
+# ============================================================
