@@ -334,17 +334,36 @@ if selected_picks:
     st.caption("These picks were selected from the ⚡ Neural Analysis page. Uncheck any you want to remove.")
 
     # ── Tier Filter ───────────────────────────────────────────────────
-    _eb_tier_filter = st.multiselect(
-        "Filter by Tier",
-        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
-        default=[],
-        key="eb_tier_filter",
-        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
-    )
+    _eb_filter_col1, _eb_filter_col2 = st.columns(2)
+    with _eb_filter_col1:
+        _eb_tier_filter = st.multiselect(
+            "Filter by Tier",
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            default=[],
+            key="eb_tier_filter",
+            help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+        )
+    with _eb_filter_col2:
+        _eb_bet_filter = st.multiselect(
+            "Filter by Bet Classification",
+            ["🧌 Goblin — Easy Money", "👿 Demon — Trap/Avoid", "⚡ Normal"],
+            default=[],
+            key="eb_bet_filter",
+            help="Filter picks by Goblin/Demon/Normal classification. Leave empty to show all.",
+        )
     _filtered_picks = selected_picks
     if _eb_tier_filter:
         _eb_tier_names = [t.split(" ")[0] for t in _eb_tier_filter]
-        _filtered_picks = [p for p in selected_picks if p.get("tier") in _eb_tier_names]
+        _filtered_picks = [p for p in _filtered_picks if p.get("tier") in _eb_tier_names]
+    if _eb_bet_filter:
+        _eb_bet_types = []
+        if any("Goblin" in f for f in _eb_bet_filter):
+            _eb_bet_types.append("goblin")
+        if any("Demon" in f for f in _eb_bet_filter):
+            _eb_bet_types.append("demon")
+        if any("Normal" in f for f in _eb_bet_filter):
+            _eb_bet_types.append("normal")
+        _filtered_picks = [p for p in _filtered_picks if p.get("bet_type", "normal") in _eb_bet_types]
 
     # Sort options
     sort_by = st.selectbox("Sort by:", ["Confidence (highest first)", "Probability", "Edge"], key="selected_sort")

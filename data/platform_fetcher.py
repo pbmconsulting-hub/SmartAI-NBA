@@ -746,6 +746,25 @@ def fetch_all_platform_props(
     if progress_callback:
         progress_callback(total_steps, total_steps, f"Done! {len(all_props)} props fetched.")
 
+    # Auto-fill missing team data from players.csv (DraftKings doesn't include team)
+    _props_missing_team_count = sum(1 for p in all_props if not p.get("team"))
+    if _props_missing_team_count > 0:
+        try:
+            from data.data_manager import load_players_data as _load_pd
+            _players_data = _load_pd()
+            if _players_data:
+                all_props = enrich_props_with_csv_names(all_props, _players_data)
+                _newly_filled = (
+                    sum(1 for p in all_props if p.get("team"))
+                    - (len(all_props) - _props_missing_team_count)
+                )
+                _logger.info(
+                    f"[Master] Team auto-fill: {_props_missing_team_count} props had no team; "
+                    f"filled {max(0, _newly_filled)} via players.csv lookup."
+                )
+        except Exception as _team_fill_err:
+            _logger.warning(f"[Master] Team auto-fill failed (non-fatal): {_team_fill_err}")
+
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")
     return all_props
 
