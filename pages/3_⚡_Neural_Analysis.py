@@ -42,6 +42,7 @@ except ImportError:
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
+from engine.odds_engine import american_odds_to_implied_probability as _odds_to_implied_prob
 from engine.calibration import get_calibration_adjustment   # C10: historical calibration
 from engine.clv_tracker import store_opening_line, get_stat_type_clv_penalties  # C12: CLV + penalties
 
@@ -1410,7 +1411,24 @@ if run_analysis:
         trap_line_penalty = trap_line_result.get("confidence_penalty", 0.0)
 
         probability_over  = simulation_output.get("probability_over", 0.5)
-        edge_pct          = calculate_edge_percentage(probability_over)
+
+        # Use actual odds from the prop when available so the edge reflects the
+        # true implied probability for this platform/line, not a fixed -110 default.
+        # For PrizePicks / Underdog (no vig), we still default to 0.5238 (-110 equiv)
+        # since they use fixed-payout structures, not per-leg juice.
+        _prop_over_odds  = prop.get("over_odds", -110)
+        _prop_under_odds = prop.get("under_odds", -110)
+        _platform_for_odds = prop.get("platform", "")
+        # Platforms without per-leg vig: treat as standard -110 breakeven
+        _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
+        if _platform_for_odds in _NO_VIG_PLATFORMS:
+            # No vig — use the standard -110 breakeven (0.5238)
+            _implied_prob_for_edge = None  # let calculate_edge_percentage use default
+        else:
+            # DraftKings and other sportsbooks: use actual over odds for the implied prob
+            _implied_prob_for_edge = _odds_to_implied_prob(_prop_over_odds)
+
+        edge_pct = calculate_edge_percentage(probability_over, _implied_prob_for_edge)
 
         # C10: Historical calibration — adjust confidence score based on
         # how well-calibrated the model has been historically at this
@@ -1469,6 +1487,9 @@ if run_analysis:
             edge_percentage=edge_pct,
             stat_standard_deviation=stat_std,
             stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
+            stat_type=stat_type,
+            platform=prop.get("platform", ""),
+            over_odds=prop.get("over_odds", -110),
         )
 
         # Merge kill-switch flags from confidence engine (C2/C3) with

@@ -315,6 +315,8 @@ def should_avoid_prop(
     stat_standard_deviation,
     stat_average,
     stat_type=None,
+    platform=None,
+    over_odds=-110,
 ):
     """
     Determine whether a prop pick should be avoided.
@@ -331,6 +333,12 @@ def should_avoid_prop(
         edge_percentage (float): Edge %, positive = lean over
         stat_standard_deviation (float): Variability
         stat_average (float): Average for this stat
+        stat_type (str, optional): Stat type for low-volume check
+        platform (str, optional): Platform name — PrizePicks/Underdog have 0%
+            structural vig on individual legs (payout baked into table).
+            DraftKings uses variable juice from actual odds.
+        over_odds (float): American odds on the over side (used for DraftKings
+            vig calculation). Default -110.
 
     Returns:
         tuple: (should_avoid: bool, reasons: list of str)
@@ -341,10 +349,29 @@ def should_avoid_prop(
     """
     avoid_reasons = []  # Collect all reasons to avoid
 
+    # ── Platform-specific vig adjustment ──────────────────────────────────────
+    # PrizePicks and Underdog have NO per-leg juice — vig is baked into the
+    # multi-leg payout structure, so we apply 0% to individual legs.
+    # DraftKings uses actual American odds, so we calculate the real vig.
+    _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
+    if platform and platform in _NO_VIG_PLATFORMS:
+        effective_vig = 0.0
+    elif over_odds and over_odds != -110:
+        # Derive vig from actual DraftKings odds (e.g. -130 → breakeven 56.5%)
+        # Vig = implied_prob - 0.5 (excess above fair 50/50)
+        try:
+            _odds = float(over_odds)
+            _implied = abs(_odds) / (abs(_odds) + 100.0) if _odds < 0 else 100.0 / (_odds + 100.0)
+            # Vig = implied_prob excess above a fair 50/50 coin flip
+            effective_vig = max(0.0, (_implied - 0.5) * 100.0)
+        except (ValueError, TypeError):
+            effective_vig = VIG_ADJUSTMENT_PCT
+    else:
+        effective_vig = VIG_ADJUSTMENT_PCT
+
     # Reason 1: Edge too small after vig adjustment
-    # Sportsbooks build in ~4.5% vig; subtract 2.5% from raw edge before evaluating.
     stat_type_lower = str(stat_type).lower() if stat_type else ""
-    vig_adjusted_edge = abs(edge_percentage) - VIG_ADJUSTMENT_PCT
+    vig_adjusted_edge = abs(edge_percentage) - effective_vig
     # Low-volume stats require a larger effective edge due to higher variance.
     if stat_type_lower in LOW_VOLUME_STATS:
         effective_edge = vig_adjusted_edge / LOW_VOLUME_UNCERTAINTY_MULTIPLIER
@@ -352,9 +379,10 @@ def should_avoid_prop(
         effective_edge = vig_adjusted_edge
     if effective_edge < MIN_EDGE_AFTER_VIG:
         _vig_adj_display = max(0.0, vig_adjusted_edge)  # show 0 if negative to avoid confusion
+        _vig_label = f"{effective_vig:.1f}% vig" if effective_vig > 0 else "no vig (PrizePicks/Underdog)"
         avoid_reasons.append(
             f"Insufficient edge after vig ({edge_percentage:.1f}% raw → "
-            f"{_vig_adj_display:.1f}% after {VIG_ADJUSTMENT_PCT}% vig) — "
+            f"{_vig_adj_display:.1f}% after {_vig_label}) — "
             f"below {MIN_EDGE_AFTER_VIG}% minimum"
         )
 
