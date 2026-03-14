@@ -333,18 +333,37 @@ if selected_picks:
     st.subheader(f"✅ Your Selected Picks ({len(selected_picks)} picks)")
     st.caption("These picks were selected from the ⚡ Neural Analysis page. Uncheck any you want to remove.")
 
-    # ── Tier Filter ───────────────────────────────────────────────────
-    _eb_tier_filter = st.multiselect(
-        "Filter by Tier",
-        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
-        default=[],
-        key="eb_tier_filter",
-        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
-    )
+    # ── Tier Filter & Bet Classification Filter ───────────────────────────
+    _eb_filter_col1, _eb_filter_col2 = st.columns(2)
+    with _eb_filter_col1:
+        _eb_tier_filter = st.multiselect(
+            "Filter by Tier",
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            default=[],
+            key="eb_tier_filter",
+            help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+        )
+    with _eb_filter_col2:
+        _eb_bet_type_filter = st.multiselect(
+            "Bet Classification",
+            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            default=[],
+            key="eb_bet_type_filter",
+            help="Filter by bet classification. Select 'Goblin — Easy Money' for the strongest picks.",
+        )
     _filtered_picks = selected_picks
     if _eb_tier_filter:
         _eb_tier_names = [t.split(" ")[0] for t in _eb_tier_filter]
-        _filtered_picks = [p for p in selected_picks if p.get("tier") in _eb_tier_names]
+        _filtered_picks = [p for p in _filtered_picks if p.get("tier") in _eb_tier_names]
+    if _eb_bet_type_filter:
+        _eb_bt_map = {
+            "🧌 Goblin — Easy Money": "goblin",
+            "👿 Demon — Trap/Avoid": "demon",
+            "⚡ Normal": "normal",
+        }
+        _eb_bt_values = [_eb_bt_map[t] for t in _eb_bet_type_filter if t in _eb_bt_map]
+        _filtered_picks = [p for p in _filtered_picks if p.get("bet_type", "normal") in _eb_bt_values]
+
 
     # Sort options
     sort_by = st.selectbox("Sort by:", ["Confidence (highest first)", "Probability", "Edge"], key="selected_sort")
@@ -364,16 +383,20 @@ if selected_picks:
         prob = pick.get("probability_over", 0.5)
         display_prob = (1.0 - prob) * 100 if direction == "UNDER" else prob * 100
         tier_emoji = pick.get("tier_emoji", "🥉")
-        
+        pick_team = pick.get("player_team", pick.get("team", ""))
+        pick_bet_type_emoji = pick.get("bet_type_emoji", "")
+        team_suffix = f" ({pick_team})" if pick_team else ""
+
         col_check, col_info = st.columns([0.1, 0.9])
         with col_check:
             include = st.checkbox("", value=True, key=f"pick_check_{i}_{pick.get('player_name','')}")
         with col_info:
             st.markdown(
-                f"**{pick.get('player_name','')}** — "
+                f"**{pick.get('player_name','')}{team_suffix}** — "
                 f"{pick.get('stat_type','').capitalize()} {direction} {pick.get('line',0)} "
                 f"| {tier_emoji} {pick.get('tier','')} "
-                f"| {display_prob:.0f}% "
+                + (f"| {pick_bet_type_emoji} " if pick_bet_type_emoji else "")
+                + f"| {display_prob:.0f}% "
                 f"| Edge: {pick.get('edge_percentage',0):.1f}%"
             )
         

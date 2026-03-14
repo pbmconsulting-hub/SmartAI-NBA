@@ -512,17 +512,35 @@ with tab_ai_picks:
     ]
     ai_bets = [b for b in ai_bets_raw if _platform_filter_fn(b)]
 
-    # ── Tier Filter ───────────────────────────────────────────────────
-    _ai_tier_filter = st.multiselect(
-        "Filter by Tier",
-        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
-        default=[],
-        key="ai_tier_filter",
-        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
-    )
+    # ── Tier Filter & Bet Classification Filter ───────────────────────────
+    _ai_filter_col1, _ai_filter_col2 = st.columns(2)
+    with _ai_filter_col1:
+        _ai_tier_filter = st.multiselect(
+            "Filter by Tier",
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            default=[],
+            key="ai_tier_filter",
+            help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+        )
+    with _ai_filter_col2:
+        _ai_bet_type_filter = st.multiselect(
+            "Bet Classification",
+            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            default=[],
+            key="ai_bet_type_filter",
+            help="Filter by bet classification. Leave empty to show all.",
+        )
     if _ai_tier_filter:
         _ai_tier_names = [t.split(" ")[0] for t in _ai_tier_filter]
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
+    if _ai_bet_type_filter:
+        _ai_bt_map = {
+            "🧌 Goblin — Easy Money": "goblin",
+            "👿 Demon — Trap/Avoid": "demon",
+            "⚡ Normal": "normal",
+        }
+        _ai_bt_values = [_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map]
+        ai_bets = [b for b in ai_bets if b.get("bet_type", "normal") in _ai_bt_values]
 
     if not ai_bets:
         st.info(
@@ -790,17 +808,35 @@ with tab_all_picks:
         all_picks_data = db_all_picks
         _date_field = "pick_date"
 
-    # ── Tier Filter ───────────────────────────────────────────────────
-    _ap_tier_filter = st.multiselect(
-        "Filter by Tier",
-        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
-        default=[],
-        key="ap_tier_filter",
-        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
-    )
+    # ── Tier Filter & Bet Classification Filter ───────────────────────────
+    _ap_filter_col1, _ap_filter_col2 = st.columns(2)
+    with _ap_filter_col1:
+        _ap_tier_filter = st.multiselect(
+            "Filter by Tier",
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            default=[],
+            key="ap_tier_filter",
+            help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+        )
+    with _ap_filter_col2:
+        _ap_bet_type_filter = st.multiselect(
+            "Bet Classification",
+            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            default=[],
+            key="ap_bet_type_filter",
+            help="Filter by bet classification. Leave empty to show all.",
+        )
     if _ap_tier_filter:
         _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
+    if _ap_bet_type_filter:
+        _ap_bt_map = {
+            "🧌 Goblin — Easy Money": "goblin",
+            "👿 Demon — Trap/Avoid": "demon",
+            "⚡ Normal": "normal",
+        }
+        _ap_bt_values = [_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map]
+        all_picks_data = [p for p in all_picks_data if p.get("bet_type", "normal") in _ap_bt_values]
 
     if not all_picks_data:
         st.info(
@@ -1185,6 +1221,15 @@ with tab_bets:
             label_visibility="collapsed",
         )
 
+        # ── Bet Classification Filter ─────────────────────────────────
+        _bets_bet_type_filter = st.multiselect(
+            "Bet Classification",
+            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            default=[],
+            key="bets_bet_type_filter",
+            help="Filter by bet classification. Leave empty to show all.",
+        )
+
         def _apply_filter(bets, choice):
             if choice == "Wins Only":
                 return [b for b in bets if b.get("result") == "WIN"]
@@ -1197,6 +1242,14 @@ with tab_bets:
             return bets
 
         filtered_bets = _apply_filter(all_bets, filter_choice)
+        if _bets_bet_type_filter:
+            _bets_bt_map = {
+                "🧌 Goblin — Easy Money": "goblin",
+                "👿 Demon — Trap/Avoid": "demon",
+                "⚡ Normal": "normal",
+            }
+            _bets_bt_values = [_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map]
+            filtered_bets = [b for b in filtered_bets if b.get("bet_type", "normal") in _bets_bt_values]
 
         # ── Summary Cards ─────────────────────────────────────────────
         _res_bets = [b for b in all_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]

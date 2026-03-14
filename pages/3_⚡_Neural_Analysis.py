@@ -83,6 +83,7 @@ from styles.theme import (
     get_qds_strategy_table_html,
     get_qds_framework_logic_html,
     get_qds_final_verdict_html,
+    get_education_box_html,
     GLOSSARY,
 )
 
@@ -1742,17 +1743,35 @@ if analysis_results:
     else:
         displayed_results = analysis_results
 
-    # ── Tier Filter ──────────────────────────────────────────────────────
-    _na_tier_filter = st.multiselect(
-        "Filter by Tier",
-        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
-        default=[],
-        key="na_tier_filter",
-        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
-    )
+    # ── Tier Filter & Bet Classification Filter ──────────────────────────
+    _na_filter_col1, _na_filter_col2 = st.columns(2)
+    with _na_filter_col1:
+        _na_tier_filter = st.multiselect(
+            "Filter by Tier",
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            default=[],
+            key="na_tier_filter",
+            help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+        )
+    with _na_filter_col2:
+        _na_bet_type_filter = st.multiselect(
+            "Bet Classification",
+            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            default=[],
+            key="na_bet_type_filter",
+            help="Filter by bet type. Leave empty to show all. Select 'Goblin — Easy Money' to see only the strongest picks.",
+        )
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
+    if _na_bet_type_filter:
+        _na_bt_map = {
+            "🧌 Goblin — Easy Money": "goblin",
+            "👿 Demon — Trap/Avoid": "demon",
+            "⚡ Normal": "normal",
+        }
+        _na_bt_values = [_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map]
+        displayed_results = [r for r in displayed_results if r.get("bet_type", "normal") in _na_bt_values]
 
     # Sort by confidence score descending
     displayed_results.sort(
@@ -1968,8 +1987,24 @@ if analysis_results:
             '</div>',
             unsafe_allow_html=True,
         )
+        st.markdown(
+            get_education_box_html(
+                "What is a Goblin Bet? 🧌",
+                "A <strong>Goblin bet</strong> is a bet where the platform's line is so far from "
+                "reality that it's almost free money. Think of it like finding a $20 bill on the "
+                "ground — the sportsbook set the line at a number that's <em>WAY</em> below (or "
+                "above) where the player is actually likely to land.<br><br>"
+                "<strong>Example:</strong> LeBron James OVER 12.5 points when he averages 25 and our "
+                "model projects 26.8. The line is absurdly low — there's an 88% chance he goes over. "
+                "That's a Goblin. 🧌<br><br>"
+                "<strong>Criteria:</strong> Model projection is 2+ standard deviations from the line, "
+                "probability ≥80%, edge ≥25%.",
+            ),
+            unsafe_allow_html=True,
+        )
         for _gp in _goblin_picks:
             _gp_name   = _html.escape(str(_gp.get("player_name", "")))
+            _gp_team   = _html.escape(str(_gp.get("player_team", _gp.get("team", ""))))
             _gp_stat   = _html.escape(str(_gp.get("stat_type", "")).title())
             _gp_dir    = _html.escape(str(_gp.get("direction", "OVER")))
             _gp_line   = _gp.get("line", 0)
@@ -1980,6 +2015,13 @@ if analysis_results:
             _gp_sigma  = abs(_gp.get("std_devs_from_line", 0))
             _gp_tier   = _html.escape(str(_gp.get("tier", "")))
             _gp_tier_emoji = _gp.get("tier_emoji", "")
+            # Season average for the stat
+            _gp_stat_key = _gp.get("stat_type", "points").lower()
+            _gp_avg_map = {
+                "points": "season_pts_avg", "rebounds": "season_reb_avg",
+                "assists": "season_ast_avg", "threes": "season_threes_avg",
+            }
+            _gp_season_avg = float(_gp.get(_gp_avg_map.get(_gp_stat_key, ""), 0) or 0)
             _gp_reasons_html = "".join(
                 f'<li style="color:#c8e6c9;font-size:0.8rem;">{_html.escape(str(r))}</li>'
                 for r in _gp.get("bet_type_reasons", [])
@@ -1988,17 +2030,31 @@ if analysis_results:
             _under_odds = _gp.get("under_odds", -110)
             _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
             _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
+            # Plain-English reason sentence
+            _gp_plain_reason = (
+                f"Line is set at {_gp_line}"
+                + (f", but {_gp_name} averages {_gp_season_avg:.1f} and we project {_gp_proj:.1f}." if _gp_season_avg else f", but we project {_gp_proj:.1f}.")
+                + " The gap is massive — easy money."
+            )
+            _gp_team_badge = (
+                f'<span style="background:rgba(76,175,80,0.2);color:#81c784;padding:1px 7px;'
+                f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
+                f'border:1px solid rgba(76,175,80,0.4);">{_gp_team}</span>'
+                if _gp_team else ""
+            )
             st.markdown(
                 f'<div style="background:#0d1a0d;border:2px solid #4caf50;border-radius:8px;'
                 f'padding:14px 18px;margin-bottom:10px;">'
                 f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
                 f'<div>'
                 f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
+                f'{_gp_team_badge}'
                 f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
                 f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
                 f'<span style="color:#a0d0a0;font-size:0.8rem;margin-left:8px;">'
                 f'(Proj: <strong style="color:#4caf50;">{_gp_proj:.1f}</strong>'
-                f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
+                + (f' &nbsp;|&nbsp; Avg: {_gp_season_avg:.1f}' if _gp_season_avg else "")
+                + f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
                 f'</div>'
                 f'<div style="text-align:right;">'
                 f'<span style="background:#4caf50;color:#0a1a0a;padding:3px 10px;border-radius:4px;'
@@ -2009,6 +2065,10 @@ if analysis_results:
                 f'<span style="color:#a0d0a0;font-size:0.75rem;margin-left:8px;">'
                 f'Odds: {_odds_str}</span>'
                 f'</div>'
+                f'</div>'
+                f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.08);'
+                f'border-radius:4px;color:#a5d6a7;font-size:0.8rem;font-style:italic;">'
+                f'💡 {_html.escape(_gp_plain_reason)}'
                 f'</div>'
                 f'<div style="margin-top:8px;">'
                 f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
@@ -2034,6 +2094,24 @@ if analysis_results:
             expanded=False,
         ):
             st.markdown(
+                get_education_box_html(
+                    "What is a Demon Bet? 👿",
+                    "A <strong>Demon bet</strong> LOOKS appealing — maybe a star player has a nice "
+                    "edge — but has hidden danger signals that make it a likely loser. It's a trap.<br><br>"
+                    "<strong>There are 4 types of Demons:</strong><br>"
+                    "1. <strong>Conflict Demon:</strong> The model's forces are fighting each other — "
+                    "nearly 50/50 OVER vs UNDER. It's a coin flip disguised as an edge.<br>"
+                    "2. <strong>Variance Demon:</strong> High-variance stat (3-pointers, steals, blocks) "
+                    "with a tiny edge (&lt;8%). These stats are too random game-to-game.<br>"
+                    "3. <strong>Fatigue Demon:</strong> Back-to-back game + big spread (blowout expected). "
+                    "Player will likely rest in the 4th quarter.<br>"
+                    "4. <strong>Regression Demon:</strong> The line is set at a hot streak value (125%+ of "
+                    "season average). The player is due to come back to earth.<br><br>"
+                    "Demon bets are <em>automatically added to your Avoid List</em>.",
+                ),
+                unsafe_allow_html=True,
+            )
+            st.markdown(
                 '<div style="background:rgba(180,0,0,0.12);border-radius:8px;padding:12px 16px;'
                 'margin-bottom:12px;border-left:4px solid #ff4444;">'
                 '<strong style="color:#ff4444;">⚠️ These picks LOOK appealing but are statistically dangerous.</strong><br>'
@@ -2045,26 +2123,73 @@ if analysis_results:
             )
             for _dp in _demon_picks:
                 _dp_name  = _html.escape(str(_dp.get("player_name", "")))
+                _dp_team  = _html.escape(str(_dp.get("player_team", _dp.get("team", ""))))
                 _dp_stat  = _html.escape(str(_dp.get("stat_type", "")).title())
                 _dp_dir   = _html.escape(str(_dp.get("direction", "OVER")))
                 _dp_line  = _dp.get("line", 0)
                 _dp_proj  = _dp.get("adjusted_projection", 0)
                 _dp_edge  = _dp.get("edge_percentage", 0)
+                # Detect demon type from reasons list
+                _dp_reasons_list = _dp.get("bet_type_reasons", [])
+                _dp_demon_type = "Demon"
+                _dp_type_color = "#ff4444"
+                for _r_text in _dp_reasons_list:
+                    _r_lower = str(_r_text).lower()
+                    if "conflict" in _r_lower or "50/50" in _r_lower or "conflicting" in _r_lower:
+                        _dp_demon_type = "Conflict Demon"
+                        break
+                    elif "variance" in _r_lower or "high-variance" in _r_lower or "random" in _r_lower:
+                        _dp_demon_type = "Variance Demon"
+                        break
+                    elif "fatigue" in _r_lower or "back-to-back" in _r_lower or "b2b" in _r_lower:
+                        _dp_demon_type = "Fatigue Demon"
+                        break
+                    elif "regression" in _r_lower or "hot streak" in _r_lower or "125%" in _r_lower:
+                        _dp_demon_type = "Regression Demon"
+                        break
+                _dp_type_descriptions = {
+                    "Conflict Demon": "Forces nearly 50/50 — a coin flip disguised as an edge.",
+                    "Variance Demon": "High-variance stat with a tiny edge — too random to rely on.",
+                    "Fatigue Demon": "Back-to-back game — player may rest late in a blowout.",
+                    "Regression Demon": "Line set at hot-streak value — player is due to regress.",
+                    "Demon": "Hidden structural risk makes this pick dangerous.",
+                }
+                _dp_type_desc = _dp_type_descriptions.get(_dp_demon_type, "")
                 _dp_reasons_html = "".join(
                     f'<li style="color:#ffb0b0;font-size:0.82rem;">{_html.escape(str(r))}</li>'
-                    for r in _dp.get("bet_type_reasons", [])
+                    for r in _dp_reasons_list
+                )
+                _dp_team_badge = (
+                    f'<span style="background:rgba(255,68,68,0.15);color:#ff8a80;padding:1px 7px;'
+                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
+                    f'border:1px solid rgba(255,68,68,0.3);">{_dp_team}</span>'
+                    if _dp_team else ""
                 )
                 st.markdown(
                     f'<div style="background:rgba(180,0,0,0.08);border:1px solid rgba(255,68,68,0.35);'
                     f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<div>'
                     f'<span style="color:#ff6666;font-weight:700;">👿 {_dp_name}</span>'
+                    f'{_dp_team_badge}'
+                    f'<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;'
+                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">{_dp_demon_type}</span>'
+                    f'</div>'
+                    f'<div style="text-align:right;">'
                     f'<span style="color:#ffb0b0;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat} '
                     f'(Proj: {_dp_proj:.1f})</span>'
-                    f'<span style="color:#ff4444;font-size:0.8rem;font-weight:600;">'
+                    f'<br><span style="color:#ff4444;font-size:0.8rem;font-weight:600;">'
                     f'Edge: {_dp_edge:+.1f}%</span>'
                     f'</div>'
-                    f'<div style="margin-top:8px;">'
+                    f'</div>'
+                    + (
+                        f'<div style="margin-top:6px;padding:5px 9px;background:rgba(255,68,68,0.06);'
+                        f'border-radius:4px;color:#ffb0b0;font-size:0.79rem;font-style:italic;">'
+                        f'⚠️ {_html.escape(_dp_type_desc)}'
+                        f'</div>'
+                        if _dp_type_desc else ""
+                    )
+                    + f'<div style="margin-top:8px;">'
                     f'<span style="color:#ff4444;font-size:0.75rem;font-weight:600;">WHY IT\'S A DEMON (AVOID):</span>'
                     f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_reasons_html}</ul>'
                     f'</div>'
