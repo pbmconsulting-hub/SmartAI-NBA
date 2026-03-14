@@ -193,25 +193,29 @@ with edge_col1:
         value=float(current_edge_threshold),
         step=0.5,
         help=(
-            "Minimum edge (distance from 50% probability) required "
+            "Minimum edge (distance from the -110 breakeven of 52.38%) required "
             "to display a pick in 'Top Picks' view.\n"
-            "5% = need at least 55% probability (or 45% for unders).\n"
+            "5% = need at least 57.4% probability (52.38% + 5%).\n"
             "Higher = fewer but stronger picks."
         ),
     )
     st.session_state["minimum_edge_threshold"] = new_edge_threshold
     st.caption(
         f"Picks need at least **{new_edge_threshold}% edge** "
-        f"(≥{50 + new_edge_threshold:.0f}% or ≤{50 - new_edge_threshold:.0f}%)"
+        f"(≥{52.38 + new_edge_threshold:.1f}% probability at -110 odds)"
     )
 
 with edge_col2:
     st.info(
         "💡 **What is Edge?**\n\n"
-        "Edge = how far your probability is from 50% (the coin flip).\n\n"
-        "- 55% probability = +5% edge (lean OVER)\n"
-        "- 45% probability = +5% edge (lean UNDER)\n"
-        "- 52% probability = only +2% edge (near coin flip)\n\n"
+        "Edge = how far your probability is from the **-110 breakeven** (52.38%).\n\n"
+        "At standard -110 odds you need to win 52.38% of the time just to break even, "
+        "so the true edge is your model probability **minus 52.38%**, not minus 50%.\n\n"
+        "- 63% probability = +10.6% edge (63% − 52.38%)\n"
+        "- 55% probability = +2.6% edge (55% − 52.38%)\n"
+        "- 52% probability = −0.4% edge (no value at -110)\n\n"
+        "For DraftKings with different juice (e.g. -130), the breakeven is higher (~56.5%), "
+        "so the displayed edge automatically adjusts to the actual odds.\n\n"
         "We recommend at least **5% edge** to justify a bet."
     )
 

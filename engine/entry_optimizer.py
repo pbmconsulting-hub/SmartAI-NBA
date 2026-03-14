@@ -776,14 +776,14 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
     """
     Find the probability threshold where Power becomes more +EV than Flex.
 
-    Searches for the uniform probability p where EV(Power) == EV(Flex).
-    This gives users a clear threshold: 'if all your picks are above X%,
-    Power play is better.'
+    Computes BOTH the uniform breakeven (traditional threshold analysis)
+    AND the actual heterogeneous EV comparison using the real pick
+    probabilities, so users get an accurate recommendation even when
+    picks have varying probabilities (e.g. [0.55, 0.55, 0.90]).
 
     Args:
-        pick_probabilities (list of float): Actual probabilities (used to
-            calibrate the search range, though breakeven is computed for
-            uniform probability scenarios).
+        pick_probabilities (list of float): Actual win probabilities for
+            each pick.  Used for the real EV comparison.
         entry_size (int): Number of picks.
 
     Returns:
@@ -791,6 +791,9 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
             'breakeven_probability': float,  # Uniform prob where Power = Flex EV
             'current_min_prob': float,       # Actual minimum probability in entry
             'power_better_above': float,     # Clear threshold (breakeven + buffer)
+            'actual_power_ev': float,        # Real Power EV with actual probabilities
+            'actual_flex_ev': float,         # Real Flex EV with actual probabilities
+            'power_is_better_actual': bool,  # True when real EVs favour Power
             'interpretation': str,
         }
 
@@ -830,28 +833,67 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
     current_min_prob = min(pick_probabilities) if pick_probabilities else 0.5
     power_better_above = min(0.99, breakeven + 0.02)   # 2% safety buffer
 
-    if current_min_prob >= power_better_above:
+    # ── Actual heterogeneous EV comparison ────────────────────────────────────
+    # Unlike the uniform-probability breakeven search above, this uses the
+    # REAL probabilities so picks like [0.55, 0.55, 0.90] are handled correctly
+    # (that entry may favour Power even though the weakest leg is below breakeven).
+    actual_power_ev = 0.0
+    actual_flex_ev  = 0.0
+    if pick_probabilities and power_multiplier > 0 and flex_payout:
+        try:
+            # Power: all legs must hit
+            p_all_hit = 1.0
+            for p in pick_probabilities:
+                p_all_hit *= p
+            actual_power_ev = round(
+                p_all_hit * power_multiplier * entry_fee - entry_fee, 2
+            )
+            # Flex: use actual probabilities (not uniform)
+            flex_result = _compute_flex_ev(list(pick_probabilities), flex_payout, entry_fee)
+            actual_flex_ev = round(flex_result.get('ev_dollars', 0.0), 2)
+        except Exception:
+            pass  # Fall back to zeros; uniform analysis still valid
+    power_is_better_actual = actual_power_ev > actual_flex_ev
+
+    def _ev_str(ev):
+        """Format an EV value with sign and dollar sign (e.g. '+$3.61', '-$1.20')."""
+        sign = "+" if ev >= 0 else "-"
+        return f"{sign}${abs(ev):.2f}"
+
+    if power_is_better_actual:
+        interpretation = (
+            f"Based on your actual pick probabilities, Power play has better EV "
+            f"({_ev_str(actual_power_ev)} vs {_ev_str(actual_flex_ev)} Flex). "
+            f"Uniform breakeven threshold: {breakeven*100:.0f}%."
+        )
+    elif current_min_prob >= power_better_above:
         interpretation = (
             f"Your weakest leg ({current_min_prob*100:.0f}%) is above the "
-            f"{power_better_above*100:.0f}% threshold — Power play is recommended."
+            f"{power_better_above*100:.0f}% threshold — Power play is recommended "
+            f"(uniform analysis)."
         )
     elif current_min_prob >= breakeven:
         interpretation = (
             f"Your weakest leg ({current_min_prob*100:.0f}%) is near the breakeven "
-            f"({breakeven*100:.0f}%). Power play is marginal — consider Flex for safety."
+            f"({breakeven*100:.0f}%). Power play is marginal — consider Flex for safety. "
+            f"Actual EV: Power {_ev_str(actual_power_ev)}, Flex {_ev_str(actual_flex_ev)}."
         )
     else:
         interpretation = (
             f"Breakeven at {breakeven*100:.0f}% uniform probability. "
             f"Your weakest leg ({current_min_prob*100:.0f}%) is below this — "
-            "Flex play has better expected value."
+            f"Flex play has better expected value "
+            f"(actual EV: Power {_ev_str(actual_power_ev)}, Flex {_ev_str(actual_flex_ev)})."
         )
 
     return {
-        'breakeven_probability': breakeven,
-        'current_min_prob':      round(current_min_prob, 4),
-        'power_better_above':    round(power_better_above, 4),
-        'interpretation':        interpretation,
+        'breakeven_probability':  breakeven,
+        'current_min_prob':       round(current_min_prob, 4),
+        'power_better_above':     round(power_better_above, 4),
+        'actual_power_ev':        actual_power_ev,
+        'actual_flex_ev':         actual_flex_ev,
+        'power_is_better_actual': power_is_better_actual,
+        'interpretation':         interpretation,
     }
 
 
