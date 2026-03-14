@@ -552,13 +552,13 @@ def build_player_projection(
     # Use compute_league_average_game_total() to get a dynamic league average
     # from live team data when available, falling back to the season constant.
     league_avg_total = compute_league_average_game_total(teams_data)
-    if game_total > 0:
+    if game_total > 0 and league_avg_total > 0:
         # BEGINNER NOTE: This creates a small boost/penalty based on
         # how far the total is from average. Capped at ±5%
         game_total_factor = 1.0 + ((game_total - league_avg_total) / league_avg_total) * 0.5
         game_total_factor = max(0.95, min(1.05, game_total_factor))  # Cap at ±5%
     else:
-        game_total_factor = 1.0  # Neutral if no total provided
+        game_total_factor = 1.0  # Neutral if no total provided or league avg unavailable
 
     # --- Factor 6: Blowout Risk (W6: Smart Blowout Risk) ---
     # Now uses BOTH spread AND game total, plus team tendency,

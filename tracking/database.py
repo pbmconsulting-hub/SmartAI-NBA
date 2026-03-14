@@ -178,6 +178,30 @@ CREATE TABLE IF NOT EXISTS analysis_sessions (
 );
 """
 
+# SQL to create the backtest_results table.
+# Stores historical backtesting runs so results persist across sessions.
+CREATE_BACKTEST_RESULTS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS backtest_results (
+    backtest_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_timestamp TEXT NOT NULL,
+    season TEXT NOT NULL,
+    stat_types_json TEXT NOT NULL,
+    min_edge REAL NOT NULL,
+    tier_filter TEXT,
+    total_picks INTEGER NOT NULL DEFAULT 0,
+    wins INTEGER NOT NULL DEFAULT 0,
+    losses INTEGER NOT NULL DEFAULT 0,
+    win_rate REAL NOT NULL DEFAULT 0.0,
+    roi REAL NOT NULL DEFAULT 0.0,
+    total_pnl REAL NOT NULL DEFAULT 0.0,
+    tier_win_rates_json TEXT,
+    stat_win_rates_json TEXT,
+    edge_win_rates_json TEXT,
+    pick_log_json TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -220,6 +244,7 @@ def initialize_database():
             cursor.execute(CREATE_ALL_ANALYSIS_PICKS_TABLE_SQL)   # all Neural Analysis outputs
             cursor.execute(CREATE_SUBSCRIPTIONS_TABLE_SQL)        # Stripe subscription records
             cursor.execute(CREATE_ANALYSIS_SESSIONS_TABLE_SQL)    # analysis session persistence
+            cursor.execute(CREATE_BACKTEST_RESULTS_TABLE_SQL)     # historical backtesting results
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -1275,6 +1300,127 @@ def load_latest_analysis_session():
 
 # ============================================================
 # END SECTION: Analysis Session Persistence
+# ============================================================
+
+# ============================================================
+# SECTION: Backtest Results Persistence
+# Saves and retrieves historical backtesting runs so results
+# survive page reloads and can be compared across time.
+# ============================================================
+
+def save_backtest_result(backtest_result):
+    """
+    Persist a backtest run to the database.
+
+    Args:
+        backtest_result (dict): The dict returned by engine/backtester.run_backtest().
+
+    Returns:
+        int or None: The new backtest_id on success, None on error.
+
+    Example:
+        result = run_backtest(season="2024-25", stat_types=["points"])
+        save_backtest_result(result)
+    """
+    if not backtest_result or backtest_result.get("status") != "ok":
+        return None
+    try:
+        run_ts = datetime.datetime.now().isoformat()
+        stat_types_json = json.dumps(backtest_result.get("stat_types", []))
+        tier_win_rates_json = json.dumps(backtest_result.get("tier_win_rates", {}))
+        stat_win_rates_json = json.dumps(backtest_result.get("stat_win_rates", {}))
+        edge_win_rates_json = json.dumps(backtest_result.get("edge_win_rates", {}))
+        pick_log_json = json.dumps(backtest_result.get("pick_log", []))
+
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO backtest_results (
+                    run_timestamp, season, stat_types_json, min_edge, tier_filter,
+                    total_picks, wins, losses, win_rate, roi, total_pnl,
+                    tier_win_rates_json, stat_win_rates_json, edge_win_rates_json,
+                    pick_log_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run_ts,
+                    backtest_result.get("season", ""),
+                    stat_types_json,
+                    backtest_result.get("min_edge", 0.05),
+                    backtest_result.get("tier_filter"),
+                    backtest_result.get("total_picks", 0),
+                    backtest_result.get("wins", 0),
+                    backtest_result.get("losses", 0),
+                    backtest_result.get("win_rate", 0.0),
+                    backtest_result.get("roi", 0.0),
+                    backtest_result.get("total_pnl", 0.0),
+                    tier_win_rates_json,
+                    stat_win_rates_json,
+                    edge_win_rates_json,
+                    pick_log_json,
+                )
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as _err:
+        _logger.error(f"save_backtest_result error: {_err}")
+        return None
+
+
+def load_backtest_results(limit=20):
+    """
+    Load the most recent backtest runs from the database.
+
+    Args:
+        limit (int): Maximum number of runs to return (default 20).
+
+    Returns:
+        list of dict: Recent backtest result rows, newest first.
+
+    Example:
+        results = load_backtest_results(limit=5)
+        for r in results:
+            print(r["season"], r["win_rate"])
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM backtest_results
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,)
+            )
+            rows = cursor.fetchall()
+            results = []
+            for row in rows:
+                row_dict = dict(row)
+                # Deserialize JSON fields — handle None, empty string, and invalid JSON
+                for json_field in ("stat_types_json", "tier_win_rates_json",
+                                   "stat_win_rates_json", "edge_win_rates_json",
+                                   "pick_log_json"):
+                    raw_value = row_dict.get(json_field)
+                    if raw_value:
+                        try:
+                            row_dict[json_field] = json.loads(raw_value)
+                        except (json.JSONDecodeError, TypeError):
+                            row_dict[json_field] = None
+                    else:
+                        row_dict[json_field] = None
+                results.append(row_dict)
+            return results
+    except Exception as _err:
+        _logger.warning(f"load_backtest_results error (non-fatal): {_err}")
+        return []
+
+# ============================================================
+# END SECTION: Backtest Results Persistence
 # ============================================================
 
 # ============================================================

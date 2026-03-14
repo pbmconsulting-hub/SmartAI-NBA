@@ -638,7 +638,15 @@ def build_histogram_from_results(simulated_results, prop_line, number_of_buckets
     # BEGINNER NOTE: We divide the range into equal-width buckets
     total_range = maximum_result - minimum_result
     if total_range == 0:
-        return []  # All results are identical (no spread)
+        # All simulations returned the same value (zero variance).
+        # Return a single bucket so callers always receive a non-empty histogram.
+        return [{
+            "bucket_label": f"{minimum_result:.1f}",
+            "bucket_start": minimum_result - 0.5,
+            "bucket_end": minimum_result + 0.5,
+            "count": len(simulated_results),
+            "is_over_line": minimum_result > prop_line,
+        }]
 
     bucket_width = total_range / number_of_buckets
 
