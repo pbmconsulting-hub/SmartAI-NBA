@@ -162,7 +162,7 @@ def log_new_bet(
         "notes": notes.strip(),
         "auto_logged": int(auto_logged),
         "bet_type": str(bet_type) if bet_type else "normal",
-        "std_devs_from_line": float(std_devs_from_line) if std_devs_from_line else 0.0,
+        "std_devs_from_line": float(std_devs_from_line or 0.0),
     }
 
     # Save to database
@@ -433,7 +433,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
             ),
             auto_logged=1,
             bet_type=res.get("bet_type", "normal"),
-            std_devs_from_line=float(res.get("std_devs_from_line", 0.0) or 0.0),
+            std_devs_from_line=float(res.get("std_devs_from_line", 0.0)),
         )
         if ok:
             existing_keys.add(dedup_key)

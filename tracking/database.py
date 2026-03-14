@@ -390,7 +390,7 @@ def insert_bet(bet_data):
         bet_data.get("notes", ""),
         int(bet_data.get("auto_logged", 0)),
         bet_data.get("bet_type", "normal"),
-        float(bet_data.get("std_devs_from_line", 0.0) or 0.0),
+        float(bet_data.get("std_devs_from_line", 0.0)),
     )
 
     try:
@@ -1105,7 +1105,7 @@ def insert_analysis_picks(analysis_results):
                         r.get("tier", "Bronze"),
                         f"Auto-stored by Smart Pick Pro. SAFE Score: {r.get('confidence_score', 0):.0f}",
                         r.get("bet_type", "normal"),
-                        float(r.get("std_devs_from_line", 0.0) or 0.0),
+                        float(r.get("std_devs_from_line", 0.0)),
                     ),
                 )
                 existing.add(key)

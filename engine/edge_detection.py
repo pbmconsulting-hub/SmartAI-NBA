@@ -755,8 +755,6 @@ def classify_bet_type(
     std_devs_from_line = 0.0
     if stat_standard_deviation > 0 and prop_line > 0:
         std_devs_from_line = (projected_stat - prop_line) / stat_standard_deviation
-    # For UNDER direction, the "distance" is line minus projection
-    abs_std_devs = abs(std_devs_from_line)
 
     # ── Determine actual model direction ──
     direction = "OVER" if edge_percentage >= 0 else "UNDER"
