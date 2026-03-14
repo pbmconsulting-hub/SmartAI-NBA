@@ -3,7 +3,7 @@
 **Your Personal NBA Prop Betting Analysis Engine — Built Locally, No APIs Needed**
 
 SmartAI-NBA v7 is a local web app (Streamlit) that analyzes PrizePicks, Underdog Fantasy,
-and DraftKings Pick6 props to find the highest-probability bets using Monte Carlo simulation
+and DraftKings Pick6 props to find the highest-probability bets using Quantum Matrix Engine 5.6 simulation
 and directional force analysis. All math is built from scratch — no external libraries except Streamlit.
 
 ---
@@ -67,7 +67,7 @@ SmartAI-NBA/
 │
 ├── engine/
 │   ├── math_helpers.py                 # All math from scratch (no scipy)
-│   ├── simulation.py                   # Monte Carlo simulator
+│   ├── simulation.py                   # Quantum Matrix Engine 5.6 simulator
 │   ├── projections.py                  # Player stat projections
 │   ├── edge_detection.py              # Find betting edges
 │   ├── entry_optimizer.py             # Build optimal entries
@@ -266,7 +266,7 @@ Check that you have:
 
 ## 🧠 How the Math Works (Plain English)
 
-### Monte Carlo Simulation
+### Quantum Matrix Engine 5.6 Simulation
 We simulate 1,000 games for each player. In each game:
 1. **Minutes** are randomized (sometimes stars rest, sometimes foul trouble)
 2. **Stats** are drawn randomly from a bell curve centered on the projection

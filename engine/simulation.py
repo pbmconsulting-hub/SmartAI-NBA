@@ -1,10 +1,10 @@
 # ============================================================
 # FILE: engine/simulation.py
-# PURPOSE: Monte Carlo simulation engine — runs thousands of
+# PURPOSE: Quantum Matrix Engine 5.6 simulation engine — runs thousands of
 #          simulated games for each player to build a realistic
 #          probability distribution of their stat outcomes.
 # CONNECTS TO: math_helpers.py (sampling), projections.py (input)
-# CONCEPTS COVERED: Monte Carlo method, simulation loops,
+# CONCEPTS COVERED: Quantum Matrix Engine 5.6 method, simulation loops,
 #                   distribution building, blowout risk
 # ============================================================
 
@@ -136,13 +136,13 @@ STAT_CORRELATION = {
 # END SECTION: Module-Level Constants
 # ============================================================
 
-# SECTION: Monte Carlo Simulation Core
-# Monte Carlo = run the same random experiment thousands of
+# SECTION: Quantum Matrix Engine 5.6 Simulation Core
+# Quantum Matrix Engine 5.6 = run the same random experiment thousands of
 # times and look at the overall distribution of results.
 # Like flipping a coin 10,000 times to verify it's fair.
 # ============================================================
 
-def run_monte_carlo_simulation(
+def run_quantum_matrix_simulation(
     projected_stat_average,
     stat_standard_deviation,
     prop_line,
@@ -159,7 +159,7 @@ def run_monte_carlo_simulation(
     random_seed=None,
 ):
     """
-    Run a full Monte Carlo simulation for one player's one stat.
+    Run a full Quantum Matrix Engine 5.6 simulation for one player's one stat.
 
     Simulates `number_of_simulations` games, each with randomized
     minutes (blowout risk, foul trouble) and stat variance.
@@ -198,7 +198,7 @@ def run_monte_carlo_simulation(
             is provided but minutes_std is not.
         recent_game_logs (list of float, optional): Player's recent game stat
             values for this stat type. (C11)
-            When 15+ entries are provided, each Monte Carlo trial samples
+            When 15+ entries are provided, each Quantum Matrix Engine 5.6 trial samples
             from a KDE built from these logs (instead of skew-normal).
             This captures player-specific distribution shapes (e.g., a player
             who always scores 15 or 30 but never 22).
@@ -300,7 +300,7 @@ def run_monte_carlo_simulation(
 
     # ============================================================
     # SECTION: Run Simulation Loop
-    # This is the heart of Monte Carlo — simulate many games!
+    # This is the heart of Quantum Matrix Engine 5.6 — simulate many games!
     # ============================================================
 
     # List to store every simulated game's result
@@ -669,7 +669,7 @@ def build_histogram_from_results(simulated_results, prop_line, number_of_buckets
 
 # ============================================================
 # SECTION: Combo / Fantasy Stat Simulations
-# These extend the Monte Carlo engine to handle multi-stat
+# These extend the Quantum Matrix Engine 5.6 to handle multi-stat
 # props (Pts+Rebs, PRA, etc.) and fantasy score props.
 # ============================================================
 
@@ -748,7 +748,7 @@ def simulate_combo_stat(
     random_seed=None,
 ):
     """
-    Run a correlated Monte Carlo simulation for a combo stat prop. (C7)
+    Run a correlated Quantum Matrix Engine 5.6 simulation for a combo stat prop. (C7)
 
     Combo stats (Pts+Rebs, PRA, etc.) share a minutes factor AND a
     stat-correlation structure — points and assists are positively correlated,
@@ -772,7 +772,7 @@ def simulate_combo_stat(
             on every run — useful for debugging and validation.
 
     Returns:
-        dict: Same structure as run_monte_carlo_simulation()
+        dict: Same structure as run_quantum_matrix_simulation()
     """
     # Seed the RNG if requested (enables reproducible simulations)
     if random_seed is not None:
@@ -906,7 +906,7 @@ def simulate_fantasy_score(
             on every run — useful for debugging and validation.
 
     Returns:
-        dict: Same structure as run_monte_carlo_simulation()
+        dict: Same structure as run_quantum_matrix_simulation()
     """
     # Seed the RNG if requested (enables reproducible simulations)
     if random_seed is not None:
@@ -1155,3 +1155,6 @@ def simulate_triple_double(
 # ============================================================
 # END SECTION: Combo / Fantasy Stat Simulations
 # ============================================================
+
+# Backward-compatibility alias
+run_monte_carlo_simulation = run_quantum_matrix_simulation

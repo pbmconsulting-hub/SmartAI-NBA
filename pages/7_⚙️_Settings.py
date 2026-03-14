@@ -161,7 +161,7 @@ with col2:
     # Random seed for reproducibility (optional)
     st.info(
         "💡 **About Simulation Depth:**\n\n"
-        "Monte Carlo simulation runs thousands of random game scenarios. "
+        "Quantum Matrix Engine 5.6 simulation runs thousands of random game scenarios. "
         "More simulations = the probability estimate converges to the true value.\n\n"
         "With 500 sims: ±3-4% accuracy\n"
         "With 1,000 sims: ±2-3% accuracy\n"

@@ -23,7 +23,7 @@ import math  # For rounding
 # NOTE (W2): Redistributed weights to improve accuracy — reduced raw probability
 #            over-reliance, increased historical consistency, recent form, and
 #            directional agreement which are stronger predictors of actual outcomes.
-WEIGHT_PROBABILITY_STRENGTH = 0.20    # Raw probability (20% of score) — reduced; circular vs Monte Carlo
+WEIGHT_PROBABILITY_STRENGTH = 0.20    # Raw probability (20% of score) — reduced; circular vs Quantum Matrix Engine 5.6
 WEIGHT_EDGE_MAGNITUDE = 0.22          # How big the edge is (22%)
 WEIGHT_DIRECTIONAL_AGREEMENT = 0.20  # Multiple factors agree (20%) — increased; strong predictor
 WEIGHT_MATCHUP_FAVORABILITY = 0.10   # How good the matchup is (10%)
@@ -132,7 +132,7 @@ def calculate_confidence_score(
         defense_factor (float): Opponent defense multiplier (< 1 = tough)
         stat_standard_deviation (float): Stat variability
         stat_average (float): Player's season average for this stat
-        simulation_results (dict): Full Monte Carlo output dict
+        simulation_results (dict): Full Quantum Matrix Engine 5.6 output dict
         games_played (int, optional): Games in season (higher = more reliable)
         recent_form_ratio (float, optional): Last-5-game avg / season avg.
             > 1.0 means hot streak, < 1.0 means cold streak.

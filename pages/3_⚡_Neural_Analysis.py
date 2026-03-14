@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: pages/3_⚡_Neural_Analysis.py
-# PURPOSE: The main analysis page. Runs Monte Carlo simulation
+# PURPOSE: The main analysis page. Runs Quantum Matrix Engine 5.6 simulation
 #          for each prop and shows probability, edge, tier, and
 #          directional forces in the Quantum Design System (QDS) UI.
 # CONNECTS TO: engine/ (all modules), data_manager.py, session state
@@ -741,8 +741,8 @@ minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 st.markdown(
     '<h2 style="font-family:\'Orbitron\',sans-serif;color:#00ffd5;'
     'margin-bottom:4px;">⚡ Neural Analysis</h2>'
-    '<p style="color:#a0b4d0;margin-top:0;">SmartBetPro Neural Engine™ — '
-    'Monte Carlo Prop Analysis with Quantum Design System</p>',
+    '<p style="color:#a0b4d0;margin-top:0;">SmartBetPro Neural Engine™ — Powered by N.A.N. (Neural Analysis Network) — '
+    'Quantum Matrix Engine 5.6 Prop Analysis with Quantum Design System</p>',
     unsafe_allow_html=True,
 )
 
@@ -752,7 +752,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     
     **Running Analysis:**
     1. Ensure props are loaded (from Prop Scanner or Live Games page)
-    2. Click "▶️ Run Analysis" to start Monte Carlo simulation
+    2. Click "▶️ Run Analysis" to start Quantum Matrix Engine 5.6 simulation
     3. Each prop is simulated 1,000+ times to calculate probability
     
     **Reading Results:**
@@ -883,7 +883,7 @@ with run_col:
         type="primary",
         width="stretch",
         disabled=(len(current_props) == 0),
-        help="Analyze all loaded props with Monte Carlo simulation",
+        help="Analyze all loaded props with Quantum Matrix Engine 5.6",
     )
 
 with filter_col:
@@ -1144,7 +1144,7 @@ if run_analysis:
         # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
         # Fantasy score stats use the platform-specific weighted-sum formula.
         # Double/triple-double props use threshold-counting simulation.
-        # Simple stats fall back to the standard Monte Carlo path.
+        # Simple stats fall back to the standard Quantum Matrix Engine 5.6 path.
         _sim_kwargs = dict(
             blowout_risk_factor=projection_result.get("blowout_risk", 0.15),
             pace_adjustment_factor=projection_result.get("pace_factor", 1.0),
@@ -1236,7 +1236,7 @@ if run_analysis:
             )
 
         else:
-            # Simple stat: standard Monte Carlo simulation (C5 skew-normal, C8 minutes, C11 KDE)
+            # Simple stat: standard Quantum Matrix Engine 5.6 simulation (C5 skew-normal, C8 minutes, C11 KDE)
             simulation_output = run_monte_carlo_simulation(
                 projected_stat_average=projected_stat,
                 stat_standard_deviation=stat_std,
@@ -1968,7 +1968,7 @@ if analysis_results:
             summary    = (
                 f"The Neural Engine identified {len(top_picks_for_verdict)} high-confidence "
                 f"props led by {top_names}, with a composite confidence score of {avg_conf}/100. "
-                f"Layer 5 injury validation and Monte Carlo simulation align on these selections."
+                f"Layer 5 injury validation and Quantum Matrix Engine 5.6 simulation align on these selections."
             )
         else:
             summary = (

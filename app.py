@@ -446,7 +446,7 @@ with left_column:
     **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually or upload a CSV.
     Sample props are pre-loaded so you can start immediately.
 
-    **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Monte Carlo
+    **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Quantum Matrix Engine 5.6
     simulation. See probability gauges, tier badges, and force breakdowns.
 
     **Step 3** → 🧬 **Entry Builder** — Build optimal parlays with exact EV
@@ -520,7 +520,7 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
     st.markdown("""
     ### The Engine Under the Hood
 
-    Smart Pick Pro — NBA Edition uses **Monte Carlo simulation** to predict player stat outcomes.
+    Smart Pick Pro — NBA Edition uses **Quantum Matrix Engine 5.6 simulation** to predict player stat outcomes.
     Here's what happens when you click "Run Analysis":
 
     ---
@@ -532,7 +532,7 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
     - **Home/away** — home court advantage is real
     - **Rest** — back-to-back games cause fatigue
 
-    #### 2. 🎲 Monte Carlo Simulation
+    #### 2. 🎲 Quantum Matrix Engine 5.6 Simulation
     We simulate **1,000+ games** for each player. In each simulated game:
     - Minutes are randomized (blowout risk, foul trouble)
     - Stats are randomly drawn from a normal distribution
