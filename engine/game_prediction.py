@@ -15,7 +15,7 @@
 #   Layer 2: Pace-Adjusted Possessions Model
 #             (team-specific pace weighted 60/40 toward faster
 #              team, which research shows is empirically correct)
-#   Layer 3: Monte Carlo Game Simulation
+#   Layer 3: Quantum Matrix Game Simulation
 #             (N=2000 full-game simulations, quarter-by-quarter,
 #              with OT, blowout detection, and score distributions)
 #   Layer 4: Vegas Bayesian Blending
@@ -29,18 +29,18 @@
 #   • NBA games are always INTEGER scores — we round at output
 #   • Home-court advantage = +3.2 pts (empirical NBA average)
 #     NOT a 1.2% multiplier (which introduces compounding bias)
-#   • Ties CANNOT happen: Monte Carlo floating-point means never
+#   • Ties CANNOT happen: Quantum Matrix Engine 5.6 floating-point means never
 #     land exactly equal; rounding ties resolved by win probability
 #   • Heavily documented with # BEGINNER NOTE: comments
 #
 # CONNECTS TO: engine/game_script.py (quarter scoring approach),
 #              engine/math_helpers.py (sampling functions),
-#              engine/simulation.py (Monte Carlo patterns),
+#              engine/simulation.py (Quantum Matrix Engine 5.6 patterns),
 #              engine/confidence.py (scoring conventions)
 # ============================================================
 
 import math    # math.sqrt, math.exp, math.erf for distributions
-import random  # random.gauss for Monte Carlo sampling
+import random  # random.gauss for Quantum Matrix Engine 5.6 sampling
 
 
 # ============================================================
@@ -90,7 +90,7 @@ FOUR_FACTOR_WEIGHT_FTR = 0.15   # Free throw rate
 PACE_WEIGHT_FASTER = 0.60   # 60% contribution from faster team
 PACE_WEIGHT_SLOWER = 0.40   # 40% contribution from slower team
 
-# ── Monte Carlo Simulation Parameters ────────────────────────
+# ── Quantum Matrix Engine 5.6 Simulation Parameters ────────────────────────
 DEFAULT_NUM_SIMULATIONS = 2000  # 2000 sims for stable distribution
 
 # ── Overtime Modeling ────────────────────────────────────────
@@ -395,7 +395,7 @@ def _score_from_possession_model(adj_ortg, expected_possessions):
 
 
 # ============================================================
-# SECTION: Layer 3 — Monte Carlo Game Simulation
+# SECTION: Layer 3 — Quantum Matrix Game Simulation
 # ============================================================
 
 def _simulate_single_game(
@@ -407,7 +407,7 @@ def _simulate_single_game(
     """
     Simulate a single full NBA game (4 quarters + possible OT).
 
-    BEGINNER NOTE: This is the core of the Monte Carlo engine.
+    BEGINNER NOTE: This is the core of the Quantum Matrix Engine 5.6.
     We simulate each of the 4 quarters separately because pace
     varies by quarter (Q1 is faster, Q3 is slower after halftime).
     Each quarter's scoring is a random draw from a normal distribution
@@ -522,20 +522,19 @@ def _simulate_single_game(
     return home_score, away_score, went_to_ot
 
 
-def _run_monte_carlo_game(
+def _run_quantum_matrix_game(
     home_adj_ortg, home_drtg, home_pace,
     away_adj_ortg, away_drtg, away_pace,
     home_base_score, away_base_score,
     num_simulations=DEFAULT_NUM_SIMULATIONS,
 ):
     """
-    Run the full Monte Carlo game simulation (N simulations).
+    Run the full Quantum Matrix Engine 5.6 game simulation (N simulations).
 
-    BEGINNER NOTE: The "Monte Carlo method" is named after the
-    famous casino in Monaco. The idea: instead of solving a complex
-    math problem analytically, you simulate thousands of random
-    scenarios and average the results. With 2000 simulations, we
-    get a very stable estimate of:
+    BEGINNER NOTE: The Quantum Matrix Engine 5.6 is the Neural Analysis Network
+    (N.A.N.) simulation core. Instead of solving a complex math problem
+    analytically, it simulates thousands of random scenarios and averages the
+    results. With 2000 simulations, we get a very stable estimate of:
       - Win probabilities (how often each team wins)
       - Expected score (average across all simulations)
       - Score distributions (range of likely outcomes)
@@ -629,8 +628,11 @@ def _run_monte_carlo_game(
     }
 
 # ============================================================
-# END SECTION: Layer 3 — Monte Carlo Game Simulation
+# END SECTION: Layer 3 — Quantum Matrix Game Simulation
 # ============================================================
+
+# Backward-compatibility alias
+_run_monte_carlo_game = _run_quantum_matrix_game
 
 
 # ============================================================
@@ -873,7 +875,7 @@ def predict_game(
     that orchestrates all five layers:
       1. Derives four-factor efficiency for each team
       2. Calculates pace-adjusted expected possessions
-      3. Runs 2000 Monte Carlo game simulations
+      3. Runs 2000 Quantum Matrix Engine 5.6 game simulations
       4. Blends with Vegas lines if available
       5. Calculates a confidence score
 
@@ -886,7 +888,7 @@ def predict_game(
         vegas_spread (float, optional): Vegas spread (home perspective,
             negative = home favored). e.g., -5.5
         game_total (float, optional): Vegas over/under total. e.g., 221.5
-        num_simulations (int): Monte Carlo iterations. Default 2000.
+        num_simulations (int): Quantum Matrix Engine 5.6 iterations. Default 2000.
 
     Returns:
         dict: Rich prediction result:
@@ -996,11 +998,11 @@ def predict_game(
     home_base_score = home_base_raw + HOME_COURT_SPLIT
     away_base_score = away_base_raw - HOME_COURT_SPLIT
 
-    # ── Layer 3: Monte Carlo Game Simulation ─────────────────
+    # ── Layer 3: Quantum Matrix Game Simulation ─────────────────
     # BEGINNER NOTE: Run 2000 full-game simulations. Each simulation
     # is independent with random variance. The aggregate statistics
     # tell us the probability distribution of outcomes.
-    mc_results = _run_monte_carlo_game(
+    mc_results = _run_quantum_matrix_game(
         home_adj_ortg=home_adj_ortg,
         home_drtg=home_drtg,
         home_pace=home_pace,
@@ -1038,7 +1040,7 @@ def predict_game(
 
     # ── Integer Score Resolution (No Hacks!) ─────────────────
     # BEGINNER NOTE: NBA scores are always integers. We round the
-    # floating-point means to integers. Due to the Monte Carlo
+    # floating-point means to integers. Due to the Quantum Matrix Engine 5.6
     # simulation's natural variance and the home-court split (+1.6/-1.6),
     # the means are EXTREMELY unlikely to round to the same integer.
     # But if they do (e.g., exact mathematical symmetry), we resolve
@@ -1153,7 +1155,7 @@ def predict_game_from_abbrevs(
         teams_data_dict (dict): {abbrev: team_data_dict} from TEAMS_DATA
         vegas_spread (float, optional): Vegas spread
         game_total (float, optional): Vegas over/under
-        num_simulations (int): Monte Carlo iterations
+        num_simulations (int): Quantum Matrix Engine 5.6 iterations
 
     Returns:
         dict: Same as predict_game() returns, or None if data unavailable

@@ -332,17 +332,30 @@ selected_picks = st.session_state.get("selected_picks", [])
 if selected_picks:
     st.subheader(f"✅ Your Selected Picks ({len(selected_picks)} picks)")
     st.caption("These picks were selected from the ⚡ Neural Analysis page. Uncheck any you want to remove.")
-    
+
+    # ── Tier Filter ───────────────────────────────────────────────────
+    _eb_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="eb_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    _filtered_picks = selected_picks
+    if _eb_tier_filter:
+        _eb_tier_names = [t.split(" ")[0] for t in _eb_tier_filter]
+        _filtered_picks = [p for p in selected_picks if p.get("tier") in _eb_tier_names]
+
     # Sort options
     sort_by = st.selectbox("Sort by:", ["Confidence (highest first)", "Probability", "Edge"], key="selected_sort")
-    
+
     # Sort the picks
     if sort_by == "Confidence (highest first)":
-        selected_picks_sorted = sorted(selected_picks, key=lambda x: x.get("confidence_score", 0), reverse=True)
+        selected_picks_sorted = sorted(_filtered_picks, key=lambda x: x.get("confidence_score", 0), reverse=True)
     elif sort_by == "Probability":
-        selected_picks_sorted = sorted(selected_picks, key=lambda x: abs(x.get("probability_over", 0.5) - 0.5), reverse=True)
+        selected_picks_sorted = sorted(_filtered_picks, key=lambda x: abs(x.get("probability_over", 0.5) - 0.5), reverse=True)
     else:
-        selected_picks_sorted = sorted(selected_picks, key=lambda x: abs(x.get("edge_percentage", 0)), reverse=True)
+        selected_picks_sorted = sorted(_filtered_picks, key=lambda x: abs(x.get("edge_percentage", 0)), reverse=True)
     
     # Show picks as checkboxes
     picks_to_include = []

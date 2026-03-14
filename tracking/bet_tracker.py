@@ -1167,6 +1167,280 @@ def resolve_all_pending_bets():
     return summary
 
 
+def resolve_all_analysis_picks(date_str=None):
+    """
+    Resolve pending rows in the ``all_analysis_picks`` table.
+
+    This is the counterpart to ``resolve_all_pending_bets()`` for the
+    **All Picks** tab, which displays data from ``all_analysis_picks``
+    (not the ``bets`` table).  Without this function the "Resolve All
+    Picks" button would never actually update what the user sees.
+
+    Uses the same NBA API + PlayerGameLog approach as
+    ``resolve_all_pending_bets()``:
+      - Loads every row in ``all_analysis_picks`` where result is NULL
+      - Groups by date, fetches game logs per player per season
+      - Computes WIN / LOSS / PUSH using prop_line + direction
+      - Writes result & actual_value back via
+        ``update_analysis_pick_result()``
+
+    Args:
+        date_str (str | None): When provided (ISO "YYYY-MM-DD"), only picks
+            for that specific date are processed — even if they were already
+            resolved (allows re-checking a past night's results).
+            When ``None`` (default), all pending picks across all dates are
+            resolved.
+
+    Returns:
+        dict: {
+            "resolved": int,
+            "wins": int,
+            "losses": int,
+            "pushes": int,
+            "pending": int,
+            "errors": list[str],
+            "by_date": dict[str, int],
+        }
+    """
+    import datetime as _dt
+    import time as _time
+
+    summary = {
+        "resolved": 0, "wins": 0, "losses": 0,
+        "pushes": 0, "pending": 0, "errors": [], "by_date": {},
+    }
+
+    # ── Import dependencies ────────────────────────────────────────────
+    try:
+        from nba_api.stats.endpoints import playergamelog
+        from nba_api.stats.static import players as nba_players_static
+    except ImportError:
+        summary["errors"].append("nba_api not available — cannot resolve picks")
+        return summary
+
+    try:
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+    except ImportError:
+        COMBO_STATS = {}
+        FANTASY_SCORING = {}
+
+    try:
+        from data.data_manager import normalize_player_name as _normalize_name
+    except ImportError:
+        def _normalize_name(n):
+            return n.lower().strip()
+
+    from tracking.database import (
+        load_pending_analysis_picks,
+        update_analysis_pick_result,
+    )
+
+    # ── Build player lookup maps (once) ───────────────────────────────
+    _all_players = nba_players_static.get_players()
+    _name_to_id  = {p["full_name"].lower(): p["id"] for p in _all_players}
+    _norm_to_id  = {_normalize_name(p["full_name"]): p["id"] for p in _all_players}
+
+    _STAT_COL = {
+        "points": "PTS", "rebounds": "REB", "assists": "AST",
+        "threes": "FG3M", "steals": "STL", "blocks": "BLK",
+        "turnovers": "TOV", "three_pointers": "FG3M", "minutes": "MIN",
+    }
+
+    import calendar as _cal
+    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
+
+    def _parse_date(date_val):
+        s = str(date_val).strip()
+        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
+            try:
+                return _dt.datetime.strptime(s, fmt).date()
+            except ValueError:
+                pass
+        try:
+            parts = s.replace(",", "").split()
+            if len(parts) == 3:
+                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
+                if month_num:
+                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
+        except Exception:
+            pass
+        return None
+
+    # ── Load picks from all_analysis_picks ────────────────────────────
+    # When a specific date is requested we load ALL picks for that date
+    # (including already-resolved ones) so the user can re-verify them.
+    # When no date is given we only load pending picks to avoid redundant work.
+    try:
+        if date_str:
+            from tracking.database import load_analysis_picks_for_date
+            pending_picks = load_analysis_picks_for_date(date_str)
+        else:
+            pending_picks = load_pending_analysis_picks(limit=2000)
+    except Exception as exc:
+        summary["errors"].append(f"Failed to load pending picks: {exc}")
+        return summary
+
+    if not pending_picks:
+        return summary
+
+    # ── Group by date for efficient season-string reuse ───────────────
+    from collections import defaultdict as _defaultdict
+    by_date = _defaultdict(list)
+    for pick in pending_picks:
+        d = pick.get("pick_date") or ""
+        by_date[d].append(pick)
+
+    # Player game log cache: (player_id, season_str) → DataFrame
+    _log_cache: dict = {}
+
+    for _loop_date, picks in sorted(by_date.items()):
+        if not _loop_date:
+            summary["pending"] += len(picks)
+            continue
+
+        try:
+            target_date = _dt.datetime.strptime(_loop_date, "%Y-%m-%d").date()
+        except ValueError:
+            summary["pending"] += len(picks)
+            continue
+
+        # When no specific date was requested, skip today — games may not
+        # be final yet.  When the user explicitly asks for a date (even
+        # today) we trust them and proceed.
+        if date_str is None and target_date >= _dt.date.today():
+            summary["pending"] += len(picks)
+            continue
+
+        _year = target_date.year
+        season_str = (
+            f"{_year - 1}-{str(_year)[2:]}"
+            if target_date.month < 10
+            else f"{_year}-{str(_year + 1)[2:]}"
+        )
+
+        date_resolved = 0
+        for pick in picks:
+            pick_id     = pick.get("pick_id")
+            player_name = pick.get("player_name", "")
+            stat_type   = str(pick.get("stat_type", "")).lower()
+            prop_line   = float(pick.get("prop_line") or 0)
+            direction   = str(pick.get("direction") or "OVER").upper()
+
+            is_combo   = stat_type in COMBO_STATS
+            is_fantasy = stat_type in FANTASY_SCORING
+            stat_col   = _STAT_COL.get(stat_type)
+
+            if not stat_col and not is_combo and not is_fantasy:
+                summary["errors"].append(
+                    f"#{pick_id} {player_name}: unknown stat '{stat_type}'"
+                )
+                summary["pending"] += 1
+                continue
+
+            # ── Player lookup: exact → normalized → partial ────────────
+            player_id = _name_to_id.get(player_name.lower())
+            if not player_id:
+                player_id = _norm_to_id.get(_normalize_name(player_name))
+            if not player_id:
+                parts = _normalize_name(player_name).split()
+                if len(parts) >= 2:
+                    player_id = next(
+                        (pid for nk, pid in _norm_to_id.items()
+                         if parts[0] in nk and parts[-1] in nk),
+                        None,
+                    )
+            if not player_id:
+                summary["errors"].append(
+                    f"#{pick_id} {player_name}: not found in nba_api"
+                )
+                summary["pending"] += 1
+                continue
+
+            # ── Fetch game log (cached per player+season) ─────────────
+            cache_key = (player_id, season_str)
+            if cache_key not in _log_cache:
+                try:
+                    _time.sleep(1.0)  # respect nba_api rate limit
+                    gl = playergamelog.PlayerGameLog(
+                        player_id=player_id,
+                        season=season_str,
+                        season_type_all_star="Regular Season",
+                    )
+                    _log_cache[cache_key] = gl.get_data_frames()[0]
+                except Exception as exc:
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: API error — {exc}"
+                    )
+                    summary["pending"] += 1
+                    continue
+
+            df = _log_cache[cache_key]
+            if df.empty:
+                summary["errors"].append(
+                    f"#{pick_id} {player_name}: no game log for {season_str}"
+                )
+                summary["pending"] += 1
+                continue
+
+            # ── Match game by date ─────────────────────────────────────
+            df["_parsed_date"] = df["GAME_DATE"].apply(_parse_date)
+            matching = df[df["_parsed_date"] == target_date]
+            if matching.empty:
+                summary["pending"] += 1
+                continue
+
+            row = matching.iloc[0]
+
+            # ── Compute actual stat value ──────────────────────────────
+            try:
+                if is_combo:
+                    actual_value = sum(
+                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0)
+                        for c in COMBO_STATS[stat_type]
+                    )
+                elif is_fantasy:
+                    actual_value = round(sum(
+                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0) * w
+                        for c, w in FANTASY_SCORING[stat_type].items()
+                    ), 2)
+                else:
+                    actual_value = float(row.get(stat_col, 0) or 0)
+
+                # ── Determine WIN / LOSS / PUSH ────────────────────────
+                if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
+                    result = "PUSH"
+                elif direction == "OVER":
+                    result = "WIN" if actual_value > prop_line else "LOSS"
+                else:
+                    result = "WIN" if actual_value < prop_line else "LOSS"
+
+                # ── Write result to all_analysis_picks ─────────────────
+                ok = update_analysis_pick_result(pick_id, result, actual_value)
+                if ok:
+                    summary["resolved"] += 1
+                    date_resolved += 1
+                    if result == "WIN":
+                        summary["wins"] += 1
+                    elif result == "LOSS":
+                        summary["losses"] += 1
+                    else:
+                        summary["pushes"] += 1
+                else:
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: DB update failed"
+                    )
+                    summary["pending"] += 1
+
+            except Exception as exc:
+                summary["errors"].append(f"#{pick_id} {player_name}: {exc}")
+                summary["pending"] += 1
+
+        if date_resolved > 0:
+            summary["by_date"][_loop_date] = date_resolved
+
+    return summary
+
+
 def get_live_bet_status(bets_list):
     """
     Check live box scores for today's pending bets.

@@ -333,7 +333,7 @@ def _predict_game(home_abbrev, away_abbrev, vegas_spread=None, game_total=None):
     Calls engine/game_prediction.py which implements:
       Layer 1: Dean Oliver Four-Factor Model
       Layer 2: Pace-Adjusted Possessions (60/40 toward faster team)
-      Layer 3: Monte Carlo Game Simulation (2000 iterations)
+      Layer 3: Quantum Matrix Game Simulation (2000 iterations)
       Layer 4: Vegas Bayesian Blending (55% model / 45% Vegas)
       Layer 5: Confidence & Context Scoring
 

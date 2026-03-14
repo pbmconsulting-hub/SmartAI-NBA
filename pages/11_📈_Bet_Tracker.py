@@ -24,6 +24,7 @@ from tracking.bet_tracker import (
     auto_log_analysis_bets,
     auto_resolve_bet_results,
     resolve_all_pending_bets,
+    resolve_all_analysis_picks,
     get_model_performance_stats,
     log_new_bet,
     record_bet_result,
@@ -35,6 +36,8 @@ from tracking.database import (
     get_rolling_stats,
     save_daily_snapshot,
     load_all_analysis_picks,
+    load_analysis_picks_for_date,
+    get_analysis_pick_dates,
 )
 from styles.theme import (
     get_global_css,
@@ -467,6 +470,18 @@ with tab_ai_picks:
     ]
     ai_bets = [b for b in ai_bets_raw if _platform_filter_fn(b)]
 
+    # ── Tier Filter ───────────────────────────────────────────────────
+    _ai_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="ai_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    if _ai_tier_filter:
+        _ai_tier_names = [t.split(" ")[0] for t in _ai_tier_filter]
+        ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
+
     if not ai_bets:
         st.info(
             "📭 No AI-auto-logged picks yet. "
@@ -540,6 +555,180 @@ with tab_all_picks:
         "Track the **complete** performance record of every prediction the app makes."
     )
 
+    # ── 🔄 Resolve All Picks button ───────────────────────────────────
+    _rap_col1, _rap_col2 = st.columns([1, 3])
+    with _rap_col1:
+        _resolve_all_picks_btn = st.button(
+            "🔄 Resolve All Picks",
+            key="resolve_all_picks_btn",
+            type="primary",
+            help="Fetch actual NBA stats and auto-resolve ALL unresolved picks (manual and AI-logged).",
+        )
+    with _rap_col2:
+        st.caption("Auto-resolves every pending pick using live NBA stats — includes both manual and AI-logged picks.")
+
+    if _resolve_all_picks_btn:
+        with st.spinner("🔄 Resolving all pending picks across all dates…"):
+            try:
+                # ── Step 1: Resolve all_analysis_picks table (what this tab displays) ──
+                _picks_result  = resolve_all_analysis_picks()
+                # ── Step 2: Also resolve the bets table (manual + AI bets) ──────────
+                _bets_result   = resolve_all_pending_bets()
+
+                # Combine both results for reporting
+                _rap_resolved  = _picks_result.get("resolved", 0) + _bets_result.get("resolved", 0)
+                _rap_wins      = _picks_result.get("wins", 0)    + _bets_result.get("wins", 0)
+                _rap_losses    = _picks_result.get("losses", 0)  + _bets_result.get("losses", 0)
+                _rap_pushes    = _picks_result.get("pushes", 0)  + _bets_result.get("pushes", 0)
+                _rap_pending   = _picks_result.get("pending", 0) + _bets_result.get("pending", 0)
+                _rap_errors    = _picks_result.get("errors", []) + _bets_result.get("errors", [])
+
+                # Deduplicate errors (same player may appear in both tables)
+                _rap_errors = list(dict.fromkeys(_rap_errors))
+
+                if _rap_resolved > 0:
+                    st.success(
+                        f"✅ Resolved **{_rap_resolved}** pick(s): "
+                        f"✅ {_rap_wins} WIN · ❌ {_rap_losses} LOSS · 🔄 {_rap_pushes} PUSH"
+                        + (f" | ⏳ {_rap_pending} still pending (game may not be final)" if _rap_pending > 0 else "")
+                    )
+                    # Show per-date breakdown
+                    _combined_by_date = {}
+                    for _d, _n in {**_picks_result.get("by_date", {}), **_bets_result.get("by_date", {})}.items():
+                        _combined_by_date[_d] = _combined_by_date.get(_d, 0) + _n
+                    if _combined_by_date:
+                        for _d in sorted(_combined_by_date):
+                            st.caption(f"  📅 {_d}: {_combined_by_date[_d]} resolved")
+                elif _rap_errors and not _rap_pending:
+                    st.info("ℹ️ No picks were resolved. See errors below.")
+                else:
+                    st.info(
+                        "ℹ️ No pending picks found to resolve. "
+                        "Either all picks are already resolved, today's games aren't final yet, "
+                        "or no picks have been logged."
+                    )
+                if _rap_errors:
+                    with st.expander(f"⚠️ {len(_rap_errors)} resolution error(s) (click to expand)"):
+                        for _e in _rap_errors:
+                            st.caption(_e)
+            except Exception as _rap_exc:
+                st.error(f"❌ Resolution failed: {_rap_exc}")
+
+    st.divider()
+
+    # ── 🗓️ Resolve / Re-check by Date ────────────────────────────────
+    st.markdown("### 🗓️ Resolve / Re-check Picks by Date")
+    st.caption(
+        "Select a past night to view its picks and re-verify results against "
+        "actual NBA stats — useful when bets weren't resolved automatically."
+    )
+
+    _rbd_available_dates = get_analysis_pick_dates(days=30)
+
+    if not _rbd_available_dates:
+        st.info("ℹ️ No pick history found in the last 30 days. Run Neural Analysis to log picks.")
+    else:
+        _rbd_date_options = _rbd_available_dates  # already sorted newest-first
+        _rbd_selected = st.selectbox(
+            "📅 Select date",
+            options=_rbd_date_options,
+            index=0,
+            key="rbd_date_selectbox",
+            help="Choose a past night to inspect and resolve.",
+        )
+
+        # Load all picks for the selected date (pending AND already resolved)
+        _rbd_picks = load_analysis_picks_for_date(_rbd_selected)
+
+        if not _rbd_picks:
+            st.info(f"No picks logged for {_rbd_selected}.")
+        else:
+            # Summary line
+            _rbd_w = sum(1 for p in _rbd_picks if p.get("result") == "WIN")
+            _rbd_l = sum(1 for p in _rbd_picks if p.get("result") == "LOSS")
+            _rbd_push = sum(1 for p in _rbd_picks if p.get("result") == "PUSH")
+            _rbd_pend = sum(1 for p in _rbd_picks if not p.get("result"))
+            _rbd_res = _rbd_w + _rbd_l
+            _rbd_wr_str = f" · **{_rbd_w / max(_rbd_res, 1) * 100:.0f}% win rate**" if _rbd_res > 0 else ""
+            st.markdown(
+                f"**{len(_rbd_picks)} picks** for {_rbd_selected}{_rbd_wr_str}  \n"
+                f"✅ {_rbd_w} WIN · ❌ {_rbd_l} LOSS · 🔄 {_rbd_push} PUSH · ⏳ {_rbd_pend} Pending"
+            )
+
+            # Quick picks table
+            _rbd_rows = []
+            for _p in _rbd_picks:
+                _res = _p.get("result") or "⏳ Pending"
+                _res_icon = {"WIN": "✅ WIN", "LOSS": "❌ LOSS", "PUSH": "🔄 PUSH"}.get(_res, "⏳ Pending")
+                _actual = _p.get("actual_value")
+                _actual_str = f"{_actual:.1f}" if _actual is not None else "—"
+                _rbd_rows.append({
+                    "Player": _p.get("player_name", "—"),
+                    "Stat": _p.get("stat_type", "—"),
+                    "Line": _p.get("prop_line", "—"),
+                    "Dir": _p.get("direction", "—"),
+                    "Actual": _actual_str,
+                    "Result": _res_icon,
+                    "Tier": _p.get("tier", "—"),
+                })
+            st.dataframe(
+                _rbd_rows,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Player": st.column_config.TextColumn("Player", width="medium"),
+                    "Stat":   st.column_config.TextColumn("Stat",   width="small"),
+                    "Line":   st.column_config.NumberColumn("Line",  format="%.1f"),
+                    "Dir":    st.column_config.TextColumn("Dir",    width="small"),
+                    "Actual": st.column_config.TextColumn("Actual", width="small"),
+                    "Result": st.column_config.TextColumn("Result", width="small"),
+                    "Tier":   st.column_config.TextColumn("Tier",   width="small"),
+                },
+            )
+
+            # Resolve / Re-check button for this date
+            _rbd_resolve_btn = st.button(
+                f"🔄 Resolve / Re-check {_rbd_selected}",
+                key="rbd_resolve_btn",
+                type="primary",
+                help=f"Fetch actual NBA stats for {_rbd_selected} and update WIN/LOSS/PUSH for all picks on that night.",
+            )
+
+            if _rbd_resolve_btn:
+                with st.spinner(f"Fetching NBA stats and resolving picks for {_rbd_selected}…"):
+                    try:
+                        # Resolve all_analysis_picks for this date (re-checks even resolved rows)
+                        _rbd_picks_res  = resolve_all_analysis_picks(date_str=_rbd_selected)
+                        # Also resolve the bets table for this date
+                        _rbd_bets_cnt, _rbd_bets_errs = auto_resolve_bet_results(date_str=_rbd_selected)
+
+                        _rbd_total = _rbd_picks_res.get("resolved", 0) + _rbd_bets_cnt
+                        _rbd_wins  = _rbd_picks_res.get("wins", 0)
+                        _rbd_loss  = _rbd_picks_res.get("losses", 0)
+                        _rbd_psh   = _rbd_picks_res.get("pushes", 0)
+                        _rbd_errs  = _rbd_picks_res.get("errors", []) + _rbd_bets_errs
+                        _rbd_errs  = list(dict.fromkeys(_rbd_errs))
+
+                        if _rbd_total > 0:
+                            st.success(
+                                f"✅ Resolved **{_rbd_total}** pick(s) for {_rbd_selected}: "
+                                f"✅ {_rbd_wins} WIN · ❌ {_rbd_loss} LOSS · 🔄 {_rbd_psh} PUSH"
+                            )
+                            st.rerun()
+                        else:
+                            st.warning(
+                                f"⚠️ No picks were resolved for {_rbd_selected}. "
+                                "The game log may not yet be available, or no matching players were found."
+                            )
+                        if _rbd_errs:
+                            with st.expander(f"⚠️ {len(_rbd_errs)} error(s)"):
+                                for _e in _rbd_errs:
+                                    st.caption(_e)
+                    except Exception as _rbd_exc:
+                        st.error(f"❌ Resolution failed: {_rbd_exc}")
+
+    st.divider()
+
     # ── Session-state picks (most recent run) ─────────────────────────
     session_picks = st.session_state.get("analysis_results", [])
     # ── Historical picks from DB (persistent) ────────────────────────
@@ -558,6 +747,18 @@ with tab_all_picks:
     else:
         all_picks_data = db_all_picks
         _date_field = "pick_date"
+
+    # ── Tier Filter ───────────────────────────────────────────────────
+    _ap_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="ap_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    if _ap_tier_filter:
+        _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
+        all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
 
     if not all_picks_data:
         st.info(

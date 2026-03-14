@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: pages/10_🔮_Player_Simulator.py
-# PURPOSE: Player Simulator — run Monte Carlo simulations for
+# PURPOSE: Player Simulator — run Quantum Matrix Engine 5.6 simulations for
 #          selected players to project their full stat line and
 #          surface "dark horse" upside picks for tonight's slate.
 # CONNECTS TO: engine/ (simulation, projections), data_manager.py
@@ -352,7 +352,7 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
         f'<tbody>{rec_rows}</tbody>'
         f'</table></div>'
         f'<div style="margin-top:10px;font-size:0.75rem;color:#8a9bb8;">'
-        f'ℹ️ Methodology: projections based on Monte Carlo simulation using '
+        f'ℹ️ Methodology: projections based on Quantum Matrix Engine 5.6 simulation using '
         f'matchup-adjusted season averages, pace, rest, and home/away factors. '
         f'Prop line ≈ season average rounded to nearest 0.5.</div>'
         f'</div>'
@@ -474,7 +474,7 @@ if run_sim and selected_names:
     _mode_label = " (Scenario)" if _scenario_mode else (" (Compare)" if _compare_mode else "")
     st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
 
-    with st.spinner("🔮 Running Monte Carlo simulations…"):
+    with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
         _all_sim_results = []
         for pname in selected_names:
             pdata = next((p for p in tonight_players if p.get("name") == pname), None)

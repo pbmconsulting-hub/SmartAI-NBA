@@ -7,7 +7,7 @@
 #          multipliers miss: star players sitting in blowouts,
 #          faster/slower pace depending on lead size, etc.
 #
-#          Result is blended with flat Monte Carlo results (70%
+#          Result is blended with flat Quantum Matrix results (70%
 #          flat, 30% game-script) since game-script adds signal
 #          but is noisier than the proven flat simulation.
 #
@@ -27,10 +27,10 @@ import random
 # ============================================================
 
 # Default number of simulations for game script engine
-DEFAULT_GAME_SCRIPT_SIMULATIONS = 500   # Fewer than full Monte Carlo (noisier)
+DEFAULT_GAME_SCRIPT_SIMULATIONS = 500   # Fewer than full Quantum Matrix Engine 5.6 (noisier)
 
 # Blend weight for game-script vs flat simulation results
-GAME_SCRIPT_BLEND_WEIGHT = 0.30   # 30% game-script + 70% flat Monte Carlo
+GAME_SCRIPT_BLEND_WEIGHT = 0.30   # 30% game-script + 70% flat Quantum Matrix
 
 # Score differential thresholds for player management (positive = winning)
 BLOWOUT_DIFFERENTIAL_MILD = 12     # 12+ point lead: minor reduction
@@ -235,7 +235,7 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
 
 def blend_with_flat_simulation(game_script_results, flat_simulation_results, blend_weight=0.30):
     """
-    Blend game-script simulation results with flat Monte Carlo results.
+    Blend game-script simulation results with flat Quantum Matrix results.
 
     Uses blend_weight for game-script and (1-blend_weight) for flat simulation.
     The mean and std are blended; the combined result is what gets used
@@ -243,7 +243,7 @@ def blend_with_flat_simulation(game_script_results, flat_simulation_results, ble
 
     Args:
         game_script_results (dict): Output from simulate_game_script.
-        flat_simulation_results (dict): Standard Monte Carlo output (from simulation.py).
+        flat_simulation_results (dict): Standard Quantum Matrix Engine 5.6 output (from simulation.py).
             Expected keys: 'mean' (or 'average'), 'std' (or 'standard_deviation').
         blend_weight (float): Weight for game-script component. Default 0.30.
 

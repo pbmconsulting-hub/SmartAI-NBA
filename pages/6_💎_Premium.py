@@ -267,7 +267,7 @@ st.markdown("""
   <p class="hero-title">SmartBetPro Premium</p>
   <p class="hero-subtitle">
     Unlock the full power of our NBA AI — unlimited prop analysis,
-    advanced Monte Carlo simulations, parlay construction, risk
+    advanced Quantum Matrix Engine 5.6 simulations, parlay construction, risk
     management, and complete performance tracking.
   </p>
   <span class="hero-badge">🏀 NBA Season 2025-26</span>
@@ -374,7 +374,7 @@ with col_pricing:
     <li>Full Entry Builder (parlays + EV)</li>
     <li>Risk Shield — avoid traps</li>
     <li>AI Game Reports</li>
-    <li>Player Monte Carlo Simulator</li>
+    <li>Player Quantum Matrix Simulator</li>
     <li>Bet Tracker &amp; model health</li>
     <li>Priority feature access</li>
     <li>Powered by Stripe — secure</li>
@@ -492,7 +492,7 @@ with col_compare:
       <td><span class="check-yes">✓</span></td>
     </tr>
     <tr>
-      <td>⚡ Neural Analysis — Monte Carlo</td>
+      <td>⚡ Neural Analysis — Quantum Matrix Engine 5.6</td>
       <td><span class="check-limit">Up to 3 props</span></td>
       <td><span class="check-yes">✓ Unlimited</span></td>
     </tr>
