@@ -56,6 +56,16 @@ except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
 
+# Import the rate limiter for polite API access with circuit breaker
+try:
+    from utils.rate_limiter import RateLimiter as _RateLimiter
+    # Feature 10: 20 req/min, 200/hour — matches existing live_data_fetcher limits
+    _platform_rate_limiter = _RateLimiter(max_requests_per_minute=20, max_requests_per_hour=200)
+    _RATE_LIMITER_AVAILABLE = True
+except ImportError:
+    _RATE_LIMITER_AVAILABLE = False
+    _platform_rate_limiter = None
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -483,7 +493,11 @@ def fetch_draftkings_props(api_key=None):
     except requests.exceptions.HTTPError as err:
         # HTTPError is raised by raise_for_status() — events_resp is guaranteed to exist
         status_code = events_resp.status_code
-        if status_code == 401:
+        if status_code == 429:
+            _logger.warning("[DraftKings] Rate limited (429). Backing off.")
+            if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
+                _platform_rate_limiter.handle_429_response(retry_after=60)
+        elif status_code == 401:
             _logger.warning("[DraftKings] Invalid API key. Check your Odds API key on the Settings page.")
         elif status_code == 422:
             _logger.warning("[DraftKings] API quota exceeded for the month.")
@@ -541,8 +555,11 @@ def fetch_draftkings_props(api_key=None):
         if not event_id:
             continue
 
-        # Add a short delay between event requests to stay polite
-        time.sleep(0.5)
+        # Add a short delay / rate limiting between event requests
+        if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
+            _platform_rate_limiter.acquire()
+        else:
+            time.sleep(0.5)
 
         props_url = (
             f"{ODDS_API_BASE_URL}/sports/basketball_nba/events/{event_id}/odds"
@@ -688,9 +705,12 @@ def fetch_all_platform_props(
         except Exception as err:
             _logger.error(f"[Master] PrizePicks fetch failed: {err}")
 
-        # Be polite to APIs — wait before the next call
+        # Be polite to APIs — rate limit before the next call
         if include_underdog or include_draftkings:
-            time.sleep(API_DELAY_SECONDS)
+            if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
+                _platform_rate_limiter.acquire()
+            else:
+                time.sleep(API_DELAY_SECONDS)
 
     # ── Underdog Fantasy ───────────────────────────────────────
     if include_underdog:
@@ -706,7 +726,10 @@ def fetch_all_platform_props(
 
         # Rate limiting delay
         if include_draftkings:
-            time.sleep(API_DELAY_SECONDS)
+            if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
+                _platform_rate_limiter.acquire()
+            else:
+                time.sleep(API_DELAY_SECONDS)
 
     # ── DraftKings (via The Odds API) ──────────────────────────
     if include_draftkings:

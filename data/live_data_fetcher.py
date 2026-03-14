@@ -34,6 +34,17 @@ try:
 except ImportError:
     _GAME_LOG_CACHE_AVAILABLE = False
 
+# Feature 12: SQLite game log persistence (write-through alongside JSON cache)
+try:
+    from tracking.database import (
+        save_player_game_logs_to_db,
+        load_player_game_logs_from_db,
+        is_game_log_cache_stale,
+    )
+    _DB_GAME_LOG_AVAILABLE = True
+except ImportError:
+    _DB_GAME_LOG_AVAILABLE = False
+
 try:
     from utils.rate_limiter import RateLimiter
     _rate_limiter = RateLimiter(max_requests_per_minute=15, max_requests_per_hour=150)
@@ -267,6 +278,33 @@ def save_last_updated(data_type):
     except Exception as error:
         # If we can't save, just print a warning — it's not critical
         _logger.warning(f"Warning: Could not save timestamp: {error}")
+
+
+def _invalidate_data_caches():
+    """
+    Bust all st.cache_data caches for CSV loaders in data_manager.py.
+
+    Called after writing fresh data to disk so the next Streamlit read
+    picks up the new file content instead of a stale in-memory copy.
+    Imported lazily to avoid circular imports (live_data_fetcher is
+    loaded early in the Python import chain).
+
+    BEGINNER NOTE: Streamlit's @st.cache_data caches function results
+    in memory.  We must call .clear() after writing new CSV data
+    so the cache doesn't serve the old data.
+    """
+    try:
+        from data.data_manager import (  # noqa: PLC0415 (lazy import intentional)
+            load_players_data,
+            load_teams_data,
+            load_defensive_ratings_data,
+        )
+        load_players_data.clear()
+        load_teams_data.clear()
+        load_defensive_ratings_data.clear()
+        _logger.debug("Streamlit data caches cleared after CSV update.")
+    except Exception:
+        pass  # Cache clearing is best-effort — never block a data fetch
 
 
 def load_last_updated():
@@ -1080,6 +1118,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players (today's teams only)!")
 
         _logger.info(f"Saved {len(formatted_players)} players for today's games to {PLAYERS_CSV_PATH}")
+        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
         return True
 
     except Exception as error:
@@ -1385,9 +1424,19 @@ def fetch_player_stats(progress_callback=None):
                         if _RATE_LIMITER_AVAILABLE and _rate_limiter:
                             _rate_limiter.record_request()
 
-                        # Cache the result for future calls
+                        # Cache the result for future calls (JSON + SQLite write-through)
                         if _GAME_LOG_CACHE_AVAILABLE and game_log_data:
                             save_game_logs_to_cache(player_name, game_log_data)
+                        # Feature 12: also persist to SQLite DB for cross-session durability
+                        if _DB_GAME_LOG_AVAILABLE and game_log_data:
+                            try:
+                                save_player_game_logs_to_db(
+                                    player_id=player_id,
+                                    player_name=player_name,
+                                    game_logs=game_log_data,
+                                )
+                            except Exception:
+                                pass  # SQLite write failure is non-fatal
 
                         # Take only the last 20 games for recency
                         recent_games = game_log_data[:20]
@@ -1563,6 +1612,7 @@ def fetch_player_stats(progress_callback=None):
             progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players!")
 
         _logger.info(f"Successfully saved {len(formatted_players)} players to {PLAYERS_CSV_PATH}")
+        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
         return True  # Signal success
 
     except Exception as error:
@@ -1836,6 +1886,7 @@ def fetch_team_stats(progress_callback=None):
             progress_callback(6, 6, f"✅ Saved {len(formatted_teams)} teams and defensive ratings!")
 
         _logger.info(f"Successfully saved {len(formatted_teams)} teams and defensive ratings.")
+        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
         return True  # Signal success
 
     except Exception as error:
@@ -1844,6 +1895,115 @@ def fetch_team_stats(progress_callback=None):
 
 # ============================================================
 # END SECTION: Team Stats Fetcher
+# ============================================================
+
+
+# ============================================================
+# SECTION: Defensive Ratings Auto-Update (Feature 11)
+# A standalone wrapper so callers can refresh just defensive
+# ratings without re-fetching all team stats from scratch.
+# BEGINNER NOTE: defensive_ratings.csv is built as a byproduct
+# of fetch_team_stats(). This function checks staleness first
+# and only re-fetches when the file is more than 7 days old.
+# ============================================================
+
+def fetch_defensive_ratings(force=False, progress_callback=None):
+    """
+    Refresh defensive_ratings.csv from the NBA API.
+
+    Checks whether the existing file is stale (> 7 days old).
+    If stale (or force=True), runs fetch_team_stats() which rebuilds
+    both teams.csv and defensive_ratings.csv in one pass.
+
+    Args:
+        force (bool): If True, always refresh even if data is fresh.
+            Defaults to False (only refresh if stale).
+        progress_callback: Optional function(step, total, msg) for UI.
+
+    Returns:
+        dict: {
+            'refreshed': bool — True if a fetch was performed,
+            'reason': str   — why refreshed/skipped,
+            'teams_path': str,
+            'defensive_path': str,
+        }
+    """
+    _STALE_DAYS = 7  # Refresh if data is older than this many days
+
+    timestamps = load_last_updated()
+    teams_ts_str = timestamps.get("teams")
+
+    if not force and teams_ts_str:
+        try:
+            import datetime as _dt
+            teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
+            age_days = (_dt.datetime.now() - teams_ts).total_seconds() / 86400.0
+            if age_days < _STALE_DAYS:
+                _logger.info(
+                    f"[DefensiveRatings] Data is fresh ({age_days:.1f}d old, "
+                    f"threshold {_STALE_DAYS}d). Skipping fetch."
+                )
+                return {
+                    "refreshed": False,
+                    "reason": f"Data is fresh ({age_days:.1f} days old)",
+                    "teams_path": str(TEAMS_CSV_PATH),
+                    "defensive_path": str(DEFENSIVE_RATINGS_CSV_PATH),
+                }
+        except Exception:
+            pass  # If timestamp parse fails, refresh anyway
+
+    _logger.info("[DefensiveRatings] Data stale or force-refresh. Running fetch_team_stats()...")
+    ok = fetch_team_stats(progress_callback=progress_callback)
+
+    return {
+        "refreshed": ok,
+        "reason": "Fetched from NBA API" if ok else "Fetch failed — see logs",
+        "teams_path": str(TEAMS_CSV_PATH),
+        "defensive_path": str(DEFENSIVE_RATINGS_CSV_PATH),
+    }
+
+
+def get_teams_staleness_warning():
+    """
+    Return a warning string if teams.csv/defensive_ratings.csv are stale.
+
+    Used by app.py and the Analysis page to show a prominent banner
+    when the team data is old.
+
+    Returns:
+        str or None: Warning message, or None if data is fresh enough.
+    """
+    _WARN_DAYS  = 7   # Yellow warning after 7 days
+    _STALE_DAYS = 14  # Red warning after 14 days
+
+    timestamps = load_last_updated()
+    teams_ts_str = timestamps.get("teams")
+
+    if not teams_ts_str:
+        return "⚠️ teams.csv has never been updated — run Data Feed → Fetch Team Stats."
+
+    try:
+        import datetime as _dt
+        teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
+        age_days = (_dt.datetime.now() - teams_ts).total_seconds() / 86400.0
+        if age_days >= _STALE_DAYS:
+            return (
+                f"🔴 Team data is **{age_days:.0f} days old** — seriously stale! "
+                "Go to 📡 Data Feed → Fetch Team Stats to refresh defensive ratings."
+            )
+        if age_days >= _WARN_DAYS:
+            return (
+                f"🟡 Team data is **{age_days:.0f} days old**. "
+                "Consider refreshing via 📡 Data Feed → Fetch Team Stats."
+            )
+    except Exception:
+        return "⚠️ Could not determine team data age — check last_updated.json."
+
+    return None  # Fresh enough — no warning
+
+
+# ============================================================
+# END SECTION: Defensive Ratings Auto-Update
 # ============================================================
 
 

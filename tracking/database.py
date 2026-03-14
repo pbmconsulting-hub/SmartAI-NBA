@@ -202,6 +202,34 @@ CREATE TABLE IF NOT EXISTS backtest_results (
 );
 """
 
+# SQL to create the player_game_logs cache table.
+# Feature 12: Game Log Persistence Across Sessions.
+# Stores per-player game log rows fetched from nba_api so browser
+# refreshes and session resets don't lose expensive API data.
+# Cache invalidation: re-fetch if most recent game is > 24 hours old.
+CREATE_PLAYER_GAME_LOGS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS player_game_logs (
+    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id TEXT NOT NULL,
+    player_name TEXT NOT NULL,
+    game_date TEXT NOT NULL,
+    opponent TEXT,
+    minutes REAL,
+    points INTEGER,
+    rebounds INTEGER,
+    assists INTEGER,
+    threes INTEGER,
+    steals INTEGER,
+    blocks INTEGER,
+    turnovers INTEGER,
+    fg_pct REAL,
+    ft_pct REAL,
+    plus_minus INTEGER,
+    fetched_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(player_id, game_date)
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -245,6 +273,7 @@ def initialize_database():
             cursor.execute(CREATE_SUBSCRIPTIONS_TABLE_SQL)        # Stripe subscription records
             cursor.execute(CREATE_ANALYSIS_SESSIONS_TABLE_SQL)    # analysis session persistence
             cursor.execute(CREATE_BACKTEST_RESULTS_TABLE_SQL)     # historical backtesting results
+            cursor.execute(CREATE_PLAYER_GAME_LOGS_TABLE_SQL)     # Feature 12: game log persistence
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -1458,6 +1487,163 @@ def load_backtest_results(limit=20):
 
 # ============================================================
 # END SECTION: Backtest Results Persistence
+# ============================================================
+
+
+# ============================================================
+# SECTION: Player Game Logs Persistence (Feature 12)
+# Store and retrieve player game logs from SQLite so the KDE
+# simulation engine has reliable data across browser refreshes.
+# ============================================================
+
+def save_player_game_logs_to_db(player_id, player_name, game_logs):
+    """
+    Persist a list of player game log rows to the player_game_logs table.
+
+    Uses INSERT OR REPLACE so re-running the fetch doesn't create
+    duplicate rows (the UNIQUE constraint on player_id + game_date
+    handles deduplication).
+
+    Args:
+        player_id (str): NBA API player ID
+        player_name (str): Player display name
+        game_logs (list[dict]): List of game log dicts with keys:
+            game_date, opponent, minutes, points, rebounds, assists,
+            threes, steals, blocks, turnovers, fg_pct, ft_pct, plus_minus
+
+    Returns:
+        int: Number of rows inserted/replaced.
+    """
+    if not game_logs:
+        return 0
+
+    import datetime as _dt
+    fetched_at = _dt.datetime.now().isoformat()
+    inserted = 0
+
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            for g in game_logs:
+                conn.execute(
+                    """
+                    INSERT OR REPLACE INTO player_game_logs
+                        (player_id, player_name, game_date, opponent,
+                         minutes, points, rebounds, assists, threes,
+                         steals, blocks, turnovers, fg_pct, ft_pct,
+                         plus_minus, fetched_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(player_id),
+                        str(player_name),
+                        str(g.get("game_date", g.get("GAME_DATE", ""))),
+                        str(g.get("opponent",  g.get("MATCHUP", ""))),
+                        _safe_float(g.get("minutes", g.get("MIN", g.get("min")))),
+                        _safe_int(g.get("points",    g.get("PTS", g.get("pts")))),
+                        _safe_int(g.get("rebounds",  g.get("REB", g.get("reb")))),
+                        _safe_int(g.get("assists",   g.get("AST", g.get("ast")))),
+                        _safe_int(g.get("threes",    g.get("FG3M", g.get("fg3m")))),
+                        _safe_int(g.get("steals",    g.get("STL", g.get("stl")))),
+                        _safe_int(g.get("blocks",    g.get("BLK", g.get("blk")))),
+                        _safe_int(g.get("turnovers", g.get("TOV", g.get("tov")))),
+                        _safe_float(g.get("fg_pct",  g.get("FG_PCT", g.get("fg_pct")))),
+                        _safe_float(g.get("ft_pct",  g.get("FT_PCT", g.get("ft_pct")))),
+                        _safe_int(g.get("plus_minus", g.get("PLUS_MINUS", g.get("plus_minus")))),
+                        fetched_at,
+                    ),
+                )
+                inserted += 1
+            conn.commit()
+    except Exception as err:
+        _logger.warning(f"save_player_game_logs_to_db error (non-fatal): {err}")
+
+    return inserted
+
+
+def _safe_float(value, default=None):
+    """Safely convert a value to float, returning default on failure."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(value, default=None):
+    """Safely convert a value to int, returning default on failure."""
+    if value is None:
+        return default
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def load_player_game_logs_from_db(player_id, days=60):
+    """
+    Load cached game logs for a player from SQLite.
+
+    Args:
+        player_id (str): NBA API player ID.
+        days (int): How many days of history to return. Defaults to 60.
+
+    Returns:
+        list[dict]: Game log rows ordered most-recent-first.
+            Returns empty list if no data or on error.
+    """
+    import datetime as _dt
+    cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    rows = []
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """
+                SELECT * FROM player_game_logs
+                WHERE player_id = ? AND game_date >= ?
+                ORDER BY game_date DESC
+                """,
+                (str(player_id), cutoff),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+    except Exception as err:
+        _logger.warning(f"load_player_game_logs_from_db error (non-fatal): {err}")
+    return rows
+
+
+def is_game_log_cache_stale(player_id, max_age_hours=24):
+    """
+    Check whether the cached game logs for a player are stale.
+
+    Args:
+        player_id (str): NBA API player ID.
+        max_age_hours (int): Age threshold in hours. Defaults to 24.
+
+    Returns:
+        bool: True if cache is missing or older than max_age_hours.
+    """
+    import datetime as _dt
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            row = conn.execute(
+                "SELECT MAX(fetched_at) FROM player_game_logs WHERE player_id = ?",
+                (str(player_id),),
+            ).fetchone()
+            if not row or not row[0]:
+                return True
+            latest_ts = _dt.datetime.fromisoformat(str(row[0]))
+            age_hours = (_dt.datetime.now() - latest_ts).total_seconds() / 3600.0
+            return age_hours > max_age_hours
+    except Exception:
+        return True  # If we can't check, assume stale and re-fetch
+
+
+# ============================================================
+# END SECTION: Player Game Logs Persistence
 # ============================================================
 
 # ============================================================

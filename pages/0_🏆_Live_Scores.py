@@ -11,6 +11,13 @@ import time
 
 from styles.theme import get_global_css, get_qds_css
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # ============================================================
 # SECTION: Page Setup
 # ============================================================
@@ -90,7 +97,7 @@ def _fetch_live_scores():
             })
         return results
     except Exception as live_err:
-        print(f"Live scoreboard error: {live_err}")
+        _logger.warning(f"Live scoreboard error: {live_err}")
 
     # Fallback: ScoreboardV2
     try:
@@ -121,7 +128,7 @@ def _fetch_live_scores():
             })
         return results
     except Exception as v2_err:
-        print(f"ScoreboardV2 fallback error: {v2_err}")
+        _logger.warning(f"ScoreboardV2 fallback error: {v2_err}")
 
     return []
 

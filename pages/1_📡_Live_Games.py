@@ -12,6 +12,13 @@ import time
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
 from data.live_data_fetcher import fetch_todays_games, fetch_todays_players_only, fetch_all_todays_data
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # ============================================================
 # SECTION: Page Setup
 # ============================================================
@@ -307,7 +314,7 @@ if auto_load_clicked:
                     injury_map = _load_inj()
                     st.session_state["injury_status_map"] = injury_map
                 except Exception as _inj_load_err:
-                    print(f"Auto-load: could not load injury map: {_inj_load_err}")
+                    _logger.warning(f"Auto-load: could not load injury map: {_inj_load_err}")
 
             # ── Step 3: Auto-generate props for all 3 platforms ──────────
             # Do this *after* fetch_todays_players_only so the freshly-written
@@ -338,7 +345,7 @@ if auto_load_clicked:
                     else:
                         props_msg = "Props: ⚠️ none generated (check player data)"
                 except Exception as _prop_err:
-                    print(f"Auto-load: prop generation failed: {_prop_err}")
+                    _logger.warning(f"Auto-load: prop generation failed: {_prop_err}")
                     props_msg = "Props: ⚠️ generation failed"
 
             status_text.text("⏳ Finalizing…")
@@ -527,7 +534,7 @@ if platform_props_clicked:
         except Exception as _save_err:
             # Best-effort — don't abort analysis if save fails (e.g. closed WS)
             try:
-                print(f"Live Games: non-fatal save error: {_save_err}")
+                _logger.warning(f"Live Games: non-fatal save error: {_save_err}")
             except Exception:
                 pass
 
@@ -545,7 +552,7 @@ if platform_props_clicked:
             props_to_analyze = _enrich(props_to_analyze, players_data_for_analysis)
         except Exception as _enrich_err:
             try:
-                print(f"Live Games: enrichment step failed (non-fatal): {_enrich_err}")
+                _logger.warning(f"Live Games: enrichment step failed (non-fatal): {_enrich_err}")
             except Exception:
                 pass
 

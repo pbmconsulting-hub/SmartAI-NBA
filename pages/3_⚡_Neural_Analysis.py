@@ -13,6 +13,13 @@ import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 import time             # For elapsed-time measurement
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # Import our engine modules
 from engine.simulation import (
     run_monte_carlo_simulation,
@@ -25,6 +32,12 @@ from engine.simulation import (
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type
+
+try:
+    from engine.rotation_tracker import track_minutes_trend
+    _rotation_tracker_available = True
+except ImportError:
+    _rotation_tracker_available = False
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
@@ -710,6 +723,21 @@ def display_prop_analysis_card_qds(result):
                        else 1.0 - result.get("probability_over", 0.5)) * 100.0
         _true_edge_pct = _model_prob - _implied_prob
         _proj_val = result.get("adjusted_projection", 0)
+
+        # Minutes trend indicator (from Feature 6 rotation tracking)
+        _mt_indicator = result.get("minutes_trend_indicator", "")
+        _mt_info      = result.get("minutes_trend")
+        _mt_extra = ""
+        if _mt_info and _mt_info.get("games_analyzed", 0) > 0 and _mt_indicator in ("🔺", "🔻"):
+            _mt_recent = _mt_info.get("recent_avg_minutes", 0)
+            _mt_season = _mt_info.get("season_avg_minutes", 0)
+            _mt_dir    = "up" if _mt_indicator == "🔺" else "down"
+            _mt_extra  = (
+                f' &nbsp;|&nbsp; <span style="color:#{"69f0ae" if _mt_dir == "up" else "ff9966"};'
+                f'font-weight:600;">'
+                f'{_mt_indicator} Min Trend: {_mt_recent:.0f} vs {_mt_season:.0f} avg</span>'
+            )
+
         st.markdown(
             f'<div style="background:rgba(0,240,255,0.05);border:1px solid rgba(0,240,255,0.2);'
             f'border-radius:6px;padding:6px 12px;margin-bottom:6px;font-size:0.78rem;color:#a0c0d8;">'
@@ -720,6 +748,7 @@ def display_prop_analysis_card_qds(result):
             f'<span style="color:#00f0ff;font-weight:600;">Breakeven:</span> {_implied_prob:.1f}% &nbsp;|&nbsp; '
             f'<span style="color:#{"4caf50" if _true_edge_pct > 0 else "ff4444"};font-weight:600;">'
             f'True Edge: {_true_edge_pct:+.1f}%</span>'
+            + _mt_extra +
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -1176,6 +1205,18 @@ if run_analysis:
 
         recent_form_games  = prop.get("recent_form_results", [])
 
+        # ── Feature 6: Minutes Trend — compute using rotation_tracker ──
+        # If game logs contain minutes (MIN field), detect trend vs season avg.
+        _minutes_trend = None
+        _minutes_trend_indicator = "➡️"  # default: stable
+        if _rotation_tracker_available and recent_form_games:
+            try:
+                _minutes_trend = track_minutes_trend(recent_form_games, window=5)
+                _td = _minutes_trend.get("trend_direction", "stable")
+                _minutes_trend_indicator = "🔺" if _td == "up" else ("🔻" if _td == "down" else "➡️")
+            except Exception:
+                _minutes_trend = None
+
         # ── C4: Teammate-Out Usage Adjustment ────────────────────
         # Check if a high-usage teammate is OUT and boost this player's
         # projection accordingly (+8% primary option, +5% secondary, cap +15%).
@@ -1505,6 +1546,8 @@ if run_analysis:
             "trap_line_penalty":      round(trap_line_penalty, 1),
             "teammate_out_notes":     projection_result.get("teammate_out_notes", []),
             "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
+            "minutes_trend":           _minutes_trend,
+            "minutes_trend_indicator": _minutes_trend_indicator,
             "player_is_out":    False,
             "player_status":    player_status,
             "player_status_note": player_status_info.get("injury_note", ""),
@@ -1623,7 +1666,7 @@ if run_analysis:
                     st.success(f"✅ Smart Update matched {_rematched} additional player(s).")
         except Exception as _su_err:
             # Non-fatal — proceed with existing results
-            print(f"Smart Update error (non-fatal): {_su_err}")
+            _logger.warning(f"Smart Update error (non-fatal): {_su_err}")
 
     st.session_state["analysis_results"] = analysis_results_list
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
@@ -1650,9 +1693,9 @@ if run_analysis:
         from tracking.database import insert_analysis_picks as _insert_picks
         _stored = _insert_picks(analysis_results_list)
         if _stored > 0:
-            print(f"Stored {_stored} analysis picks to all_analysis_picks table.")
+            _logger.info(f"Stored {_stored} analysis picks to all_analysis_picks table.")
     except Exception as _store_err:
-        print(f"Store analysis picks error (non-fatal): {_store_err}")
+        _logger.warning(f"Store analysis picks error (non-fatal): {_store_err}")
 
     # ── Auto-log all qualifying picks to the Bet Tracker ────────
     try:
@@ -1664,7 +1707,7 @@ if run_analysis:
             )
     except Exception as _auto_log_err:
         # Auto-logging is best-effort — never block the main analysis flow
-        print(f"Auto-log error (non-fatal): {_auto_log_err}")
+        _logger.warning(f"Auto-log error (non-fatal): {_auto_log_err}")
 
     st.rerun()
 
