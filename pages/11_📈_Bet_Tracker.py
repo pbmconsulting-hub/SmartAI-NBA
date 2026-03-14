@@ -36,6 +36,8 @@ from tracking.database import (
     get_rolling_stats,
     save_daily_snapshot,
     load_all_analysis_picks,
+    load_analysis_picks_for_date,
+    get_analysis_pick_dates,
 )
 from styles.theme import (
     get_global_css,
@@ -611,6 +613,119 @@ with tab_all_picks:
                             st.caption(_e)
             except Exception as _rap_exc:
                 st.error(f"❌ Resolution failed: {_rap_exc}")
+
+    st.divider()
+
+    # ── 🗓️ Resolve / Re-check by Date ────────────────────────────────
+    st.markdown("### 🗓️ Resolve / Re-check Picks by Date")
+    st.caption(
+        "Select a past night to view its picks and re-verify results against "
+        "actual NBA stats — useful when bets weren't resolved automatically."
+    )
+
+    _rbd_available_dates = get_analysis_pick_dates(days=30)
+
+    if not _rbd_available_dates:
+        st.info("ℹ️ No pick history found in the last 30 days. Run Neural Analysis to log picks.")
+    else:
+        _rbd_date_options = _rbd_available_dates  # already sorted newest-first
+        _rbd_selected = st.selectbox(
+            "📅 Select date",
+            options=_rbd_date_options,
+            index=0,
+            key="rbd_date_selectbox",
+            help="Choose a past night to inspect and resolve.",
+        )
+
+        # Load all picks for the selected date (pending AND already resolved)
+        _rbd_picks = load_analysis_picks_for_date(_rbd_selected)
+
+        if not _rbd_picks:
+            st.info(f"No picks logged for {_rbd_selected}.")
+        else:
+            # Summary line
+            _rbd_w = sum(1 for p in _rbd_picks if p.get("result") == "WIN")
+            _rbd_l = sum(1 for p in _rbd_picks if p.get("result") == "LOSS")
+            _rbd_push = sum(1 for p in _rbd_picks if p.get("result") == "PUSH")
+            _rbd_pend = sum(1 for p in _rbd_picks if not p.get("result"))
+            _rbd_res = _rbd_w + _rbd_l
+            _rbd_wr_str = f" · **{_rbd_w / max(_rbd_res, 1) * 100:.0f}% win rate**" if _rbd_res > 0 else ""
+            st.markdown(
+                f"**{len(_rbd_picks)} picks** for {_rbd_selected}{_rbd_wr_str}  \n"
+                f"✅ {_rbd_w} WIN · ❌ {_rbd_l} LOSS · 🔄 {_rbd_push} PUSH · ⏳ {_rbd_pend} Pending"
+            )
+
+            # Quick picks table
+            _rbd_rows = []
+            for _p in _rbd_picks:
+                _res = _p.get("result") or "⏳ Pending"
+                _res_icon = {"WIN": "✅ WIN", "LOSS": "❌ LOSS", "PUSH": "🔄 PUSH"}.get(_res, "⏳ Pending")
+                _actual = _p.get("actual_value")
+                _actual_str = f"{_actual:.1f}" if _actual is not None else "—"
+                _rbd_rows.append({
+                    "Player": _p.get("player_name", "—"),
+                    "Stat": _p.get("stat_type", "—"),
+                    "Line": _p.get("prop_line", "—"),
+                    "Dir": _p.get("direction", "—"),
+                    "Actual": _actual_str,
+                    "Result": _res_icon,
+                    "Tier": _p.get("tier", "—"),
+                })
+            st.dataframe(
+                _rbd_rows,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Player": st.column_config.TextColumn("Player", width="medium"),
+                    "Stat":   st.column_config.TextColumn("Stat",   width="small"),
+                    "Line":   st.column_config.NumberColumn("Line",  format="%.1f"),
+                    "Dir":    st.column_config.TextColumn("Dir",    width="small"),
+                    "Actual": st.column_config.TextColumn("Actual", width="small"),
+                    "Result": st.column_config.TextColumn("Result", width="small"),
+                    "Tier":   st.column_config.TextColumn("Tier",   width="small"),
+                },
+            )
+
+            # Resolve / Re-check button for this date
+            _rbd_resolve_btn = st.button(
+                f"🔄 Resolve / Re-check {_rbd_selected}",
+                key="rbd_resolve_btn",
+                type="primary",
+                help=f"Fetch actual NBA stats for {_rbd_selected} and update WIN/LOSS/PUSH for all picks on that night.",
+            )
+
+            if _rbd_resolve_btn:
+                with st.spinner(f"Fetching NBA stats and resolving picks for {_rbd_selected}…"):
+                    try:
+                        # Resolve all_analysis_picks for this date (re-checks even resolved rows)
+                        _rbd_picks_res  = resolve_all_analysis_picks(date_str=_rbd_selected)
+                        # Also resolve the bets table for this date
+                        _rbd_bets_cnt, _rbd_bets_errs = auto_resolve_bet_results(date_str=_rbd_selected)
+
+                        _rbd_total = _rbd_picks_res.get("resolved", 0) + _rbd_bets_cnt
+                        _rbd_wins  = _rbd_picks_res.get("wins", 0)
+                        _rbd_loss  = _rbd_picks_res.get("losses", 0)
+                        _rbd_psh   = _rbd_picks_res.get("pushes", 0)
+                        _rbd_errs  = _rbd_picks_res.get("errors", []) + _rbd_bets_errs
+                        _rbd_errs  = list(dict.fromkeys(_rbd_errs))
+
+                        if _rbd_total > 0:
+                            st.success(
+                                f"✅ Resolved **{_rbd_total}** pick(s) for {_rbd_selected}: "
+                                f"✅ {_rbd_wins} WIN · ❌ {_rbd_loss} LOSS · 🔄 {_rbd_psh} PUSH"
+                            )
+                            st.rerun()
+                        else:
+                            st.warning(
+                                f"⚠️ No picks were resolved for {_rbd_selected}. "
+                                "The game log may not yet be available, or no matching players were found."
+                            )
+                        if _rbd_errs:
+                            with st.expander(f"⚠️ {len(_rbd_errs)} error(s)"):
+                                for _e in _rbd_errs:
+                                    st.caption(_e)
+                    except Exception as _rbd_exc:
+                        st.error(f"❌ Resolution failed: {_rbd_exc}")
 
     st.divider()
 

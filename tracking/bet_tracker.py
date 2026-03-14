@@ -1167,9 +1167,9 @@ def resolve_all_pending_bets():
     return summary
 
 
-def resolve_all_analysis_picks():
+def resolve_all_analysis_picks(date_str=None):
     """
-    Resolve ALL pending rows in the ``all_analysis_picks`` table.
+    Resolve pending rows in the ``all_analysis_picks`` table.
 
     This is the counterpart to ``resolve_all_pending_bets()`` for the
     **All Picks** tab, which displays data from ``all_analysis_picks``
@@ -1183,6 +1183,13 @@ def resolve_all_analysis_picks():
       - Computes WIN / LOSS / PUSH using prop_line + direction
       - Writes result & actual_value back via
         ``update_analysis_pick_result()``
+
+    Args:
+        date_str (str | None): When provided (ISO "YYYY-MM-DD"), only picks
+            for that specific date are processed — even if they were already
+            resolved (allows re-checking a past night's results).
+            When ``None`` (default), all pending picks across all dates are
+            resolved.
 
     Returns:
         dict: {
@@ -1259,9 +1266,16 @@ def resolve_all_analysis_picks():
             pass
         return None
 
-    # ── Load all pending picks from all_analysis_picks ─────────────────
+    # ── Load picks from all_analysis_picks ────────────────────────────
+    # When a specific date is requested we load ALL picks for that date
+    # (including already-resolved ones) so the user can re-verify them.
+    # When no date is given we only load pending picks to avoid redundant work.
     try:
-        pending_picks = load_pending_analysis_picks(limit=2000)
+        if date_str:
+            from tracking.database import load_analysis_picks_for_date
+            pending_picks = load_analysis_picks_for_date(date_str)
+        else:
+            pending_picks = load_pending_analysis_picks(limit=2000)
     except Exception as exc:
         summary["errors"].append(f"Failed to load pending picks: {exc}")
         return summary
@@ -1279,19 +1293,21 @@ def resolve_all_analysis_picks():
     # Player game log cache: (player_id, season_str) → DataFrame
     _log_cache: dict = {}
 
-    for date_str, picks in sorted(by_date.items()):
-        if not date_str:
+    for _loop_date, picks in sorted(by_date.items()):
+        if not _loop_date:
             summary["pending"] += len(picks)
             continue
 
         try:
-            target_date = _dt.datetime.strptime(date_str, "%Y-%m-%d").date()
+            target_date = _dt.datetime.strptime(_loop_date, "%Y-%m-%d").date()
         except ValueError:
             summary["pending"] += len(picks)
             continue
 
-        # Skip today — games may not be final yet
-        if target_date >= _dt.date.today():
+        # When no specific date was requested, skip today — games may not
+        # be final yet.  When the user explicitly asks for a date (even
+        # today) we trust them and proceed.
+        if date_str is None and target_date >= _dt.date.today():
             summary["pending"] += len(picks)
             continue
 
@@ -1420,7 +1436,7 @@ def resolve_all_analysis_picks():
                 summary["pending"] += 1
 
         if date_resolved > 0:
-            summary["by_date"][date_str] = date_resolved
+            summary["by_date"][_loop_date] = date_resolved
 
     return summary
 

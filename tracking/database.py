@@ -1135,6 +1135,59 @@ def load_pending_analysis_picks(limit=2000):
         _logger.warning(f"load_pending_analysis_picks error (non-fatal): {err}")
     return rows
 
+
+def load_analysis_picks_for_date(date_str):
+    """
+    Load ALL picks (resolved and pending) from all_analysis_picks for a
+    specific date so users can review and re-resolve a past night's picks.
+
+    Args:
+        date_str (str): ISO date string "YYYY-MM-DD".
+
+    Returns:
+        list[dict]: Pick rows for that date ordered by confidence_score DESC.
+    """
+    rows = []
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                "SELECT * FROM all_analysis_picks WHERE pick_date = ? ORDER BY confidence_score DESC",
+                (date_str,),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+    except Exception as err:
+        _logger.warning(f"load_analysis_picks_for_date error (non-fatal): {err}")
+    return rows
+
+
+def get_analysis_pick_dates(days=30):
+    """
+    Return a sorted list (newest first) of distinct pick_date values in the
+    all_analysis_picks table within the last *days* days.
+
+    Args:
+        days (int): How many days of history to scan. Defaults to 30.
+
+    Returns:
+        list[str]: ISO date strings, e.g. ["2026-03-13", "2026-03-12", ...].
+    """
+    import datetime as _dt
+    cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    dates = []
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            rows = conn.execute(
+                "SELECT DISTINCT pick_date FROM all_analysis_picks WHERE pick_date >= ? ORDER BY pick_date DESC",
+                (cutoff,),
+            ).fetchall()
+            dates = [r[0] for r in rows]
+    except Exception as err:
+        _logger.warning(f"get_analysis_pick_dates error (non-fatal): {err}")
+    return dates
+
 # ============================================================
 # END SECTION: All Analysis Picks
 # ============================================================
