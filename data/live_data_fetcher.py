@@ -294,7 +294,7 @@ def _invalidate_data_caches():
     so the cache doesn't serve the old data.
     """
     try:
-        from data.data_manager import (  # noqa: PLC0415 (lazy import intentional)
+        from data.data_manager import (  # noqa: C0415 (lazy import intentional)
             load_players_data,
             load_teams_data,
             load_defensive_ratings_data,

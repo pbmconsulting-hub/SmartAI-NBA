@@ -303,7 +303,7 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already exists — safe to ignore
 
-            # ── Goblin / Demon bet_type column migrations ─────────────
+            # ── Goblin/Demon bet_type column migrations ───────────────
             # Add bet_type and std_devs_from_line to bets table
             try:
                 cursor.execute(
@@ -1538,7 +1538,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
                         str(player_id),
                         str(player_name),
                         str(g.get("game_date", g.get("GAME_DATE", ""))),
-                        str(g.get("opponent",  g.get("MATCHUP", ""))),
+                        str(g.get("opponent", g.get("MATCHUP", ""))),
                         _safe_float(g.get("minutes", g.get("MIN", g.get("min")))),
                         _safe_int(g.get("points",    g.get("PTS", g.get("pts")))),
                         _safe_int(g.get("rebounds",  g.get("REB", g.get("reb")))),
