@@ -124,7 +124,43 @@ with st.expander("📖 How to Use This Page", expanded=False):
 #   Fetches REAL live prop lines from PrizePicks, Underdog, and
 #   DraftKings APIs, runs them through Neural Analysis, and shows
 #   the best bets grouped by platform. Does NOT depend on Auto-Load.
+#
+# BUTTON 3 — ⚡ One-Click Setup (COMBINED):
+#   Runs BOTH Auto-Load AND Fetch Platform Props in one click.
+#   This is the recommended action for new sessions.
 # ============================================================
+
+# ── ⚡ One-Click Setup — Combined Button (recommended) ─────────────────────
+st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(0,240,255,0.10),rgba(200,0,255,0.08));
+            border:2px solid rgba(0,240,255,0.35);border-radius:12px;
+            padding:14px 20px;margin-bottom:14px;text-align:center;">
+  <div style="font-family:'Orbitron',sans-serif;font-size:1.05rem;font-weight:800;
+              color:#00f0ff;text-shadow:0 0 12px rgba(0,240,255,0.7);letter-spacing:1px;">
+    ⚡ One-Click Setup — Recommended
+  </div>
+  <div style="color:#8a9bb8;font-size:0.84rem;margin-top:4px;">
+    Loads tonight's games + fetches live prop lines from all platforms in one step
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+_one_click_col, _one_click_info = st.columns([1, 3])
+with _one_click_col:
+    one_click_setup_clicked = st.button(
+        "⚡ One-Click Setup",
+        key="one_click_setup_btn",
+        type="primary",
+        width="stretch",
+        help="Runs BOTH Auto-Load (tonight's games + rosters + stats) AND Fetch Live Props from all platforms in one click.",
+    )
+with _one_click_info:
+    st.caption(
+        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from PrizePicks/Underdog/DraftKings. "
+        "Best choice for a fresh session — everything in one click."
+    )
+
+st.markdown("---")
 
 # ── Visual separator card ───────────────────────────────────────────────────
 st.markdown("""
@@ -842,6 +878,119 @@ if platform_props_clicked:
 
 # ============================================================
 # END SECTION: Platform Props & Analyze Button
+# ============================================================
+
+# ============================================================
+# SECTION: One-Click Setup (Auto-Load + Fetch Live Props combined)
+# ============================================================
+
+if one_click_setup_clicked:
+    st.divider()
+    st.subheader("⚡ One-Click Setup")
+    st.markdown("Running **Auto-Load** + **Fetch Live Props** in one step…")
+    _oc_bar = st.progress(0)
+    _oc_status = st.empty()
+
+    try:
+        # ── Phase 1: Auto-Load Tonight's Games ────────────────────────
+        _oc_status.text("⏳ Phase 1/2 — Auto-loading tonight's games, rosters & stats…")
+        _oc_bar.progress(5)
+        from data.live_data_fetcher import (
+            fetch_todays_games as _oc_fetch_games,
+            fetch_todays_players_only as _oc_fetch_players,
+        )
+        from data.data_manager import (
+            load_players_data as _oc_load_players,
+            generate_props_for_todays_players as _oc_gen_props,
+            save_props_to_session as _oc_save_props,
+            clear_all_caches as _oc_clear_caches,
+            load_injury_status as _oc_load_inj,
+        )
+
+        _oc_games = _oc_fetch_games()
+        if _oc_games:
+            st.session_state["todays_games"] = _oc_games
+        else:
+            _oc_games = st.session_state.get("todays_games", [])
+
+        _oc_bar.progress(25)
+        _oc_status.text(f"⏳ Phase 1/2 — {len(_oc_games)} game(s) loaded. Fetching player data…")
+
+        _oc_players_ok = _oc_fetch_players(_oc_games) if _oc_games else False
+        _oc_bar.progress(45)
+
+        # Reload fresh player data and generate synthetic props
+        _oc_clear_caches()
+        _oc_fresh_players = _oc_load_players()
+        _oc_selected_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
+        _oc_auto_props = _oc_gen_props(_oc_fresh_players, _oc_games, platforms=_oc_selected_platforms)
+        if _oc_auto_props:
+            _oc_save_props(_oc_auto_props, st.session_state)
+
+        try:
+            st.session_state["injury_status_map"] = _oc_load_inj()
+        except Exception:
+            pass
+
+        _oc_bar.progress(55)
+
+        # ── Phase 2: Fetch Live Platform Props ────────────────────────
+        _oc_status.text("⏳ Phase 2/2 — Fetching live prop lines from all platforms…")
+
+        try:
+            from data.platform_fetcher import fetch_all_platform_props as _oc_fetch_platform
+            from data.data_manager import (
+                save_platform_props_to_session as _oc_save_platform,
+                save_platform_props_to_csv as _oc_save_csv,
+            )
+            _oc_odds_key = st.session_state.get("odds_api_key") or ""
+            _oc_platform_props = _oc_fetch_platform(odds_api_key=_oc_odds_key or None)
+            _oc_bar.progress(85)
+            if _oc_platform_props:
+                # Merge with existing props
+                _oc_existing = list(st.session_state.get("current_props", []))
+                _oc_seen = set()
+                _oc_merged = []
+                for _p in _oc_existing + _oc_platform_props:
+                    _pk = (str(_p.get("player_name","")).lower(), str(_p.get("stat_type","")).lower(), str(_p.get("platform","")).lower())
+                    if _pk not in _oc_seen:
+                        _oc_seen.add(_pk)
+                        _oc_merged.append(_p)
+                _oc_save_props(_oc_merged, st.session_state)
+                _oc_save_platform(_oc_platform_props, st.session_state)
+                try:
+                    _oc_save_csv(_oc_platform_props)
+                except Exception:
+                    pass
+                _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props fetched"
+            else:
+                _oc_platform_msg = "⚠️ No live platform props returned (APIs may be unavailable)"
+        except Exception as _oc_plat_err:
+            _oc_platform_msg = f"⚠️ Platform fetch failed: {_oc_plat_err}"
+
+        _oc_bar.progress(100)
+        _oc_status.empty()
+        _oc_bar.empty()
+
+        _oc_total_props = len(st.session_state.get("current_props", []))
+        st.success(
+            f"✅ **One-Click Setup complete!** "
+            f"Games: {'✅ ' + str(len(_oc_games)) if _oc_games else '⚠️ none'} | "
+            f"Players: {'✅' if _oc_players_ok else '⚠️ check data'} | "
+            f"Props: {_oc_platform_msg} | "
+            f"Total props loaded: **{_oc_total_props}**\n\n"
+            "👉 Go to **⚡ Neural Analysis** and click **Run Analysis** to analyze all loaded props."
+        )
+        time.sleep(1)
+        st.rerun()
+
+    except Exception as _oc_err:
+        _oc_bar.empty()
+        _oc_status.empty()
+        st.error(f"❌ One-Click Setup failed: {_oc_err}")
+
+# ============================================================
+# END SECTION: One-Click Setup
 # ============================================================
 
 st.divider()

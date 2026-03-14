@@ -467,6 +467,18 @@ with tab_ai_picks:
     ]
     ai_bets = [b for b in ai_bets_raw if _platform_filter_fn(b)]
 
+    # ── Tier Filter ───────────────────────────────────────────────────
+    _ai_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="ai_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    if _ai_tier_filter:
+        _ai_tier_names = [t.split(" ")[0] for t in _ai_tier_filter]
+        ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
+
     if not ai_bets:
         st.info(
             "📭 No AI-auto-logged picks yet. "
@@ -540,6 +552,33 @@ with tab_all_picks:
         "Track the **complete** performance record of every prediction the app makes."
     )
 
+    # ── 🔄 Resolve All Picks button ───────────────────────────────────
+    _rap_col1, _rap_col2 = st.columns([1, 3])
+    with _rap_col1:
+        _resolve_all_picks_btn = st.button(
+            "🔄 Resolve All Picks",
+            key="resolve_all_picks_btn",
+            type="primary",
+            help="Fetch actual NBA stats and auto-resolve ALL unresolved picks (manual and AI-logged).",
+        )
+    with _rap_col2:
+        st.caption("Auto-resolves every pending pick using live NBA stats — includes both manual and AI-logged picks.")
+
+    if _resolve_all_picks_btn:
+        with st.spinner("🔄 Resolving all pending picks…"):
+            try:
+                _rap_resolved, _rap_errors = auto_resolve_bet_results()
+                if _rap_resolved > 0:
+                    st.success(f"✅ Resolved **{_rap_resolved}** pick(s)!")
+                elif _rap_errors:
+                    st.info(_rap_errors[0] if _rap_errors else "Nothing to resolve.")
+                else:
+                    st.info("No pending picks found to resolve.")
+            except Exception as _rap_exc:
+                st.error(f"❌ Resolution failed: {_rap_exc}")
+
+    st.divider()
+
     # ── Session-state picks (most recent run) ─────────────────────────
     session_picks = st.session_state.get("analysis_results", [])
     # ── Historical picks from DB (persistent) ────────────────────────
@@ -558,6 +597,18 @@ with tab_all_picks:
     else:
         all_picks_data = db_all_picks
         _date_field = "pick_date"
+
+    # ── Tier Filter ───────────────────────────────────────────────────
+    _ap_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="ap_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    if _ap_tier_filter:
+        _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
+        all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
 
     if not all_picks_data:
         st.info(

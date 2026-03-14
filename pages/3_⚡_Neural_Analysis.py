@@ -102,6 +102,25 @@ if "selected_picks" not in st.session_state:
 if "injury_status_map" not in st.session_state:
     st.session_state["injury_status_map"] = load_injury_status()
 
+# ── Analysis Session Persistence — Rehydrate from DB if session empty ──────
+# If the user's session state has no analysis results (e.g. after inactivity
+# or a page refresh), reload the most recently saved session from SQLite so
+# they never have to re-run analysis just because time passed.
+if not st.session_state.get("analysis_results"):
+    try:
+        from tracking.database import load_latest_analysis_session as _load_session
+        _saved_session = _load_session()
+        if _saved_session and _saved_session.get("analysis_results"):
+            st.session_state["analysis_results"] = _saved_session["analysis_results"]
+            if _saved_session.get("todays_games") and not st.session_state.get("todays_games"):
+                st.session_state["todays_games"] = _saved_session["todays_games"]
+            if _saved_session.get("selected_picks") and not st.session_state.get("selected_picks"):
+                st.session_state["selected_picks"] = _saved_session["selected_picks"]
+            # Record the timestamp so the UI can show when the session was saved
+            st.session_state["_analysis_session_reloaded_at"] = _saved_session.get("analysis_timestamp", "")
+    except Exception:
+        pass  # Non-fatal — just show empty state
+
 # ─── Auto-refresh injury data if empty or stale (>4 hours) ──
 # Use a 30-minute in-session cooldown to avoid re-fetching on every
 # page navigation, while still updating when data is genuinely stale.
@@ -1503,6 +1522,17 @@ if run_analysis:
 
     st.session_state["analysis_results"] = analysis_results_list
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
+
+    # ── Persist analysis session to SQLite (survives page refresh/inactivity) ──
+    try:
+        from tracking.database import save_analysis_session as _save_session
+        _save_session(
+            analysis_results=analysis_results_list,
+            todays_games=st.session_state.get("todays_games", []),
+            selected_picks=st.session_state.get("selected_picks", []),
+        )
+    except Exception as _persist_err:
+        pass  # Non-fatal — session state still has results
     progress_bar.empty()
     _analysis_elapsed = time.time() - _analysis_start_time
     st.success(
@@ -1543,6 +1573,14 @@ if run_analysis:
 
 analysis_results = st.session_state.get("analysis_results", [])
 
+# Show a notice if results were reloaded from the saved session
+if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
+    _reloaded_ts = st.session_state["_analysis_session_reloaded_at"]
+    st.info(
+        f"💾 **Analysis restored from saved session** (last run: {_reloaded_ts}). "
+        "Results are preserved from your last analysis run — click **🚀 Run Analysis** above to refresh."
+    )
+
 if analysis_results:
     st.divider()
 
@@ -1555,6 +1593,18 @@ if analysis_results:
         ]
     else:
         displayed_results = analysis_results
+
+    # ── Tier Filter ──────────────────────────────────────────────────────
+    _na_tier_filter = st.multiselect(
+        "Filter by Tier",
+        ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+        default=[],
+        key="na_tier_filter",
+        help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
+    )
+    if _na_tier_filter:
+        _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
+        displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
 
     # Sort by confidence score descending
     displayed_results.sort(

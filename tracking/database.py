@@ -161,6 +161,21 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 );
 """
 
+# SQL to create the analysis_sessions table.
+# Persists Neural Analysis results so users never lose their analysis
+# after inactivity. On page load, session state is rehydrated from here.
+CREATE_ANALYSIS_SESSIONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS analysis_sessions (
+    session_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analysis_timestamp TEXT NOT NULL,
+    analysis_results_json TEXT NOT NULL,
+    todays_games_json TEXT,
+    selected_picks_json TEXT,
+    prop_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -202,6 +217,7 @@ def initialize_database():
             cursor.execute(CREATE_DAILY_SNAPSHOTS_TABLE_SQL)      # daily performance tracking
             cursor.execute(CREATE_ALL_ANALYSIS_PICKS_TABLE_SQL)   # all Neural Analysis outputs
             cursor.execute(CREATE_SUBSCRIPTIONS_TABLE_SQL)        # Stripe subscription records
+            cursor.execute(CREATE_ANALYSIS_SESSIONS_TABLE_SQL)    # analysis session persistence
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -1065,6 +1081,94 @@ def load_all_analysis_picks(days=30):
 
 # ============================================================
 # END SECTION: All Analysis Picks
+# ============================================================
+
+# ============================================================
+# SECTION: Analysis Session Persistence
+# Saves and restores full Neural Analysis results to SQLite so
+# users never lose their analysis after page refresh or inactivity.
+# ============================================================
+
+def save_analysis_session(analysis_results, todays_games=None, selected_picks=None):
+    """
+    Persist a full Neural Analysis session to SQLite.
+
+    Args:
+        analysis_results (list[dict]): Full analysis results list from Neural Analysis.
+        todays_games (list[dict]|None): Tonight's games list.
+        selected_picks (list[dict]|None): Currently selected picks.
+
+    Returns:
+        int: The new session_id, or -1 on error.
+    """
+    import json as _json
+    import datetime as _dt
+    try:
+        initialize_database()
+        _ts = _dt.datetime.now().isoformat(timespec="seconds")
+        _results_json = _json.dumps(analysis_results, default=str)
+        _games_json = _json.dumps(todays_games or [], default=str)
+        _picks_json = _json.dumps(selected_picks or [], default=str)
+        _prop_count = len(analysis_results)
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.execute(
+                """INSERT INTO analysis_sessions
+                   (analysis_timestamp, analysis_results_json, todays_games_json,
+                    selected_picks_json, prop_count)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (_ts, _results_json, _games_json, _picks_json, _prop_count),
+            )
+            conn.commit()
+            return cursor.lastrowid
+    except Exception as _err:
+        _logger.warning(f"save_analysis_session error (non-fatal): {_err}")
+        return -1
+
+
+def load_latest_analysis_session():
+    """
+    Load the most recently saved Neural Analysis session from SQLite.
+
+    Returns:
+        dict|None: Session dict with keys:
+            'analysis_timestamp', 'analysis_results', 'todays_games', 'selected_picks',
+            'prop_count', 'created_at'
+        Returns None if no session found or on error.
+    """
+    import json as _json
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """SELECT * FROM analysis_sessions
+                   ORDER BY session_id DESC LIMIT 1"""
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            row_dict = dict(row)
+            # Deserialize JSON blobs
+            try:
+                row_dict["analysis_results"] = _json.loads(row_dict.get("analysis_results_json") or "[]")
+            except Exception:
+                row_dict["analysis_results"] = []
+            try:
+                row_dict["todays_games"] = _json.loads(row_dict.get("todays_games_json") or "[]")
+            except Exception:
+                row_dict["todays_games"] = []
+            try:
+                row_dict["selected_picks"] = _json.loads(row_dict.get("selected_picks_json") or "[]")
+            except Exception:
+                row_dict["selected_picks"] = []
+            return row_dict
+    except Exception as _err:
+        _logger.warning(f"load_latest_analysis_session error (non-fatal): {_err}")
+        return None
+
+# ============================================================
+# END SECTION: Analysis Session Persistence
 # ============================================================
 
 # ============================================================
