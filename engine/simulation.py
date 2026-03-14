@@ -477,6 +477,10 @@ def run_quantum_matrix_simulation(
     # ============================================================
 
 
+# Backward-compatibility alias
+run_monte_carlo_simulation = run_quantum_matrix_simulation
+
+
 # ============================================================
 # SECTION: Helper Functions for Game Scenario Randomization
 # These internal helpers simulate realistic game situations
@@ -1155,6 +1159,3 @@ def simulate_triple_double(
 # ============================================================
 # END SECTION: Combo / Fantasy Stat Simulations
 # ============================================================
-
-# Backward-compatibility alias
-run_monte_carlo_simulation = run_quantum_matrix_simulation

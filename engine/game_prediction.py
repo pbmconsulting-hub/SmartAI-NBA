@@ -531,10 +531,10 @@ def _run_quantum_matrix_game(
     """
     Run the full Quantum Matrix Engine 5.6 game simulation (N simulations).
 
-    BEGINNER NOTE: The "Quantum Matrix Engine 5.6" uses the Neural Analysis
-    Network (N.A.N.) to simulate thousands of random
-    scenarios and average the results. With 2000 simulations, we
-    get a very stable estimate of:
+    BEGINNER NOTE: The Quantum Matrix Engine 5.6 is the Neural Analysis Network
+    (N.A.N.) simulation core. Instead of solving a complex math problem
+    analytically, it simulates thousands of random scenarios and averages the
+    results. With 2000 simulations, we get a very stable estimate of:
       - Win probabilities (how often each team wins)
       - Expected score (average across all simulations)
       - Score distributions (range of likely outcomes)
@@ -630,6 +630,9 @@ def _run_quantum_matrix_game(
 # ============================================================
 # END SECTION: Layer 3 — Quantum Matrix Game Simulation
 # ============================================================
+
+# Backward-compatibility alias
+_run_monte_carlo_game = _run_quantum_matrix_game
 
 
 # ============================================================
@@ -1174,6 +1177,3 @@ def predict_game_from_abbrevs(
 # ============================================================
 # END SECTION: Main Public API — predict_game()
 # ============================================================
-
-# Backward-compatibility alias
-_run_monte_carlo_game = _run_quantum_matrix_game
