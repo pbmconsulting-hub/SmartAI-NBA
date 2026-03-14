@@ -17,6 +17,13 @@ import sqlite3    # Built-in SQLite database (no install needed!)
 import os         # For file path operations
 from pathlib import Path  # Modern file path handling
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 
 # ============================================================
 # SECTION: Database Configuration
@@ -230,7 +237,7 @@ def initialize_database():
         return True
 
     except sqlite3.Error as database_error:
-        print(f"Database initialization error: {database_error}")
+        _logger.error(f"Database initialization error: {database_error}")
         return False
 
 
@@ -317,7 +324,7 @@ def insert_bet(bet_data):
             return cursor.lastrowid  # Return the new row's ID
 
     except sqlite3.Error as database_error:
-        print(f"Error inserting bet: {database_error}")
+        _logger.error(f"Error inserting bet: {database_error}")
         return None
 
 
@@ -347,7 +354,7 @@ def update_bet_result(bet_id, result, actual_value):
             return cursor.rowcount > 0  # True if a row was updated
 
     except sqlite3.Error as database_error:
-        print(f"Error updating bet result: {database_error}")
+        _logger.error(f"Error updating bet result: {database_error}")
         return False
 
 
@@ -377,7 +384,7 @@ def load_all_bets(limit=200):
             return [dict(row) for row in rows]
 
     except sqlite3.Error as database_error:
-        print(f"Error loading bets: {database_error}")
+        _logger.error(f"Error loading bets: {database_error}")
         return []
 
 
@@ -427,7 +434,7 @@ def get_performance_summary():
                 }
 
     except sqlite3.Error as database_error:
-        print(f"Error getting performance summary: {database_error}")
+        _logger.error(f"Error getting performance summary: {database_error}")
 
     return {
         "total_bets": 0,
@@ -484,7 +491,7 @@ def insert_prediction(prediction_data):
             connection.commit()
             return cursor.lastrowid
     except sqlite3.Error as database_error:
-        print(f"Error inserting prediction: {database_error}")
+        _logger.error(f"Error inserting prediction: {database_error}")
         return None
 
 
@@ -512,7 +519,7 @@ def update_prediction_outcome(prediction_id, was_correct, actual_value):
             connection.commit()
             return True
     except sqlite3.Error as database_error:
-        print(f"Error updating prediction outcome: {database_error}")
+        _logger.error(f"Error updating prediction outcome: {database_error}")
         return False
 
 
@@ -582,7 +589,7 @@ def get_calibration_adjustment(stat_type=None, min_samples=20):
                 return round(max(-15.0, min(15.0, adjustment)), 1)
 
     except sqlite3.Error as database_error:
-        print(f"Error computing calibration: {database_error}")
+        _logger.error(f"Error computing calibration: {database_error}")
 
     return 0.0  # No adjustment if insufficient data
 
@@ -660,7 +667,7 @@ def get_calibration_report():
                     }
 
     except sqlite3.Error as database_error:
-        print(f"Error building calibration report: {database_error}")
+        _logger.error(f"Error building calibration report: {database_error}")
 
     return report
 
@@ -816,7 +823,7 @@ def save_daily_snapshot(date_str=None):
         conn.close()
         return True
     except Exception as exc:
-        print(f"[database] save_daily_snapshot error: {exc}")
+        _logger.error(f"[database] save_daily_snapshot error: {exc}")
         return False
 
 
@@ -858,7 +865,7 @@ def load_daily_snapshots(days=14):
             snapshots.append(s)
         return snapshots
     except Exception as exc:
-        print(f"[database] load_daily_snapshots error: {exc}")
+        _logger.error(f"[database] load_daily_snapshots error: {exc}")
         return []
 
 
@@ -883,7 +890,7 @@ def purge_old_snapshots(days=30):
         conn.close()
         return deleted
     except Exception as exc:
-        print(f"[database] purge_old_snapshots error: {exc}")
+        _logger.error(f"[database] purge_old_snapshots error: {exc}")
         return 0
 
 
@@ -1025,7 +1032,7 @@ def insert_analysis_picks(analysis_results):
                 inserted += 1
             conn.commit()
     except Exception as err:
-        print(f"insert_analysis_picks error (non-fatal): {err}")
+        _logger.warning(f"insert_analysis_picks error (non-fatal): {err}")
 
     return inserted
 
@@ -1053,7 +1060,7 @@ def load_all_analysis_picks(days=30):
             )
             rows = [dict(row) for row in cursor.fetchall()]
     except Exception as err:
-        print(f"load_all_analysis_picks error (non-fatal): {err}")
+        _logger.warning(f"load_all_analysis_picks error (non-fatal): {err}")
     return rows
 
 # ============================================================

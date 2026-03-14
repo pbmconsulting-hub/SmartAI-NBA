@@ -262,3 +262,34 @@ def get_trending_minutes(player_data, game_logs):
 
     blended = RECENT_WEIGHT * recent_avg + SEASON_WEIGHT * season_avg
     return round(blended, 2)
+
+
+def get_minutes_adjustment(game_logs, window=10):
+    """
+    Calculate a minutes adjustment multiplier based on recent game log trends.
+
+    BEGINNER NOTE: If a player has been playing significantly more or fewer
+    minutes recently vs their season average, their stat projections should
+    be scaled accordingly.
+
+    Args:
+        game_logs (list of dict): Player's game logs (most recent first or last)
+        window (int): Number of recent games to analyze
+
+    Returns:
+        float: Multiplier to apply to minute-based projections.
+            1.0 = no change, 1.15 = 15% more minutes recently, 0.85 = 15% fewer
+    """
+    if not game_logs or len(game_logs) < 3:
+        return 1.0
+
+    result = track_minutes_trend(game_logs, window=min(window, len(game_logs)))
+    season_avg = result.get("season_avg_minutes", 0.0)
+    recent_avg = result.get("recent_avg_minutes", 0.0)
+
+    if season_avg < 5.0 or recent_avg < 1.0:
+        return 1.0
+
+    ratio = recent_avg / season_avg
+    # Cap adjustment at 20% in either direction
+    return max(0.80, min(1.20, ratio))

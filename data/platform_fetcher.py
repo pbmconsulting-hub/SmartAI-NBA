@@ -49,6 +49,13 @@ except ImportError:
 # This converts "3-Point Made" → "threes", "Pts+Rebs" → "points_rebounds", etc.
 from data.platform_mappings import normalize_stat_type
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -87,6 +94,12 @@ UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
 # The Odds API base URL — used to fetch DraftKings player props
 # Documentation: https://the-odds-api.com/liveapi/guides/v4/
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
+
+# Default American odds for platforms without traditional juice (e.g. -110)
+# BEGINNER NOTE: -110 is the standard American odds for prop bets on DraftKings.
+# Breakeven at -110 = 52.38% win rate. PrizePicks/Underdog don't use odds,
+# so we default to -110 for their implied probability calculations.
+_DEFAULT_AMERICAN_ODDS = -110
 
 # ============================================================
 # END SECTION: Module-level constants
@@ -165,14 +178,14 @@ def fetch_prizepicks_props(league="NBA"):
         #      "line": 24.5, "platform": "PrizePicks", ...}, ...]
     """
     if not REQUESTS_AVAILABLE:
-        print("Warning: 'requests' library not installed. Cannot fetch PrizePicks props.")
+        _logger.warning("Warning: 'requests' library not installed. Cannot fetch PrizePicks props.")
         return []
 
     # PrizePicks requires Referer header in addition to the base headers
     headers = dict(_BASE_HEADERS)
     headers["Referer"] = "https://app.prizepicks.com/"
 
-    print(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
+    _logger.info(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
 
     try:
         response = requests.get(
@@ -187,13 +200,13 @@ def fetch_prizepicks_props(league="NBA"):
         data = response.json()
 
     except requests.exceptions.Timeout:
-        print("[PrizePicks] Request timed out. Skipping.")
+        _logger.warning("[PrizePicks] Request timed out. Skipping.")
         return []
     except requests.exceptions.ConnectionError as err:
-        print(f"[PrizePicks] Connection error: {err}. Skipping.")
+        _logger.warning(f"[PrizePicks] Connection error: {err}. Skipping.")
         return []
     except Exception as err:
-        print(f"[PrizePicks] Unexpected error: {err}. Skipping.")
+        _logger.error(f"[PrizePicks] Unexpected error: {err}. Skipping.")
         return []
 
     # ── Parse the response ────────────────────────────────────
@@ -269,9 +282,11 @@ def fetch_prizepicks_props(league="NBA"):
             "platform": "PrizePicks",
             "game_date": today,
             "fetched_at": fetched_at,
+            "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+            "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
         })
 
-    print(f"[PrizePicks] Fetched {len(props)} NBA props.")
+    _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props.")
     return props
 
 # ============================================================
@@ -303,10 +318,10 @@ def fetch_underdog_props(league="NBA"):
         #      "line": 3.5, "platform": "Underdog", ...}, ...]
     """
     if not REQUESTS_AVAILABLE:
-        print("Warning: 'requests' library not installed. Cannot fetch Underdog props.")
+        _logger.warning("Warning: 'requests' library not installed. Cannot fetch Underdog props.")
         return []
 
-    print(f"[Underdog] Fetching NBA props from {UNDERDOG_URL} ...")
+    _logger.info(f"[Underdog] Fetching NBA props from {UNDERDOG_URL} ...")
 
     try:
         response = requests.get(
@@ -318,13 +333,13 @@ def fetch_underdog_props(league="NBA"):
         data = response.json()
 
     except requests.exceptions.Timeout:
-        print("[Underdog] Request timed out. Skipping.")
+        _logger.warning("[Underdog] Request timed out. Skipping.")
         return []
     except requests.exceptions.ConnectionError as err:
-        print(f"[Underdog] Connection error: {err}. Skipping.")
+        _logger.warning(f"[Underdog] Connection error: {err}. Skipping.")
         return []
     except Exception as err:
-        print(f"[Underdog] Unexpected error: {err}. Skipping.")
+        _logger.error(f"[Underdog] Unexpected error: {err}. Skipping.")
         return []
 
     # ── Parse the response ────────────────────────────────────
@@ -385,9 +400,11 @@ def fetch_underdog_props(league="NBA"):
             "platform": "Underdog",
             "game_date": today,
             "fetched_at": fetched_at,
+            "over_odds": line_item.get("price", line_item.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+            "under_odds": line_item.get("under_price", _DEFAULT_AMERICAN_ODDS),
         })
 
-    print(f"[Underdog] Fetched {len(props)} NBA props.")
+    _logger.info(f"[Underdog] Fetched {len(props)} NBA props.")
     return props
 
 # ============================================================
@@ -425,7 +442,7 @@ def fetch_draftkings_props(api_key=None):
         #      "line": 28.5, "platform": "DraftKings", ...}, ...]
     """
     if not REQUESTS_AVAILABLE:
-        print("Warning: 'requests' library not installed. Cannot fetch DraftKings props.")
+        _logger.warning("Warning: 'requests' library not installed. Cannot fetch DraftKings props.")
         return []
 
     # ── Resolve API key ────────────────────────────────────────
@@ -442,14 +459,14 @@ def fetch_draftkings_props(api_key=None):
         api_key = os.environ.get("ODDS_API_KEY", "").strip() or None
 
     if not api_key:
-        print(
+        _logger.warning(
             "[DraftKings] No Odds API key configured. "
             "Add your key on the Settings page or set ODDS_API_KEY env var. "
             "Get a free key at https://the-odds-api.com"
         )
         return []
 
-    print("[DraftKings] Fetching NBA events via The Odds API ...")
+    _logger.info("[DraftKings] Fetching NBA events via The Odds API ...")
 
     # ── Step 1: Get list of today's NBA events ─────────────────
     events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
@@ -467,21 +484,21 @@ def fetch_draftkings_props(api_key=None):
         # HTTPError is raised by raise_for_status() — events_resp is guaranteed to exist
         status_code = events_resp.status_code
         if status_code == 401:
-            print("[DraftKings] Invalid API key. Check your Odds API key on the Settings page.")
+            _logger.warning("[DraftKings] Invalid API key. Check your Odds API key on the Settings page.")
         elif status_code == 422:
-            print("[DraftKings] API quota exceeded for the month.")
+            _logger.warning("[DraftKings] API quota exceeded for the month.")
         else:
-            print(f"[DraftKings] HTTP error fetching events: {err}")
+            _logger.error(f"[DraftKings] HTTP error fetching events: {err}")
         return []
     except Exception as err:
-        print(f"[DraftKings] Error fetching events: {err}. Skipping.")
+        _logger.error(f"[DraftKings] Error fetching events: {err}. Skipping.")
         return []
 
     if not events:
-        print("[DraftKings] No NBA events found today.")
+        _logger.info("[DraftKings] No NBA events found today.")
         return []
 
-    print(f"[DraftKings] Found {len(events)} NBA events. Fetching player props...")
+    _logger.info(f"[DraftKings] Found {len(events)} NBA events. Fetching player props...")
 
     # ── Step 2: Fetch player props for each event ──────────────
     # BEGINNER NOTE: The Odds API charges per request, so we request
@@ -549,12 +566,12 @@ def fetch_draftkings_props(api_key=None):
         except requests.exceptions.HTTPError as err:
             # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
             if props_resp.status_code == 422:
-                print("[DraftKings] API quota exceeded. Stopping early.")
+                _logger.warning("[DraftKings] API quota exceeded. Stopping early.")
                 break
-            print(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
+            _logger.error(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
             continue
         except Exception as err:
-            print(f"[DraftKings] Error for event {event_id}: {err}. Skipping.")
+            _logger.error(f"[DraftKings] Error for event {event_id}: {err}. Skipping.")
             continue
 
         # ── Parse bookmaker data ───────────────────────────────
@@ -598,9 +615,11 @@ def fetch_draftkings_props(api_key=None):
                         "platform": "DraftKings",
                         "game_date": today,
                         "fetched_at": fetched_at,
+                        "over_odds": outcome.get("price", outcome.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+                        "under_odds": outcome.get("under_price", _DEFAULT_AMERICAN_ODDS),
                     })
 
-    print(f"[DraftKings] Fetched {len(props)} NBA props.")
+    _logger.info(f"[DraftKings] Fetched {len(props)} NBA props.")
     return props
 
 # ============================================================
@@ -665,9 +684,9 @@ def fetch_all_platform_props(
         try:
             pp_props = fetch_prizepicks_props()
             all_props.extend(pp_props)
-            print(f"[Master] PrizePicks: {len(pp_props)} props added.")
+            _logger.info(f"[Master] PrizePicks: {len(pp_props)} props added.")
         except Exception as err:
-            print(f"[Master] PrizePicks fetch failed: {err}")
+            _logger.error(f"[Master] PrizePicks fetch failed: {err}")
 
         # Be polite to APIs — wait before the next call
         if include_underdog or include_draftkings:
@@ -681,9 +700,9 @@ def fetch_all_platform_props(
         try:
             ud_props = fetch_underdog_props()
             all_props.extend(ud_props)
-            print(f"[Master] Underdog: {len(ud_props)} props added.")
+            _logger.info(f"[Master] Underdog: {len(ud_props)} props added.")
         except Exception as err:
-            print(f"[Master] Underdog fetch failed: {err}")
+            _logger.error(f"[Master] Underdog fetch failed: {err}")
 
         # Rate limiting delay
         if include_draftkings:
@@ -697,14 +716,14 @@ def fetch_all_platform_props(
         try:
             dk_props = fetch_draftkings_props(api_key=odds_api_key)
             all_props.extend(dk_props)
-            print(f"[Master] DraftKings: {len(dk_props)} props added.")
+            _logger.info(f"[Master] DraftKings: {len(dk_props)} props added.")
         except Exception as err:
-            print(f"[Master] DraftKings fetch failed: {err}")
+            _logger.error(f"[Master] DraftKings fetch failed: {err}")
 
     if progress_callback:
         progress_callback(total_steps, total_steps, f"Done! {len(all_props)} props fetched.")
 
-    print(f"[Master] Total props fetched: {len(all_props)}")
+    _logger.info(f"[Master] Total props fetched: {len(all_props)}")
     return all_props
 
 # ============================================================
@@ -865,7 +884,7 @@ def match_platform_player_to_csv(platform_name, players_data):
         if player:
             return player.get("name", None)
     except Exception as err:
-        print(f"[NameMatch] Error matching '{platform_name}': {err}")
+        _logger.warning(f"[NameMatch] Error matching '{platform_name}': {err}")
 
     return None
 

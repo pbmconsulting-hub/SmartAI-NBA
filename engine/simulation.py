@@ -12,6 +12,13 @@
 import random   # For randomizing game scenarios (minutes, pace)
 import math     # For mathematical rounding and calculations
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # Import our custom math helpers (built from scratch)
 from engine.math_helpers import (
     sample_from_normal_distribution,  # Draw a random game result (normal)

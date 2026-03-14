@@ -285,6 +285,53 @@ players_data = load_players_data()
 props_data = load_props_data()
 teams_data = load_teams_data()
 
+# ── Teams Data Staleness Check ─────────────────────────────────
+try:
+    from data.live_data_fetcher import load_last_updated as _load_lu
+    from data.data_manager import load_teams_data as _load_teams
+    _last_updated = _load_lu() or {}
+    _teams_ts = _last_updated.get("teams_stats")
+    if _teams_ts:
+        import datetime as _dt
+        _teams_date = _dt.datetime.fromisoformat(_teams_ts)
+        _teams_age_days = (_dt.datetime.now() - _teams_date).days
+        if _teams_age_days >= 7:
+            st.warning(
+                f"⚠️ Team stats are **{_teams_age_days} days old**. "
+                f"Go to **📡 Data Feed → Smart Update** to refresh."
+            )
+        elif _teams_age_days >= 3:
+            st.info(
+                f"ℹ️ Team stats last updated {_teams_age_days} days ago. "
+                f"Consider refreshing on the Data Feed page."
+            )
+    else:
+        _teams_data = _load_teams()
+        if not _teams_data:
+            st.warning(
+                "⚠️ No team stats found. Go to **📡 Data Feed → Smart Update** "
+                "to load team data for accurate analysis."
+            )
+except Exception:
+    pass
+
+# ── Data Validation on Startup ─────────────────────────────────
+try:
+    from data.validators import validate_players_csv, validate_teams_csv
+    from data.data_manager import load_players_data as _lp_val, load_teams_data as _lt_val
+    _val_players = _lp_val()
+    _val_teams = _lt_val()
+    _p_errors = validate_players_csv(_val_players)
+    _t_errors = validate_teams_csv(_val_teams)
+    if _p_errors or _t_errors:
+        with st.expander("⚠️ Data Validation Issues (click to expand)", expanded=False):
+            for e in _p_errors:
+                st.warning(f"players.csv: {e}")
+            for e in _t_errors:
+                st.warning(f"teams.csv: {e}")
+except Exception:
+    pass
+
 current_props = st.session_state.get("current_props", props_data)
 number_of_current_props = len(current_props)
 number_of_analysis_results = len(st.session_state.get("analysis_results", []))
