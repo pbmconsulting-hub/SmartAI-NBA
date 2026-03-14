@@ -8,14 +8,13 @@ import statistics
 from datetime import date
 
 try:
-    from engine.simulation import run_monte_carlo_simulation
+    from engine.simulation import run_quantum_matrix_simulation
 except ImportError:
-    run_monte_carlo_simulation = None
+    run_quantum_matrix_simulation = None
 
-try:
-    from engine.edge_detection import calculate_edge
-except ImportError:
-    calculate_edge = None
+# Implied probability for -110 odds (standard breakeven for edge calculation)
+# -110 → breakeven = 110 / (110 + 100) = 0.5238
+_IMPLIED_PROB_MINUS_110 = 110.0 / (110.0 + 100.0)  # ≈ 0.5238
 
 
 def _season_avg_up_to_date(game_logs, stat_key, cutoff_date_str):
@@ -32,6 +31,24 @@ def _season_avg_up_to_date(game_logs, stat_key, cutoff_date_str):
     if not values:
         return None
     return sum(values) / len(values)
+
+
+def _season_std_up_to_date(game_logs, stat_key, cutoff_date_str):
+    """Compute the standard deviation of stat_key from game logs up to cutoff_date_str."""
+    values = []
+    for g in game_logs:
+        gd = g.get("GAME_DATE", g.get("game_date", ""))
+        if gd and gd < cutoff_date_str:
+            try:
+                v = float(g.get(stat_key, 0) or 0)
+                values.append(v)
+            except (ValueError, TypeError):
+                pass
+    if len(values) < 2:
+        return None
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
+    return math.sqrt(variance)
 
 
 def _round_to_half(value):
@@ -63,7 +80,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
     Args:
         season (str): NBA season string, e.g. "2024-25"
         stat_types (list): List of stat type strings to backtest, e.g. ["points", "rebounds"]
-        min_edge (float): Minimum edge threshold (0.05 = 5%)
+        min_edge (float): Minimum edge threshold above -110 breakeven (0.05 = 5%)
         tier_filter (str or None): If set, only include picks of this tier
         game_logs_by_player (dict or None): {player_name: [game_log_dicts]}
             If None, returns an empty result (no data available).
@@ -74,7 +91,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
     if not game_logs_by_player:
         return _empty_result("No game log data provided. Fetch player data first.")
 
-    if run_monte_carlo_simulation is None:
+    if run_quantum_matrix_simulation is None:
         return _empty_result("Simulation engine not available.")
 
     total_picks = 0
@@ -112,35 +129,33 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                     continue
                 prop_line = _round_to_half(season_avg)
 
-                # Build minimal player_data for simulation (use only prior-game season avg)
-                avg_key = stat_type + "_avg"
-                player_data = {
-                    "name": player_name,
-                    avg_key: season_avg,
-                    "points_avg": season_avg if stat_type == "points" else float(
-                        _season_avg_up_to_date(sorted_logs, "PTS", game_date) or season_avg
-                    ),
-                    "minutes_avg": float(
-                        _season_avg_up_to_date(sorted_logs, "MIN", game_date) or 32
-                    ),
-                    "position": "G",
-                    "team": game.get("TEAM_ABBREVIATION", ""),
-                }
+                # Estimate standard deviation from prior game logs
+                season_std = _season_std_up_to_date(sorted_logs, stat_key, game_date)
+                if season_std is None or season_std <= 0:
+                    # Fallback: use ~30% CV as a reasonable default
+                    season_std = max(0.5, season_avg * 0.30)
 
-                game_context = {
-                    "vegas_spread": 0.0,
-                    "game_total": 220.0,
-                    "rest_days": 1,
-                    "is_home": True,
-                }
+                # Prior game log values for KDE sampling (up to this date)
+                prior_log_values = []
+                for g in sorted_logs[:i]:
+                    try:
+                        prior_log_values.append(float(g.get(stat_key, 0) or 0))
+                    except (ValueError, TypeError):
+                        pass
 
                 try:
-                    sim_result = run_monte_carlo_simulation(
-                        player_data=player_data,
-                        stat_type=stat_type,
+                    sim_result = run_quantum_matrix_simulation(
+                        projected_stat_average=season_avg,
+                        stat_standard_deviation=season_std,
                         prop_line=prop_line,
-                        game_context=game_context,
-                        num_simulations=500,
+                        number_of_simulations=500,
+                        blowout_risk_factor=0.0,
+                        pace_adjustment_factor=1.0,
+                        matchup_adjustment_factor=1.0,
+                        home_away_adjustment=0.0,
+                        rest_adjustment_factor=1.0,
+                        stat_type=stat_type,
+                        recent_game_logs=prior_log_values if len(prior_log_values) >= 15 else None,
                     )
                 except Exception:
                     continue
@@ -149,15 +164,17 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                     continue
 
                 over_prob = sim_result.get("probability_over", 0.5)
-                under_prob = sim_result.get("probability_under", 0.5)
-                edge = abs(over_prob - 0.5)
+                # probability_under = complement of probability_over
+                under_prob = 1.0 - over_prob
+
+                # Determine model pick direction first, then compute edge on that side
+                pick_direction = "OVER" if over_prob > under_prob else "UNDER"
+                model_prob = over_prob if pick_direction == "OVER" else under_prob
+                # True edge = model probability for selected side minus -110 breakeven
+                edge = model_prob - _IMPLIED_PROB_MINUS_110
 
                 if edge < min_edge:
                     continue
-
-                # Determine model pick
-                pick_direction = "OVER" if over_prob > under_prob else "UNDER"
-                model_prob = over_prob if pick_direction == "OVER" else under_prob
 
                 # Determine tier based on model probability
                 if model_prob >= 0.70:

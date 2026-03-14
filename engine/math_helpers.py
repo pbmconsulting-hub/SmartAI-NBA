@@ -785,8 +785,13 @@ def sample_zero_inflated(mean, std, zero_probability, game_log_values=None):
     raw = sample_skew_normal(conditional_mean, std * 1.1, skew_param=2.0)
 
     # Round to nearest 0.5 (threes are whole numbers; 0.5 granularity is fine)
+    # Clamp to >= 0.0: the conditional skew-normal can produce negative raw values,
+    # but the zero-inflation component above already accounts for actual 0-three games.
+    # Using max(0.5, ...) was incorrect — it prevented the non-zero path from ever
+    # returning 0.0, which artificially inflated three-point predictions for players
+    # whose conditional distribution has significant mass near zero.
     rounded = round(raw * 2.0) / 2.0
-    return max(0.5, rounded)
+    return max(0.0, rounded)
 
 
 def estimate_zero_probability(game_log_values, stat_type):
