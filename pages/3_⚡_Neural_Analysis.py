@@ -12,6 +12,7 @@ import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 import time             # For elapsed-time measurement
+import os               # For logo path resolution
 
 try:
     from utils.logger import get_logger
@@ -89,9 +90,13 @@ from styles.theme import (
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 
-# ============================================================
-# SECTION: Page Setup
-# ============================================================
+# ── Section logo paths ────────────────────────────────────────────────────────
+# Logos are stored in assets/ and loaded via st.image() for efficient serving.
+_ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+_GOBLIN_LOGO_PATH = os.path.join(_ASSETS_DIR, "Goblin_Logo.png")
+_DEMON_LOGO_PATH  = os.path.join(_ASSETS_DIR, "Demon_Logo.png")
+_GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "Gold_Logo.png")
+
 
 st.set_page_config(
     page_title="Neural Analysis — SmartBetPro NBA",
@@ -1976,17 +1981,22 @@ if analysis_results:
     )
 
     if _goblin_picks:
-        st.markdown(
-            '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
-            'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
-            '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">🧌 Goblin Picks — Easy Money</h3>'
-            '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
-            'Extreme-edge bets where the model projection is far beyond the line — '
-            'massive edge, high probability, the closest thing to a sure bet in sports.'
-            '</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        _gcol_logo, _gcol_title = st.columns([1, 6])
+        with _gcol_logo:
+            if os.path.exists(_GOBLIN_LOGO_PATH):
+                st.image(_GOBLIN_LOGO_PATH, width=110)
+        with _gcol_title:
+            st.markdown(
+                '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
+                'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
+                '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">🧌 Goblin Picks — Easy Money</h3>'
+                '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
+                'Extreme-edge bets where the model projection is far beyond the line — '
+                'massive edge, high probability, the closest thing to a sure bet in sports.'
+                '</p>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
         st.markdown(
             get_education_box_html(
                 "What is a Goblin Bet? 🧌",
@@ -2093,6 +2103,22 @@ if analysis_results:
             f"👿 Demon Bets Detected ({len(_demon_picks)}) — Click to See Traps to AVOID",
             expanded=False,
         ):
+            _dcol_logo, _dcol_title = st.columns([1, 6])
+            with _dcol_logo:
+                if os.path.exists(_DEMON_LOGO_PATH):
+                    st.image(_DEMON_LOGO_PATH, width=110)
+            with _dcol_title:
+                st.markdown(
+                    '<div style="background:rgba(180,0,0,0.15);border:2px solid #ff4444;'
+                    'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
+                    '<strong style="color:#ff4444;font-size:1.0rem;">👿 Demon Bets Warning</strong><br>'
+                    '<span style="color:#ffb0b0;font-size:0.85rem;">These picks LOOK appealing but are statistically dangerous. '
+                    'Demon bets have hidden structural risks — hot streak regression, back-to-back fatigue, '
+                    'conflicting forces, or high-variance stats with tiny edges. '
+                    'They are automatically added to your Avoid List.</span>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
             st.markdown(
                 get_education_box_html(
                     "What is a Demon Bet? 👿",
@@ -2109,16 +2135,6 @@ if analysis_results:
                     "season average). The player is due to come back to earth.<br><br>"
                     "Demon bets are <em>automatically added to your Avoid List</em>.",
                 ),
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                '<div style="background:rgba(180,0,0,0.12);border-radius:8px;padding:12px 16px;'
-                'margin-bottom:12px;border-left:4px solid #ff4444;">'
-                '<strong style="color:#ff4444;">⚠️ These picks LOOK appealing but are statistically dangerous.</strong><br>'
-                '<span style="color:#ffb0b0;font-size:0.85rem;">Demon bets have hidden structural risks that make them likely losers — '
-                'hot streak regression, back-to-back fatigue, conflicting forces, or high-variance stats with tiny edges. '
-                'They are automatically added to your Avoid List.</span>'
-                '</div>',
                 unsafe_allow_html=True,
             )
             for _dp in _demon_picks:
@@ -2213,6 +2229,26 @@ if analysis_results:
     )[:8]  # Show top 8
 
     if _single_bet_pool:
+        # ── Gold tier banner (with Gold_Logo.png) ──────────────────────
+        _gold_pool = [r for r in _single_bet_pool if r.get("tier") in ("Gold", "Platinum")]
+        if _gold_pool:
+            _goldcol_logo, _goldcol_title = st.columns([1, 6])
+            with _goldcol_logo:
+                if os.path.exists(_GOLD_LOGO_PATH):
+                    st.image(_GOLD_LOGO_PATH, width=110)
+            with _goldcol_title:
+                st.markdown(
+                    '<div style="background:linear-gradient(135deg,#1a1200,#231800);'
+                    'border:2px solid #ffd700;border-radius:10px;padding:14px 18px;margin-bottom:4px;">'
+                    '<h3 style="color:#ffd700;font-family:Orbitron,sans-serif;margin:0 0 4px;">🥇 Gold Tier Picks</h3>'
+                    '<p style="color:#ffe082;font-size:0.85rem;margin:0;">'
+                    'High-confidence picks with strong model projections and favorable matchups. '
+                    'Gold picks are ideal for your core entry legs.'
+                    '</p>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
+
         st.markdown(
             '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
             'border:2px solid #00f0ff;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
