@@ -95,6 +95,12 @@ UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
 # Documentation: https://the-odds-api.com/liveapi/guides/v4/
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 
+# Default American odds for platforms without traditional juice (e.g. -110)
+# BEGINNER NOTE: -110 is the standard American odds for prop bets on DraftKings.
+# Breakeven at -110 = 52.38% win rate. PrizePicks/Underdog don't use odds,
+# so we default to -110 for their implied probability calculations.
+_DEFAULT_AMERICAN_ODDS = -110
+
 # ============================================================
 # END SECTION: Module-level constants
 # ============================================================
@@ -276,8 +282,8 @@ def fetch_prizepicks_props(league="NBA"):
             "platform": "PrizePicks",
             "game_date": today,
             "fetched_at": fetched_at,
-            "over_odds": attrs.get("price", attrs.get("over_price", -110)),
-            "under_odds": attrs.get("under_price", -110),
+            "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+            "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
         })
 
     _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props.")
@@ -394,8 +400,8 @@ def fetch_underdog_props(league="NBA"):
             "platform": "Underdog",
             "game_date": today,
             "fetched_at": fetched_at,
-            "over_odds": line_item.get("price", line_item.get("over_price", -110)),
-            "under_odds": line_item.get("under_price", -110),
+            "over_odds": line_item.get("price", line_item.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+            "under_odds": line_item.get("under_price", _DEFAULT_AMERICAN_ODDS),
         })
 
     _logger.info(f"[Underdog] Fetched {len(props)} NBA props.")
@@ -609,8 +615,8 @@ def fetch_draftkings_props(api_key=None):
                         "platform": "DraftKings",
                         "game_date": today,
                         "fetched_at": fetched_at,
-                        "over_odds": outcome.get("price", outcome.get("over_price", -110)),
-                        "under_odds": outcome.get("under_price", -110),
+                        "over_odds": outcome.get("price", outcome.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+                        "under_odds": outcome.get("under_price", _DEFAULT_AMERICAN_ODDS),
                     })
 
     _logger.info(f"[DraftKings] Fetched {len(props)} NBA props.")

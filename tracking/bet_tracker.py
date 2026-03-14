@@ -329,8 +329,8 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
     Returns:
         int: Number of new bets logged.
     """
-    import datetime as _dt
     import sqlite3 as _sqlite3
+    import datetime as _dt
     from tracking.database import DB_FILE_PATH as _DB_PATH
 
     if not analysis_results:

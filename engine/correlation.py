@@ -131,7 +131,7 @@ def calculate_game_environment_correlation(game_total, stat_type):
         stat_type (str): The prop stat type ('points', 'assists', etc.)
 
     Returns:
-        float: Correlation boost/penalty per player in this game (-0.15 to +0.15)
+        float: Correlation boost/penalty per player in this game (-MAX_CORRELATION_ADJUSTMENT to +MAX_CORRELATION_ADJUSTMENT)
     """
     if game_total is None:
         return 0.0
@@ -183,7 +183,7 @@ def calculate_usage_cannibalization(player1_usage_rate, player2_usage_rate, stat
     if combined > 0.50:
         # Strong negative correlation when total usage is high
         cannibalization = -(combined - 0.50) * 0.4
-        return max(-0.15, cannibalization)
+        return max(-MAX_CORRELATION_ADJUSTMENT, cannibalization)
 
     return 0.0
 
@@ -286,7 +286,11 @@ def adjust_parlay_probability(individual_probs, correlation_matrix):
     avg_prob = sum(individual_probs) / n
     # The adjustment is proportional to both correlation and how extreme the probs are
     prob_factor = avg_prob * (1 - avg_prob)  # maximized at p=0.5
-    adjustment = avg_corr * prob_factor * 2.0
+    # BEGINNER NOTE: Scale factor of 2.0 normalizes the prob_factor (max 0.25 at p=0.5)
+    # so that full correlation (r=1) with average probability gives a meaningful adjustment.
+    # Without this factor, the adjustment would be too small to matter.
+    _COPULA_SCALE = 2.0
+    adjustment = avg_corr * prob_factor * _COPULA_SCALE
 
     # Cap adjustment to MAX_CORRELATION_ADJUSTMENT
     adjustment = max(-MAX_CORRELATION_ADJUSTMENT, min(MAX_CORRELATION_ADJUSTMENT, adjustment))

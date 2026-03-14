@@ -507,8 +507,11 @@ def calculate_correlation_risk(selected_picks):
             corr_summary = get_correlation_summary(selected_picks, corr_matrix)
             result["correlation_matrix"] = corr_matrix
             result["correlation_summary"] = corr_summary
-            # Escalate correlation_level if the matrix analysis finds high risk
-            if corr_summary.get("risk_level") == "high" and correlation_level == "none":
+            # Escalate correlation_level based on matrix analysis risk level
+            risk = corr_summary.get("risk_level", "low")
+            if risk == "high":
+                result["correlation_level"] = "high"
+            elif risk == "medium" and correlation_level == "none":
                 result["correlation_level"] = "low"
         except Exception:
             pass  # Fallback to game-grouping result above
