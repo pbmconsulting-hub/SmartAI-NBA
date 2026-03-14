@@ -21,6 +21,12 @@ logs/
 logs/*.log
 logs/*.log.*
 
+# Environment / secrets — NEVER commit API keys or credentials
+.env
+.env.*
+secrets.toml
+.streamlit/secrets.toml
+
 # Virtual environment (if user creates one)
 venv/
 .venv/
