@@ -274,6 +274,37 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already exists — safe to ignore
 
+            # ── Goblin / Demon bet_type column migrations ─────────────
+            # Add bet_type and std_devs_from_line to bets table
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN bet_type TEXT DEFAULT 'normal'"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN std_devs_from_line REAL DEFAULT 0.0"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            # Add bet_type to all_analysis_picks table
+            try:
+                cursor.execute(
+                    "ALTER TABLE all_analysis_picks ADD COLUMN bet_type TEXT DEFAULT 'normal'"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE all_analysis_picks ADD COLUMN std_devs_from_line REAL DEFAULT 0.0"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
             # Save the changes
             connection.commit()
 
@@ -337,8 +368,9 @@ def insert_bet(bet_data):
     INSERT INTO bets (
         bet_date, player_name, team, stat_type, prop_line,
         direction, platform, confidence_score, probability_over,
-        edge_percentage, tier, entry_type, entry_fee, notes, auto_logged
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        edge_percentage, tier, entry_type, entry_fee, notes, auto_logged,
+        bet_type, std_devs_from_line
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """
 
     values = (
@@ -357,6 +389,8 @@ def insert_bet(bet_data):
         bet_data.get("entry_fee", 0.0),
         bet_data.get("notes", ""),
         int(bet_data.get("auto_logged", 0)),
+        bet_data.get("bet_type", "normal"),
+        float(bet_data.get("std_devs_from_line", 0.0) or 0.0),
     )
 
     try:
@@ -1053,8 +1087,9 @@ def insert_analysis_picks(analysis_results):
                     INSERT INTO all_analysis_picks
                         (pick_date, player_name, team, stat_type, prop_line,
                          direction, platform, confidence_score, probability_over,
-                         edge_percentage, tier, result, actual_value, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+                         edge_percentage, tier, result, actual_value, notes,
+                         bet_type, std_devs_from_line)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
                     """,
                     (
                         today_str,
@@ -1069,6 +1104,8 @@ def insert_analysis_picks(analysis_results):
                         float(r.get("edge_percentage", 0) or 0),
                         r.get("tier", "Bronze"),
                         f"Auto-stored by Smart Pick Pro. SAFE Score: {r.get('confidence_score', 0):.0f}",
+                        r.get("bet_type", "normal"),
+                        float(r.get("std_devs_from_line", 0.0) or 0.0),
                     ),
                 )
                 existing.add(key)

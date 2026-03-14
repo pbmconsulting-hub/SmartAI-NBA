@@ -24,7 +24,7 @@ from engine.simulation import (
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
@@ -658,6 +658,71 @@ def display_prop_analysis_card_qds(result):
     tier = result.get("tier", "Bronze")
     tier_icon_map = {"Platinum": "💎", "Gold": "🔒", "Silver": "✓", "Bronze": "⭐"}
     tier_icon = tier_icon_map.get(tier, "⭐")
+
+    # ── Goblin / Demon badge ─────────────────────────────────────
+    bet_type       = result.get("bet_type", "normal")
+    bet_type_emoji = result.get("bet_type_emoji", "")
+    bet_type_label = result.get("bet_type_label", "")
+    bet_type_reasons = result.get("bet_type_reasons", []) or []
+
+    if bet_type == "goblin":
+        _goblin_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
+        st.markdown(
+            f'<div style="background:rgba(76,175,80,0.12);border:1px solid #4caf50;border-radius:6px;'
+            f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
+            f'<span style="font-size:1.3rem;">🧌</span>'
+            f'<div>'
+            f'<span style="color:#4caf50;font-weight:700;font-size:0.9rem;">GOBLIN BET — Easy Money</span>'
+            + (f'<br><span style="color:#a5d6a7;font-size:0.78rem;">{_html.escape(_goblin_reasons_str)}</span>'
+               if _goblin_reasons_str else "")
+            + f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    elif bet_type == "demon":
+        _demon_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
+        st.markdown(
+            f'<div style="background:rgba(255,68,68,0.10);border:1px solid #ff4444;border-radius:6px;'
+            f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
+            f'<span style="font-size:1.3rem;">👿</span>'
+            f'<div>'
+            f'<span style="color:#ff4444;font-weight:700;font-size:0.9rem;">DEMON BET — AVOID (Dangerous Trap)</span>'
+            + (f'<br><span style="color:#ffb0b0;font-size:0.78rem;">{_html.escape(_demon_reasons_str)}</span>'
+               if _demon_reasons_str else "")
+            + f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── True odds / implied probability display ───────────────────
+    _over_odds  = result.get("over_odds",  -110)
+    _under_odds = result.get("under_odds", -110)
+    _odds_for_dir = _over_odds if direction == "OVER" else _under_odds
+    if _odds_for_dir and _odds_for_dir != 0:
+        _odds_str = f"+{_odds_for_dir}" if int(_odds_for_dir) > 0 else str(int(_odds_for_dir))
+        # Implied probability from odds
+        _abs_odds = abs(float(_odds_for_dir))
+        if float(_odds_for_dir) < 0:
+            _implied_prob = _abs_odds / (_abs_odds + 100.0) * 100.0
+        else:
+            _implied_prob = 100.0 / (float(_odds_for_dir) + 100.0) * 100.0
+        _model_prob = (result.get("probability_over", 0.5) if direction == "OVER"
+                       else 1.0 - result.get("probability_over", 0.5)) * 100.0
+        _true_edge_pct = _model_prob - _implied_prob
+        _proj_val = result.get("adjusted_projection", 0)
+        st.markdown(
+            f'<div style="background:rgba(0,240,255,0.05);border:1px solid rgba(0,240,255,0.2);'
+            f'border-radius:6px;padding:6px 12px;margin-bottom:6px;font-size:0.78rem;color:#a0c0d8;">'
+            f'<span style="color:#00f0ff;font-weight:600;">Platform Line:</span> '
+            f'{direction.title()} {line} &nbsp;|&nbsp; '
+            f'<span style="color:#00f0ff;font-weight:600;">Odds:</span> {_odds_str} &nbsp;|&nbsp; '
+            f'<span style="color:#00f0ff;font-weight:600;">Model Proj:</span> {_proj_val:.1f} &nbsp;|&nbsp; '
+            f'<span style="color:#00f0ff;font-weight:600;">Breakeven:</span> {_implied_prob:.1f}% &nbsp;|&nbsp; '
+            f'<span style="color:#{"4caf50" if _true_edge_pct > 0 else "ff4444"};font-weight:600;">'
+            f'True Edge: {_true_edge_pct:+.1f}%</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Prop description string ──────────────────────────────────
     stat_emoji = _STAT_EMOJI.get(stat, "🏀")
@@ -1445,7 +1510,47 @@ if run_analysis:
             "player_status_note": player_status_info.get("injury_note", ""),
         }
 
-        # ── Feature 1: CLV stat-type penalties ───────────────────────
+        # ── Goblin / Demon Bet Classification ────────────────────────
+        # Classify each pick as a Goblin (easy money), Demon (trap/avoid),
+        # or Normal bet based on statistical criteria.
+        try:
+            _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
+            _bet_classification = classify_bet_type(
+                probability_over=probability_over,
+                edge_percentage=edge_pct,
+                stat_standard_deviation=stat_std,
+                projected_stat=projected_stat,
+                prop_line=prop_line,
+                stat_type=stat_type,
+                directional_forces_result=forces_result,
+                rest_days=game_context.get("rest_days", 1),
+                vegas_spread=game_context.get("vegas_spread", 0.0),
+                recent_form_ratio=projection_result.get("recent_form_ratio"),
+                season_average=_season_avg_for_classify,
+            )
+            full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
+            full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
+            full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Normal Bet")
+            full_result["bet_type_reasons"]= _bet_classification.get("reasons", [])
+            full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
+            # Demon bets should be added to the avoid list automatically
+            if _bet_classification.get("demon") and not full_result.get("should_avoid"):
+                full_result["should_avoid"] = True
+                full_result["avoid_reasons"] = list(full_result.get("avoid_reasons", [])) + [
+                    f"👿 Demon Bet: {'; '.join(_bet_classification.get('reasons', []))}"
+                ]
+        except Exception:
+            full_result["bet_type"]         = "normal"
+            full_result["bet_type_emoji"]   = ""
+            full_result["bet_type_label"]   = "Normal Bet"
+            full_result["bet_type_reasons"] = []
+            full_result["std_devs_from_line"] = 0.0
+
+        # ── Capture odds from the original prop (for display) ────────
+        full_result["over_odds"]  = prop.get("over_odds",  -110)
+        full_result["under_odds"] = prop.get("under_odds", -110)
+
+
         try:
             _clv_penalties = get_stat_type_clv_penalties(days=90)
             _clv_stat_penalty = _clv_penalties.get(stat_type, 0.0)
@@ -1635,6 +1740,8 @@ if analysis_results:
     total_under_picks= sum(1 for r in displayed_results if r.get("direction") == "UNDER")
     platinum_count   = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
     gold_count       = sum(1 for r in displayed_results if r.get("tier") == "Gold")
+    goblin_count     = sum(1 for r in analysis_results if r.get("bet_type") == "goblin")
+    demon_count      = sum(1 for r in analysis_results if r.get("bet_type") == "demon")
     avg_edge         = (
         sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
         if displayed_results else 0
@@ -1643,12 +1750,14 @@ if analysis_results:
 
     st.subheader(f"📊 Results: {len(displayed_results)} picks (of {total_analyzed} analyzed)")
 
-    sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
+    sum_col1, sum_col2, sum_col3, sum_col4, sum_col5, sum_col6, sum_col7 = st.columns(7)
     sum_col1.metric("Showing",     len(displayed_results))
     sum_col2.metric("⬆️ OVER",    total_over_picks)
     sum_col3.metric("⬇️ UNDER",   total_under_picks)
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("🥇 Gold",     gold_count)
+    sum_col6.metric("🧌 Goblin",   goblin_count)
+    sum_col7.metric("👿 Demon",    demon_count)
 
     # ── Slate Summary Dashboard ────────────────────────────────
     silver_count  = sum(1 for r in displayed_results if r.get("tier") == "Silver")
@@ -1789,6 +1898,138 @@ if analysis_results:
                     st.write(", ".join(unmatched_names_deduped))
 
     st.divider()
+
+    # ============================================================
+    # SECTION: 🧌 Goblin Picks — Extreme Edge "Easy Money" Bets
+    # ============================================================
+    _goblin_picks = [
+        r for r in displayed_results
+        if r.get("bet_type") == "goblin"
+        and not r.get("player_is_out", False)
+    ]
+    _goblin_picks = sorted(
+        _goblin_picks,
+        key=lambda r: (abs(r.get("edge_percentage", 0)), r.get("confidence_score", 0)),
+        reverse=True,
+    )
+
+    if _goblin_picks:
+        st.markdown(
+            '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
+            'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
+            '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">🧌 Goblin Picks — Easy Money</h3>'
+            '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
+            'Extreme-edge bets where the model projection is far beyond the line — '
+            'massive edge, high probability, the closest thing to a sure bet in sports.'
+            '</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        for _gp in _goblin_picks:
+            _gp_name   = _html.escape(str(_gp.get("player_name", "")))
+            _gp_stat   = _html.escape(str(_gp.get("stat_type", "")).title())
+            _gp_dir    = _html.escape(str(_gp.get("direction", "OVER")))
+            _gp_line   = _gp.get("line", 0)
+            _gp_proj   = _gp.get("adjusted_projection", _gp.get("projected_stat", 0))
+            _gp_prob   = _gp.get("probability_over", 0.5) if _gp_dir == "OVER" else 1.0 - _gp.get("probability_over", 0.5)
+            _gp_edge   = abs(_gp.get("edge_percentage", 0))
+            _gp_conf   = _gp.get("confidence_score", 0)
+            _gp_sigma  = abs(_gp.get("std_devs_from_line", 0))
+            _gp_tier   = _html.escape(str(_gp.get("tier", "")))
+            _gp_tier_emoji = _gp.get("tier_emoji", "")
+            _gp_reasons_html = "".join(
+                f'<li style="color:#c8e6c9;font-size:0.8rem;">{_html.escape(str(r))}</li>'
+                for r in _gp.get("bet_type_reasons", [])
+            )
+            _over_odds  = _gp.get("over_odds",  -110)
+            _under_odds = _gp.get("under_odds", -110)
+            _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
+            _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
+            st.markdown(
+                f'<div style="background:#0d1a0d;border:2px solid #4caf50;border-radius:8px;'
+                f'padding:14px 18px;margin-bottom:10px;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+                f'<div>'
+                f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
+                f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
+                f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
+                f'<span style="color:#a0d0a0;font-size:0.8rem;margin-left:8px;">'
+                f'(Proj: <strong style="color:#4caf50;">{_gp_proj:.1f}</strong>'
+                f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
+                f'</div>'
+                f'<div style="text-align:right;">'
+                f'<span style="background:#4caf50;color:#0a1a0a;padding:3px 10px;border-radius:4px;'
+                f'font-size:0.8rem;font-weight:700;margin-right:6px;">SAFE {_gp_conf:.0f}/100</span>'
+                f'<span style="color:#81c784;font-size:0.8rem;">Edge {_gp_edge:+.1f}%</span>'
+                f'<br><span style="color:#69f0ae;font-size:0.75rem;">'
+                f'P({_gp_dir.title()}): {_gp_prob*100:.0f}%</span>'
+                f'<span style="color:#a0d0a0;font-size:0.75rem;margin-left:8px;">'
+                f'Odds: {_odds_str}</span>'
+                f'</div>'
+                f'</div>'
+                f'<div style="margin-top:8px;">'
+                f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
+                f'<ul style="margin:4px 0 0 16px;padding:0;">{_gp_reasons_html}</ul>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        st.markdown(f"*{len(_goblin_picks)} Goblin pick(s) found on this slate.*")
+        st.divider()
+
+    # ============================================================
+    # SECTION: 👿 Demon Bets Warning Section
+    # ============================================================
+    _demon_picks = [
+        r for r in analysis_results  # Use ALL results, not just displayed
+        if r.get("bet_type") == "demon"
+        and not r.get("player_is_out", False)
+    ]
+    if _demon_picks:
+        with st.expander(
+            f"👿 Demon Bets Detected ({len(_demon_picks)}) — Click to See Traps to AVOID",
+            expanded=False,
+        ):
+            st.markdown(
+                '<div style="background:rgba(180,0,0,0.12);border-radius:8px;padding:12px 16px;'
+                'margin-bottom:12px;border-left:4px solid #ff4444;">'
+                '<strong style="color:#ff4444;">⚠️ These picks LOOK appealing but are statistically dangerous.</strong><br>'
+                '<span style="color:#ffb0b0;font-size:0.85rem;">Demon bets have hidden structural risks that make them likely losers — '
+                'hot streak regression, back-to-back fatigue, conflicting forces, or high-variance stats with tiny edges. '
+                'They are automatically added to your Avoid List.</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            for _dp in _demon_picks:
+                _dp_name  = _html.escape(str(_dp.get("player_name", "")))
+                _dp_stat  = _html.escape(str(_dp.get("stat_type", "")).title())
+                _dp_dir   = _html.escape(str(_dp.get("direction", "OVER")))
+                _dp_line  = _dp.get("line", 0)
+                _dp_proj  = _dp.get("adjusted_projection", 0)
+                _dp_edge  = _dp.get("edge_percentage", 0)
+                _dp_reasons_html = "".join(
+                    f'<li style="color:#ffb0b0;font-size:0.82rem;">{_html.escape(str(r))}</li>'
+                    for r in _dp.get("bet_type_reasons", [])
+                )
+                st.markdown(
+                    f'<div style="background:rgba(180,0,0,0.08);border:1px solid rgba(255,68,68,0.35);'
+                    f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="color:#ff6666;font-weight:700;">👿 {_dp_name}</span>'
+                    f'<span style="color:#ffb0b0;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat} '
+                    f'(Proj: {_dp_proj:.1f})</span>'
+                    f'<span style="color:#ff4444;font-size:0.8rem;font-weight:600;">'
+                    f'Edge: {_dp_edge:+.1f}%</span>'
+                    f'</div>'
+                    f'<div style="margin-top:8px;">'
+                    f'<span style="color:#ff4444;font-size:0.75rem;font-weight:600;">WHY IT\'S A DEMON (AVOID):</span>'
+                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_reasons_html}</ul>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        st.divider()
 
     # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
     _single_bet_pool = [
