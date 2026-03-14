@@ -1081,6 +1081,60 @@ def load_all_analysis_picks(days=30):
         _logger.warning(f"load_all_analysis_picks error (non-fatal): {err}")
     return rows
 
+def update_analysis_pick_result(pick_id, result, actual_value):
+    """
+    Write a WIN / LOSS / PUSH result back to a row in all_analysis_picks.
+
+    Args:
+        pick_id (int): Primary key of the row in all_analysis_picks.
+        result (str): 'WIN', 'LOSS', or 'PUSH'.
+        actual_value (float): The player's actual stat value.
+
+    Returns:
+        bool: True if a row was updated, False otherwise.
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.execute(
+                "UPDATE all_analysis_picks SET result = ?, actual_value = ? WHERE pick_id = ?",
+                (result, float(actual_value), int(pick_id)),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as err:
+        _logger.warning(f"update_analysis_pick_result error (non-fatal): {err}")
+        return False
+
+
+def load_pending_analysis_picks(limit=2000):
+    """
+    Load all rows from all_analysis_picks that have not yet been resolved
+    (result IS NULL or result = '').
+
+    Args:
+        limit (int): Maximum rows to return.
+
+    Returns:
+        list[dict]: Pending pick rows as dicts.
+    """
+    rows = []
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(
+                """SELECT * FROM all_analysis_picks
+                   WHERE (result IS NULL OR result = '')
+                   ORDER BY pick_date ASC
+                   LIMIT ?""",
+                (limit,),
+            )
+            rows = [dict(row) for row in cursor.fetchall()]
+    except Exception as err:
+        _logger.warning(f"load_pending_analysis_picks error (non-fatal): {err}")
+    return rows
+
 # ============================================================
 # END SECTION: All Analysis Picks
 # ============================================================

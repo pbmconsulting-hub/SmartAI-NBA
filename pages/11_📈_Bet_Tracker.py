@@ -24,6 +24,7 @@ from tracking.bet_tracker import (
     auto_log_analysis_bets,
     auto_resolve_bet_results,
     resolve_all_pending_bets,
+    resolve_all_analysis_picks,
     get_model_performance_stats,
     log_new_bet,
     record_bet_result,
@@ -567,25 +568,45 @@ with tab_all_picks:
     if _resolve_all_picks_btn:
         with st.spinner("🔄 Resolving all pending picks across all dates…"):
             try:
-                _rap_result = resolve_all_pending_bets()
-                _rap_resolved = _rap_result.get("resolved", 0)
-                _rap_wins    = _rap_result.get("wins", 0)
-                _rap_losses  = _rap_result.get("losses", 0)
-                _rap_pushes  = _rap_result.get("pushes", 0)
-                _rap_pending = _rap_result.get("pending", 0)
-                _rap_errors  = _rap_result.get("errors", [])
+                # ── Step 1: Resolve all_analysis_picks table (what this tab displays) ──
+                _picks_result  = resolve_all_analysis_picks()
+                # ── Step 2: Also resolve the bets table (manual + AI bets) ──────────
+                _bets_result   = resolve_all_pending_bets()
+
+                # Combine both results for reporting
+                _rap_resolved  = _picks_result.get("resolved", 0) + _bets_result.get("resolved", 0)
+                _rap_wins      = _picks_result.get("wins", 0)    + _bets_result.get("wins", 0)
+                _rap_losses    = _picks_result.get("losses", 0)  + _bets_result.get("losses", 0)
+                _rap_pushes    = _picks_result.get("pushes", 0)  + _bets_result.get("pushes", 0)
+                _rap_pending   = _picks_result.get("pending", 0) + _bets_result.get("pending", 0)
+                _rap_errors    = _picks_result.get("errors", []) + _bets_result.get("errors", [])
+
+                # Deduplicate errors (same player may appear in both tables)
+                _rap_errors = list(dict.fromkeys(_rap_errors))
+
                 if _rap_resolved > 0:
                     st.success(
                         f"✅ Resolved **{_rap_resolved}** pick(s): "
                         f"✅ {_rap_wins} WIN · ❌ {_rap_losses} LOSS · 🔄 {_rap_pushes} PUSH"
-                        + (f" | ⏳ {_rap_pending} still pending" if _rap_pending > 0 else "")
+                        + (f" | ⏳ {_rap_pending} still pending (game may not be final)" if _rap_pending > 0 else "")
                     )
-                elif _rap_errors:
-                    st.info(_rap_errors[0] if _rap_errors else "Nothing to resolve.")
+                    # Show per-date breakdown
+                    _combined_by_date = {}
+                    for _d, _n in {**_picks_result.get("by_date", {}), **_bets_result.get("by_date", {})}.items():
+                        _combined_by_date[_d] = _combined_by_date.get(_d, 0) + _n
+                    if _combined_by_date:
+                        for _d in sorted(_combined_by_date):
+                            st.caption(f"  📅 {_d}: {_combined_by_date[_d]} resolved")
+                elif _rap_errors and not _rap_pending:
+                    st.info("ℹ️ No picks were resolved. See errors below.")
                 else:
-                    st.info("No pending picks found to resolve.")
+                    st.info(
+                        "ℹ️ No pending picks found to resolve. "
+                        "Either all picks are already resolved, today's games aren't final yet, "
+                        "or no picks have been logged."
+                    )
                 if _rap_errors:
-                    with st.expander("⚠️ Resolution errors (click to expand)"):
+                    with st.expander(f"⚠️ {len(_rap_errors)} resolution error(s) (click to expand)"):
                         for _e in _rap_errors:
                             st.caption(_e)
             except Exception as _rap_exc:
