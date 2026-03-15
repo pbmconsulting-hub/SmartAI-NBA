@@ -21,9 +21,9 @@ def american_odds_to_implied_probability(odds):
     try:
         odds = float(odds)
         if odds < 0:
-            return abs(odds) / (abs(odds) + 100.0)
+            return round(abs(odds) / (abs(odds) + 100.0), 6)
         else:
-            return 100.0 / (odds + 100.0)
+            return round(100.0 / (odds + 100.0), 6)
     except (ValueError, TypeError):
         return 0.5238  # Default to -110 breakeven
 

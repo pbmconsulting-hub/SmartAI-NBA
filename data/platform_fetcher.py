@@ -49,6 +49,13 @@ except ImportError:
 # This converts "3-Point Made" → "threes", "Pts+Rebs" → "points_rebounds", etc.
 from data.platform_mappings import normalize_stat_type
 
+# Import odds math from the single source of truth — engine/odds_engine.py
+from engine.odds_engine import (
+    american_odds_to_implied_probability,
+    implied_probability_to_american_odds,
+    calculate_breakeven_probability,
+)
+
 try:
     from utils.logger import get_logger
     _logger = get_logger(__name__)
@@ -205,35 +212,6 @@ def _now_str():
     """Return the current datetime as an ISO string."""
     return datetime.datetime.now().isoformat(timespec="seconds")
 
-
-def american_odds_to_implied_probability(odds):
-    """Convert American odds to implied probability."""
-    try:
-        odds = float(odds)
-        if odds < 0:
-            return round(abs(odds) / (abs(odds) + 100.0), 6)
-        else:
-            return round(100.0 / (odds + 100.0), 6)
-    except (ValueError, TypeError):
-        return 0.5238
-
-
-def implied_probability_to_american_odds(prob):
-    """Convert implied probability to American odds."""
-    try:
-        prob = float(prob)
-        prob = max(0.001, min(0.999, prob))
-        if prob >= 0.5:
-            return round(-(prob / (1.0 - prob)) * 100.0, 1)
-        else:
-            return round(((1.0 - prob) / prob) * 100.0, 1)
-    except (ValueError, TypeError):
-        return -110.0
-
-
-def calculate_breakeven_probability(odds):
-    """Calculate breakeven probability needed to profit at these odds."""
-    return american_odds_to_implied_probability(odds)
 
 # ============================================================
 # END SECTION: Helper — today's date string
@@ -678,15 +656,20 @@ def fetch_draftkings_props(api_key=None):
                 if not stat_type:
                     continue  # Skip markets we don't track
 
+                # ── Pair Over and Under outcomes by player + line ──
+                # The Odds API returns separate outcome objects for "Over" and
+                # "Under". We first index every outcome by (player_name, line),
+                # then combine them so under_odds comes from the real Under
+                # outcome price instead of always falling back to _DEFAULT_AMERICAN_ODDS.
+                over_map = {}   # (player_name, line) → over_price
+                under_map = {}  # (player_name, line) → under_price
+
                 for outcome in market.get("outcomes", []):
                     # The Odds API player props have:
-                    #   name     → player name (e.g., "LeBron James")
-                    #   point    → the line value (e.g., 24.5)
+                    #   name        → player name (e.g., "LeBron James")
+                    #   point       → the line value (e.g., 24.5)
                     #   description → "Over" or "Under"
-
-                    # Only record "Over" outcomes (one line per player/stat)
-                    if outcome.get("description", "").lower() != "over":
-                        continue
+                    #   price       → American odds for this side
 
                     player_name = outcome.get("name", "").strip()
                     if not player_name:
@@ -700,6 +683,24 @@ def fetch_draftkings_props(api_key=None):
                     if line <= 0:
                         continue
 
+                    direction = outcome.get("description", "").lower()
+                    price = outcome.get("price", _DEFAULT_AMERICAN_ODDS)
+                    key = (player_name, line)
+
+                    if direction == "over":
+                        over_map[key] = price
+                    elif direction == "under":
+                        under_map[key] = price
+
+                # Build one prop dict per Over outcome, attaching the matching Under price
+                for (player_name, line), over_price in over_map.items():
+                    _has_under = (player_name, line) in under_map
+                    under_price = under_map.get((player_name, line), _DEFAULT_AMERICAN_ODDS)
+                    if not _has_under:
+                        _logger.debug(
+                            f"[DraftKings] No Under outcome found for {player_name} {stat_type} {line} "
+                            f"— defaulting under_odds to {_DEFAULT_AMERICAN_ODDS}"
+                        )
                     props.append({
                         "player_name": player_name,
                         "team": "",  # Odds API doesn't include team in player props
@@ -708,8 +709,8 @@ def fetch_draftkings_props(api_key=None):
                         "platform": "DraftKings",
                         "game_date": today,
                         "fetched_at": fetched_at,
-                        "over_odds": outcome.get("price", outcome.get("over_price", _DEFAULT_AMERICAN_ODDS)),
-                        "under_odds": outcome.get("under_price", _DEFAULT_AMERICAN_ODDS),
+                        "over_odds": over_price,
+                        "under_odds": under_price,
                     })
 
     _logger.info(f"[DraftKings] Fetched {len(props)} NBA props.")
