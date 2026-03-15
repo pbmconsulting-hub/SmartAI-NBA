@@ -31,7 +31,7 @@ from engine.simulation import (
     simulate_triple_double,
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
-from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost
+from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type
 
 try:
@@ -1195,13 +1195,74 @@ if run_analysis:
         player_matched = player_data is not None
 
         if player_data is None:
+            # Build a complete fallback using positional priors.
+            # Using only one stat's avg (the old approach) caused zero-projections for
+            # every other stat — which breaks combo stats, double_double, fantasy scores,
+            # and the directional forces analysis entirely.
+            #
+            # Strategy:
+            #  1. Fill all 7 stat avgs from the SF position prior (league-average for
+            #     an unknown player whose position we cannot determine).
+            #  2. For the specific stat being analyzed, anchor to prop_line (the most
+            #     reliable single data point we have) by scaling the prior components
+            #     proportionally so the expected total matches the prop line.
+            #  3. Set games_played=30 (above the Bayesian threshold of 25) so shrinkage
+            #     is NOT applied — the prop_line is already our best anchor and further
+            #     shrinkage toward league priors would move estimates away from it.
+            _pos   = "SF"  # default when position is unknown
+            _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
             player_data = {
-                "name":            player_name,
-                "team":            prop.get("team", ""),
-                "position":        "SF",
-                f"{stat_type}_avg": str(prop_line),
-                f"{stat_type}_std": str(prop_line * 0.35),
+                "name":          player_name,
+                "team":          prop.get("team", ""),
+                "position":      _pos,
+                "games_played":  30,   # above Bayesian threshold — trust prop_line anchor
+                "minutes_avg":   28.0,
+                # All seven stats seeded from position priors
+                "points_avg":    str(_prior["points"]),
+                "rebounds_avg":  str(_prior["rebounds"]),
+                "assists_avg":   str(_prior["assists"]),
+                "threes_avg":    str(_prior["threes"]),
+                "steals_avg":    str(_prior["steals"]),
+                "blocks_avg":    str(_prior["blocks"]),
+                "turnovers_avg": str(_prior["turnovers"]),
             }
+
+            if stat_type in COMBO_STAT_TYPES:
+                # Scale prior components so they sum to the prop_line.
+                # e.g. PRA line=50.5, SF prior P+R+A=25.0 → scale=2.02
+                # → pts=32.3, reb=11.1, ast=7.1  (realistic split that totals 50.5)
+                _components = COMBO_STATS.get(stat_type, [])
+                _prior_sum = sum(_prior.get(s, 0.0) for s in _components)
+                if _prior_sum > 0 and prop_line > 0:
+                    _scale = prop_line / _prior_sum
+                    for _c in _components:
+                        _est = round(_prior.get(_c, 0.0) * _scale, 1)
+                        player_data[f"{_c}_avg"] = str(_est)
+                        player_data[f"{_c}_std"] = str(round(max(0.5, _est * 0.35), 1))
+                else:
+                    # Equal split fallback
+                    _split = round(prop_line / max(len(_components), 1), 1)
+                    for _c in _components:
+                        player_data[f"{_c}_avg"] = str(_split)
+                        player_data[f"{_c}_std"] = str(round(max(0.5, _split * 0.35), 1))
+
+            elif stat_type in FANTASY_STAT_TYPES:
+                # Scale all stats so the weighted fantasy total matches prop_line.
+                _formula = FANTASY_SCORING.get(stat_type, {})
+                _prior_fantasy = sum(_prior.get(s, 0.0) * w for s, w in _formula.items())
+                if _prior_fantasy > 0 and prop_line > 0:
+                    _scale = prop_line / _prior_fantasy
+                    for _fs in _formula:
+                        _est = round(_prior.get(_fs, 0.0) * _scale, 1)
+                        player_data[f"{_fs}_avg"] = str(_est)
+                        player_data[f"{_fs}_std"] = str(round(max(0.5, _est * 0.35), 1))
+
+            elif stat_type not in {"double_double", "triple_double"}:
+                # Simple stat: prop_line is the best single-point estimate.
+                player_data[f"{stat_type}_avg"] = str(prop_line)
+                player_data[f"{stat_type}_std"] = str(round(prop_line * 0.35, 1))
+            # For double_double / triple_double, the position priors already seed
+            # all five required components — no further override needed.
 
         player_team  = player_data.get("team", prop.get("team", ""))
         game_context = find_game_context_for_player(player_team, todays_games)
@@ -1675,18 +1736,19 @@ if run_analysis:
             from data.live_data_fetcher import fetch_todays_players_only as _fetch_today
             _roster_result = _fetch_today(todays_games, progress_callback=None)
             if _roster_result:
-                # Reload players data after the update
-                _refreshed_players = load_players_data()
-                # Re-match previously-unmatched players
-                _rematched = 0
-                for _r in analysis_results_list:
-                    if not _r.get("player_matched", True) and not _r.get("player_is_out", False):
-                        _pd = find_player_by_name(_refreshed_players, _r.get("player_name", ""))
-                        if _pd is not None:
-                            _r["player_matched"] = True
-                            _rematched += 1
-                if _rematched:
-                    st.success(f"✅ Smart Update matched {_rematched} additional player(s).")
+                # Re-run the full analysis now that players.csv is populated.
+                # Simply clearing the analysis cache and re-running the page gives
+                # every player a complete projection from real season averages
+                # rather than the position-prior estimates used above.
+                try:
+                    load_players_data.clear()  # bust Streamlit's CSV cache
+                except Exception:
+                    pass
+                st.success(
+                    f"✅ Smart Roster Update complete — re-running analysis with "
+                    f"fresh player data for {len(_unmatched_players)} player(s)."
+                )
+                st.rerun()
         except Exception as _su_err:
             # Non-fatal — proceed with existing results
             _logger.warning(f"Smart Update error (non-fatal): {_su_err}")

@@ -694,8 +694,9 @@ def fetch_draftkings_props(api_key=None):
 
                 # Build one prop dict per Over outcome, attaching the matching Under price
                 for (player_name, line), over_price in over_map.items():
+                    _has_under = (player_name, line) in under_map
                     under_price = under_map.get((player_name, line), _DEFAULT_AMERICAN_ODDS)
-                    if (player_name, line) not in under_map:
+                    if not _has_under:
                         _logger.debug(
                             f"[DraftKings] No Under outcome found for {player_name} {stat_type} {line} "
                             f"— defaulting under_odds to {_DEFAULT_AMERICAN_ODDS}"
