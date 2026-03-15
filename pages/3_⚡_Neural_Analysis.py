@@ -720,12 +720,8 @@ def display_prop_analysis_card_qds(result):
     _odds_for_dir = _over_odds if direction == "OVER" else _under_odds
     if _odds_for_dir and _odds_for_dir != 0:
         _odds_str = f"+{_odds_for_dir}" if int(_odds_for_dir) > 0 else str(int(_odds_for_dir))
-        # Implied probability from odds
-        _abs_odds = abs(float(_odds_for_dir))
-        if float(_odds_for_dir) < 0:
-            _implied_prob = _abs_odds / (_abs_odds + 100.0) * 100.0
-        else:
-            _implied_prob = 100.0 / (float(_odds_for_dir) + 100.0) * 100.0
+        # Implied probability from odds — use the canonical function from odds_engine
+        _implied_prob = _odds_to_implied_prob(_odds_for_dir) * 100.0
         _model_prob = (result.get("probability_over", 0.5) if direction == "OVER"
                        else 1.0 - result.get("probability_over", 0.5)) * 100.0
         _true_edge_pct = _model_prob - _implied_prob

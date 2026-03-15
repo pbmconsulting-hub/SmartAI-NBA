@@ -258,6 +258,19 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
     stats = sim_result["stats"]
     player_name = player_data.get("name", "")
 
+    # Build a lookup of live platform prop lines from session state.
+    # current_props is a list of prop dicts with keys: player_name, stat_type, line, platform.
+    # We index by (normalized_player_name, stat_type) for fast lookup.
+    live_props_lookup = {}
+    for prop in st.session_state.get("current_props", []):
+        prop_player = prop.get("player_name", "").strip().lower()
+        prop_stat = prop.get("stat_type", "").strip().lower()
+        if prop_player and prop_stat:
+            key = (prop_player, prop_stat)
+            # Prefer the first (highest-priority) match; do not overwrite
+            if key not in live_props_lookup:
+                live_props_lookup[key] = prop
+
     rec_rows = ""
     for stat in _STAT_TYPES:
         s = stats.get(stat, {})
@@ -270,8 +283,18 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
         if season_avg < 0.5:
             continue  # Skip stats where the player has essentially no production
 
-        # Use season avg as proxy for the prop line
-        prop_line = round(season_avg * 2) / 2  # Round to nearest 0.5 (typical book format)
+        # ── Resolve prop line: live platform data > season-avg proxy ──
+        live_key = (player_name.strip().lower(), stat.strip().lower())
+        live_prop = live_props_lookup.get(live_key)
+        if live_prop is not None:
+            prop_line = float(live_prop.get("line", 0))
+            live_platform = live_prop.get("platform", "")
+        else:
+            prop_line = round(season_avg * 2) / 2  # Round to nearest 0.5 (typical book format)
+            live_platform = ""
+
+        if prop_line <= 0:
+            continue  # Guard against bad line values
         edge_pct = round((projected - prop_line) / max(prop_line, 0.1) * 100, 1)
         direction = "OVER" if projected >= prop_line else "UNDER"
         dir_color = "#00ff9d" if direction == "OVER" else "#ff5e00"
@@ -294,7 +317,10 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
             f'<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
             f'<td style="padding:6px 8px;color:#c0d0e8;">{emoji} {_html.escape(stat.replace("_", " ").title())}</td>'
             f'<td style="padding:6px 8px;color:#ff5e00;font-weight:700;">{projected}</td>'
-            f'<td style="padding:6px 8px;color:#8a9bb8;">{prop_line}</td>'
+            f'<td style="padding:6px 8px;color:#8a9bb8;">{prop_line}'
+            + (f'<br><span style="color:#5a8fa8;font-size:0.72rem;">{_html.escape(live_platform)}</span>' if live_platform else
+               '<br><span style="color:#5a5a5a;font-size:0.72rem;">est.</span>')
+            + f'</td>'
             f'<td style="padding:6px 8px;color:{dir_color};font-weight:700;">'
             f'{direction} {upside_tag}</td>'
             f'<td style="padding:6px 8px;color:{dir_color};">{edge_label}</td>'
