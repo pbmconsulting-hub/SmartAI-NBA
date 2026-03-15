@@ -847,7 +847,7 @@ defensive_ratings_data = load_defensive_ratings_data()
 current_props  = load_props_from_session(st.session_state)
 todays_games   = st.session_state.get("todays_games", [])
 
-simulation_depth = st.session_state.get("simulation_depth", 1000)
+simulation_depth = st.session_state.get("simulation_depth", 2000)
 minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 
 # ============================================================

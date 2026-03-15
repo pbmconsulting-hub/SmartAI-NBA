@@ -111,8 +111,84 @@ ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 # so we default to -110 for their implied probability calculations.
 _DEFAULT_AMERICAN_ODDS = -110
 
+# Retry configuration for API calls with exponential backoff
+# BEGINNER NOTE: Networks fail occasionally. Retrying with increasing delays
+# handles temporary blips without hammering the server.
+MAX_API_RETRIES = 3          # Max retry attempts before giving up
+RETRY_BASE_DELAY_SECONDS = 1.0  # Base delay: 1s, 2s, 4s (exponential backoff)
+
 # ============================================================
 # END SECTION: Module-level constants
+# ============================================================
+
+
+# ============================================================
+# SECTION: Retry Helper
+# ============================================================
+
+def _fetch_with_retry(url, headers=None, params=None, timeout=None):
+    """
+    Perform an HTTP GET request with exponential backoff retry on failure.
+
+    Retries up to MAX_API_RETRIES times with delays of 1s, 2s, 4s on:
+    - Connection errors
+    - Timeout errors
+    - HTTP 429 (rate limited) or 5xx server errors
+
+    BEGINNER NOTE: Exponential backoff means we wait longer after each
+    failure. This avoids overwhelming a struggling API server.
+
+    Args:
+        url (str): The URL to GET.
+        headers (dict or None): HTTP headers.
+        params (dict or None): URL query parameters.
+        timeout (int or None): Request timeout in seconds. Uses REQUEST_TIMEOUT_SECONDS if None.
+
+    Returns:
+        requests.Response or None: Response on success, None on all retries failed.
+    """
+    if not REQUESTS_AVAILABLE:
+        return None
+
+    timeout = timeout or REQUEST_TIMEOUT_SECONDS
+    headers = headers or _BASE_HEADERS.copy()
+    last_exc = None
+
+    for attempt in range(MAX_API_RETRIES + 1):
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=timeout)
+
+            # Retry on rate limit or server error
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt < MAX_API_RETRIES:
+                    delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)  # Cap at 10s
+                    _logger.warning(
+                        f"HTTP {response.status_code} on attempt {attempt+1}/{MAX_API_RETRIES+1} "
+                        f"for {url} — retrying in {delay:.1f}s"
+                    )
+                    time.sleep(delay)
+                    continue
+                return None  # All retries exhausted
+
+            return response  # Success (even if status is 404, caller handles it)
+
+        except Exception as exc:
+            last_exc = exc
+            if attempt < MAX_API_RETRIES:
+                delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)  # Cap at 10s
+                _logger.warning(
+                    f"Request error on attempt {attempt+1}/{MAX_API_RETRIES+1} "
+                    f"for {url}: {exc} — retrying in {delay:.1f}s"
+                )
+                time.sleep(delay)
+            else:
+                _logger.error(f"All retries exhausted for {url}: {last_exc}")
+
+    return None
+
+
+# ============================================================
+# END SECTION: Retry Helper
 # ============================================================
 
 

@@ -53,7 +53,65 @@ BLOWOUT_Q4_REDUCTION_HEAVY = 9.5   # Heavy blowout: effectively DNP in Q4
 QUARTER_SCORE_STD = 8.0   # Each quarter's net score is ~N(0, 8)
 
 # ============================================================
-# END SECTION: Module-Level Constants
+# SECTION: Player Importance Tier Constants
+# BEGINNER NOTE: Stars get pulled earlier in blowouts (coach protects them),
+# while bench players actually GAIN minutes in blowout garbage time.
+# This asymmetry is a key difference from treating all players identically.
+# ============================================================
+
+# Player importance tiers determine blowout minute impact
+PLAYER_TIER_STAR     = "star"      # Top-usage, franchise player: loses most in blowouts
+PLAYER_TIER_ROTATION = "rotation"  # Regular starter/key rotation: moderate impact
+PLAYER_TIER_BENCH    = "bench"     # Backup/fringe: GAINS minutes in blowouts (garbage time)
+
+# Star thresholds: projected stat determines tier
+STAR_POINTS_THRESHOLD  = 20.0  # 20+ PPG → star
+ROTATION_POINTS_THRESHOLD = 10.0  # 10-20 PPG → rotation
+
+# Blowout minute adjustments by tier (applied in addition to base reduction)
+# Stars lose MORE minutes in blowouts (coaches protect them)
+STAR_BLOWOUT_EXTRA_REDUCTION_MILD  = 2.0  # Extra -2 mins for stars in mild blowout
+STAR_BLOWOUT_EXTRA_REDUCTION_HEAVY = 3.5  # Extra -3.5 mins for stars in heavy blowout
+# Bench players GAIN minutes in blowouts (garbage time)
+BENCH_BLOWOUT_GAIN_MILD  = 2.5   # +2.5 mins for bench in mild blowout
+BENCH_BLOWOUT_GAIN_HEAVY = 5.0   # +5.0 mins for bench in heavy blowout
+
+# Garbage time stat boost for bench players
+BENCH_GARBAGE_TIME_STAT_BOOST = 0.15   # +15% stat boost for bench in blowouts
+
+# Close-game extra effort for stars
+CLOSE_GAME_SPREAD_THRESHOLD = 3.0    # Game within 3 points → "close game"
+STAR_CLOSE_GAME_BOOST       = 0.03   # +3% stat boost for stars in close games
+
+# ============================================================
+# END SECTION: Player Importance Tier Constants
+# ============================================================
+
+
+def _determine_player_tier(projected_stat):
+    """
+    Determine a player's importance tier based on their projected stat.
+
+    BEGINNER NOTE: NBA coaches treat stars, rotation players, and bench
+    players very differently in blowout situations. Stars get pulled early
+    to prevent injury; bench players flood the court for garbage time.
+
+    Args:
+        projected_stat (float): Player's projected stat value (usually points)
+
+    Returns:
+        str: One of PLAYER_TIER_STAR, PLAYER_TIER_ROTATION, PLAYER_TIER_BENCH
+    """
+    if projected_stat >= STAR_POINTS_THRESHOLD:
+        return PLAYER_TIER_STAR
+    elif projected_stat >= ROTATION_POINTS_THRESHOLD:
+        return PLAYER_TIER_ROTATION
+    else:
+        return PLAYER_TIER_BENCH
+
+
+# ============================================================
+# END SECTION: Quarter Minutes Estimation
 # ============================================================
 
 
@@ -61,39 +119,70 @@ QUARTER_SCORE_STD = 8.0   # Each quarter's net score is ~N(0, 8)
 # SECTION: Quarter Minutes Estimation
 # ============================================================
 
-def estimate_quarter_minutes(avg_quarter_minutes, quarter, score_differential, is_starter=True):
+def estimate_quarter_minutes(avg_quarter_minutes, quarter, score_differential,
+                             is_starter=True, player_tier=None):
     """
-    Estimate minutes in a specific quarter given score differential.
+    Estimate minutes in a specific quarter given score differential and player tier.
+
+    BEGINNER NOTE: Stars get pulled earlier in blowouts than rotation players.
+    Bench players GAIN minutes in garbage time (large blowouts).
 
     Args:
         avg_quarter_minutes (float): Player's typical minutes per quarter.
         quarter (int): Quarter number (1-4).
         score_differential (float): Current score difference (positive = leading).
         is_starter (bool): Whether the player is a starter. Default True.
+        player_tier (str or None): One of 'star', 'rotation', 'bench'.
+            When None, defaults to 'rotation' behavior.
 
     Returns:
         float: Estimated minutes in this quarter (0.0 to 12.0).
 
     Example:
-        # Starter in Q4 with big lead
-        mins = estimate_quarter_minutes(8.5, quarter=4, score_differential=22, is_starter=True)
-        # → ~2.5 minutes (starters sit in garbage time)
+        # Star player in Q4 with big lead: sits early
+        mins = estimate_quarter_minutes(8.5, quarter=4, score_differential=22,
+                                        is_starter=True, player_tier='star')
+        # → ~0.5 minutes (star sits most of Q4 in blowout)
+        # Bench player in Q4 with big lead: plays MORE
+        mins = estimate_quarter_minutes(3.0, quarter=4, score_differential=22,
+                                        is_starter=False, player_tier='bench')
+        # → ~7.0 minutes (bench player gets garbage time)
     """
+    tier = player_tier or PLAYER_TIER_ROTATION
+
     # Start with the player's typical quarter minutes, capped at 12
     base = min(avg_quarter_minutes, 12.0)
 
-    # Q4 blowout logic: starters get pulled based on lead size
+    # Q4 blowout logic: apply tier-specific adjustments
     if quarter == 4 and abs(score_differential) > BLOWOUT_DIFFERENTIAL_HEAVY:
-        if is_starter and score_differential > 0:
-            # Winning big → star sits to protect from injury
-            base -= BLOWOUT_Q4_REDUCTION_HEAVY
-        elif is_starter and score_differential < 0:
-            # Losing big → may keep starters in to try comeback, smaller cut
-            base -= BLOWOUT_Q4_REDUCTION_MILD
+        if tier == PLAYER_TIER_STAR:
+            if score_differential > 0:
+                # Star winning big → sits most of Q4 to protect from injury
+                base -= (BLOWOUT_Q4_REDUCTION_HEAVY + STAR_BLOWOUT_EXTRA_REDUCTION_HEAVY)
+            else:
+                # Star losing big → may stay in for comeback attempt (smaller cut)
+                base -= BLOWOUT_Q4_REDUCTION_MILD
+        elif tier == PLAYER_TIER_BENCH:
+            # Bench player in blowout → garbage time bonus (both winning AND losing)
+            base += BENCH_BLOWOUT_GAIN_HEAVY
+        else:
+            # Rotation player: standard blowout treatment
+            if is_starter and score_differential > 0:
+                base -= BLOWOUT_Q4_REDUCTION_HEAVY
+            elif is_starter and score_differential < 0:
+                base -= BLOWOUT_Q4_REDUCTION_MILD
+
     elif quarter == 4 and abs(score_differential) > BLOWOUT_DIFFERENTIAL_MILD:
-        if is_starter and score_differential > 0:
-            # Mild winning lead → some rest, partial reduction
-            base -= BLOWOUT_Q4_REDUCTION_MILD
+        if tier == PLAYER_TIER_STAR:
+            if score_differential > 0:
+                # Star mild winning lead → some early rest
+                base -= (BLOWOUT_Q4_REDUCTION_MILD + STAR_BLOWOUT_EXTRA_REDUCTION_MILD)
+        elif tier == PLAYER_TIER_BENCH:
+            # Bench player in mild blowout → some garbage time
+            base += BENCH_BLOWOUT_GAIN_MILD
+        else:
+            if is_starter and score_differential > 0:
+                base -= BLOWOUT_Q4_REDUCTION_MILD
 
     # Add natural game-to-game variation in quarter minutes
     base += random.gauss(0, 1.5)
@@ -115,15 +204,23 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
     Simulate a player's stat distribution using quarter-by-quarter game script.
 
     For each simulation: simulates 4 quarters of score differential,
-    determines player court time each quarter based on differential,
-    then derives stat accumulation from per-minute rate.
+    determines player court time each quarter based on differential and
+    player importance tier (star/rotation/bench), then derives stat
+    accumulation from per-minute rate.
+
+    New features:
+    - Player importance tier (star/rotation/bench) affects blowout behavior
+    - Garbage time stat inflation (+15%) for bench players in blowouts
+    - Close-game extra effort (+3%) for stars in games projected within 3 pts
+    - Asymmetric blowout treatment: both winning AND losing team loses starters
 
     Args:
         player_projection (dict): Output from projections.py with keys:
             'projected_stat' (float), 'projected_minutes' (float),
             'stat_std' (float, optional).
         game_context (dict): Game info with 'vegas_spread' (float),
-            'game_total' (float), 'is_home' (bool).
+            'game_total' (float), 'is_home' (bool),
+            'player_tier' (str, optional): 'star'/'rotation'/'bench'.
         num_simulations (int): Number of game-script simulations. Default 500.
 
     Returns:
@@ -134,12 +231,14 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
             'p10': float,   # 10th percentile (floor)
             'p90': float,   # 90th percentile (ceiling)
             'blowout_game_rate': float,  # Fraction of simulations that became blowouts
+            'player_tier': str,          # Tier used for this simulation
         }
 
     Example:
         results = simulate_game_script(
             player_projection={'projected_stat': 25.0, 'projected_minutes': 34.0},
-            game_context={'vegas_spread': 8.0, 'game_total': 228.5, 'is_home': True},
+            game_context={'vegas_spread': 8.0, 'game_total': 228.5, 'is_home': True,
+                          'player_tier': 'star'},
         )
     """
     projected_stat = float(player_projection.get('projected_stat', 20.0))
@@ -147,6 +246,17 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
 
     vegas_spread = float(game_context.get('vegas_spread', 0.0))
     is_home = bool(game_context.get('is_home', False))
+
+    # Determine player importance tier from game_context or auto-detect from projection
+    player_tier = game_context.get('player_tier', None)
+    if player_tier not in (PLAYER_TIER_STAR, PLAYER_TIER_ROTATION, PLAYER_TIER_BENCH):
+        player_tier = _determine_player_tier(projected_stat)
+
+    # Close-game extra effort modifier for stars
+    abs_spread = abs(vegas_spread)
+    close_game_boost = 0.0
+    if abs_spread <= CLOSE_GAME_SPREAD_THRESHOLD and player_tier == PLAYER_TIER_STAR:
+        close_game_boost = STAR_CLOSE_GAME_BOOST  # +3% for stars in close games
 
     # Per-minute production rate (stat per minute on the court)
     stat_per_minute = projected_stat / max(1.0, projected_minutes)
@@ -168,6 +278,7 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
         running_differential = 0.0
         total_simulated_minutes = 0.0
         game_became_blowout = False
+        is_blowout_bench_game = False
 
         for quarter in range(1, 5):
             # Simulate this quarter's net score swing
@@ -182,13 +293,17 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
             # Detect blowout at any quarter
             if abs(running_differential) > BLOWOUT_DIFFERENTIAL_HEAVY:
                 game_became_blowout = True
+                if player_tier == PLAYER_TIER_BENCH:
+                    is_blowout_bench_game = True
 
             # Estimate how many minutes the player plays this quarter
+            # Pass player_tier for tier-specific blowout behavior
             quarter_minutes = estimate_quarter_minutes(
                 avg_quarter_minutes,
                 quarter,
                 running_differential,
-                True   # Treat as starter for conservative modeling
+                is_starter=(player_tier != PLAYER_TIER_BENCH),
+                player_tier=player_tier,
             )
             total_simulated_minutes += quarter_minutes
 
@@ -197,6 +312,17 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
 
         # Derive simulated stat from per-minute rate × actual minutes × game variance
         raw_stat = stat_per_minute * total_simulated_minutes * random.gauss(1.0, 0.15)
+
+        # Apply garbage time stat inflation for bench players in blowouts
+        # BEGINNER NOTE: Bench players get easier matchups and more offensive freedom
+        # in garbage time — their per-minute production typically increases.
+        if is_blowout_bench_game:
+            raw_stat *= (1.0 + BENCH_GARBAGE_TIME_STAT_BOOST)
+
+        # Apply close-game extra effort for stars
+        if close_game_boost > 0 and not game_became_blowout:
+            raw_stat *= (1.0 + close_game_boost)
+
         simulated_stat = max(0.0, raw_stat)
         simulated_values.append(simulated_stat)
 
@@ -222,6 +348,7 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
         'p10': round(p10_val, 3),
         'p90': round(p90_val, 3),
         'blowout_game_rate': round(blowout_rate, 4),
+        'player_tier': player_tier,
     }
 
 # ============================================================

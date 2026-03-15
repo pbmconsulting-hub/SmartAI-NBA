@@ -85,6 +85,22 @@ COMBO_STAT_TYPES = {
     "points_rebounds_assists", "fantasy_score", "double_double", "triple_double",
 }
 
+# Synergy bonus: multiplicative interaction between edge + consistency + probability.
+# When all three strong signals align, a bonus is added to confidence score.
+SYNERGY_EDGE_THRESHOLD        = 8.0   # Edge % required for synergy bonus
+SYNERGY_CONSISTENCY_THRESHOLD = 70.0  # Historical score required for synergy bonus
+SYNERGY_PROBABILITY_THRESHOLD = 0.60  # P(over) or P(under) required for synergy bonus
+SYNERGY_BONUS_POINTS          = 3.0   # Bonus confidence points when all signals align
+
+# CV penalty constants: high coefficient of variation means very unreliable projections
+CV_PENALTY_THRESHOLD   = 0.40   # CV above this triggers a penalty
+CV_PENALTY_SCALE       = 25.0   # Points penalty per 1.0 excess CV (e.g. CV=0.55 → 3.75 pts penalty)
+CV_PENALTY_MAX         = 15.0   # Maximum penalty applied for extreme CV values
+
+# Sample size correction: confidence scales with games played
+SAMPLE_SIZE_FULL_GAMES  = 30.0  # Games for full confidence (sample_factor = 1.0)
+SAMPLE_SIZE_FLOOR       = 0.50  # Minimum sample_factor (protects new players)
+
 # ============================================================
 # END SECTION: Confidence Score Constants
 # ============================================================
@@ -229,6 +245,27 @@ def calculate_confidence_score(
         + recent_form_score * WEIGHT_RECENT_FORM
     )
 
+    # --- Synergy Bonus: multiplicative interaction between strong signals ---
+    # BEGINNER NOTE: When edge, consistency, AND probability are all high,
+    # the combination is more than the sum of its parts. This bonus captures
+    # that interaction — a +3-point bonus when all three signals align.
+    _abs_edge = abs(edge_percentage)
+    _prob_in_dir = probability_over if probability_over >= 0.5 else (1.0 - probability_over)
+    if (_abs_edge > SYNERGY_EDGE_THRESHOLD
+            and historical_score > SYNERGY_CONSISTENCY_THRESHOLD
+            and _prob_in_dir > SYNERGY_PROBABILITY_THRESHOLD):
+        combined_score += SYNERGY_BONUS_POINTS  # Synergy bonus: all three strong signals align
+
+    # --- CV Penalty Scaling: harsh penalty for very high variance stats ---
+    # BEGINNER NOTE: When a stat has CV > CV_PENALTY_THRESHOLD, the projection
+    # is inherently unreliable regardless of other signals.
+    if stat_average > 0:
+        _cv = stat_standard_deviation / stat_average
+        if _cv > CV_PENALTY_THRESHOLD:
+            # CV penalty: (CV - threshold) * scale points subtracted
+            _cv_penalty = (_cv - CV_PENALTY_THRESHOLD) * CV_PENALTY_SCALE
+            combined_score -= min(CV_PENALTY_MAX, _cv_penalty)
+
     # --- Apply Post-Scoring Penalties ---
     # W1: Line Sharpness Penalty — deduct when book has accurately priced the line
     # W5: Trap Line Penalty — deduct when a bait line is detected
@@ -259,6 +296,16 @@ def calculate_confidence_score(
             excess = form_deviation_abs - 0.25
             regression_penalty = min(8.0, excess * 20.0)
             combined_score -= regression_penalty
+
+    # --- Sample Size Correction: confidence scales with effective sample ---
+    # BEGINNER NOTE: A player with 10 games played has far less reliable stats
+    # than one with 50 games. The sample_factor multiplier reduces confidence
+    # proportionally for low-game-count players (e.g. 10 games → 0.33 factor).
+    if games_played is not None and games_played > 0:
+        _sample_factor = min(1.0, games_played / SAMPLE_SIZE_FULL_GAMES)
+        # Blend: don't fully zero out scores for new players — floor at SAMPLE_SIZE_FLOOR
+        _sample_factor = max(SAMPLE_SIZE_FLOOR, _sample_factor)
+        combined_score *= _sample_factor
 
     # Round to nearest whole number, clamped to 0-100
     final_score = round(max(0.0, min(100.0, combined_score)), 1)
