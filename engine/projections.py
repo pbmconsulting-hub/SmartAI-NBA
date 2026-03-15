@@ -272,6 +272,7 @@ def build_player_projection(
     teammate_out_notes=None,
     played_yesterday=False,
     rolling_defensive_data=None,
+    game_context=None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -499,6 +500,8 @@ def build_player_projection(
     # SECTION: Calculate Adjustment Factors
     # ============================================================
 
+    notes = []  # Game-context notes and warnings displayed in the UI
+
     # --- Factor 1: Opponent Defensive Rating (C9: Rolling Window blend) ---
     # Season-long defensive factor from defensive_ratings.csv
     season_defense_factor = _get_defense_adjustment_factor(
@@ -529,12 +532,81 @@ def build_player_projection(
         teams_data,
     )
 
-    # --- Factor 3: Home Court Advantage ---
-    # Home teams historically shoot better and have more energy
+    # --- Factor 3: Home Court Advantage (Stat-Specific) ---
+    # Home teams historically shoot better and have more energy.
+    # BEGINNER NOTE: The home advantage isn't uniform across stats.
+    # Points benefit most (+3%), while steals/blocks barely change (±0.5%).
+    # This replaces the old fixed +2.5%/-1.5% single constant.
     if is_home_game:
-        home_away_factor = 0.025   # +2.5% boost for playing at home
+        home_away_factor = 0.025   # Default +2.5% for use in single-factor calcs
     else:
-        home_away_factor = -0.015  # -1.5% penalty for away games
+        home_away_factor = -0.015  # Default -1.5% for use in single-factor calcs
+
+    # Stat-specific home/away factors (applied individually in projection calc below)
+    # Points: biggest effect (crowd energy boosts scoring).
+    # Rebounds: modest effect (home rim knowledge, crowd noise).
+    # Assists: moderate effect (comfortable home environment).
+    # Steals/blocks: minimal effect (defensive instincts don't change with venue).
+    _HOME_FACTORS = {
+        "points":    0.030,   # +3.0% home
+        "rebounds":  0.015,   # +1.5% home
+        "assists":   0.020,   # +2.0% home
+        "threes":    0.025,   # +2.5% home (shooting benefits from home crowd)
+        "steals":    0.005,   # +0.5% home
+        "blocks":    0.005,   # +0.5% home
+        "turnovers": 0.000,   # No change (turnovers don't follow home/away pattern)
+    }
+    _AWAY_FACTORS = {
+        "points":    -0.020,  # -2.0% away
+        "rebounds":  -0.010,  # -1.0% away
+        "assists":   -0.015,  # -1.5% away
+        "threes":    -0.020,  # -2.0% away
+        "steals":    -0.005,  # -0.5% away
+        "blocks":    -0.005,  # -0.5% away
+        "turnovers":  0.000,  # No change
+    }
+
+    # --- Factor 3b: Altitude Adjustment ---
+    # Denver (DEN / Nuggets) plays at 5,280 feet above sea level.
+    # The thinner air slightly boosts pace (+2%) as players fatigue faster
+    # and the pace tends to be more chaotic. Visiting teams get a fatigue penalty.
+    # BEGINNER NOTE: Altitude doesn't change players' skills, but it does
+    # increase pace in games played in Denver, and visiting teams tire faster.
+    _ALTITUDE_TEAMS = {"DEN"}  # Nuggets home = altitude boost
+    altitude_pace_boost = 0.0
+    altitude_fatigue_penalty = 0.0
+    player_team_raw = player_data.get("team", "").upper().strip()
+
+    if opponent_team_abbreviation.upper().strip() in _ALTITUDE_TEAMS and not is_home_game:
+        # Visiting team playing IN Denver → slight fatigue penalty
+        altitude_fatigue_penalty = -0.015   # -1.5% for visiting team at altitude
+        altitude_pace_boost = 0.02          # +2% pace boost for all players
+        notes.append("⛰️ Denver altitude game — visiting team fatigue penalty applied")
+    elif player_team_raw in _ALTITUDE_TEAMS and is_home_game:
+        # Nuggets at home in Denver → home pace boost (no fatigue for home team)
+        altitude_pace_boost = 0.015   # +1.5% pace boost for home team at altitude
+    elif opponent_team_abbreviation.upper().strip() in _ALTITUDE_TEAMS and is_home_game:
+        # Nuggets visiting (away game at Denver) — handled by visiting team case above
+        pass
+
+    # Apply altitude boost to pace factor
+    pace_factor = pace_factor * (1.0 + altitude_pace_boost)
+
+    # --- Factor 3c: Travel / Timezone Fatigue ---
+    # Cross-timezone road trips measurably hurt performance.
+    # BEGINNER NOTE: Flying east-to-west is easier than west-to-east for
+    # NBA players. Teams traveling 2+ timezones get a -1.5% penalty.
+    # We estimate timezone using player's home team city.
+    travel_fatigue_penalty = 0.0
+    if not is_home_game and game_context is not None:
+        # game_context may include timezone_diff if provided
+        tz_diff = game_context.get("timezone_diff", None) if isinstance(game_context, dict) else None
+        if tz_diff is None:
+            # Estimate from team abbreviations using simple West/East/Central mapping
+            tz_diff = _estimate_timezone_diff(player_team_raw, opponent_team_abbreviation)
+        if tz_diff is not None and abs(tz_diff) >= 2:
+            travel_fatigue_penalty = -0.015  # -1.5% for 2+ timezone travel
+            notes.append(f"✈️ Long travel ({abs(tz_diff)} timezone change) — fatigue penalty applied")
 
     # --- Factor 4: Rest Adjustment ---
     # Back-to-back games cause fatigue; well-rested players perform better
@@ -542,10 +614,12 @@ def build_player_projection(
 
     # Back-to-back override: if the player literally played yesterday, apply
     # an additional 5% fatigue reduction on top of the rest-day factor.
-    notes = []
     if played_yesterday:
         rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER  # 5% fatigue penalty for back-to-back
         notes.append("⚠️ Back-to-back game — fatigue factor applied")
+
+    # Apply altitude and travel fatigue to rest factor
+    rest_factor = rest_factor * (1.0 + altitude_fatigue_penalty + travel_fatigue_penalty)
 
     # --- Factor 5: Game Total / Scoring Environment ---
     # High-total games (230+ pts projected) are fast-paced, high scoring
@@ -626,41 +700,48 @@ def build_player_projection(
     # SECTION: Apply Adjustments to Get Tonight's Projections
     # ============================================================
 
+    # Retrieve stat-specific home/away adjustment factors
+    _home_factor_map = _HOME_FACTORS if is_home_game else _AWAY_FACTORS
+
     # Combine all factors into one multiplier for offensive stats
     # W8/C1: minutes_adjustment_factor boosts projections when a key
     # teammate is OUT (more usage) or applies a slight discount when
     # the player themselves is on a restriction.
-    offensive_stat_multiplier = (
-        defense_factor
-        * pace_factor
-        * game_total_factor
-        * (1.0 + home_away_factor)
-        * rest_factor
-        * minutes_adjustment_factor  # W8/C4: teammate injury / minutes restriction
-    )
+    def _off_mult(stat_name):
+        """Build a stat-specific offensive multiplier using the per-stat home/away factor."""
+        ha = _home_factor_map.get(stat_name, home_away_factor)
+        return (
+            defense_factor
+            * pace_factor
+            * game_total_factor
+            * (1.0 + ha)
+            * rest_factor
+            * minutes_adjustment_factor
+        )
 
-    # Project each stat by applying the combined multiplier
-    projected_points = season_points_average * offensive_stat_multiplier
-    projected_rebounds = season_rebounds_average * (
-        pace_factor * defense_factor * (1.0 + home_away_factor) * rest_factor
+    # Project each stat using its stat-specific multiplier
+    projected_points    = season_points_average    * _off_mult("points")
+    projected_rebounds  = season_rebounds_average  * _off_mult("rebounds")
+    projected_assists   = season_assists_average   * _off_mult("assists")
+    projected_threes    = season_threes_average    * _off_mult("threes")
+
+    # Defensive stats (steals/blocks) scale with pace and have minimal home/away effect
+    _def_ha_steals = _home_factor_map.get("steals", home_away_factor * 0.2)
+    _def_ha_blocks = _home_factor_map.get("blocks", home_away_factor * 0.2)
+    projected_steals = season_steals_average * (
+        pace_factor * defense_factor * rest_factor
+        * (1.0 + _def_ha_steals)
         * minutes_adjustment_factor
     )
-    projected_assists = season_assists_average * offensive_stat_multiplier
-    projected_threes = season_threes_average * offensive_stat_multiplier
-    # Defensive stats (steals/blocks) scale with pace (more possessions = more steal/block
-    # opportunities), defense factor (weak defenders give up more steals on sloppy ball
-    # handling), and minutes adjustment (more minutes = proportionally more opportunities).
-    # Home/away is half-weighted — defensive intensity is lower at home.
-    defensive_stat_multiplier = (
-        pace_factor
-        * defense_factor
-        * rest_factor
-        * (1.0 + home_away_factor * 0.5)
+    projected_blocks = season_blocks_average * (
+        pace_factor * defense_factor * rest_factor
+        * (1.0 + _def_ha_blocks)
         * minutes_adjustment_factor
     )
-    projected_steals = season_steals_average * defensive_stat_multiplier
-    projected_blocks = season_blocks_average * defensive_stat_multiplier
     projected_turnovers = season_turnovers_average * pace_factor  # Turnovers up with pace
+
+    # Keep single offensive_stat_multiplier for backward compatibility in return dict
+    offensive_stat_multiplier = _off_mult("points")
 
     # Round to 1 decimal place for readability
     projections = {
@@ -943,6 +1024,64 @@ def _estimate_blowout_risk(
 
     # Cap between 5% and 45%
     return max(0.05, min(0.45, blowout_risk))
+
+
+# ============================================================
+# SECTION: Timezone Estimation Helper
+# ============================================================
+
+# Approximate timezone offset from Eastern Time for each NBA team.
+# Positive = ahead of Eastern (or further west), Negative = behind Eastern.
+# These are used to estimate cross-timezone travel fatigue.
+_TEAM_TIMEZONE_OFFSETS = {
+    # Eastern Time (UTC-5 / UTC-4 DST) → offset 0
+    "ATL": 0, "BOS": 0, "BKN": 0, "CHA": 0, "CHI": -1,  # CHI = Central = -1
+    "CLE": 0, "DET": 0, "IND": 0, "MIA": 0, "MIL": -1,
+    "NYK": 0, "ORL": 0, "PHI": 0, "TOR": 0, "WAS": 0,
+    # Central Time (UTC-6 / UTC-5 DST) → offset -1 from Eastern
+    "DAL": -1, "HOU": -1, "MEM": -1, "MIN": -1, "NOP": -1, "SAS": -1,
+    # Mountain Time (UTC-7 / UTC-6 DST) → offset -2 from Eastern
+    "DEN": -2, "OKC": -1, "UTA": -2,
+    # Pacific Time (UTC-8 / UTC-7 DST) → offset -3 from Eastern
+    "GSW": -3, "LAC": -3, "LAL": -3, "PHX": -2, "POR": -3, "SAC": -3, "SEA": -3,
+}
+
+
+def _estimate_timezone_diff(player_team, opponent_team):
+    """
+    Estimate the timezone difference when a team travels for an away game.
+
+    BEGINNER NOTE: When a West Coast team plays at an East Coast venue,
+    they may have traveled 3 timezones which can cause fatigue and
+    affect sleep schedules. The direction matters too: traveling east
+    (earlier wake up) tends to hurt more than traveling west.
+
+    Args:
+        player_team (str): Player's home team abbreviation (e.g. 'GSW')
+        opponent_team (str): Opponent's abbreviation (where the game is played)
+
+    Returns:
+        int or None: Timezone difference in hours (positive = going east),
+            None if either team is not found in the mapping.
+
+    Example:
+        _estimate_timezone_diff('GSW', 'BOS') → 3 (Pacific → Eastern: +3 hours east)
+        _estimate_timezone_diff('BOS', 'LAL') → -3 (Eastern → Pacific: -3 hours west)
+    """
+    p_tz = _TEAM_TIMEZONE_OFFSETS.get(player_team.upper().strip())
+    o_tz = _TEAM_TIMEZONE_OFFSETS.get(opponent_team.upper().strip())
+
+    if p_tz is None or o_tz is None:
+        return None
+
+    # Positive = traveling east (earlier wake up = harder)
+    # Negative = traveling west (later schedule = easier)
+    return o_tz - p_tz
+
+
+# ============================================================
+# END SECTION: Timezone Estimation Helper
+# ============================================================
 
 
 def get_stat_standard_deviation(player_data, stat_type):

@@ -50,7 +50,7 @@ _PROFILES = {
     },
     "⚖️ Balanced": {
         "description": "Recommended defaults. Good mix of volume and confidence.",
-        "simulation_depth": 1000,
+        "simulation_depth": 2000,
         "minimum_edge_threshold": 5.0,
         "entry_fee": 10.0,
         "selected_platforms": ["PrizePicks", "Underdog", "DraftKings"],
@@ -131,13 +131,13 @@ with col1:
     simulation_depth_options = {
         "Fast (500 sims)": 500,
         "Standard (1,000 sims)": 1000,
-        "Accurate (2,000 sims)": 2000,
+        "Recommended (2,000 sims)": 2000,
         "High Accuracy (5,000 sims)": 5000,
     }
 
-    current_depth = st.session_state.get("simulation_depth", 1000)
+    current_depth = st.session_state.get("simulation_depth", 2000)
     # Find the current label for the default
-    current_label = "Standard (1,000 sims)"
+    current_label = "Recommended (2,000 sims)"
     for label, value in simulation_depth_options.items():
         if value == current_depth:
             current_label = label

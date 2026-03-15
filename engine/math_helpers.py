@@ -356,6 +356,151 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
     return edge
 
 
+# Platform-specific implied probability baselines.
+# BEGINNER NOTE: PrizePicks and Underdog have NO per-leg vig — the house
+# edge is baked into the multi-leg payout table (e.g., you need 3/3 to win
+# the "power" play). So each individual leg is a fair 50/50 bet on those
+# platforms. DraftKings has standard -110 vig on individual legs.
+_PLATFORM_BASELINE_PROBS = {
+    "prizepicks":       0.50,   # No individual leg vig
+    "prize picks":      0.50,
+    "underdog":         0.50,   # No individual leg vig
+    "underdog fantasy": 0.50,
+    "draftkings":       0.5238, # Standard -110 vig
+    "dk":               0.5238,
+    "fanduel":          0.5238, # Standard -110 vig
+    "betmgm":           0.5238,
+    "caesars":          0.5238,
+}
+_DEFAULT_PLATFORM_BASELINE = 0.5238  # Conservative default (DraftKings-style)
+
+
+def calculate_platform_edge_percentage(probability_over, platform=None, over_odds=None):
+    """
+    Calculate edge percentage using the correct baseline for each platform.
+
+    BEGINNER NOTE: On PrizePicks/Underdog, the breakeven is 50% (no juice
+    on individual legs). On DraftKings it's 52.38% (-110). Using the wrong
+    baseline gives you wrong edge numbers.
+
+    Args:
+        probability_over (float): Model's P(over), 0-1
+        platform (str or None): Platform name ('PrizePicks', 'DraftKings', etc.)
+            When None, defaults to -110 (-52.38%) breakeven.
+        over_odds (float or None): Actual American odds from DraftKings.
+            When provided, overrides the platform baseline with the true
+            implied probability derived from the actual odds.
+
+    Returns:
+        float: Edge in percentage points
+
+    Examples:
+        calculate_platform_edge_percentage(0.63, 'PrizePicks') → +13.0% (vs 50%)
+        calculate_platform_edge_percentage(0.63, 'DraftKings') → +10.62% (vs 52.38%)
+        calculate_platform_edge_percentage(0.63, 'DraftKings', -120) → true edge vs -120
+    """
+    # If actual odds are provided, use the precise implied probability
+    if over_odds is not None:
+        try:
+            odds_float = float(over_odds)
+            if odds_float < 0:
+                baseline = abs(odds_float) / (abs(odds_float) + 100.0)
+            else:
+                baseline = 100.0 / (odds_float + 100.0)
+        except (ValueError, TypeError):
+            baseline = _DEFAULT_PLATFORM_BASELINE
+    elif platform:
+        baseline = _PLATFORM_BASELINE_PROBS.get(platform.lower().strip(), _DEFAULT_PLATFORM_BASELINE)
+    else:
+        baseline = _DEFAULT_PLATFORM_BASELINE
+
+    return (probability_over - baseline) * 100.0
+
+
+def probability_standard_error(p, n_simulations):
+    """
+    Compute the standard error of an estimated probability.
+
+    BEGINNER NOTE: When we run 2000 simulations and 1200 go over the line
+    (60% probability), the true probability has uncertainty around it.
+    The standard error tells us how precise that 60% estimate is.
+    With more simulations, the SE gets smaller (more precise).
+
+    Formula: SE = sqrt(p * (1 - p) / n)
+
+    Args:
+        p (float): Estimated probability (0-1)
+        n_simulations (int): Number of simulations run
+
+    Returns:
+        float: Standard error (e.g. 0.011 means ±1.1% uncertainty)
+
+    Example:
+        probability_standard_error(0.60, 2000) → ~0.011 (±1.1%)
+        probability_standard_error(0.60, 500)  → ~0.022 (±2.2%)
+    """
+    if n_simulations <= 0 or p <= 0 or p >= 1:
+        return 0.0
+    return math.sqrt(p * (1.0 - p) / n_simulations)
+
+
+def probability_confidence_interval(p, n, alpha=0.05):
+    """
+    Compute the Wilson score confidence interval for a probability estimate.
+
+    The Wilson interval is preferred over the naive normal approximation
+    because it remains accurate even for extreme probabilities (near 0 or 1)
+    where the normal approximation breaks down.
+
+    BEGINNER NOTE: If our simulation says 60% probability, the Wilson
+    interval gives us a range like [58%, 62%] at 95% confidence.
+    A wider interval means we're less certain about the exact probability.
+
+    Args:
+        p (float): Estimated probability (0-1)
+        n (int): Number of observations (simulations run)
+        alpha (float): Significance level. Default 0.05 → 95% CI.
+
+    Returns:
+        tuple: (lower, upper) — the 95% confidence interval bounds
+
+    Example:
+        probability_confidence_interval(0.60, 2000) → (~0.578, ~0.622)
+    """
+    if n <= 0 or p < 0 or p > 1:
+        return (max(0.0, p - 0.05), min(1.0, p + 0.05))
+
+    # z-score for alpha/2 (1.96 for alpha=0.05)
+    # BEGINNER NOTE: 1.96 corresponds to the 97.5th percentile of the
+    # standard normal distribution (the two-tail 95% confidence level).
+    # We hardcode this to avoid needing scipy.stats.
+    if alpha <= 0.01:
+        z = 2.576  # 99% CI
+    elif alpha <= 0.05:
+        z = 1.960  # 95% CI
+    elif alpha <= 0.10:
+        z = 1.645  # 90% CI
+    else:
+        z = 1.282  # 80% CI
+
+    z2 = z * z
+    n_float = float(n)
+    p_float = float(p)
+
+    # Wilson score interval formula
+    # center = (p + z²/2n) / (1 + z²/n)
+    # half_width = z * sqrt(p(1-p)/n + z²/4n²) / (1 + z²/n)
+    denom = 1.0 + z2 / n_float
+    center = (p_float + z2 / (2.0 * n_float)) / denom
+    half_width = (z / denom) * math.sqrt(
+        (p_float * (1.0 - p_float) / n_float) + (z2 / (4.0 * n_float * n_float))
+    )
+
+    lower = max(0.0, center - half_width)
+    upper = min(1.0, center + half_width)
+    return (round(lower, 6), round(upper, 6))
+
+
 def clamp_probability(probability):
     """
     Ensure a probability stays between 0.01 and 0.99.

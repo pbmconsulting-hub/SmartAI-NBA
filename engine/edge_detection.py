@@ -603,6 +603,8 @@ def detect_trap_line(
     2. Line 10%+ above average + multiple positive factors present
        → Looks like a tough OVER but the positive factors will carry it
        (though this pattern is less dangerous)
+    3. Line set at an exact common hit number (e.g., 24.5 near 25 avg)
+       → Book is using a round number trap to attract action
 
     Args:
         prop_line (float): The betting line
@@ -616,7 +618,7 @@ def detect_trap_line(
     Returns:
         dict or None: Trap detection result with:
             'is_trap': bool
-            'trap_type': str ('under_trap' | 'over_trap' | None)
+            'trap_type': str ('under_trap' | 'over_trap' | 'round_number_trap' | None)
             'warning_message': str
             'confidence_penalty': float (0-15 points to subtract)
             'negative_factors': list of str
@@ -653,6 +655,43 @@ def detect_trap_line(
         positive_factors.append(f"High Vegas total ({game_total:.0f}) — fast pace expected")
     if blowout_risk < 0.10:
         positive_factors.append("Very low blowout risk (likely competitive game)")
+
+    # --- Check Trap Pattern 3: Round Number Trap ---
+    # BEGINNER NOTE: Books often set lines at round numbers like 24.5 when a
+    # player averages ~25. The psychological "round number" attracts action on
+    # the OVER, but the line is really at the player's true average (coin-flip).
+    # Common round numbers: 5, 10, 15, 20, 25, 30 for points; 5, 10 for rebounds; etc.
+    _COMMON_HIT_NUMBERS = {
+        "points":    [5, 10, 15, 20, 25, 30, 35, 40],
+        "rebounds":  [5, 8, 10, 12, 15],
+        "assists":   [5, 8, 10, 12],
+        "threes":    [1, 2, 3, 4, 5],
+        "steals":    [1, 2, 3],
+        "blocks":    [1, 2, 3],
+        "turnovers": [2, 3, 4, 5],
+    }
+    stat_type_lower = stat_type.lower() if stat_type else "points"
+    common_numbers = _COMMON_HIT_NUMBERS.get(stat_type_lower, [])
+
+    for common_num in common_numbers:
+        # Check if the line is set within 0.5 of a common round number
+        # AND the season average is near that same round number (within 5%)
+        line_near_round = abs(prop_line - common_num) <= 0.5
+        avg_near_round = abs(season_average - common_num) / max(1, common_num) < 0.05
+        if line_near_round and avg_near_round:
+            penalty = 5.0  # Moderate penalty for round number trap
+            return {
+                "is_trap": True,
+                "trap_type": "round_number_trap",
+                "warning_message": (
+                    f"⚠️ Round Number Trap: Line {prop_line} is set at the common "
+                    f"hit number {common_num} (player avg {season_average:.1f}) — "
+                    f"books use round numbers to attract action at 50/50 lines."
+                ),
+                "confidence_penalty": round(penalty, 1),
+                "negative_factors": negative_factors,
+                "positive_factors": positive_factors,
+            }
 
     # --- Check Trap Pattern 1: Line too LOW + multiple negative factors ---
     # "Bait OVER" trap: line looks like easy over, but negatives will sink it
@@ -699,6 +738,159 @@ def detect_trap_line(
 
 # ============================================================
 # END SECTION: Trap Line Detection
+# ============================================================
+
+
+# ============================================================
+# SECTION: Confidence-Adjusted Edge and Coin-Flip Detection
+# ============================================================
+
+def calculate_confidence_adjusted_edge(raw_edge_pct, confidence_score):
+    """
+    Calculate the confidence-adjusted edge by scaling raw edge by confidence.
+
+    BEGINNER NOTE: A 15% raw edge from an unreliable model is worth less than
+    a 10% edge from a highly confident model. This function scales the edge
+    by the model's confidence level to give a more accurate picture.
+
+    Formula: adjusted_edge = raw_edge * (confidence_score / 100)
+
+    Args:
+        raw_edge_pct (float): Raw edge percentage (e.g. 12.5 for 12.5%)
+        confidence_score (float): Model confidence score 0-100
+
+    Returns:
+        float: Confidence-adjusted edge percentage
+
+    Example:
+        calculate_confidence_adjusted_edge(15.0, 60) → 9.0%
+        calculate_confidence_adjusted_edge(10.0, 85) → 8.5%
+    """
+    if confidence_score <= 0:
+        return 0.0
+    adjusted = raw_edge_pct * (max(0.0, min(100.0, confidence_score)) / 100.0)
+    return round(adjusted, 3)
+
+
+def detect_coin_flip(projection, prop_line, stat_std, stat_type=None):
+    """
+    Detect when a projection is so close to the line that it's essentially a coin flip.
+
+    BEGINNER NOTE: When the model's projection and the betting line are within
+    0.3 standard deviations of each other, the outcome is highly uncertain —
+    essentially a 50/50 bet that should be avoided regardless of other signals.
+    There's no real edge to exploit here.
+
+    Args:
+        projection (float): Model's projected stat value
+        prop_line (float): The betting line
+        stat_std (float): Standard deviation of the stat
+        stat_type (str, optional): Stat type for description
+
+    Returns:
+        dict: {
+            'is_coin_flip': bool,
+            'std_devs_from_line': float,
+            'message': str,
+        }
+
+    Example:
+        # Player projects 24.8 points, line is 24.5, std is 6.0
+        # Gap = 0.3 / 6.0 = 0.05 std devs → coin flip
+        detect_coin_flip(24.8, 24.5, 6.0, 'points')
+        → {'is_coin_flip': True, 'std_devs_from_line': 0.05, ...}
+    """
+    COIN_FLIP_THRESHOLD = 0.3  # Less than 0.3 std devs = coin flip
+
+    if stat_std <= 0 or prop_line <= 0:
+        return {"is_coin_flip": False, "std_devs_from_line": 0.0, "message": ""}
+
+    std_devs = abs(projection - prop_line) / stat_std
+
+    if std_devs < COIN_FLIP_THRESHOLD:
+        stat_desc = stat_type.title() if stat_type else "Stat"
+        msg = (
+            f"🪙 COIN FLIP — AVOID: {stat_desc} projection ({projection:.1f}) is only "
+            f"{std_devs:.2f}σ from the line ({prop_line}). This is essentially a 50/50 "
+            f"flip — no meaningful edge exists at this separation."
+        )
+        return {
+            "is_coin_flip": True,
+            "std_devs_from_line": round(std_devs, 3),
+            "message": msg,
+        }
+
+    return {
+        "is_coin_flip": False,
+        "std_devs_from_line": round(std_devs, 3),
+        "message": "",
+    }
+
+
+def calculate_weighted_net_force(directional_forces_result):
+    """
+    Calculate a weighted net force score where force strength matters.
+
+    BEGINNER NOTE: The current system counts forces equally, but a
+    "Strong OVER force" from game pace should count more than a
+    "Weak OVER force" from home court advantage. This function weights
+    forces by their impact magnitude.
+
+    Force strength mapping:
+        strength >= 2.0 → "strong" (weight 1.0)
+        strength >= 1.0 → "moderate" (weight 0.6)
+        strength <  1.0 → "weak" (weight 0.3)
+
+    Args:
+        directional_forces_result (dict): Output of analyze_directional_forces
+
+    Returns:
+        dict: {
+            'weighted_over_score': float,
+            'weighted_under_score': float,
+            'weighted_net': float (positive = OVER favored),
+            'dominant_direction': str ('OVER' | 'UNDER'),
+        }
+
+    Example:
+        Forces: 1 strong OVER (2.5), 1 weak UNDER (0.4)
+        weighted_over = 1.0, weighted_under = 0.3 * 0.4 / 1.0 ≈ 0.12
+        → net = 0.88 in favor of OVER
+    """
+    def _strength_weight(s):
+        """Convert force strength to a normalized weight."""
+        if s >= 2.0:
+            return 1.0   # Strong force
+        elif s >= 1.0:
+            return 0.6   # Moderate force
+        else:
+            return 0.3   # Weak force
+
+    over_forces  = directional_forces_result.get("over_forces",  [])
+    under_forces = directional_forces_result.get("under_forces", [])
+
+    weighted_over = sum(
+        _strength_weight(f.get("strength", 0)) * f.get("strength", 0)
+        for f in over_forces
+    )
+    weighted_under = sum(
+        _strength_weight(f.get("strength", 0)) * f.get("strength", 0)
+        for f in under_forces
+    )
+
+    net = weighted_over - weighted_under
+    dominant = "OVER" if net >= 0 else "UNDER"
+
+    return {
+        "weighted_over_score": round(weighted_over, 3),
+        "weighted_under_score": round(weighted_under, 3),
+        "weighted_net": round(net, 3),
+        "dominant_direction": dominant,
+    }
+
+
+# ============================================================
+# END SECTION: Confidence-Adjusted Edge and Coin-Flip Detection
 # ============================================================
 
 

@@ -76,24 +76,28 @@ def get_vig_percentage(odds_side1, odds_side2=None):
     """
     Calculate the vig (juice) percentage on a two-sided market.
 
-    If only one side is provided, assumes the other side has symmetric odds.
+    If only one side is provided, assumes the other side is the standard
+    -110 complement (not a mirror of side 1), which is the correct
+    assumption for most NBA prop markets.
 
     Args:
         odds_side1 (float): American odds for side 1 (e.g. -110)
         odds_side2 (float or None): American odds for side 2 (e.g. -110)
-            If None, assumes symmetric (both sides same odds).
+            If None, defaults to -110 (standard market complement).
 
     Returns:
         float: Vig as a percentage (e.g. 0.0476 = 4.76% for a -110/-110 market)
 
     Example:
         get_vig_percentage(-110, -110) → 0.0476
+        get_vig_percentage(-120)       → uses -110 as complement, not -120 mirror
     """
     try:
         p1 = american_odds_to_implied_probability(float(odds_side1))
         if odds_side2 is None:
-            # Mirror the first side
-            p2 = american_odds_to_implied_probability(float(odds_side1))
+            # FIXED: Default to -110 (standard complement) not a mirror of side 1
+            # This is the correct assumption for most DraftKings prop markets
+            p2 = american_odds_to_implied_probability(-110.0)
         else:
             p2 = american_odds_to_implied_probability(float(odds_side2))
         overround = p1 + p2
@@ -157,6 +161,104 @@ def calculate_expected_value_with_odds(model_probability, odds, stake=1.0):
         return round(ev, 4)
     except (ValueError, TypeError):
         return 0.0
+
+
+def devig_probabilities(over_odds, under_odds):
+    """
+    Remove the bookmaker's vig to get the true fair probabilities for both sides.
+
+    Uses the multiplicative (proportional) devig method, which is considered
+    more accurate than the additive method for NBA props.
+
+    BEGINNER NOTE: When a book offers -110 on both sides, the implied
+    probabilities sum to 1.048 (not 1.0). This 4.8% excess is the vig.
+    Devigging scales both probabilities down proportionally so they sum to 1.0.
+    The resulting "fair" probabilities are the book's true assessment.
+
+    Args:
+        over_odds (float): American odds for the Over side (e.g. -115)
+        under_odds (float): American odds for the Under side (e.g. -105)
+
+    Returns:
+        tuple: (fair_over_prob, fair_under_prob) — both float, sum to 1.0
+
+    Examples:
+        devig_probabilities(-110, -110) → (0.5, 0.5)
+        devig_probabilities(-120, +100) → (0.545, 0.455) approximately
+    """
+    try:
+        p_over_raw  = american_odds_to_implied_probability(float(over_odds))
+        p_under_raw = american_odds_to_implied_probability(float(under_odds))
+        overround = p_over_raw + p_under_raw
+
+        if overround <= 0:
+            return (0.5, 0.5)
+
+        # Multiplicative devig: divide each side by the overround
+        fair_over  = p_over_raw  / overround
+        fair_under = p_under_raw / overround
+
+        return (round(fair_over, 6), round(fair_under, 6))
+    except (ValueError, TypeError):
+        return (0.5, 0.5)
+
+
+def calculate_half_kelly_ev(model_probability, odds, bankroll=1.0):
+    """
+    Calculate the Half Kelly Criterion stake for a bet.
+
+    BEGINNER NOTE: The Kelly Criterion tells you the optimal fraction of
+    your bankroll to bet to maximize long-run growth. Half Kelly (50% of
+    the Kelly fraction) reduces variance while capturing most of the edge.
+
+    Formula:
+        Kelly fraction f = (b*p - q) / b
+        where b = net payout ratio, p = win prob, q = 1-p
+        Half Kelly = f / 2
+
+    Args:
+        model_probability (float): Model's win probability (0-1)
+        odds (float): American odds on the bet (e.g. -110, +150)
+        bankroll (float): Total bankroll. Default 1.0 (returns fraction).
+
+    Returns:
+        dict: {
+            'kelly_fraction': float (full Kelly as fraction of bankroll),
+            'half_kelly_fraction': float (recommended 50% Kelly fraction),
+            'half_kelly_stake': float (dollar amount at given bankroll),
+            'ev': float (expected value per unit staked),
+        }
+
+    Example:
+        calculate_half_kelly_ev(0.62, -110, bankroll=1000)
+        → stake about $44.50 (4.45% of $1000 bankroll)
+    """
+    try:
+        p = max(0.001, min(0.999, float(model_probability)))
+        q = 1.0 - p
+        b = odds_to_payout_multiplier(float(odds)) - 1.0  # Net payout ratio
+        if b <= 0:
+            return {"kelly_fraction": 0.0, "half_kelly_fraction": 0.0,
+                    "half_kelly_stake": 0.0, "ev": 0.0}
+
+        # Kelly fraction
+        kelly_f = (b * p - q) / b
+
+        # Negative Kelly → no edge → don't bet
+        kelly_f = max(0.0, kelly_f)
+        half_kelly = kelly_f / 2.0
+
+        ev = p * b - q  # Expected value per unit staked
+
+        return {
+            "kelly_fraction": round(kelly_f, 6),
+            "half_kelly_fraction": round(half_kelly, 6),
+            "half_kelly_stake": round(half_kelly * float(bankroll), 2),
+            "ev": round(ev, 6),
+        }
+    except (ValueError, TypeError):
+        return {"kelly_fraction": 0.0, "half_kelly_fraction": 0.0,
+                "half_kelly_stake": 0.0, "ev": 0.0}
 
 
 def odds_to_payout_multiplier(american_odds):

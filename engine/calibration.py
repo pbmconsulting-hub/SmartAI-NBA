@@ -32,7 +32,20 @@ CALIBRATION_BUCKET_WIDTH = 0.10
 
 # Maximum adjustment magnitude in confidence score points.
 # Caps adjustments to avoid over-correcting on small samples.
-MAX_CALIBRATION_ADJUSTMENT = 10.0
+# Increased from 10 to 15 for severely miscalibrated stat types.
+MAX_CALIBRATION_ADJUSTMENT = 15.0
+
+# Per-stat type cap: use a tighter cap for well-calibrated stats
+# (points tends to be well-calibrated; blocks/steals may be worse)
+STAT_TYPE_CALIBRATION_CAPS = {
+    "points":    10.0,   # Well-calibrated — tighter cap
+    "rebounds":  12.0,
+    "assists":   12.0,
+    "threes":    15.0,   # Highly variable — allow larger correction
+    "steals":    15.0,
+    "blocks":    15.0,
+    "turnovers": 12.0,
+}
 
 # Fine-grained calibration bucket width for isotonic method.
 # 0.05 = 5% buckets: [0.50-0.55), [0.55-0.60), ... [0.95-1.00)
@@ -70,28 +83,68 @@ def _get_bucket_midpoint(prob, bucket_width):
     return round(bucket_idx + bucket_width / 2.0, 4)
 
 
-def _load_historical_predictions(days=90):
+def _load_historical_predictions(days=90, stat_type=None):
     """
     Load historical prediction records from the tracking database.
 
+    Now supports filtering by stat_type for per-stat calibration curves.
+    Applies exponential recency weighting: predictions from the last 30 days
+    are duplicated (given 2x weight) vs older records.
+
     Args:
         days (int): Number of past days to include. Default 90.
+        stat_type (str or None): If provided, only return records for this
+            stat type (e.g. 'points', 'blocks'). None returns all stats.
 
     Returns:
-        list of dict: Prediction records. Each record should have:
-            - 'probability_over': float, the model's predicted probability
-            - 'result': int/bool, 1=hit (over was correct), 0=miss
+        list of dict: Prediction records (with recency weighting applied).
+            Each record has: 'probability_over', 'result', optionally 'stat_type', 'date'.
         Empty list on cold start or database errors.
     """
     try:
         from tracking.database import load_recent_predictions
         records = load_recent_predictions(days=days)
         # Filter to records with both probability and result
-        return [
+        records = [
             r for r in (records or [])
             if r.get("probability_over") is not None
             and r.get("result") is not None
         ]
+
+        # Filter by stat type if requested
+        if stat_type:
+            stat_lower = stat_type.lower()
+            records = [
+                r for r in records
+                if (r.get("stat_type") or "").lower() == stat_lower
+            ]
+
+        # Apply recency weighting: duplicate records from last 30 days
+        # BEGINNER NOTE: More recent data is more representative of current
+        # model performance. We give it 2x weight by duplicating recent records.
+        weighted_records = []
+        for r in records:
+            weighted_records.append(r)
+            # Check if record is recent (last 30 days)
+            record_date = r.get("date", r.get("created_at", ""))
+            if record_date:
+                try:
+                    from datetime import date as _date, timedelta
+                    import datetime as _dt
+                    if isinstance(record_date, str) and len(record_date) >= 10:
+                        record_date_parsed = _dt.datetime.strptime(record_date[:10], "%Y-%m-%d").date()
+                    elif not isinstance(record_date, str):
+                        record_date_parsed = record_date
+                    else:
+                        record_date_parsed = None
+                    if record_date_parsed is not None:
+                        cutoff = _date.today() - timedelta(days=30)
+                        if record_date_parsed >= cutoff:
+                            weighted_records.append(r)   # 2x weight for recent records
+                except (ValueError, TypeError, AttributeError):
+                    pass
+
+        return weighted_records
     except Exception:
         return []
 
@@ -421,13 +474,17 @@ def get_isotonic_calibration_curve(days=90):
 # SECTION: Calibration Adjustment Function
 # ============================================================
 
-def get_calibration_adjustment(raw_probability, days=90):
+def get_calibration_adjustment(raw_probability, days=90, stat_type=None):
     """
     Compute the calibration adjustment for a given raw probability. (C10)
 
     Compares the model's predicted probability to the historical hit rate
     at that probability level. Returns an offset in confidence score points
     to subtract (positive adjustment = model overestimates confidence).
+
+    Now supports stat-type-specific calibration curves — blocks/steals may
+    be poorly calibrated while points/rebounds are well-calibrated. Per-stat
+    calibration curves catch these differences.
 
     Cold start behavior:
         If fewer than MIN_BETS_FOR_CALIBRATION bets exist for the relevant
@@ -436,6 +493,8 @@ def get_calibration_adjustment(raw_probability, days=90):
     Args:
         raw_probability (float): The model's predicted P(over), 0-1.
         days (int): Days of historical data to consider. Default 90.
+        stat_type (str or None): Stat type for per-stat calibration.
+            If None, uses all historical data (global calibration).
 
     Returns:
         float: Calibration offset in confidence score points.
@@ -448,7 +507,15 @@ def get_calibration_adjustment(raw_probability, days=90):
         → calibration gap = 8% → adjustment = +4.0 pts (reduce confidence)
     """
     try:
-        records = _load_historical_predictions(days=days)
+        # Per-stat calibration cap
+        _stat_cap = STAT_TYPE_CALIBRATION_CAPS.get(
+            (stat_type or "").lower(), MAX_CALIBRATION_ADJUSTMENT
+        )
+
+        # Try stat-specific records first; fall back to all records
+        records = _load_historical_predictions(days=days, stat_type=stat_type)
+        if not records:
+            records = _load_historical_predictions(days=days)
         if not records:
             return 0.0  # Cold start: no historical data
 
@@ -458,8 +525,7 @@ def get_calibration_adjustment(raw_probability, days=90):
             raw = max(0.5, min(0.9999, float(raw_probability)))
             # Convert probability difference to confidence-score points (same scale)
             adjustment = (raw - calibrated_prob) * 100.0
-            adjustment = max(-MAX_CALIBRATION_ADJUSTMENT,
-                             min(MAX_CALIBRATION_ADJUSTMENT, adjustment))
+            adjustment = max(-_stat_cap, min(_stat_cap, adjustment))
             return round(adjustment, 2)
 
         # ── Coarse fallback: original 10% bucket logic ──
@@ -485,8 +551,8 @@ def get_calibration_adjustment(raw_probability, days=90):
         # A 10% calibration gap maps to roughly 5 confidence score points
         adjustment = calibration_gap * 50.0  # 0.10 gap → 5 pts
 
-        # Cap the adjustment
-        adjustment = max(-MAX_CALIBRATION_ADJUSTMENT, min(MAX_CALIBRATION_ADJUSTMENT, adjustment))
+        # Cap the adjustment using per-stat cap
+        adjustment = max(-_stat_cap, min(_stat_cap, adjustment))
 
         return round(adjustment, 2)
 
