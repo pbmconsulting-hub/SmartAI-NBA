@@ -554,9 +554,12 @@ def build_player_projection(
     league_avg_total = compute_league_average_game_total(teams_data)
     if game_total > 0 and league_avg_total > 0:
         # BEGINNER NOTE: This creates a small boost/penalty based on
-        # how far the total is from average. Capped at ±5%
+        # how far the total is from average. Capped at ±8% to properly
+        # reflect high/low total games (e.g., a 240-total game is ~9% above
+        # the 220 average — capping at 5% was too restrictive and lost edge
+        # on extreme totals).
         game_total_factor = 1.0 + ((game_total - league_avg_total) / league_avg_total) * 0.5
-        game_total_factor = max(0.95, min(1.05, game_total_factor))  # Cap at ±5%
+        game_total_factor = max(0.92, min(1.08, game_total_factor))  # Cap at ±8%
     else:
         game_total_factor = 1.0  # Neutral if no total provided or league avg unavailable
 
@@ -644,8 +647,19 @@ def build_player_projection(
     )
     projected_assists = season_assists_average * offensive_stat_multiplier
     projected_threes = season_threes_average * offensive_stat_multiplier
-    projected_steals = season_steals_average * rest_factor * (1.0 + home_away_factor * 0.5)
-    projected_blocks = season_blocks_average * rest_factor * (1.0 + home_away_factor * 0.5)
+    # Defensive stats (steals/blocks) scale with pace (more possessions = more steal/block
+    # opportunities), defense factor (weak defenders give up more steals on sloppy ball
+    # handling), and minutes adjustment (more minutes = proportionally more opportunities).
+    # Home/away is half-weighted — defensive intensity is lower at home.
+    defensive_stat_multiplier = (
+        pace_factor
+        * defense_factor
+        * rest_factor
+        * (1.0 + home_away_factor * 0.5)
+        * minutes_adjustment_factor
+    )
+    projected_steals = season_steals_average * defensive_stat_multiplier
+    projected_blocks = season_blocks_average * defensive_stat_multiplier
     projected_turnovers = season_turnovers_average * pace_factor  # Turnovers up with pace
 
     # Round to 1 decimal place for readability

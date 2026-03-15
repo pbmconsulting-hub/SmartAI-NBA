@@ -89,6 +89,15 @@ COLD_GAME_PROBABILITY = 0.10  # 10% chance player is "ice cold"
 COLD_GAME_MULTIPLIER_MIN = 0.70
 COLD_GAME_MULTIPLIER_MAX = 0.85
 
+# Player-specific hot/cold: CV ratio caps relative to the "average" CV baseline (0.35).
+# Min cap prevents consistent players from having near-zero hot/cold probability.
+# Max cap prevents extreme outliers from dominating the momentum model.
+HOT_COLD_CV_BASELINE = 0.35        # CV reference: "average" NBA player variability
+HOT_COLD_CV_RATIO_MIN = 0.5        # Minimum CV-based scaling factor
+HOT_COLD_CV_RATIO_MAX = 2.0        # Maximum CV-based scaling factor
+HOT_COLD_MAX_HOT_PROB  = 0.25      # Hard ceiling on player-specific hot probability
+HOT_COLD_MAX_COLD_PROB = 0.20      # Hard ceiling on player-specific cold probability
+
 # Convergence: stop early when the running probability changes by less than this
 # between 500-simulation checkpoints.
 CONVERGENCE_THRESHOLD = 0.005
@@ -334,9 +343,10 @@ def run_quantum_matrix_simulation(
         minutes_multiplier = 1.0 - minutes_reduction
 
         # --- Step 2: Apply Hot Hand / Cold Game Modifier (W4: Momentum) ---
-        # In 15% of games the player is "on fire"; in 10% they're "ice cold".
-        # This creates fat tails in the distribution, especially for threes.
-        momentum_multiplier = _simulate_hot_cold_modifier()
+        # Player-specific hot/cold probabilities are derived from the CV of
+        # recent game logs when available (high-variance players like Kyrie
+        # have more hot/cold games than consistent players like Jokic).
+        momentum_multiplier = _simulate_hot_cold_modifier(recent_game_logs)
 
         # --- Step 3: Simulate Minutes (C8) OR Use Scenario Multiplier ---
         # C8: When projected_minutes is available, simulate the player's
@@ -417,10 +427,15 @@ def run_quantum_matrix_simulation(
 
         # --- Step 6: Convergence Check (every 500 simulations) ---
         # If the running probability has stabilised, stop early to save time.
+        # IMPORTANT: Do NOT exit early when the probability is within 5% of 0.5
+        # because this is exactly where the edge decision (OVER vs UNDER) is
+        # made — an early exit here could lock in a false edge.
         sims_done = sim_index + 1
         if sims_done % 500 == 0 and sims_done >= 500:
             current_prob = count_of_games_over_line / sims_done
-            if abs(current_prob - prev_prob_checkpoint) < CONVERGENCE_THRESHOLD:
+            # Skip convergence check for props near the 50% decision boundary
+            _near_50 = abs(current_prob - 0.5) < 0.05
+            if not _near_50 and abs(current_prob - prev_prob_checkpoint) < CONVERGENCE_THRESHOLD:
                 simulations_completed = sims_done
                 break
             prev_prob_checkpoint = current_prob
@@ -538,7 +553,7 @@ def _simulate_game_scenario(blowout_risk_factor):
     return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
 
 
-def _simulate_hot_cold_modifier():
+def _simulate_hot_cold_modifier(recent_game_logs=None):
     """
     Apply a "hot hand" or "cold game" multiplier to the stat mean. (W4)
 
@@ -547,15 +562,42 @@ def _simulate_hot_cold_modifier():
     a distribution with FATTER TAILS than a pure normal, which is
     especially important for streaky stats like threes.
 
+    When recent_game_logs are provided, the hot/cold probabilities are
+    scaled by the player's coefficient of variation (CV = std / mean)
+    so high-variance players (e.g. Kyrie Irving) have larger hot/cold
+    swings than consistent players (e.g. Nikola Jokic).
+
+    Args:
+        recent_game_logs (list of float, optional): Player's recent stat
+            values. Used to compute player-specific hot/cold frequencies.
+            Falls back to module-level constants when not provided.
+
     Returns:
         float: Multiplier near 1.0 (hot → 1.15-1.30, cold → 0.70-0.85)
     """
+    # Derive player-specific hot/cold probabilities from the CV of their logs
+    hot_prob  = HOT_HAND_PROBABILITY   # default 0.15
+    cold_prob = COLD_GAME_PROBABILITY  # default 0.10
+    if recent_game_logs and len(recent_game_logs) >= 5:
+        _mean = sum(recent_game_logs) / len(recent_game_logs)
+        if _mean > 1e-6:
+            _variance = sum((x - _mean) ** 2 for x in recent_game_logs) / len(recent_game_logs)
+            _std = _variance ** 0.5
+            _cv = _std / _mean
+            # Scale probabilities by CV relative to an "average" CV baseline.
+            # CV > baseline → more volatile player → higher hot/cold chance.
+            # CV < baseline → more consistent player → lower hot/cold chance.
+            _cv_ratio = _cv / HOT_COLD_CV_BASELINE
+            _cv_ratio = max(HOT_COLD_CV_RATIO_MIN, min(HOT_COLD_CV_RATIO_MAX, _cv_ratio))
+            hot_prob  = min(HOT_COLD_MAX_HOT_PROB,  HOT_HAND_PROBABILITY  * _cv_ratio)
+            cold_prob = min(HOT_COLD_MAX_COLD_PROB, COLD_GAME_PROBABILITY * _cv_ratio)
+
     roll = random.random()
 
-    if roll < HOT_HAND_PROBABILITY:
+    if roll < hot_prob:
         # "On fire" game — player is in a rhythm
         return random.uniform(HOT_HAND_MULTIPLIER_MIN, HOT_HAND_MULTIPLIER_MAX)
-    elif roll < HOT_HAND_PROBABILITY + COLD_GAME_PROBABILITY:
+    elif roll < hot_prob + cold_prob:
         # "Ice cold" game — nothing going in
         return random.uniform(COLD_GAME_MULTIPLIER_MIN, COLD_GAME_MULTIPLIER_MAX)
     else:
