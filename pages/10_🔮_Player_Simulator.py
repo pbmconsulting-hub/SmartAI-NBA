@@ -362,8 +362,6 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
     html_out = (
         f'<div style="background:#0f1424;border-radius:8px;padding:16px 18px;'
         f'margin-top:6px;margin-bottom:16px;border-top:2px solid #00ff9d;">'
-        f'<div style="font-family:\'Orbitron\',sans-serif;color:#00ff9d;'
-        f'font-size:0.92rem;font-weight:700;margin-bottom:10px;">💡 Betting Recommendations</div>'
         + dark_horse_explain +
         f'<div style="overflow-x:auto;">'
         f'<table style="width:100%;border-collapse:collapse;font-size:0.86rem;">'
@@ -383,7 +381,12 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
         f'Prop line ≈ season average rounded to nearest 0.5.</div>'
         f'</div>'
     )
-    st.markdown(html_out, unsafe_allow_html=True)
+    _exp_label = (
+        f"💡 Betting Recommendations — {player_name}" if player_name
+        else "💡 Betting Recommendations"
+    )
+    with st.expander(_exp_label, expanded=True):
+        st.markdown(html_out, unsafe_allow_html=True)
 
 
 def _render_sim_card(sim_result: dict):
@@ -649,11 +652,18 @@ if run_dark_horse:
     st.divider()
     st.markdown("**Full simulation cards for top 3 dark horses:**")
     for dh in dark_horses[:3]:
-        sim_full = _simulate_player(dh["player"], sim_depth, todays_games)
-        _render_sim_card(sim_full)
-        _is_dh_full = any(
-            s["upside_ratio"] >= 1.5
-            for s in sim_full["stats"].values()
-            if s["season_avg"] > 0.5
-        )
-        _render_betting_recommendations(sim_full, is_dark_horse=_is_dh_full)
+        _dh_pname = dh["player"].get("name", "Unknown Player")
+        _dh_ratio = dh["best_ratio"]
+        _dh_badge = "🌑 DARK HORSE" if _dh_ratio >= 1.5 else "📈 Upside"
+        with st.expander(
+            f"{_dh_badge} — {_dh_pname} (Upside {_dh_ratio:.2f}×)",
+            expanded=True,
+        ):
+            sim_full = _simulate_player(dh["player"], sim_depth, todays_games)
+            _render_sim_card(sim_full)
+            _is_dh_full = any(
+                s["upside_ratio"] >= 1.5
+                for s in sim_full["stats"].values()
+                if s["season_avg"] > 0.5
+            )
+            _render_betting_recommendations(sim_full, is_dark_horse=_is_dh_full)

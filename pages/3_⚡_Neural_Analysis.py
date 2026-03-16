@@ -1642,6 +1642,11 @@ if run_analysis:
         # or Normal bet based on statistical criteria.
         try:
             _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
+            # Determine the source of the prop line so the classifier can
+            # validate whether it is a real platform line or a synthetic one.
+            # Props with no platform or marked as estimated are treated as
+            # synthetic to prevent garbage-in/garbage-out Goblin awards.
+            _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
             _bet_classification = classify_bet_type(
                 probability_over=probability_over,
                 edge_percentage=edge_pct,
@@ -1654,12 +1659,15 @@ if run_analysis:
                 vegas_spread=game_context.get("vegas_spread", 0.0),
                 recent_form_ratio=projection_result.get("recent_form_ratio"),
                 season_average=_season_avg_for_classify,
+                line_source=_line_source,
             )
             full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
             full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
             full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Normal Bet")
             full_result["bet_type_reasons"]= _bet_classification.get("reasons", [])
             full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
+            full_result["line_verified"]   = _bet_classification.get("line_verified", True)
+            full_result["line_reliability_warning"] = _bet_classification.get("line_reliability_warning")
             # Demon bets should be added to the avoid list automatically
             if _bet_classification.get("demon") and not full_result.get("should_avoid"):
                 full_result["should_avoid"] = True
@@ -1672,6 +1680,8 @@ if run_analysis:
             full_result["bet_type_label"]   = "Normal Bet"
             full_result["bet_type_reasons"] = []
             full_result["std_devs_from_line"] = 0.0
+            full_result["line_verified"]    = True
+            full_result["line_reliability_warning"] = None
 
         # ── Capture odds from the original prop (for display) ────────
         full_result["over_odds"]  = prop.get("over_odds",  -110)
@@ -2060,113 +2070,135 @@ if analysis_results:
     )
 
     if _goblin_picks:
-        _gcol_logo, _gcol_title = st.columns([1, 6])
-        with _gcol_logo:
-            if os.path.exists(_GOBLIN_LOGO_PATH):
-                st.image(_GOBLIN_LOGO_PATH, width=110)
-        with _gcol_title:
+        with st.expander(
+            f"🧌 Goblin Picks — Easy Money ({len(_goblin_picks)})",
+            expanded=True,
+        ):
+            _gcol_logo, _gcol_title = st.columns([1, 6])
+            with _gcol_logo:
+                if os.path.exists(_GOBLIN_LOGO_PATH):
+                    st.image(_GOBLIN_LOGO_PATH, width=110)
+            with _gcol_title:
+                st.markdown(
+                    '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
+                    'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
+                    '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">🧌 Goblin Picks — Easy Money</h3>'
+                    '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
+                    'Extreme-edge bets where the model projection is far beyond the line — '
+                    'massive edge, high probability, the closest thing to a sure bet in sports.'
+                    '</p>'
+                    '</div>',
+                    unsafe_allow_html=True,
+                )
             st.markdown(
-                '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
-                'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
-                '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">🧌 Goblin Picks — Easy Money</h3>'
-                '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
-                'Extreme-edge bets where the model projection is far beyond the line — '
-                'massive edge, high probability, the closest thing to a sure bet in sports.'
-                '</p>'
-                '</div>',
+                get_education_box_html(
+                    "What is a Goblin Bet? 🧌",
+                    "A <strong>Goblin bet</strong> is a bet where the platform's line is so far from "
+                    "reality that it's almost free money. Think of it like finding a $20 bill on the "
+                    "ground — the sportsbook set the line at a number that's <em>WAY</em> below (or "
+                    "above) where the player is actually likely to land.<br><br>"
+                    "<strong>Example:</strong> LeBron James OVER 12.5 points when he averages 25 and our "
+                    "model projects 26.8. The line is absurdly low — there's an 88% chance he goes over. "
+                    "That's a Goblin. 🧌<br><br>"
+                    "<strong>Criteria:</strong> Model projection is 2+ standard deviations from the line, "
+                    "probability ≥80%, edge ≥25%. Line must be verified (not synthetic/estimated).",
+                ),
                 unsafe_allow_html=True,
             )
-        st.markdown(
-            get_education_box_html(
-                "What is a Goblin Bet? 🧌",
-                "A <strong>Goblin bet</strong> is a bet where the platform's line is so far from "
-                "reality that it's almost free money. Think of it like finding a $20 bill on the "
-                "ground — the sportsbook set the line at a number that's <em>WAY</em> below (or "
-                "above) where the player is actually likely to land.<br><br>"
-                "<strong>Example:</strong> LeBron James OVER 12.5 points when he averages 25 and our "
-                "model projects 26.8. The line is absurdly low — there's an 88% chance he goes over. "
-                "That's a Goblin. 🧌<br><br>"
-                "<strong>Criteria:</strong> Model projection is 2+ standard deviations from the line, "
-                "probability ≥80%, edge ≥25%.",
-            ),
-            unsafe_allow_html=True,
-        )
-        for _gp in _goblin_picks:
-            _gp_name   = _html.escape(str(_gp.get("player_name", "")))
-            _gp_team   = _html.escape(str(_gp.get("player_team", _gp.get("team", ""))))
-            _gp_stat   = _html.escape(str(_gp.get("stat_type", "")).title())
-            _gp_dir    = _html.escape(str(_gp.get("direction", "OVER")))
-            _gp_line   = _gp.get("line", 0)
-            _gp_proj   = _gp.get("adjusted_projection", _gp.get("projected_stat", 0))
-            _gp_prob   = _gp.get("probability_over", 0.5) if _gp_dir == "OVER" else 1.0 - _gp.get("probability_over", 0.5)
-            _gp_edge   = abs(_gp.get("edge_percentage", 0))
-            _gp_conf   = _gp.get("confidence_score", 0)
-            _gp_sigma  = abs(_gp.get("std_devs_from_line", 0))
-            _gp_tier   = _html.escape(str(_gp.get("tier", "")))
-            _gp_tier_emoji = _gp.get("tier_emoji", "")
-            # Season average for the stat
-            _gp_stat_key = _gp.get("stat_type", "points").lower()
-            _gp_avg_map = {
-                "points": "season_pts_avg", "rebounds": "season_reb_avg",
-                "assists": "season_ast_avg", "threes": "season_threes_avg",
-            }
-            _gp_season_avg = float(_gp.get(_gp_avg_map.get(_gp_stat_key, ""), 0) or 0)
-            _gp_reasons_html = "".join(
-                f'<li style="color:#c8e6c9;font-size:0.8rem;">{_html.escape(str(r))}</li>'
-                for r in _gp.get("bet_type_reasons", [])
-            )
-            _over_odds  = _gp.get("over_odds",  -110)
-            _under_odds = _gp.get("under_odds", -110)
-            _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
-            _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
-            # Plain-English reason sentence
-            _gp_plain_reason = (
-                f"Line is set at {_gp_line}"
-                + (f", but {_gp_name} averages {_gp_season_avg:.1f} and we project {_gp_proj:.1f}." if _gp_season_avg else f", but we project {_gp_proj:.1f}.")
-                + " The gap is massive — easy money."
-            )
-            _gp_team_badge = (
-                f'<span style="background:rgba(76,175,80,0.2);color:#81c784;padding:1px 7px;'
-                f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-                f'border:1px solid rgba(76,175,80,0.4);">{_gp_team}</span>'
-                if _gp_team else ""
-            )
-            st.markdown(
-                f'<div style="background:#0d1a0d;border:2px solid #4caf50;border-radius:8px;'
-                f'padding:14px 18px;margin-bottom:10px;">'
-                f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-                f'<div>'
-                f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
-                f'{_gp_team_badge}'
-                f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
-                f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
-                f'<span style="color:#a0d0a0;font-size:0.8rem;margin-left:8px;">'
-                f'(Proj: <strong style="color:#4caf50;">{_gp_proj:.1f}</strong>'
-                + (f' &nbsp;|&nbsp; Avg: {_gp_season_avg:.1f}' if _gp_season_avg else "")
-                + f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
-                f'</div>'
-                f'<div style="text-align:right;">'
-                f'<span style="background:#4caf50;color:#0a1a0a;padding:3px 10px;border-radius:4px;'
-                f'font-size:0.8rem;font-weight:700;margin-right:6px;">SAFE {_gp_conf:.0f}/100</span>'
-                f'<span style="color:#81c784;font-size:0.8rem;">Edge {_gp_edge:+.1f}%</span>'
-                f'<br><span style="color:#69f0ae;font-size:0.75rem;">'
-                f'P({_gp_dir.title()}): {_gp_prob*100:.0f}%</span>'
-                f'<span style="color:#a0d0a0;font-size:0.75rem;margin-left:8px;">'
-                f'Odds: {_odds_str}</span>'
-                f'</div>'
-                f'</div>'
-                f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.08);'
-                f'border-radius:4px;color:#a5d6a7;font-size:0.8rem;font-style:italic;">'
-                f'💡 {_html.escape(_gp_plain_reason)}'
-                f'</div>'
-                f'<div style="margin-top:8px;">'
-                f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
-                f'<ul style="margin:4px 0 0 16px;padding:0;">{_gp_reasons_html}</ul>'
-                f'</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown(f"*{len(_goblin_picks)} Goblin pick(s) found on this slate.*")
+            for _gp in _goblin_picks:
+                _gp_name   = _html.escape(str(_gp.get("player_name", "")))
+                _gp_team   = _html.escape(str(_gp.get("player_team", _gp.get("team", ""))))
+                _gp_stat   = _html.escape(str(_gp.get("stat_type", "")).title())
+                _gp_dir    = _html.escape(str(_gp.get("direction", "OVER")))
+                _gp_line   = _gp.get("line", 0)
+                _gp_proj   = _gp.get("adjusted_projection", _gp.get("projected_stat", 0))
+                _gp_prob   = _gp.get("probability_over", 0.5) if _gp_dir == "OVER" else 1.0 - _gp.get("probability_over", 0.5)
+                _gp_edge   = abs(_gp.get("edge_percentage", 0))
+                _gp_conf   = _gp.get("confidence_score", 0)
+                _gp_sigma  = abs(_gp.get("std_devs_from_line", 0))
+                _gp_tier   = _html.escape(str(_gp.get("tier", "")))
+                _gp_tier_emoji = _gp.get("tier_emoji", "")
+                _gp_line_verified = _gp.get("line_verified", True)
+                _gp_line_warning  = _gp.get("line_reliability_warning") or ""
+                # Season average for the stat
+                _gp_stat_key = _gp.get("stat_type", "points").lower()
+                _gp_avg_map = {
+                    "points": "season_pts_avg", "rebounds": "season_reb_avg",
+                    "assists": "season_ast_avg", "threes": "season_threes_avg",
+                }
+                _gp_season_avg = float(_gp.get(_gp_avg_map.get(_gp_stat_key, ""), 0) or 0)
+                _gp_reasons_html = "".join(
+                    f'<li style="color:#c8e6c9;font-size:0.8rem;">{_html.escape(str(r))}</li>'
+                    for r in _gp.get("bet_type_reasons", [])
+                )
+                _over_odds  = _gp.get("over_odds",  -110)
+                _under_odds = _gp.get("under_odds", -110)
+                _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
+                _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
+                # Synthetic-line warning badge (shown only when line is unverified)
+                _synthetic_badge = (
+                    '<span style="background:#ff9800;color:#0a0f1a;padding:2px 8px;border-radius:4px;'
+                    'font-size:0.72rem;font-weight:700;margin-left:8px;">⚠️ Synthetic Line</span>'
+                    if not _gp_line_verified else ""
+                )
+                # Plain-English reason sentence
+                _gp_plain_reason = (
+                    f"Line is set at {_gp_line}"
+                    + (f", but {_gp_name} averages {_gp_season_avg:.1f} and we project {_gp_proj:.1f}." if _gp_season_avg else f", but we project {_gp_proj:.1f}.")
+                    + " The gap is massive — easy money."
+                )
+                _gp_team_badge = (
+                    f'<span style="background:rgba(76,175,80,0.2);color:#81c784;padding:1px 7px;'
+                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
+                    f'border:1px solid rgba(76,175,80,0.4);">{_gp_team}</span>'
+                    if _gp_team else ""
+                )
+                # Optional warning block shown when line is synthetic/unverified
+                _line_warning_block = (
+                    f'<div style="margin-top:8px;padding:6px 10px;background:rgba(255,152,0,0.12);'
+                    f'border-left:3px solid #ff9800;border-radius:4px;color:#ffe082;font-size:0.8rem;">'
+                    f'⚠️ {_html.escape(_gp_line_warning)}'
+                    f'</div>'
+                    if not _gp_line_verified and _gp_line_warning else ""
+                )
+                st.markdown(
+                    f'<div style="background:#0d1a0d;border:2px solid #4caf50;border-radius:8px;'
+                    f'padding:14px 18px;margin-bottom:10px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+                    f'<div>'
+                    f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
+                    f'{_gp_team_badge}'
+                    f'{_synthetic_badge}'
+                    f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
+                    f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
+                    f'<span style="color:#a0d0a0;font-size:0.8rem;margin-left:8px;">'
+                    f'(Proj: <strong style="color:#4caf50;">{_gp_proj:.1f}</strong>'
+                    + (f' &nbsp;|&nbsp; Avg: {_gp_season_avg:.1f}' if _gp_season_avg else "")
+                    + f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
+                    f'</div>'
+                    f'<div style="text-align:right;">'
+                    f'<span style="background:#4caf50;color:#0a1a0a;padding:3px 10px;border-radius:4px;'
+                    f'font-size:0.8rem;font-weight:700;margin-right:6px;">SAFE {_gp_conf:.0f}/100</span>'
+                    f'<span style="color:#81c784;font-size:0.8rem;">Edge {_gp_edge:+.1f}%</span>'
+                    f'<br><span style="color:#69f0ae;font-size:0.75rem;">'
+                    f'P({_gp_dir.title()}): {_gp_prob*100:.0f}%</span>'
+                    f'<span style="color:#a0d0a0;font-size:0.75rem;margin-left:8px;">'
+                    f'Odds: {_odds_str}</span>'
+                    f'</div>'
+                    f'</div>'
+                    + _line_warning_block
+                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.08);'
+                    f'border-radius:4px;color:#a5d6a7;font-size:0.8rem;font-style:italic;">'
+                    f'💡 {_html.escape(_gp_plain_reason)}'
+                    f'</div>'
+                    f'<div style="margin-top:8px;">'
+                    f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
+                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_gp_reasons_html}</ul>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            st.markdown(f"*{len(_goblin_picks)} Goblin pick(s) found on this slate.*")
         st.divider()
 
     # ============================================================
