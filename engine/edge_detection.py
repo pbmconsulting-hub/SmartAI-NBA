@@ -1015,47 +1015,43 @@ def classify_bet_type(
     line_verified = True
     line_reliability_warning = None
 
-    _line_source_lower = str(line_source).lower() if line_source else ""
+    # Normalise line_source; treat None / missing as unverified
+    _line_source_lower = str(line_source).lower() if line_source is not None else ""
+    _is_synthetic_source = _line_source_lower in (
+        "", "synthetic", "estimated", "default", "none"
+    )
+
+    def _line_ratio_warning(ratio, avg, is_synthetic):
+        """Return a human-readable warning for an out-of-range line ratio."""
+        qualifier = "likely a synthetic/default line" if is_synthetic else "unreliable line"
+        if ratio < GOBLIN_LINE_MIN_RATIO:
+            return (
+                f"Prop line ({prop_line}) is only {ratio*100:.0f}% of season "
+                f"average ({avg:.1f}) — {qualifier}; "
+                "Goblin classification withheld"
+            )
+        if ratio > GOBLIN_LINE_MAX_RATIO:
+            return (
+                f"Prop line ({prop_line}) is {ratio:.1f}× the season "
+                f"average ({avg:.1f}) — {qualifier}; "
+                "Goblin classification withheld"
+            )
+        return None  # Within acceptable bounds
+
     if prop_line <= 0:
         line_verified = False
         line_reliability_warning = (
             "Prop line is zero or missing — cannot verify Goblin classification"
         )
-    elif _line_source_lower in ("synthetic", "estimated", "default", ""):
-        # Only flag as unverified if we also have a season average to compare
-        if season_average is not None and season_average > 0:
-            line_ratio = prop_line / season_average
-            if line_ratio < GOBLIN_LINE_MIN_RATIO:
-                line_verified = False
-                line_reliability_warning = (
-                    f"Prop line ({prop_line}) is only {line_ratio*100:.0f}% of season "
-                    f"average ({season_average:.1f}) — likely a synthetic/default line; "
-                    "Goblin classification withheld"
-                )
-            elif line_ratio > GOBLIN_LINE_MAX_RATIO:
-                line_verified = False
-                line_reliability_warning = (
-                    f"Prop line ({prop_line}) is {line_ratio:.1f}× the season "
-                    f"average ({season_average:.1f}) — implausibly high, likely a "
-                    "synthetic/default line; Goblin classification withheld"
-                )
     elif season_average is not None and season_average > 0:
-        # Even for platform-sourced lines, flag if wildly off from season avg
+        # Check ratio for both synthetic and real-platform lines.
+        # Synthetic sources get an additional benefit-of-the-doubt block
+        # even if the ratio looks okay (we can't confirm it's real data).
         line_ratio = prop_line / season_average
-        if line_ratio < GOBLIN_LINE_MIN_RATIO:
+        _ratio_warn = _line_ratio_warning(line_ratio, season_average, _is_synthetic_source)
+        if _ratio_warn:
             line_verified = False
-            line_reliability_warning = (
-                f"Prop line ({prop_line}) is only {line_ratio*100:.0f}% of season "
-                f"average ({season_average:.1f}) — unreliable line; "
-                "Goblin classification withheld"
-            )
-        elif line_ratio > GOBLIN_LINE_MAX_RATIO:
-            line_verified = False
-            line_reliability_warning = (
-                f"Prop line ({prop_line}) is {line_ratio:.1f}× the season "
-                f"average ({season_average:.1f}) — unreliable line; "
-                "Goblin classification withheld"
-            )
+            line_reliability_warning = _ratio_warn
 
     # ============================================================
     # GOBLIN CHECK
