@@ -22,6 +22,7 @@
 import json
 import datetime
 import os
+import logging
 from pathlib import Path
 
 
@@ -578,8 +579,8 @@ def _load_all_clv_records():
         if _CLV_JSON_PATH.exists():
             with open(_CLV_JSON_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[CLV] Unexpected error in CLV summary: {_exc}")
     return {}
 
 

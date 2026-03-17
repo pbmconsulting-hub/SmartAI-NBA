@@ -12,6 +12,7 @@
 
 # Standard library only
 import math  # For rounding and calculation helpers
+import logging
 
 try:
     from engine.rotation_tracker import get_minutes_adjustment
@@ -253,26 +254,26 @@ def compute_league_average_game_total(teams_data=None):
                 totals.append(ppg + opp_ppg)
         if totals:
             return sum(totals) / len(totals)
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[Projections] Unexpected error: {_exc}")
     return LEAGUE_AVERAGE_GAME_TOTAL
 
 
 def build_player_projection(
-    player_data,
-    opponent_team_abbreviation,
-    is_home_game,
-    rest_days,
-    game_total,
-    defensive_ratings_data,
-    teams_data,
-    recent_form_games=None,
-    vegas_spread=0.0,
-    minutes_adjustment_factor=1.0,
-    teammate_out_notes=None,
-    played_yesterday=False,
-    rolling_defensive_data=None,
-    game_context=None,
+    player_data: dict,
+    opponent_team_abbreviation: str,
+    is_home_game: bool,
+    rest_days: int,
+    game_total: float,
+    defensive_ratings_data: list,
+    teams_data: list,
+    recent_form_games: list | None = None,
+    vegas_spread: float = 0.0,
+    minutes_adjustment_factor: float = 1.0,
+    teammate_out_notes: str | None = None,
+    played_yesterday: bool = False,
+    rolling_defensive_data: list | None = None,
+    game_context: dict | None = None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -683,8 +684,8 @@ def build_player_projection(
             rotation_adjustment = get_minutes_adjustment(recent_form_games)
             if rotation_adjustment != 1.0:
                 minutes_adjustment_factor = minutes_adjustment_factor * rotation_adjustment
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[Projections] Unexpected error: {_exc}")
 
     projected_minutes = round(
         season_minutes_average

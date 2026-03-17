@@ -17,11 +17,15 @@
 # ============================================================
 
 import math
+import logging
 
 try:
     from engine.rotation_tracker import get_trending_minutes
     _HAS_ROTATION_TRACKER = True
 except ImportError:
+    logging.getLogger(__name__).warning("[MinutesModel] Optional module not available: rotation_tracker")
+    def get_trending_minutes(*args, **kwargs):  # no-op fallback
+        return None
     _HAS_ROTATION_TRACKER = False
 
 
@@ -113,7 +117,8 @@ def project_player_minutes(player_data, game_context, teammate_status=None, game
             base_minutes = trending if trending > 0 else None
             if base_minutes:
                 adjustment_notes.append(f"Base: {base_minutes:.1f} min (trending avg)")
-        except Exception:
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[MinutesModel] Unexpected error: {_exc}")
             base_minutes = None
     else:
         base_minutes = None

@@ -10,6 +10,7 @@ import streamlit as st
 import datetime
 import os
 import base64
+import logging
 
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.live_data_fetcher import load_last_updated
@@ -312,8 +313,8 @@ try:
                 "⚠️ No team stats found. Go to **📡 Data Feed → Smart Update** "
                 "to load team data for accurate analysis."
             )
-except Exception:
-    pass
+except Exception as _exc:
+    logging.getLogger(__name__).warning(f"[App] Setup step failed: {_exc}")
 
 # ── Data Validation on Startup ─────────────────────────────────
 try:
@@ -329,8 +330,8 @@ try:
                 st.warning(f"players.csv: {e}")
             for e in _t_errors:
                 st.warning(f"teams.csv: {e}")
-except Exception:
-    pass
+except Exception as _exc:
+    logging.getLogger(__name__).warning(f"[App] Setup step failed: {_exc}")
 
 # ── Teams/Defensive Ratings Staleness Warning (Feature 11) ───────
 try:
@@ -338,8 +339,8 @@ try:
     _staleness_warn = get_teams_staleness_warning()
     if _staleness_warn:
         st.sidebar.warning(_staleness_warn)
-except Exception:
-    pass
+except Exception as _exc:
+    logging.getLogger(__name__).warning(f"[App] Setup step failed: {_exc}")
 
 current_props = st.session_state.get("current_props", props_data)
 number_of_current_props = len(current_props)
@@ -641,8 +642,8 @@ try:
             st.success("✅ All data files present and fresh.")
 
         st.caption("Go to **📡 Data Feed** to refresh data.")
-except Exception:
-    pass
+except Exception as _exc:
+    logging.getLogger(__name__).warning(f"[App] Setup step failed: {_exc}")
 
 st.caption(
     f"© Smart Pick Pro | {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} | "

@@ -872,7 +872,7 @@ with _tab_builder:
 
         if st.button("🚀 Run Custom Analysis", type="primary", key="gb_run"):
             from engine.projections import build_player_projection, get_stat_standard_deviation
-            from engine.simulation import run_monte_carlo_simulation
+            from engine.simulation import run_quantum_matrix_simulation
             from engine.confidence import calculate_confidence_score
             from data.data_manager import load_defensive_ratings_data as _load_def_gb
 
@@ -955,7 +955,7 @@ with _tab_builder:
                         prop_line_gb = round(projected_value_gb * 2) / 2
 
                         try:
-                            sim_gb = run_monte_carlo_simulation(
+                            sim_gb = run_quantum_matrix_simulation(
                                 projected_stat_average=projected_value_gb,
                                 stat_standard_deviation=std_dev_gb,
                                 prop_line=prop_line_gb,

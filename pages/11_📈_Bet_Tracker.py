@@ -17,6 +17,7 @@
 
 import datetime
 import json
+import logging
 
 import streamlit as st
 
@@ -361,6 +362,18 @@ with tab_model_health:
                     ),
                     unsafe_allow_html=True,
                 )
+                # Tier spotlight metric cards
+                _tier_spot_cols = st.columns(4)
+                _tier_icons = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+                for _ti, _tn in enumerate(["Platinum", "Gold", "Silver", "Bronze"]):
+                    if _tn in tier_perf:
+                        _td = tier_perf[_tn]
+                        _tier_spot_cols[_ti].metric(
+                            f"{_tier_icons[_tn]} {_tn}",
+                            f"{_td.get('win_rate', 0):.1f}%",
+                            help=f"{_tn}: {_td.get('wins', 0)}W / {_td.get('losses', 0)}L "
+                                 f"({_td.get('total', 0)} total bets)",
+                        )
             else:
                 st.caption("No tier data yet.")
 
@@ -435,21 +448,30 @@ with tab_model_health:
                 # Highlight the key insight
                 _goblin_data = bet_type_perf.get("goblin", {})
                 _demon_data  = bet_type_perf.get("demon", {})
-                _cols = st.columns(2)
+                _metric_cols = st.columns(3)
                 if _goblin_data.get("total", 0) > 0:
-                    _cols[0].metric(
+                    _metric_cols[0].metric(
                         "🧌 Goblin Win Rate",
                         f"{_goblin_data.get('win_rate', 0):.1f}%",
                         help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
                     )
                 if _demon_data.get("total", 0) > 0:
-                    _demon_loss_rate = round(
-                        (_demon_data.get("losses", 0) / max(_demon_data.get("total", 1), 1)) * 100, 1
+                    _demon_total = _demon_data.get("total", 1)
+                    _demon_wins  = _demon_data.get("wins", 0)
+                    _demon_losses = _demon_data.get("losses", 0)
+                    _demon_win_rate  = round(_demon_wins  / max(_demon_total, 1) * 100, 1)
+                    _demon_loss_rate = round(_demon_losses / max(_demon_total, 1) * 100, 1)
+                    _metric_cols[1].metric(
+                        "👿 Demon Win Rate",
+                        f"{_demon_win_rate:.1f}%",
+                        help=f"Demon bets should rarely win. Based on {_demon_total} logged Demon bets.",
                     )
-                    _cols[1].metric(
+                    _metric_cols[2].metric(
                         "👿 Demon Loss Rate",
                         f"{_demon_loss_rate:.1f}%",
-                        help=f"Based on {_demon_data.get('total', 0)} logged Demon bets — a high loss rate validates the system",
+                        delta=f"Validated: {_demon_loss_rate:.0f}% loss rate",
+                        delta_color="normal",
+                        help=f"A high Demon loss rate validates the system — these are trap bets to avoid.",
                     )
 
             # ── Individual Goblin Bet Results ──────────────────────────
@@ -482,10 +504,37 @@ with tab_model_health:
             if _demon_resolved:
                 _dm_wins   = sum(1 for b in _demon_resolved if b.get("result") == "WIN")
                 _dm_losses = sum(1 for b in _demon_resolved if b.get("result") == "LOSS")
+                _dm_pushes = sum(1 for b in _demon_resolved if b.get("result") == "PUSH")
+                _dm_total  = len(_demon_resolved)
                 with st.expander(
-                    f"👿 Demon Bet Results — {_dm_wins} Wins / {_dm_losses} Losses",
+                    f"👿 Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
+                    f"({round(_dm_wins/_dm_total*100,1) if _dm_total else 0:.1f}% win rate)",
                     expanded=False,
                 ):
+                    st.caption(
+                        "👿 **Demon bets** are traps — conflicting forces, high variance, "
+                        "fatigue risk, or hot-streak regression. A **high loss rate validates the system**."
+                    )
+                    # Demon subtype breakdown from notes/reasons
+                    _type_counts = {"Conflict": 0, "Variance": 0, "Fatigue": 0, "Regression": 0, "Other": 0}
+                    for _dm in _demon_resolved:
+                        _notes = (_dm.get("notes") or "").lower()
+                        if "conflict" in _notes:
+                            _type_counts["Conflict"] += 1
+                        elif "variance" in _notes or "high-variance" in _notes:
+                            _type_counts["Variance"] += 1
+                        elif "fatigue" in _notes or "back-to-back" in _notes or "blowout" in _notes:
+                            _type_counts["Fatigue"] += 1
+                        elif "regression" in _notes or "hot streak" in _notes or "inflated" in _notes:
+                            _type_counts["Regression"] += 1
+                        else:
+                            _type_counts["Other"] += 1
+                    _active_types = {k: v for k, v in _type_counts.items() if v > 0}
+                    if _active_types:
+                        _tc_cols = st.columns(len(_active_types))
+                        for _tci, (_tname, _tcnt) in enumerate(_active_types.items()):
+                            _tc_cols[_tci].metric(f"{_tname}", str(_tcnt), help=f"Demon bets triggered by {_tname} pattern")
+                    st.divider()
                     _dmc_a, _dmc_b = st.columns(2)
                     for _dmi, _dm in enumerate(_demon_resolved):
                         _dmc = _dmc_a if _dmi % 2 == 0 else _dmc_b
@@ -508,8 +557,8 @@ with tab_model_health:
                             _col_c.caption("Win rate: no bet results recorded yet")
                 else:
                     st.info("📊 Tier accuracy report will appear after recording bets and closing lines.")
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
 
         # Feature 4: Isotonic calibration curve
         try:
@@ -529,8 +578,8 @@ with tab_model_health:
                         )
                 else:
                     st.info("📈 Isotonic calibration curve will appear after recording enough bets (200+ for fine-grained view).")
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
 
 # ============================================================
 # END SECTION: Model Health Tab
@@ -1144,8 +1193,8 @@ with tab_auto_resolve:
                     f"🔄 Auto-resolved {_rtr_result['resolved']} bet(s) "
                     f"({_rtr_result['wins']}W / {_rtr_result['losses']}L)"
                 )
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
         st.rerun()
 
     st.divider()
@@ -1191,8 +1240,8 @@ with tab_auto_resolve:
         if resolved > 0:
             try:
                 save_daily_snapshot(resolve_date.isoformat())
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
             st.success(f"✅ Auto-resolved **{resolved}** bet(s) for {resolve_date.isoformat()}.")
             st.rerun()
         else:

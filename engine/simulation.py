@@ -224,7 +224,7 @@ def run_quantum_matrix_simulation(
     enable_fatigue_curve=True,
     vegas_spread=None,
     game_total=None,
-):
+) -> dict:
     """
     Run a full Quantum Matrix Engine 5.6 simulation for one player's one stat.
 
@@ -588,8 +588,23 @@ def run_quantum_matrix_simulation(
     # ============================================================
 
 
-# Backward-compatibility alias
-run_monte_carlo_simulation = run_quantum_matrix_simulation
+import warnings as _warnings
+
+
+def run_monte_carlo_simulation(*args, **kwargs):
+    """
+    DEPRECATED: Use ``run_quantum_matrix_simulation`` directly.
+
+    This backward-compatibility wrapper logs a deprecation warning and
+    delegates to ``run_quantum_matrix_simulation``.  It will be removed
+    in a future release.
+    """
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "run_monte_carlo_simulation is deprecated; "
+        "call run_quantum_matrix_simulation directly."
+    )
+    return run_quantum_matrix_simulation(*args, **kwargs)
 
 
 # ============================================================
@@ -861,7 +876,7 @@ def _simulate_foul_trouble_minutes_reduction():
         return 0.0
 
 
-def build_histogram_from_results(simulated_results, prop_line, number_of_buckets=20):
+def build_histogram_from_results(simulated_results, prop_line, number_of_buckets=20) -> dict:
     """
     Build a histogram (frequency distribution) from simulation results.
     Used by the Analysis page to display a bar chart.
@@ -1433,7 +1448,7 @@ def run_enhanced_simulation(
     random_seed=None,
     vegas_spread=None,
     game_total=None,
-):
+) -> dict:
     """
     Run an enhanced simulation blending QME and game-script results. (1F)
 
@@ -1533,8 +1548,8 @@ def run_enhanced_simulation(
             if isinstance(blended_prob, dict):
                 blended_prob = blended_prob.get("probability_over", qme_prob)
             blend_method = "qme_70_gamescript_30"
-    except Exception:
-        pass  # Game script unavailable — use QME only
+    except Exception as _exc:
+        _logger.warning(f"[Simulation] Game script unavailable, using QME only: {_exc}")
 
     blended_prob = clamp_probability(float(blended_prob))
 
@@ -1544,3 +1559,111 @@ def run_enhanced_simulation(
     result["game_script_probability"] = game_script_prob
     result["blend_method"] = blend_method
     return result
+
+
+# ============================================================
+# SECTION: Sensitivity Analysis
+# ============================================================
+
+def run_sensitivity_analysis(
+    projected_stat_average: float,
+    stat_standard_deviation: float,
+    prop_line: float,
+    number_of_simulations: int,
+    blowout_risk_factor: float,
+    pace_adjustment_factor: float,
+    matchup_adjustment_factor: float,
+    home_away_adjustment: float,
+    rest_adjustment_factor: float,
+    stat_type: str = None,
+    projected_minutes: float = None,
+    blowout_delta: float = 0.10,
+    pace_delta: float = 0.05,
+    matchup_delta: float = 0.05,
+) -> dict:
+    """
+    Run sensitivity analysis by varying key parameters ±delta and reporting
+    how the over-probability changes.
+
+    For each parameter varied, three simulations are run:
+      - base: the parameter at its original value
+      - low:  the parameter reduced by delta
+      - high: the parameter increased by delta
+
+    Args:
+        projected_stat_average: Player season average for the stat.
+        stat_standard_deviation: Standard deviation of stat across games.
+        prop_line: The betting line (over/under threshold).
+        number_of_simulations: Number of Monte Carlo iterations per run.
+        blowout_risk_factor: Base blowout risk (0–1).
+        pace_adjustment_factor: Base pace multiplier.
+        matchup_adjustment_factor: Base matchup multiplier.
+        home_away_adjustment: Home/away adjustment factor.
+        rest_adjustment_factor: Rest days adjustment factor.
+        stat_type: Optional stat type string (e.g. 'points').
+        projected_minutes: Optional projected minutes.
+        blowout_delta: Fractional delta for blowout risk (default ±0.10).
+        pace_delta: Fractional delta for pace (default ±0.05).
+        matchup_delta: Fractional delta for matchup (default ±0.05).
+
+    Returns:
+        dict: Sensitivity results with structure::
+
+            {
+                "base_probability": float,
+                "parameters": {
+                    "blowout_risk": {
+                        "base": float,
+                        "low":  {"value": float, "probability": float, "delta_pct": float},
+                        "high": {"value": float, "probability": float, "delta_pct": float},
+                    },
+                    "pace": { ... },
+                    "matchup": { ... },
+                },
+            }
+    """
+    _base_kwargs = dict(
+        projected_stat_average=projected_stat_average,
+        stat_standard_deviation=stat_standard_deviation,
+        prop_line=prop_line,
+        number_of_simulations=number_of_simulations,
+        blowout_risk_factor=blowout_risk_factor,
+        pace_adjustment_factor=pace_adjustment_factor,
+        matchup_adjustment_factor=matchup_adjustment_factor,
+        home_away_adjustment=home_away_adjustment,
+        rest_adjustment_factor=rest_adjustment_factor,
+        stat_type=stat_type,
+        projected_minutes=projected_minutes,
+        random_seed=42,
+    )
+
+    base_result = run_quantum_matrix_simulation(**_base_kwargs)
+    base_prob = base_result.get("probability_over", 0.5)
+
+    def _vary(param_name, base_val, delta):
+        low_val  = max(0.0, base_val - delta)
+        high_val = base_val + delta
+        low_kwargs  = dict(_base_kwargs); low_kwargs[param_name]  = low_val
+        high_kwargs = dict(_base_kwargs); high_kwargs[param_name] = high_val
+        low_prob  = run_quantum_matrix_simulation(**low_kwargs).get("probability_over", base_prob)
+        high_prob = run_quantum_matrix_simulation(**high_kwargs).get("probability_over", base_prob)
+        return {
+            "base": base_val,
+            "low":  {"value": low_val,  "probability": round(low_prob, 4),
+                     "delta_pct": round((low_prob  - base_prob) * 100, 2)},
+            "high": {"value": high_val, "probability": round(high_prob, 4),
+                     "delta_pct": round((high_prob - base_prob) * 100, 2)},
+        }
+
+    return {
+        "base_probability": round(base_prob, 4),
+        "parameters": {
+            "blowout_risk": _vary("blowout_risk_factor",        blowout_risk_factor,        blowout_delta),
+            "pace":         _vary("pace_adjustment_factor",     pace_adjustment_factor,     pace_delta),
+            "matchup":      _vary("matchup_adjustment_factor",  matchup_adjustment_factor,  matchup_delta),
+        },
+    }
+
+# ============================================================
+# END SECTION: Sensitivity Analysis
+# ============================================================

@@ -77,7 +77,7 @@ def analyze_directional_forces(
     game_context,
     platform_lines=None,
     recent_form_ratio=None,
-):
+) -> dict:
     """
     Identify all forces pushing the stat OVER or UNDER the line.
 
@@ -547,7 +547,7 @@ def should_avoid_prop(
     stat_type=None,
     platform=None,
     over_odds=-110,
-):
+) -> dict:
     """
     Determine whether a prop pick should be avoided.
 
@@ -741,7 +741,7 @@ def detect_correlated_props(props_with_results):
 # true average (a trap for bettors) vs. a line with real edge.
 # ============================================================
 
-def detect_line_sharpness(prop_line, season_average, stat_type="points"):
+def detect_line_sharpness(prop_line, season_average, stat_type="points") -> dict:
     """
     Detect whether a prop line is "sharp" (set close to the true average).
 
@@ -822,7 +822,7 @@ def detect_trap_line(
     game_total,
     blowout_risk,
     stat_type="points",
-):
+) -> dict:
     """
     Detect whether a prop line is a potential "trap."
 
@@ -1176,7 +1176,7 @@ def classify_bet_type(
     goblin_min_edge=None,
     demon_conflict_ratio=None,
     demon_regression_pct=None,
-):
+) -> dict:
     """
     Classify a prop bet as a Goblin 🧌, Demon 👿, or Normal bet.
 
@@ -1432,3 +1432,94 @@ def classify_bet_type(
 # ============================================================
 # END SECTION: Goblin / Demon Bet Classification
 # ============================================================
+
+
+def _normalize_force_strength(raw_value: float, method: str = "ratio") -> float:
+    """
+    Normalize a raw force-strength signal to the [0, 100] scale.
+
+    Two standardised methods are supported:
+
+    * ``"ratio"``  — interprets *raw_value* as a ratio where 1.0 = neutral.
+      Uses ``(factor - 1) * 100`` capped to [0, 100].  Best for
+      factors like pace multipliers and matchup multipliers.
+    * ``"gap"``    — interprets *raw_value* as an absolute gap (e.g. the
+      difference between projected value and prop line measured in the
+      same units as the stat).  Uses ``gap / 3`` capped to [0, 100].
+      Best for raw numerical differences.
+
+    Args:
+        raw_value: The un-normalised signal value.
+        method:    ``"ratio"`` (default) or ``"gap"``.
+
+    Returns:
+        float: Normalised strength in [0.0, 100.0].
+    """
+    if method == "gap":
+        return min(max(raw_value / 3.0, 0.0), 100.0)
+    # Default: "ratio" method
+    return min(max((raw_value - 1.0) * 100.0, 0.0), 100.0)
+
+
+def _reconcile_line_signals(
+    sharpness_signal: dict,
+    trap_signal: dict,
+) -> dict:
+    """
+    Reconcile conflicting signals from line sharpness (W1) and trap line
+    detection (W5).
+
+    When both fire, the higher-confidence signal wins.  If confidence is
+    equal the trap signal is given priority (conservative approach: when
+    in doubt, don't bet).
+
+    Args:
+        sharpness_signal: Dict from ``detect_line_sharpness()`` with at
+            minimum ``{"is_sharp": bool, "confidence": float}``.
+        trap_signal: Dict from ``detect_trap_line()`` with at minimum
+            ``{"is_trap": bool, "confidence": float}``.
+
+    Returns:
+        dict:
+            ``{"winner": "sharpness" | "trap" | "neutral",
+               "is_sharp": bool, "is_trap": bool,
+               "note": str}``
+    """
+    sharp_conf = float(sharpness_signal.get("confidence", 0.0))
+    trap_conf  = float(trap_signal.get("confidence",  0.0))
+    is_sharp   = bool(sharpness_signal.get("is_sharp", False))
+    is_trap    = bool(trap_signal.get("is_trap",   False))
+
+    if not is_sharp and not is_trap:
+        return {"winner": "neutral", "is_sharp": False, "is_trap": False,
+                "note": "Neither signal active."}
+
+    if is_sharp and not is_trap:
+        return {"winner": "sharpness", "is_sharp": True, "is_trap": False,
+                "note": "Only sharpness active."}
+
+    if is_trap and not is_sharp:
+        return {"winner": "trap", "is_sharp": False, "is_trap": True,
+                "note": "Only trap active."}
+
+    # Both fire — resolve by confidence
+    if sharp_conf > trap_conf:
+        return {
+            "winner": "sharpness",
+            "is_sharp": True,
+            "is_trap": False,
+            "note": (
+                f"Both W1+W5 fired; sharpness confidence ({sharp_conf:.2f}) "
+                f"> trap confidence ({trap_conf:.2f}) — treating as sharp line."
+            ),
+        }
+    else:
+        return {
+            "winner": "trap",
+            "is_sharp": False,
+            "is_trap": True,
+            "note": (
+                f"Both W1+W5 fired; trap confidence ({trap_conf:.2f}) "
+                f">= sharpness confidence ({sharp_conf:.2f}) — treating as trap (conservative)."
+            ),
+        }
