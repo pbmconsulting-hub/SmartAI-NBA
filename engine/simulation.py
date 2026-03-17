@@ -58,14 +58,17 @@ FOUL_TROUBLE_PROBABILITY = 0.12
 # stat_multiplier: applied on top of the scaled projection
 GAME_SCENARIOS = [
     # (name, probability, minutes_reduction_min, minutes_reduction_max, stat_boost_min, stat_boost_max)
-    # Disruption scenarios increased to ~42% to better reflect real NBA game variance.
-    # Normal reduced to 0.55 to accommodate more blowout/foul-trouble weight.
-    ("normal",       0.55,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
-    ("blowout_win",  0.13,  0.18,  0.28,  0.88,  0.93),  # Team wins big, star sits late (stricter)
-    ("blowout_loss", 0.11,  0.12,  0.22,  0.86,  0.96),  # Team loses big, garbage time (stricter)
-    ("foul_trouble", 0.11,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
-    ("close_game",   0.07, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
-    ("injury_scare", 0.03,  0.40,  0.60,  0.30,  0.60),  # Injury scare: massive minutes cut
+    # Disruption scenarios increased to ~47% to better reflect real NBA game variance.
+    # Normal reduced to 0.53, close_game to 0.06 to accommodate 3 new scenario types (1A).
+    ("normal",         0.53,  0.00,  0.05,  0.97,  1.03),  # Normal game: minimal impact
+    ("blowout_win",    0.13,  0.18,  0.28,  0.88,  0.93),  # Team wins big, star sits late (stricter)
+    ("blowout_loss",   0.11,  0.12,  0.22,  0.86,  0.96),  # Team loses big, garbage time (stricter)
+    ("foul_trouble",   0.11,  0.15,  0.30,  0.92,  1.00),  # Foul trouble limits minutes
+    ("close_game",     0.06, -0.15, -0.05,  1.05,  1.15),  # Close game / OT: MORE minutes, stat boost
+    ("injury_scare",   0.03,  0.40,  0.60,  0.30,  0.60),  # Injury scare: massive minutes cut
+    ("shootout",       0.01, -0.05,  0.05,  1.05,  1.15),  # High-scoring shootout (1A)
+    ("grind_blowout",  0.01,  0.25,  0.40,  0.75,  0.85),  # Slow-paced blowout (1A)
+    ("defensive_slug", 0.01,  0.00,  0.08,  0.85,  0.93),  # Defensive low-scorer (1A)
 ]
 
 # Validate scenario probabilities sum to 1.0
@@ -73,6 +76,43 @@ _SCENARIO_PROB_SUM = sum(s[1] for s in GAME_SCENARIOS)
 assert abs(_SCENARIO_PROB_SUM - 1.0) < 1e-6, (
     f"GAME_SCENARIOS probabilities must sum to 1.0, got {_SCENARIO_PROB_SUM:.4f}"
 )
+
+# Spread-total matrix scenario weight overrides. (1A)
+# When |spread| and total match a pattern, override base scenario weights.
+# Format: {(spread_abs_threshold, total_threshold, comparison): {scenario_name: weight, ...}}
+# These weights are RELATIVE (will be normalized inside _simulate_game_scenario).
+_SPREAD_TOTAL_MATRIX = {
+    # Tight game + high total → shootout
+    "shootout_game": {
+        "spread_max": 4.0,
+        "total_min": 228.0,
+        "weights": {
+            "shootout": 0.25, "normal": 0.50, "close_game": 0.10,
+            "injury_scare": 0.05, "foul_trouble": 0.05, "blowout_win": 0.025,
+            "blowout_loss": 0.025,
+        },
+    },
+    # Blowout + low total → grind blowout
+    "grind_blowout_game": {
+        "spread_min": 10.0,
+        "total_max": 215.0,
+        "weights": {
+            "grind_blowout": 0.30, "blowout_win": 0.15, "blowout_loss": 0.15,
+            "normal": 0.30, "injury_scare": 0.05, "foul_trouble": 0.025,
+            "close_game": 0.025,
+        },
+    },
+    # Tight game + low total → defensive slug
+    "defensive_slug_game": {
+        "spread_max": 4.0,
+        "total_max": 215.0,
+        "weights": {
+            "defensive_slug": 0.20, "normal": 0.55, "foul_trouble": 0.10,
+            "injury_scare": 0.05, "close_game": 0.05, "blowout_win": 0.025,
+            "blowout_loss": 0.025,
+        },
+    },
+}
 
 # ============================================================
 # SECTION: Hot Hand / Cold Game Probabilities (W4: Momentum)
@@ -99,8 +139,11 @@ HOT_COLD_MAX_HOT_PROB  = 0.25      # Hard ceiling on player-specific hot probabi
 HOT_COLD_MAX_COLD_PROB = 0.20      # Hard ceiling on player-specific cold probability
 
 # Convergence: stop early when the running probability changes by less than this
-# between 500-simulation checkpoints.
-CONVERGENCE_THRESHOLD = 0.005
+# between checkpoints.
+CONVERGENCE_THRESHOLD = 0.003  # 1E: tightened from 0.005
+
+# Convergence check interval (1E): check every 250 sims after the first 500.
+CONVERGENCE_CHECK_INTERVAL = 250
 
 # Wilson score z-value for the 90% confidence interval (P(|Z| > 1.645) ≈ 0.10)
 Z_SCORE_90_CI = 1.645
@@ -137,6 +180,18 @@ STAT_CORRELATION = {
     ("assists",  "rebounds"): 0.05,
 }
 
+# Quarter-based fatigue multipliers (1B).
+# Each quarter, the stat rate per minute decays slightly due to cumulative fatigue.
+# Q1: full rate, Q4: 90% rate. Back-to-back games further multiply by 0.95.
+QUARTER_FATIGUE_RATES = (1.00, 0.97, 0.94, 0.90)  # Q1, Q2, Q3, Q4
+BACK_TO_BACK_FATIGUE_MULTIPLIER = 0.95  # Additional fatigue on back-to-back nights
+
+# Momentum score thresholds for enhanced hot/cold detection (1D)
+MOMENTUM_HOT_THRESHOLD = 0.15    # >15% above average → hot momentum
+MOMENTUM_COLD_THRESHOLD = -0.15  # <-15% below average → cold momentum
+MOMENTUM_HOT_CAP = 1.12          # Maximum hot streak multiplier
+MOMENTUM_COLD_FLOOR = 0.88       # Minimum cold streak multiplier
+
 # ============================================================
 # END SECTION: Minutes Simulation Constants
 # ============================================================
@@ -166,6 +221,9 @@ def run_quantum_matrix_simulation(
     minutes_std=None,
     recent_game_logs=None,
     random_seed=None,
+    enable_fatigue_curve=True,
+    vegas_spread=None,
+    game_total=None,
 ):
     """
     Run a full Quantum Matrix Engine 5.6 simulation for one player's one stat.
@@ -179,6 +237,8 @@ def run_quantum_matrix_simulation(
         with stat-type-specific skew parameters (right skew for NBA).
     C8: Optionally simulates minutes first, then scales per-minute rate,
         capturing the natural correlation between minutes and stats.
+    1B: Quarter-aware fatigue decay reduces effective stat rate across Q1-Q4.
+    1C: Garbage time adjustment recaps star-player minutes in blowouts.
 
     Args:
         projected_stat_average (float): Our projected mean for the stat
@@ -216,6 +276,14 @@ def run_quantum_matrix_simulation(
             When provided, the simulation produces reproducible results
             across runs — useful for debugging and model validation.
             Defaults to None (non-deterministic / different each run).
+        enable_fatigue_curve (bool): When True, applies quarter-aware fatigue
+            decay (1B). Q4 stats are modestly lower than Q1. Default True.
+        vegas_spread (float, optional): Vegas point spread (positive = player's
+            team favored). Feeds into spread-total matrix for scenario weighting
+            (1A). Defaults to None (neutral).
+        game_total (float, optional): Vegas over/under total. Combined with
+            vegas_spread for spread-total matrix weighting (1A).
+            Defaults to None (uses 225.0 baseline).
 
     Returns:
         dict: Simulation results containing:
@@ -318,10 +386,14 @@ def run_quantum_matrix_simulation(
     # Counter for games where player goes OVER the prop line
     count_of_games_over_line = 0
 
-    # Convergence tracking: check every 500 simulations whether the
-    # running probability has stabilized (early-exit optimisation).
+    # Convergence tracking: check every CONVERGENCE_CHECK_INTERVAL simulations
+    # whether the running probability has stabilized (early-exit optimisation).
     prev_prob_checkpoint = 0.0
     simulations_completed = number_of_simulations  # updated on early exit
+
+    # 1E: Running sum for mean+std convergence tracking
+    _running_sum = 0.0
+    _running_sum_sq = 0.0
 
     # Run the simulation `number_of_simulations` times
     # BEGINNER NOTE: range(n) creates numbers 0 to n-1
@@ -334,7 +406,11 @@ def run_quantum_matrix_simulation(
         # AND stats together. This models the real-world correlation:
         # e.g., a player in foul trouble in a blowout DEFINITELY sits.
         scenario_name, minutes_reduction, stat_scenario_multiplier = (
-            _simulate_game_scenario(blowout_risk_factor)
+            _simulate_game_scenario(
+                blowout_risk_factor,
+                vegas_spread=vegas_spread,
+                game_total=game_total,
+            )
         )
 
         # minutes_reduction can be negative (close game/OT = extra minutes)
@@ -363,6 +439,13 @@ def run_quantum_matrix_simulation(
             )
             # Apply scenario-level minutes reduction on top
             sim_minutes *= minutes_multiplier
+
+            # 1C: Apply garbage time adjustment for blowout scenarios
+            if projected_minutes > 0:
+                _is_star = projected_minutes >= 30
+                _gt_minutes = _apply_garbage_time_adjustment(projected_minutes, scenario_name, _is_star)
+                sim_minutes = min(sim_minutes, _gt_minutes * 1.1)  # don't exceed adjusted ceiling
+
             effective_mean = (
                 stat_per_minute
                 * sim_minutes
@@ -382,6 +465,14 @@ def run_quantum_matrix_simulation(
             )
             # Scale std dev proportionally (less minutes = less variance too)
             scaled_std = adjusted_standard_deviation * math.sqrt(max(0.1, minutes_multiplier))
+
+        # --- Step 3b: Apply Quarter-Aware Fatigue Curve (1B) ---
+        if enable_fatigue_curve:
+            avg_fatigue = sum(QUARTER_FATIGUE_RATES) / 4
+            is_back_to_back = rest_adjustment_factor < 0.97
+            if is_back_to_back:
+                avg_fatigue *= BACK_TO_BACK_FATIGUE_MULTIPLIER
+            effective_mean *= avg_fatigue
 
         # --- Step 4: Draw Sample (C11: KDE when logs available, else C5: skew-normal) ---
         # Priority order:
@@ -425,18 +516,23 @@ def run_quantum_matrix_simulation(
         if simulated_game_stat > prop_line:
             count_of_games_over_line += 1
 
-        # --- Step 6: Convergence Check (every 500 simulations) ---
+        # 1E: Track running stats for mean+std convergence
+        _running_sum += simulated_game_stat
+        _running_sum_sq += simulated_game_stat ** 2
+
+        # --- Step 6: Convergence Check (every CONVERGENCE_CHECK_INTERVAL simulations) ---
         # If the running probability has stabilised, stop early to save time.
         # IMPORTANT: Do NOT exit early when the probability is within 5% of 0.5
         # because this is exactly where the edge decision (OVER vs UNDER) is
         # made — an early exit here could lock in a false edge.
         sims_done = sim_index + 1
-        if sims_done % 500 == 0 and sims_done >= 500:
+        if sims_done % CONVERGENCE_CHECK_INTERVAL == 0 and sims_done >= 500:
             current_prob = count_of_games_over_line / sims_done
             # Skip convergence check for props near the 50% decision boundary
             _near_50 = abs(current_prob - 0.5) < 0.05
             if not _near_50 and abs(current_prob - prev_prob_checkpoint) < CONVERGENCE_THRESHOLD:
                 simulations_completed = sims_done
+                _logger.debug("Converged at %d sims (probability converged)", sims_done)
                 break
             prev_prob_checkpoint = current_prob
 
@@ -502,7 +598,7 @@ run_monte_carlo_simulation = run_quantum_matrix_simulation
 # like blowouts and foul trouble.
 # ============================================================
 
-def _simulate_game_scenario(blowout_risk_factor):
+def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=225.0):
     """
     Pick a holistic game scenario for this simulated game. (W3)
 
@@ -512,16 +608,61 @@ def _simulate_game_scenario(blowout_risk_factor):
     incoming `blowout_risk_factor` so high-spread games still
     get more blowout weight.
 
+    When vegas_spread and game_total are provided, the spread-total
+    matrix (1A) may override the base scenario weights with context-
+    specific distributions (e.g., tight game + high total → shootout).
+
     Args:
         blowout_risk_factor (float): 0.0-1.0 blowout probability
             from projections.py. Higher → more weight on blowout
             scenarios, less on normal game.
+        vegas_spread (float): Vegas point spread; abs value used for matrix.
+            Defaults to 0.0 (neutral/unknown).
+        game_total (float): Vegas over/under; used for matrix matching.
+            Defaults to 225.0 (league-average total).
 
     Returns:
         tuple: (scenario_name: str,
                 minutes_reduction: float,   # fraction of mins lost (negative = gained)
                 stat_multiplier: float)     # additional stat modifier
     """
+    # Check spread-total matrix for context-specific scenario weighting (1A)
+    # Thresholds are read directly from _SPREAD_TOTAL_MATRIX (single source of truth).
+    abs_spread = abs(vegas_spread or 0.0)
+    gt = game_total or 225.0
+
+    matrix_weights = None
+    _sg = _SPREAD_TOTAL_MATRIX["shootout_game"]
+    _gb = _SPREAD_TOTAL_MATRIX["grind_blowout_game"]
+    _ds = _SPREAD_TOTAL_MATRIX["defensive_slug_game"]
+    if abs_spread < _sg["spread_max"] and gt > _sg["total_min"]:
+        matrix_weights = _sg["weights"]
+    elif abs_spread > _gb["spread_min"] and gt < _gb["total_max"]:
+        matrix_weights = _gb["weights"]
+    elif abs_spread < _ds["spread_max"] and gt < _ds["total_max"]:
+        matrix_weights = _ds["weights"]
+
+    if matrix_weights is not None:
+        # Use matrix-specific weights (bypass blowout_extra logic)
+        adjusted_scenarios = []
+        for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in GAME_SCENARIOS:
+            w = matrix_weights.get(name, 0.0)
+            adjusted_scenarios.append((name, w, min_red_lo, min_red_hi, stat_lo, stat_hi))
+        total_weight = sum(s[1] for s in adjusted_scenarios)
+        roll = random.random() * total_weight
+        cumulative = 0.0
+        for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:
+            cumulative += prob
+            if roll <= cumulative:
+                minutes_reduction = random.uniform(min_red_lo, min_red_hi)
+                stat_multiplier = random.uniform(stat_lo, stat_hi)
+                return name, minutes_reduction, stat_multiplier
+        # Floating-point guard: return 'normal' params from GAME_SCENARIOS
+        _normal = next((s for s in GAME_SCENARIOS if s[0] == "normal"), None)
+        if _normal:
+            return "normal", random.uniform(_normal[2], _normal[3]), random.uniform(_normal[4], _normal[5])
+        return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
+
     # Scale blowout scenario weights by the actual blowout risk.
     # Base blowout_win + blowout_loss weight is 0.18. If blowout_risk_factor
     # is higher than the base 0.15, shift weight from "normal" to blowout.
@@ -555,12 +696,17 @@ def _simulate_game_scenario(blowout_risk_factor):
 
 def _simulate_hot_cold_modifier(recent_game_logs=None):
     """
-    Apply a "hot hand" or "cold game" multiplier to the stat mean. (W4)
+    Apply a "hot hand" or "cold game" multiplier to the stat mean. (W4 / 1D)
 
     In real NBA games, players have momentum nights (three-point
     streaks, every shot dropping) and ice-cold nights. This creates
     a distribution with FATTER TAILS than a pure normal, which is
     especially important for streaky stats like threes.
+
+    Enhanced (1D): When 5+ recent game logs AND season_avg context
+    are available, uses a weighted momentum score from the last 3
+    games (50/30/20 weights) to detect genuine hot/cold streaks
+    instead of purely random rolls.
 
     When recent_game_logs are provided, the hot/cold probabilities are
     scaled by the player's coefficient of variation (CV = std / mean)
@@ -569,13 +715,31 @@ def _simulate_hot_cold_modifier(recent_game_logs=None):
 
     Args:
         recent_game_logs (list of float, optional): Player's recent stat
-            values. Used to compute player-specific hot/cold frequencies.
-            Falls back to module-level constants when not provided.
+            values. Used to compute player-specific hot/cold frequencies
+            and momentum score. Falls back to module-level constants
+            when not provided.
 
     Returns:
-        float: Multiplier near 1.0 (hot → 1.15-1.30, cold → 0.70-0.85)
+        float: Multiplier near 1.0 (hot → up to 1.12, cold → down to 0.88)
     """
-    # Derive player-specific hot/cold probabilities from the CV of their logs
+    # 1D: Enhanced momentum detection when 5+ logs available
+    # (len >= 5 guarantees last3 always has exactly 3 entries)
+    if recent_game_logs and len(recent_game_logs) >= 5:
+        _mean_all = sum(recent_game_logs) / len(recent_game_logs)
+        if _mean_all > 1e-6:
+            # Weighted average of last 3 games: 50%, 30%, 20% (most-recent first)
+            last3 = recent_game_logs[-3:]  # always exactly 3 items given len >= 5
+            _weights = (0.20, 0.30, 0.50)  # oldest→newest: 20%, 30%, 50%
+            _wsum = sum(w * v for w, v in zip(_weights, last3))
+            _weighted_recent = _wsum  # weights already sum to 1.0
+            momentum = (_weighted_recent - _mean_all) / _mean_all
+            if momentum > MOMENTUM_HOT_THRESHOLD:
+                return min(MOMENTUM_HOT_CAP, 1.0 + momentum * 0.3)
+            if momentum < MOMENTUM_COLD_THRESHOLD:
+                return max(MOMENTUM_COLD_FLOOR, 1.0 + momentum * 0.3)
+            # Near-average momentum: fall through to CV-based random behavior
+
+    # CV-based player-specific hot/cold probabilities (W4 original logic)
     hot_prob  = HOT_HAND_PROBABILITY   # default 0.15
     cold_prob = COLD_GAME_PROBABILITY  # default 0.10
     if recent_game_logs and len(recent_game_logs) >= 5:
@@ -603,6 +767,47 @@ def _simulate_hot_cold_modifier(recent_game_logs=None):
     else:
         # Typical game — no hot/cold modifier
         return 1.0
+
+
+def _apply_garbage_time_adjustment(projected_minutes, scenario_name, is_star_player):
+    """
+    Adjust projected minutes for garbage time effects in blowout scenarios. (1C)
+
+    In blowout games, star players are rested in Q4 (garbage time),
+    while bench players get extended minutes. This function returns
+    the adjusted minutes.
+
+    BEGINNER NOTE: "Garbage time" is when the game is decided and
+    coaches rest their starters, giving bench players more playing time.
+    Stars on winning teams lose minutes; bench players gain minutes.
+
+    Args:
+        projected_minutes (float): Player's normal projected minutes
+        scenario_name (str): Current game scenario name
+        is_star_player (bool): True when projected_minutes >= 30
+
+    Returns:
+        float: Adjusted projected minutes
+
+    Example:
+        Star player (34 min) in blowout_win → Q4 garbage time reduces by ~70%
+        → adjusted ≈ 34 * (1 - 0.70 * 0.25) ≈ 28 minutes
+    """
+    _BLOWOUT_SCENARIOS = {"blowout_win", "blowout_loss", "grind_blowout"}
+    if scenario_name not in _BLOWOUT_SCENARIOS:
+        return projected_minutes  # No adjustment for non-blowout scenarios
+
+    if is_star_player:
+        # Q4 garbage time: reduce Q4 minutes by 60-80%
+        # Q4 is 25% of the game (12 of 48 minutes)
+        q4_reduction_pct = random.uniform(0.60, 0.80)
+        adjusted = projected_minutes * (1.0 - q4_reduction_pct * 0.25)
+    else:
+        # Bench player: gets a 30-50% minutes BOOST in garbage time Q4
+        q4_boost_pct = random.uniform(0.30, 0.50)
+        adjusted = projected_minutes * (1.0 + q4_boost_pct * 0.25)
+
+    return max(0.0, min(48.0, adjusted))
 
 
 def _simulate_blowout_minutes_reduction(blowout_risk_factor):
@@ -1209,3 +1414,133 @@ def simulate_triple_double(
 # ============================================================
 # END SECTION: Combo / Fantasy Stat Simulations
 # ============================================================
+
+
+def run_enhanced_simulation(
+    projected_stat_average,
+    stat_standard_deviation,
+    prop_line,
+    number_of_simulations=2000,
+    blowout_risk_factor=0.15,
+    pace_adjustment_factor=1.0,
+    matchup_adjustment_factor=1.0,
+    home_away_adjustment=0.0,
+    rest_adjustment_factor=1.0,
+    stat_type=None,
+    projected_minutes=None,
+    minutes_std=None,
+    recent_game_logs=None,
+    random_seed=None,
+    vegas_spread=None,
+    game_total=None,
+):
+    """
+    Run an enhanced simulation blending QME and game-script results. (1F)
+
+    Convenience wrapper that enables all new features and blends
+    Quantum Matrix Engine results with game-script simulation (if available).
+    Uses 70% QME weight + 30% game-script weight.
+
+    BEGINNER NOTE: This is the recommended entry point for Neural Analysis.
+    It uses every enhancement: fatigue curves, garbage time, momentum,
+    spread-total matrix, and game-script blending.
+
+    Args:
+        projected_stat_average (float): Projected mean for the stat
+        stat_standard_deviation (float): Historical variability (std dev)
+        prop_line (float): The betting line to beat
+        number_of_simulations (int): Simulations to run (default 2000)
+        blowout_risk_factor (float): 0.0-1.0 blowout probability
+        pace_adjustment_factor (float): Game pace multiplier
+        matchup_adjustment_factor (float): Opponent defense multiplier
+        home_away_adjustment (float): Home/away additive adjustment
+        rest_adjustment_factor (float): Rest/fatigue multiplier
+        stat_type (str, optional): Stat type for distribution selection
+        projected_minutes (float, optional): Tonight's projected minutes
+        minutes_std (float, optional): Std dev of minutes
+        recent_game_logs (list of float, optional): Recent game stat values
+        random_seed (int, optional): Seed for reproducible results
+        vegas_spread (float, optional): Vegas point spread (positive = player's
+            team is favored). Used for spread-total matrix weighting.
+        game_total (float, optional): Vegas over/under total. Used for
+            spread-total matrix weighting.
+
+    Returns:
+        dict: Same structure as run_quantum_matrix_simulation() plus:
+            - 'qme_probability': float, QME-only probability
+            - 'game_script_probability': float or None
+            - 'blend_method': str, describes the blending approach used
+
+    Example:
+        result = run_enhanced_simulation(25.0, 6.0, 24.5,
+                     vegas_spread=3.5, game_total=231.0)
+        # Returns blended probability from QME + game-script
+    """
+    # Run the full QME simulation with all enhancements
+    qme_result = run_quantum_matrix_simulation(
+        projected_stat_average=projected_stat_average,
+        stat_standard_deviation=stat_standard_deviation,
+        prop_line=prop_line,
+        number_of_simulations=number_of_simulations,
+        blowout_risk_factor=blowout_risk_factor,
+        pace_adjustment_factor=pace_adjustment_factor,
+        matchup_adjustment_factor=matchup_adjustment_factor,
+        home_away_adjustment=home_away_adjustment,
+        rest_adjustment_factor=rest_adjustment_factor,
+        stat_type=stat_type,
+        projected_minutes=projected_minutes,
+        minutes_std=minutes_std,
+        recent_game_logs=recent_game_logs,
+        random_seed=random_seed,
+        enable_fatigue_curve=True,
+        vegas_spread=vegas_spread,
+        game_total=game_total,
+    )
+    qme_prob = qme_result["probability_over"]
+
+    # Try to blend with game-script simulation
+    game_script_prob = None
+    blend_method = "qme_only"
+    blended_prob = qme_prob
+
+    try:
+        from engine.game_script import simulate_game_script, blend_with_flat_simulation
+        player_projection = {
+            "projected_stat": projected_stat_average,
+            "stat_std": stat_standard_deviation,
+            "prop_line": prop_line,
+            "stat_type": stat_type or "points",
+            "projected_minutes": projected_minutes or 30.0,
+        }
+        game_context = {
+            "blowout_risk": blowout_risk_factor,
+            "pace_factor": pace_adjustment_factor,
+            "is_home": home_away_adjustment >= 0,
+            "rest_days": 1 if rest_adjustment_factor >= 0.97 else 0,
+            "vegas_spread": vegas_spread or 0.0,
+            "game_total": game_total or 225.0,
+        }
+        gs_result = simulate_game_script(
+            player_projection, game_context,
+            num_simulations=min(500, number_of_simulations // 4)
+        )
+        if gs_result and "probability_over" in gs_result:
+            game_script_prob = gs_result["probability_over"]
+            # Blend: 70% QME + 30% game-script
+            blended_prob = blend_with_flat_simulation(
+                gs_result, qme_result, blend_weight=0.30
+            )
+            if isinstance(blended_prob, dict):
+                blended_prob = blended_prob.get("probability_over", qme_prob)
+            blend_method = "qme_70_gamescript_30"
+    except Exception:
+        pass  # Game script unavailable — use QME only
+
+    blended_prob = clamp_probability(float(blended_prob))
+
+    result = dict(qme_result)
+    result["probability_over"] = blended_prob
+    result["qme_probability"] = qme_prob
+    result["game_script_probability"] = game_script_prob
+    result["blend_method"] = blend_method
+    return result
