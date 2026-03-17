@@ -20,6 +20,54 @@ import statistics
 # Maximum correlation adjustment magnitude (conservative cap)
 MAX_CORRELATION_ADJUSTMENT = 0.15  # 15% max adjustment to joint probability
 
+# Cross-stat teammate correlations (4A).
+# These model how two different stats from different teammates co-move.
+# Keyed by (stat1, stat2) sorted alphabetically for canonical lookup.
+CROSS_STAT_CORRELATIONS = {
+    ("assists", "points"):        0.12,   # Scorer + playmaker synergy
+    ("points", "rebounds"):      -0.05,   # Slight negative (different roles)
+    ("points", "threes"):         0.25,   # Strong positive (threes contribute to points)
+    ("assists", "rebounds"):      0.03,   # Near-independent
+    ("assists", "threes"):        0.08,   # Positive (assist to 3-point shooter)
+    ("blocks", "rebounds"):       0.18,   # Positive (big man stats)
+    ("assists", "steals"):        0.10,   # Active hands correlate with court vision
+    ("points", "turnovers"):      0.15,   # High usage → more of both
+    ("assists", "turnovers"):     0.20,   # Ball-handler gets both
+    ("blocks", "points"):        -0.08,   # Big man vs scorer role separation
+    ("points", "steals"):         0.05,   # Mild positive (active players)
+    ("rebounds", "steals"):       0.02,   # Minimal
+    ("blocks", "turnovers"):      0.05,   # Minimal
+    ("rebounds", "turnovers"):    0.04,   # Low usage bigs vs high usage guards
+    ("steals", "threes"):         0.06,   # Active guards correlation
+    ("blocks", "steals"):         0.08,   # Both defensive stats
+    ("rebounds", "threes"):      -0.10,   # Big man vs perimeter role
+    ("steals", "turnovers"):      0.12,   # Both guard/ball-handler stats
+    ("assists", "blocks"):       -0.05,   # Guard vs big separation
+    ("threes", "turnovers"):      0.08,   # Perimeter usage correlation
+}
+
+# Position-based correlation adjustments (4B).
+# Two players at the same position often compete for usage (negative).
+# Complementary positions have positive correlation.
+# Keyed by (pos1, pos2) sorted alphabetically.
+POSITION_CORRELATION_ADJUSTMENTS = {
+    ("PG", "PG"):  -0.08,   # Two PGs: usage competition
+    ("PG", "SG"):   0.05,   # Backcourt synergy
+    ("PG", "SF"):   0.02,   # Mild positive
+    ("PF", "PG"):   0.03,   # Mild positive
+    ("C", "PG"):    0.10,   # Pick-and-roll connection
+    ("SG", "SG"):  -0.06,   # Slight competition
+    ("SF", "SG"):   0.03,   # Mild positive
+    ("PF", "SG"):   0.01,   # Near-independent
+    ("C", "SG"):    0.06,   # Backcourt-frontcourt synergy
+    ("SF", "SF"):  -0.04,   # Slight competition
+    ("PF", "SF"):   0.03,   # Mild positive
+    ("C", "SF"):    0.04,   # Mild positive
+    ("PF", "PF"):  -0.08,   # Big-man competition
+    ("C", "PF"):   -0.10,   # Heavy frontcourt overlap
+    ("C", "C"):    -0.12,   # Big-man competition (rebounds especially)
+}
+
 # Platform-specific default implied probabilities
 # BEGINNER NOTE: These are the breakeven win rates for each platform's payout structure
 PLATFORM_IMPLIED_PROB = {
@@ -74,7 +122,12 @@ def calculate_pearson_correlation(values_a, values_b):
 
 def calculate_player_correlation(player1_logs, player2_logs, stat_type):
     """
-    Compute empirical correlation between two players' stats from game logs.
+    Compute recency-weighted empirical correlation between two players' stats. (4D)
+
+    Uses exponentially decaying weights (newest game = 1.0, each older game
+    decays by 0.9x) so recent games matter more. Requires minimum 8 shared
+    games. Blends empirical result with the heuristic prior (60/40) to
+    prevent wild empirical values from small samples dominating.
 
     Args:
         player1_logs (list of dict): Game logs for player 1 (must have 'GAME_DATE')
@@ -82,10 +135,8 @@ def calculate_player_correlation(player1_logs, player2_logs, stat_type):
         stat_type (str): Stat to correlate ('points', 'rebounds', etc.)
 
     Returns:
-        float: Pearson correlation coefficient (-1 to 1)
+        float: Blended Pearson correlation coefficient (-1 to 1)
     """
-    # BEGINNER NOTE: We need to match games where BOTH players played.
-    # Map by game date so we only include shared games.
     stat_key_map = {
         "points": "PTS", "rebounds": "REB", "assists": "AST",
         "steals": "STL", "blocks": "BLK", "threes": "FG3M",
@@ -110,12 +161,37 @@ def calculate_player_correlation(player1_logs, player2_logs, stat_type):
 
     shared_dates = sorted(set(p1_map.keys()) & set(p2_map.keys()))
 
-    if len(shared_dates) < 3:
+    # 4D: Require minimum 8 shared games for reliable empirical correlation
+    if len(shared_dates) < 8:
         return 0.0
 
     a = [p1_map[d] for d in shared_dates]
     b = [p2_map[d] for d in shared_dates]
-    return calculate_pearson_correlation(a, b)
+
+    # 4D: Recency weights — most recent game = 1.0, each older decays by 0.9x
+    n = len(shared_dates)
+    weights = [0.9 ** (n - 1 - i) for i in range(n)]  # oldest first
+    total_w = sum(weights)
+
+    # Weighted means
+    mean_a = sum(w * v for w, v in zip(weights, a)) / total_w
+    mean_b = sum(w * v for w, v in zip(weights, b)) / total_w
+
+    # Weighted Pearson correlation
+    num = sum(w * (ai - mean_a) * (bi - mean_b) for w, ai, bi in zip(weights, a, b))
+    den_a = math.sqrt(max(0.0, sum(w * (ai - mean_a) ** 2 for w, ai in zip(weights, a))))
+    den_b = math.sqrt(max(0.0, sum(w * (bi - mean_b) ** 2 for w, bi in zip(weights, b))))
+
+    if den_a < 1e-9 or den_b < 1e-9:
+        empirical_corr = 0.0
+    else:
+        empirical_corr = max(-1.0, min(1.0, num / (den_a * den_b)))
+
+    # 4D: Blend with heuristic prior (60% empirical + 40% heuristic)
+    heuristic_prior = get_teammate_correlation(stat_type)
+    blended = 0.6 * empirical_corr + 0.4 * heuristic_prior
+
+    return round(max(-1.0, min(1.0, blended)), 4)
 
 
 def calculate_game_environment_correlation(game_total, stat_type):
@@ -188,7 +264,7 @@ def calculate_usage_cannibalization(player1_usage_rate, player2_usage_rate, stat
     return 0.0
 
 
-def get_teammate_correlation(stat_type, game_total=None):
+def get_teammate_correlation(stat_type, stat_type2=None, game_total=None):
     """
     Return estimated correlation for two teammates' prop outcomes based on stat type.
 
@@ -211,6 +287,18 @@ def get_teammate_correlation(stat_type, game_total=None):
     Returns:
         float: Estimated correlation (-1 to 1)
     """
+    # 4A: Cross-stat lookup when two different stat types are provided
+    if stat_type2 is not None and stat_type2.lower() != stat_type.lower():
+        s1, s2 = sorted([stat_type.lower(), stat_type2.lower()])
+        cross_corr = CROSS_STAT_CORRELATIONS.get((s1, s2), 0.0)
+        # Apply same game total scaling
+        if game_total is not None:
+            LEAGUE_AVG = 222.0
+            deviation = (game_total - LEAGUE_AVG) / LEAGUE_AVG
+            effect = max(-0.03, min(0.03, deviation * 0.10))
+            cross_corr = cross_corr + abs(cross_corr) * effect if cross_corr >= 0 else cross_corr * (1.0 - effect)
+        return round(max(-1.0, min(1.0, cross_corr)), 4)
+
     # BEGINNER NOTE: These values are based on published NBA analytics research
     # on same-team prop correlations. Key findings:
     # - Same-team same-stat (points vs points): ≈ -0.12 (shot competition)
@@ -249,6 +337,47 @@ def get_teammate_correlation(stat_type, game_total=None):
             base_corr = base_corr * (1.0 - game_total_effect)
 
     return round(max(-1.0, min(1.0, base_corr)), 4)
+
+
+def get_position_correlation_adjustment(pos1, pos2):
+    """
+    Return the additive correlation adjustment for two players' positions. (4B)
+
+    Playing-position affects how much teammates' stats co-move.
+    Two point guards split ball-handling duties (negative), while
+    a PG and C benefit from pick-and-roll synergy (positive).
+
+    BEGINNER NOTE: Position-based adjustments are added ON TOP of the
+    stat-type-based teammate correlation. They represent the structural
+    relationship between the two players' roles on the court.
+
+    Args:
+        pos1 (str): Position of player 1 ('PG', 'SG', 'SF', 'PF', 'C')
+        pos2 (str): Position of player 2
+
+    Returns:
+        float: Additive adjustment to apply to base teammate correlation
+
+    Example:
+        get_position_correlation_adjustment("PG", "C") → 0.10  (pick-and-roll)
+        get_position_correlation_adjustment("C", "C")  → -0.12 (rebounding competition)
+    """
+    # Normalize positions (remove suffixes like G, F, G/F, etc.)
+    def _normalize_pos(p):
+        p = str(p).upper().strip()
+        # Map common variants to canonical positions
+        _pos_map = {
+            "G": "PG", "F": "SF", "C": "C",
+            "G/F": "SG", "F/C": "PF", "C/F": "PF",
+        }
+        return _pos_map.get(p, p)
+
+    p1 = _normalize_pos(pos1)
+    p2 = _normalize_pos(pos2)
+
+    # Use sorted tuple for symmetric lookup
+    key = tuple(sorted([p1, p2]))
+    return POSITION_CORRELATION_ADJUSTMENTS.get(key, 0.0)
 
 
 def get_within_player_cross_stat_correlation(stat1, stat2):
@@ -424,10 +553,27 @@ def build_correlation_matrix(picks, game_logs_by_player=None):
                 else:
                     corr = get_teammate_correlation(stat1)
             else:
-                # Opponents — low correlation
-                # Game-environment correlation applies when same game
-                # For now: 0 unless game-level context provided
-                corr = 0.0
+                # 4C: Opponent correlation — not 0; they share game environment
+                p1_stat = str(p1.get("stat_type", "")).lower()
+                p2_stat = str(p2.get("stat_type", "")).lower()
+                game_total_ctx = None
+                spread_ctx = 0.0
+                # Try to get game context from pick dicts
+                game_total_ctx = p1.get("game_total") or p2.get("game_total")
+                spread_ctx = float(p1.get("vegas_spread", 0.0) or 0.0)
+
+                gt = float(game_total_ctx) if game_total_ctx else 225.0
+                if gt >= 230.0:
+                    if p1_stat == "points" and p2_stat == "points":
+                        corr = 0.10  # Both scorers in high-total game benefit
+                    else:
+                        corr = 0.06  # General pace benefit
+                elif abs(spread_ctx) > 8.0:
+                    # Heavy favorite/underdog — star of favored team may sit
+                    corr = -0.08 * (abs(spread_ctx) / 15.0)
+                    corr = max(-0.12, corr)
+                else:
+                    corr = 0.0
 
             # Cap
             corr = max(-MAX_CORRELATION_ADJUSTMENT, min(MAX_CORRELATION_ADJUSTMENT, corr))
@@ -503,4 +649,154 @@ def get_correlation_summary(picks, correlation_matrix):
         "avg_correlation": round(avg, 4),
         "correlated_pairs": pairs,
         "description": desc,
+    }
+
+
+def get_correlation_confidence(picks, correlation_matrix):
+    """
+    Measure how safe a parlay's correlation structure is. (4E)
+
+    High positive correlations between picks = correlated failure risk.
+    All independent picks = higher confidence.
+    Mix of positive and negative = moderate confidence.
+
+    BEGINNER NOTE: In a parlay, if all picks are correlated (they all
+    go over or all go under together), you're essentially making one
+    big bet. Diversification — picks from different games and different
+    stat types — reduces this risk.
+
+    Args:
+        picks (list of dict): Picks with 'player_name', 'team', 'stat_type', 'game'
+        correlation_matrix (list of list of float): n×n pairwise correlations
+
+    Returns:
+        dict: {
+            'correlation_confidence': float 0-100,
+            'correlation_risk_level': str ('low', 'medium', 'high'),
+            'diversification_score': float 0-1 (unique games / total picks),
+        }
+
+    Example:
+        4 picks all from same game, corr≈0.10 → low diversification,
+        lower correlation_confidence
+    """
+    n = len(picks)
+    if n == 0:
+        return {"correlation_confidence": 50.0, "correlation_risk_level": "medium",
+                "diversification_score": 1.0}
+    if n == 1:
+        return {"correlation_confidence": 75.0, "correlation_risk_level": "low",
+                "diversification_score": 1.0}
+
+    # Diversification: unique games / total picks
+    unique_games = len(set(
+        frozenset([str(p.get("team", "")), str(p.get("opponent", ""))])
+        for p in picks
+        if p.get("team") or p.get("opponent")
+    ))
+    diversification_score = min(1.0, unique_games / max(1, n))
+
+    # Average pairwise absolute correlation
+    total_corr = 0.0
+    pair_count = 0
+    for i in range(n):
+        for j in range(i + 1, n):
+            try:
+                c = float(correlation_matrix[i][j])
+            except (IndexError, TypeError, ValueError):
+                c = 0.0
+            total_corr += abs(c)
+            pair_count += 1
+
+    avg_abs_corr = total_corr / max(1, pair_count)
+
+    # Correlation confidence: inversely proportional to average correlation
+    # High avg correlation (0.12) = lower confidence; near 0 = higher confidence
+    corr_confidence = max(0.0, min(100.0, 75.0 - avg_abs_corr * 300.0))
+
+    # Boost for diversification
+    corr_confidence += diversification_score * 20.0
+    corr_confidence = min(100.0, corr_confidence)
+
+    if corr_confidence >= 65:
+        risk_level = "low"
+    elif corr_confidence >= 40:
+        risk_level = "medium"
+    else:
+        risk_level = "high"
+
+    return {
+        "correlation_confidence": round(corr_confidence, 1),
+        "correlation_risk_level": risk_level,
+        "diversification_score": round(diversification_score, 3),
+    }
+
+
+def correlation_adjusted_kelly(picks, bankroll, correlation_matrix):
+    """
+    Calculate correlation-adjusted Kelly Criterion bet sizing. (4F)
+
+    Standard Kelly is optimal for independent bets. When picks are
+    positively correlated, concentration risk justifies a smaller bet.
+    We reduce the Kelly fraction by `1.0 - max_abs_corr * 0.5`.
+
+    BEGINNER NOTE: Kelly Criterion says "bet a fraction of your bankroll
+    proportional to your edge divided by the odds." With correlated picks,
+    we reduce the bet size because a correlated loss hurts more than
+    independent losses do. Think of it as portfolio diversification.
+
+    Args:
+        picks (list of dict): Picks, each with:
+            'win_probability' (float): P(win), 0-1
+            'odds_decimal' (float): Decimal odds (e.g. 1.91 for -110)
+        bankroll (float): Total bankroll in dollars
+        correlation_matrix (list of list of float): n×n pairwise correlations
+
+    Returns:
+        dict: {
+            'kelly_fraction': float,
+            'recommended_bet': float,
+            'correlation_discount': float,
+        }
+
+    Example:
+        picks=[{'win_probability': 0.60, 'odds_decimal': 1.91}],
+        bankroll=1000, correlation_matrix=[[1.0]]
+        → kelly_fraction ≈ 0.157, recommended_bet ≈ $157
+    """
+    if not picks or bankroll <= 0:
+        return {"kelly_fraction": 0.0, "recommended_bet": 0.0, "correlation_discount": 1.0}
+
+    n = len(picks)
+    total_kelly = 0.0
+    for pick in picks:
+        p = float(pick.get("win_probability", 0.5))
+        b = float(pick.get("odds_decimal", 1.91)) - 1.0  # net odds (profit per $1 stake)
+        q = 1.0 - p
+        if b > 0:
+            kelly = (p * b - q) / b
+            total_kelly += max(0.0, kelly)
+
+    avg_kelly = total_kelly / max(1, n)
+
+    # Correlation discount: reduce by max absolute pairwise correlation * 0.5
+    max_abs_corr = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            try:
+                c = abs(float(correlation_matrix[i][j]))
+                max_abs_corr = max(max_abs_corr, c)
+            except (IndexError, TypeError, ValueError):
+                pass
+
+    correlation_discount = max(0.1, 1.0 - max_abs_corr * 0.5)
+    adjusted_kelly = avg_kelly * correlation_discount
+
+    # Apply a safety cap (never bet more than 25% of bankroll on a single decision)
+    adjusted_kelly = min(0.25, max(0.0, adjusted_kelly))
+
+    return {
+        "kelly_fraction": round(adjusted_kelly, 4),
+        "recommended_bet": round(adjusted_kelly * bankroll, 2),
+        "correlation_discount": round(correlation_discount, 4),
     }
