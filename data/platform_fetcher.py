@@ -70,7 +70,7 @@ _API_CACHE: dict = {}
 _API_CACHE_TTL: int = 300  # seconds (5 minutes default)
 
 
-def _cache_get(url: str) -> object:
+def _cache_get(url: str):
     """Return cached response for *url* if not expired, else None."""
     entry = _API_CACHE.get(url)
     if entry is None:
@@ -82,7 +82,7 @@ def _cache_get(url: str) -> object:
     return payload
 
 
-def _cache_set(url: str, payload: object) -> None:
+def _cache_set(url: str, payload) -> None:
     """Store *payload* in the cache keyed by *url*."""
     _API_CACHE[url] = (payload, _time.time())
 

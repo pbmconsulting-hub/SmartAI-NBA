@@ -1321,8 +1321,7 @@ def filter_props_to_platform_players(
     if not platform_props:
         return generated_props
 
-    import logging as _log
-    _logger_filter = _log.getLogger(__name__)
+    _logger_filter = logging.getLogger(__name__)
 
     # Build a set of normalised player names present on any platform
     platform_player_names: set = set()

@@ -24,7 +24,8 @@ try:
     _HAS_ROTATION_TRACKER = True
 except ImportError:
     logging.getLogger(__name__).warning("[MinutesModel] Optional module not available: rotation_tracker")
-    get_trending_minutes = None
+    def get_trending_minutes(*args, **kwargs):  # no-op fallback
+        return None
     _HAS_ROTATION_TRACKER = False
 
 
