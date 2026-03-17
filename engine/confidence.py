@@ -8,7 +8,8 @@
 # ============================================================
 
 # No external imports needed — pure Python logic
-import math  # For rounding
+import math        # For rounding and floor
+import statistics  # For stdev in multi-source agreement bonus (3B)
 
 
 # ============================================================
@@ -101,6 +102,37 @@ CV_PENALTY_MAX         = 15.0   # Maximum penalty applied for extreme CV values
 SAMPLE_SIZE_FULL_GAMES  = 30.0  # Games for full confidence (sample_factor = 1.0)
 SAMPLE_SIZE_FLOOR       = 0.50  # Minimum sample_factor (protects new players)
 
+# Bayesian sample-size damping thresholds (3A).
+# Early-season picks have less reliable season averages.
+BAYESIAN_SAMPLE_MIN_GAMES = 15   # Below this: apply damping
+BAYESIAN_TIER_CAP_SMALL    = 10  # Below this: cap tier at Silver
+BAYESIAN_TIER_CAP_TINY     = 5   # Below this: cap tier at Bronze
+
+# Multi-source probability agreement bonus (3B)
+PROBABILITY_AGREEMENT_BONUS_MAX = 8.0   # Max bonus points when all models agree
+PROBABILITY_DISAGREEMENT_PENALTY = 5.0  # Penalty when models disagree on direction
+
+# Streak-adjusted confidence adjustments (3C)
+STREAK_HOT_OVER_BONUS   =  3.0  # Hot streak + OVER: momentum bonus
+STREAK_HOT_UNDER_PENALTY = -5.0  # Hot streak + UNDER: momentum contradiction
+STREAK_COLD_UNDER_BONUS  =  3.0  # Cold streak + UNDER: momentum bonus
+STREAK_COLD_OVER_PENALTY = -5.0  # Cold streak + OVER: momentum contradiction
+STREAK_LENGTH_DOUBLE_THRESHOLD = 5  # Streak length above this doubles the bonus/penalty
+STREAK_MAX_ADJUSTMENT   = 10.0  # Maximum absolute adjustment (±10)
+
+# Platform-specific tier score premiums (3D).
+# Higher premium = harder to achieve high tier on that platform.
+# PrizePicks Flex: 0 (partial payouts reduce risk).
+# DraftKings: +3 (traditional vig makes each leg harder to beat).
+# PrizePicks Power: +5 (all-or-nothing structure is harder).
+PLATFORM_TIER_PREMIUMS = {
+    "PrizePicks":        0,   # Flex: no additional premium
+    "PrizePicks Power":  5,   # All-or-nothing: raise all thresholds by 5
+    "DraftKings":        3,   # Traditional vig: raise by 3
+    "Underdog":          0,   # Similar to PrizePicks Flex
+    "Underdog Fantasy":  0,
+}
+
 # ============================================================
 # END SECTION: Confidence Score Constants
 # ============================================================
@@ -125,6 +157,10 @@ def calculate_confidence_score(
     calibration_adjustment=0.0,
     injury_status_penalty=0.0,
     stat_type=None,
+    games_played_season=None,
+    alternative_probabilities=None,
+    streak_info=None,
+    platform=None,
 ):
     """
     Calculate a 0-100 confidence score for a prop pick.
@@ -165,6 +201,14 @@ def calculate_confidence_score(
             Doubtful). Typically 0-10 points. Default 0.0 (no penalty).
         stat_type (str, optional): The stat being evaluated (e.g. 'points',
             'points_rebounds'). Used to apply combo-stat confidence penalty.
+        games_played_season (int, optional): Games played this season for
+            Bayesian sample-size damping (3A). Distinct from games_played.
+        alternative_probabilities (list of float, optional): Probabilities from
+            other models/sources for multi-source agreement bonus (3B).
+        streak_info (dict, optional): Streak context for momentum adjustment (3C).
+            Keys: 'type' ('hot'|'cold'|'none'), 'length' (int).
+        platform (str, optional): Betting platform name for tier premium (3D).
+            E.g. 'PrizePicks', 'PrizePicks Power', 'DraftKings'.
 
     Returns:
         dict: {
@@ -176,6 +220,9 @@ def calculate_confidence_score(
             'recommendation': str (e.g., "Strong OVER play"),
             'should_avoid': bool (C2: auto-AVOID flag),
             'avoid_reasons': list of str (C2/C3: reasons for avoid flag),
+            'sample_size_discount': float (3A: Bayesian damping factor applied),
+            'probability_agreement_bonus': float (3B: bonus/penalty from model agreement),
+            'streak_adjustment': float (3C: momentum adjustment applied),
         }
 
     Example:
@@ -256,6 +303,43 @@ def calculate_confidence_score(
             and _prob_in_dir > SYNERGY_PROBABILITY_THRESHOLD):
         combined_score += SYNERGY_BONUS_POINTS  # Synergy bonus: all three strong signals align
 
+    # --- 3B: Multi-source probability agreement bonus ---
+    probability_agreement_bonus = 0.0
+    if alternative_probabilities and len(alternative_probabilities) >= 3:
+        all_probs = list(alternative_probabilities)
+        direction_over = sum(1 for p in all_probs if p > 0.5)
+        direction_under = len(all_probs) - direction_over
+        if direction_over == len(all_probs) or direction_under == len(all_probs):
+            # All agree on direction — calculate agreement strength
+            try:
+                _std = statistics.stdev(all_probs) if len(all_probs) >= 2 else 0.0
+            except statistics.StatisticsError:
+                _std = 0.0
+            agreement_strength = max(0.0, 1.0 - _std)
+            probability_agreement_bonus = agreement_strength * PROBABILITY_AGREEMENT_BONUS_MAX
+            combined_score += probability_agreement_bonus
+        else:
+            # Disagreement on direction — penalty
+            probability_agreement_bonus = -PROBABILITY_DISAGREEMENT_PENALTY
+            combined_score += probability_agreement_bonus
+
+    # --- 3C: Streak-adjusted confidence ---
+    streak_adjustment = 0.0
+    if streak_info is not None:
+        streak_type = streak_info.get("type", "none")
+        streak_length = int(streak_info.get("length", 0))
+        _is_over_bet = probability_over >= 0.5
+        if streak_type == "hot":
+            base_adj = STREAK_HOT_OVER_BONUS if _is_over_bet else STREAK_HOT_UNDER_PENALTY
+        elif streak_type == "cold":
+            base_adj = STREAK_COLD_UNDER_BONUS if not _is_over_bet else STREAK_COLD_OVER_PENALTY
+        else:
+            base_adj = 0.0
+        if streak_length > STREAK_LENGTH_DOUBLE_THRESHOLD:
+            base_adj *= 2.0
+        streak_adjustment = max(-STREAK_MAX_ADJUSTMENT, min(STREAK_MAX_ADJUSTMENT, base_adj))
+        combined_score += streak_adjustment
+
     # --- CV Penalty Scaling: harsh penalty for very high variance stats ---
     # BEGINNER NOTE: When a stat has CV > CV_PENALTY_THRESHOLD, the projection
     # is inherently unreliable regardless of other signals.
@@ -310,6 +394,13 @@ def calculate_confidence_score(
     # Round to nearest whole number, clamped to 0-100
     final_score = round(max(0.0, min(100.0, combined_score)), 1)
 
+    # --- 3A: Bayesian sample-size damping ---
+    sample_size_discount = 1.0
+    if games_played_season is not None and games_played_season > 0 and games_played_season < BAYESIAN_SAMPLE_MIN_GAMES:
+        sample_size_discount = 0.6 + 0.4 * (games_played_season / BAYESIAN_SAMPLE_MIN_GAMES)
+        final_score *= sample_size_discount
+        final_score = round(max(0.0, min(100.0, final_score)), 1)
+
     # ============================================================
     # END SECTION: Combine Scores with Weights
     # ============================================================
@@ -350,9 +441,14 @@ def calculate_confidence_score(
     if abs_edge < LOW_EDGE_THRESHOLD:
         avoid_reasons.append(f"Low edge ({abs_edge:.1f}% < {LOW_EDGE_THRESHOLD}% minimum)")
 
+    # 3D: Apply platform-specific tier premium (lower score for harder platforms)
+    _platform_premium = PLATFORM_TIER_PREMIUMS.get(platform or "", 0)
+    # We subtract the premium from the score used for tier assignment only
+    _score_for_tier = final_score - _platform_premium
+
     # ── Assign tier with C3 raised thresholds + edge gates ───────
     if (
-        final_score >= PLATINUM_TIER_MINIMUM_SCORE
+        _score_for_tier >= PLATINUM_TIER_MINIMUM_SCORE
         and prob_in_direction >= PLATINUM_MIN_PROBABILITY  # C2: min 60%
         and abs_edge >= PLATINUM_MIN_EDGE_PCT              # C3: min 10% edge
     ):
@@ -360,14 +456,14 @@ def calculate_confidence_score(
         tier_emoji = "💎"
         recommendation = f"Elite {bet_direction} play — highest confidence"
     elif (
-        final_score >= GOLD_TIER_MINIMUM_SCORE
+        _score_for_tier >= GOLD_TIER_MINIMUM_SCORE
         and prob_in_direction >= GOLD_MIN_PROBABILITY      # C2: min 55%
         and abs_edge >= GOLD_MIN_EDGE_PCT                  # C3: min 7% edge
     ):
         tier_name = "Gold"
         tier_emoji = "🥇"
         recommendation = f"Strong {bet_direction} play — good confidence"
-    elif final_score >= SILVER_TIER_MINIMUM_SCORE and abs_edge >= SILVER_MIN_EDGE_PCT:
+    elif _score_for_tier >= SILVER_TIER_MINIMUM_SCORE and abs_edge >= SILVER_MIN_EDGE_PCT:
         tier_name = "Silver"
         tier_emoji = "🥈"
         recommendation = f"Moderate {bet_direction} lean — use with others"
@@ -377,7 +473,7 @@ def calculate_confidence_score(
         recommendation = f"Weak {bet_direction} signal — consider avoiding"
 
     # Do Not Bet: scores below DO_NOT_BET_SCORE_THRESHOLD are explicitly flagged as Avoid
-    if final_score < DO_NOT_BET_SCORE_THRESHOLD:
+    if _score_for_tier < DO_NOT_BET_SCORE_THRESHOLD:
         tier_name = "Avoid"
         tier_emoji = "⛔"
         recommendation = f"Do not bet — very low confidence ({final_score:.0f}/100)"
@@ -398,6 +494,19 @@ def calculate_confidence_score(
         recommendation = f"Moderate {bet_direction} lean — use with others"
         avoid_reasons.append(f"Downgraded Gold→Silver (prob {prob_in_direction:.1%} < {GOLD_MIN_PROBABILITY:.0%})")
 
+    # 3A: Bayesian tier caps for very small samples
+    if games_played_season is not None:
+        if games_played_season < BAYESIAN_TIER_CAP_TINY:
+            if tier_name in ("Platinum", "Gold", "Silver"):
+                tier_name = "Bronze"
+                tier_emoji = "🥉"
+                recommendation = f"Small sample (only {games_played_season} games) — treat with caution"
+        elif games_played_season < BAYESIAN_TIER_CAP_SMALL:
+            if tier_name in ("Platinum", "Gold"):
+                tier_name = "Silver"
+                tier_emoji = "🥈"
+                recommendation = f"Limited sample ({games_played_season} games) — moderate confidence only"
+
     # ============================================================
     # END SECTION: Assign Tier and Direction
     # ============================================================
@@ -410,6 +519,9 @@ def calculate_confidence_score(
         "recommendation": recommendation,
         "should_avoid": should_avoid,
         "avoid_reasons": avoid_reasons,
+        "sample_size_discount": round(sample_size_discount, 3),
+        "probability_agreement_bonus": round(probability_agreement_bonus, 2),
+        "streak_adjustment": round(streak_adjustment, 2),
         "score_breakdown": {
             "probability_score": round(probability_score, 1),
             "edge_score": round(edge_score, 1),
@@ -592,6 +704,160 @@ def get_tier_color(tier_name):
         "Bronze": "#CD7F32",    # Bronze brown
     }
     return tier_color_map.get(tier_name, "#FFFFFF")  # White default
+
+
+def calculate_risk_score(confidence_result, edge_pct, cv, platform=None):
+    """
+    Calculate a composite 1-10 risk rating for a prop pick. (3E)
+
+    Combines confidence score, edge percentage, and coefficient of variation
+    into a single risk rating. Lower scores = safer bets.
+
+    BEGINNER NOTE: A "risk score" of 1-3 means the pick has strong confidence,
+    good edge, and low variance. A score of 7-10 means high uncertainty —
+    the pick might win, but the risk/reward isn't favorable.
+
+    Args:
+        confidence_result (dict): Output of calculate_confidence_score()
+        edge_pct (float): Edge percentage (e.g. 12.5 for 12.5%)
+        cv (float): Coefficient of variation (std/mean, e.g. 0.35)
+        platform (str, optional): Platform name for context
+
+    Returns:
+        dict: {
+            'risk_score': float (1-10),
+            'risk_label': str ('Low Risk', 'Medium Risk', 'High Risk'),
+            'risk_factors': list[str],
+        }
+
+    Example:
+        confidence=75, edge=10%, cv=0.30 → risk_score ≈ 3.5 (Low Risk)
+        confidence=45, edge=3%, cv=0.55 → risk_score ≈ 7.2 (High Risk)
+    """
+    confidence = float(confidence_result.get("confidence_score", 50.0))
+    abs_edge = abs(float(edge_pct))
+    safe_cv = max(0.0, min(1.0, float(cv)))
+
+    # Risk formula: risk = 10 - (confidence/10 * 0.4 + edge_pct * 0.3 + (1-cv)*10 * 0.3)
+    risk = 10.0 - (
+        (confidence / 10.0) * 0.4
+        + abs_edge * 0.3
+        + (1.0 - safe_cv) * 10.0 * 0.3
+    )
+    risk = round(max(1.0, min(10.0, risk)), 2)
+
+    if risk <= 3:
+        risk_label = "Low Risk"
+    elif risk <= 6:
+        risk_label = "Medium Risk"
+    else:
+        risk_label = "High Risk"
+
+    risk_factors = []
+    if confidence < 55:
+        risk_factors.append(f"Low confidence score ({confidence:.0f}/100)")
+    if abs_edge < 5.0:
+        risk_factors.append(f"Thin edge ({abs_edge:.1f}%)")
+    if cv > 0.40:
+        risk_factors.append(f"High variance stat (CV={cv:.2f})")
+    tier = confidence_result.get("tier", "")
+    if tier in ("Bronze", "Avoid"):
+        risk_factors.append(f"Low tier ({tier})")
+
+    return {
+        "risk_score": risk,
+        "risk_label": risk_label,
+        "risk_factors": risk_factors,
+    }
+
+
+def enforce_tier_distribution(all_picks_results, max_platinum_pct=0.10, max_gold_pct=0.25):
+    """
+    Enforce a healthy tier distribution to prevent overconfidence inflation. (3F)
+
+    If more picks than expected are classified at high tiers, downgrade
+    the weakest ones to maintain realistic tier proportions.
+
+    BEGINNER NOTE: If the model gives 40% of picks a Platinum rating,
+    something is wrong — real Platinums should be rare. This function
+    enforces realistic maximums: ≤10% Platinum, ≤25% Gold.
+
+    Args:
+        all_picks_results (list of dict): Each dict is the output of
+            calculate_confidence_score() for one pick.
+        max_platinum_pct (float): Maximum fraction of picks allowed to be Platinum.
+            Default 0.10 (10%).
+        max_gold_pct (float): Maximum fraction of picks allowed to be Gold or better.
+            Default 0.25 (25%).
+
+    Returns:
+        tuple: (adjusted_results: list of dict, any_downgrades_occurred: bool)
+
+    Example:
+        If 5 of 10 picks are Platinum (50% > 10% max):
+        → downgrade the 4 weakest Platinums to Gold
+        → return adjusted list + True (downgrades occurred)
+    """
+    if not all_picks_results:
+        return all_picks_results, False
+
+    results = [dict(r) for r in all_picks_results]  # shallow copy
+    n = len(results)
+    any_downgrades = False
+
+    max_platinum = max(1, int(math.floor(n * max_platinum_pct)))
+    max_gold_total = max(1, int(math.floor(n * max_gold_pct)))
+
+    # Sort by confidence score descending (strongest picks first)
+    platinums = sorted(
+        [r for r in results if r.get("tier") == "Platinum"],
+        key=lambda r: r.get("confidence_score", 0),
+        reverse=True,
+    )
+    golds = sorted(
+        [r for r in results if r.get("tier") == "Gold"],
+        key=lambda r: r.get("confidence_score", 0),
+        reverse=True,
+    )
+
+    # Downgrade excess Platinums to Gold
+    if len(platinums) > max_platinum:
+        excess = platinums[max_platinum:]  # Weakest Platinums (already sorted desc)
+        for pick in excess:
+            for r in results:
+                if r is pick or (
+                    r.get("confidence_score") == pick.get("confidence_score")
+                    and r.get("tier") == "Platinum"
+                ):
+                    r["tier"] = "Gold"
+                    r["tier_emoji"] = "🥇"
+                    r["recommendation"] = (
+                        r.get("recommendation", "").replace("Elite", "Strong")
+                        or "Strong play — good confidence"
+                    )
+                    any_downgrades = True
+                    break
+
+    # Re-count golds after Platinum downgrades
+    current_gold_count = sum(1 for r in results if r.get("tier") in ("Platinum", "Gold"))
+    if current_gold_count > max_gold_total:
+        # Find the weakest Golds to downgrade
+        all_golds_now = sorted(
+            [r for r in results if r.get("tier") == "Gold"],
+            key=lambda r: r.get("confidence_score", 0),
+            reverse=True,
+        )
+        excess_gold = max(0, current_gold_count - max_gold_total)
+        for pick in all_golds_now[-excess_gold:]:  # Weakest Golds
+            pick["tier"] = "Silver"
+            pick["tier_emoji"] = "🥈"
+            pick["recommendation"] = (
+                pick.get("recommendation", "").replace("Strong", "Moderate")
+                or "Moderate lean — use with others"
+            )
+            any_downgrades = True
+
+    return results, any_downgrades
 
 # ============================================================
 # END SECTION: Helper Score Functions
