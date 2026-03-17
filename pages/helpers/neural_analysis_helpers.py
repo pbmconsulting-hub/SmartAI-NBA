@@ -730,7 +730,7 @@ def display_prop_analysis_card_qds(result):
         st.markdown(
             f'<div style="background:rgba(76,175,80,0.12);border:1px solid #4caf50;border-radius:6px;'
             f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_GOBLIN_LOGO_PATH, width=28, alt="[Goblin]")}</span>'
+            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_GOBLIN_LOGO_PATH, width=28, alt="Goblin")}</span>'
             f'<div>'
             f'<span style="color:#4caf50;font-weight:700;font-size:0.9rem;">GOBLIN BET — Easy Money</span>'
             + (f'<br><span style="color:#a5d6a7;font-size:0.78rem;">{_html.escape(_goblin_reasons_str)}</span>'
@@ -739,14 +739,16 @@ def display_prop_analysis_card_qds(result):
             f'</div>',
             unsafe_allow_html=True,
         )
-    elif bet_type == "demon":
+    elif bet_type in ("50_50", "demon"):
+        # "50_50" is the renamed "demon" classification (conflicting forces).
+        # Both values are handled here for backward compat with older DB records.
         _demon_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
         st.markdown(
             f'<div style="background:rgba(255,68,68,0.10);border:1px solid #ff4444;border-radius:6px;'
             f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_DEMON_LOGO_PATH, width=28, alt="[Demon]")}</span>'
+            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_DEMON_LOGO_PATH, width=28, alt="Demon")}</span>'
             f'<div>'
-            f'<span style="color:#ff4444;font-weight:700;font-size:0.9rem;">DEMON BET — AVOID (Dangerous Trap)</span>'
+            f'<span style="color:#ff4444;font-weight:700;font-size:0.9rem;">50/50 BET — UNCERTAIN (Conflicting Forces)</span>'
             + (f'<br><span style="color:#ffb0b0;font-size:0.78rem;">{_html.escape(_demon_reasons_str)}</span>'
                if _demon_reasons_str else "")
             + f'</div>'

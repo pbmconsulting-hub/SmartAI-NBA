@@ -98,7 +98,7 @@ def log_new_bet(
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
         auto_logged (int): 1 if logged automatically by the engine, 0 if manual
-        bet_type (str): 'goblin', 'demon', or 'normal'
+        bet_type (str): 'goblin', '50_50', 'demon' (legacy), or 'normal'
         std_devs_from_line (float): How many std devs projection is from line
 
     Returns:
@@ -316,7 +316,7 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 _MAX_DEMON_REASONS = 2   # max bet_type_reasons to include in notes for Demon bets
 _MAX_GOBLIN_REASONS = 1  # max bet_type_reasons to include in notes for Goblin bets
 
-def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
+def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
     """
     Automatically log bet records for analysis results that have a positive
     edge in the model's recommended direction.
@@ -338,7 +338,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
             Defaults to 5.0.  Only picks with edge > 0
             (model favours the recommended direction) are ever logged.
         max_bets (int): Maximum number of new bets to log in a single
-            analysis run. Defaults to 25.
+            analysis run. Defaults to 15.
 
     Returns:
         int: Number of new bets logged.
@@ -373,7 +373,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
     # Bronze qualifies only with edge >= 8% AND confidence score >= 60/100.
     AUTO_LOG_TIERS = {"Gold", "Platinum", "Silver", "Bronze"}
     # Silver picks only need 3% edge; Gold/Platinum use the minimum_edge parameter
-    SILVER_MIN_EDGE = 3.0
+    SILVER_MIN_EDGE = 5.0
     BRONZE_MIN_EDGE = 8.0
     BRONZE_MIN_CONFIDENCE = 60.0  # out of 100
 
@@ -435,8 +435,9 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
                 f"Auto-logged by SmartAI. "
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
                 + (
-                    "Demon reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
-                    if res.get("bet_type") == "demon" and res.get("bet_type_reasons")
+                    # "50_50" is the renamed "demon" (conflicting forces) classification
+                    "50/50 reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
+                    if res.get("bet_type") in ("50_50", "demon") and res.get("bet_type_reasons")
                     else (
                         "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
                         if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")

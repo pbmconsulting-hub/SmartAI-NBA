@@ -30,7 +30,7 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css, get_education_box_html
+from styles.theme import get_global_css, get_education_box_html, get_logo_img_tag, GOLD_LOGO_PATH
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── Custom CSS ────────────────────────────────────────────
@@ -338,7 +338,11 @@ if auto_load_clicked:
     except Exception as _exc:
         progress_bar.empty()
         status_text.empty()
-        st.error(f"❌ Auto-load failed: {_exc}")
+        _exc_str = str(_exc)
+        if "WebSocketClosedError" in _exc_str or "StreamClosedError" in _exc_str:
+            pass  # Connection closed — user navigated away
+        else:
+            st.error(f"❌ Auto-load failed: {_exc}")
 
 if fetch_players_clicked:
     todays_games_for_fetch = st.session_state.get("todays_games", [])
@@ -537,7 +541,7 @@ if platform_props_clicked:
 
         from engine.projections import build_player_projection, get_stat_standard_deviation
         from engine.simulation import run_quantum_matrix_simulation
-        from engine.edge_detection import analyze_directional_forces, should_avoid_prop
+        from engine.edge_detection import analyze_directional_forces, should_avoid_prop, classify_bet_type
         from engine.confidence import calculate_confidence_score
         from data.data_manager import load_defensive_ratings_data, load_teams_data as _load_teams
 
@@ -702,6 +706,25 @@ if platform_props_clicked:
                 if tier == "Avoid":
                     continue
 
+                # Skip props below the minimum edge threshold (Bug 3)
+                if abs(raw_edge) < 5.0:
+                    continue
+
+                # Classify bet type (Bug 2)
+                _bet_cls = classify_bet_type(
+                    probability_over=prob_over,
+                    edge_percentage=raw_edge,
+                    stat_standard_deviation=std_dev,
+                    projected_stat=projected_value,
+                    prop_line=prop_line,
+                    stat_type=stat_type,
+                    directional_forces_result=forces,
+                    rest_days=game_ctx.get("rest_days", 1),
+                    vegas_spread=game_ctx.get("vegas_spread", 0.0),
+                    season_average=float(player_data.get(f"{stat_type}_avg", projected_value) or projected_value),
+                    line_source=prop.get("platform", platform_name),
+                )
+
                 analyzed_props.append({
                     "player_name": player_name,
                     "team": player_data.get("team", ""),
@@ -714,12 +737,29 @@ if platform_props_clicked:
                     "tier_emoji": conf.get("tier_emoji", "🥉"),
                     "direction": direction,
                     "platform": platform_name,
+                    "over_odds": prop.get("over_odds", -110),
+                    "under_odds": prop.get("under_odds", -110),
+                    "bet_type": _bet_cls.get("bet_type", "normal"),
+                    "bet_type_label": _bet_cls.get("bet_type_label", "Normal Bet"),
+                    "probability_over": prob_over,
+                    "line_source": prop.get("platform", platform_name),
                 })
             except Exception as _prop_err:
                 pass  # Skip props that fail analysis
 
         # Sort by confidence descending
         analyzed_props.sort(key=lambda x: x["confidence_score"], reverse=True)
+
+        # Per-player cap: max 3 props per player, keeping highest confidence (Bug 3)
+        _player_prop_counts: dict = {}
+        _capped_props = []
+        for _ap in analyzed_props:
+            _pname = _ap.get("player_name", "")
+            _count = _player_prop_counts.get(_pname, 0)
+            if _count < 3:
+                _capped_props.append(_ap)
+                _player_prop_counts[_pname] = _count + 1
+        analyzed_props = _capped_props
 
         pp_status.text(f"⏳ 5/5 — Analysis complete: {len(analyzed_props)} qualifying pick(s). Auto-logging top picks…")
         pp_bar.progress(75)
@@ -786,7 +826,7 @@ if platform_props_clicked:
             gold_count  = sum(1 for p in analyzed_props if p["tier"] == "Gold")
             st.success(
                 f"✅ **{total_picks} qualifying picks** found across platforms | "
-                f"💎 {plat_count} Platinum · [Gold] {gold_count} Gold"
+                f"💎 {plat_count} Platinum · 🥇 {gold_count} Gold"
             )
 
             # Group by platform
@@ -948,7 +988,11 @@ if one_click_setup_clicked:
     except Exception as _oc_err:
         _oc_bar.empty()
         _oc_status.empty()
-        st.error(f"❌ One-Click Setup failed: {_oc_err}")
+        _oc_err_str = str(_oc_err)
+        if "WebSocketClosedError" in _oc_err_str or "StreamClosedError" in _oc_err_str:
+            pass  # Connection closed — user navigated away
+        else:
+            st.error(f"❌ One-Click Setup failed: {_oc_err}")
 
 # ============================================================
 # END SECTION: One-Click Setup

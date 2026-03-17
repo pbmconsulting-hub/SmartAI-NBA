@@ -1047,7 +1047,7 @@ with _tab_builder:
                 over_prob_r = r_gb.get("over_probability", 0.5)
                 direction_r = "OVER" if over_prob_r > 0.5 else "UNDER"
                 conf_r = r_gb.get("confidence_score", 0)
-                tier_r = "[Gold] Platinum" if conf_r >= 85 else "🥈 Gold" if conf_r >= 70 else "🥉 Silver" if conf_r >= 55 else "Bronze"
+                tier_r = "💎 Platinum" if conf_r >= 85 else "Gold" if conf_r >= 70 else "🥈 Silver" if conf_r >= 55 else "Bronze"
                 st.markdown(
                     f"**{r_gb['player_name']}** ({r_gb['team']}) — "
                     f"{r_gb['stat_type'].upper()} {direction_r} {r_gb['prop_line']} "

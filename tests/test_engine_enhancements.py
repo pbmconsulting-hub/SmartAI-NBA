@@ -1249,3 +1249,203 @@ class TestPlayerIntelligence(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# ============================================================
+# MODULE: Alternate Line Categorization
+# ============================================================
+
+class TestCategorizeAltLines(unittest.TestCase):
+    """Tests for categorize_alt_lines() in engine/edge_detection.py."""
+
+    def setUp(self):
+        from engine.edge_detection import categorize_alt_lines
+        self.categorize = categorize_alt_lines
+
+    # ── Basic categorization ──────────────────────────────────────
+
+    def test_lines_below_standard_are_goblin_bets(self):
+        """Lines below the standard line must appear in goblin_bets."""
+        result = self.categorize(31.5, [28.5, 29.5, 33.5])
+        self.assertIn(28.5, result["goblin_bets"])
+        self.assertIn(29.5, result["goblin_bets"])
+
+    def test_lines_above_standard_are_demon_bets(self):
+        """Lines above the standard line must appear in demon_bets."""
+        result = self.categorize(31.5, [28.5, 33.5, 36.5])
+        self.assertIn(33.5, result["demon_bets"])
+        self.assertIn(36.5, result["demon_bets"])
+
+    def test_line_equal_to_standard_is_excluded(self):
+        """A line exactly equal to standard_line must NOT appear in either list."""
+        result = self.categorize(31.5, [28.5, 31.5, 34.5])
+        self.assertNotIn(31.5, result["goblin_bets"])
+        self.assertNotIn(31.5, result["demon_bets"])
+
+    # ── Sorting & structure ────────────────────────────────────────
+
+    def test_goblin_bets_are_sorted_ascending(self):
+        """goblin_bets must be sorted from lowest (safest) first."""
+        result = self.categorize(31.5, [30.5, 28.5, 29.5])
+        self.assertEqual(result["goblin_bets"], sorted(result["goblin_bets"]))
+
+    def test_demon_bets_are_sorted_ascending(self):
+        """demon_bets must be sorted from lowest (closest to std) first."""
+        result = self.categorize(31.5, [36.5, 33.5, 38.5])
+        self.assertEqual(result["demon_bets"], sorted(result["demon_bets"]))
+
+    def test_returns_correct_standard_line(self):
+        """Return dict must echo the standard_line that was passed in."""
+        result = self.categorize(33.5, [39.5, 41.5, 44.5])
+        self.assertEqual(result["standard_line"], 33.5)
+
+    # ── Edge cases ─────────────────────────────────────────────────
+
+    def test_all_above_standard_gives_empty_goblin(self):
+        """When all alternate lines are above standard, goblin_bets is empty."""
+        result = self.categorize(33.5, [39.5, 41.5, 44.5])
+        self.assertEqual(result["goblin_bets"], [])
+        self.assertEqual(result["demon_bets"], [39.5, 41.5, 44.5])
+
+    def test_all_below_standard_gives_empty_demon(self):
+        """When all alternate lines are below standard, demon_bets is empty."""
+        result = self.categorize(31.5, [28.5, 29.5, 30.5])
+        self.assertEqual(result["demon_bets"], [])
+        self.assertEqual(result["goblin_bets"], [28.5, 29.5, 30.5])
+
+    def test_empty_available_lines(self):
+        """With no available lines, both lists are empty."""
+        result = self.categorize(25.5, [])
+        self.assertEqual(result["goblin_bets"], [])
+        self.assertEqual(result["demon_bets"], [])
+
+    def test_zero_standard_line_returns_empty_lists(self):
+        """A standard_line of 0 or None should return empty lists."""
+        for bad_std in (0, None, 0.0):
+            result = self.categorize(bad_std, [10.5, 20.5])
+            self.assertEqual(result["goblin_bets"], [])
+            self.assertEqual(result["demon_bets"], [])
+
+    def test_non_numeric_lines_are_skipped(self):
+        """Non-numeric entries in available_lines must be silently skipped."""
+        result = self.categorize(25.5, [22.5, "bad", None, 28.5])
+        self.assertIn(22.5, result["goblin_bets"])
+        self.assertIn(28.5, result["demon_bets"])
+        self.assertEqual(len(result["goblin_bets"]) + len(result["demon_bets"]), 2)
+
+    def test_result_has_all_required_keys(self):
+        """Return dict must always contain standard_line, goblin_bets, demon_bets."""
+        result = self.categorize(20.5, [18.5, 22.5])
+        for key in ("standard_line", "goblin_bets", "demon_bets"):
+            self.assertIn(key, result)
+
+
+class TestParseAltLinesFromPlatformProps(unittest.TestCase):
+    """Tests for parse_alt_lines_from_platform_props() in data/platform_fetcher.py."""
+
+    def setUp(self):
+        from data.platform_fetcher import parse_alt_lines_from_platform_props
+        self.parse = parse_alt_lines_from_platform_props
+
+    def _make_prop(self, player, stat, line, platform="PrizePicks"):
+        return {
+            "player_name": player,
+            "stat_type":   stat,
+            "line":        line,
+            "platform":    platform,
+        }
+
+    # ── Single-entry group (no alternates) ────────────────────────
+
+    def test_single_line_is_standard(self):
+        """When only one line exists for a player/stat/platform, it is standard."""
+        props = [self._make_prop("SGA", "points", 31.5)]
+        result = self.parse(props)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["line_category"], "standard")
+        self.assertAlmostEqual(result[0]["standard_line"], 31.5)
+
+    # ── Multi-entry group: alt line categorization ────────────────
+
+    def test_below_median_is_goblin(self):
+        """Lines below the median standard line are categorized as 'goblin'."""
+        props = [
+            self._make_prop("SGA", "points", 28.5),
+            self._make_prop("SGA", "points", 31.5),
+            self._make_prop("SGA", "points", 34.5),
+        ]
+        result = self.parse(props)
+        cats = {p["line"]: p["line_category"] for p in result}
+        self.assertEqual(cats[28.5], "goblin")
+
+    def test_above_median_is_demon(self):
+        """Lines above the median standard line are categorized as 'demon'."""
+        props = [
+            self._make_prop("SGA", "points", 28.5),
+            self._make_prop("SGA", "points", 31.5),
+            self._make_prop("SGA", "points", 34.5),
+        ]
+        result = self.parse(props)
+        cats = {p["line"]: p["line_category"] for p in result}
+        self.assertEqual(cats[34.5], "demon")
+
+    def test_median_line_is_standard(self):
+        """The median line in a group is categorized as 'standard'."""
+        props = [
+            self._make_prop("SGA", "points", 28.5),
+            self._make_prop("SGA", "points", 31.5),
+            self._make_prop("SGA", "points", 34.5),
+        ]
+        result = self.parse(props)
+        cats = {p["line"]: p["line_category"] for p in result}
+        self.assertEqual(cats[31.5], "standard")
+
+    # ── Enrichment & structure ────────────────────────────────────
+
+    def test_result_count_matches_input(self):
+        """Output list must have the same number of entries as input."""
+        props = [
+            self._make_prop("Player A", "points", 22.5),
+            self._make_prop("Player A", "points", 25.5),
+            self._make_prop("Player B", "rebounds", 8.5),
+        ]
+        result = self.parse(props)
+        self.assertEqual(len(result), len(props))
+
+    def test_original_fields_preserved(self):
+        """All original prop fields must be preserved in the enriched output."""
+        props = [self._make_prop("LeBron", "points", 24.5)]
+        result = self.parse(props)
+        self.assertEqual(result[0]["player_name"], "LeBron")
+        self.assertEqual(result[0]["stat_type"], "points")
+        self.assertEqual(result[0]["line"], 24.5)
+
+    def test_platforms_are_grouped_separately(self):
+        """Same player/stat on different platforms are independent groups."""
+        props = [
+            self._make_prop("SGA", "points", 28.5, "PrizePicks"),
+            self._make_prop("SGA", "points", 31.5, "PrizePicks"),
+            self._make_prop("SGA", "points", 34.5, "PrizePicks"),
+            self._make_prop("SGA", "points", 30.0, "Underdog"),
+        ]
+        result = self.parse(props)
+        pp = [p for p in result if p["platform"] == "PrizePicks"]
+        ud = [p for p in result if p["platform"] == "Underdog"]
+        # Underdog has only one line → must be standard
+        self.assertEqual(ud[0]["line_category"], "standard")
+        # PrizePicks has 3 lines; median is 31.5 → standard; 28.5 → goblin; 34.5 → demon
+        pp_cats = {p["line"]: p["line_category"] for p in pp}
+        self.assertEqual(pp_cats[28.5], "goblin")
+        self.assertEqual(pp_cats[31.5], "standard")
+        self.assertEqual(pp_cats[34.5], "demon")
+
+    def test_empty_props_returns_empty(self):
+        """Empty input should return an empty list."""
+        self.assertEqual(self.parse([]), [])
+
+    def test_all_required_keys_present(self):
+        """Each enriched prop must contain 'standard_line' and 'line_category'."""
+        props = [self._make_prop("Test", "rebounds", 8.5)]
+        result = self.parse(props)
+        self.assertIn("standard_line", result[0])
+        self.assertIn("line_category", result[0])

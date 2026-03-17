@@ -1178,14 +1178,18 @@ def classify_bet_type(
     demon_regression_pct=None,
 ) -> dict:
     """
-    Classify a prop bet as a Goblin 🧌, Demon 👿, or Normal bet.
+    Classify a prop bet as a Goblin, 50/50, or Normal bet.
 
-    Goblin bets are extreme edges — the model's projection is so far
+    Goblin bets are extreme statistical edges — the model's projection is so far
     from the line that it represents a near-guaranteed outcome.  These
     are the "easy money" plays that books occasionally leave open.
 
-    Demon bets are dangerous traps — they look appealing on the surface
-    but have hidden structural risks that make them likely losers.
+    50/50 bets (formerly called "Demon" in legacy code) are picks where
+    conflicting forces make the outcome uncertain — they look appealing on
+    the surface but have hidden structural risks.  Use
+    ``categorize_alt_lines()`` to identify true Demon bets (alternate lines
+    offered ABOVE the standard O/U) and Goblin bets (alternate lines BELOW
+    the standard O/U).
 
     A Goblin classification is BLOCKED when the prop_line looks synthetic
     or unreliable (zero, wildly below/above the player's season average).
@@ -1210,23 +1214,24 @@ def classify_bet_type(
 
     Returns:
         dict: {
-            'bet_type': 'goblin' | 'demon' | 'normal',
-            'bet_type_emoji': '🧌' | '👿' | '',
+            'bet_type': 'goblin' | '50_50' | 'normal',
+            'bet_type_emoji': str,
             'bet_type_label': str,
             'goblin': bool,
-            'demon': bool,
-            'reasons': list[str],    # Why it's a goblin/demon
-            'std_devs_from_line': float,   # How many std devs projection is from line
-            'line_verified': bool,         # False if line looks synthetic/unreliable
-            'line_reliability_warning': str | None,  # Human-readable warning if unverified
+            'demon': bool,   # True when bet_type is '50_50' (legacy compat key)
+            '50_50': bool,
+            'reasons': list[str],
+            'std_devs_from_line': float,
+            'line_verified': bool,
+            'line_reliability_warning': str | None,
         }
 
     Example (Goblin):
         Line 12.5 pts, projection 28 pts, std 7 → 2.2 std devs above line,
-        probability 88%, edge 38% → Goblin 🧌
+        probability 88%, edge 38% → Goblin
 
-    Example (Demon):
-        Back-to-back + spread 14 pts → blowout + fatigue → Demon 👿
+    Example (50/50 — formerly "Demon"):
+        Back-to-back + spread 14 pts → blowout + fatigue → 50/50 uncertain
     """
     stat_type_lower = str(stat_type).lower() if stat_type else ""
 
@@ -1336,7 +1341,7 @@ def classify_bet_type(
     if is_goblin:
         return {
             "bet_type":        "goblin",
-            "bet_type_emoji":  "[Goblin]",
+            "bet_type_emoji":  "Goblin",
             "bet_type_label":  "Goblin Bet — Easy Money",
             "goblin":          True,
             "demon":           False,
@@ -1404,11 +1409,16 @@ def classify_bet_type(
 
     if is_demon:
         return {
-            "bet_type":        "demon",
-            "bet_type_emoji":  "[Demon]",
-            "bet_type_label":  "Demon Bet — Dangerous Trap",
+            # Renamed from "demon" → "50_50": the old classification was based on
+            # conflicting statistical forces, not line position. True "Demon" bets
+            # are now defined as alternate lines ABOVE the standard O/U (see
+            # categorize_alt_lines()). These conflicting-forces picks are "50/50 bets".
+            "bet_type":        "50_50",
+            "bet_type_emoji":  "50/50",
+            "bet_type_label":  "50/50 Bet — Uncertain",
             "goblin":          False,
-            "demon":           True,
+            "demon":           True,   # kept for backward compat (legacy callers)
+            "50_50":           True,
             "reasons":         demon_reasons,
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
@@ -1422,10 +1432,94 @@ def classify_bet_type(
         "bet_type_label":  "Normal Bet",
         "goblin":          False,
         "demon":           False,
+        "50_50":           False,
         "reasons":         [],
         "std_devs_from_line": round(std_devs_from_line, 2),
         "line_verified":   line_verified,
         "line_reliability_warning": line_reliability_warning,
+    }
+
+
+def categorize_alt_lines(standard_line, available_lines):
+    """
+    Categorize alternate sportsbook prop lines relative to the Standard_Line.
+
+    Sportsbooks offer a primary "standard" Over/Under line plus a set of
+    alternate lines at higher or lower thresholds.  This function splits
+    those alternate lines into two categories:
+
+    * **Goblin_Bets** — lines BELOW the standard line.
+      These are safer floor bets; the player only needs to exceed a lower
+      threshold to win.  High-probability, lower payout.
+
+    * **Demon_Bets** — lines ABOVE the standard line.
+      These are high-risk / high-reward bets; the player must exceed a
+      higher threshold.  Lower probability, higher payout.
+
+    Analysis should only be triggered on ACTUAL bookmaker lines — never
+    on hypothetical or generated lines.  Feed the output of this function
+    directly to the statistical analysis pipeline to ensure only real
+    sportsbook lines are evaluated.
+
+    Args:
+        standard_line (float): The primary median O/U projection set by the
+            sportsbook for this player prop (e.g. SGA Points O/U = 31.5).
+        available_lines (list of float): The remaining alternate lines
+            offered by the bookmaker for the same player prop.  Do NOT
+            include the standard_line itself in this list.
+
+    Returns:
+        dict: {
+            'standard_line': float,
+            'goblin_bets':   list[float],  # Lines < standard_line, sorted asc
+            'demon_bets':    list[float],  # Lines > standard_line, sorted asc
+        }
+
+    Example:
+        # SGA Points — standard 31.5, alternates [28.5, 29.5, 33.5, 36.5]
+        result = categorize_alt_lines(31.5, [28.5, 29.5, 33.5, 36.5])
+        # → {
+        #     'standard_line': 31.5,
+        #     'goblin_bets':   [28.5, 29.5],  # below 31.5 → safe floor
+        #     'demon_bets':    [33.5, 36.5],  # above 31.5 → high risk
+        # }
+
+        # Paolo Banchero PRA — standard 33.5, alternates [39.5, 41.5, 44.5]
+        result = categorize_alt_lines(33.5, [39.5, 41.5, 44.5])
+        # → {
+        #     'standard_line': 33.5,
+        #     'goblin_bets':   [],
+        #     'demon_bets':    [39.5, 41.5, 44.5],
+        # }
+    """
+    if not standard_line or standard_line <= 0:
+        return {
+            "standard_line": standard_line,
+            "goblin_bets":   [],
+            "demon_bets":    [],
+        }
+
+    goblin_bets = []
+    demon_bets  = []
+
+    for raw in available_lines:
+        try:
+            line_val = float(raw)
+        except (ValueError, TypeError):
+            continue  # Skip non-numeric entries
+
+        # Lines below the standard line are Goblin_Bets (safe floor)
+        if line_val < standard_line:
+            goblin_bets.append(line_val)
+        # Lines above the standard line are Demon_Bets (high risk/reward)
+        elif line_val > standard_line:
+            demon_bets.append(line_val)
+        # Lines exactly equal to the standard are neither (they ARE the standard)
+
+    return {
+        "standard_line": standard_line,
+        "goblin_bets":   sorted(goblin_bets),  # lowest first (safest first)
+        "demon_bets":    sorted(demon_bets),   # lowest first (closest to std first)
     }
 
 

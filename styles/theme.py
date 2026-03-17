@@ -107,7 +107,7 @@ GLOSSARY = {
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
     ),
-    "Goblin Bet [Goblin]": (
+    "Goblin Bet": (
         "A Goblin bet is one where the platform's line is so far from reality that it's "
         "almost free money. Think of it like finding a $20 bill on the ground — the "
         "sportsbook set the line at a number that's WAY below (or above) where the player "
@@ -116,7 +116,7 @@ GLOSSARY = {
         "goes over. Goblin criteria: projection 2+ standard deviations from the line, "
         "probability ≥80%, edge ≥25%."
     ),
-    "Demon Bet [Demon]": (
+    "Demon Bet": (
         "A Demon bet LOOKS appealing on the surface but has hidden danger signals that make "
         "it a likely loser — it's a trap. There are 4 types: (1) Conflict Demon: the model's "
         "forces are nearly 50/50, a coin flip disguised as an edge. (2) Variance Demon: "
