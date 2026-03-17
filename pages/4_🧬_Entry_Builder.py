@@ -7,6 +7,7 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
+import logging
 
 # Import our entry optimizer engine
 from engine.entry_optimizer import (
@@ -644,8 +645,8 @@ if build_button:
                         _recommended_bet = round(_kelly * bankroll_amount, 2)
                         if _recommended_bet > 0:
                             st.caption(f"💰 Kelly sizing: **${_recommended_bet:.2f}** ({_kelly*100:.1f}% of bankroll) — {kelly_mode} Kelly")
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
 
             # Feature 10: Flex vs Power recommendation
             try:
@@ -664,8 +665,8 @@ if build_button:
                             f"_{_play_type['reasoning']}_",
                             unsafe_allow_html=True,
                         )
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
 
             st.markdown("---")
 
@@ -692,8 +693,8 @@ if build_button:
             c1.metric("Total at Risk", f"${_risk_summary['total_at_risk']:.2f}", f"{_risk_summary['total_at_risk_pct']*100:.1f}% of bankroll")
             c2.metric("Expected Profit", f"${_risk_summary['expected_profit']:.2f}")
             c3.metric("P(Positive Session)", f"{_risk_summary['prob_positive_session']*100:.1f}%")
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
 
     else:
         st.warning(

@@ -13,6 +13,7 @@ import json       # For session state persistence
 import datetime   # For timestamp handling
 import unicodedata  # For normalizing unicode characters in names
 import re           # For regex-based suffix stripping
+import logging
 from pathlib import Path  # Modern file path handling
 
 import streamlit as st
@@ -782,8 +783,8 @@ def find_players_by_team(players_list, team_abbrev):
     # Sort by points average descending (stars first)
     try:
         matches.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
     return matches
 
 
@@ -1296,7 +1297,60 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     return props
 
 
-def parse_props_from_csv_text(csv_text):
+def filter_props_to_platform_players(
+    generated_props: list,
+    platform_props: list,
+) -> list:
+    """
+    Filter auto-generated props to only include players that appear in
+    real platform data (PrizePicks / Underdog / DraftKings).
+
+    Players whose name matches one in platform_props will have their
+    generated props returned.  Players not found on any platform are
+    dropped entirely — we never want synthetic props for players who
+    are not active on a betting app today.
+
+    Args:
+        generated_props: List of auto-generated prop dicts (may be synthetic).
+        platform_props: List of real platform prop dicts fetched from APIs.
+
+    Returns:
+        List of props limited to platform-present players. If platform_props
+        is empty or None, returns generated_props unchanged (graceful fallback).
+    """
+    if not platform_props:
+        return generated_props
+
+    import logging as _log
+    _logger_filter = _log.getLogger(__name__)
+
+    # Build a set of normalised player names present on any platform
+    platform_player_names: set = set()
+    for p in platform_props:
+        raw_name = (p.get("player_name") or "").strip().lower()
+        if raw_name:
+            platform_player_names.add(raw_name)
+
+    if not platform_player_names:
+        return generated_props
+
+    filtered = []
+    dropped_names: set = set()
+    for prop in generated_props:
+        name = (prop.get("player_name") or "").strip()
+        if name.lower() in platform_player_names:
+            filtered.append(prop)
+        else:
+            dropped_names.add(name)
+
+    if dropped_names:
+        _logger_filter.info(
+            f"[DataManager] Filtered out {len(dropped_names)} players not on any betting platform: "
+            + ", ".join(sorted(dropped_names)[:10])
+            + (" ..." if len(dropped_names) > 10 else "")
+        )
+
+    return filtered
     """
     Parse prop lines from CSV text (uploaded by user).
 
@@ -1608,8 +1662,8 @@ def clear_all_caches():
         load_players_data.clear()
         load_teams_data.clear()
         load_defensive_ratings_data.clear()
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
 
 
 def get_data_health_report():
@@ -1685,8 +1739,8 @@ def get_data_health_report():
             is_stale = days_old > 3
             if is_stale:
                 warnings.append(f"Data is {days_old} day(s) old — consider refreshing")
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
 
     if players_count == 0:
         warnings.append("No players loaded — run Data Feed to populate")

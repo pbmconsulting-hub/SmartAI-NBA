@@ -12,6 +12,7 @@
 
 # Standard library only
 import math  # For rounding and calculation helpers
+import logging
 
 try:
     from engine.rotation_tracker import get_minutes_adjustment
@@ -253,8 +254,8 @@ def compute_league_average_game_total(teams_data=None):
                 totals.append(ppg + opp_ppg)
         if totals:
             return sum(totals) / len(totals)
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[Projections] Unexpected error: {_exc}")
     return LEAGUE_AVERAGE_GAME_TOTAL
 
 
@@ -683,8 +684,8 @@ def build_player_projection(
             rotation_adjustment = get_minutes_adjustment(recent_form_games)
             if rotation_adjustment != 1.0:
                 minutes_adjustment_factor = minutes_adjustment_factor * rotation_adjustment
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[Projections] Unexpected error: {_exc}")
 
     projected_minutes = round(
         season_minutes_average

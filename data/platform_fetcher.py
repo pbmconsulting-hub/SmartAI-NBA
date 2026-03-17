@@ -63,6 +63,29 @@ except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
 
+import time as _time
+
+# ── Simple time-based API response cache ─────────────────────────────────────
+_API_CACHE: dict = {}
+_API_CACHE_TTL: int = 300  # seconds (5 minutes default)
+
+
+def _cache_get(url: str) -> object:
+    """Return cached response for *url* if not expired, else None."""
+    entry = _API_CACHE.get(url)
+    if entry is None:
+        return None
+    payload, ts = entry
+    if _time.time() - ts > _API_CACHE_TTL:
+        del _API_CACHE[url]
+        return None
+    return payload
+
+
+def _cache_set(url: str, payload: object) -> None:
+    """Store *payload* in the cache keyed by *url*."""
+    _API_CACHE[url] = (payload, _time.time())
+
 # Import the rate limiter for polite API access with circuit breaker
 try:
     from utils.rate_limiter import RateLimiter as _RateLimiter
@@ -251,27 +274,32 @@ def fetch_prizepicks_props(league="NBA"):
 
     _logger.info(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
 
-    try:
-        response = requests.get(
-            PRIZEPICKS_URL,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-            params={"league_id": 7, "per_page": 250, "single_stat": "true"},
-            # BEGINNER NOTE: league_id=7 is NBA on PrizePicks.
-            # per_page=250 gets more projections in one call.
-        )
-        response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
-        data = response.json()
+    _cached = _cache_get(PRIZEPICKS_URL)
+    if _cached is not None:
+        data = _cached
+    else:
+        try:
+            response = requests.get(
+                PRIZEPICKS_URL,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                params={"league_id": 7, "per_page": 250, "single_stat": "true"},
+                # BEGINNER NOTE: league_id=7 is NBA on PrizePicks.
+                # per_page=250 gets more projections in one call.
+            )
+            response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
+            data = response.json()
+            _cache_set(PRIZEPICKS_URL, data)
 
-    except requests.exceptions.Timeout:
-        _logger.warning("[PrizePicks] Request timed out. Skipping.")
-        return []
-    except requests.exceptions.ConnectionError as err:
-        _logger.warning(f"[PrizePicks] Connection error: {err}. Skipping.")
-        return []
-    except Exception as err:
-        _logger.error(f"[PrizePicks] Unexpected error: {err}. Skipping.")
-        return []
+        except requests.exceptions.Timeout:
+            _logger.warning("[PrizePicks] Request timed out. Skipping.")
+            return []
+        except requests.exceptions.ConnectionError as err:
+            _logger.warning(f"[PrizePicks] Connection error: {err}. Skipping.")
+            return []
+        except Exception as err:
+            _logger.error(f"[PrizePicks] Unexpected error: {err}. Skipping.")
+            return []
 
     # ── Parse the response ────────────────────────────────────
     # PrizePicks returns two arrays:
@@ -387,24 +415,29 @@ def fetch_underdog_props(league="NBA"):
 
     _logger.info(f"[Underdog] Fetching NBA props from {UNDERDOG_URL} ...")
 
-    try:
-        response = requests.get(
-            UNDERDOG_URL,
-            headers=_BASE_HEADERS,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        data = response.json()
+    _cached_ud = _cache_get(UNDERDOG_URL)
+    if _cached_ud is not None:
+        data = _cached_ud
+    else:
+        try:
+            response = requests.get(
+                UNDERDOG_URL,
+                headers=_BASE_HEADERS,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            data = response.json()
+            _cache_set(UNDERDOG_URL, data)
 
-    except requests.exceptions.Timeout:
-        _logger.warning("[Underdog] Request timed out. Skipping.")
-        return []
-    except requests.exceptions.ConnectionError as err:
-        _logger.warning(f"[Underdog] Connection error: {err}. Skipping.")
-        return []
-    except Exception as err:
-        _logger.error(f"[Underdog] Unexpected error: {err}. Skipping.")
-        return []
+        except requests.exceptions.Timeout:
+            _logger.warning("[Underdog] Request timed out. Skipping.")
+            return []
+        except requests.exceptions.ConnectionError as err:
+            _logger.warning(f"[Underdog] Connection error: {err}. Skipping.")
+            return []
+        except Exception as err:
+            _logger.error(f"[Underdog] Unexpected error: {err}. Skipping.")
+            return []
 
     # ── Parse the response ────────────────────────────────────
     # Underdog returns a flat list in "over_under_lines"
@@ -618,32 +651,37 @@ def fetch_draftkings_props(api_key=None):
         props_url = (
             f"{ODDS_API_BASE_URL}/sports/basketball_nba/events/{event_id}/odds"
         )
-        try:
-            props_resp = requests.get(
-                props_url,
-                headers=_BASE_HEADERS,
-                params={
-                    "apiKey": api_key,
-                    "regions": "us",
-                    "markets": MARKETS,
-                    "bookmakers": "draftkings",
-                    "oddsFormat": "american",
-                },
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
-            props_resp.raise_for_status()
-            event_data = props_resp.json()
+        _cached_dk = _cache_get(props_url)
+        if _cached_dk is not None:
+            event_data = _cached_dk
+        else:
+            try:
+                props_resp = requests.get(
+                    props_url,
+                    headers=_BASE_HEADERS,
+                    params={
+                        "apiKey": api_key,
+                        "regions": "us",
+                        "markets": MARKETS,
+                        "bookmakers": "draftkings",
+                        "oddsFormat": "american",
+                    },
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
+                props_resp.raise_for_status()
+                event_data = props_resp.json()
+                _cache_set(props_url, event_data)
 
-        except requests.exceptions.HTTPError as err:
-            # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
-            if props_resp.status_code == 422:
-                _logger.warning("[DraftKings] API quota exceeded. Stopping early.")
-                break
-            _logger.error(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
-            continue
-        except Exception as err:
-            _logger.error(f"[DraftKings] Error for event {event_id}: {err}. Skipping.")
-            continue
+            except requests.exceptions.HTTPError as err:
+                # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
+                if props_resp.status_code == 422:
+                    _logger.warning("[DraftKings] API quota exceeded. Stopping early.")
+                    break
+                _logger.error(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
+                continue
+            except Exception as err:
+                _logger.error(f"[DraftKings] Error for event {event_id}: {err}. Skipping.")
+                continue
 
         # ── Parse bookmaker data ───────────────────────────────
         for bookmaker in event_data.get("bookmakers", []):

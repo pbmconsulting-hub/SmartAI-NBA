@@ -23,7 +23,7 @@ except ImportError:
 
 # Import our engine modules
 from engine.simulation import (
-    run_monte_carlo_simulation,
+    run_quantum_matrix_simulation,
     build_histogram_from_results,
     simulate_combo_stat,
     simulate_fantasy_score,
@@ -1695,7 +1695,7 @@ if run_analysis:
         else:
             # Simple stat: standard Quantum Matrix Engine 5.6 simulation (C5 skew-normal, C8 minutes, C11 KDE)
             _flat_sim_minutes = _precise_minutes or projection_result.get("projected_minutes")
-            simulation_output = run_monte_carlo_simulation(
+            simulation_output = run_quantum_matrix_simulation(
                 projected_stat_average=projected_stat,
                 stat_standard_deviation=stat_std,
                 prop_line=prop_line,

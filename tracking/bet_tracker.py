@@ -9,6 +9,7 @@
 # Standard library imports only
 import datetime  # For getting today's date
 import time      # For retry delays in resolve_todays_bets
+import logging
 
 try:
     from utils.logger import get_logger
@@ -559,8 +560,8 @@ def auto_resolve_bet_results(date_str=None):
                 month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
                 if month_num:
                     return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
     for bet in pending_bets:
@@ -799,8 +800,8 @@ def resolve_todays_bets():
                 month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
                 if month_num:
                     return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
     # Primary stat column map
@@ -935,8 +936,8 @@ def resolve_todays_bets():
     if summary["resolved"] > 0:
         try:
             save_daily_snapshot(today_str)
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     # Count remaining unresolved bets
     try:
@@ -945,8 +946,8 @@ def resolve_todays_bets():
             1 for b in remaining
             if b.get("bet_date") == today_str and not b.get("result")
         )
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     return summary
 
@@ -1025,8 +1026,8 @@ def resolve_all_pending_bets():
                 month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
                 if month_num:
                     return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
     # Load all pending bets (no result set) regardless of date
@@ -1173,8 +1174,8 @@ def resolve_all_pending_bets():
             try:
                 from tracking.database import save_daily_snapshot
                 save_daily_snapshot(date_str)
-            except Exception:
-                pass
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     return summary
 
@@ -1274,8 +1275,8 @@ def resolve_all_analysis_picks(date_str=None):
                 month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
                 if month_num:
                     return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
     # ── Load picks from all_analysis_picks ────────────────────────────
@@ -1475,8 +1476,8 @@ def get_live_bet_status(bets_list):
         _static_players = nba_players_static.get_active_players()
         for p in _static_players:
             player_id_cache[p["full_name"].lower()] = p["id"]
-    except Exception:
-        pass
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     # Fetch live box scores
     live_box: dict = {}  # player_name_lower → current stat totals
@@ -1515,10 +1516,10 @@ def get_live_bet_status(bets_list):
                             "is_final": is_final,
                             "is_live": is_live,
                         }
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
+    except Exception as _exc:
+        logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     STAT_TO_BOX = {
         "points": "pts",
@@ -1661,7 +1662,7 @@ def save_top_picks_from_analysis(analysis_results):
             })
             existing_keys.add(dup_key)
             saved_count += 1
-        except Exception:
-            pass
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
 
     return saved_count

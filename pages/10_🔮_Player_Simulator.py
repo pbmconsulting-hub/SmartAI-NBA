@@ -15,7 +15,7 @@ from data.data_manager import (
     load_defensive_ratings_data,
 )
 from engine.projections import build_player_projection, get_stat_standard_deviation
-from engine.simulation import run_monte_carlo_simulation
+from engine.simulation import run_quantum_matrix_simulation
 
 # ─── Page config ────────────────────────────────────────────
 st.set_page_config(
@@ -215,7 +215,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
         if scenario_overrides and "def_adj" in scenario_overrides:
             projected_val = projected_val * (1.0 + scenario_overrides["def_adj"])
         stat_std = get_stat_standard_deviation(player_data, stat)
-        sim_out = run_monte_carlo_simulation(
+        sim_out = run_quantum_matrix_simulation(
             projected_stat_average=projected_val,
             stat_standard_deviation=stat_std,
             prop_line=projected_val,  # Use projected as line for percentile calculation

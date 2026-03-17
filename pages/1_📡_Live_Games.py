@@ -567,7 +567,7 @@ if platform_props_clicked:
         pp_bar.progress(40)
 
         from engine.projections import build_player_projection, get_stat_standard_deviation
-        from engine.simulation import run_monte_carlo_simulation
+        from engine.simulation import run_quantum_matrix_simulation
         from engine.edge_detection import analyze_directional_forces, should_avoid_prop
         from engine.confidence import calculate_confidence_score
         from data.data_manager import load_defensive_ratings_data, load_teams_data as _load_teams
@@ -676,7 +676,7 @@ if platform_props_clicked:
                 blowout_risk = proj.get("blowout_risk_factor", 0.1)
 
                 # Simulation
-                sim = run_monte_carlo_simulation(
+                sim = run_quantum_matrix_simulation(
                     projected_stat_average=projected_value,
                     stat_standard_deviation=std_dev,
                     prop_line=prop_line,

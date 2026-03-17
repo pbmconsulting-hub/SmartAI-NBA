@@ -161,14 +161,41 @@ def calculate_confidence_score(
     alternative_probabilities=None,
     streak_info=None,
     platform=None,
-):
+) -> dict:
     """
-    Calculate a 0-100 confidence score for a prop pick.
+    Calculate a 0-100 SAFE Score (Statistical Analysis of Force & Edge) for a prop pick.
 
-    Combines eight factors into a weighted score, then assigns
-    a tier label: Platinum, Gold, Silver, or Bronze.
-    Post-scoring penalties for line sharpness (W1), trap lines (W5),
-    calibration (W7), and injury status are applied additively.
+    Combines eight signal weights into a weighted score, applies four penalties,
+    then assigns a tier label: Platinum, Gold, Silver, or Bronze.
+
+    ## Weights (W1–W8)
+
+    The base score is a weighted sum of seven independent factor scores (each 0–100),
+    plus one optional penalty group, normalised to a 0–100 final score:
+
+    | Signal | Weight | Variable |
+    |--------|--------|----------|
+    | W1 Line Sharpness Penalty | post-score deduction (0–8 pts) | ``line_sharpness_penalty`` |
+    | W2 Edge Magnitude | 22% | ``WEIGHT_EDGE_MAGNITUDE`` |
+    | W3 Directional Agreement | 20% | ``WEIGHT_DIRECTIONAL_AGREEMENT`` |
+    | W4 Historical Consistency | 12% | ``WEIGHT_HISTORICAL_CONSISTENCY`` |
+    | W5 Trap Line Penalty | post-score deduction (0–15 pts) | ``trap_line_penalty`` |
+    | W6 Recent Form | 10% | ``WEIGHT_RECENT_FORM`` |
+    | W7 Calibration Adjustment | post-score adjustment (±) | ``calibration_adjustment`` |
+    | W8 Matchup Favorability | 10% | ``WEIGHT_MATCHUP_FAVORABILITY`` |
+
+    Additional weighted inputs:
+    - Probability Strength: 20% (``WEIGHT_PROBABILITY_STRENGTH``)
+    - Sample Size (games played): 6% (``WEIGHT_SAMPLE_SIZE``)
+
+    ## Penalties (P1–P4)
+
+    | Penalty | Trigger | Effect |
+    |---------|---------|--------|
+    | P1 Low Edge | edge < SILVER_MIN_EDGE_PCT | Score capped below Silver |
+    | P2 Low Probability | prob < tier minimum | Tier downgrade |
+    | P3 High CV | CV > 0.45 | Variance penalty (5–15 pts) |
+    | P4 Injury / availability | injury_status_penalty > 0 | Direct score reduction |
 
     Phase 1 C2/C3 additions:
     - Hard kill switches (C2): override tier after scoring based on
@@ -706,7 +733,7 @@ def get_tier_color(tier_name):
     return tier_color_map.get(tier_name, "#FFFFFF")  # White default
 
 
-def calculate_risk_score(confidence_result, edge_pct, cv, platform=None):
+def calculate_risk_score(confidence_result, edge_pct, cv, platform=None) -> dict:
     """
     Calculate a composite 1-10 risk rating for a prop pick. (3E)
 
@@ -771,7 +798,7 @@ def calculate_risk_score(confidence_result, edge_pct, cv, platform=None):
     }
 
 
-def enforce_tier_distribution(all_picks_results, max_platinum_pct=0.10, max_gold_pct=0.25):
+def enforce_tier_distribution(all_picks_results, max_platinum_pct=0.10, max_gold_pct=0.25) -> list:
     """
     Enforce a healthy tier distribution to prevent overconfidence inflation. (3F)
 
