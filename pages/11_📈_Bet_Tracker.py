@@ -340,111 +340,157 @@ with tab_model_health:
         performance_stats = get_model_performance_stats()
 
         # Win rate by tier
-        st.subheader("🏆 Win Rate by Tier")
-        tier_perf = performance_stats.get("by_tier", {})
-        if tier_perf:
-            tier_order = ["Platinum", "Gold", "Silver", "Bronze"]
-            tier_rows = [
-                {
-                    "Tier": t,
-                    "Total": tier_perf[t].get("total", 0),
-                    "Wins":  tier_perf[t].get("wins", 0),
-                    "Losses": tier_perf[t].get("losses", 0),
-                    "Win Rate": f"{tier_perf[t].get('win_rate', 0):.1f}%",
-                }
-                for t in tier_order if t in tier_perf
-            ]
-            st.markdown(
-                get_styled_stats_table_html(
-                    tier_rows,
-                    ["Tier", "Total", "Wins", "Losses", "Win Rate"],
-                ),
-                unsafe_allow_html=True,
-            )
+        with st.expander("🏆 Win Rate by Tier", expanded=True):
+            tier_perf = performance_stats.get("by_tier", {})
+            if tier_perf:
+                tier_order = ["Platinum", "Gold", "Silver", "Bronze"]
+                tier_rows = [
+                    {
+                        "Tier": t,
+                        "Total": tier_perf[t].get("total", 0),
+                        "Wins":  tier_perf[t].get("wins", 0),
+                        "Losses": tier_perf[t].get("losses", 0),
+                        "Win Rate": f"{tier_perf[t].get('win_rate', 0):.1f}%",
+                    }
+                    for t in tier_order if t in tier_perf
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        tier_rows,
+                        ["Tier", "Total", "Wins", "Losses", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption("No tier data yet.")
 
         # Win rate by platform
-        st.subheader("🎰 Win Rate by Platform")
-        plat_perf = performance_stats.get("by_platform", {})
-        if plat_perf:
-            plat_rows = [
-                {
-                    "Platform": p,
-                    "Total": d.get("total", 0),
-                    "Wins":  d.get("wins", 0),
-                    "Win Rate": f"{d.get('win_rate', 0):.1f}%",
-                }
-                for p, d in plat_perf.items()
-            ]
-            st.markdown(
-                get_styled_stats_table_html(
-                    plat_rows,
-                    ["Platform", "Total", "Wins", "Win Rate"],
-                ),
-                unsafe_allow_html=True,
-            )
+        with st.expander("🎰 Win Rate by Platform", expanded=True):
+            plat_perf = performance_stats.get("by_platform", {})
+            if plat_perf:
+                plat_rows = [
+                    {
+                        "Platform": p,
+                        "Total": d.get("total", 0),
+                        "Wins":  d.get("wins", 0),
+                        "Win Rate": f"{d.get('win_rate', 0):.1f}%",
+                    }
+                    for p, d in plat_perf.items()
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        plat_rows,
+                        ["Platform", "Total", "Wins", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption("No platform data yet.")
 
         # Win rate by stat type
-        st.subheader("📐 Win Rate by Stat Type")
-        stat_perf = performance_stats.get("by_stat_type", {})
-        if stat_perf:
-            stat_rows = [
-                {
-                    "Stat Type": s.capitalize(),
-                    "Total": d.get("total", 0),
-                    "Wins":  d.get("wins", 0),
-                    "Win Rate": f"{d.get('win_rate', 0):.1f}%",
-                }
-                for s, d in sorted(stat_perf.items())
-            ]
-            st.markdown(
-                get_styled_stats_table_html(
-                    stat_rows,
-                    ["Stat Type", "Total", "Wins", "Win Rate"],
-                ),
-                unsafe_allow_html=True,
-            )
+        with st.expander("📐 Win Rate by Stat Type", expanded=False):
+            stat_perf = performance_stats.get("by_stat_type", {})
+            if stat_perf:
+                stat_rows = [
+                    {
+                        "Stat Type": s.capitalize(),
+                        "Total": d.get("total", 0),
+                        "Wins":  d.get("wins", 0),
+                        "Win Rate": f"{d.get('win_rate', 0):.1f}%",
+                    }
+                    for s, d in sorted(stat_perf.items())
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        stat_rows,
+                        ["Stat Type", "Total", "Wins", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption("No stat type data yet.")
 
         # Win rate by Goblin / Demon / Normal bet classification
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
-            st.subheader("🧌👿 Win Rate by Bet Classification")
-            _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
-            bt_rows = [
-                {
-                    "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
-                    "Total":     d.get("total", 0),
-                    "Wins":      d.get("wins", 0),
-                    "Losses":    d.get("losses", 0),
-                    "Win Rate":  f"{d.get('win_rate', 0):.1f}%",
-                }
-                for bt, d in sorted(bet_type_perf.items())
+            with st.expander("🧌👿 Win Rate by Bet Classification", expanded=True):
+                _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
+                bt_rows = [
+                    {
+                        "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
+                        "Total":     d.get("total", 0),
+                        "Wins":      d.get("wins", 0),
+                        "Losses":    d.get("losses", 0),
+                        "Win Rate":  f"{d.get('win_rate', 0):.1f}%",
+                    }
+                    for bt, d in sorted(bet_type_perf.items())
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        bt_rows,
+                        ["Bet Type", "Total", "Wins", "Losses", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+                # Highlight the key insight
+                _goblin_data = bet_type_perf.get("goblin", {})
+                _demon_data  = bet_type_perf.get("demon", {})
+                _cols = st.columns(2)
+                if _goblin_data.get("total", 0) > 0:
+                    _cols[0].metric(
+                        "🧌 Goblin Win Rate",
+                        f"{_goblin_data.get('win_rate', 0):.1f}%",
+                        help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
+                    )
+                if _demon_data.get("total", 0) > 0:
+                    _demon_loss_rate = round(
+                        (_demon_data.get("losses", 0) / max(_demon_data.get("total", 1), 1)) * 100, 1
+                    )
+                    _cols[1].metric(
+                        "👿 Demon Loss Rate",
+                        f"{_demon_loss_rate:.1f}%",
+                        help=f"Based on {_demon_data.get('total', 0)} logged Demon bets — a high loss rate validates the system",
+                    )
+
+            # ── Individual Goblin Bet Results ──────────────────────────
+            _goblin_resolved = [
+                b for b in filtered_health
+                if b.get("bet_type", "") == "goblin"
+                and b.get("result") in ("WIN", "LOSS", "PUSH")
             ]
-            st.markdown(
-                get_styled_stats_table_html(
-                    bt_rows,
-                    ["Bet Type", "Total", "Wins", "Losses", "Win Rate"],
-                ),
-                unsafe_allow_html=True,
-            )
-            # Highlight the key insight
-            _goblin_data = bet_type_perf.get("goblin", {})
-            _demon_data  = bet_type_perf.get("demon", {})
-            _cols = st.columns(2)
-            if _goblin_data.get("total", 0) > 0:
-                _cols[0].metric(
-                    "🧌 Goblin Win Rate",
-                    f"{_goblin_data.get('win_rate', 0):.1f}%",
-                    help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
-                )
-            if _demon_data.get("total", 0) > 0:
-                _demon_loss_rate = round(
-                    (_demon_data.get("losses", 0) / max(_demon_data.get("total", 1), 1)) * 100, 1
-                )
-                _cols[1].metric(
-                    "👿 Demon Loss Rate",
-                    f"{_demon_loss_rate:.1f}%",
-                    help=f"Based on {_demon_data.get('total', 0)} logged Demon bets — a high loss rate validates the system",
-                )
+            if _goblin_resolved:
+                _gb_wins   = sum(1 for b in _goblin_resolved if b.get("result") == "WIN")
+                _gb_losses = sum(1 for b in _goblin_resolved if b.get("result") == "LOSS")
+                with st.expander(
+                    f"🧌 Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
+                    expanded=False,
+                ):
+                    _gbc_a, _gbc_b = st.columns(2)
+                    for _gbi, _gb in enumerate(_goblin_resolved):
+                        _res = _gb.get("result", "")
+                        _res_icon = "✅" if _res == "WIN" else ("❌" if _res == "LOSS" else "🔄")
+                        _gbc = _gbc_a if _gbi % 2 == 0 else _gbc_b
+                        with _gbc:
+                            st.markdown(get_bet_card_html(_gb), unsafe_allow_html=True)
+
+            # ── Individual Demon Bet Results ───────────────────────────
+            _demon_resolved = [
+                b for b in filtered_health
+                if b.get("bet_type", "") == "demon"
+                and b.get("result") in ("WIN", "LOSS", "PUSH")
+            ]
+            if _demon_resolved:
+                _dm_wins   = sum(1 for b in _demon_resolved if b.get("result") == "WIN")
+                _dm_losses = sum(1 for b in _demon_resolved if b.get("result") == "LOSS")
+                with st.expander(
+                    f"👿 Demon Bet Results — {_dm_wins} Wins / {_dm_losses} Losses",
+                    expanded=False,
+                ):
+                    _dmc_a, _dmc_b = st.columns(2)
+                    for _dmi, _dm in enumerate(_demon_resolved):
+                        _dmc = _dmc_a if _dmi % 2 == 0 else _dmc_b
+                        with _dmc:
+                            st.markdown(get_bet_card_html(_dm), unsafe_allow_html=True)
 
         # Feature 1: Enhanced tier accuracy report
         try:
@@ -1302,15 +1348,46 @@ with tab_bets:
                     else:
                         st.error(f"❌ {msg}")
 
-        # ── Bet Cards Grid ────────────────────────────────────────────
+        # ── Bet Cards Grid — grouped by date ─────────────────────────
         if not filtered_bets:
             st.info(f"No bets match the '{filter_choice}' filter.")
         else:
-            col_a, col_b = st.columns(2)
-            for idx, bet in enumerate(filtered_bets):
-                col = col_a if idx % 2 == 0 else col_b
-                with col:
-                    st.markdown(get_bet_card_html(bet), unsafe_allow_html=True)
+            _today_str = datetime.date.today().isoformat()
+            _today_bets = [b for b in filtered_bets if b.get("bet_date", "") == _today_str]
+            _past_bets_by_date: dict = {}
+            for _b in filtered_bets:
+                _bd = _b.get("bet_date", "Unknown")
+                if _bd != _today_str:
+                    _past_bets_by_date.setdefault(_bd, []).append(_b)
+
+            # ── Today's Bets ─────────────────────────────────────────
+            if _today_bets:
+                st.subheader("📅 Today's Bets")
+                col_a, col_b = st.columns(2)
+                for idx, bet in enumerate(_today_bets):
+                    col = col_a if idx % 2 == 0 else col_b
+                    with col:
+                        st.markdown(get_bet_card_html(bet), unsafe_allow_html=True)
+
+            # ── Previous Days — collapsible expanders ────────────────
+            for _past_date in sorted(_past_bets_by_date.keys(), reverse=True):
+                _pd_bets = _past_bets_by_date[_past_date]
+                _pd_w    = sum(1 for b in _pd_bets if b.get("result") == "WIN")
+                _pd_l    = sum(1 for b in _pd_bets if b.get("result") == "LOSS")
+                _pd_pend = sum(1 for b in _pd_bets if not b.get("result"))
+                _pd_label = (
+                    f"📅 {_past_date} — {len(_pd_bets)} bet(s) · ✅{_pd_w} ❌{_pd_l}"
+                    + (f" ⏳{_pd_pend} pending" if _pd_pend else "")
+                )
+                with st.expander(_pd_label, expanded=False):
+                    col_a, col_b = st.columns(2)
+                    for idx, bet in enumerate(_pd_bets):
+                        col = col_a if idx % 2 == 0 else col_b
+                        with col:
+                            st.markdown(get_bet_card_html(bet), unsafe_allow_html=True)
+
+            if not _today_bets and not _past_bets_by_date:
+                st.info(f"No bets match the '{filter_choice}' filter.")
 
 # ============================================================
 # END SECTION: My Bets Tab
@@ -1601,6 +1678,67 @@ with tab_history:
         rs5.metric("Worst Day",    worst_day_str)
         st.divider()
 
+    # ── Cumulative ROI Time-Series Chart ───────────────────────────────
+    # Build a cumulative P&L series from all resolved bets over the
+    # last 14 days to visualize the strategy's trend.
+    _all_hist_bets = load_all_bets(limit=1000)
+    _resolved_bets = [
+        b for b in _all_hist_bets
+        if b.get("result") in ("WIN", "LOSS", "PUSH")
+        and _platform_filter_fn(b)
+    ]
+    _resolved_bets.sort(key=lambda b: (b.get("bet_date", ""), b.get("id", 0)))
+
+    if len(_resolved_bets) >= 3:
+        with st.expander("📈 Cumulative P&L Curve (resolved bets)", expanded=True):
+            _HIST_PAYOUT = 0.909
+            _cum_pnl = 0.0
+            _pnl_vals = []
+            _pnl_labels = []
+            _daily_pnl: dict = {}  # date → cumulative at end of day
+            for _rb in _resolved_bets:
+                _res = _rb.get("result", "")
+                if _res == "WIN":
+                    _cum_pnl += _HIST_PAYOUT
+                elif _res == "LOSS":
+                    _cum_pnl -= 1.0
+                # PUSH: no change
+                _pnl_vals.append(round(_cum_pnl, 2))
+                _pnl_labels.append(_rb.get("bet_date", ""))
+                _daily_pnl[_rb.get("bet_date", "")] = round(_cum_pnl, 2)
+
+            _wins_total = sum(1 for b in _resolved_bets if b.get("result") == "WIN")
+            _losses_total = sum(1 for b in _resolved_bets if b.get("result") == "LOSS")
+            _wr_total = _wins_total / max(_wins_total + _losses_total, 1) * 100
+
+            _roi_cols = st.columns(4)
+            _roi_cols[0].metric("Resolved Bets", len(_resolved_bets))
+            _roi_cols[1].metric("Win Rate", f"{_wr_total:.1f}%",
+                                delta=f"{_wr_total - 52.38:+.1f}% vs breakeven")
+            _roi_cols[2].metric("Total P&L", f"{_cum_pnl:+.2f} units")
+            _roi_cols[3].metric(
+                "ROI/bet",
+                f"{_cum_pnl / max(len(_resolved_bets), 1):+.3f}u",
+                delta="positive = profitable" if _cum_pnl > 0 else "negative = losing"
+            )
+
+            # Line chart of cumulative P&L
+            st.line_chart({"Cumulative P&L (units)": _pnl_vals}, height=220)
+            st.caption(
+                f"📊 {len(_resolved_bets)} resolved bets · "
+                f"{_wins_total}W / {_losses_total}L · "
+                f"Final: {_cum_pnl:+.2f}u"
+            )
+
+            # Daily P&L mini-table
+            if _daily_pnl:
+                _dpnl_rows = [
+                    {"Date": d, "End-of-Day P&L": f"{v:+.2f}u"}
+                    for d, v in sorted(_daily_pnl.items(), reverse=True)[:14]
+                ]
+                st.dataframe(_dpnl_rows, hide_index=True, use_container_width=True)
+        st.divider()
+
     # ── History Filter ─────────────────────────────────────────────────
     hist_filter = st.radio(
         "History filter",
@@ -1668,6 +1806,8 @@ with tab_history:
                             _hcol = _ha if _idx % 2 == 0 else _hb
                             with _hcol:
                                 st.markdown(get_bet_card_html(_hb_bet), unsafe_allow_html=True)
+                        if len(_show_bets) > 6:
+                            st.caption(f"*{len(_show_bets)} bets shown for {_date}.*")
     else:
         # Use daily_snapshots for summaries + load individual bets for expansion
         all_bets_hist = load_all_bets(limit=1000)

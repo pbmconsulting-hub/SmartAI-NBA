@@ -907,6 +907,14 @@ GOBLIN_MIN_STD_DEVS_FROM_LINE = 2.0   # Projection must be ≥2 std devs from li
 GOBLIN_MIN_PROBABILITY        = 0.80   # Model probability must be ≥80%
 GOBLIN_MIN_EDGE               = 25.0   # Edge must be ≥25%
 
+# Line-reliability thresholds for Goblin validation.
+# A Goblin requires a REAL platform line, not a synthetic/default one.
+# If the prop_line is 0, wildly low (< 25% of season avg), or wildly high
+# (> 4× season avg), we treat it as an unverified synthetic line and refuse
+# to award the Goblin badge — garbage-in/garbage-out prevention.
+GOBLIN_LINE_MIN_RATIO = 0.25   # Line must be ≥25% of season average
+GOBLIN_LINE_MAX_RATIO = 4.0    # Line must be ≤4× the season average
+
 # Thresholds for Demon classification
 DEMON_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% of each other = conflicting
 DEMON_HIGH_VAR_MAX_EDGE        = 8.0    # High-variance stats with edge <8% = demon
@@ -927,6 +935,14 @@ def classify_bet_type(
     vegas_spread=0.0,
     recent_form_ratio=None,
     season_average=None,
+    line_source=None,
+    # Optional threshold overrides — pulled from Settings page session state
+    # when provided via st.session_state (pass None to use module constants).
+    goblin_min_std_devs=None,
+    goblin_min_probability=None,
+    goblin_min_edge=None,
+    demon_conflict_ratio=None,
+    demon_regression_pct=None,
 ):
     """
     Classify a prop bet as a Goblin 🧌, Demon 👿, or Normal bet.
@@ -937,6 +953,11 @@ def classify_bet_type(
 
     Demon bets are dangerous traps — they look appealing on the surface
     but have hidden structural risks that make them likely losers.
+
+    A Goblin classification is BLOCKED when the prop_line looks synthetic
+    or unreliable (zero, wildly below/above the player's season average).
+    This prevents garbage-in/garbage-out misclassifications caused by
+    stale, default, or auto-generated lines.
 
     Args:
         probability_over (float): Model P(over), 0–1
@@ -950,6 +971,9 @@ def classify_bet_type(
         vegas_spread (float): Point spread, positive = team favored
         recent_form_ratio (float or None): Recent form (>1 = hot, <1 = cold)
         season_average (float or None): Player's season average for this stat
+        line_source (str or None): Where the line came from (e.g. 'PrizePicks',
+            'Underdog', 'DraftKings', 'synthetic').  'synthetic' (or None with
+            a suspicious line) will block Goblin classification.
 
     Returns:
         dict: {
@@ -960,6 +984,8 @@ def classify_bet_type(
             'demon': bool,
             'reasons': list[str],    # Why it's a goblin/demon
             'std_devs_from_line': float,   # How many std devs projection is from line
+            'line_verified': bool,         # False if line looks synthetic/unreliable
+            'line_reliability_warning': str | None,  # Human-readable warning if unverified
         }
 
     Example (Goblin):
@@ -970,6 +996,13 @@ def classify_bet_type(
         Back-to-back + spread 14 pts → blowout + fatigue → Demon 👿
     """
     stat_type_lower = str(stat_type).lower() if stat_type else ""
+
+    # ── Apply optional threshold overrides from Settings page ────
+    _goblin_std_thresh  = goblin_min_std_devs if goblin_min_std_devs is not None else GOBLIN_MIN_STD_DEVS_FROM_LINE
+    _goblin_prob_thresh = goblin_min_probability if goblin_min_probability is not None else GOBLIN_MIN_PROBABILITY
+    _goblin_edge_thresh = goblin_min_edge if goblin_min_edge is not None else GOBLIN_MIN_EDGE
+    _demon_conflict     = demon_conflict_ratio if demon_conflict_ratio is not None else DEMON_CONFLICT_RATIO_THRESHOLD
+    _demon_regression   = demon_regression_pct if demon_regression_pct is not None else (DEMON_HOT_STREAK_RATIO * 100.0)
 
     # ── Compute how many std devs the projection is from the line ──
     std_devs_from_line = 0.0
@@ -982,11 +1015,65 @@ def classify_bet_type(
     favorable_std_devs = std_devs_from_line if direction == "OVER" else -std_devs_from_line
 
     # ============================================================
+    # LINE RELIABILITY CHECK
+    # Before classifying as a Goblin we verify that prop_line is a
+    # real, fetched line — not a synthetic/default value (e.g. season
+    # average rounded to 0.5, or a stale placeholder).
+    #
+    # A line is considered UNVERIFIED if:
+    #   - It is zero or negative (clearly missing/default)
+    #   - It is explicitly tagged as 'synthetic' via line_source
+    #   - It is < 25% of the season average (implausibly low)
+    #   - It is > 4× the season average (implausibly high)
+    # ============================================================
+    line_verified = True
+    line_reliability_warning = None
+
+    # Normalise line_source; treat None / missing as unverified
+    _line_source_lower = str(line_source).lower() if line_source is not None else ""
+    _is_synthetic_source = _line_source_lower in (
+        "", "synthetic", "estimated", "default", "none"
+    )
+
+    def _line_ratio_warning(ratio, avg, is_synthetic):
+        """Return a human-readable warning for an out-of-range line ratio."""
+        qualifier = "likely a synthetic/default line" if is_synthetic else "unreliable line"
+        if ratio < GOBLIN_LINE_MIN_RATIO:
+            return (
+                f"Prop line ({prop_line}) is only {ratio*100:.0f}% of season "
+                f"average ({avg:.1f}) — {qualifier}; "
+                "Goblin classification withheld"
+            )
+        if ratio > GOBLIN_LINE_MAX_RATIO:
+            return (
+                f"Prop line ({prop_line}) is {ratio:.1f}× the season "
+                f"average ({avg:.1f}) — {qualifier}; "
+                "Goblin classification withheld"
+            )
+        return None  # Within acceptable bounds
+
+    if prop_line <= 0:
+        line_verified = False
+        line_reliability_warning = (
+            "Prop line is zero or missing — cannot verify Goblin classification"
+        )
+    elif season_average is not None and season_average > 0:
+        # Check ratio for both synthetic and real-platform lines.
+        # Synthetic sources get an additional benefit-of-the-doubt block
+        # even if the ratio looks okay (we can't confirm it's real data).
+        line_ratio = prop_line / season_average
+        _ratio_warn = _line_ratio_warning(line_ratio, season_average, _is_synthetic_source)
+        if _ratio_warn:
+            line_verified = False
+            line_reliability_warning = _ratio_warn
+
+    # ============================================================
     # GOBLIN CHECK
     # A "Goblin bet" requires ALL three conditions to be met:
     #   1. Projection is ≥2 std devs from the line in favorable direction
     #   2. Probability is ≥80%
     #   3. Edge is ≥25%
+    #   4. The prop_line must be verified (not synthetic/default)
     # ============================================================
     is_goblin = False
     goblin_reasons = []
@@ -995,9 +1082,10 @@ def classify_bet_type(
     abs_edge = abs(edge_percentage)
 
     if (
-        favorable_std_devs >= GOBLIN_MIN_STD_DEVS_FROM_LINE
-        and prob_for_direction >= GOBLIN_MIN_PROBABILITY
-        and abs_edge >= GOBLIN_MIN_EDGE
+        line_verified
+        and favorable_std_devs >= _goblin_std_thresh
+        and prob_for_direction >= _goblin_prob_thresh
+        and abs_edge >= _goblin_edge_thresh
     ):
         is_goblin = True
         goblin_reasons.append(
@@ -1006,10 +1094,10 @@ def classify_bet_type(
         )
         goblin_reasons.append(
             f"Model probability: {prob_for_direction*100:.0f}% "
-            f"(threshold: {GOBLIN_MIN_PROBABILITY*100:.0f}%)"
+            f"(threshold: {_goblin_prob_thresh*100:.0f}%)"
         )
         goblin_reasons.append(
-            f"Edge: {abs_edge:.1f}% (threshold: {GOBLIN_MIN_EDGE:.0f}%)"
+            f"Edge: {abs_edge:.1f}% (threshold: {_goblin_edge_thresh:.0f}%)"
         )
 
     if is_goblin:
@@ -1021,6 +1109,8 @@ def classify_bet_type(
             "demon":           False,
             "reasons":         goblin_reasons,
             "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   True,
+            "line_reliability_warning": None,
         }
 
     # ============================================================
@@ -1034,7 +1124,7 @@ def classify_bet_type(
     under_strength = directional_forces_result.get("under_strength", 0)
     if over_strength > 0 and under_strength > 0:
         conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
-        if conflict_ratio >= DEMON_CONFLICT_RATIO_THRESHOLD:
+        if conflict_ratio >= _demon_conflict:
             demon_reasons.append(
                 f"Conflicting forces: OVER ({over_strength:.1f}) vs UNDER ({under_strength:.1f}) "
                 f"are nearly balanced ({conflict_ratio*100:.0f}% overlap) — no clear edge direction"
@@ -1059,9 +1149,10 @@ def classify_bet_type(
     # Pattern 4: Line set at recent hot streak value likely to regress
     # If recent form ratio is very high (player on hot streak) AND the line
     # is already pushed up to match that hot streak, regression is likely.
+    _hot_streak_ratio_threshold = _demon_regression / 100.0  # convert pct → ratio
     if (
         recent_form_ratio is not None
-        and recent_form_ratio >= DEMON_HOT_STREAK_RATIO
+        and recent_form_ratio >= _hot_streak_ratio_threshold
         and season_average is not None
         and season_average > 0
         and prop_line > 0
@@ -1069,7 +1160,7 @@ def classify_bet_type(
         # The line is inflated to match the hot streak — but the hot streak
         # itself makes it a regression candidate
         line_vs_avg_ratio = prop_line / season_average if season_average > 0 else 1.0
-        if line_vs_avg_ratio >= DEMON_HOT_STREAK_RATIO:
+        if line_vs_avg_ratio >= _hot_streak_ratio_threshold:
             demon_reasons.append(
                 f"Line ({prop_line}) inflated to match recent hot streak "
                 f"(recent form {recent_form_ratio:.2f}x, season avg {season_average:.1f}) — "
@@ -1087,6 +1178,8 @@ def classify_bet_type(
             "demon":           True,
             "reasons":         demon_reasons,
             "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   line_verified,
+            "line_reliability_warning": line_reliability_warning,
         }
 
     # Normal bet — no special classification
@@ -1098,6 +1191,8 @@ def classify_bet_type(
         "demon":           False,
         "reasons":         [],
         "std_devs_from_line": round(std_devs_from_line, 2),
+        "line_verified":   line_verified,
+        "line_reliability_warning": line_reliability_warning,
     }
 
 

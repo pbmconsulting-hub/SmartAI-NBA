@@ -127,30 +127,117 @@ if result.get("status") == "no_data":
 st.success(result.get("message", "Backtest complete."))
 
 # ── Top-level Metrics ─────────────────────────────────────────
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("Total Picks", result["total_picks"])
-c2.metric("Wins", result["wins"])
-c3.metric("Losses", result["losses"])
-c4.metric("Win Rate", f"{result['win_rate']*100:.1f}%")
-c5.metric("ROI", f"{result['roi']*100:.2f}%", delta=f"${result['total_pnl']:.2f} P&L")
+c2.metric("Wins ✅", result["wins"])
+c3.metric("Losses ❌", result["losses"])
+c4.metric("Win Rate", f"{result['win_rate']*100:.1f}%",
+          delta=f"{(result['win_rate'] - 0.5238)*100:+.1f}% vs breakeven")
+c5.metric("ROI", f"{result['roi']*100:.2f}%",
+          delta=f"${result['total_pnl']:.2f} P&L")
+_sharpe = result.get("sharpe_ratio", 0.0)
+c6.metric("Sharpe Ratio", f"{_sharpe:.3f}",
+          delta="✅ Good" if _sharpe > 1.0 else ("⚠️ Fair" if _sharpe > 0 else "❌ Bad"),
+          delta_color="off")
+_dd = result.get("max_drawdown", 0.0)
+c7.metric("Max Drawdown", f"{_dd:.2f}u",
+          delta="Peak-to-trough units", delta_color="off")
 
 st.divider()
 
-# ── By Tier ───────────────────────────────────────────────────
-col_left, col_right = st.columns(2)
+# ── Sharpe / Drawdown / OOS Explainer ────────────────────────
+with st.expander("📖 Understanding Sharpe Ratio, Drawdown & Out-of-Sample", expanded=False):
+    st.markdown("""
+    **Sharpe Ratio** measures return-per-unit-of-risk (consistency).
+    - > 2.0 = Excellent (consistent profitable edge)
+    - 1.0–2.0 = Good
+    - 0–1.0 = Fair (profitable but with variance)
+    - < 0 = Strategy is losing money
 
-with col_left:
-    st.subheader("📊 Win Rate by Tier")
+    **Max Drawdown** is the worst peak-to-trough decline in cumulative units.
+    - -5 means the strategy fell 5 units from its best point before recovering.
+    - Smaller (less negative) is better.
+
+    **Out-of-Sample (OOS) Split**: The pick log is split 70% in-sample / 30% OOS.
+    - If OOS win rate ≈ in-sample win rate, the model generalizes well.
+    - If OOS is significantly lower, the model may be overfit to historical data.
+    """)
+
+# ── In-Sample vs Out-of-Sample ────────────────────────────────
+oos = result.get("oos_metrics", {})
+if oos and oos.get("oos_picks", 0) > 0:
+    st.subheader("🔬 In-Sample vs Out-of-Sample Validation")
+    oos_col1, oos_col2, oos_col3, oos_col4 = st.columns(4)
+    oos_col1.metric("In-Sample Picks", oos.get("is_picks", 0))
+    oos_col2.metric("In-Sample Win Rate", f"{oos.get('is_win_rate', 0)*100:.1f}%")
+    oos_col3.metric("OOS Picks", oos.get("oos_picks", 0))
+    _oos_wr  = oos.get("oos_win_rate", 0)
+    _is_wr   = oos.get("is_win_rate", 0)
+    _wr_gap  = (_oos_wr - _is_wr) * 100
+    oos_col4.metric(
+        "OOS Win Rate",
+        f"{_oos_wr*100:.1f}%",
+        delta=f"{_wr_gap:+.1f}% vs in-sample",
+        delta_color="normal",
+    )
+    if abs(_wr_gap) < 3:
+        st.success("✅ Model generalizes well — OOS win rate is within 3% of in-sample rate.")
+    elif _wr_gap < -5:
+        st.warning(
+            f"⚠️ OOS win rate is {abs(_wr_gap):.1f}% below in-sample. "
+            "The model may be overfit — check if thresholds need adjustment."
+        )
+    else:
+        st.info(f"ℹ️ OOS win rate gap: {_wr_gap:+.1f}%")
+
+st.divider()
+
+# ── Cumulative P&L Chart ──────────────────────────────────────
+pick_log = result.get("pick_log", [])
+if pick_log:
+    st.subheader("📈 Cumulative P&L Curve")
+    # Build cumulative P&L series
+    _PAYOUT = 0.909  # -110 win payout per unit
+    _cumulative = 0.0
+    _pnl_series = []
+    _dates_seen  = []
+    for _p in pick_log:
+        _cumulative += _PAYOUT if _p["correct"] else -1.0
+        _pnl_series.append(round(_cumulative, 2))
+        _dates_seen.append(_p.get("date", ""))
+
+    # Simple ASCII-style chart using Streamlit's built-in line_chart
+    # We use st.line_chart with a dict of {pick_index: pnl}
+    _chart_data = {
+        "Cumulative P&L (units)": _pnl_series,
+    }
+    st.line_chart(_chart_data, height=260)
+    st.caption(
+        f"📊 {len(pick_log)} picks · "
+        f"Final: {_cumulative:+.2f} units · "
+        f"ROI: {result['roi']*100:+.2f}% per pick"
+    )
+
+    st.divider()
+
+# ── By Tier ───────────────────────────────────────────────────
+with st.expander("📊 Win Rate & ROI by Model Tier", expanded=True):
     tier_data = result.get("tier_win_rates", {})
     if tier_data:
         rows = []
         for tier, d in tier_data.items():
             if d["picks"] > 0:
+                _roi_pct = d.get("roi", 0.0) * 100
+                _pnl = d.get("pnl", 0.0)
                 rows.append({
                     "Tier": tier,
                     "Picks": d["picks"],
                     "Wins": d["wins"],
+                    "Losses": d["picks"] - d["wins"],
                     "Win Rate": f"{d['win_rate']*100:.1f}%",
+                    "ROI/pick": f"{_roi_pct:+.2f}%",
+                    "P&L (units)": f"{_pnl:+.2f}",
+                    "Profitable": "✅" if _roi_pct > 0 else "❌",
                 })
         if rows:
             st.dataframe(rows, hide_index=True, use_container_width=True)
@@ -159,18 +246,20 @@ with col_left:
     else:
         st.caption("No tier data available.")
 
-with col_right:
-    st.subheader("📈 Win Rate by Stat Type")
+# ── By Stat Type ─────────────────────────────────────────────
+with st.expander("📈 Win Rate by Stat Type", expanded=True):
     stat_data = result.get("stat_win_rates", {})
     if stat_data:
         rows = []
-        for stat, d in stat_data.items():
+        for stat, d in sorted(stat_data.items(), key=lambda x: -x[1]["wins"]):
             if d["picks"] > 0:
                 rows.append({
                     "Stat": stat.capitalize(),
                     "Picks": d["picks"],
                     "Wins": d["wins"],
+                    "Losses": d["picks"] - d["wins"],
                     "Win Rate": f"{d['win_rate']*100:.1f}%",
+                    "Above 52%": "✅" if d["win_rate"] > 0.52 else "❌",
                 })
         if rows:
             st.dataframe(rows, hide_index=True, use_container_width=True)
@@ -180,42 +269,56 @@ with col_right:
         st.caption("No stat data available.")
 
 # ── By Edge Bucket ────────────────────────────────────────────
-st.subheader("🎯 Win Rate by Edge Bucket")
-edge_data = result.get("edge_win_rates", {})
-if edge_data:
-    rows = []
-    for label, d in edge_data.items():
-        if d["picks"] > 0:
-            rows.append({
-                "Edge Range": label,
-                "Picks": d["picks"],
-                "Wins": d["wins"],
-                "Win Rate": f"{d['win_rate']*100:.1f}%",
-            })
-    if rows:
-        st.dataframe(rows, hide_index=True, use_container_width=True)
-    else:
-        st.caption("No picks in any edge bucket.")
+with st.expander("🎯 Win Rate by Edge Bucket", expanded=True):
+    edge_data = result.get("edge_win_rates", {})
+    if edge_data:
+        rows = []
+        for label, d in edge_data.items():
+            if d["picks"] > 0:
+                rows.append({
+                    "Edge Range": label,
+                    "Picks": d["picks"],
+                    "Wins": d["wins"],
+                    "Win Rate": f"{d['win_rate']*100:.1f}%",
+                    "Insight": (
+                        "✅ Higher edge = higher win rate (healthy)" if d["win_rate"] > 0.55
+                        else "⚠️ Expected >55% win rate at this edge level"
+                    ),
+                })
+        if rows:
+            st.dataframe(rows, hide_index=True, use_container_width=True)
+        else:
+            st.caption("No picks in any edge bucket.")
+
+st.divider()
 
 # ── Pick Log ──────────────────────────────────────────────────
-st.divider()
-st.subheader("📋 Recent Pick Log (last 200)")
-pick_log = result.get("pick_log", [])
-if pick_log:
-    display = []
-    for p in reversed(pick_log):
-        display.append({
-            "Date": p["date"],
-            "Player": p["player"],
-            "Stat": p["stat"].capitalize(),
-            "Line": p["line"],
-            "Actual": p["actual"],
-            "Direction": p["direction"],
-            "Result": "✅ WIN" if p["correct"] else "❌ LOSS",
-            "Prob": f"{p['model_prob']*100:.1f}%",
-            "Tier": p["tier"],
-            "Edge": f"{p['edge']*100:.1f}%",
-        })
-    st.dataframe(display, hide_index=True, use_container_width=True)
-else:
-    st.caption("No picks in the log.")
+with st.expander("📋 Full Pick Log (last 200)", expanded=False):
+    if pick_log:
+        display = []
+        for p in reversed(pick_log):
+            display.append({
+                "Date": p["date"],
+                "Player": p["player"],
+                "Stat": p["stat"].capitalize(),
+                "Line": p["line"],
+                "Actual": p["actual"],
+                "Direction": p["direction"],
+                "Result": "✅ WIN" if p["correct"] else "❌ LOSS",
+                "Prob": f"{p['model_prob']*100:.1f}%",
+                "Tier": p["tier"],
+                "Edge": f"{p['edge']*100:.1f}%",
+            })
+        st.dataframe(display, hide_index=True, use_container_width=True)
+
+        # Download button for the pick log
+        import json as _json
+        _log_json = _json.dumps(pick_log, indent=2)
+        st.download_button(
+            "⬇️ Download Pick Log (JSON)",
+            data=_log_json,
+            file_name=f"backtest_pick_log_{result.get('season','')}.json",
+            mime="application/json",
+        )
+    else:
+        st.caption("No picks in the log.")

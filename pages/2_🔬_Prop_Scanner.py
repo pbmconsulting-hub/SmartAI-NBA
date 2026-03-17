@@ -575,9 +575,30 @@ if _display_props_enriched:
             "Line": line,
             "Season Avg": round(season_avg, 1) if season_avg else "—",
             "Line Context": line_ctx if season_avg else "—",
+            "Value Signal": (
+                "🔥 Low Line" if season_avg and line_diff < -12 else
+                "⚠️ High Line" if season_avg and line_diff > 15 else
+                "✅ Fair" if season_avg else "—"
+            ),
             "Platform": platform,
             "Date": prop.get("game_date", ""),
         })
+
+    # ── Quick Value Summary Banner ─────────────────────────────────
+    _low_count  = sum(1 for r in display_rows if r.get("Value Signal", "").startswith("🔥"))
+    _high_count = sum(1 for r in display_rows if r.get("Value Signal", "").startswith("⚠️"))
+    _fair_count = sum(1 for r in display_rows if r.get("Value Signal", "").startswith("✅"))
+    if _low_count + _high_count + _fair_count > 0:
+        st.markdown(
+            f'<div style="background:rgba(0,240,255,0.05);border:1px solid rgba(0,240,255,0.15);'
+            f'border-radius:6px;padding:8px 14px;margin-bottom:8px;font-size:0.83rem;color:#c0d0e8;">'
+            f'📊 <strong>Line Value Summary:</strong> &nbsp; '
+            f'<span style="color:#00ff9d;font-weight:700;">🔥 {_low_count} Low (OVER value)</span> &nbsp;·&nbsp; '
+            f'<span style="color:#69b4ff;font-weight:600;">✅ {_fair_count} Fair</span> &nbsp;·&nbsp; '
+            f'<span style="color:#ff9966;font-weight:700;">⚠️ {_high_count} High (UNDER value)</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     st.dataframe(
         display_rows,
