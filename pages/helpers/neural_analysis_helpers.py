@@ -23,6 +23,15 @@ from styles.theme import (
     get_qds_prop_card_html,
 )
 
+# Prefix used to identify composite fantasy-score stat types.
+# Change here propagates everywhere in this module.
+_FANTASY_SCORE_STAT_PREFIX = "fantasy_score"
+
+
+def _is_fantasy_score_stat(stat_type: str) -> bool:
+    """Return True if *stat_type* is a composite fantasy-score stat."""
+    return str(stat_type).startswith(_FANTASY_SCORE_STAT_PREFIX)
+
 
 def find_game_context_for_player(player_team, todays_games_list):
     """
@@ -161,7 +170,7 @@ def _build_entry_strategy(results):
         and not r.get("player_is_out", False)
         and abs(r.get("edge_percentage", 0)) >= 3.0
         # Exclude fantasy-score composite stats from parlay legs
-        and not str(r.get("stat_type", "")).startswith("fantasy_score")
+        and not _is_fantasy_score_stat(r.get("stat_type", ""))
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
