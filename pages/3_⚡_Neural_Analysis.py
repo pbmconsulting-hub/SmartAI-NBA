@@ -57,6 +57,28 @@ except ImportError:
     calculate_matchup_adjustment = None
     get_matchup_force_signal = None
 
+try:
+    from engine.ensemble import get_ensemble_projection  # Ensemble 3-model blend
+    _ensemble_available = True
+except ImportError:
+    _ensemble_available = False
+    get_ensemble_projection = None
+
+try:
+    from engine.game_script import simulate_game_script, blend_with_flat_simulation  # Game script blend
+    _game_script_available = True
+except ImportError:
+    _game_script_available = False
+    simulate_game_script = None
+    blend_with_flat_simulation = None
+
+try:
+    from engine.minutes_model import project_player_minutes  # Precise minutes projection
+    _minutes_model_available = True
+except ImportError:
+    _minutes_model_available = False
+    project_player_minutes = None
+
 # Import data loading functions
 from data.data_manager import (
     load_players_data,
@@ -761,6 +783,56 @@ def display_prop_analysis_card_qds(result):
     dir_label  = "Over" if direction == "OVER" else "Under"
     prop_text  = f"{stat_emoji} {dir_label} {line} {stat.title()}"
 
+    # ── Ensemble / model badges ───────────────────────────────────
+    _ensemble_used    = result.get("ensemble_used", False)
+    _ensemble_models  = result.get("ensemble_models", 1)
+    _ens_disagree     = result.get("ensemble_disagreement", "")
+    _projected_mins   = result.get("projected_minutes")
+    _season_avg_show  = float(result.get(f"season_{stat}_avg",
+                          result.get(f"{stat}_avg", 0) or 0))
+    # Derive the per-stat season avg from the player's stored data
+    if _season_avg_show == 0:
+        _stat_avg_key_map = {
+            "points": "season_pts_avg", "rebounds": "season_reb_avg",
+            "assists": "season_ast_avg",
+        }
+        _season_avg_show = float(result.get(_stat_avg_key_map.get(stat, ""), 0) or 0)
+
+    _meta_badges = []
+    if _ensemble_used and _ensemble_models >= 2:
+        _meta_badges.append(
+            f'<span style="background:rgba(0,168,255,0.15);color:#29b6f6;padding:2px 7px;'
+            f'border-radius:4px;font-size:0.72rem;font-weight:700;border:1px solid rgba(0,168,255,0.3);">'
+            f'🧬 {_ensemble_models}-Model Ensemble</span>'
+        )
+    if _projected_mins:
+        _meta_badges.append(
+            f'<span style="background:rgba(0,200,83,0.12);color:#69f0ae;padding:2px 7px;'
+            f'border-radius:4px;font-size:0.72rem;font-weight:700;border:1px solid rgba(0,200,83,0.2);">'
+            f'⏱️ Proj. {_projected_mins:.0f} min</span>'
+        )
+    if _season_avg_show > 0:
+        _gap = line - _season_avg_show
+        _gap_color = "#ff6b6b" if _gap > 0 else "#69f0ae"
+        _meta_badges.append(
+            f'<span style="background:rgba(255,255,255,0.04);color:{_gap_color};padding:2px 7px;'
+            f'border-radius:4px;font-size:0.72rem;border:1px solid rgba(255,255,255,0.08);">'
+            f'Season avg: {_season_avg_show:.1f} · Line gap: {_gap:+.1f}</span>'
+        )
+    if _ens_disagree and ("disagree" in _ens_disagree.lower() or "⚠️" in _ens_disagree):
+        _meta_badges.append(
+            f'<span style="background:rgba(255,165,0,0.12);color:#ffa726;padding:2px 7px;'
+            f'border-radius:4px;font-size:0.72rem;font-weight:700;border:1px solid rgba(255,165,0,0.25);">'
+            f'⚠️ Model Disagree</span>'
+        )
+    if _meta_badges:
+        st.markdown(
+            f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">'
+            + "".join(_meta_badges)
+            + f'</div>',
+            unsafe_allow_html=True,
+        )
+
     # ── Build metrics & bonus factors ────────────────────────────
     metrics       = _build_result_metrics(result)
     bonus_factors = _build_bonus_factors(result)
@@ -792,22 +864,105 @@ def display_prop_analysis_card_qds(result):
     selected_picks = st.session_state.get("selected_picks", [])
     already_added  = any(p.get("key") == pick_key for p in selected_picks)
 
-    btn_label    = "✅ Added" if already_added else "➕ Add to Entry"
-    btn_disabled = already_added
-    if st.button(btn_label, key=f"add_pick_{pick_key}", disabled=btn_disabled):
-        st.session_state["selected_picks"].append({
-            "key":             pick_key,
-            "player_name":     player,
-            "stat_type":       stat,
-            "line":            line,
-            "direction":       direction,
-            "confidence_score": confidence,
-            "tier":            tier,
-            "tier_emoji":      tier_icon,
-            "platform":        platform,
-            "edge_percentage": result.get("edge_percentage", 0),
-        })
-        st.rerun()
+    _btn_col, _detail_col = st.columns([1, 2])
+    with _btn_col:
+        btn_label    = "✅ Added" if already_added else "➕ Add to Entry"
+        btn_disabled = already_added
+        if st.button(btn_label, key=f"add_pick_{pick_key}", disabled=btn_disabled):
+            st.session_state["selected_picks"].append({
+                "key":             pick_key,
+                "player_name":     player,
+                "stat_type":       stat,
+                "line":            line,
+                "direction":       direction,
+                "confidence_score": confidence,
+                "tier":            tier,
+                "tier_emoji":      tier_icon,
+                "platform":        platform,
+                "edge_percentage": result.get("edge_percentage", 0),
+            })
+            st.rerun()
+
+    with _detail_col:
+        # Quick stats pill row
+        _prob_pct = result.get("probability_over", 0.5) * 100 if direction == "OVER" else (1 - result.get("probability_over", 0.5)) * 100
+        _edge_pct = result.get("edge_percentage", 0)
+        _proj_val = result.get("adjusted_projection", 0)
+        _gp = result.get("games_played")
+        _gp_str = f" · {_gp}G" if _gp else ""
+        st.caption(
+            f"📊 Prob: {_prob_pct:.0f}% · Edge: {_edge_pct:+.1f}% · "
+            f"Proj: {_proj_val:.1f}{_gp_str}"
+        )
+
+    # ── Confidence Score Breakdown Expander ───────────────────────
+    _score_bd = result.get("score_breakdown", {})
+    _forces = result.get("forces", {})
+    _over_forces_list  = _forces.get("over_forces",  []) or []
+    _under_forces_list = _forces.get("under_forces", []) or []
+    _avoid_reasons = result.get("avoid_reasons", []) or []
+    _tm_notes = result.get("teammate_out_notes", []) or []
+    _ens_weights = result.get("ensemble_model_weights", {}) or {}
+
+    with st.expander(f"🔬 SAFE Score™ Breakdown — {confidence:.0f}/100", expanded=False):
+        # Score breakdown table
+        if _score_bd:
+            _bd_rows = []
+            for _factor, _pts in sorted(_score_bd.items(), key=lambda x: abs(x[1] or 0), reverse=True):
+                _pts_val = _pts or 0
+                _bd_rows.append({
+                    "Factor": _factor.replace("_", " ").title(),
+                    "Points": f"{_pts_val:+.1f}",
+                    "Impact": "✅ Boost" if _pts_val > 0 else ("❌ Penalty" if _pts_val < 0 else "➡️ Neutral"),
+                })
+            st.dataframe(_bd_rows, hide_index=True, use_container_width=True)
+        else:
+            st.caption("Score breakdown not available for this pick.")
+
+        # Directional forces summary
+        if _over_forces_list or _under_forces_list:
+            _fc1, _fc2 = st.columns(2)
+            with _fc1:
+                st.markdown(
+                    f'<div style="color:#00ff9d;font-size:0.8rem;font-weight:700;">⬆️ OVER Forces ({len(_over_forces_list)})</div>',
+                    unsafe_allow_html=True,
+                )
+                for _f in _over_forces_list[:5]:
+                    _fname = _f.get("name", _f.get("force", "")) if isinstance(_f, dict) else str(_f)
+                    st.markdown(f'<div style="color:#a0d0b0;font-size:0.77rem;">• {_html.escape(str(_fname))}</div>', unsafe_allow_html=True)
+            with _fc2:
+                st.markdown(
+                    f'<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">⬇️ UNDER Forces ({len(_under_forces_list)})</div>',
+                    unsafe_allow_html=True,
+                )
+                for _f in _under_forces_list[:5]:
+                    _fname = _f.get("name", _f.get("force", "")) if isinstance(_f, dict) else str(_f)
+                    st.markdown(f'<div style="color:#d0a0a0;font-size:0.77rem;">• {_html.escape(str(_fname))}</div>', unsafe_allow_html=True)
+
+        # Ensemble model weights (if used)
+        if _ens_weights:
+            _wt_parts = [f"{k.replace('_', ' ').title()}: {v*100:.0f}%" for k, v in _ens_weights.items() if v > 0]
+            if _wt_parts:
+                st.caption(f"🧬 Ensemble weights: {' · '.join(_wt_parts)}")
+
+        # Teammate boost notes
+        if _tm_notes:
+            for _tn in _tm_notes[:3]:
+                st.caption(f"💪 {_tn}")
+
+        # Projected minutes
+        _proj_min = result.get("projected_minutes")
+        if _proj_min:
+            st.caption(f"⏱️ Projected minutes: **{_proj_min:.0f}** (minutes model)")
+
+        # Avoid reasons (if any)
+        if _avoid_reasons:
+            for _ar in _avoid_reasons[:3]:
+                st.markdown(
+                    f'<div style="color:#ff9966;font-size:0.78rem;background:rgba(255,80,0,0.08);'
+                    f'border-radius:4px;padding:4px 8px;margin-top:3px;">⚠️ {_html.escape(str(_ar))}</div>',
+                    unsafe_allow_html=True,
+                )
 
     # ── Full Breakdown (QDS-styled HTML rendered via iframe to avoid st.markdown stripping) ─
     breakdown_html = _render_qds_full_breakdown_html(result)
@@ -881,11 +1036,49 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Green arrows = factors pushing OVER (weak defense, fast pace, etc.)
     - Red arrows = factors pushing UNDER (tough defense, injury risk, etc.)
     
+    **Ensemble Model 🧬:**
+    - When game logs are available, the 3-model ensemble is used (season avg + recent form + matchup history)
+    - `🧬 Ensemble` badge on result cards means blended projection was used
+    - Model disagreement reduces confidence automatically
+    
     💡 **Pro Tips:**
     - Focus on Platinum and Gold tier picks for best results
     - Avoid picks with ⚠️ "should avoid" flags
     - Select picks to send to Entry Builder for parlay optimization
+    - Run **Smart Update** on the Data Feed page before each session for freshest data
     """)
+
+# ── Data Freshness Banner ─────────────────────────────────────
+# Show a warning if players.csv is stale (>24 hours old).
+# Stale data is the #1 source of inaccurate projections.
+try:
+    import os as _os_check
+    _players_csv = _os_check.path.join(
+        _os_check.path.dirname(_os_check.path.dirname(__file__)), "data", "players.csv"
+    )
+    if _os_check.path.exists(_players_csv):
+        _players_age_h = (
+            datetime.datetime.now().timestamp()
+            - _os_check.path.getmtime(_players_csv)
+        ) / 3600.0
+        if _players_age_h > 48:
+            st.error(
+                f"🚨 **Player data is {_players_age_h:.0f}h old!** "
+                "Go to **📡 Data Feed** → Smart Update to refresh. "
+                "Stale data severely reduces projection accuracy."
+            )
+        elif _players_age_h > 24:
+            st.warning(
+                f"⚠️ **Player data is {_players_age_h:.0f}h old.** "
+                "Consider running a **Smart Update** on the Data Feed page for the most accurate projections."
+            )
+        elif _players_age_h < 2:
+            st.success(
+                f"✅ Player data is fresh ({_players_age_h*60:.0f} minutes old). "
+                "Projections are using current stats."
+            )
+except Exception:
+    pass  # Non-critical check
 
 # ── Matchup header (shown when games are configured) ──────────
 if len(todays_games) == 1:
@@ -1290,6 +1483,34 @@ if run_analysis:
             teammates_data=players_data,
         )
 
+        # ── Precise Minutes Projection (minutes_model.py) ─────────
+        # Use the dedicated minutes model to get a more accurate minutes estimate
+        # before running the full stat projection. The minutes projection
+        # accounts for blowout spread, back-to-back, teammate injuries, and pace.
+        _precise_minutes = None
+        if _minutes_model_available and project_player_minutes is not None:
+            try:
+                _teammate_status = {
+                    k: v.get("status", "Active")
+                    for k, v in injury_map.items()
+                } if injury_map else None
+                _min_result = project_player_minutes(
+                    player_data=player_data,
+                    game_context={
+                        "opponent": game_context.get("opponent", ""),
+                        "is_home": game_context.get("is_home", True),
+                        "vegas_spread": game_context.get("vegas_spread", 0.0),
+                        "game_total": game_context.get("game_total", 220.0),
+                        "rest_days": game_context.get("rest_days", 2),
+                        "back_to_back": game_context.get("back_to_back", False),
+                    },
+                    teammate_status=_teammate_status,
+                    game_logs=recent_form_games if recent_form_games else None,
+                )
+                _precise_minutes = _min_result.get("projected_minutes")
+            except Exception:
+                _precise_minutes = None
+
         projection_result  = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=game_context.get("opponent", ""),
@@ -1304,11 +1525,58 @@ if run_analysis:
             teammate_out_notes=teammate_boost_notes,
         )
 
+        # ── Ensemble Model Override (3-model blend) ────────────────
+        # When game logs are available, run the full ensemble model (Model A:
+        # season avg + context, Model B: recent form, Model C: matchup history)
+        # and use the blended projection as the primary projected_stat.
+        # This is more accurate than a single model approach.
+        _ensemble_result = None
+        _ensemble_penalty = 0.0
+        if _ensemble_available and get_ensemble_projection is not None and stat_type not in (
+            "double_double", "triple_double"
+        ):
+            try:
+                _ens_ctx = {
+                    "stat_type": stat_type,
+                    "opponent": game_context.get("opponent", ""),
+                    "is_home": game_context.get("is_home", True),
+                    "rest_factor": projection_result.get("rest_factor", 1.0),
+                    "pace_factor": projection_result.get("pace_factor", 1.0),
+                    "defense_factor": projection_result.get("defense_factor", 1.0),
+                }
+                _ensemble_result = get_ensemble_projection(
+                    player_data=player_data,
+                    game_context=_ens_ctx,
+                    game_logs=recent_form_games if len(recent_form_games or []) >= 3 else None,
+                )
+                _ensemble_penalty = _ensemble_result.get("confidence_adjustment", 0.0)
+            except Exception:
+                _ensemble_result = None
+                _ensemble_penalty = 0.0
+
         stat_std      = get_stat_standard_deviation(player_data, stat_type)
         projected_stat = projection_result.get(
             f"projected_{stat_type}",
             float(player_data.get(f"{stat_type}_avg", prop_line))
         )
+
+        # ── Apply Ensemble Projection Override ───────────────────
+        # When the ensemble produced a blended projection, use it to
+        # override the single-model projected_stat. The ensemble blends
+        # season-avg, recent-form, and matchup-history models with
+        # inverse-variance weighting — consistently more accurate.
+        _ensemble_used = False
+        if (_ensemble_result is not None
+                and stat_type not in ("double_double", "triple_double")
+                and stat_type not in list(COMBO_STAT_TYPES) + list(FANTASY_STAT_TYPES)):
+            _ens_proj = _ensemble_result.get("ensemble_projection", 0)
+            _ens_std  = _ensemble_result.get("ensemble_std", 0)
+            if _ens_proj and _ens_proj > 0:
+                projected_stat = _ens_proj
+                _ensemble_used = True
+                # Blend ensemble std with base std for richer variance estimate
+                if _ens_std > 0:
+                    stat_std = (_ens_std + stat_std) / 2.0
 
         # ── C8: Minutes-Stat Correlation — pass projected_minutes to sim ─
         # ── C11: KDE from Game Logs — pass recent_game_logs to sim ──────
@@ -1426,17 +1694,73 @@ if run_analysis:
 
         else:
             # Simple stat: standard Quantum Matrix Engine 5.6 simulation (C5 skew-normal, C8 minutes, C11 KDE)
+            _flat_sim_minutes = _precise_minutes or projection_result.get("projected_minutes")
             simulation_output = run_monte_carlo_simulation(
                 projected_stat_average=projected_stat,
                 stat_standard_deviation=stat_std,
                 prop_line=prop_line,
                 number_of_simulations=simulation_depth,
                 stat_type=stat_type,
-                projected_minutes=projection_result.get("projected_minutes"),
+                projected_minutes=_flat_sim_minutes,
                 minutes_std=4.0,
                 recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
                 **_sim_kwargs,
             )
+
+            # ── Game Script Blend (30% game-script + 70% flat) ────
+            # For simple stats, blend in the game-script simulation to
+            # capture within-game dynamics (blowout minutes cuts, close
+            # game OT boosts) that the flat model misses.
+            # IMPORTANT: We update the simulated_mean/std but keep all
+            # other keys (probability_over, percentiles, etc.) from the
+            # flat simulation since blend_with_flat_simulation only
+            # provides mean/std — no probability recalculation.
+            if _game_script_available and simulate_game_script is not None:
+                try:
+                    _gs_proj_dict = {
+                        "projected_stat":    projected_stat,
+                        "projected_minutes": _flat_sim_minutes or 32.0,
+                        "stat_std":          stat_std,
+                    }
+                    _gs_ctx = {
+                        "vegas_spread": game_context.get("vegas_spread", 0.0),
+                        "game_total":   game_context.get("game_total", 220.0),
+                        "is_home":      game_context.get("is_home", True),
+                        "stat_type":    stat_type,
+                    }
+                    _gs_result = simulate_game_script(
+                        player_projection=_gs_proj_dict,
+                        game_context=_gs_ctx,
+                        num_simulations=min(500, simulation_depth),
+                    )
+                    # game_script returns 'simulated_values' not 'simulated_results'
+                    if _gs_result and _gs_result.get("simulated_values"):
+                        # blend_with_flat_simulation expects 'mean'/'std' keys,
+                        # but simulation.py returns 'simulated_mean'/'simulated_std'.
+                        # Build a normalized flat dict for the blend function.
+                        _flat_for_blend = {
+                            "mean": simulation_output.get(
+                                "simulated_mean",
+                                simulation_output.get("mean", 0.0)
+                            ),
+                            "std": simulation_output.get(
+                                "simulated_std",
+                                simulation_output.get("std", 0.0)
+                            ),
+                        }
+                        _blended = blend_with_flat_simulation(
+                            game_script_results=_gs_result,
+                            flat_simulation_results=_flat_for_blend,
+                        )
+                        if _blended and _blended.get("blended_mean", 0) > 0:
+                            # Merge blended mean/std back into simulation_output
+                            # without overwriting probability keys
+                            simulation_output = dict(simulation_output)
+                            simulation_output["simulated_mean"] = _blended["blended_mean"]
+                            simulation_output["simulated_std"]  = _blended["blended_std"]
+                            simulation_output["game_script_applied"] = True
+                except Exception:
+                    pass  # Game script is additive — never block main flow
 
         forces_result = analyze_directional_forces(
             player_data=player_data,
@@ -1506,6 +1830,11 @@ if run_analysis:
             trap_line_penalty=trap_line_penalty,
             calibration_adjustment=calibration_adj,  # C10
         )
+
+        # ── Apply ensemble model-disagreement penalty to confidence ─
+        if _ensemble_penalty > 0:
+            _cur_conf = confidence_output.get("confidence_score", 50)
+            confidence_output["confidence_score"] = max(0.0, _cur_conf - _ensemble_penalty)
 
         # C12: Closing Line Value — record the model's opening projection and
         # recommendation at analysis time.  Callers can later call
@@ -1632,9 +1961,20 @@ if run_analysis:
             "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
             "minutes_trend":           _minutes_trend,
             "minutes_trend_indicator": _minutes_trend_indicator,
+            "projected_minutes":       round(_precise_minutes, 1) if _precise_minutes else None,
             "player_is_out":    False,
             "player_status":    player_status,
             "player_status_note": player_status_info.get("injury_note", ""),
+            # Ensemble model metadata
+            "ensemble_used":       _ensemble_used,
+            "ensemble_models":     _ensemble_result.get("effective_models", 1) if _ensemble_result else 1,
+            "ensemble_disagreement": (
+                _ensemble_result.get("disagreement", {}).get("description", "")
+                if _ensemble_result else ""
+            ),
+            "ensemble_model_weights": (
+                _ensemble_result.get("model_weights", {}) if _ensemble_result else {}
+            ),
         }
 
         # ── Goblin / Demon Bet Classification ────────────────────────
@@ -1647,6 +1987,14 @@ if run_analysis:
             # Props with no platform or marked as estimated are treated as
             # synthetic to prevent garbage-in/garbage-out Goblin awards.
             _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
+            # Pull user-configured thresholds from session state (set on Settings page)
+            _ss = st.session_state
+            _g_std  = _ss.get("goblin_min_std_devs")
+            _g_prob = (_ss.get("goblin_min_probability_pct", 80.0) / 100.0
+                       if _ss.get("goblin_min_probability_pct") is not None else None)
+            _g_edge = _ss.get("goblin_min_edge_pct")
+            _d_conf = _ss.get("demon_conflict_ratio")
+            _d_regr = _ss.get("demon_regression_pct")
             _bet_classification = classify_bet_type(
                 probability_over=probability_over,
                 edge_percentage=edge_pct,
@@ -1660,6 +2008,11 @@ if run_analysis:
                 recent_form_ratio=projection_result.get("recent_form_ratio"),
                 season_average=_season_avg_for_classify,
                 line_source=_line_source,
+                goblin_min_std_devs=_g_std,
+                goblin_min_probability=_g_prob,
+                goblin_min_edge=_g_edge,
+                demon_conflict_ratio=_d_conf,
+                demon_regression_pct=_d_regr,
             )
             full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
             full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
@@ -2548,13 +2901,62 @@ if analysis_results:
 
     st.divider()
 
-    # ── Prop Cards (sorted by confidence) ────────────────────────
-    for result in displayed_results:
-        display_prop_analysis_card_qds(result)
+    # ── Prop Cards — grouped by player when 10+ results ──────────
+    # When there are many props (10+), group them by player with
+    # collapsible expanders to keep the page scannable.
+    # Fewer than 10 props display in a flat list as before.
+    _PLAYER_GROUP_THRESHOLD = 10
+    _non_out_display = [r for r in displayed_results if not r.get("player_is_out", False)]
+    _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
+
+    if len(_non_out_display) >= _PLAYER_GROUP_THRESHOLD:
+        # Group by player
+        _by_player: dict = {}
+        for _r in _non_out_display:
+            _pname = _r.get("player_name", "Unknown")
+            _by_player.setdefault(_pname, []).append(_r)
+
         st.markdown(
-            '<div style="height:6px;"></div>',
+            f'<div style="font-size:0.82rem;color:#8a9bb8;margin-bottom:10px;">'
+            f'📊 {len(_non_out_display)} picks across {len(_by_player)} player(s). '
+            f'Grouped by player — click to expand.'
+            f'</div>',
             unsafe_allow_html=True,
         )
+
+        for _pname, _pgroup in _by_player.items():
+            _best_conf = max(r.get("confidence_score", 0) for r in _pgroup)
+            _best_tier = max(
+                (r.get("tier", "Bronze") for r in _pgroup),
+                key=lambda t: {"Platinum": 4, "Gold": 3, "Silver": 2, "Bronze": 1}.get(t, 0),
+            )
+            _tier_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_best_tier, "🏀")
+            _has_goblin = any(r.get("bet_type") == "goblin" for r in _pgroup)
+            _has_demon  = any(r.get("bet_type") == "demon" for r in _pgroup)
+            _goblin_tag = " 🧌" if _has_goblin else ""
+            _demon_tag  = " 👿" if _has_demon else ""
+            _team_tag   = f" [{_pgroup[0].get('player_team', '')}]" if _pgroup[0].get("player_team") else ""
+            _exp_label  = (
+                f"{_tier_emoji} {_pname}{_team_tag} — "
+                f"{len(_pgroup)} prop(s) · SAFE {_best_conf:.0f}/100"
+                + _goblin_tag + _demon_tag
+            )
+            with st.expander(_exp_label, expanded=(_best_tier in ("Platinum", "Gold") or _has_goblin)):
+                for _pr in _pgroup:
+                    display_prop_analysis_card_qds(_pr)
+                    st.markdown('<div style="height:4px;"></div>', unsafe_allow_html=True)
+    else:
+        # Flat list for fewer than 10 props
+        for result in _non_out_display:
+            display_prop_analysis_card_qds(result)
+            st.markdown(
+                '<div style="height:6px;"></div>',
+                unsafe_allow_html=True,
+            )
+
+    # Show OUT players at the bottom
+    for result in _out_display:
+        display_prop_analysis_card_qds(result)
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()

@@ -347,6 +347,104 @@ with st.expander("Advanced Adjustment Factors"):
 st.divider()
 
 # ============================================================
+# SECTION: Goblin / Demon Bet Classification Thresholds
+# These control when the engine classifies a pick as a "Goblin"
+# (easy-money strong edge) or "Demon" (trap/avoid).
+# ============================================================
+
+st.subheader("🧌 Goblin & 👿 Demon Bet Classification")
+
+st.markdown(get_education_box_html(
+    "📖 What Are Goblin and Demon Bets?",
+    """
+    <strong>Goblin Bets (🧌)</strong> are the highest-conviction picks — the model projection is at
+    least 2 standard deviations from the line, probability ≥ 80%, and edge ≥ 25%. These are the
+    safest, most confident bets. Raising these thresholds = fewer but higher quality Goblins.<br><br>
+    <strong>Demon Bets (👿)</strong> are trap picks — they <em>look</em> appealing but have hidden
+    structural risks (conflicting forces, hot-streak regression, back-to-back fatigue, high variance
+    stats). These are automatically added to the Avoid List.<br><br>
+    ⚠️ Only change these if you know what you're doing. Defaults are carefully tuned.
+    """
+), unsafe_allow_html=True)
+
+with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
+    _gc1, _gc2, _gc3 = st.columns(3)
+
+    with _gc1:
+        _goblin_min_std = st.slider(
+            "🧌 Goblin: Min Std Devs from Line",
+            min_value=1.0, max_value=4.0,
+            value=float(st.session_state.get("goblin_min_std_devs", 2.0)),
+            step=0.25,
+            help="How many standard deviations must the projection be from the line to qualify as a Goblin. Default: 2.0",
+        )
+        st.session_state["goblin_min_std_devs"] = _goblin_min_std
+        st.caption(f"Projection must be ≥ **{_goblin_min_std:.2f}** std devs from line")
+
+    with _gc2:
+        _goblin_min_prob = st.slider(
+            "🧌 Goblin: Min Probability (%)",
+            min_value=60.0, max_value=95.0,
+            value=float(st.session_state.get("goblin_min_probability_pct", 80.0)),
+            step=1.0,
+            help="Minimum win probability to classify as Goblin. Default: 80%",
+        )
+        st.session_state["goblin_min_probability_pct"] = _goblin_min_prob
+        st.caption(f"Win probability must be ≥ **{_goblin_min_prob:.0f}%**")
+
+    with _gc3:
+        _goblin_min_edge = st.slider(
+            "🧌 Goblin: Min Edge (%)",
+            min_value=10.0, max_value=50.0,
+            value=float(st.session_state.get("goblin_min_edge_pct", 25.0)),
+            step=1.0,
+            help="Minimum edge percentage to classify as Goblin. Default: 25%",
+        )
+        st.session_state["goblin_min_edge_pct"] = _goblin_min_edge
+        st.caption(f"Edge must be ≥ **{_goblin_min_edge:.0f}%**")
+
+    st.divider()
+    _dc1, _dc2 = st.columns(2)
+
+    with _dc1:
+        _demon_min_conflict = st.slider(
+            "👿 Demon: Min Conflict Force Ratio",
+            min_value=0.5, max_value=1.0,
+            value=float(st.session_state.get("demon_conflict_ratio", 0.75)),
+            step=0.05,
+            help="Ratio of under vs over forces that triggers a Conflict Demon. Default: 0.75 (75% as strong as the winning side). Lower = more demons detected.",
+        )
+        st.session_state["demon_conflict_ratio"] = _demon_min_conflict
+        st.caption(f"Conflict detected when under-force ≥ **{_demon_min_conflict:.0%}** of over-force")
+
+    with _dc2:
+        _demon_regression_pct = st.slider(
+            "👿 Demon: Regression Line Threshold (%)",
+            min_value=110.0, max_value=150.0,
+            value=float(st.session_state.get("demon_regression_pct", 125.0)),
+            step=5.0,
+            help="If the prop line is this % above season average, it's flagged as a Regression Demon. Default: 125%",
+        )
+        st.session_state["demon_regression_pct"] = _demon_regression_pct
+        st.caption(f"Line ≥ **{_demon_regression_pct:.0f}%** of season avg → Regression Demon")
+
+    _gc_reset_col, _ = st.columns([1, 2])
+    with _gc_reset_col:
+        if st.button("🔄 Reset Goblin/Demon Thresholds to Defaults"):
+            for _k in ("goblin_min_std_devs", "goblin_min_probability_pct", "goblin_min_edge_pct",
+                       "demon_conflict_ratio", "demon_regression_pct"):
+                if _k in st.session_state:
+                    del st.session_state[_k]
+            st.success("Goblin/Demon thresholds reset to defaults!")
+            st.rerun()
+
+# ============================================================
+# END SECTION: Goblin / Demon Bet Classification Thresholds
+# ============================================================
+
+st.divider()
+
+# ============================================================
 # SECTION: API Keys
 # Configure API keys needed for platform prop fetching.
 # PrizePicks and Underdog have free public APIs (no key needed).
@@ -485,6 +583,11 @@ settings_summary = {
     "Underdog Fetch": "Enabled" if st.session_state.get("fetch_underdog_enabled", True) else "Disabled",
     "DraftKings Fetch": "Enabled" if st.session_state.get("fetch_draftkings_enabled", True) else "Disabled",
     "Odds API Key": "Configured ✓" if st.session_state.get("odds_api_key", "") else "Not set",
+    "🧌 Goblin Min Std Devs": f"{st.session_state.get('goblin_min_std_devs', 2.0):.2f}σ",
+    "🧌 Goblin Min Probability": f"{st.session_state.get('goblin_min_probability_pct', 80.0):.0f}%",
+    "🧌 Goblin Min Edge": f"{st.session_state.get('goblin_min_edge_pct', 25.0):.0f}%",
+    "👿 Demon Conflict Ratio": f"{st.session_state.get('demon_conflict_ratio', 0.75):.0%}",
+    "👿 Demon Regression Threshold": f"{st.session_state.get('demon_regression_pct', 125.0):.0f}%",
 }
 
 summary_rows = [{"Setting": k, "Value": v} for k, v in settings_summary.items()]
@@ -499,6 +602,8 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
         "selected_platforms", "home_court_boost", "blowout_sensitivity",
         "fatigue_sensitivity", "pace_sensitivity",
         "fetch_prizepicks_enabled", "fetch_underdog_enabled", "fetch_draftkings_enabled",
+        "goblin_min_std_devs", "goblin_min_probability_pct", "goblin_min_edge_pct",
+        "demon_conflict_ratio", "demon_regression_pct",
     ]
     for key in settings_keys_to_clear:
         if key in st.session_state:

@@ -936,6 +936,13 @@ def classify_bet_type(
     recent_form_ratio=None,
     season_average=None,
     line_source=None,
+    # Optional threshold overrides — pulled from Settings page session state
+    # when provided via st.session_state (pass None to use module constants).
+    goblin_min_std_devs=None,
+    goblin_min_probability=None,
+    goblin_min_edge=None,
+    demon_conflict_ratio=None,
+    demon_regression_pct=None,
 ):
     """
     Classify a prop bet as a Goblin 🧌, Demon 👿, or Normal bet.
@@ -989,6 +996,13 @@ def classify_bet_type(
         Back-to-back + spread 14 pts → blowout + fatigue → Demon 👿
     """
     stat_type_lower = str(stat_type).lower() if stat_type else ""
+
+    # ── Apply optional threshold overrides from Settings page ────
+    _goblin_std_thresh  = goblin_min_std_devs if goblin_min_std_devs is not None else GOBLIN_MIN_STD_DEVS_FROM_LINE
+    _goblin_prob_thresh = goblin_min_probability if goblin_min_probability is not None else GOBLIN_MIN_PROBABILITY
+    _goblin_edge_thresh = goblin_min_edge if goblin_min_edge is not None else GOBLIN_MIN_EDGE
+    _demon_conflict     = demon_conflict_ratio if demon_conflict_ratio is not None else DEMON_CONFLICT_RATIO_THRESHOLD
+    _demon_regression   = demon_regression_pct if demon_regression_pct is not None else (DEMON_HOT_STREAK_RATIO * 100.0)
 
     # ── Compute how many std devs the projection is from the line ──
     std_devs_from_line = 0.0
@@ -1069,9 +1083,9 @@ def classify_bet_type(
 
     if (
         line_verified
-        and favorable_std_devs >= GOBLIN_MIN_STD_DEVS_FROM_LINE
-        and prob_for_direction >= GOBLIN_MIN_PROBABILITY
-        and abs_edge >= GOBLIN_MIN_EDGE
+        and favorable_std_devs >= _goblin_std_thresh
+        and prob_for_direction >= _goblin_prob_thresh
+        and abs_edge >= _goblin_edge_thresh
     ):
         is_goblin = True
         goblin_reasons.append(
@@ -1080,10 +1094,10 @@ def classify_bet_type(
         )
         goblin_reasons.append(
             f"Model probability: {prob_for_direction*100:.0f}% "
-            f"(threshold: {GOBLIN_MIN_PROBABILITY*100:.0f}%)"
+            f"(threshold: {_goblin_prob_thresh*100:.0f}%)"
         )
         goblin_reasons.append(
-            f"Edge: {abs_edge:.1f}% (threshold: {GOBLIN_MIN_EDGE:.0f}%)"
+            f"Edge: {abs_edge:.1f}% (threshold: {_goblin_edge_thresh:.0f}%)"
         )
 
     if is_goblin:
@@ -1110,7 +1124,7 @@ def classify_bet_type(
     under_strength = directional_forces_result.get("under_strength", 0)
     if over_strength > 0 and under_strength > 0:
         conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
-        if conflict_ratio >= DEMON_CONFLICT_RATIO_THRESHOLD:
+        if conflict_ratio >= _demon_conflict:
             demon_reasons.append(
                 f"Conflicting forces: OVER ({over_strength:.1f}) vs UNDER ({under_strength:.1f}) "
                 f"are nearly balanced ({conflict_ratio*100:.0f}% overlap) — no clear edge direction"
@@ -1135,9 +1149,10 @@ def classify_bet_type(
     # Pattern 4: Line set at recent hot streak value likely to regress
     # If recent form ratio is very high (player on hot streak) AND the line
     # is already pushed up to match that hot streak, regression is likely.
+    _hot_streak_ratio_threshold = _demon_regression / 100.0  # convert pct → ratio
     if (
         recent_form_ratio is not None
-        and recent_form_ratio >= DEMON_HOT_STREAK_RATIO
+        and recent_form_ratio >= _hot_streak_ratio_threshold
         and season_average is not None
         and season_average > 0
         and prop_line > 0
@@ -1145,7 +1160,7 @@ def classify_bet_type(
         # The line is inflated to match the hot streak — but the hot streak
         # itself makes it a regression candidate
         line_vs_avg_ratio = prop_line / season_average if season_average > 0 else 1.0
-        if line_vs_avg_ratio >= DEMON_HOT_STREAK_RATIO:
+        if line_vs_avg_ratio >= _hot_streak_ratio_threshold:
             demon_reasons.append(
                 f"Line ({prop_line}) inflated to match recent hot streak "
                 f"(recent form {recent_form_ratio:.2f}x, season avg {season_average:.1f}) — "

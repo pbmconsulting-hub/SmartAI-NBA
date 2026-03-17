@@ -1678,6 +1678,67 @@ with tab_history:
         rs5.metric("Worst Day",    worst_day_str)
         st.divider()
 
+    # ── Cumulative ROI Time-Series Chart ───────────────────────────────
+    # Build a cumulative P&L series from all resolved bets over the
+    # last 14 days to visualize the strategy's trend.
+    _all_hist_bets = load_all_bets(limit=1000)
+    _resolved_bets = [
+        b for b in _all_hist_bets
+        if b.get("result") in ("WIN", "LOSS", "PUSH")
+        and _platform_filter_fn(b)
+    ]
+    _resolved_bets.sort(key=lambda b: (b.get("bet_date", ""), b.get("id", 0)))
+
+    if len(_resolved_bets) >= 3:
+        with st.expander("📈 Cumulative P&L Curve (resolved bets)", expanded=True):
+            _HIST_PAYOUT = 0.909
+            _cum_pnl = 0.0
+            _pnl_vals = []
+            _pnl_labels = []
+            _daily_pnl: dict = {}  # date → cumulative at end of day
+            for _rb in _resolved_bets:
+                _res = _rb.get("result", "")
+                if _res == "WIN":
+                    _cum_pnl += _HIST_PAYOUT
+                elif _res == "LOSS":
+                    _cum_pnl -= 1.0
+                # PUSH: no change
+                _pnl_vals.append(round(_cum_pnl, 2))
+                _pnl_labels.append(_rb.get("bet_date", ""))
+                _daily_pnl[_rb.get("bet_date", "")] = round(_cum_pnl, 2)
+
+            _wins_total = sum(1 for b in _resolved_bets if b.get("result") == "WIN")
+            _losses_total = sum(1 for b in _resolved_bets if b.get("result") == "LOSS")
+            _wr_total = _wins_total / max(_wins_total + _losses_total, 1) * 100
+
+            _roi_cols = st.columns(4)
+            _roi_cols[0].metric("Resolved Bets", len(_resolved_bets))
+            _roi_cols[1].metric("Win Rate", f"{_wr_total:.1f}%",
+                                delta=f"{_wr_total - 52.38:+.1f}% vs breakeven")
+            _roi_cols[2].metric("Total P&L", f"{_cum_pnl:+.2f} units")
+            _roi_cols[3].metric(
+                "ROI/bet",
+                f"{_cum_pnl / max(len(_resolved_bets), 1):+.3f}u",
+                delta="positive = profitable" if _cum_pnl > 0 else "negative = losing"
+            )
+
+            # Line chart of cumulative P&L
+            st.line_chart({"Cumulative P&L (units)": _pnl_vals}, height=220)
+            st.caption(
+                f"📊 {len(_resolved_bets)} resolved bets · "
+                f"{_wins_total}W / {_losses_total}L · "
+                f"Final: {_cum_pnl:+.2f}u"
+            )
+
+            # Daily P&L mini-table
+            if _daily_pnl:
+                _dpnl_rows = [
+                    {"Date": d, "End-of-Day P&L": f"{v:+.2f}u"}
+                    for d, v in sorted(_daily_pnl.items(), reverse=True)[:14]
+                ]
+                st.dataframe(_dpnl_rows, hide_index=True, use_container_width=True)
+        st.divider()
+
     # ── History Filter ─────────────────────────────────────────────────
     hist_filter = st.radio(
         "History filter",
