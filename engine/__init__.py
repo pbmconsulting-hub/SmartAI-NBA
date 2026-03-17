@@ -53,3 +53,34 @@ VALID_STAT_TYPES = SIMPLE_STAT_TYPES | COMBO_STAT_TYPES | FANTASY_STAT_TYPES | Y
 #   engine.game_script           — Feature 7: Quarter-by-quarter simulation
 #   engine.market_movement       — Feature 9: Sharp money line movement
 # ============================================================
+
+# ============================================================
+# SECTION: v9 Enhanced Engine Public API
+# New public functions added by the comprehensive engine enhancement.
+# These can be imported from engine.* modules directly or via these
+# convenience re-exports.
+# ============================================================
+
+# simulation.py — Quantum Matrix Engine 6.0
+from engine.simulation import (
+    run_enhanced_simulation,          # QME + game-script blended simulation (1F)
+)
+
+# edge_detection.py — Advanced Edge Analysis
+from engine.edge_detection import (
+    estimate_closing_line_value,      # CLV estimation (2B)
+    calculate_dynamic_vig,            # Dynamic vig by platform (2C)
+)
+
+# confidence.py — Precision Confidence Scoring
+from engine.confidence import (
+    calculate_risk_score,             # Composite 1-10 risk rating (3E)
+    enforce_tier_distribution,        # Tier distribution guardrails (3F)
+)
+
+# correlation.py — Advanced Correlation Engine
+from engine.correlation import (
+    get_position_correlation_adjustment,  # Position-based correlation priors (4B)
+    get_correlation_confidence,           # Parlay correlation confidence (4E)
+    correlation_adjusted_kelly,           # Correlation-adjusted Kelly sizing (4F)
+)
