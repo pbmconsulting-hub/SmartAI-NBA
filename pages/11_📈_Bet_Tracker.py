@@ -429,7 +429,7 @@ with tab_model_health:
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
             with st.expander("Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"goblin": "Goblin", "demon": "Demon", "normal": "Normal"}
+                _bt_emoji_map = {"goblin": "Goblin", "50_50": "50/50", "demon": "50/50 (Legacy)", "normal": "Normal"}
                 bt_rows = [
                     {
                         "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -497,10 +497,10 @@ with tab_model_health:
                         with _gbc:
                             st.markdown(get_bet_card_html(_gb), unsafe_allow_html=True)
 
-            # ── Individual Demon Bet Results ───────────────────────────
+            # ── Individual 50/50 Bet Results (formerly "Demon") ────────
             _demon_resolved = [
                 b for b in filtered_health
-                if b.get("bet_type", "") == "demon"
+                if b.get("bet_type", "") in ("50_50", "demon")  # "demon" = legacy
                 and b.get("result") in ("WIN", "LOSS", "PUSH")
             ]
             if _demon_resolved:
@@ -622,7 +622,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -633,10 +633,12 @@ with tab_ai_picks:
     if _ai_bet_type_filter:
         _ai_bt_map = {
             "Goblin — Easy Money": "goblin",
-            "Demon — Trap/Avoid": "demon",
-            "⚡ Normal": "normal",
+            "50/50 — Uncertain":   "50_50",
+            "⚡ Normal":           "normal",
         }
-        _ai_bt_values = [_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map]
+        _ai_bt_values = {_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map}
+        if "50_50" in _ai_bt_values:
+            _ai_bt_values.add("demon")  # legacy DB records
         ai_bets = [b for b in ai_bets if b.get("bet_type", "normal") in _ai_bt_values]
 
     if not ai_bets:
@@ -918,7 +920,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -929,10 +931,12 @@ with tab_all_picks:
     if _ap_bet_type_filter:
         _ap_bt_map = {
             "Goblin — Easy Money": "goblin",
-            "Demon — Trap/Avoid": "demon",
-            "⚡ Normal": "normal",
+            "50/50 — Uncertain":   "50_50",
+            "⚡ Normal":           "normal",
         }
-        _ap_bt_values = [_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map]
+        _ap_bt_values = {_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map}
+        if "50_50" in _ap_bt_values:
+            _ap_bt_values.add("demon")  # legacy DB records
         all_picks_data = [p for p in all_picks_data if p.get("bet_type", "normal") in _ap_bt_values]
 
     if not all_picks_data:
@@ -1321,7 +1325,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1342,10 +1346,13 @@ with tab_bets:
         if _bets_bet_type_filter:
             _bets_bt_map = {
                 "Goblin — Easy Money": "goblin",
-                "Demon — Trap/Avoid": "demon",
-                "⚡ Normal": "normal",
+                "50/50 — Uncertain":   "50_50",
+                "⚡ Normal":           "normal",
             }
-            _bets_bt_values = [_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map]
+            _bets_bt_values = {_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map}
+            # Also accept legacy "demon" records when filtering for "50_50"
+            if "50_50" in _bets_bt_values:
+                _bets_bt_values.add("demon")
             filtered_bets = [b for b in filtered_bets if b.get("bet_type", "normal") in _bets_bt_values]
 
         # ── Summary Cards ─────────────────────────────────────────────

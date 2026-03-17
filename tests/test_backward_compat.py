@@ -130,7 +130,8 @@ class TestEdgeDetectionBackwardCompat(unittest.TestCase):
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_classify_kwargs())
         self.assertIn("bet_type", result)
-        self.assertIn(result["bet_type"], ("normal", "goblin", "demon"))
+        # "50_50" is the renamed "demon" classification; "demon" kept for compat
+        self.assertIn(result["bet_type"], ("normal", "goblin", "50_50", "demon"))
 
     def test_classify_returns_reasons_list(self):
         from engine.edge_detection import classify_bet_type

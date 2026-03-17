@@ -98,7 +98,7 @@ def log_new_bet(
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
         auto_logged (int): 1 if logged automatically by the engine, 0 if manual
-        bet_type (str): 'goblin', 'demon', or 'normal'
+        bet_type (str): 'goblin', '50_50', 'demon' (legacy), or 'normal'
         std_devs_from_line (float): How many std devs projection is from line
 
     Returns:
@@ -435,8 +435,9 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
                 f"Auto-logged by SmartAI. "
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
                 + (
-                    "Demon reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
-                    if res.get("bet_type") == "demon" and res.get("bet_type_reasons")
+                    # "50_50" is the renamed "demon" (conflicting forces) classification
+                    "50/50 reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
+                    if res.get("bet_type") in ("50_50", "demon") and res.get("bet_type_reasons")
                     else (
                         "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
                         if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")

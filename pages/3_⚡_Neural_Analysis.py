@@ -1486,10 +1486,10 @@ if analysis_results:
     with _na_filter_col2:
         _na_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
             default=[],
             key="na_bet_type_filter",
-            help="Filter by bet type. Leave empty to show all. Select 'Goblin — Easy Money' to see only the strongest picks.",
+            help="Filter by bet type. Leave empty to show all. '50/50 — Uncertain' shows conflicting-force picks (formerly 'Demon — Trap/Avoid').",
         )
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
@@ -1497,10 +1497,13 @@ if analysis_results:
     if _na_bet_type_filter:
         _na_bt_map = {
             "Goblin — Easy Money": "goblin",
-            "Demon — Trap/Avoid": "demon",
-            "⚡ Normal": "normal",
+            "50/50 — Uncertain":   "50_50",
+            "⚡ Normal":           "normal",
         }
-        _na_bt_values = [_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map]
+        _na_bt_values = {_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map}
+        # Also accept legacy "demon" records when filtering for "50_50"
+        if "50_50" in _na_bt_values:
+            _na_bt_values.add("demon")
         displayed_results = [r for r in displayed_results if r.get("bet_type", "normal") in _na_bt_values]
 
     # Sort by confidence score descending
@@ -1533,7 +1536,7 @@ if analysis_results:
     platinum_count   = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
     gold_count       = sum(1 for r in displayed_results if r.get("tier") == "Gold")
     goblin_count     = sum(1 for r in analysis_results if r.get("bet_type") == "goblin")
-    demon_count      = sum(1 for r in analysis_results if r.get("bet_type") == "demon")
+    demon_count      = sum(1 for r in analysis_results if r.get("bet_type") in ("50_50", "demon"))
     avg_edge         = (
         sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
         if displayed_results else 0
@@ -1822,16 +1825,16 @@ if analysis_results:
         st.divider()
 
     # ============================================================
-    # SECTION: 👿 Demon Bets Warning Section
+    # SECTION: 50/50 Bets Warning Section (formerly "Demon Bets")
     # ============================================================
     _demon_picks = [
         r for r in analysis_results  # Use ALL results, not just displayed
-        if r.get("bet_type") == "demon"
+        if r.get("bet_type") in ("50_50", "demon")  # "demon" = legacy DB records
         and not r.get("player_is_out", False)
     ]
     if _demon_picks:
         with st.expander(
-            f"Demon Bets Detected ({len(_demon_picks)}) — Click to See Traps to AVOID",
+            f"50/50 Bets Detected ({len(_demon_picks)}) — Conflicting Forces, Use Caution",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -2199,7 +2202,7 @@ if analysis_results:
             )
             _tier_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_best_tier, "🏀")
             _has_goblin = any(r.get("bet_type") == "goblin" for r in _pgroup)
-            _has_demon  = any(r.get("bet_type") == "demon" for r in _pgroup)
+            _has_demon  = any(r.get("bet_type") in ("50_50", "demon") for r in _pgroup)
             _goblin_tag = " Goblin" if _has_goblin else ""
             _demon_tag  = " Demon" if _has_demon else ""
             _team_tag   = f" [{_pgroup[0].get('player_team', '')}]" if _pgroup[0].get("player_team") else ""
