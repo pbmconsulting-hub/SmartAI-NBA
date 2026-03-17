@@ -1351,6 +1351,9 @@ def filter_props_to_platform_players(
         )
 
     return filtered
+
+
+def parse_props_from_csv_text(csv_text):
     """
     Parse prop lines from CSV text (uploaded by user).
 
