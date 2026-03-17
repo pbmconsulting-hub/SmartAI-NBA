@@ -396,7 +396,7 @@ def calculate_confidence_score(
 
     # --- 3A: Bayesian sample-size damping ---
     sample_size_discount = 1.0
-    if games_played_season is not None and games_played_season > 0 and games_played_season < BAYESIAN_SAMPLE_MIN_GAMES:
+    if games_played_season and 0 < games_played_season < BAYESIAN_SAMPLE_MIN_GAMES:
         sample_size_discount = 0.6 + 0.4 * (games_played_season / BAYESIAN_SAMPLE_MIN_GAMES)
         final_score *= sample_size_discount
         final_score = round(max(0.0, min(100.0, final_score)), 1)

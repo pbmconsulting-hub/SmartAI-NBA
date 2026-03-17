@@ -56,6 +56,11 @@ LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
 # 1.3x means a steal prop needs effectively 1.3x more edge to qualify.
 LOW_VOLUME_UNCERTAINTY_MULTIPLIER = 1.3  # softened from 1.5 to reduce over-penalizing secondary stats
 
+# Conflict severity threshold for "high conflict" force detection (2E).
+# When min(over, under) / max(over, under) exceeds this, forces are considered
+# in high conflict (both sides nearly equal strength with significant magnitude).
+CONFLICT_SEVERITY_HIGH_THRESHOLD = 0.7  # was inline magic number 0.7
+
 
 # ============================================================
 # SECTION: Force Definitions
@@ -626,7 +631,7 @@ def should_avoid_prop(
     under_strength = directional_forces_result.get("under_strength", 0)
     conflict_severity = directional_forces_result.get("conflict_severity", 0.0)
     if over_strength > 0 and under_strength > 0:
-        if conflict_severity > 0.7 and over_strength > 1.0 and under_strength > 1.0:
+        if conflict_severity > CONFLICT_SEVERITY_HIGH_THRESHOLD and over_strength > 1.0 and under_strength > 1.0:
             avoid_reasons.append(
                 f"High conflict severity ({conflict_severity:.2f}) — strong opposing signals "
                 "on both sides with no clear direction"

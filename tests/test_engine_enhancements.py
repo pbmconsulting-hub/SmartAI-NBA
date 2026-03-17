@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: tests/test_engine_enhancements.py
-# PURPOSE: Unit tests for the v9 comprehensive engine enhancements
+# PURPOSE: Unit tests for the QME 6.0 comprehensive engine enhancements
 #          covering all four core modules:
 #            - engine/simulation.py (QME 6.0)
 #            - engine/edge_detection.py (Advanced Edge Analysis)
@@ -232,7 +232,7 @@ class TestSimulationEnhancements(unittest.TestCase):
 # ============================================================
 
 class TestEdgeDetectionEnhancements(unittest.TestCase):
-    """Tests for v9 enhancements in engine/edge_detection.py."""
+    """Tests for QME 6.0 enhancements in engine/edge_detection.py."""
 
     def setUp(self):
         from engine.edge_detection import (
@@ -451,7 +451,7 @@ class TestEdgeDetectionEnhancements(unittest.TestCase):
 # ============================================================
 
 class TestConfidenceEnhancements(unittest.TestCase):
-    """Tests for v9 enhancements in engine/confidence.py."""
+    """Tests for QME 6.0 enhancements in engine/confidence.py."""
 
     def setUp(self):
         from engine.confidence import (
@@ -723,7 +723,7 @@ class TestConfidenceEnhancements(unittest.TestCase):
 # ============================================================
 
 class TestCorrelationEnhancements(unittest.TestCase):
-    """Tests for v9 enhancements in engine/correlation.py."""
+    """Tests for QME 6.0 enhancements in engine/correlation.py."""
 
     def setUp(self):
         from engine.correlation import (

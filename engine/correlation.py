@@ -20,6 +20,11 @@ import statistics
 # Maximum correlation adjustment magnitude (conservative cap)
 MAX_CORRELATION_ADJUSTMENT = 0.15  # 15% max adjustment to joint probability
 
+# Recency decay factor for weighted Pearson correlation (4D).
+# Each game older than the most recent decays by this factor.
+# 0.9 means a game from 2 games ago gets 0.81x weight, 3 games ago = 0.729x.
+RECENCY_DECAY_FACTOR = 0.9
+
 # Cross-stat teammate correlations (4A).
 # These model how two different stats from different teammates co-move.
 # Keyed by (stat1, stat2) sorted alphabetically for canonical lookup.
@@ -170,7 +175,7 @@ def calculate_player_correlation(player1_logs, player2_logs, stat_type):
 
     # 4D: Recency weights — most recent game = 1.0, each older decays by 0.9x
     n = len(shared_dates)
-    weights = [0.9 ** (n - 1 - i) for i in range(n)]  # oldest first
+    weights = [RECENCY_DECAY_FACTOR ** (n - 1 - i) for i in range(n)]  # oldest first
     total_w = sum(weights)
 
     # Weighted means
