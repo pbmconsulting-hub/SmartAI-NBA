@@ -1024,5 +1024,228 @@ class TestEngineInitExports(unittest.TestCase):
         self.assertTrue(callable(correlation_adjusted_kelly))
 
 
+# ============================================================
+# MODULE 5: player_intelligence.py
+# ============================================================
+
+class TestPlayerIntelligence(unittest.TestCase):
+    """Tests for engine/player_intelligence.py — hit rate, streaks,
+    matchup grading, availability context, and line value assessment."""
+
+    _GAME_LOGS = [
+        {"GAME_DATE": "2024-11-15", "MATCHUP": "LAL @ BOS", "PTS": 28, "REB": 7, "AST": 5,
+         "FG3M": 2, "STL": 1, "BLK": 0, "TOV": 2},
+        {"GAME_DATE": "2024-11-13", "MATCHUP": "LAL vs GSW", "PTS": 22, "REB": 6, "AST": 4,
+         "FG3M": 1, "STL": 0, "BLK": 1, "TOV": 1},
+        {"GAME_DATE": "2024-11-11", "MATCHUP": "LAL vs MIA", "PTS": 30, "REB": 9, "AST": 6,
+         "FG3M": 3, "STL": 2, "BLK": 0, "TOV": 3},
+        {"GAME_DATE": "2024-11-09", "MATCHUP": "LAL @ DEN", "PTS": 18, "REB": 5, "AST": 3,
+         "FG3M": 0, "STL": 1, "BLK": 0, "TOV": 1},
+        {"GAME_DATE": "2024-11-07", "MATCHUP": "LAL vs PHX", "PTS": 25, "REB": 8, "AST": 4,
+         "FG3M": 2, "STL": 0, "BLK": 1, "TOV": 2},
+    ]
+
+    def setUp(self):
+        from engine.player_intelligence import (
+            get_recent_form_vs_line,
+            get_availability_context,
+            assess_line_value,
+            grade_matchup,
+            get_player_intelligence_summary,
+            aggregate_streak_summary,
+            _compute_streak,
+        )
+        self.get_form = get_recent_form_vs_line
+        self.get_avail = get_availability_context
+        self.assess_line = assess_line_value
+        self.grade_mu = grade_matchup
+        self.get_summary = get_player_intelligence_summary
+        self.agg_streak = aggregate_streak_summary
+        self.compute_streak = _compute_streak
+
+    # ── get_recent_form_vs_line ───────────────────────────────────
+
+    def test_form_hit_rate_correct(self):
+        """3 out of 5 games over 24.5 = 60% hit rate."""
+        result = self.get_form(self._GAME_LOGS, "points", 24.5)
+        self.assertEqual(result["hits"], 3)
+        self.assertEqual(result["window"], 5)
+        self.assertAlmostEqual(result["hit_rate"], 0.6, places=2)
+
+    def test_form_hot_label_when_over_70pct(self):
+        logs = [
+            {"PTS": 30, "REB": 6, "AST": 4, "FG3M": 2, "STL": 1, "BLK": 0, "TOV": 1,
+             "GAME_DATE": "2024-11-15", "MATCHUP": "LAL @ BOS"},
+            {"PTS": 28, "REB": 5, "AST": 3, "FG3M": 1, "STL": 0, "BLK": 1, "TOV": 2,
+             "GAME_DATE": "2024-11-13", "MATCHUP": "LAL vs GSW"},
+            {"PTS": 31, "REB": 7, "AST": 5, "FG3M": 3, "STL": 1, "BLK": 0, "TOV": 0,
+             "GAME_DATE": "2024-11-11", "MATCHUP": "LAL vs MIA"},
+            {"PTS": 26, "REB": 4, "AST": 2, "FG3M": 0, "STL": 0, "BLK": 0, "TOV": 1,
+             "GAME_DATE": "2024-11-09", "MATCHUP": "LAL @ DEN"},
+            {"PTS": 29, "REB": 8, "AST": 6, "FG3M": 2, "STL": 2, "BLK": 1, "TOV": 3,
+             "GAME_DATE": "2024-11-07", "MATCHUP": "LAL vs PHX"},
+        ]
+        result = self.get_form(logs, "points", 24.5)
+        self.assertIn("Hot", result["form_label"])
+
+    def test_form_cold_label_when_under_30pct(self):
+        logs = [
+            {"PTS": 20, "REB": 5, "AST": 3, "FG3M": 1, "STL": 0, "BLK": 0, "TOV": 1,
+             "GAME_DATE": "2024-11-15", "MATCHUP": "LAL @ BOS"},
+            {"PTS": 18, "REB": 4, "AST": 2, "FG3M": 0, "STL": 0, "BLK": 0, "TOV": 2,
+             "GAME_DATE": "2024-11-13", "MATCHUP": "LAL vs GSW"},
+            {"PTS": 15, "REB": 3, "AST": 1, "FG3M": 0, "STL": 0, "BLK": 0, "TOV": 1,
+             "GAME_DATE": "2024-11-11", "MATCHUP": "LAL vs MIA"},
+            {"PTS": 22, "REB": 6, "AST": 4, "FG3M": 1, "STL": 1, "BLK": 1, "TOV": 0,
+             "GAME_DATE": "2024-11-09", "MATCHUP": "LAL @ DEN"},
+            {"PTS": 17, "REB": 4, "AST": 2, "FG3M": 0, "STL": 0, "BLK": 0, "TOV": 1,
+             "GAME_DATE": "2024-11-07", "MATCHUP": "LAL vs PHX"},
+        ]
+        result = self.get_form(logs, "points", 24.5)
+        self.assertIn("Cold", result["form_label"])
+
+    def test_form_empty_logs_returns_no_data(self):
+        result = self.get_form([], "points", 24.5)
+        self.assertEqual(result["form_label"], "No Data")
+        self.assertFalse(result["sufficient_data"])
+
+    def test_form_combo_stat_sums_components(self):
+        """PRA = PTS + REB + AST. All games above 35 = hot."""
+        result = self.get_form(self._GAME_LOGS, "points_rebounds_assists", 25.0)
+        for r in result["results"]:
+            # PTS + REB + AST for each game should be > 25
+            self.assertGreater(r["value"], 25.0)
+        self.assertTrue(result["sufficient_data"])
+
+    # ── _compute_streak ────────────────────────────────────────────
+
+    def test_streak_three_consecutive_hits(self):
+        results = [
+            {"hit": True}, {"hit": True}, {"hit": True}, {"hit": False}, {"hit": True},
+        ]
+        streak = self.compute_streak(results)
+        self.assertEqual(streak["type"], "hit")
+        self.assertEqual(streak["count"], 3)
+        self.assertTrue(streak["active"])
+
+    def test_streak_empty_list(self):
+        streak = self.compute_streak([])
+        self.assertFalse(streak["active"])
+
+    # ── get_availability_context ───────────────────────────────────
+
+    def test_availability_active_player(self):
+        injury_map = {"lebron james": {"status": "Active", "injury_note": ""}}
+        result = self.get_avail("LeBron James", injury_map)
+        self.assertTrue(result["is_active"])
+        self.assertFalse(result["is_flagged"])
+        self.assertEqual(result["badge_class"], "avail-active")
+
+    def test_availability_gtd_player(self):
+        injury_map = {"kawhi leonard": {"status": "Day-to-Day", "injury_note": "Knee"}}
+        result = self.get_avail("Kawhi Leonard", injury_map)
+        self.assertTrue(result["is_active"])
+        self.assertTrue(result["is_flagged"])
+
+    def test_availability_out_player(self):
+        injury_map = {"joel embiid": {"status": "Out", "injury_note": "Knee – surgery"}}
+        result = self.get_avail("Joel Embiid", injury_map)
+        self.assertFalse(result["is_active"])
+        self.assertEqual(result["badge_class"], "avail-out")
+
+    def test_availability_unknown_player_defaults_active(self):
+        result = self.get_avail("Unknown Player XYZ", {})
+        self.assertTrue(result["is_active"])
+
+    # ── assess_line_value ──────────────────────────────────────────
+
+    def test_line_value_great_over(self):
+        """Season avg of 28 vs line of 24.5 = ~14% edge = Great Value."""
+        result = self.assess_line(28.0, 24.5, "points")
+        self.assertEqual(result["direction"], "OVER")
+        self.assertEqual(result["value_class"], "val-great")
+        self.assertGreater(result["edge_pct"], 8.0)
+
+    def test_line_value_under_direction(self):
+        result = self.assess_line(20.0, 24.5, "points")
+        self.assertEqual(result["direction"], "UNDER")
+
+    def test_line_value_zero_line_returns_no_data(self):
+        result = self.assess_line(20.0, 0.0, "points")
+        self.assertEqual(result["value_label"], "No Data")
+
+    # ── grade_matchup ──────────────────────────────────────────────
+
+    def test_grade_a_easy_matchup(self):
+        """Opponent allows most (worst defense) → A grade."""
+        all_ratings = [100, 105, 108, 110, 112, 115, 118, 120, 122, 125]
+        result = self.grade_mu("points", 130.0, all_ratings)
+        self.assertEqual(result["grade"], "A")
+
+    def test_grade_d_tough_matchup(self):
+        """Opponent allows fewest (best defense) → D grade."""
+        all_ratings = [100, 105, 108, 110, 112, 115, 118, 120, 122, 125]
+        result = self.grade_mu("points", 95.0, all_ratings)
+        self.assertEqual(result["grade"], "D")
+
+    def test_grade_na_no_data(self):
+        result = self.grade_mu("points", None, [])
+        self.assertEqual(result["grade"], "N/A")
+
+    # ── aggregate_streak_summary ───────────────────────────────────
+
+    def test_aggregate_counts_correct(self):
+        stubs = [
+            {"player_name": "A", "form": {"form_label": "Hot 🔥"}},
+            {"player_name": "B", "form": {"form_label": "Cold 🧊"}},
+            {"player_name": "C", "form": {"form_label": "Neutral ➡️"}},
+            {"player_name": "D", "form": {"form_label": "Hot 🔥"}},
+        ]
+        summary = self.agg_streak(stubs)
+        self.assertEqual(summary["hot_count"], 2)
+        self.assertEqual(summary["cold_count"], 1)
+        self.assertEqual(summary["neutral_count"], 1)
+
+    def test_aggregate_empty_list(self):
+        summary = self.agg_streak([])
+        self.assertEqual(summary["hot_count"], 0)
+
+    # ── get_player_intelligence_summary ───────────────────────────
+
+    def test_summary_includes_all_keys(self):
+        injury_map = {"lebron james": {"status": "Active", "injury_note": ""}}
+        player_data = {"points_avg": "24.8", "rebounds_avg": "7.2", "assists_avg": "3.5"}
+        result = self.get_summary(
+            player_name="LeBron James",
+            stat_type="points",
+            prop_line=24.5,
+            player_data=player_data,
+            game_logs=self._GAME_LOGS,
+            injury_status_map=injury_map,
+        )
+        for key in ("availability", "form", "line_value", "matchup_grade",
+                    "alert_flags", "highlight_flags", "season_avg"):
+            self.assertIn(key, result)
+
+    def test_summary_hot_player_generates_highlight(self):
+        """A player hitting 70%+ of games should generate a hot highlight."""
+        injury_map = {}
+        hot_logs = [
+            {"GAME_DATE": f"2024-11-0{i}", "MATCHUP": "LAL @ BOS",
+             "PTS": 30, "REB": 6, "AST": 4, "FG3M": 2, "STL": 1, "BLK": 0, "TOV": 1}
+            for i in range(1, 6)
+        ]
+        player_data = {"points_avg": "29.0"}
+        result = self.get_summary("Test Player", "points", 24.5, player_data, hot_logs, injury_map)
+        highlight_text = " ".join(result["highlight_flags"])
+        self.assertIn("Hot", highlight_text)
+
+    def test_summary_out_player_generates_alert(self):
+        injury_map = {"injured player": {"status": "Out", "injury_note": "Knee"}}
+        result = self.get_summary("Injured Player", "points", 24.5, {}, [], injury_map)
+        alert_text = " ".join(result["alert_flags"])
+        self.assertIn("do not bet", alert_text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

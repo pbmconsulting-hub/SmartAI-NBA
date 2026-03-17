@@ -22,9 +22,24 @@ from styles.theme import (
     get_logo_img_tag,
     get_qds_confidence_bar_html,
     get_qds_prop_card_html,
+    get_player_intel_css,
+    get_availability_badge_html,
+    get_form_dots_html,
+    get_matchup_grade_badge_html,
+    get_intel_strip_html,
     GOBLIN_LOGO_PATH as _GOBLIN_LOGO_PATH,
     DEMON_LOGO_PATH as _DEMON_LOGO_PATH,
 )
+
+try:
+    from engine.player_intelligence import (
+        get_player_intelligence_summary,
+        get_recent_form_vs_line,
+        get_availability_context,
+    )
+    _PLAYER_INTEL_AVAILABLE = True
+except ImportError:
+    _PLAYER_INTEL_AVAILABLE = False
 
 import os as _os
 
@@ -449,6 +464,211 @@ def _render_qds_full_breakdown_html(result):
     )
 
 
+# ============================================================
+# SECTION: Player Intelligence Rendering Helpers
+# These helpers enrich each analysis card with live form data,
+# injury status, and matchup context sourced from the new
+# engine/player_intelligence.py module.
+# ============================================================
+
+# Track whether we've already injected the intel CSS in this run.
+_intel_css_injected: set = set()
+
+
+def _inject_intel_css() -> None:
+    """Inject player intelligence CSS once per Streamlit session."""
+    if "injected" not in _intel_css_injected:
+        st.markdown(get_player_intel_css(), unsafe_allow_html=True)
+        _intel_css_injected.add("injected")
+
+
+def render_player_intel_strip(
+    result: dict,
+    injury_status_map: dict,
+    game_logs: list | None = None,
+) -> None:
+    """Render a compact player intelligence strip beneath the main prop card.
+
+    Shows:
+    - Availability / injury status badge
+    - Form dots (last 5 games hit/miss vs prop line)
+    - Hit-rate percentage
+    - Matchup grade badge (when available from result)
+    - Season-avg edge vs line
+
+    Args:
+        result:             Full analysis result dict (from the simulation loop).
+        injury_status_map:  Dict loaded from data/injury_status.json.
+        game_logs:          Optional list of recent game-log dicts.  When provided
+                            form dots are computed from actual game results instead
+                            of the cached form ratio in *result*.
+    """
+    if not _PLAYER_INTEL_AVAILABLE:
+        return
+
+    _inject_intel_css()
+
+    player = result.get("player_name", "")
+    stat   = (result.get("stat_type") or "points").lower()
+    line   = float(result.get("line") or 0)
+
+    # ── Availability badge ────────────────────────────────────────
+    avail = get_availability_context(player, injury_status_map)
+    avail_html = get_availability_badge_html(
+        avail["badge_label"], avail["badge_class"], avail["injury_note"]
+    )
+
+    # ── Form dots ─────────────────────────────────────────────────
+    form_results: list = []
+    form_label = "No Data"
+    hit_rate = 0.0
+    streak_label = ""
+
+    if game_logs and line > 0:
+        form_data = get_recent_form_vs_line(game_logs, stat, line)
+        form_results = form_data.get("results", [])
+        form_label   = form_data.get("form_label", "No Data")
+        hit_rate     = form_data.get("hit_rate", 0.0)
+        streak       = form_data.get("streak", {})
+        if streak.get("active"):
+            streak_label = streak.get("label", "")
+    elif result.get("recent_form_ratio") is not None:
+        # Fall back to projection-derived form label
+        form_ratio = float(result.get("recent_form_ratio", 1.0))
+        if form_ratio > 1.05:
+            form_label = "Hot 🔥"
+        elif form_ratio < 0.95:
+            form_label = "Cold 🧊"
+        else:
+            form_label = "Neutral ➡️"
+
+    form_html = get_form_dots_html(form_results, window=5, prop_line=line)
+
+    # ── Matchup grade ──────────────────────────────────────────────
+    # result may contain 'matchup_grade' if we populated it upstream
+    grade_info = result.get("matchup_grade") or {}
+    grade = grade_info.get("grade", "N/A")
+    grade_label = grade_info.get("label", "No Data")
+    grade_cls   = grade_info.get("color_class", "grade-na")
+    grade_html  = get_matchup_grade_badge_html(grade, grade_label, grade_cls)
+
+    # ── Season avg edge ───────────────────────────────────────────
+    season_avg = 0.0
+    _stat_avg_key = f"{stat}_avg"
+    _alt_avg_keys = {
+        "points": "season_pts_avg", "rebounds": "season_reb_avg",
+        "assists": "season_ast_avg",
+    }
+    try:
+        season_avg = float(
+            result.get(_stat_avg_key)
+            or result.get(_alt_avg_keys.get(stat, ""), 0)
+            or 0
+        )
+    except (TypeError, ValueError):
+        season_avg = 0.0
+
+    edge_pct = ((season_avg - line) / line * 100.0) if line > 0 and season_avg > 0 else 0.0
+    direction = "OVER" if edge_pct >= 0 else "UNDER"
+
+    # ── Build and render strip ────────────────────────────────────
+    strip_html = get_intel_strip_html(
+        availability_html=avail_html,
+        form_html=form_html,
+        hit_rate_pct=hit_rate,
+        form_label=form_label,
+        grade_html=grade_html,
+        edge_pct=round(edge_pct, 1),
+        direction=direction,
+        streak_label=streak_label,
+    )
+    st.markdown(strip_html, unsafe_allow_html=True)
+
+
+def render_recent_form_section(
+    player_name: str,
+    stat_type: str,
+    prop_line: float,
+    game_logs: list,
+    window: int = 10,
+) -> None:
+    """Render an expandable recent form section with per-game hit/miss table.
+
+    Shows the last *window* games with the actual stat value, whether the
+    player hit the over, and the margin vs the prop line.
+
+    This section is shown inside the SAFE Score™ Breakdown expander.
+    """
+    if not _PLAYER_INTEL_AVAILABLE or not game_logs or prop_line <= 0:
+        return
+
+    form_data = get_recent_form_vs_line(game_logs, stat_type, prop_line, window=window)
+    if not form_data.get("sufficient_data"):
+        return
+
+    results = form_data.get("results", [])
+    hit_rate = form_data.get("hit_rate", 0.0)
+    hits = form_data.get("hits", 0)
+    total = len(results)
+    form_label = form_data.get("form_label", "")
+
+    form_color = "#ff7b2e" if "Hot" in form_label else "#5bc8f5" if "Cold" in form_label else "#8a9bb8"
+
+    st.markdown(
+        f'<div style="color:{form_color};font-weight:700;font-size:0.82rem;margin:8px 0 4px;">'
+        f'📈 Recent Form vs Line {prop_line}: '
+        f'{hits}/{total} Over ({hit_rate * 100:.0f}%) — {form_label}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Table rows
+    rows_html = []
+    for i, r in enumerate(results):
+        hit_color = "#00d084" if r["hit"] else "#ff4d4d"
+        hit_text  = "✅ HIT" if r["hit"] else "❌ MISS"
+        sign = "+" if r["margin"] >= 0 else ""
+        matchup_str = r.get("matchup", "")
+        rows_html.append(
+            f'<tr style="background:{"rgba(0,208,132,0.06)" if r["hit"] else "rgba(255,77,77,0.06)"};">'
+            f'<td style="padding:4px 8px;color:#8a9bb8;font-size:0.75rem;">{r.get("date","")}</td>'
+            f'<td style="padding:4px 8px;color:#a0b4c8;font-size:0.75rem;">{matchup_str}</td>'
+            f'<td style="padding:4px 8px;color:#e8f4ff;font-weight:600;text-align:center;">{r["value"]}</td>'
+            f'<td style="padding:4px 8px;color:{hit_color};font-weight:700;text-align:center;">{hit_text}</td>'
+            f'<td style="padding:4px 8px;color:{hit_color};text-align:center;font-size:0.78rem;">{sign}{r["margin"]}</td>'
+            f'</tr>'
+        )
+
+    table_html = (
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">'
+        '<thead><tr>'
+        '<th style="text-align:left;padding:4px 8px;color:#5a6e8a;font-size:0.72rem;">Date</th>'
+        '<th style="text-align:left;padding:4px 8px;color:#5a6e8a;font-size:0.72rem;">Matchup</th>'
+        '<th style="text-align:center;padding:4px 8px;color:#5a6e8a;font-size:0.72rem;">Value</th>'
+        '<th style="text-align:center;padding:4px 8px;color:#5a6e8a;font-size:0.72rem;">Result</th>'
+        '<th style="text-align:center;padding:4px 8px;color:#5a6e8a;font-size:0.72rem;">vs Line</th>'
+        '</tr></thead>'
+        '<tbody>' + "".join(rows_html) + '</tbody>'
+        '</table>'
+    )
+
+    st.markdown(table_html, unsafe_allow_html=True)
+
+    # Streak banner
+    streak = form_data.get("streak", {})
+    if streak.get("active") and streak.get("count", 0) >= 3:
+        banner_cls = "streak-banner-hot" if streak["type"] == "hit" else "streak-banner-cold"
+        st.markdown(
+            f'<div class="{banner_cls}">{_html.escape(streak.get("label", ""))}</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ============================================================
+# END SECTION: Player Intelligence Rendering Helpers
+# ============================================================
+
+
 def display_prop_analysis_card_qds(result):
     """
     Display a QDS-styled analysis card for one prop result.
@@ -649,6 +869,11 @@ def display_prop_analysis_card_qds(result):
     )
     st.markdown(card_html, unsafe_allow_html=True)
 
+    # ── Player Intelligence Strip (form dots + availability + grade) ─
+    _injury_map = st.session_state.get("injury_status_map", {})
+    _recent_logs = result.get("recent_form_games") or []
+    render_player_intel_strip(result, _injury_map, game_logs=_recent_logs)
+
     # ── Confidence bar (standalone) ──────────────────────────────
     conf_bar_html = get_qds_confidence_bar_html(
         label=f"{player} — {prop_text}",
@@ -752,6 +977,10 @@ def display_prop_analysis_card_qds(result):
         _proj_min = result.get("projected_minutes")
         if _proj_min:
             st.caption(f"⏱️ Projected minutes: **{_proj_min:.0f}** (minutes model)")
+
+        # Recent form vs line — detailed game-by-game table
+        if _recent_logs:
+            render_recent_form_section(player, stat, line, _recent_logs, window=10)
 
         # Avoid reasons (if any)
         if _avoid_reasons:

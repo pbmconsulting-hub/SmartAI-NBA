@@ -931,3 +931,203 @@ if st.button("⚡ Parse & Add Props") and quick_add_text.strip():
     else:
         st.error("Could not parse any props from the input.")
 
+# ============================================================
+# END SECTION: Quick Add Multiple Props
+# ============================================================
+
+st.divider()
+
+# ============================================================
+# SECTION: Quick Analysis Panel
+# Shows edge indicators, injury status, and recent form for
+# all currently loaded props without running the full simulation.
+# This gives users an instant snapshot to prioritise which props
+# are worth sending to Neural Analysis.
+# ============================================================
+
+st.subheader("⚡ Quick Analysis — Loaded Props")
+
+_qa_props = load_props_from_session(st.session_state)
+
+if not _qa_props:
+    st.info(
+        "No props loaded yet. Fetch live props above, add them manually, "
+        "or upload a CSV to populate this panel."
+    )
+else:
+    # Try to load player intelligence helpers
+    try:
+        from engine.player_intelligence import (
+            build_quick_analysis_rows,
+            aggregate_streak_summary,
+        )
+        from styles.theme import get_player_intel_css, get_form_dots_html
+        _QA_AVAILABLE = True
+    except ImportError:
+        _QA_AVAILABLE = False
+
+    if not _QA_AVAILABLE:
+        st.info(f"ℹ️ {len(_qa_props)} props loaded. Quick Analysis unavailable (player_intelligence module not found).")
+    else:
+        # Inject CSS once
+        st.markdown(get_player_intel_css(), unsafe_allow_html=True)
+
+        # Load supporting data
+        _qa_injury_map = load_injury_status()
+        _qa_game_logs_cache = st.session_state.get("game_logs_cache", {})
+
+        with st.spinner("Building quick analysis..."):
+            _qa_rows = build_quick_analysis_rows(
+                props=_qa_props,
+                players_data=players_data,
+                game_logs_cache=_qa_game_logs_cache,
+                injury_status_map=_qa_injury_map,
+            )
+
+        if not _qa_rows:
+            st.warning("No analysis rows generated.")
+        else:
+            # ── Summary metrics ────────────────────────────────────────
+            _all_intel_stubs = [
+                {"player_name": r["player_name"], "form": {"form_label": r["form_label"]}}
+                for r in _qa_rows
+            ]
+            _streak_summary = aggregate_streak_summary(_all_intel_stubs)
+
+            _col_h, _col_c, _col_n = st.columns(3)
+            with _col_h:
+                st.metric("🔥 Hot Players", _streak_summary["hot_count"],
+                          help="Players hitting the over in 70%+ of last 5 games")
+            with _col_c:
+                st.metric("🧊 Cold Players", _streak_summary["cold_count"],
+                          help="Players hitting the over in 30% or fewer of last 5 games")
+            with _col_n:
+                _flagged_count = sum(1 for r in _qa_rows if r.get("is_flagged"))
+                st.metric("⚠️ Injury Flagged", _flagged_count,
+                          help="Players with GTD / Day-to-Day / Questionable status")
+
+            # ── Filters ────────────────────────────────────────────────
+            _qa_filter_col1, _qa_filter_col2, _qa_filter_col3 = st.columns(3)
+            with _qa_filter_col1:
+                _qa_sort_by = st.selectbox(
+                    "Sort by",
+                    ["Edge % (Best first)", "Hit Rate (Best first)", "Player Name"],
+                    key="qa_sort_by",
+                )
+            with _qa_filter_col2:
+                _qa_form_filter = st.selectbox(
+                    "Form filter",
+                    ["All", "Hot only 🔥", "Cold only 🧊", "No injury flags"],
+                    key="qa_form_filter",
+                )
+            with _qa_filter_col3:
+                _qa_stat_filter = st.selectbox(
+                    "Stat type",
+                    ["All"] + sorted(set(r.get("stat_type", "") for r in _qa_rows)),
+                    key="qa_stat_filter",
+                )
+
+            # Apply filters
+            _filtered_rows = _qa_rows[:]
+            if _qa_form_filter == "Hot only 🔥":
+                _filtered_rows = [r for r in _filtered_rows if "Hot" in r.get("form_label", "")]
+            elif _qa_form_filter == "Cold only 🧊":
+                _filtered_rows = [r for r in _filtered_rows if "Cold" in r.get("form_label", "")]
+            elif _qa_form_filter == "No injury flags":
+                _filtered_rows = [r for r in _filtered_rows if not r.get("is_flagged")]
+            if _qa_stat_filter != "All":
+                _filtered_rows = [r for r in _filtered_rows if r.get("stat_type") == _qa_stat_filter]
+
+            # Apply sort
+            if _qa_sort_by == "Edge % (Best first)":
+                _filtered_rows.sort(key=lambda r: abs(r.get("edge_pct", 0)), reverse=True)
+            elif _qa_sort_by == "Hit Rate (Best first)":
+                _filtered_rows.sort(key=lambda r: r.get("hit_rate", 0), reverse=True)
+            else:
+                _filtered_rows.sort(key=lambda r: r.get("player_name", ""))
+
+            st.caption(f"Showing {len(_filtered_rows)} of {len(_qa_rows)} props")
+
+            # ── Quick Analysis rows ────────────────────────────────────
+            import html as _html_mod
+            for _qrow in _filtered_rows:
+                _qp = _qrow.get("player_name", "")
+                _qs = _qrow.get("stat_type", "")
+                _ql = _qrow.get("line", 0)
+                _qavg = _qrow.get("season_avg", 0.0)
+                _qedge = _qrow.get("edge_pct", 0.0)
+                _qdir = _qrow.get("direction", "—")
+                _qhr = _qrow.get("hit_rate", 0.0)
+                _qfl = _qrow.get("form_label", "No Data")
+                _qform = _qrow.get("form_results", [])
+                _qavail = _qrow.get("availability_badge", "🟢 Active")
+                _qavail_cls = _qrow.get("availability_class", "avail-active")
+                _qinj = _qrow.get("injury_note", "")
+                _qstreak = _qrow.get("streak_label", "")
+                _qplat = _qrow.get("platform", "")
+                _qteam = _qrow.get("team", _qrow.get("player_team", ""))
+
+                # Edge colour
+                _edge_css = "qa-edge-pos" if _qedge >= 4 else "qa-edge-neg" if _qedge <= -4 else "qa-edge-neu"
+                _edge_sign = "+" if _qedge >= 0 else ""
+
+                # Form label colour
+                _flbl_css = "form-label-hot" if "Hot" in _qfl else "form-label-cold" if "Cold" in _qfl else "form-label-neutral"
+
+                # Dots HTML
+                _dots_html = get_form_dots_html(_qform, window=5, prop_line=float(_ql or 0))
+
+                # Availability badge HTML
+                _avail_html = (
+                    f'<span class="avail-badge {_qavail_cls}"'
+                    + (f' title="{_html_mod.escape(_qinj)}"' if _qinj else "")
+                    + f">{_qavail}</span>"
+                )
+
+                # Platform badge
+                _plat_lower = _qplat.lower() if _qplat else "default"
+                _plat_html = f'<span class="plat-{_plat_lower}">{_qplat}</span>' if _qplat else ""
+
+                # Streak badge
+                _streak_html = ""
+                if _qstreak:
+                    _sbanner = "streak-banner-hot" if "Over" in _qstreak else "streak-banner-cold"
+                    _streak_html = (
+                        f'<span class="{_sbanner}" style="padding:1px 8px;border-radius:4px;">'
+                        f'{_html_mod.escape(_qstreak)}</span>'
+                    )
+
+                # Row HTML
+                _avg_html = (
+                    f'<span style="color:#8a9bb8;font-size:0.75rem;"> (avg {_qavg:.1f})</span>'
+                    if _qavg > 0 else ""
+                )
+                _row_html = (
+                    f'<div class="qa-row">'
+                    f'<div><span class="qa-player">{_html_mod.escape(_qp)}</span>'
+                    f' <span class="qa-stat">{_html_mod.escape(_qteam)}</span> {_plat_html}</div>'
+                    f'<div><span class="qa-stat">{_html_mod.escape(_qs.replace("_"," ").title())}</span>'
+                    f' <span class="qa-line">{_ql}</span>{_avg_html}</div>'
+                    f'<div><span class="qa-edge {_edge_css}">{_edge_sign}{_qedge:.1f}% {_qdir}</span></div>'
+                    f'<div style="display:flex;align-items:center;gap:6px;">'
+                    f'{_dots_html}<span class="{_flbl_css}">{int(_qhr*100)}% over</span></div>'
+                    f'<div>{_avail_html}</div>'
+                    + (f'<div>{_streak_html}</div>' if _streak_html else "")
+                    + f'</div>'
+                )
+                st.markdown(_row_html, unsafe_allow_html=True)
+
+            # ── Hot/Cold summary footer ────────────────────────────────
+            if _streak_summary["hot_players"]:
+                st.success(
+                    f"🔥 **Hot players:** {', '.join(_streak_summary['hot_players'][:8])}"
+                )
+            if _streak_summary["cold_players"]:
+                st.warning(
+                    f"🧊 **Cold players:** {', '.join(_streak_summary['cold_players'][:8])}"
+                )
+
+# ============================================================
+# END SECTION: Quick Analysis Panel
+# ============================================================
+
