@@ -32,7 +32,7 @@ from 0–100 that combines 8 signal weights and 4 penalties.
 | Tier | Minimum Score | Minimum Edge | Minimum Probability |
 |------|--------------|-------------|-------------------|
 | 💎 Platinum | 84 | 10% | 62% |
-| 🥇 Gold | 65 | 7% | 57% |
+| [Gold] Gold | 65 | 7% | 57% |
 | 🥈 Silver | 57 | 3% | — |
 | 🥉 Bronze | 35 | 1% | — |
 | ❌ Do Not Bet | < 35 | — | — |

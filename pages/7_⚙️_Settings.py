@@ -352,15 +352,15 @@ st.divider()
 # (easy-money strong edge) or "Demon" (trap/avoid).
 # ============================================================
 
-st.subheader("🧌 Goblin & 👿 Demon Bet Classification")
+st.subheader("[Goblin] Goblin & [Demon] Demon Bet Classification")
 
 st.markdown(get_education_box_html(
     "📖 What Are Goblin and Demon Bets?",
     """
-    <strong>Goblin Bets (🧌)</strong> are the highest-conviction picks — the model projection is at
+    <strong>Goblin Bets ([Goblin])</strong> are the highest-conviction picks — the model projection is at
     least 2 standard deviations from the line, probability ≥ 80%, and edge ≥ 25%. These are the
     safest, most confident bets. Raising these thresholds = fewer but higher quality Goblins.<br><br>
-    <strong>Demon Bets (👿)</strong> are trap picks — they <em>look</em> appealing but have hidden
+    <strong>Demon Bets ([Demon])</strong> are trap picks — they <em>look</em> appealing but have hidden
     structural risks (conflicting forces, hot-streak regression, back-to-back fatigue, high variance
     stats). These are automatically added to the Avoid List.<br><br>
     ⚠️ Only change these if you know what you're doing. Defaults are carefully tuned.
@@ -372,7 +372,7 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _gc1:
         _goblin_min_std = st.slider(
-            "🧌 Goblin: Min Std Devs from Line",
+            "[Goblin] Goblin: Min Std Devs from Line",
             min_value=1.0, max_value=4.0,
             value=float(st.session_state.get("goblin_min_std_devs", 2.0)),
             step=0.25,
@@ -383,7 +383,7 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _gc2:
         _goblin_min_prob = st.slider(
-            "🧌 Goblin: Min Probability (%)",
+            "[Goblin] Goblin: Min Probability (%)",
             min_value=60.0, max_value=95.0,
             value=float(st.session_state.get("goblin_min_probability_pct", 80.0)),
             step=1.0,
@@ -394,7 +394,7 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _gc3:
         _goblin_min_edge = st.slider(
-            "🧌 Goblin: Min Edge (%)",
+            "[Goblin] Goblin: Min Edge (%)",
             min_value=10.0, max_value=50.0,
             value=float(st.session_state.get("goblin_min_edge_pct", 25.0)),
             step=1.0,
@@ -408,7 +408,7 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _dc1:
         _demon_min_conflict = st.slider(
-            "👿 Demon: Min Conflict Force Ratio",
+            "[Demon] Demon: Min Conflict Force Ratio",
             min_value=0.5, max_value=1.0,
             value=float(st.session_state.get("demon_conflict_ratio", 0.75)),
             step=0.05,
@@ -419,7 +419,7 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _dc2:
         _demon_regression_pct = st.slider(
-            "👿 Demon: Regression Line Threshold (%)",
+            "[Demon] Demon: Regression Line Threshold (%)",
             min_value=110.0, max_value=150.0,
             value=float(st.session_state.get("demon_regression_pct", 125.0)),
             step=5.0,
@@ -583,11 +583,11 @@ settings_summary = {
     "Underdog Fetch": "Enabled" if st.session_state.get("fetch_underdog_enabled", True) else "Disabled",
     "DraftKings Fetch": "Enabled" if st.session_state.get("fetch_draftkings_enabled", True) else "Disabled",
     "Odds API Key": "Configured ✓" if st.session_state.get("odds_api_key", "") else "Not set",
-    "🧌 Goblin Min Std Devs": f"{st.session_state.get('goblin_min_std_devs', 2.0):.2f}σ",
-    "🧌 Goblin Min Probability": f"{st.session_state.get('goblin_min_probability_pct', 80.0):.0f}%",
-    "🧌 Goblin Min Edge": f"{st.session_state.get('goblin_min_edge_pct', 25.0):.0f}%",
-    "👿 Demon Conflict Ratio": f"{st.session_state.get('demon_conflict_ratio', 0.75):.0%}",
-    "👿 Demon Regression Threshold": f"{st.session_state.get('demon_regression_pct', 125.0):.0f}%",
+    "[Goblin] Goblin Min Std Devs": f"{st.session_state.get('goblin_min_std_devs', 2.0):.2f}σ",
+    "[Goblin] Goblin Min Probability": f"{st.session_state.get('goblin_min_probability_pct', 80.0):.0f}%",
+    "[Goblin] Goblin Min Edge": f"{st.session_state.get('goblin_min_edge_pct', 25.0):.0f}%",
+    "[Demon] Demon Conflict Ratio": f"{st.session_state.get('demon_conflict_ratio', 0.75):.0%}",
+    "[Demon] Demon Regression Threshold": f"{st.session_state.get('demon_regression_pct', 125.0):.0f}%",
 }
 
 summary_rows = [{"Setting": k, "Value": v} for k, v in settings_summary.items()]

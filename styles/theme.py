@@ -12,9 +12,42 @@
 # ============================================================
 
 # Standard library only — no new dependencies
+import base64 as _base64
 import datetime as _datetime
+import functools as _functools
 import html as _html
+import logging as _logging
 import math as _math
+import os as _os
+
+_logger_theme = _logging.getLogger(__name__)
+
+# ── Centralised logo paths ──────────────────────────────────────
+GOBLIN_LOGO_PATH = _os.path.join("assets", "New_Goblin_Logo.png")
+DEMON_LOGO_PATH  = _os.path.join("assets", "New_Demon_Logo.png")
+GOLD_LOGO_PATH   = _os.path.join("assets", "NewGold_Logo.png")
+
+
+@_functools.lru_cache(maxsize=32)
+def _load_logo_b64(logo_path):
+    """Load and base64-encode a logo file, cached per path."""
+    try:
+        with open(logo_path, "rb") as _f:
+            return _base64.b64encode(_f.read()).decode()
+    except OSError as _e:
+        _logger_theme.warning("Could not load logo file '%s': %s", logo_path, _e)
+        return None
+
+
+def get_logo_img_tag(logo_path, width=20, alt="logo"):
+    """Return an inline <img> tag for use in st.markdown HTML."""
+    if _os.path.exists(logo_path):
+        _b64 = _load_logo_b64(logo_path)
+        if _b64:
+            _safe_alt = _html.escape(str(alt))
+            return f'<img src="data:image/png;base64,{_b64}" width="{width}" alt="{_safe_alt}" style="vertical-align:middle;">'
+    _logger_theme.debug("Logo not found at '%s', using alt text '%s'", logo_path, alt)
+    return _html.escape(str(alt))
 
 
 # ============================================================
@@ -74,7 +107,7 @@ GLOSSARY = {
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
     ),
-    "Goblin Bet 🧌": (
+    "Goblin Bet [Goblin]": (
         "A Goblin bet is one where the platform's line is so far from reality that it's "
         "almost free money. Think of it like finding a $20 bill on the ground — the "
         "sportsbook set the line at a number that's WAY below (or above) where the player "
@@ -83,7 +116,7 @@ GLOSSARY = {
         "goes over. Goblin criteria: projection 2+ standard deviations from the line, "
         "probability ≥80%, edge ≥25%."
     ),
-    "Demon Bet 👿": (
+    "Demon Bet [Demon]": (
         "A Demon bet LOOKS appealing on the surface but has hidden danger signals that make "
         "it a likely loser — it's a trap. There are 4 types: (1) Conflict Demon: the model's "
         "forces are nearly 50/50, a coin flip disguised as an edge. (2) Variance Demon: "
@@ -1595,7 +1628,7 @@ def get_tier_badge_html(tier, tier_emoji=None):
     """
     tier_emojis = {
         "Platinum": "💎",
-        "Gold": "🥇",
+        "Gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
         "Silver": "🥈",
         "Bronze": "🥉",
     }
@@ -1907,7 +1940,7 @@ def get_best_bets_section_html(best_bets):
     if not best_bets:
         return ""
 
-    rank_emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    rank_emojis = [get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="#1"), "🥈", "🥉", "4️⃣", "5️⃣"]
     rows = []
     for i, bet in enumerate(best_bets[:5]):
         emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
@@ -4302,7 +4335,7 @@ def get_bet_card_html(bet, show_live_status=False):
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'
 
     # Tier badge
-    tier_emojis = {"platinum": "💎", "gold": "🥇", "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
+    tier_emojis = {"platinum": "💎", "gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"), "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
     tier_emoji = tier_emojis.get(tier_lower, "🏅")
     tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
 
@@ -4480,7 +4513,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
 
     _TIER_EMOJI = {
         "platinum": "💎",
-        "gold":     "🥇",
+        "gold":     get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
         "silver":   "🥈",
         "bronze":   "🥉",
     }
@@ -4563,4 +4596,251 @@ def get_styled_stats_table_html(rows, columns, title=""):
 
 # ============================================================
 # END SECTION: Bet Tracker Card CSS & HTML Generators
+# ============================================================
+
+
+# ============================================================
+# SECTION: Player Intelligence CSS & HTML Helpers
+# Provides CSS classes and HTML generators for the player
+# intelligence strip, form dots, matchup grade badges, and
+# availability badges used in Neural Analysis cards and the
+# Prop Scanner Quick Analysis panel.
+# ============================================================
+
+_PLAYER_INTEL_CSS = """
+<style>
+/* ─── Availability Badges ─────────────────────────────── */
+.avail-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+.avail-active   { background: rgba(0,255,128,0.15); color: #00ff90; border: 1px solid rgba(0,255,128,0.35); }
+.avail-gtd      { background: rgba(255,200,0,0.15);  color: #ffc800; border: 1px solid rgba(255,200,0,0.35); }
+.avail-doubtful { background: rgba(255,120,0,0.15);  color: #ff8800; border: 1px solid rgba(255,120,0,0.35); }
+.avail-out      { background: rgba(255,60,60,0.15);  color: #ff4444; border: 1px solid rgba(255,60,60,0.35); }
+
+/* ─── Form Dots ───────────────────────────────────────── */
+.form-dots-row {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+.form-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    position: relative;
+    flex-shrink: 0;
+    cursor: default;
+}
+.form-dot-hit  { background: #00d084; box-shadow: 0 0 5px rgba(0,208,132,0.55); }
+.form-dot-miss { background: #ff4d4d; box-shadow: 0 0 5px rgba(255,77,77,0.45); }
+.form-dot-na   { background: #3a4560; }
+.form-label-hot     { color: #ff7b2e; font-weight: 700; font-size: 0.78rem; }
+.form-label-cold    { color: #5bc8f5; font-weight: 700; font-size: 0.78rem; }
+.form-label-neutral { color: #8a9bb8; font-weight: 600; font-size: 0.78rem; }
+
+/* ─── Matchup Grade Badges ────────────────────────────── */
+.grade-badge {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+.grade-a  { background: rgba(0,255,128,0.18); color: #00e57a; border: 1px solid rgba(0,255,128,0.40); }
+.grade-b  { background: rgba(0,200,255,0.14); color: #00c8ff; border: 1px solid rgba(0,200,255,0.35); }
+.grade-c  { background: rgba(255,200,0,0.13); color: #e6b800; border: 1px solid rgba(255,200,0,0.30); }
+.grade-d  { background: rgba(255,60,60,0.14); color: #ff5050; border: 1px solid rgba(255,60,60,0.32); }
+.grade-na { background: rgba(80,90,120,0.20); color: #8a9bb8; border: 1px solid rgba(80,90,120,0.25); }
+
+/* ─── Value Assessment Classes ────────────────────────── */
+.val-great   { color: #00e57a; font-weight: 700; }
+.val-good    { color: #00c8ff; font-weight: 600; }
+.val-neutral { color: #8a9bb8; }
+
+/* ─── Player Intel Strip ──────────────────────────────── */
+.intel-strip {
+    background: rgba(13,20,45,0.72);
+    border: 1px solid rgba(0,240,255,0.10);
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+.intel-section {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.76rem;
+}
+.intel-label {
+    color: #5a6e8a;
+    font-size: 0.70rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-right: 2px;
+}
+
+/* ─── Streak Banner ───────────────────────────────────── */
+.streak-banner-hot  { background: rgba(255,100,0,0.10); border-left: 3px solid #ff6420;
+                      padding: 4px 10px; border-radius: 0 6px 6px 0; font-size: 0.78rem; color: #ffaa60; margin-bottom:4px; }
+.streak-banner-cold { background: rgba(0,160,255,0.10); border-left: 3px solid #009fff;
+                      padding: 4px 10px; border-radius: 0 6px 6px 0; font-size: 0.78rem; color: #70ceff; margin-bottom:4px; }
+
+/* ─── Quick Analysis Panel (Prop Scanner) ─────────────── */
+.qa-row {
+    background: rgba(13,20,45,0.55);
+    border: 1px solid rgba(0,240,255,0.09);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.qa-player   { font-weight: 700; color: #e8f4ff; font-size: 0.88rem; min-width: 140px; }
+.qa-stat     { color: #8a9bb8; font-size: 0.78rem; }
+.qa-line     { color: #c0d0e8; font-weight: 600; font-size: 0.85rem; }
+.qa-edge     { font-weight: 700; font-size: 0.82rem; }
+.qa-edge-pos { color: #00e57a; }
+.qa-edge-neg { color: #ff5050; }
+.qa-edge-neu { color: #8a9bb8; }
+</style>
+"""
+
+
+def get_player_intel_css() -> str:
+    """Return CSS for the player intelligence UI components."""
+    return _PLAYER_INTEL_CSS
+
+
+def get_availability_badge_html(badge_label: str, badge_class: str, injury_note: str = "") -> str:
+    """Return HTML for an availability / injury status badge.
+
+    *badge_class* should be one of: avail-active, avail-gtd,
+    avail-doubtful, avail-out.
+    """
+    import html as _h
+    tooltip = _h.escape(injury_note) if injury_note else ""
+    title_attr = f' title="{tooltip}"' if tooltip else ""
+    return (
+        f'<span class="avail-badge {badge_class}"{title_attr}>'
+        f'{_h.escape(badge_label)}</span>'
+    )
+
+
+def get_form_dots_html(form_results: list, window: int = 5, prop_line: float = 0.0) -> str:
+    """Return an HTML row of coloured dots representing last-N-game over/under results.
+
+    *form_results* is the ``results`` list from
+    ``engine.player_intelligence.get_recent_form_vs_line()``.
+    """
+    dots = []
+    # Most recent game first
+    for i, r in enumerate(form_results[:window]):
+        css_cls = "form-dot-hit" if r.get("hit") else "form-dot-miss"
+        date_str = r.get("date", "")
+        val = r.get("value", "?")
+        margin = r.get("margin", 0)
+        sign = "+" if margin >= 0 else ""
+        tooltip = f"{date_str}: {val} ({sign}{margin})"
+        import html as _h
+        dots.append(
+            f'<span class="form-dot {css_cls}" title="{_h.escape(tooltip)}"></span>'
+        )
+    # Pad with grey dots if fewer games available
+    for _ in range(max(0, window - len(form_results))):
+        dots.append('<span class="form-dot form-dot-na" title="No data"></span>')
+
+    return f'<span class="form-dots-row">{"".join(dots)}</span>'
+
+
+def get_matchup_grade_badge_html(grade: str, label: str, css_class: str) -> str:
+    """Return an HTML matchup grade badge (A / B / C / D / N/A)."""
+    import html as _h
+    return (
+        f'<span class="grade-badge {css_class}" title="{_h.escape(label)}">'
+        f'{_h.escape(grade)}</span>'
+    )
+
+
+def get_intel_strip_html(
+    availability_html: str,
+    form_html: str,
+    hit_rate_pct: float,
+    form_label: str,
+    grade_html: str,
+    edge_pct: float,
+    direction: str,
+    streak_label: str = "",
+) -> str:
+    """Return a compact player intelligence strip HTML block.
+
+    Shows availability badge, form dots, hit-rate, matchup grade, and
+    edge assessment in a single-row layout for use inside analysis cards.
+    """
+    form_css = (
+        "form-label-hot" if "Hot" in form_label
+        else "form-label-cold" if "Cold" in form_label
+        else "form-label-neutral"
+    )
+    hit_pct_str = f"{hit_rate_pct * 100:.0f}%"
+
+    edge_sign = "+" if edge_pct >= 0 else ""
+    edge_css = "qa-edge-pos" if edge_pct >= 4 else "qa-edge-neg" if edge_pct <= -4 else "qa-edge-neu"
+
+    streak_html = ""
+    if streak_label:
+        banner_cls = "streak-banner-hot" if "Over" in streak_label else "streak-banner-cold"
+        import html as _h
+        streak_html = f'<div class="{banner_cls}">{_h.escape(streak_label)}</div>'
+
+    # Determine direction label from form label
+    if "Hot" in form_label:
+        _form_dir_label = "Over"
+    elif "Cold" in form_label:
+        _form_dir_label = "Under"
+    else:
+        _form_dir_label = "-"
+
+    return f"""
+{streak_html}
+<div class="intel-strip">
+  <div class="intel-section">
+    <span class="intel-label">Status</span>{availability_html}
+  </div>
+  <div class="intel-section">
+    <span class="intel-label">L{len(form_html)//20 or 5}</span>
+    {form_html}
+    <span class="{form_css}">{hit_pct_str} ({_form_dir_label})</span>
+  </div>
+  <div class="intel-section">
+    <span class="intel-label">Matchup</span>{grade_html}
+  </div>
+  <div class="intel-section">
+    <span class="intel-label">Avg Edge</span>
+    <span class="qa-edge {edge_css}">{edge_sign}{edge_pct:.1f}% {direction}</span>
+  </div>
+</div>
+"""
+
+
+# ============================================================
+# END SECTION: Player Intelligence CSS & HTML Helpers
 # ============================================================

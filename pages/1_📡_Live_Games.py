@@ -178,7 +178,7 @@ st.markdown("""
     ⚡ Two independent data pipelines — choose based on your goal:
   </span><br>
   <span style="color:#8a9bb8;font-size:0.84rem;">
-    <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats + synthetic props from season averages &nbsp;|&nbsp;
+    <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
     <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from PrizePicks / Underdog / DraftKings → Neural Analysis
   </span>
 </div>
@@ -191,7 +191,7 @@ with auto_col:
         "🔄 Auto-Load Tonight's Games",
         width="stretch",
         type="primary",
-        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats + auto-generate props from season averages",
+        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
     )
 
 with fetch_col:
@@ -203,7 +203,7 @@ with fetch_col:
 
 with info_col:
     st.caption(
-        "**Auto-Load** = games + rosters + stats (generates synthetic props from averages). "
+        "**Auto-Load** = games + rosters + stats. "
         "**Fetch Players Only** = refresh player data only."
     )
 
@@ -284,7 +284,7 @@ if auto_load_clicked:
     status_text = st.empty()
 
     try:
-        status_text.text("⏳ Step 1/3 — Fetching tonight's games...")
+        status_text.text("⏳ Step 1/2 — Fetching tonight's games...")
         progress_bar.progress(10)
         games = fetch_todays_games()
 
@@ -301,7 +301,7 @@ if auto_load_clicked:
         else:
             st.session_state["todays_games"] = games
 
-            status_text.text(f"⏳ Step 2/3 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
+            status_text.text(f"⏳ Step 2/2 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
             progress_bar.progress(35)
 
             players_ok = fetch_todays_players_only(games)
@@ -316,37 +316,7 @@ if auto_load_clicked:
                 except Exception as _inj_load_err:
                     _logger.warning(f"Auto-load: could not load injury map: {_inj_load_err}")
 
-            # ── Step 3: Auto-generate props for all 3 platforms ──────────
-            # Do this *after* fetch_todays_players_only so the freshly-written
-            # players.csv is available for reading.  This ensures every game has
-            # props ready to analyze without requiring a separate manual step.
-            props_msg = "Props: ⏭️ skipped (player fetch failed)"
-            if players_ok:
-                try:
-                    status_text.text("⏳ Step 3/3 — Auto-generating props for tonight's players…")
-                    progress_bar.progress(80)
-                    from data.data_manager import (
-                        load_players_data as _load_players,
-                        generate_props_for_todays_players as _gen_props,
-                        save_props_to_session as _save_props,
-                        clear_all_caches as _clear_caches,
-                    )
-                    _selected_platforms = st.session_state.get(
-                        "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
-                    )
-                    # Clear cache so freshly-written players.csv is read,
-                    # not the stale cached version from before the fetch.
-                    _clear_caches()
-                    _fresh_players = _load_players()
-                    _auto_props = _gen_props(_fresh_players, games, platforms=_selected_platforms)
-                    if _auto_props:
-                        _save_props(_auto_props, st.session_state)
-                        props_msg = f"Props: ✅ {len(_auto_props)} generated"
-                    else:
-                        props_msg = "Props: ⚠️ none generated (check player data)"
-                except Exception as _prop_err:
-                    _logger.warning(f"Auto-load: prop generation failed: {_prop_err}")
-                    props_msg = "Props: ⚠️ generation failed"
+
 
             status_text.text("⏳ Finalizing…")
             progress_bar.progress(90)
@@ -361,8 +331,7 @@ if auto_load_clicked:
             st.success(
                 f"✅ Loaded **{len(games)} game(s)** for tonight! "
                 f"Players: {'✅' if players_ok else '⚠️ failed'} | "
-                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'} | "
-                f"{props_msg}"
+                f"Injuries: {'✅' if injury_map else '⚠️ unavailable'}"
             )
             st.rerun()
 
@@ -817,7 +786,7 @@ if platform_props_clicked:
             gold_count  = sum(1 for p in analyzed_props if p["tier"] == "Gold")
             st.success(
                 f"✅ **{total_picks} qualifying picks** found across platforms | "
-                f"💎 {plat_count} Platinum · 🥇 {gold_count} Gold"
+                f"💎 {plat_count} Platinum · [Gold] {gold_count} Gold"
             )
 
             # Group by platform
@@ -908,7 +877,6 @@ if one_click_setup_clicked:
         )
         from data.data_manager import (
             load_players_data as _oc_load_players,
-            generate_props_for_todays_players as _oc_gen_props,
             save_props_to_session as _oc_save_props,
             clear_all_caches as _oc_clear_caches,
             load_injury_status as _oc_load_inj,
@@ -926,13 +894,8 @@ if one_click_setup_clicked:
         _oc_players_ok = _oc_fetch_players(_oc_games) if _oc_games else False
         _oc_bar.progress(45)
 
-        # Reload fresh player data and generate synthetic props
+        # Clear caches so freshly-written players.csv is read
         _oc_clear_caches()
-        _oc_fresh_players = _oc_load_players()
-        _oc_selected_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
-        _oc_auto_props = _oc_gen_props(_oc_fresh_players, _oc_games, platforms=_oc_selected_platforms)
-        if _oc_auto_props:
-            _oc_save_props(_oc_auto_props, st.session_state)
 
         try:
             st.session_state["injury_status_map"] = _oc_load_inj()
@@ -954,32 +917,7 @@ if one_click_setup_clicked:
             _oc_platform_props = _oc_fetch_platform(odds_api_key=_oc_odds_key or None)
             _oc_bar.progress(85)
             if _oc_platform_props:
-                # Filter synthetic auto-generated props to only platform-present players
-                try:
-                    from data.data_manager import filter_props_to_platform_players as _oc_filter_platform
-                    _oc_auto_props_filtered = _oc_filter_platform(_oc_auto_props, _oc_platform_props)
-                    _oc_filtered_count = len(_oc_auto_props) - len(_oc_auto_props_filtered)
-                    if _oc_filtered_count > 0:
-                        import logging as _oc_log
-                        _oc_log.getLogger(__name__).info(
-                            f"[OneClick] Filtered {_oc_filtered_count} synthetic props "
-                            "for players not on any betting platform today."
-                        )
-                except Exception as _oc_filt_err:
-                    import logging as _oc_log2
-                    _oc_log2.getLogger(__name__).warning(f"[OneClick] Platform filter failed: {_oc_filt_err}")
-                    _oc_auto_props_filtered = _oc_auto_props
-
-                # Merge platform props + filtered synthetic props (dedup)
-                _oc_existing = list(st.session_state.get("current_props", []))
-                _oc_seen = set()
-                _oc_merged = []
-                for _p in _oc_existing + _oc_platform_props + _oc_auto_props_filtered:
-                    _pk = (str(_p.get("player_name","")).lower(), str(_p.get("stat_type","")).lower(), str(_p.get("platform","")).lower())
-                    if _pk not in _oc_seen:
-                        _oc_seen.add(_pk)
-                        _oc_merged.append(_p)
-                _oc_save_props(_oc_merged, st.session_state)
+                _oc_save_props(_oc_platform_props, st.session_state)
                 _oc_save_platform(_oc_platform_props, st.session_state)
                 try:
                     _oc_save_csv(_oc_platform_props)

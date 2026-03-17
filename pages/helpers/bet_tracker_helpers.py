@@ -51,7 +51,7 @@ def build_stat_performance_rows(stat_perf: dict) -> list:
 
 def build_bet_type_performance_rows(bet_type_perf: dict) -> list:
     """Build table rows for Win Rate by Bet Classification section."""
-    _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
+    _bt_emoji_map = {"goblin": "[Goblin] Goblin", "demon": "[Demon] Demon", "normal": "Normal"}
     return [
         {
             "Bet Type":  _bt_emoji_map.get(bt, bt.title()),

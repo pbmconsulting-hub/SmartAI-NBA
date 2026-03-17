@@ -243,6 +243,7 @@ st.divider()
     tab_log,
     tab_predict,
     tab_history,
+    tab_achievements,
 ) = st.tabs([
     "📊 Model Health",
     "📊 AI Picks",
@@ -252,6 +253,7 @@ st.divider()
     "➕ Log a Bet",
     "🔮 Predictor",
     "📅 History",
+    "🏆 Achievements",
 ])
 
 # ============================================================
@@ -364,7 +366,7 @@ with tab_model_health:
                 )
                 # Tier spotlight metric cards
                 _tier_spot_cols = st.columns(4)
-                _tier_icons = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+                _tier_icons = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
                 for _ti, _tn in enumerate(["Platinum", "Gold", "Silver", "Bronze"]):
                     if _tn in tier_perf:
                         _td = tier_perf[_tn]
@@ -426,8 +428,8 @@ with tab_model_health:
         # Win rate by Goblin / Demon / Normal bet classification
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
-            with st.expander("🧌👿 Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
+            with st.expander("[Goblin][Demon] Win Rate by Bet Classification", expanded=True):
+                _bt_emoji_map = {"goblin": "[Goblin] Goblin", "demon": "[Demon] Demon", "normal": "Normal"}
                 bt_rows = [
                     {
                         "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -451,7 +453,7 @@ with tab_model_health:
                 _metric_cols = st.columns(3)
                 if _goblin_data.get("total", 0) > 0:
                     _metric_cols[0].metric(
-                        "🧌 Goblin Win Rate",
+                        "[Goblin] Goblin Win Rate",
                         f"{_goblin_data.get('win_rate', 0):.1f}%",
                         help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
                     )
@@ -462,12 +464,12 @@ with tab_model_health:
                     _demon_win_rate  = round(_demon_wins  / max(_demon_total, 1) * 100, 1)
                     _demon_loss_rate = round(_demon_losses / max(_demon_total, 1) * 100, 1)
                     _metric_cols[1].metric(
-                        "👿 Demon Win Rate",
+                        "[Demon] Demon Win Rate",
                         f"{_demon_win_rate:.1f}%",
                         help=f"Demon bets should rarely win. Based on {_demon_total} logged Demon bets.",
                     )
                     _metric_cols[2].metric(
-                        "👿 Demon Loss Rate",
+                        "[Demon] Demon Loss Rate",
                         f"{_demon_loss_rate:.1f}%",
                         delta=f"Validated: {_demon_loss_rate:.0f}% loss rate",
                         delta_color="normal",
@@ -484,7 +486,7 @@ with tab_model_health:
                 _gb_wins   = sum(1 for b in _goblin_resolved if b.get("result") == "WIN")
                 _gb_losses = sum(1 for b in _goblin_resolved if b.get("result") == "LOSS")
                 with st.expander(
-                    f"🧌 Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
+                    f"[Goblin] Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
                     expanded=False,
                 ):
                     _gbc_a, _gbc_b = st.columns(2)
@@ -507,12 +509,12 @@ with tab_model_health:
                 _dm_pushes = sum(1 for b in _demon_resolved if b.get("result") == "PUSH")
                 _dm_total  = len(_demon_resolved)
                 with st.expander(
-                    f"👿 Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
+                    f"[Demon] Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
                     f"({round(_dm_wins/_dm_total*100,1) if _dm_total else 0:.1f}% win rate)",
                     expanded=False,
                 ):
                     st.caption(
-                        "👿 **Demon bets** are traps — conflicting forces, high variance, "
+                        "[Demon] **Demon bets** are traps — conflicting forces, high variance, "
                         "fatigue risk, or hot-streak regression. A **high loss rate validates the system**."
                     )
                     # Demon subtype breakdown from notes/reasons
@@ -612,7 +614,7 @@ with tab_ai_picks:
     with _ai_filter_col1:
         _ai_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="ai_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -620,7 +622,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -630,8 +632,8 @@ with tab_ai_picks:
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
         _ai_bt_map = {
-            "🧌 Goblin — Easy Money": "goblin",
-            "👿 Demon — Trap/Avoid": "demon",
+            "[Goblin] Goblin — Easy Money": "goblin",
+            "[Demon] Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _ai_bt_values = [_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map]
@@ -908,7 +910,7 @@ with tab_all_picks:
     with _ap_filter_col1:
         _ap_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="ap_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -916,7 +918,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -926,8 +928,8 @@ with tab_all_picks:
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
         _ap_bt_map = {
-            "🧌 Goblin — Easy Money": "goblin",
-            "👿 Demon — Trap/Avoid": "demon",
+            "[Goblin] Goblin — Easy Money": "goblin",
+            "[Demon] Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _ap_bt_values = [_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map]
@@ -983,7 +985,7 @@ with tab_all_picks:
         # ── Tier Distribution Bar ─────────────────────────────────────
         _tier_bar = (
             f'<span style="color:#c800ff;font-weight:700;">💎 {_tier_counts["Platinum"]} Platinum</span>'
-            f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {_tier_counts["Gold"]} Gold</span>'
+            f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">[Gold] {_tier_counts["Gold"]} Gold</span>'
             f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {_tier_counts["Silver"]} Silver</span>'
             f' &nbsp;·&nbsp; <span style="color:#cd7f32;">🥉 {_tier_counts["Bronze"]} Bronze</span>'
         )
@@ -1319,7 +1321,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1339,8 +1341,8 @@ with tab_bets:
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
             _bets_bt_map = {
-                "🧌 Goblin — Easy Money": "goblin",
-                "👿 Demon — Trap/Avoid": "demon",
+                "[Goblin] Goblin — Easy Money": "goblin",
+                "[Demon] Demon — Trap/Avoid": "demon",
                 "⚡ Normal": "normal",
             }
             _bets_bt_values = [_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map]
@@ -1596,7 +1598,7 @@ with tab_predict:
 
         if _tier_counts_wr:
             st.markdown("**Per-Tier Expected Win Rates**")
-            _TIER_EMOJI_WR = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+            _TIER_EMOJI_WR = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
             tier_wr_rows = [
                 {
                     "Tier":            f"{_TIER_EMOJI_WR.get(t, '')} {t}",
@@ -1625,7 +1627,7 @@ with tab_predict:
             _tier_counts[t] = _tier_counts.get(t, 0) + 1
 
         _TIER_PCT   = {"Platinum": 0.30, "Gold": 0.25, "Silver": 0.20, "Bronze": 0.10}
-        _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+        _TIER_EMOJI = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
         bankroll    = st.number_input(
             "Total Bankroll ($)", min_value=10.0, max_value=100000.0, value=100.0, step=10.0
         )
@@ -1915,5 +1917,239 @@ with tab_history:
 
 # ============================================================
 # END SECTION: History Tab
+# ============================================================
+
+# ============================================================
+# SECTION: Achievements Tab
+# Gamification panel: streaks, win-rate badges, milestones,
+# personal bests, and a betting journal summary.
+# ============================================================
+
+with tab_achievements:
+    st.subheader("🏆 Achievements & Streak Tracker")
+    st.markdown(
+        "Track your betting streaks, unlock milestones, and review your personal bests."
+    )
+
+    # ── Load all resolved bets ─────────────────────────────────────
+    _ach_all_bets = load_all_picks() + load_bets()
+    _ach_resolved = [
+        b for b in _ach_all_bets
+        if b.get("result") in ("WIN", "LOSS", "PUSH")
+    ]
+    _ach_resolved.sort(key=lambda b: b.get("bet_date", ""), reverse=True)
+
+    if not _ach_resolved:
+        st.info(
+            "No resolved bets yet. Log and resolve some bets to start earning achievements!"
+        )
+    else:
+        total_bets   = len(_ach_resolved)
+        total_wins   = sum(1 for b in _ach_resolved if b.get("result") == "WIN")
+        total_losses = sum(1 for b in _ach_resolved if b.get("result") == "LOSS")
+        overall_wr   = round(total_wins / max(total_bets, 1) * 100, 1)
+
+        # ── Current hot/cold streak ────────────────────────────────
+        _cur_streak = 0
+        _cur_streak_type = ""
+        if _ach_resolved:
+            _first_result = _ach_resolved[0].get("result", "")
+            _cur_streak_type = _first_result
+            for _sb in _ach_resolved:
+                if _sb.get("result") == _first_result:
+                    _cur_streak += 1
+                else:
+                    break
+
+        # ── Longest win/loss streak ────────────────────────────────
+        _longest_win = 0
+        _longest_loss = 0
+        _run_w = 0
+        _run_l = 0
+        for _sb in reversed(_ach_resolved):
+            if _sb.get("result") == "WIN":
+                _run_w += 1
+                _run_l = 0
+            elif _sb.get("result") == "LOSS":
+                _run_l += 1
+                _run_w = 0
+            else:
+                _run_w = _run_l = 0
+            _longest_win  = max(_longest_win,  _run_w)
+            _longest_loss = max(_longest_loss, _run_l)
+
+        # ── Best single-day win rate (min 3 bets) ──────────────────
+        _day_groups: dict = {}
+        for _sb in _ach_resolved:
+            _d = _sb.get("bet_date", "Unknown")
+            _day_groups.setdefault(_d, []).append(_sb)
+        _best_day_wr = 0.0
+        _best_day    = ""
+        for _d, _dbets in _day_groups.items():
+            if len(_dbets) >= 3:
+                _dw = sum(1 for b in _dbets if b.get("result") == "WIN")
+                _dwr = _dw / len(_dbets) * 100
+                if _dwr > _best_day_wr:
+                    _best_day_wr = _dwr
+                    _best_day    = _d
+
+        # ── Top stat type by win rate ──────────────────────────────
+        _stat_groups: dict = {}
+        for _sb in _ach_resolved:
+            _st = _sb.get("stat_type", "unknown")
+            _stat_groups.setdefault(_st, {"wins": 0, "total": 0})
+            _stat_groups[_st]["total"] += 1
+            if _sb.get("result") == "WIN":
+                _stat_groups[_st]["wins"] += 1
+        _stat_wr = {
+            s: round(v["wins"] / max(v["total"], 1) * 100, 1)
+            for s, v in _stat_groups.items()
+            if v["total"] >= 3
+        }
+        _best_stat = max(_stat_wr, key=_stat_wr.get) if _stat_wr else ""
+        _best_stat_wr = _stat_wr.get(_best_stat, 0.0)
+
+        # ── Summary metrics row ────────────────────────────────────
+        _ac1, _ac2, _ac3, _ac4 = st.columns(4)
+        with _ac1:
+            st.metric("Total Resolved", total_bets)
+        with _ac2:
+            st.metric("Overall Win Rate", f"{overall_wr:.1f}%",
+                      delta=f"+{overall_wr - 50:.1f}% vs 50%" if overall_wr != 50 else None)
+        with _ac3:
+            _streak_label = (
+                f"🔥 {_cur_streak} W" if _cur_streak_type == "WIN" and _cur_streak >= 2
+                else f"❄️ {_cur_streak} L" if _cur_streak_type == "LOSS" and _cur_streak >= 2
+                else f"{_cur_streak} {_cur_streak_type}"
+            )
+            st.metric("Current Streak", _streak_label)
+        with _ac4:
+            st.metric("Best Day W%", f"{_best_day_wr:.0f}%" if _best_day else "—",
+                      help=f"Date: {_best_day}" if _best_day else "Need 3+ bets in one day")
+
+        st.divider()
+
+        # ── Achievement badges ────────────────────────────────────
+        st.markdown("### 🎖️ Earned Badges")
+
+        _badges: list[dict] = []
+
+        # Volume badges
+        if total_bets >= 100:
+            _badges.append({"icon": "💯", "name": "Century Club", "desc": "100+ resolved bets"})
+        elif total_bets >= 50:
+            _badges.append({"icon": "🥈", "name": "Fifty Strong", "desc": "50+ resolved bets"})
+        elif total_bets >= 10:
+            _badges.append({"icon": "🎯", "name": "Getting Serious", "desc": "10+ resolved bets"})
+
+        # Win rate badges
+        if overall_wr >= 70 and total_bets >= 20:
+            _badges.append({"icon": "👑", "name": "Elite Picker", "desc": f"{overall_wr:.0f}% win rate (20+ bets)"})
+        elif overall_wr >= 60 and total_bets >= 10:
+            _badges.append({"icon": "⭐", "name": "Sharp", "desc": f"{overall_wr:.0f}% win rate (10+ bets)"})
+        elif overall_wr >= 55 and total_bets >= 10:
+            _badges.append({"icon": "✅", "name": "Consistent", "desc": f"{overall_wr:.0f}% win rate"})
+
+        # Streak badges
+        if _longest_win >= 10:
+            _badges.append({"icon": "🔥🔥", "name": "On Fire", "desc": f"{_longest_win}-game win streak"})
+        elif _longest_win >= 5:
+            _badges.append({"icon": "🔥", "name": "Hot Streak", "desc": f"{_longest_win}-game win streak"})
+        elif _longest_win >= 3:
+            _badges.append({"icon": "⚡", "name": "Warming Up", "desc": f"{_longest_win}-game win streak"})
+
+        # Stat mastery badges
+        if _best_stat and _best_stat_wr >= 65:
+            _badges.append({
+                "icon": "🏆",
+                "name": f"{_best_stat.replace('_',' ').title()} Master",
+                "desc": f"{_best_stat_wr:.0f}% win rate on {_best_stat}",
+            })
+
+        # Resilience badge
+        if _longest_loss >= 5 and overall_wr >= 55:
+            _badges.append({"icon": "💪", "name": "Resilient", "desc": "Bounced back from 5+ loss streak"})
+
+        # Current streak badge
+        if _cur_streak_type == "WIN" and _cur_streak >= 5:
+            _badges.append({"icon": "🌶️", "name": "White Hot", "desc": f"Current {_cur_streak}-game win streak!"})
+
+        if not _badges:
+            st.info("No badges earned yet. Keep logging bets to unlock achievements!")
+        else:
+            _badge_cols = st.columns(min(len(_badges), 4))
+            for _bi, _badge in enumerate(_badges):
+                with _badge_cols[_bi % 4]:
+                    st.markdown(
+                        f'<div style="background:rgba(0,240,255,0.06);border:1px solid rgba(0,240,255,0.18);'
+                        f'border-radius:10px;padding:12px 10px;text-align:center;min-height:90px;">'
+                        f'<div style="font-size:1.8rem;">{_badge["icon"]}</div>'
+                        f'<div style="color:#e8f4ff;font-weight:700;font-size:0.82rem;margin:4px 0 2px;">'
+                        f'{_badge["name"]}</div>'
+                        f'<div style="color:#8a9bb8;font-size:0.70rem;">{_badge["desc"]}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+        st.divider()
+
+        # ── Streak history mini-chart (last 30 bets) ──────────────
+        st.markdown("### 📈 Last 30 Results — Win/Loss Timeline")
+        _last30 = _ach_resolved[:30]
+        if _last30:
+            _timeline_dots = []
+            for _tb in reversed(_last30):
+                _tr = _tb.get("result", "")
+                if _tr == "WIN":
+                    _timeline_dots.append('<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#00d084;margin:2px;" title="WIN"></span>')
+                elif _tr == "LOSS":
+                    _timeline_dots.append('<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#ff4d4d;margin:2px;" title="LOSS"></span>')
+                else:
+                    _timeline_dots.append('<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:#444;margin:2px;" title="PUSH"></span>')
+            st.markdown(
+                '<div style="display:flex;flex-wrap:wrap;gap:3px;padding:8px;background:rgba(13,20,45,0.55);'
+                'border:1px solid rgba(0,240,255,0.1);border-radius:8px;">'
+                + "".join(_timeline_dots)
+                + "<span style='color:#8a9bb8;font-size:0.72rem;margin-left:8px;align-self:center;'>"
+                  "← oldest &nbsp; newest →</span>"
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.caption("No timeline data available.")
+
+        st.divider()
+
+        # ── Personal bests table ───────────────────────────────────
+        st.markdown("### 🥇 Personal Bests")
+        _pb_col1, _pb_col2 = st.columns(2)
+        with _pb_col1:
+            st.metric("🔥 Longest Win Streak", f"{_longest_win} games")
+            st.metric("📅 Best Single-Day Win %", f"{_best_day_wr:.0f}%" if _best_day else "—",
+                      help=f"Date: {_best_day}" if _best_day else "")
+        with _pb_col2:
+            st.metric("🏆 Best Stat Type", f"{_best_stat.replace('_',' ').title()}" if _best_stat else "—",
+                      delta=f"{_best_stat_wr:.0f}% WR" if _best_stat else None)
+            st.metric("📊 Total Wins", total_wins)
+
+        st.divider()
+
+        # ── Win rate by stat type summary ─────────────────────────
+        if _stat_wr:
+            st.markdown("### 📊 Win Rate by Stat Type")
+            _wr_rows = [
+                {
+                    "Stat Type": s.replace("_", " ").title(),
+                    "Bets": _stat_groups[s]["total"],
+                    "Wins": _stat_groups[s]["wins"],
+                    "Win Rate": f"{wr:.1f}%",
+                    "Grade": "A ✅" if wr >= 65 else ("B ✅" if wr >= 55 else ("C ➡️" if wr >= 50 else "D ❌")),
+                }
+                for s, wr in sorted(_stat_wr.items(), key=lambda x: x[1], reverse=True)
+            ]
+            st.dataframe(_wr_rows, hide_index=True, use_container_width=True)
+
+# ============================================================
+# END SECTION: Achievements Tab
 # ============================================================
 
