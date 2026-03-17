@@ -27,6 +27,27 @@ VIG_ADJUSTMENT_PCT = 2.0
 # Minimum edge required AFTER vig deduction for a pick to qualify
 MIN_EDGE_AFTER_VIG = 2.0  # lowered from 4.0 (was 3.0 originally) to align with Silver 3% min edge
 
+# Per-stat minimum edge thresholds (2D).
+# Different stats have different variance levels — require proportionally more edge.
+# Higher-variance stats need larger edges to overcome noise.
+STAT_EDGE_THRESHOLDS = {
+    "points": 2.5,
+    "rebounds": 3.0,
+    "assists": 3.0,
+    "threes": 4.0,
+    "steals": 5.0,
+    "blocks": 5.0,
+    "turnovers": 4.0,
+    "points_rebounds_assists": 2.0,
+    "points_rebounds": 2.0,
+    "points_assists": 2.0,
+    "rebounds_assists": 2.5,
+    "blocks_steals": 4.0,
+    "fantasy_score_pp": 2.0,
+    "fantasy_score_dk": 2.0,
+    "fantasy_score_ud": 2.0,
+}
+
 # Low-volume stat types with inherently higher variance.
 # These require a larger raw edge to overcome uncertainty.
 LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
@@ -49,6 +70,8 @@ def analyze_directional_forces(
     stat_type,
     projection_result,
     game_context,
+    platform_lines=None,
+    recent_form_ratio=None,
 ):
     """
     Identify all forces pushing the stat OVER or UNDER the line.
@@ -66,6 +89,12 @@ def analyze_directional_forces(
         game_context (dict): Tonight's game info:
             'opponent', 'is_home', 'rest_days', 'game_total',
             'vegas_spread' (positive = player's team favored)
+        platform_lines (dict or None): Optional mapping of platform name
+            to posted line (e.g. {'DraftKings': 24.5, 'FanDuel': 25.0}).
+            Used for Market Consensus force (2A).
+        recent_form_ratio (float or None): Ratio of recent-game average to
+            season average (e.g. 1.25 = running 25% above average).
+            Used for Regression-to-Mean force (2F).
 
     Returns:
         dict: {
@@ -77,6 +106,7 @@ def analyze_directional_forces(
             'under_strength': float (total strength of under forces)
             'net_direction': str 'OVER' or 'UNDER'
             'net_strength': float
+            'conflict_severity': float (0-1, 1=perfectly balanced forces)
         }
 
     Example:
@@ -269,6 +299,75 @@ def analyze_directional_forces(
     # END SECTION: Line Sharpness Detection
     # ============================================================
 
+    # --- Force 9: Market Consensus (2A) ---
+    # When multiple platforms post different lines, consensus shows the "true" line.
+    # A prop line far below consensus = OVER value; far above consensus = UNDER value.
+    if platform_lines and len(platform_lines) >= 2:
+        platform_values = [float(v) for v in platform_lines.values() if v is not None]
+        if len(platform_values) >= 2:
+            consensus_line = sum(platform_values) / len(platform_values)
+            if consensus_line > 0:
+                gap_pct = (consensus_line - prop_line) / consensus_line * 100.0
+                if gap_pct > 5.0:
+                    # Prop line is more than 5% BELOW consensus → OVER value
+                    strength = min(2.0, gap_pct / 5.0)
+                    all_over_forces.append({
+                        "name": "Market Consensus",
+                        "description": (
+                            f"Line ({prop_line}) is {gap_pct:.1f}% below cross-platform "
+                            f"consensus ({consensus_line:.2f}) — potential mispriced line"
+                        ),
+                        "strength": round(strength, 2),
+                        "direction": "OVER",
+                    })
+                elif gap_pct < -5.0:
+                    # Prop line is more than 5% ABOVE consensus → UNDER value
+                    strength = min(2.0, abs(gap_pct) / 5.0)
+                    all_under_forces.append({
+                        "name": "Market Consensus",
+                        "description": (
+                            f"Line ({prop_line}) is {abs(gap_pct):.1f}% above cross-platform "
+                            f"consensus ({consensus_line:.2f}) — line may be inflated"
+                        ),
+                        "strength": round(strength, 2),
+                        "direction": "UNDER",
+                    })
+
+    # --- Force 10: Regression to Mean (2F) ---
+    # Players running significantly above/below their season average tend to revert.
+    # This is one of the most reliable phenomena in sports statistics.
+    _recent_form = recent_form_ratio if recent_form_ratio is not None else projection_result.get("recent_form_ratio", None)
+    if _recent_form is not None:
+        try:
+            _recent_form = float(_recent_form)
+        except (TypeError, ValueError):
+            _recent_form = None
+    if _recent_form is not None:
+        if _recent_form > 1.20:
+            # Running 20%+ above average — regression to mean is likely
+            strength = min(1.5, (_recent_form - 1.0) * 3.0)
+            all_under_forces.append({
+                "name": "Regression Risk",
+                "description": (
+                    f"Running {(_recent_form - 1.0) * 100:.0f}% above season average — "
+                    "regression to the mean is likely"
+                ),
+                "strength": round(strength, 2),
+                "direction": "UNDER",
+            })
+        elif _recent_form < 0.80:
+            # Running 20%+ below average — bounce-back expected
+            strength = min(1.2, (1.0 - _recent_form) * 2.5)
+            all_over_forces.append({
+                "name": "Bounce-Back",
+                "description": (
+                    f"Running {(1.0 - _recent_form) * 100:.0f}% below season average — "
+                    "bounce-back toward average expected"
+                ),
+                "strength": round(strength, 2),
+                "direction": "OVER",
+            })
+
     # ============================================================
     # SECTION: Summarize Forces
     # ============================================================
@@ -278,6 +377,14 @@ def analyze_directional_forces(
     under_count = len(all_under_forces)
     over_total_strength = sum(f["strength"] for f in all_over_forces)
     under_total_strength = sum(f["strength"] for f in all_under_forces)
+
+    # --- Conflict Severity Score (2E) ---
+    # Measures how evenly matched the opposing forces are.
+    # 1.0 = perfectly balanced (maximum conflict), 0 = one-sided
+    if over_total_strength > 0 and under_total_strength > 0:
+        conflict_severity = min(over_total_strength, under_total_strength) / max(over_total_strength, under_total_strength)
+    else:
+        conflict_severity = 0.0
 
     # Determine the net direction
     if over_total_strength > under_total_strength:
@@ -296,11 +403,129 @@ def analyze_directional_forces(
         "under_strength": round(under_total_strength, 2),
         "net_direction": net_direction,
         "net_strength": round(net_strength, 2),
+        "conflict_severity": round(conflict_severity, 3),
     }
 
     # ============================================================
     # END SECTION: Summarize Forces
     # ============================================================
+
+
+# ============================================================
+# SECTION: Closing Line Value (2B)
+# ============================================================
+
+def estimate_closing_line_value(current_line, model_projection, hours_to_game=None):
+    """
+    Estimate the closing line value (CLV) for a prop bet. (2B)
+
+    CLV is the gold standard of sharp betting: did your line beat where
+    the market eventually closed? A positive CLV means you got a better
+    number than the closing line — a strong indicator of long-term edge.
+
+    BEGINNER NOTE: Lines move as sharp bettors place wagers. The closing
+    line is the final line right before tip-off, after all professional
+    money has been processed. If you got 24.5 and it closes at 26.0,
+    you "beat the closing line" — you had better information than the
+    eventual market consensus.
+
+    Args:
+        current_line (float): The line you can bet right now
+        model_projection (float): Our model's projected value for the stat
+        hours_to_game (float or None): Hours until tip-off. When < 2,
+            less line movement is expected (market more locked in).
+
+    Returns:
+        dict: {
+            'estimated_closing_line': float,
+            'clv_edge': float,    # positive = you beat the close
+            'is_positive_clv': bool,
+        }
+
+    Example:
+        current_line=24.5, model_projection=27.0, hours_to_game=6
+        → estimated_close = 24.5*0.3 + 27.0*0.7 = 26.25
+        → clv_edge = 24.5 - 26.25 = -1.75  (negative = you DON'T beat close)
+        Flip: current_line=27.0, model_projection=24.5
+        → clv_edge = 27.0 - 25.25 = +1.75  (positive CLV — you beat close)
+    """
+    if current_line <= 0 or model_projection <= 0:
+        return {
+            "estimated_closing_line": current_line,
+            "clv_edge": 0.0,
+            "is_positive_clv": False,
+        }
+
+    if hours_to_game is not None and hours_to_game < 2:
+        # Close to game — less line movement expected
+        estimated_close = current_line * 0.6 + model_projection * 0.4
+    else:
+        # Standard: lines move significantly toward the true value
+        estimated_close = current_line * 0.3 + model_projection * 0.7
+
+    # CLV edge: positive = you're getting a better line than where it will close
+    clv_edge = current_line - estimated_close
+
+    return {
+        "estimated_closing_line": round(estimated_close, 3),
+        "clv_edge": round(clv_edge, 3),
+        "is_positive_clv": clv_edge > 0,
+    }
+
+
+# ============================================================
+# SECTION: Dynamic Vig (2C)
+# ============================================================
+
+def calculate_dynamic_vig(over_odds=None, under_odds=None, platform=None):
+    """
+    Calculate the dynamic vig percentage for a prop bet. (2C)
+
+    Different platforms have different vig structures:
+    - PrizePicks/Underdog: 0% per-leg vig (profit is in payout structure)
+    - DraftKings with real odds: actual vig from the juice
+    - Default: 2.38% (standard -110/-110 lines)
+
+    BEGINNER NOTE: Vig (or "juice") is the sportsbook's fee. At -110/-110,
+    the breakeven is 52.38% (not 50%). Subtracting the vig from our edge
+    gives the TRUE edge we need to overcome to be profitable.
+
+    Args:
+        over_odds (float or None): American odds on the over (e.g. -110, +120)
+        under_odds (float or None): American odds on the under
+        platform (str or None): Platform name ('PrizePicks', 'Underdog',
+            'DraftKings', etc.)
+
+    Returns:
+        float: Vig percentage (0.0 to ~5.0)
+
+    Example:
+        calculate_dynamic_vig(platform="PrizePicks") → 0.0
+        calculate_dynamic_vig(-110, -110, "DraftKings") → 2.38
+        calculate_dynamic_vig(-130, +110, "DraftKings") → ~3.5
+    """
+    _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
+    if platform and platform in _NO_VIG_PLATFORMS:
+        return 0.0
+
+    if over_odds is not None and under_odds is not None:
+        try:
+            o = float(over_odds)
+            u = float(under_odds)
+            # Convert American odds to implied probabilities
+            def _implied(odds):
+                if odds < 0:
+                    return abs(odds) / (abs(odds) + 100.0)
+                else:
+                    return 100.0 / (odds + 100.0)
+            total_implied = _implied(o) + _implied(u)
+            # Vig = excess implied probability above 1.0, expressed as a percentage
+            return round(max(0.0, (total_implied - 1.0) * 100.0), 3)
+        except (ValueError, TypeError):
+            pass
+
+    # Fallback: standard -110/-110 vig = 2.38%
+    return 2.38
 
 
 # ============================================================
@@ -377,13 +602,15 @@ def should_avoid_prop(
         effective_edge = vig_adjusted_edge / LOW_VOLUME_UNCERTAINTY_MULTIPLIER
     else:
         effective_edge = vig_adjusted_edge
-    if effective_edge < MIN_EDGE_AFTER_VIG:
+    # Use per-stat threshold if available, else fall back to MIN_EDGE_AFTER_VIG
+    _stat_min_edge = STAT_EDGE_THRESHOLDS.get(stat_type_lower, MIN_EDGE_AFTER_VIG)
+    if effective_edge < _stat_min_edge:
         _vig_adj_display = max(0.0, vig_adjusted_edge)  # show 0 if negative to avoid confusion
         _vig_label = f"{effective_vig:.1f}% vig" if effective_vig > 0 else "no vig (PrizePicks/Underdog)"
         avoid_reasons.append(
             f"Insufficient edge after vig ({edge_percentage:.1f}% raw → "
             f"{_vig_adj_display:.1f}% after {_vig_label}) — "
-            f"below {MIN_EDGE_AFTER_VIG}% minimum"
+            f"below {_stat_min_edge:.1f}% minimum for {stat_type_lower or 'this stat'}"
         )
 
     # Reason 2: High variance relative to line (too unpredictable)
@@ -394,14 +621,15 @@ def should_avoid_prop(
                 f"High variance stat (CV={coefficient_of_variation:.2f}) — very unpredictable"
             )
 
-    # Reason 3: Conflicting forces (roughly equal over/under pressure)
+    # Reason 3: Conflicting forces (2E enhanced)
     over_strength = directional_forces_result.get("over_strength", 0)
     under_strength = directional_forces_result.get("under_strength", 0)
+    conflict_severity = directional_forces_result.get("conflict_severity", 0.0)
     if over_strength > 0 and under_strength > 0:
-        conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
-        if conflict_ratio > 0.80:  # Within 20% of each other = conflicting (raised from 0.70)
+        if conflict_severity > 0.7 and over_strength > 1.0 and under_strength > 1.0:
             avoid_reasons.append(
-                "Conflicting forces — OVER and UNDER signals are nearly equal"
+                f"High conflict severity ({conflict_severity:.2f}) — strong opposing signals "
+                "on both sides with no clear direction"
             )
 
     # Reason 4: Strong blowout risk force present
