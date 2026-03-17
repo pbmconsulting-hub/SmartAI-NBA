@@ -458,10 +458,8 @@ with left_column:
             try:
                 from data.live_data_fetcher import fetch_todays_games as _hoc_fg, fetch_todays_players_only as _hoc_fp
                 from data.data_manager import (
-                    generate_props_for_todays_players as _hoc_gp,
-                    save_props_to_session as _hoc_sp,
                     clear_all_caches as _hoc_cc,
-                    load_players_data as _hoc_lp,
+                    load_injury_status as _hoc_li,
                 )
                 _hoc_games = _hoc_fg()
                 if _hoc_games:
@@ -470,25 +468,36 @@ with left_column:
                     _hoc_games = st.session_state.get("todays_games", [])
                 _hoc_fp(_hoc_games)
                 _hoc_cc()
-                _hoc_players = _hoc_lp()
-                _hoc_selected_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
-                _hoc_props = _hoc_gp(_hoc_players, _hoc_games, platforms=_hoc_selected_platforms)
-                if _hoc_props:
-                    _hoc_sp(_hoc_props, st.session_state)
+                try:
+                    st.session_state["injury_status_map"] = _hoc_li()
+                except Exception:
+                    pass
                 try:
                     from data.platform_fetcher import fetch_all_platform_props as _hoc_fap
-                    from data.data_manager import save_platform_props_to_session as _hoc_sps
+                    from data.data_manager import (
+                        save_platform_props_to_session as _hoc_sps,
+                        save_props_to_session as _hoc_sp,
+                    )
                     _hoc_live = _hoc_fap()
                     if _hoc_live:
                         _hoc_sps(_hoc_live, st.session_state)
+                        _hoc_sp(_hoc_live, st.session_state)
                         _hoc_total = len(st.session_state.get("current_props", []))
                         st.success(f"✅ Setup complete! {len(_hoc_games)} games · {_hoc_total} props loaded. Go to ⚡ Neural Analysis.")
                     else:
                         st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Neural Analysis.")
-                except Exception:
-                    st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Neural Analysis.")
+                except Exception as _hoc_plat_err:
+                    _hoc_err_str = str(_hoc_plat_err)
+                    if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
+                        pass
+                    else:
+                        st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Neural Analysis.")
             except Exception as _hoc_err:
-                st.error(f"❌ One-Click Setup failed: {_hoc_err}")
+                _hoc_err_str = str(_hoc_err)
+                if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
+                    pass
+                else:
+                    st.error(f"❌ One-Click Setup failed: {_hoc_err}")
 
     st.markdown("""
     **Follow these steps to find tonight's best bets:**

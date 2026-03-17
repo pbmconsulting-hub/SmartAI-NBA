@@ -339,7 +339,7 @@ if selected_picks:
     with _eb_filter_col1:
         _eb_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="eb_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -347,7 +347,7 @@ if selected_picks:
     with _eb_filter_col2:
         _eb_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
             default=[],
             key="eb_bet_type_filter",
             help="Filter by bet classification. Select 'Goblin — Easy Money' for the strongest picks.",
@@ -358,8 +358,8 @@ if selected_picks:
         _filtered_picks = [p for p in _filtered_picks if p.get("tier") in _eb_tier_names]
     if _eb_bet_type_filter:
         _eb_bt_map = {
-            "[Goblin] Goblin — Easy Money": "goblin",
-            "[Demon] Demon — Trap/Avoid": "demon",
+            "Goblin — Easy Money": "goblin",
+            "Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _eb_bt_values = [_eb_bt_map[t] for t in _eb_bet_type_filter if t in _eb_bt_map]

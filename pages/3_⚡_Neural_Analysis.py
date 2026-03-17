@@ -1308,7 +1308,7 @@ if run_analysis:
             if _bet_classification.get("demon") and not full_result.get("should_avoid"):
                 full_result["should_avoid"] = True
                 full_result["avoid_reasons"] = list(full_result.get("avoid_reasons", [])) + [
-                    f"[Demon] Demon Bet: {'; '.join(_bet_classification.get('reasons', []))}"
+                    f"Demon Bet: {'; '.join(_bet_classification.get('reasons', []))}"
                 ]
         except Exception:
             full_result["bet_type"]         = "normal"
@@ -1478,7 +1478,7 @@ if analysis_results:
     with _na_filter_col1:
         _na_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="na_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -1486,7 +1486,7 @@ if analysis_results:
     with _na_filter_col2:
         _na_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
+            ["Goblin — Easy Money", "⚡ Normal", "Demon — Trap/Avoid"],
             default=[],
             key="na_bet_type_filter",
             help="Filter by bet type. Leave empty to show all. Select 'Goblin — Easy Money' to see only the strongest picks.",
@@ -1496,8 +1496,8 @@ if analysis_results:
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
     if _na_bet_type_filter:
         _na_bt_map = {
-            "[Goblin] Goblin — Easy Money": "goblin",
-            "[Demon] Demon — Trap/Avoid": "demon",
+            "Goblin — Easy Money": "goblin",
+            "Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _na_bt_values = [_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map]
@@ -1547,9 +1547,9 @@ if analysis_results:
     sum_col2.metric("⬆️ OVER",    total_over_picks)
     sum_col3.metric("⬇️ UNDER",   total_under_picks)
     sum_col4.metric("💎 Platinum", platinum_count)
-    sum_col5.metric("[Gold] Gold",     gold_count)
-    sum_col6.metric("[Goblin] Goblin",   goblin_count)
-    sum_col7.metric("[Demon] Demon",    demon_count)
+    sum_col5.metric("Gold 🥇",     gold_count)
+    sum_col6.metric("Goblin",   goblin_count)
+    sum_col7.metric("Demon",    demon_count)
 
     # ── Slate Summary Dashboard ────────────────────────────────
     silver_count  = sum(1 for r in displayed_results if r.get("tier") == "Silver")
@@ -1561,7 +1561,7 @@ if analysis_results:
     )
     _tier_bar_html = (
         f'<span style="color:#c800ff;font-weight:700;">💎 {platinum_count} Platinum</span>'
-        f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">[Gold] {gold_count} Gold</span>'
+        f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {gold_count} Gold</span>'
         f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {silver_count} Silver</span>'
         f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥉 {bronze_count} Bronze</span>'
     )
@@ -1573,7 +1573,7 @@ if analysis_results:
         _bp_dir   = "Over" if best_pick.get("direction") == "OVER" else "Under"
         _bp_conf  = best_pick.get("confidence_score", 0)
         _bp_tier  = best_pick.get("tier", "")
-        _bp_emoji = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
+        _bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
         _best_html = (
             f'<div style="margin-top:10px;padding:10px 14px;background:rgba(255,94,0,0.08);'
             f'border-radius:6px;border-left:3px solid #ff5e00;">'
@@ -1632,7 +1632,7 @@ if analysis_results:
             else:
                 st.info("All Platinum picks already added.")
     with _qb_col2:
-        if st.button("[Gold] Select All Gold+", help="Add all Gold and Platinum tier picks to Entry Builder"):
+        if st.button("🥇 Select All Gold+", help="Add all Gold and Platinum tier picks to Entry Builder"):
             _gold_picks = [
                 r for r in displayed_results
                 if r.get("tier") in ("Platinum", "Gold")
@@ -1647,7 +1647,7 @@ if analysis_results:
                 _dir      = r.get("direction", "OVER")
                 _pick_key = f"{r.get('player_name', '')}_{_stat}_{_line}_{_dir}"
                 if _pick_key not in _existing_keys:
-                    _t_emoji = "💎" if r.get("tier") == "Platinum" else "[Gold]"
+                    _t_emoji = "💎" if r.get("tier") == "Platinum" else "🥇"
                     st.session_state.setdefault("selected_picks", []).append({
                         "key":             _pick_key,
                         "player_name":     r.get("player_name", ""),
@@ -1707,7 +1707,7 @@ if analysis_results:
 
     if _goblin_picks:
         with st.expander(
-            f"[Goblin] Goblin Picks — Easy Money ({len(_goblin_picks)})",
+            f"Goblin Picks — Easy Money ({len(_goblin_picks)})",
             expanded=True,
         ):
             _gcol_logo, _gcol_title = st.columns([1, 6])
@@ -1718,7 +1718,7 @@ if analysis_results:
                 st.markdown(
                     '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
                     'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
-                    '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">[Goblin] Goblin Picks — Easy Money</h3>'
+                    '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">Goblin Picks — Easy Money</h3>'
                     '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
                     'Extreme-edge bets where the model projection is far beyond the line — '
                     'massive edge, high probability, the closest thing to a sure bet in sports.'
@@ -1728,14 +1728,14 @@ if analysis_results:
                 )
             st.markdown(
                 get_education_box_html(
-                    "What is a Goblin Bet? [Goblin]",
+                    "What is a Goblin Bet?",
                     "A <strong>Goblin bet</strong> is a bet where the platform's line is so far from "
                     "reality that it's almost free money. Think of it like finding a $20 bill on the "
                     "ground — the sportsbook set the line at a number that's <em>WAY</em> below (or "
                     "above) where the player is actually likely to land.<br><br>"
                     "<strong>Example:</strong> LeBron James OVER 12.5 points when he averages 25 and our "
                     "model projects 26.8. The line is absurdly low — there's an 88% chance he goes over. "
-                    "That's a Goblin. [Goblin]<br><br>"
+                    "That's a Goblin.<br><br>"
                     "<strong>Criteria:</strong> Model projection is 2+ standard deviations from the line, "
                     "probability ≥80%, edge ≥25%. Line must be verified (not synthetic/estimated).",
                 ),
@@ -1788,7 +1788,7 @@ if analysis_results:
                     f'padding:14px 18px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
                     f'<div>'
-                    f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">[Goblin] {_gp_name}</span>'
+                    f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
                     f'{_gp_team_badge}'
                     f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
                     f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
@@ -1831,7 +1831,7 @@ if analysis_results:
     ]
     if _demon_picks:
         with st.expander(
-            f"[Demon] Demon Bets Detected ({len(_demon_picks)}) — Click to See Traps to AVOID",
+            f"Demon Bets Detected ({len(_demon_picks)}) — Click to See Traps to AVOID",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -1842,7 +1842,7 @@ if analysis_results:
                 st.markdown(
                     '<div style="background:rgba(180,0,0,0.15);border:2px solid #ff4444;'
                     'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
-                    '<strong style="color:#ff4444;font-size:1.0rem;">[Demon] Demon Bets Warning</strong><br>'
+                    '<strong style="color:#ff4444;font-size:1.0rem;">Demon Bets Warning</strong><br>'
                     '<span style="color:#ffb0b0;font-size:0.85rem;">These picks LOOK appealing but are statistically dangerous. '
                     'Demon bets have hidden structural risks — hot streak regression, back-to-back fatigue, '
                     'conflicting forces, or high-variance stats with tiny edges. '
@@ -1852,7 +1852,7 @@ if analysis_results:
                 )
             st.markdown(
                 get_education_box_html(
-                    "What is a Demon Bet? [Demon]",
+                    "What is a Demon Bet?",
                     "A <strong>Demon bet</strong> LOOKS appealing — maybe a star player has a nice "
                     "edge — but has hidden danger signals that make it a likely loser. It's a trap.<br><br>"
                     "<strong>There are 4 types of Demons:</strong><br>"
@@ -1917,7 +1917,7 @@ if analysis_results:
                     f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;">'
                     f'<div>'
-                    f'<span style="color:#ff6666;font-weight:700;">[Demon] {_dp_name}</span>'
+                    f'<span style="color:#ff6666;font-weight:700;">Demon: {_dp_name}</span>'
                     f'{_dp_team_badge}'
                     f'<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;'
                     f'font-size:0.72rem;font-weight:700;margin-left:8px;">{_dp_demon_type}</span>'
@@ -1971,7 +1971,7 @@ if analysis_results:
                 st.markdown(
                     '<div style="background:linear-gradient(135deg,#1a1200,#231800);'
                     'border:2px solid #ffd700;border-radius:10px;padding:14px 18px;margin-bottom:4px;">'
-                    '<h3 style="color:#ffd700;font-family:Orbitron,sans-serif;margin:0 0 4px;">[Gold] Gold Tier Picks</h3>'
+                    '<h3 style="color:#ffd700;font-family:Orbitron,sans-serif;margin:0 0 4px;">🥇 Gold Tier Picks</h3>'
                     '<p style="color:#ffe082;font-size:0.85rem;margin:0;">'
                     'High-confidence picks with strong model projections and favorable matchups. '
                     'Gold picks are ideal for your core entry legs.'
@@ -2197,11 +2197,11 @@ if analysis_results:
                 (r.get("tier", "Bronze") for r in _pgroup),
                 key=lambda t: {"Platinum": 4, "Gold": 3, "Silver": 2, "Bronze": 1}.get(t, 0),
             )
-            _tier_emoji = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}.get(_best_tier, "🏀")
+            _tier_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_best_tier, "🏀")
             _has_goblin = any(r.get("bet_type") == "goblin" for r in _pgroup)
             _has_demon  = any(r.get("bet_type") == "demon" for r in _pgroup)
-            _goblin_tag = " [Goblin]" if _has_goblin else ""
-            _demon_tag  = " [Demon]" if _has_demon else ""
+            _goblin_tag = " Goblin" if _has_goblin else ""
+            _demon_tag  = " Demon" if _has_demon else ""
             _team_tag   = f" [{_pgroup[0].get('player_team', '')}]" if _pgroup[0].get("player_team") else ""
             _exp_label  = (
                 f"{_tier_emoji} {_pname}{_team_tag} — "
