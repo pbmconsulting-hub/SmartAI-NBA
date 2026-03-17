@@ -364,7 +364,7 @@ with tab_model_health:
                 )
                 # Tier spotlight metric cards
                 _tier_spot_cols = st.columns(4)
-                _tier_icons = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+                _tier_icons = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
                 for _ti, _tn in enumerate(["Platinum", "Gold", "Silver", "Bronze"]):
                     if _tn in tier_perf:
                         _td = tier_perf[_tn]
@@ -426,8 +426,8 @@ with tab_model_health:
         # Win rate by Goblin / Demon / Normal bet classification
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
-            with st.expander("🧌👿 Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"goblin": "🧌 Goblin", "demon": "👿 Demon", "normal": "Normal"}
+            with st.expander("[Goblin][Demon] Win Rate by Bet Classification", expanded=True):
+                _bt_emoji_map = {"goblin": "[Goblin] Goblin", "demon": "[Demon] Demon", "normal": "Normal"}
                 bt_rows = [
                     {
                         "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -451,7 +451,7 @@ with tab_model_health:
                 _metric_cols = st.columns(3)
                 if _goblin_data.get("total", 0) > 0:
                     _metric_cols[0].metric(
-                        "🧌 Goblin Win Rate",
+                        "[Goblin] Goblin Win Rate",
                         f"{_goblin_data.get('win_rate', 0):.1f}%",
                         help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
                     )
@@ -462,12 +462,12 @@ with tab_model_health:
                     _demon_win_rate  = round(_demon_wins  / max(_demon_total, 1) * 100, 1)
                     _demon_loss_rate = round(_demon_losses / max(_demon_total, 1) * 100, 1)
                     _metric_cols[1].metric(
-                        "👿 Demon Win Rate",
+                        "[Demon] Demon Win Rate",
                         f"{_demon_win_rate:.1f}%",
                         help=f"Demon bets should rarely win. Based on {_demon_total} logged Demon bets.",
                     )
                     _metric_cols[2].metric(
-                        "👿 Demon Loss Rate",
+                        "[Demon] Demon Loss Rate",
                         f"{_demon_loss_rate:.1f}%",
                         delta=f"Validated: {_demon_loss_rate:.0f}% loss rate",
                         delta_color="normal",
@@ -484,7 +484,7 @@ with tab_model_health:
                 _gb_wins   = sum(1 for b in _goblin_resolved if b.get("result") == "WIN")
                 _gb_losses = sum(1 for b in _goblin_resolved if b.get("result") == "LOSS")
                 with st.expander(
-                    f"🧌 Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
+                    f"[Goblin] Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
                     expanded=False,
                 ):
                     _gbc_a, _gbc_b = st.columns(2)
@@ -507,12 +507,12 @@ with tab_model_health:
                 _dm_pushes = sum(1 for b in _demon_resolved if b.get("result") == "PUSH")
                 _dm_total  = len(_demon_resolved)
                 with st.expander(
-                    f"👿 Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
+                    f"[Demon] Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
                     f"({round(_dm_wins/_dm_total*100,1) if _dm_total else 0:.1f}% win rate)",
                     expanded=False,
                 ):
                     st.caption(
-                        "👿 **Demon bets** are traps — conflicting forces, high variance, "
+                        "[Demon] **Demon bets** are traps — conflicting forces, high variance, "
                         "fatigue risk, or hot-streak regression. A **high loss rate validates the system**."
                     )
                     # Demon subtype breakdown from notes/reasons
@@ -612,7 +612,7 @@ with tab_ai_picks:
     with _ai_filter_col1:
         _ai_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="ai_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -620,7 +620,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -630,8 +630,8 @@ with tab_ai_picks:
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
         _ai_bt_map = {
-            "🧌 Goblin — Easy Money": "goblin",
-            "👿 Demon — Trap/Avoid": "demon",
+            "[Goblin] Goblin — Easy Money": "goblin",
+            "[Demon] Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _ai_bt_values = [_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map]
@@ -908,7 +908,7 @@ with tab_all_picks:
     with _ap_filter_col1:
         _ap_tier_filter = st.multiselect(
             "Filter by Tier",
-            ["Platinum 💎", "Gold 🥇", "Silver 🥈", "Bronze 🥉"],
+            ["Platinum 💎", "Gold [Gold]", "Silver 🥈", "Bronze 🥉"],
             default=[],
             key="ap_tier_filter",
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
@@ -916,7 +916,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -926,8 +926,8 @@ with tab_all_picks:
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
         _ap_bt_map = {
-            "🧌 Goblin — Easy Money": "goblin",
-            "👿 Demon — Trap/Avoid": "demon",
+            "[Goblin] Goblin — Easy Money": "goblin",
+            "[Demon] Demon — Trap/Avoid": "demon",
             "⚡ Normal": "normal",
         }
         _ap_bt_values = [_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map]
@@ -983,7 +983,7 @@ with tab_all_picks:
         # ── Tier Distribution Bar ─────────────────────────────────────
         _tier_bar = (
             f'<span style="color:#c800ff;font-weight:700;">💎 {_tier_counts["Platinum"]} Platinum</span>'
-            f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {_tier_counts["Gold"]} Gold</span>'
+            f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">[Gold] {_tier_counts["Gold"]} Gold</span>'
             f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {_tier_counts["Silver"]} Silver</span>'
             f' &nbsp;·&nbsp; <span style="color:#cd7f32;">🥉 {_tier_counts["Bronze"]} Bronze</span>'
         )
@@ -1319,7 +1319,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["🧌 Goblin — Easy Money", "⚡ Normal", "👿 Demon — Trap/Avoid"],
+            ["[Goblin] Goblin — Easy Money", "⚡ Normal", "[Demon] Demon — Trap/Avoid"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1339,8 +1339,8 @@ with tab_bets:
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
             _bets_bt_map = {
-                "🧌 Goblin — Easy Money": "goblin",
-                "👿 Demon — Trap/Avoid": "demon",
+                "[Goblin] Goblin — Easy Money": "goblin",
+                "[Demon] Demon — Trap/Avoid": "demon",
                 "⚡ Normal": "normal",
             }
             _bets_bt_values = [_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map]
@@ -1596,7 +1596,7 @@ with tab_predict:
 
         if _tier_counts_wr:
             st.markdown("**Per-Tier Expected Win Rates**")
-            _TIER_EMOJI_WR = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+            _TIER_EMOJI_WR = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
             tier_wr_rows = [
                 {
                     "Tier":            f"{_TIER_EMOJI_WR.get(t, '')} {t}",
@@ -1625,7 +1625,7 @@ with tab_predict:
             _tier_counts[t] = _tier_counts.get(t, 0) + 1
 
         _TIER_PCT   = {"Platinum": 0.30, "Gold": 0.25, "Silver": 0.20, "Bronze": 0.10}
-        _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
+        _TIER_EMOJI = {"Platinum": "💎", "Gold": "[Gold]", "Silver": "🥈", "Bronze": "🥉"}
         bankroll    = st.number_input(
             "Total Bankroll ($)", min_value=10.0, max_value=100000.0, value=100.0, step=10.0
         )

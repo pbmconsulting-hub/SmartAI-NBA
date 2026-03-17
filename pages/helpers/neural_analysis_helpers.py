@@ -19,9 +19,16 @@ from engine.confidence import get_tier_color
 from engine.odds_engine import american_odds_to_implied_probability as _odds_to_implied_prob
 from data.data_manager import get_player_status
 from styles.theme import (
+    get_logo_img_tag,
     get_qds_confidence_bar_html,
     get_qds_prop_card_html,
+    GOBLIN_LOGO_PATH as _GOBLIN_LOGO_PATH,
+    DEMON_LOGO_PATH as _DEMON_LOGO_PATH,
 )
+
+import os as _os
+
+_ASSETS_DIR = "assets"
 
 # Prefix used to identify composite fantasy-score stat types.
 # Change here propagates everywhere in this module.
@@ -503,7 +510,7 @@ def display_prop_analysis_card_qds(result):
         st.markdown(
             f'<div style="background:rgba(76,175,80,0.12);border:1px solid #4caf50;border-radius:6px;'
             f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">🧌</span>'
+            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_GOBLIN_LOGO_PATH, width=28, alt="[Goblin]")}</span>'
             f'<div>'
             f'<span style="color:#4caf50;font-weight:700;font-size:0.9rem;">GOBLIN BET — Easy Money</span>'
             + (f'<br><span style="color:#a5d6a7;font-size:0.78rem;">{_html.escape(_goblin_reasons_str)}</span>'
@@ -517,7 +524,7 @@ def display_prop_analysis_card_qds(result):
         st.markdown(
             f'<div style="background:rgba(255,68,68,0.10);border:1px solid #ff4444;border-radius:6px;'
             f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">👿</span>'
+            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_DEMON_LOGO_PATH, width=28, alt="[Demon]")}</span>'
             f'<div>'
             f'<span style="color:#ff4444;font-weight:700;font-size:0.9rem;">DEMON BET — AVOID (Dangerous Trap)</span>'
             + (f'<br><span style="color:#ffb0b0;font-size:0.78rem;">{_html.escape(_demon_reasons_str)}</span>'

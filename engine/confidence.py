@@ -488,7 +488,7 @@ def calculate_confidence_score(
         and abs_edge >= GOLD_MIN_EDGE_PCT                  # C3: min 7% edge
     ):
         tier_name = "Gold"
-        tier_emoji = "🥇"
+        tier_emoji = "[Gold]"
         recommendation = f"Strong {bet_direction} play — good confidence"
     elif _score_for_tier >= SILVER_TIER_MINIMUM_SCORE and abs_edge >= SILVER_MIN_EDGE_PCT:
         tier_name = "Silver"
@@ -512,7 +512,7 @@ def calculate_confidence_score(
     # If the tier is Gold but probability is below 55%, force to Silver.
     if tier_name == "Platinum" and prob_in_direction < PLATINUM_MIN_PROBABILITY:
         tier_name = "Gold"
-        tier_emoji = "🥇"
+        tier_emoji = "[Gold]"
         recommendation = f"Strong {bet_direction} play — good confidence"
         avoid_reasons.append(f"Downgraded Platinum→Gold (prob {prob_in_direction:.1%} < {PLATINUM_MIN_PROBABILITY:.0%})")
     if tier_name == "Gold" and prob_in_direction < GOLD_MIN_PROBABILITY:
@@ -857,7 +857,7 @@ def enforce_tier_distribution(all_picks_results, max_platinum_pct=0.10, max_gold
                     and r.get("tier") == "Platinum"
                 ):
                     r["tier"] = "Gold"
-                    r["tier_emoji"] = "🥇"
+                    r["tier_emoji"] = "[Gold]"
                     r["recommendation"] = (
                         r.get("recommendation", "").replace("Elite", "Strong")
                         or "Strong play — good confidence"

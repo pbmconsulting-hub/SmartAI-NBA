@@ -22,7 +22,6 @@ from data.data_manager import (
     validate_props_against_roster,
     get_player_status,
     load_injury_status,
-    generate_props_for_todays_players,
 )
 from data.platform_mappings import (
     normalize_stat_type,
@@ -86,14 +85,12 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Download the template, fill in your props, upload the file
     - Best for bulk entry or importing from your own research
     
-    **Option 3: Auto-Generate from Tonight's Players**
-    - Click "🤖 Auto-Generate Props" to create props for ALL active players
-    - Lines are set to season averages (rounded to nearest 0.5)
-    - Covers all 3 platforms automatically
+    **Option 3: Fetch Live Platform Lines**
+    - Go to the **📡 Live Games** page and click **📊 Fetch Live Props & Analyze**
+    - Fetches real live lines from PrizePicks, Underdog Fantasy, and DraftKings
     
     💡 **Pro Tips:**
-    - Auto-Generate is the fastest way to get started
-    - Manually adjust lines after auto-generating for accuracy
+    - Fetch live lines for the most accurate analysis
     - Use the filter/sort options to focus on specific players or stat types
     """)
 
@@ -336,25 +333,7 @@ st.divider()
 
 current_props = load_props_from_session(st.session_state)
 
-# ── Auto-generate props when games are loaded but no props exist yet ──────────
-# This makes the Prop Scanner "just work" immediately after the user loads
-# tonight's games on the Live Games page, with no extra manual step needed.
-if not current_props:
-    _auto_games = st.session_state.get("todays_games", [])
-    if _auto_games:
-        _auto_platforms = st.session_state.get(
-            "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
-        )
-        _silent_props = generate_props_for_todays_players(
-            players_data, _auto_games, platforms=_auto_platforms
-        )
-        if _silent_props:
-            save_props_to_session(_silent_props, st.session_state)
-            current_props = _silent_props
-            st.toast(
-                f"✅ Auto-generated {len(_silent_props)} props for tonight's {len(_auto_games)} game(s).",
-                icon="🤖",
-            )
+
 
 # Load persisted injury status for warning display (no API call needed)
 injury_status_map = load_injury_status()
@@ -700,90 +679,17 @@ else:
 st.divider()
 
 # ============================================================
-# SECTION: Auto-Generate Props for Tonight's Games
+# SECTION: How to Get Prop Lines
 # ============================================================
 
-st.subheader("🤖 Auto-Generate Props for Tonight's Games")
-st.markdown(
-    "Generate prop entries for **all active players** on tonight's teams across all "
-    "three platforms — **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick 6**. "
-    "Prop lines are derived from each player's season averages (rounded to nearest 0.5)."
+st.info(
+    "💡 **To get prop lines:** Use the **📡 Live Games** page — click "
+    "**📊 Fetch Live Props & Analyze** or **⚡ One-Click Setup** to fetch "
+    "real live lines from PrizePicks, Underdog Fantasy, and DraftKings."
 )
 
-todays_games_for_gen = st.session_state.get("todays_games", [])
-if not todays_games_for_gen:
-    st.info(
-        "💡 No games loaded yet. Load tonight's games on the **📡 Live Games** page first "
-        "so only tonight's players are included. You can still auto-generate props for "
-        "all players in the database by clicking the button below."
-    )
-else:
-    st.success(
-        f"✅ {len(todays_games_for_gen)} game(s) loaded for tonight — "
-        "props will be generated for those teams only."
-    )
-
-_ag_col1, _ag_col2 = st.columns([2, 3])
-with _ag_col1:
-    _ag_platforms = st.multiselect(
-        "Platforms to generate for:",
-        options=["PrizePicks", "Underdog", "DraftKings"],
-        default=st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]),
-        key="autogen_platforms",
-        help="Choose which platforms to generate props for.",
-    )
-with _ag_col2:
-    _ag_replace = st.radio(
-        "How to add generated props:",
-        ["Replace all existing props", "Append to existing props"],
-        horizontal=True,
-        key="autogen_mode",
-    )
-
-if st.button(
-    "🤖 Auto-Generate All Props for Tonight",
-    type="primary",
-    width="content",
-    disabled=not _ag_platforms,
-):
-    with st.spinner("Generating props for tonight's active roster players…"):
-        _gen_props = generate_props_for_todays_players(
-            players_data=players_data,
-            todays_games=todays_games_for_gen,
-            platforms=_ag_platforms,
-        )
-
-    if _gen_props:
-        # Summary by platform
-        _by_plat = {}
-        for _gp in _gen_props:
-            _plat = _gp.get("platform", "—")
-            _by_plat[_plat] = _by_plat.get(_plat, 0) + 1
-
-        if _ag_replace == "Replace all existing props":
-            save_props_to_session(_gen_props, st.session_state)
-            st.success(
-                f"✅ Replaced props with **{len(_gen_props)}** auto-generated entries: "
-                + " · ".join(f"{p}: {n}" for p, n in sorted(_by_plat.items()))
-            )
-        else:
-            _existing = load_props_from_session(st.session_state)
-            _combined = _existing + _gen_props
-            save_props_to_session(_combined, st.session_state)
-            st.success(
-                f"✅ Added **{len(_gen_props)}** auto-generated props "
-                f"(total: {len(_combined)}): "
-                + " · ".join(f"{p}: {n}" for p, n in sorted(_by_plat.items()))
-            )
-        st.rerun()
-    else:
-        st.warning(
-            "⚠️ No props generated. Make sure player data is loaded and tonight's games are set. "
-            "Try loading tonight's games on the **📡 Live Games** page."
-        )
-
 # ============================================================
-# END SECTION: Auto-Generate Props for Tonight's Games
+# END SECTION: How to Get Prop Lines
 # ============================================================
 
 st.divider()

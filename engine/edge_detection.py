@@ -1336,7 +1336,7 @@ def classify_bet_type(
     if is_goblin:
         return {
             "bet_type":        "goblin",
-            "bet_type_emoji":  "🧌",
+            "bet_type_emoji":  "[Goblin]",
             "bet_type_label":  "Goblin Bet — Easy Money",
             "goblin":          True,
             "demon":           False,
@@ -1405,7 +1405,7 @@ def classify_bet_type(
     if is_demon:
         return {
             "bet_type":        "demon",
-            "bet_type_emoji":  "👿",
+            "bet_type_emoji":  "[Demon]",
             "bet_type_label":  "Demon Bet — Dangerous Trap",
             "goblin":          False,
             "demon":           True,

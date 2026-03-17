@@ -116,7 +116,7 @@ Sample props are pre-loaded so you can see the app working immediately!
 Click **Run Analysis** to simulate each prop. For every prop you'll see:
 - **Probability**: % chance of going over (or under) the line
 - **Edge**: How far above 50% the probability is (bigger = better)
-- **Tier**: Platinum 💎, Gold 🥇, Silver 🥈, or Bronze 🥉
+- **Tier**: Platinum 💎, Gold [Gold], Silver 🥈, or Bronze 🥉
 - **Direction**: OVER or UNDER
 - **Forces**: All the factors pushing the stat up or down
 - **Distribution**: Range of likely outcomes (10th, 50th, 90th percentile)

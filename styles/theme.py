@@ -12,9 +12,42 @@
 # ============================================================
 
 # Standard library only — no new dependencies
+import base64 as _base64
 import datetime as _datetime
+import functools as _functools
 import html as _html
+import logging as _logging
 import math as _math
+import os as _os
+
+_logger_theme = _logging.getLogger(__name__)
+
+# ── Centralised logo paths ──────────────────────────────────────
+GOBLIN_LOGO_PATH = _os.path.join("assets", "New_Goblin_Logo.png")
+DEMON_LOGO_PATH  = _os.path.join("assets", "New_Demon_Logo.png")
+GOLD_LOGO_PATH   = _os.path.join("assets", "NewGold_Logo.png")
+
+
+@_functools.lru_cache(maxsize=32)
+def _load_logo_b64(logo_path):
+    """Load and base64-encode a logo file, cached per path."""
+    try:
+        with open(logo_path, "rb") as _f:
+            return _base64.b64encode(_f.read()).decode()
+    except OSError as _e:
+        _logger_theme.warning("Could not load logo file '%s': %s", logo_path, _e)
+        return None
+
+
+def get_logo_img_tag(logo_path, width=20, alt="logo"):
+    """Return an inline <img> tag for use in st.markdown HTML."""
+    if _os.path.exists(logo_path):
+        _b64 = _load_logo_b64(logo_path)
+        if _b64:
+            _safe_alt = _html.escape(str(alt))
+            return f'<img src="data:image/png;base64,{_b64}" width="{width}" alt="{_safe_alt}" style="vertical-align:middle;">'
+    _logger_theme.debug("Logo not found at '%s', using alt text '%s'", logo_path, alt)
+    return _html.escape(str(alt))
 
 
 # ============================================================
@@ -74,7 +107,7 @@ GLOSSARY = {
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
     ),
-    "Goblin Bet 🧌": (
+    "Goblin Bet [Goblin]": (
         "A Goblin bet is one where the platform's line is so far from reality that it's "
         "almost free money. Think of it like finding a $20 bill on the ground — the "
         "sportsbook set the line at a number that's WAY below (or above) where the player "
@@ -83,7 +116,7 @@ GLOSSARY = {
         "goes over. Goblin criteria: projection 2+ standard deviations from the line, "
         "probability ≥80%, edge ≥25%."
     ),
-    "Demon Bet 👿": (
+    "Demon Bet [Demon]": (
         "A Demon bet LOOKS appealing on the surface but has hidden danger signals that make "
         "it a likely loser — it's a trap. There are 4 types: (1) Conflict Demon: the model's "
         "forces are nearly 50/50, a coin flip disguised as an edge. (2) Variance Demon: "
@@ -1595,7 +1628,7 @@ def get_tier_badge_html(tier, tier_emoji=None):
     """
     tier_emojis = {
         "Platinum": "💎",
-        "Gold": "🥇",
+        "Gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
         "Silver": "🥈",
         "Bronze": "🥉",
     }
@@ -1907,7 +1940,7 @@ def get_best_bets_section_html(best_bets):
     if not best_bets:
         return ""
 
-    rank_emojis = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    rank_emojis = [get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="#1"), "🥈", "🥉", "4️⃣", "5️⃣"]
     rows = []
     for i, bet in enumerate(best_bets[:5]):
         emoji = rank_emojis[i] if i < len(rank_emojis) else f"{i+1}."
@@ -4302,7 +4335,7 @@ def get_bet_card_html(bet, show_live_status=False):
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'
 
     # Tier badge
-    tier_emojis = {"platinum": "💎", "gold": "🥇", "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
+    tier_emojis = {"platinum": "💎", "gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"), "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
     tier_emoji = tier_emojis.get(tier_lower, "🏅")
     tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
 
@@ -4480,7 +4513,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
 
     _TIER_EMOJI = {
         "platinum": "💎",
-        "gold":     "🥇",
+        "gold":     get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
         "silver":   "🥈",
         "bronze":   "🥉",
     }
