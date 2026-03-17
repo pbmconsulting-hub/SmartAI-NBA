@@ -954,11 +954,27 @@ if one_click_setup_clicked:
             _oc_platform_props = _oc_fetch_platform(odds_api_key=_oc_odds_key or None)
             _oc_bar.progress(85)
             if _oc_platform_props:
-                # Merge with existing props
+                # Filter synthetic auto-generated props to only platform-present players
+                try:
+                    from data.data_manager import filter_props_to_platform_players as _oc_filter_platform
+                    _oc_auto_props_filtered = _oc_filter_platform(_oc_auto_props, _oc_platform_props)
+                    _oc_filtered_count = len(_oc_auto_props) - len(_oc_auto_props_filtered)
+                    if _oc_filtered_count > 0:
+                        import logging as _oc_log
+                        _oc_log.getLogger(__name__).info(
+                            f"[OneClick] Filtered {_oc_filtered_count} synthetic props "
+                            "for players not on any betting platform today."
+                        )
+                except Exception as _oc_filt_err:
+                    import logging as _oc_log2
+                    _oc_log2.getLogger(__name__).warning(f"[OneClick] Platform filter failed: {_oc_filt_err}")
+                    _oc_auto_props_filtered = _oc_auto_props
+
+                # Merge platform props + filtered synthetic props (dedup)
                 _oc_existing = list(st.session_state.get("current_props", []))
                 _oc_seen = set()
                 _oc_merged = []
-                for _p in _oc_existing + _oc_platform_props:
+                for _p in _oc_existing + _oc_platform_props + _oc_auto_props_filtered:
                     _pk = (str(_p.get("player_name","")).lower(), str(_p.get("stat_type","")).lower(), str(_p.get("platform","")).lower())
                     if _pk not in _oc_seen:
                         _oc_seen.add(_pk)

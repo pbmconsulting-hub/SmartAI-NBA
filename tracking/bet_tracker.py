@@ -313,6 +313,9 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # SECTION: Auto-Log Analysis Results
 # ============================================================
 
+_MAX_DEMON_REASONS = 2   # max bet_type_reasons to include in notes for Demon bets
+_MAX_GOBLIN_REASONS = 1  # max bet_type_reasons to include in notes for Goblin bets
+
 def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
     """
     Automatically log bet records for analysis results that have a positive
@@ -430,7 +433,16 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=25):
             team=res.get("player_team", res.get("team", "")),
             notes=(
                 f"Auto-logged by SmartAI. "
-                f"SAFE Score: {res.get('confidence_score', 0):.0f}"
+                f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
+                + (
+                    "Demon reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
+                    if res.get("bet_type") == "demon" and res.get("bet_type_reasons")
+                    else (
+                        "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
+                        if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")
+                        else ""
+                    )
+                )
             ),
             auto_logged=1,
             bet_type=res.get("bet_type", "normal"),
@@ -1645,6 +1657,7 @@ def save_top_picks_from_analysis(analysis_results):
         line = float(result.get("line", 0) or 0)
         platform = str(result.get("platform", "PrizePicks"))
         edge = float(result.get("edge", 0) or 0)
+        bet_type = str(result.get("bet_type", "normal"))
         notes = f"AI auto-logged | edge={edge:.1f}% | prob={prob:.1%}"
 
         try:
@@ -1659,6 +1672,7 @@ def save_top_picks_from_analysis(analysis_results):
                 "notes": notes,
                 "source": "AI_AUTO",
                 "probability": prob,
+                "bet_type": bet_type,
             })
             existing_keys.add(dup_key)
             saved_count += 1
