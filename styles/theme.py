@@ -228,7 +228,7 @@ def get_global_css():
     return """
 <style>
 /* ─── Google Fonts ────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;800;900&family=Montserrat:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@400;700;800;900&family=Montserrat:wght@400;600;700&display=swap');
 
 /* ─── Keyframe Animations ─────────────────────────────────── */
 @keyframes borderGlow {
@@ -265,18 +265,24 @@ def get_global_css():
 
 /* ─── Base / Body ─────────────────────────────────────────── */
 html, body, [class*="css"] {
-    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 16px;
     color: #c8d8f0;
-    background-color: #0a0f1a;
+    background-color: #070A13;
 }
-/* Deep space dark background with radial gradient */
+/* Deep obsidian background with radial gradient */
 .stApp {
-    background-color: #0a0f1a;
+    background-color: #070A13;
     background-image:
         radial-gradient(ellipse at 20% 20%, rgba(0,240,255,0.04) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 80%, rgba(200,0,255,0.03) 0%, transparent 50%),
-        radial-gradient(ellipse at center, #0d1220 0%, #0a0f1a 100%);
+        radial-gradient(ellipse at center, #0d1220 0%, #070A13 100%);
+}
+/* Override stAppViewContainer for institutional dark gradient */
+[data-testid="stAppViewContainer"] {
+    background: radial-gradient(ellipse at 30% 10%, rgba(0,240,255,0.03) 0%, transparent 45%),
+                radial-gradient(ellipse at 70% 90%, rgba(200,0,255,0.025) 0%, transparent 50%),
+                radial-gradient(ellipse at center, #0a0e18 0%, #070A13 100%);
 }
 
 /* Streamlit text defaults on dark background */
@@ -305,16 +311,16 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.05em;
 }
 
-/* Custom scrollbar — dark track, cyan thumb */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: rgba(10,15,26,0.8); }
-::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.35); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,240,255,0.60); }
+/* Custom scrollbar — ultra-thin dark track, cyan thumb */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: rgba(7,10,19,0.9); }
+::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.30); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,240,255,0.55); }
 
 /* ─── Sidebar — enhanced dark panel with neon border ─────── */
 /* min-width: 280px ensures emoji + full page titles are always readable */
 [data-testid="stSidebar"] {
-    background: #0a0d18 !important;
+    background: #060910 !important;
     border-right: 1px solid rgba(0,240,255,0.20) !important;
     box-shadow: 2px 0 20px rgba(0,240,255,0.05) !important;
     min-width: 280px !important;
@@ -344,7 +350,7 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box;
     text-align: center;
     font-size: 0.68rem;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'JetBrains Mono', 'Courier New', monospace;
     font-weight: 700;
     color: rgba(0,240,255,0.70) !important;
     letter-spacing: 0.08em;
@@ -353,18 +359,49 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─── Streamlit native elements on dark bg ───────────────── */
-[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; font-size: 1.4rem !important; }
-[data-testid="stMetricLabel"] { color: #c8d8f0 !important; font-size: 1rem !important; }
-.stAlert { background: rgba(20,25,43,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: #e0eeff !important; font-size: 1rem !important; padding: 14px 18px !important; }
-.stExpander { background: rgba(20,25,43,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
+/* Metric glassmorphic card treatment */
+[data-testid="stMetric"] {
+    background: rgba(13,18,32,0.55);
+    border: 1px solid rgba(0,240,255,0.12);
+    border-radius: 14px;
+    padding: 18px 20px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 0 20px rgba(0,240,255,0.05), 0 4px 20px rgba(0,0,0,0.35);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+[data-testid="stMetric"]:hover {
+    border-color: rgba(0,240,255,0.28);
+    box-shadow: 0 0 28px rgba(0,240,255,0.12), 0 6px 24px rgba(0,0,0,0.45);
+    transform: translateY(-3px);
+}
+[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; font-size: 1.4rem !important; font-family: 'JetBrains Mono', 'Courier New', monospace !important; }
+[data-testid="stMetricLabel"] { color: #8a9bb8 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Inter', sans-serif !important; }
+[data-testid="stMetricDelta"] { font-family: 'JetBrains Mono', monospace !important; }
+.stAlert { background: rgba(13,18,32,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: #e0eeff !important; font-size: 1rem !important; padding: 14px 18px !important; }
+.stExpander { background: rgba(13,18,32,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
 .stExpander summary, .stExpander [data-testid="stExpanderToggleIcon"] + span { color: #e0eeff !important; font-size: 1rem !important; font-weight: 600 !important; }
 button[kind="primary"] {
     background: linear-gradient(135deg, #00ffd5, #00b4ff) !important;
-    color: #0a0f1a !important;
+    color: #070A13 !important;
     border: none !important;
-    font-family: 'Orbitron', sans-serif !important;
-    letter-spacing: 0.05em !important;
-    box-shadow: 0 0 16px rgba(0,255,213,0.35) !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em !important;
+    box-shadow: 0 0 16px rgba(0,255,213,0.30) !important;
+    transition: transform 0.2s ease, box-shadow 0.25s ease !important;
+}
+button[kind="primary"]:hover {
+    transform: scale(1.03) !important;
+    box-shadow: 0 0 28px rgba(0,255,213,0.50), 0 4px 16px rgba(0,0,0,0.4) !important;
+}
+/* Secondary / default buttons */
+.stButton > button {
+    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease !important;
+}
+.stButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 16px rgba(0,240,255,0.15) !important;
 }
 /* Tab labels */
 [data-testid="stTab"] button {
@@ -376,17 +413,33 @@ button[kind="primary"] {
     color: #00f0ff !important;
     border-bottom: 2px solid #00f0ff !important;
 }
-/* Dataframe / table text */
-[data-testid="stDataFrame"] td,
-[data-testid="stDataFrame"] th {
-    font-size: 0.95rem !important;
-    color: #e0eeff !important;
+/* Dataframe / table text — terminal look */
+[data-testid="stDataFrame"] {
+    border: none !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
 }
-.stDataFrame, .stTable { background: rgba(20,25,43,0.85) !important; color: #e0eeff !important; }
+[data-testid="stDataFrame"] td {
+    font-size: 0.92rem !important;
+    color: #e0eeff !important;
+    font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    border-color: rgba(0,240,255,0.06) !important;
+}
+[data-testid="stDataFrame"] th {
+    font-size: 0.78rem !important;
+    color: #8a9bb8 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.10em !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 700 !important;
+    background: rgba(7,10,19,0.90) !important;
+    border-color: rgba(0,240,255,0.08) !important;
+}
+.stDataFrame, .stTable { background: rgba(13,18,32,0.85) !important; color: #e0eeff !important; }
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {
-    background: rgba(20,25,43,0.85);
+    background: rgba(13,18,32,0.85);
     border: 1px solid rgba(0,240,255,0.15);
     border-radius: 16px;
     padding: 20px 24px;
@@ -417,7 +470,7 @@ button[kind="primary"] {
 
 /* ─── Neural Header ───────────────────────────────────────── */
 .neural-header {
-    background: linear-gradient(135deg, #0a0f1a 0%, #0d1a2e 50%, #0a0f1a 100%);
+    background: linear-gradient(135deg, #070A13 0%, #0d1a2e 50%, #070A13 100%);
     border: 1px solid rgba(0,240,255,0.30);
     border-radius: 16px;
     padding: 24px 30px;
@@ -454,7 +507,7 @@ button[kind="primary"] {
     font-size: 0.88rem;
     color: rgba(192,208,232,0.80);
     margin-top: 6px;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'JetBrains Mono', 'Courier New', monospace;
     letter-spacing: 0.06em;
 }
 .circuit-dot {
@@ -535,33 +588,45 @@ button[kind="primary"] {
     letter-spacing: 0.05em;
     text-transform: uppercase;
     position: relative;
-    transition: box-shadow 0.2s ease;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.tier-badge:hover {
+    transform: scale(1.04);
 }
 .tier-platinum {
-    background: linear-gradient(135deg, #1a2035, #2a3555);
-    color: #00f0ff;
-    animation: pulse-platinum 2.5s infinite;
-    border: 1px solid rgba(0,240,255,0.45);
-    box-shadow: 0 0 12px rgba(0,240,255,0.25);
+    background: linear-gradient(135deg, #d4d8e0, #ffffff, #b0b8c8, #ffffff, #d4d8e0);
+    background-size: 300% 100%;
+    color: #1a2035;
+    border: 1px solid rgba(255,255,255,0.50);
+    box-shadow: 0 0 18px rgba(255,255,255,0.25), 0 0 6px rgba(0,240,255,0.20);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    animation: pulse-platinum 2.5s infinite, nba-shimmer-platinum 3s linear infinite;
 }
 .tier-gold {
-    background: linear-gradient(135deg, #2a1500, #3d2200);
-    color: #ff9d00;
-    animation: pulse-gold 2.8s infinite;
-    border: 1px solid rgba(255,94,0,0.45);
-    box-shadow: 0 0 12px rgba(255,94,0,0.25);
+    background: linear-gradient(135deg, #a67c00, #ffd700, #c9a800, #ffd700, #a67c00);
+    background-size: 300% 100%;
+    color: #2a1800;
+    border: 1px solid rgba(255,215,0,0.55);
+    box-shadow: 0 0 16px rgba(255,215,0,0.30), 0 0 6px rgba(255,160,0,0.20);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.20);
+    animation: pulse-gold 2.8s infinite, nba-gold-gleam 4s ease-in-out infinite;
 }
 .tier-silver {
-    background: linear-gradient(135deg, #1a1f30, #252b40);
-    color: #c0d0e8;
-    border: 1px solid rgba(192,208,232,0.35);
-    box-shadow: 0 0 8px rgba(192,208,232,0.15);
+    background: linear-gradient(135deg, #8a8e96, #c0c0c0, #a8acb4, #c0c0c0, #8a8e96);
+    background-size: 300% 100%;
+    color: #1a1f30;
+    border: 1px solid rgba(192,192,192,0.45);
+    box-shadow: 0 0 12px rgba(192,192,192,0.20);
+    text-shadow: 0 1px 1px rgba(0,0,0,0.15);
+    animation: nba-silver-sheen 3.5s linear infinite;
 }
 .tier-bronze {
-    background: linear-gradient(135deg, #2a1800, #3d2500);
-    color: #ff7c3a;
-    border: 1px solid rgba(249,115,22,0.40);
-    box-shadow: 0 0 8px rgba(249,115,22,0.25);
+    background: linear-gradient(135deg, #8B4513, #CD7F32, #a0652a, #CD7F32, #8B4513);
+    background-size: 300% 100%;
+    color: #fff;
+    border: 1px solid rgba(205,127,50,0.50);
+    box-shadow: 0 0 10px rgba(205,127,50,0.25);
+    animation: nba-bronze-pulse 2.5s ease-in-out infinite;
 }
 
 /* ─── AI Verdict Card ─────────────────────────────────────── */
@@ -600,7 +665,7 @@ button[kind="primary"] {
 .verdict-confidence {
     font-size: 0.8rem;
     color: #b0bec5;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     margin-top: 4px;
 }
 .verdict-explanation {
@@ -614,7 +679,7 @@ button[kind="primary"] {
 
 /* ─── Stat Readout (monospace terminal) ───────────────────── */
 .stat-readout {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     background: rgba(0,200,255,0.05);
     border: 1px solid rgba(0,240,255,0.15);
     border-radius: 8px;
@@ -648,7 +713,7 @@ button[kind="primary"] {
 
 /* ─── Education Box ───────────────────────────────────────── */
 .education-box {
-    background: rgba(20,25,43,0.70);
+    background: rgba(13,18,32,0.70);
     border: 1px solid rgba(0,240,255,0.18);
     border-radius: 12px;
     padding: 14px 18px;
@@ -658,7 +723,7 @@ button[kind="primary"] {
     -webkit-backdrop-filter: blur(8px);
 }
 .education-box:hover {
-    background: rgba(20,25,43,0.90);
+    background: rgba(13,18,32,0.90);
 }
 .education-box-title {
     font-size: 0.88rem;
@@ -692,7 +757,7 @@ button[kind="primary"] {
     color: #b0bec5;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 /* ─── Signal Strength Bar ─────────────────────────────────── */
@@ -716,7 +781,7 @@ button[kind="primary"] {
 .signal-strength-label {
     font-size: 0.72rem;
     color: #b0bec5;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     margin-left: 6px;
     vertical-align: middle;
 }
@@ -734,7 +799,7 @@ button[kind="primary"] {
     visibility: hidden;
     opacity: 0;
     width: 260px;
-    background: rgba(10,15,26,0.97);
+    background: rgba(7,10,19,0.97);
     border: 1px solid rgba(0,240,255,0.35);
     color: #e2e8f0;
     font-size: 0.8rem;
@@ -785,7 +850,7 @@ button[kind="primary"] {
 
 /* ─── Probability Gauge ───────────────────────────────────── */
 .prob-gauge-wrap {
-    background: rgba(20,25,43,0.80);
+    background: rgba(13,18,32,0.80);
     border-radius: 10px;
     height: 16px;
     overflow: hidden;
@@ -810,14 +875,14 @@ button[kind="primary"] {
     font-size: 1.15rem;
     font-weight: 800;
     color: rgba(255,255,255,0.95);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 .edge-badge {
     padding: 2px 8px;
     border-radius: 6px;
     font-size: 0.82rem;
     font-weight: 700;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 .edge-positive { background: rgba(0,255,157,0.10); color: #00ff9d; border: 1px solid rgba(0,255,157,0.35); text-shadow: 0 0 6px rgba(0,255,157,0.4); }
 .edge-negative { background: rgba(220,38,38,0.10); color: #ff6b6b; border: 1px solid rgba(220,38,38,0.35); }
@@ -831,7 +896,7 @@ button[kind="primary"] {
     font-weight: 800;
     font-size: 0.9rem;
     border: 1px solid rgba(0,255,157,0.35);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     text-shadow: 0 0 6px rgba(0,255,157,0.5);
 }
 .dir-under {
@@ -842,7 +907,7 @@ button[kind="primary"] {
     font-weight: 800;
     font-size: 0.9rem;
     border: 1px solid rgba(220,38,38,0.35);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 
 /* ─── Force Bar ───────────────────────────────────────────── */
@@ -851,7 +916,7 @@ button[kind="primary"] {
     height: 10px;
     border-radius: 5px;
     overflow: hidden;
-    background: rgba(20,25,43,0.80);
+    background: rgba(13,18,32,0.80);
     margin-top: 5px;
     border: 1px solid rgba(0,240,255,0.10);
 }
@@ -860,11 +925,11 @@ button[kind="primary"] {
 
 /* ─── Distribution Range ──────────────────────────────────── */
 .dist-range-wrap { text-align: right; }
-.dist-p10  { color: #ff6b6b; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
-.dist-p50  { color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 800; font-family: 'Courier New', Courier, monospace; }
-.dist-p90  { color: #00f0ff; font-size: 0.82rem; font-weight: 700; font-family: 'Courier New', Courier, monospace; }
+.dist-p10  { color: #ff6b6b; font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+.dist-p50  { color: rgba(255,255,255,0.95); font-size: 0.9rem; font-weight: 800; font-family: 'JetBrains Mono', 'Courier New', monospace; }
+.dist-p90  { color: #00f0ff; font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', 'Courier New', monospace; }
 .dist-sep  { color: #4a5568; font-size: 0.82rem; margin: 0 3px; }
-.dist-label { color: #b0bec5; font-size: 0.7rem; font-family: 'Courier New', Courier, monospace; }
+.dist-label { color: #b0bec5; font-size: 0.7rem; font-family: 'JetBrains Mono', 'Courier New', monospace; }
 
 /* ─── Form Dots ───────────────────────────────────────────── */
 .form-dot-over  { display:inline-block; width:11px; height:11px; border-radius:50%;
@@ -876,7 +941,7 @@ button[kind="primary"] {
 
 /* ─── Summary Cards ───────────────────────────────────────── */
 .summary-card {
-    background: rgba(20,25,43,0.85);
+    background: rgba(13,18,32,0.85);
     border: 1px solid rgba(0,240,255,0.15);
     border-radius: 12px;
     padding: 16px 20px;
@@ -896,7 +961,7 @@ button[kind="primary"] {
     font-weight: 800;
     color: rgba(255,255,255,0.95);
     line-height: 1.1;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 .summary-label {
     font-size: 0.75rem;
@@ -908,7 +973,7 @@ button[kind="primary"] {
 
 /* ─── Best Bets Card ──────────────────────────────────────── */
 .best-bet-card {
-    background: rgba(20,25,43,0.85);
+    background: rgba(13,18,32,0.85);
     border: 1px solid rgba(0,240,255,0.18);
     border-radius: 14px;
     padding: 16px 20px;
@@ -933,7 +998,7 @@ button[kind="primary"] {
     font-size: 0.75rem;
     padding: 2px 10px;
     border-radius: 10px;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     box-shadow: 0 0 10px rgba(255,94,0,0.4);
 }
 
@@ -1020,7 +1085,7 @@ button[kind="primary"] {
 
 /* ─── Player Analysis Card ────────────────────────────────── */
 .player-analysis-card {
-    background: rgba(20,25,43,0.85);
+    background: rgba(13,18,32,0.85);
     border: 1px solid rgba(0,240,255,0.15);
     border-radius: 16px;
     padding: 20px 24px;
@@ -1057,7 +1122,7 @@ button[kind="primary"] {
     font-weight: 800;
     font-size: 0.8rem;
     cursor: pointer;
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     transition: opacity 0.2s ease, transform 0.2s ease;
     box-shadow: 0 0 12px rgba(255,94,0,0.40);
 }
@@ -1145,7 +1210,7 @@ button[kind="primary"] {
 .nba-game-day-banner {
     border-top: 3px solid transparent;
     border-image: linear-gradient(90deg, #C8102E 0%, #FFFFFF 33%, #1D428A 66%, #C8102E 100%) 1;
-    background: rgba(10,15,26,0.92);
+    background: rgba(7,10,19,0.92);
     border-radius: 0 0 10px 10px;
     padding: 12px 24px;
     text-align: center;
@@ -1271,29 +1336,39 @@ button[kind="primary"] {
    ═══════════════════════════════════════════════════════════ */
 
 /* ─── Enhanced Tier Badges ────────────────────────────────── */
-/* Platinum — holographic shimmer */
+/* Platinum — metallic white-silver with outer glow */
 .tier-platinum {
     background: linear-gradient(
         135deg,
-        #1a2035 0%, #2a3555 30%, #1e3050 50%, #2a3555 70%, #1a2035 100%
+        #d4d8e0 0%, #ffffff 30%, #b0b8c8 50%, #ffffff 70%, #d4d8e0 100%
     ) !important;
     background-size: 300% 100% !important;
-    animation: pulse-platinum 2.5s infinite, nba-shimmer-platinum 3.5s linear infinite !important;
+    color: #1a2035 !important;
+    -webkit-background-clip: unset !important;
+    -webkit-text-fill-color: #1a2035 !important;
+    animation: pulse-platinum 2.5s infinite, nba-shimmer-platinum 3s linear infinite !important;
 }
-/* Gold — gleam sweep */
+/* Gold — polished metal gleam */
 .tier-gold {
+    background: linear-gradient(
+        135deg,
+        #a67c00 0%, #ffd700 30%, #c9a800 50%, #ffd700 70%, #a67c00 100%
+    ) !important;
+    background-size: 300% 100% !important;
+    color: #2a1800 !important;
     animation: pulse-gold 2.8s infinite, nba-gold-gleam 4s ease-in-out infinite !important;
 }
 /* Silver — metallic sheen */
 .tier-silver {
     background: linear-gradient(
         105deg,
-        #1a1f30 0%, #252b40 40%, #3a4060 50%, #252b40 60%, #1a1f30 100%
+        #8a8e96 0%, #c0c0c0 40%, #d0d4dc 50%, #c0c0c0 60%, #8a8e96 100%
     ) !important;
     background-size: 300% 100% !important;
+    color: #1a1f30 !important;
     animation: nba-silver-sheen 3s linear infinite !important;
 }
-/* Bronze — warm pulse */
+/* Bronze — warm metallic pulse */
 .tier-bronze {
     animation: nba-bronze-pulse 2.5s ease-in-out infinite !important;
 }
@@ -1340,7 +1415,7 @@ button[kind="primary"] {
 /* ─── Premium Metric Card ────────────────────────────────── */
 /* Usage: <div class="premium-metric-card">...</div>          */
 .premium-metric-card {
-    background: rgba(20,25,43,0.90);
+    background: rgba(13,18,32,0.90);
     border: 1px solid rgba(0,240,255,0.18);
     border-radius: 16px;
     padding: 22px 26px;
@@ -1383,7 +1458,7 @@ button[kind="primary"] {
     opacity: 0;
     max-width: 300px;
     min-width: 140px;
-    background: rgba(10,15,26,0.97);
+    background: rgba(7,10,19,0.97);
     border: 1px solid rgba(0,240,255,0.35);
     border-radius: 10px;
     padding: 10px 14px;
@@ -1453,17 +1528,17 @@ button[kind="primary"] {
 }
 
 /* ─── Enhanced Scrollbar ──────────────────────────────────── */
-::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track {
-    background: rgba(10,15,26,0.95);
-    border-radius: 4px;
+    background: rgba(7,10,19,0.95);
+    border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, rgba(0,240,255,0.50), rgba(200,16,46,0.35));
-    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(0,240,255,0.40), rgba(0,240,255,0.20));
+    border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, rgba(0,240,255,0.80), rgba(200,16,46,0.55));
+    background: linear-gradient(180deg, rgba(0,240,255,0.70), rgba(0,240,255,0.40));
 }
 /* Custom text selection colors */
 ::selection {
@@ -1573,13 +1648,7 @@ input:focus, textarea:focus, select:focus,
     0% { background-position: -200% center; }
     100% { background-position: 200% center; }
 }
-.tier-platinum {
-    background: linear-gradient(90deg, #e5e4e2, #ffffff, #c0c0c0, #ffffff, #e5e4e2);
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: platinumShimmer 3s linear infinite;
-}
+/* NOTE: .tier-platinum is now a metallic badge — no text-clip needed */
 </style>
 """
 
@@ -1980,8 +2049,8 @@ def get_best_bets_section_html(best_bets):
     </div>
   </div>
   <div style="margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <span style="color:rgba(255,255,255,0.95);font-weight:700;font-family:'Courier New',monospace;">{prob_pct:.1f}%</span>
-    <span style="color:#00ff9d;font-size:0.82rem;font-family:'Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
+    <span style="color:rgba(255,255,255,0.95);font-weight:700;font-family:'JetBrains Mono','Courier New',monospace;">{prob_pct:.1f}%</span>
+    <span style="color:#00ff9d;font-size:0.82rem;font-family:'JetBrains Mono','Courier New',monospace;">{edge_sign}{edge:.1f}% edge</span>
     <span style="color:#b0bec5;font-size:0.82rem;font-style:italic;">{rec}</span>
   </div>
 </div>
@@ -1989,7 +2058,7 @@ def get_best_bets_section_html(best_bets):
 
     cards_html = "\n".join(rows)
     return f"""
-<div style="background:rgba(20,25,43,0.85);
+<div style="background:rgba(13,18,32,0.85);
             border:1px solid rgba(0,240,255,0.18);border-radius:16px;padding:20px 24px;margin-bottom:20px;
             backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
             box-shadow:0 0 20px rgba(0,240,255,0.08),0 4px 24px rgba(0,0,0,0.4);">
@@ -2080,7 +2149,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
     total = len(matched) + len(fuzzy_matched) + len(unmatched)
     match_pct = int((len(matched) + len(fuzzy_matched)) / max(total, 1) * 100)
     return f"""
-<div style="background:rgba(20,25,43,0.85);border:1px solid rgba(0,240,255,0.15);
+<div style="background:rgba(13,18,32,0.85);border:1px solid rgba(0,240,255,0.15);
             border-radius:12px;padding:16px 20px;margin-bottom:16px;
             backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
             box-shadow:0 0 18px rgba(0,240,255,0.07),0 4px 16px rgba(0,0,0,0.4);">
@@ -2189,10 +2258,10 @@ def get_ai_verdict_card_html(verdict, confidence, explanation):
     <div style="text-align:right;">
       <div class="verdict-confidence">CONFIDENCE</div>
       <div style="font-size:1.1rem;font-weight:800;color:{conf_bar_color};
-                  font-family:'Courier New',Courier,monospace;">{confidence:.0f}/100</div>
+                  font-family:'JetBrains Mono','JetBrains Mono','Courier New',monospace;">{confidence:.0f}/100</div>
     </div>
   </div>
-  <div style="margin-top:8px;background:rgba(20,25,43,0.80);border-radius:6px;height:6px;overflow:hidden;">
+  <div style="margin-top:8px;background:rgba(13,18,32,0.80);border-radius:6px;height:6px;overflow:hidden;">
     <div style="width:{bar_width}%;height:100%;background:{conf_bar_color};
                 border-radius:6px;box-shadow:0 0 8px {conf_bar_color};
                 transition:width 0.5s ease;"></div>
@@ -2431,7 +2500,7 @@ def get_progress_ring_html(percentage, label):
             stroke-dashoffset="{circumference * 0.25:.2f}"
             style="filter:drop-shadow(0 0 4px {ring_color});transition:stroke-dasharray 0.5s ease;"/>
     <text x="36" y="40" text-anchor="middle"
-          font-family="'Courier New',Courier,monospace"
+          font-family="'JetBrains Mono','JetBrains Mono','Courier New',monospace"
           font-size="13" font-weight="700"
           fill="{ring_color}">{pct:.0f}%</text>
   </svg>
@@ -3046,22 +3115,22 @@ def get_game_report_html(game=None, analysis_results=None):
     {_force_items(pick)}
   </div>{verdict_html}
   <!-- Always-open full breakdown panel -->
-  <div style="background:rgba(20,25,43,0.7);border-radius:6px;padding:12px 15px;margin-top:10px;border:1px solid rgba(255,94,0,0.12);">
+  <div style="background:rgba(13,18,32,0.7);border-radius:6px;padding:12px 15px;margin-top:10px;border:1px solid rgba(255,94,0,0.12);">
     <div style="color:#ff5e00;font-weight:600;font-size:0.8rem;margin-bottom:10px;">📊 Distribution</div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px;">
-      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+      <div style="text-align:center;padding:6px;background:rgba(7,10,19,0.6);border-radius:5px;">
         <div style="color:#b0bec5;font-size:0.7rem;">10th pct</div>
         <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_10", 0):.1f}</div>
       </div>
-      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+      <div style="text-align:center;padding:6px;background:rgba(7,10,19,0.6);border-radius:5px;">
         <div style="color:#b0bec5;font-size:0.7rem;">Median</div>
         <div style="color:var(--qds-primary);font-weight:700;font-size:0.85rem;">{pick.get("percentile_50", 0):.1f}</div>
       </div>
-      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+      <div style="text-align:center;padding:6px;background:rgba(7,10,19,0.6);border-radius:5px;">
         <div style="color:#b0bec5;font-size:0.7rem;">90th pct</div>
         <div style="color:#ff5e00;font-weight:700;font-size:0.85rem;">{pick.get("percentile_90", 0):.1f}</div>
       </div>
-      <div style="text-align:center;padding:6px;background:rgba(10,15,26,0.6);border-radius:5px;">
+      <div style="text-align:center;padding:6px;background:rgba(7,10,19,0.6);border-radius:5px;">
         <div style="color:#b0bec5;font-size:0.7rem;">Std Dev</div>
         <div style="color:white;font-weight:700;font-size:0.85rem;">{pick.get("simulated_std", 0):.1f}</div>
       </div>

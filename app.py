@@ -53,14 +53,16 @@ def _load_logo_b64(path: str) -> str:
 # ─── Quantum Edge Theme CSS — page-level overrides ───────────
 st.markdown("""
 <style>
-/* Hero banner gradient — vibrant high-tech Quantum Edge teal/blue */
+/* Hero banner — deep-space glassmorphic container */
 .hero-banner {
-    background: linear-gradient(135deg, #00b4ff 0%, #00ffd5 50%, #00e0b8 100%);
-    border: 1px solid rgba(0,240,255,0.25);
-    border-radius: 14px;
-    padding: 28px 36px;
+    background: rgba(13,18,32,0.60);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(0,240,255,0.18);
+    border-radius: 16px;
+    padding: 32px 40px;
     margin-bottom: 24px;
-    box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 6px 28px rgba(0,0,0,0.5);
+    box-shadow: 0 0 40px rgba(0,240,255,0.08), 0 8px 32px rgba(0,0,0,0.5);
     position: relative;
     overflow: hidden;
 }
@@ -68,56 +70,80 @@ st.markdown("""
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #FFD700, #c800ff, #00f0ff);
     background-size: 200% 100%;
     animation: headerShimmer 4s ease infinite;
 }
+.hero-tagline {
+    font-size: 1.6rem;
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    background: linear-gradient(135deg, #00f0ff, #00ff9d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.04em;
+    margin: 0;
+    line-height: 1.3;
+}
+.hero-subtext {
+    font-size: 0.82rem;
+    color: rgba(138,155,184,0.90);
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    letter-spacing: 0.06em;
+    margin-top: 8px;
+}
 .spp-hero-logo {
-    max-height: 90px;
+    max-height: 80px;
     max-width: 100%;
     object-fit: contain;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(0,240,255,0.35);
 }
 .hero-date {
-    font-size: 0.95rem;
-    color: rgba(10,15,26,0.70);
-    margin-top: 4px;
-    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.88rem;
+    color: rgba(138,155,184,0.80);
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    letter-spacing: 0.03em;
 }
 /* Status card — dark glass panel */
 .status-card {
-    background: rgba(20,25,43,0.85);
-    border: 1px solid rgba(0,240,255,0.15);
-    border-radius: 10px;
+    background: rgba(13,18,32,0.55);
+    border: 1px solid rgba(0,240,255,0.12);
+    border-radius: 12px;
     padding: 16px 20px;
     text-align: center;
-    box-shadow: 0 0 16px rgba(0,240,255,0.07), 0 4px 16px rgba(0,0,0,0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 0 16px rgba(0,240,255,0.05), 0 4px 16px rgba(0,0,0,0.35);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .status-card:hover {
-    border-color: rgba(0,240,255,0.35);
+    border-color: rgba(0,240,255,0.30);
     transform: translateY(-3px);
+    box-shadow: 0 0 24px rgba(0,240,255,0.12), 0 6px 20px rgba(0,0,0,0.45);
 }
 .status-card-value {
     font-size: 2rem;
     font-weight: 800;
     color: rgba(255,255,255,0.95);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
 }
 .status-card-label {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     color: #8a9bb8;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     margin-top: 4px;
+    font-family: 'Inter', sans-serif;
 }
 /* Tonight's slate team chips */
 .team-chip {
     display: inline-block;
-    background: rgba(0,240,255,0.07);
+    background: rgba(0,240,255,0.06);
     color: rgba(255,255,255,0.90);
-    border: 1px solid rgba(0,240,255,0.25);
+    border: 1px solid rgba(0,240,255,0.20);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 0.85rem;
@@ -233,14 +259,13 @@ _logo_img_tag = (
 )
 
 st.markdown(f"""
-<div class="neural-header spp-hero-header" style="display:flex;align-items:center;justify-content:center;padding:18px 36px;">
+<div class="hero-banner" style="display:flex;align-items:center;gap:28px;">
   {_logo_img_tag}
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown(f"""
-<div class="hero-banner">
-  <div class="hero-date">📅 {today_str} &nbsp;•&nbsp; 🏟️ {game_count_text}</div>
+  <div style="flex:1;">
+    <div class="hero-tagline">Quantum-Powered Prop Analytics</div>
+    <div class="hero-subtext">1,000x Monte Carlo Simulations &bull; Institutional Edge Detection</div>
+    <div class="hero-date">📅 {today_str} &nbsp;&bull;&nbsp; 🏟️ {game_count_text}</div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
