@@ -192,9 +192,11 @@ if _check_now_btn:
                     f"Pending: {_top_result.get('pending', 0)}"
                 )
             if _top_result.get("errors"):
-                with st.expander(f"⚠️ {len(_top_result['errors'])} detail(s)"):
-                    for _e in _top_result["errors"]:
-                        st.markdown(f"- {_e}")
+                st.warning("⚠️ " + " | ".join(_top_result["errors"][:3]))
+                if len(_top_result["errors"]) > 3:
+                    with st.expander(f"See all {len(_top_result['errors'])} detail(s)"):
+                        for _e in _top_result["errors"]:
+                            st.markdown(f"- {_e}")
         except Exception as _top_err:
             st.error(f"❌ Could not check results: {_top_err}")
 
@@ -758,7 +760,7 @@ with tab_all_picks:
         with st.spinner("🔄 Resolving all pending picks across all dates…"):
             try:
                 # ── Step 1: Resolve all_analysis_picks table (what this tab displays) ──
-                _picks_result  = resolve_all_analysis_picks()
+                _picks_result  = resolve_all_analysis_picks(include_today=True)
                 # ── Step 2: Also resolve the bets table (manual + AI bets) ──────────
                 _bets_result   = resolve_all_pending_bets()
 
@@ -1161,9 +1163,11 @@ with tab_auto_resolve:
                         f"Still pending: {_result.get('pending', 0)}"
                     )
                 if _result.get("errors"):
-                    with st.expander(f"⚠️ {len(_result['errors'])} issue(s)"):
-                        for err in _result["errors"]:
-                            st.markdown(f"- {err}")
+                    st.warning("⚠️ " + " | ".join(_result["errors"][:3]))
+                    if len(_result["errors"]) > 3:
+                        with st.expander(f"See all {len(_result['errors'])} issue(s)"):
+                            for err in _result["errors"]:
+                                st.markdown(f"- {err}")
             except Exception as _err:
                 st.error(f"❌ Resolve failed: {_err}")
 
@@ -1226,6 +1230,9 @@ with tab_auto_resolve:
                     f"🔄 Auto-resolved {_rtr_result['resolved']} bet(s) "
                     f"({_rtr_result['wins']}W / {_rtr_result['losses']}L)"
                 )
+            if _rtr_result.get("errors"):
+                for _rtr_err in _rtr_result["errors"]:
+                    logging.getLogger(__name__).warning(f"[BetTrackerPage] resolve: {_rtr_err}")
         except Exception as _exc:
             logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
         st.rerun()
@@ -1319,9 +1326,11 @@ with tab_auto_resolve:
             st.info("No pending bets found to resolve, or all bets are already resolved.")
 
         if _all_errors:
-            with st.expander(f"⚠️ {len(_all_errors)} error(s) during resolve-all"):
-                for err in _all_errors:
-                    st.markdown(f"- {err}")
+            st.warning("⚠️ " + " | ".join(_all_errors[:3]))
+            if len(_all_errors) > 3:
+                with st.expander(f"See all {len(_all_errors)} error(s) during resolve-all"):
+                    for err in _all_errors:
+                        st.markdown(f"- {err}")
 
 # ============================================================
 # END SECTION: Auto-Resolve Tab
