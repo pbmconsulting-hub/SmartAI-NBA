@@ -1177,6 +1177,78 @@ with tab_all_picks:
                             help=f"Based on {_btd['total']} {_btkey} picks",
                         )
 
+        # ── Win Rate by Platform ──────────────────────────────────────
+        _ap_plat_data: dict = {}
+        for _p in all_picks_data:
+            _plat = str(_p.get("platform") or "Unknown")
+            _res  = _p.get("result")
+            if _plat not in _ap_plat_data:
+                _ap_plat_data[_plat] = {"wins": 0, "losses": 0, "total": 0}
+            _ap_plat_data[_plat]["total"] += 1
+            if _res == "WIN":
+                _ap_plat_data[_plat]["wins"] += 1
+            elif _res == "LOSS":
+                _ap_plat_data[_plat]["losses"] += 1
+        if _ap_plat_data:
+            with st.expander("🎰 Win Rate by Platform", expanded=False):
+                _plat_rows = [
+                    {
+                        "Platform": _plat,
+                        "Total":    d["total"],
+                        "Wins":     d["wins"],
+                        "Losses":   d["losses"],
+                        "Win Rate": (
+                            f"{d['wins'] / max(d['wins'] + d['losses'], 1) * 100:.1f}%"
+                            if d["wins"] + d["losses"] > 0 else "—"
+                        ),
+                    }
+                    for _plat, d in sorted(_ap_plat_data.items())
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        _plat_rows,
+                        ["Platform", "Total", "Wins", "Losses", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+        # ── Bet Type Distribution ─────────────────────────────────────
+        _ap_total_picks = len(all_picks_data)
+        if _ap_total_picks > 0:
+            _ap_dist_data: dict = {}
+            for _p in all_picks_data:
+                _bt = str(_p.get("bet_type") or "normal")
+                _ap_dist_data[_bt] = _ap_dist_data.get(_bt, 0) + 1
+            _ap_bt_dist_display = {
+                "goblin": "🟢 Goblin",
+                "50_50":  "⚖️ 50/50",
+                "demon":  "🔥 Demon",
+                "normal": "Normal",
+            }
+            with st.expander("📊 Bet Type Distribution", expanded=False):
+                _dist_rows = [
+                    {
+                        "Bet Type":   _ap_bt_dist_display.get(_bt, _bt.title()),
+                        "Picks":      cnt,
+                        "% of Total": f"{cnt / _ap_total_picks * 100:.1f}%",
+                    }
+                    for _bt, cnt in sorted(_ap_dist_data.items(), key=lambda x: -x[1])
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        _dist_rows,
+                        ["Bet Type", "Picks", "% of Total"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+                _dist_cols = st.columns(len(_dist_rows))
+                for _di, _dr in enumerate(_dist_rows):
+                    _dist_cols[_di].metric(
+                        _dr["Bet Type"],
+                        _dr["Picks"],
+                        help=f"{_dr['% of Total']} of all picks",
+                    )
+
         st.divider()
 
         # ── Per-day sections ──────────────────────────────────────────

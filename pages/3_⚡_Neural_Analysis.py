@@ -2186,6 +2186,10 @@ if analysis_results:
             _tier_icon_map = {
                 "Platinum": "💎", "Gold": "🔒", "Silver": "✓", "Bronze": "⭐"
             }
+            _STAT_EMOJI = {
+                "points": "🏀", "rebounds": "📊", "assists": "🎯",
+                "threes": "🎯", "steals": "⚡", "blocks": "🛡️", "turnovers": "❌",
+            }
             for r in non_out_results:
                 _stat     = r.get("stat_type", "")
                 _emoji    = _STAT_EMOJI.get(_stat, "🏀")

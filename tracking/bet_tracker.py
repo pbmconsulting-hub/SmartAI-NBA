@@ -464,24 +464,29 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
         edge = res.get("edge_percentage", 0)
         tier = res.get("tier", "Bronze")
         confidence = res.get("confidence_score", 0)
-        # Only log picks where edge is positive
-        if edge <= 0:
+        bet_type = res.get("bet_type", "normal")
+        # Demon bets bypass all edge filters — their alt line is set above the
+        # standard O/U so negative edge is expected and they should still be tracked.
+        is_demon = bet_type == "demon"
+        # Only log picks where edge is positive (demons are exempt)
+        if edge <= 0 and not is_demon:
             continue
         # Only auto-log recognised tiers
         if tier not in AUTO_LOG_TIERS:
             continue
-        # Apply tier-specific minimum edge thresholds
-        if tier == "Silver":
-            min_required_edge = SILVER_MIN_EDGE
-        elif tier == "Bronze":
-            # Bronze needs high edge AND high confidence to qualify
-            if edge < BRONZE_MIN_EDGE or confidence < BRONZE_MIN_CONFIDENCE:
+        # Apply tier-specific minimum edge thresholds (demons bypass all filters)
+        if not is_demon:
+            if tier == "Silver":
+                min_required_edge = SILVER_MIN_EDGE
+            elif tier == "Bronze":
+                # Bronze needs high edge AND high confidence to qualify
+                if edge < BRONZE_MIN_EDGE or confidence < BRONZE_MIN_CONFIDENCE:
+                    continue
+                min_required_edge = BRONZE_MIN_EDGE
+            else:
+                min_required_edge = minimum_edge
+            if edge < min_required_edge:
                 continue
-            min_required_edge = BRONZE_MIN_EDGE
-        else:
-            min_required_edge = minimum_edge
-        if edge < min_required_edge:
-            continue
         if res.get("player_is_out", False):
             continue
 
