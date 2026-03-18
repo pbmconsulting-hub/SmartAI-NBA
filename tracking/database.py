@@ -1377,7 +1377,7 @@ def save_analysis_session(analysis_results, todays_games=None, selected_picks=No
     """
     try:
         initialize_database()
-        _ts = datetime.datetime.now().isoformat(timespec="seconds")
+        _ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
         _results_json = json.dumps(analysis_results, default=str)
         _games_json = json.dumps(todays_games or [], default=str)
         _picks_json = json.dumps(selected_picks or [], default=str)
@@ -1465,7 +1465,7 @@ def save_backtest_result(backtest_result):
     if not backtest_result or backtest_result.get("status") != "ok":
         return None
     try:
-        run_ts = datetime.datetime.now().isoformat()
+        run_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
         stat_types_json = json.dumps(backtest_result.get("stat_types", []))
         tier_win_rates_json = json.dumps(backtest_result.get("tier_win_rates", {}))
         stat_win_rates_json = json.dumps(backtest_result.get("stat_win_rates", {}))
@@ -1592,7 +1592,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
         return 0
 
     import datetime as _dt
-    fetched_at = _dt.datetime.now().isoformat()
+    fetched_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     inserted = 0
 
     try:
@@ -1710,7 +1710,12 @@ def is_game_log_cache_stale(player_id, max_age_hours=24):
             if not row or not row[0]:
                 return True
             latest_ts = _dt.datetime.fromisoformat(str(row[0]))
-            age_hours = (_dt.datetime.now() - latest_ts).total_seconds() / 3600.0
+            # Ensure both sides are tz-aware (UTC) to avoid
+            # "can't subtract offset-naive and offset-aware datetimes"
+            now_utc = _dt.datetime.now(_dt.timezone.utc)
+            if latest_ts.tzinfo is None:
+                latest_ts = latest_ts.replace(tzinfo=_dt.timezone.utc)
+            age_hours = (now_utc - latest_ts).total_seconds() / 3600.0
             return age_hours > max_age_hours
     except Exception:
         return True  # If we can't check, assume stale and re-fetch

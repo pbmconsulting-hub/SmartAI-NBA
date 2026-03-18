@@ -192,6 +192,15 @@ class TestPlatformFiltering(unittest.TestCase):
     """Tests for platform-only player filtering in data/data_manager.py."""
 
     def setUp(self):
+        import sys
+        from unittest.mock import MagicMock
+
+        # data.data_manager does `import streamlit as st` at module level.
+        # In CI environments where streamlit is not installed, we inject a
+        # lightweight mock so the pure-logic function under test can load.
+        if "streamlit" not in sys.modules:
+            sys.modules["streamlit"] = MagicMock()
+
         from data.data_manager import filter_props_to_platform_players
         self.filter_fn = filter_props_to_platform_players
 

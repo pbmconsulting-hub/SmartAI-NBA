@@ -163,6 +163,25 @@ GTD_INJURY_STATUSES = frozenset({
 # ============================================================
 
 
+def _nba_today_et():
+    """Return today's date anchored to US/Eastern time.
+
+    NBA defines game dates in Eastern Time. A server running in UTC
+    would shift the date boundary by 5 hours, causing late West-Coast
+    games (which tip off at 10:30 PM ET / 3:30 AM UTC) to be assigned
+    to the wrong calendar day.
+
+    NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
+    (EDT = UTC-4). Install ``tzdata`` for correct DST handling.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        _eastern = ZoneInfo("America/New_York")
+    except ImportError:
+        _eastern = datetime.timezone(datetime.timedelta(hours=-5))
+    return datetime.datetime.now(_eastern).date()
+
+
 # ============================================================
 # SECTION: NBA Team Abbreviation Mapping
 # nba_api uses team IDs internally; we need abbreviations.
@@ -262,10 +281,9 @@ def save_last_updated(data_type):
         except Exception:
             existing_timestamps = {}  # If file is broken, start fresh
 
-    # Add/update the timestamp for this data type
-    # datetime.datetime.now() gets the current date and time
-    # .isoformat() converts it to a string like "2026-03-06T14:30:00"
-    existing_timestamps[data_type] = datetime.datetime.now().isoformat()
+    # Add/update the timestamp for this data type (always UTC).
+    # Using UTC avoids ambiguity when the server timezone differs from ET.
+    existing_timestamps[data_type] = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
     # Also save an "is_live" flag to indicate real data is loaded
     existing_timestamps["is_live"] = True
@@ -498,7 +516,7 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
         "away_team_name": away_team_name,
         "vegas_spread": DEFAULT_VEGAS_SPREAD,
         "game_total": DEFAULT_GAME_TOTAL,
-        "game_date": datetime.date.today().isoformat(),
+        "game_date": _nba_today_et().isoformat(),
         "game_time_et": game_time_et,
         "arena": arena_display,
         # Team records
@@ -546,7 +564,7 @@ def _fetch_games_layer1_scoreboard_v2(team_records):
                 "name": t.get("nickname", ""),
             }
 
-        today_str = datetime.date.today().strftime("%m/%d/%Y")
+        today_str = _nba_today_et().strftime("%m/%d/%Y")
         sb = scoreboardv2.ScoreboardV2(game_date=today_str, day_offset=0)
         dfs = sb.get_data_frames()
         time.sleep(API_DELAY_SECONDS)
@@ -1941,7 +1959,10 @@ def fetch_defensive_ratings(force=False, progress_callback=None):
         try:
             import datetime as _dt
             teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
-            age_days = (_dt.datetime.now() - teams_ts).total_seconds() / 86400.0
+            _now_utc = _dt.datetime.now(_dt.timezone.utc)
+            if teams_ts.tzinfo is None:
+                teams_ts = teams_ts.replace(tzinfo=_dt.timezone.utc)
+            age_days = (_now_utc - teams_ts).total_seconds() / 86400.0
             if age_days < _STALE_DAYS:
                 _logger.info(
                     f"[DefensiveRatings] Data is fresh ({age_days:.1f}d old, "
@@ -1989,7 +2010,10 @@ def get_teams_staleness_warning():
     try:
         import datetime as _dt
         teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
-        age_days = (_dt.datetime.now() - teams_ts).total_seconds() / 86400.0
+        _now_utc = _dt.datetime.now(_dt.timezone.utc)
+        if teams_ts.tzinfo is None:
+            teams_ts = teams_ts.replace(tzinfo=_dt.timezone.utc)
+        age_days = (_now_utc - teams_ts).total_seconds() / 86400.0
         if age_days >= _STALE_DAYS:
             return (
                 f"🔴 Team data is **{age_days:.0f} days old** — seriously stale! "

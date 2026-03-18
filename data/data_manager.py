@@ -146,7 +146,11 @@ def load_injury_status():
         return {}
     try:
         with open(INJURY_STATUS_JSON_PATH, encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        # Defensive copy: @st.cache_data caches the return value by reference.
+        # If a caller mutates the returned dict (e.g., popping a player key),
+        # the cached copy is corrupted for every Streamlit session.
+        return {k: dict(v) if isinstance(v, dict) else v for k, v in data.items()}
     except Exception as err:
         print(f"load_injury_status: could not read {INJURY_STATUS_JSON_PATH}: {err}")
         return {}
@@ -202,7 +206,13 @@ def _load_csv_file(file_path):
         print(f"Error loading {file_path}: {error}")
         return []
 
-    return rows
+    # Return a defensive copy.  @st.cache_data caches by reference —
+    # if a caller mutates the returned list or inner dicts, the cache
+    # is permanently corrupted for every Streamlit session.
+    # Building new dicts via the comprehension above already creates
+    # fresh row dicts, but we still need a fresh outer list to prevent
+    # callers from appending/popping rows on the cached object.
+    return list(rows)
 
 
 # ============================================================
@@ -1416,7 +1426,7 @@ def save_last_updated_timestamp(data_type):
             existing_timestamps = {}  # If broken, start fresh
 
     # Set the current time as the timestamp for this data type
-    existing_timestamps[data_type] = datetime.datetime.now().isoformat()
+    existing_timestamps[data_type] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     existing_timestamps["is_live"] = True  # Mark that live data is loaded
 
     # Save back to the file
@@ -1515,11 +1525,11 @@ def get_data_health_report():
     if last_updated:
         try:
             ts = datetime.datetime.fromisoformat(last_updated)
-            now_local = datetime.datetime.now()
-            # Strip tzinfo for comparison if naive
-            if ts.tzinfo is not None:
-                ts = ts.replace(tzinfo=None)
-            age = now_local - ts
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            # Ensure both sides are tz-aware (UTC) for safe arithmetic
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=datetime.timezone.utc)
+            age = now_utc - ts
             days_old = age.days
             is_stale = days_old > 3
             if is_stale:

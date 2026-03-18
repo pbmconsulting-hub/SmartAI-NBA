@@ -53,94 +53,149 @@ def _load_logo_b64(path: str) -> str:
 # ─── Quantum Edge Theme CSS — page-level overrides ───────────
 st.markdown("""
 <style>
-/* Hero banner gradient — vibrant high-tech Quantum Edge teal/blue */
-.hero-banner {
-    background: linear-gradient(135deg, #00b4ff 0%, #00ffd5 50%, #00e0b8 100%);
-    border: 1px solid rgba(0,240,255,0.25);
-    border-radius: 14px;
-    padding: 28px 36px;
+/* ═══════════════════════════════════════════════════════════
+   PILLAR 3 — Hero HUD: Glassmorphic, Responsive Flexbox
+   ═══════════════════════════════════════════════════════════ */
+.hero-hud {
+    background: rgba(15,23,42,0.50);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px;
+    padding: 32px 40px;
     margin-bottom: 24px;
-    box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 6px 28px rgba(0,0,0,0.5);
+    box-shadow: 0 0 40px rgba(0,240,255,0.06), 0 8px 32px rgba(0,0,0,0.45);
     position: relative;
     overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 28px;
 }
-.hero-banner::before {
+/* Rainbow accent bar at top */
+.hero-hud::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; height: 3px;
-    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #FFD700, #c800ff, #00f0ff);
     background-size: 200% 100%;
     animation: headerShimmer 4s ease infinite;
 }
-.spp-hero-logo {
-    max-height: 90px;
-    max-width: 100%;
-    object-fit: contain;
+.hero-hud-text { flex: 1; min-width: 0; }
+.hero-tagline {
+    font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+    font-weight: 800;
+    font-family: 'Orbitron', sans-serif;
+    background: linear-gradient(135deg, #00f0ff, #00ff9d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.04em;
+    margin: 0;
+    line-height: 1.3;
+}
+.hero-subtext {
+    font-size: clamp(0.72rem, 1.1vw, 0.85rem);
+    color: #94A3B8;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
 }
 .hero-date {
-    font-size: 0.95rem;
-    color: rgba(10,15,26,0.70);
-    margin-top: 4px;
-    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.82rem;
+    color: rgba(148,163,184,0.80);
+    margin-top: 10px;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.03em;
+}
+.spp-hero-logo {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(0,240,255,0.30);
+    flex-shrink: 0;
+}
+/* Responsive: stack on mobile */
+@media (max-width: 640px) {
+    .hero-hud { flex-direction: column; text-align: center; padding: 24px 20px; }
+    .spp-hero-logo { width: 56px; height: 56px; }
 }
 /* Status card — dark glass panel */
 .status-card {
-    background: rgba(20,25,43,0.85);
-    border: 1px solid rgba(0,240,255,0.15);
-    border-radius: 10px;
+    background: rgba(15,23,42,0.50);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
     padding: 16px 20px;
     text-align: center;
-    box-shadow: 0 0 16px rgba(0,240,255,0.07), 0 4px 16px rgba(0,0,0,0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 0 16px rgba(0,240,255,0.04), 0 4px 16px rgba(0,0,0,0.30);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 .status-card:hover {
-    border-color: rgba(0,240,255,0.35);
+    border-color: rgba(0,240,255,0.20);
     transform: translateY(-3px);
+    box-shadow: 0 0 24px rgba(0,240,255,0.10), 0 6px 20px rgba(0,0,0,0.40);
 }
 .status-card-value {
     font-size: 2rem;
     font-weight: 800;
     color: rgba(255,255,255,0.95);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
 }
 .status-card-label {
-    font-size: 0.8rem;
-    color: #8a9bb8;
+    font-size: 0.72rem;
+    color: #94A3B8;
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     margin-top: 4px;
+    font-family: 'Inter', sans-serif;
 }
 /* Tonight's slate team chips */
 .team-chip {
     display: inline-block;
-    background: rgba(0,240,255,0.07);
+    background: rgba(0,240,255,0.05);
     color: rgba(255,255,255,0.90);
-    border: 1px solid rgba(0,240,255,0.25);
+    border: 1px solid rgba(255,255,255,0.08);
     padding: 3px 10px;
     border-radius: 6px;
     font-size: 0.85rem;
     font-weight: 600;
     margin: 3px;
+    transition: border-color 0.2s ease;
 }
-/* Tier badge pill */
+.team-chip:hover { border-color: rgba(0,240,255,0.25); }
+/* LIVE badge with "The Pulse" dot built in */
 .live-badge {
-    display: inline-block;
-    background: rgba(0,255,157,0.10);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,255,157,0.08);
     color: #00ff9d;
-    border: 1px solid rgba(0,255,157,0.35);
+    border: 1px solid rgba(0,255,157,0.30);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
     font-weight: 700;
-    text-shadow: 0 0 6px rgba(0,255,157,0.4);
+}
+.live-badge::before {
+    content: '';
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #00ff9d;
+    animation: thePulse 1.8s ease-in-out infinite;
+    flex-shrink: 0;
 }
 .sample-badge {
     display: inline-block;
-    background: rgba(255,94,0,0.10);
+    background: rgba(255,94,0,0.08);
     color: #ff9d4d;
-    border: 1px solid rgba(255,94,0,0.35);
+    border: 1px solid rgba(255,94,0,0.30);
     padding: 3px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
@@ -233,14 +288,13 @@ _logo_img_tag = (
 )
 
 st.markdown(f"""
-<div class="neural-header spp-hero-header" style="display:flex;align-items:center;justify-content:center;padding:18px 36px;">
+<div class="hero-hud ss-fade-in-up">
   {_logo_img_tag}
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown(f"""
-<div class="hero-banner">
-  <div class="hero-date">📅 {today_str} &nbsp;•&nbsp; 🏟️ {game_count_text}</div>
+  <div class="hero-hud-text">
+    <div class="hero-tagline">Quantum-Powered Prop Analytics</div>
+    <div class="hero-subtext">1,000&times; Monte Carlo Simulations &bull; Institutional Edge Detection</div>
+    <div class="hero-date">📅 {today_str} &nbsp;&bull;&nbsp; 🏟️ {game_count_text}</div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -349,7 +403,7 @@ number_of_analysis_results = len(st.session_state.get("analysis_results", []))
 # Live data status
 live_data_timestamps = load_last_updated()
 is_using_live_data = live_data_timestamps.get("is_live", False)
-data_badge = '<span class="live-badge">✅ LIVE</span>' if is_using_live_data else '<span class="sample-badge">📊 SAMPLE</span>'
+data_badge = '<span class="live-badge">LIVE</span>' if is_using_live_data else '<span class="sample-badge">📊 SAMPLE</span>'
 
 st.subheader("📊 Status")
 

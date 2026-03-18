@@ -323,6 +323,8 @@ def run_quantum_matrix_simulation(
 
     # Calculate the final adjusted projection for tonight
     adjusted_stat_projection = projected_stat_average * combined_adjustment_multiplier
+    # Floor at 0: a negative stat projection is physically meaningless
+    adjusted_stat_projection = max(0.0, adjusted_stat_projection)
 
     # Adjust standard deviation slightly for extreme multipliers
     # When pace is high, variance also increases (more unpredictable)
@@ -654,19 +656,21 @@ def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=22
             w = matrix_weights.get(name, 0.0)
             adjusted_scenarios.append((name, w, min_red_lo, min_red_hi, stat_lo, stat_hi))
         total_weight = sum(s[1] for s in adjusted_scenarios)
-        roll = random.random() * total_weight
-        cumulative = 0.0
-        for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:
-            cumulative += prob
-            if roll <= cumulative:
-                minutes_reduction = random.uniform(min_red_lo, min_red_hi)
-                stat_multiplier = random.uniform(stat_lo, stat_hi)
-                return name, minutes_reduction, stat_multiplier
-        # Floating-point guard: return 'normal' params from GAME_SCENARIOS
-        _normal = next((s for s in GAME_SCENARIOS if s[0] == "normal"), None)
-        if _normal:
-            return "normal", random.uniform(_normal[2], _normal[3]), random.uniform(_normal[4], _normal[5])
-        return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
+        _use_matrix = total_weight >= 1e-9
+        if _use_matrix:
+            roll = random.random() * total_weight
+            cumulative = 0.0
+            for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:
+                cumulative += prob
+                if roll <= cumulative:
+                    minutes_reduction = random.uniform(min_red_lo, min_red_hi)
+                    stat_multiplier = random.uniform(stat_lo, stat_hi)
+                    return name, minutes_reduction, stat_multiplier
+            # Floating-point guard: return 'normal' params from GAME_SCENARIOS
+            _normal = next((s for s in GAME_SCENARIOS if s[0] == "normal"), None)
+            if _normal:
+                return "normal", random.uniform(_normal[2], _normal[3]), random.uniform(_normal[4], _normal[5])
+            return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
 
     # Scale blowout scenario weights by the actual blowout risk.
     # Base blowout_win + blowout_loss weight is 0.18. If blowout_risk_factor
@@ -881,6 +885,9 @@ def build_histogram_from_results(simulated_results, prop_line, number_of_buckets
     """
     if not simulated_results:
         return []  # Return empty list if no results
+
+    # Guard: ensure number_of_buckets is at least 1 to prevent ZeroDivisionError
+    number_of_buckets = max(1, int(number_of_buckets))
 
     # Find the range of results (min to max)
     minimum_result = min(simulated_results)

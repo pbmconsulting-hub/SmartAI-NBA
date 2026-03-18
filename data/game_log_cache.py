@@ -32,7 +32,7 @@ def save_game_logs_to_cache(player_name, game_logs):
         cache[key] = {
             "player_name": player_name,
             "game_logs": game_logs,
-            "cached_at": datetime.datetime.now().isoformat(),
+            "cached_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         }
         _write_cache_file(cache)
         return True
@@ -70,7 +70,10 @@ def load_game_logs_from_cache(player_name):
         if cached_at_str:
             try:
                 cached_at = datetime.datetime.fromisoformat(cached_at_str)
-                age = datetime.datetime.now() - cached_at
+                now_utc = datetime.datetime.now(datetime.timezone.utc)
+                if cached_at.tzinfo is None:
+                    cached_at = cached_at.replace(tzinfo=datetime.timezone.utc)
+                age = now_utc - cached_at
                 is_stale = age.total_seconds() > _CACHE_TTL_HOURS * 3600
             except (ValueError, TypeError):
                 is_stale = True
