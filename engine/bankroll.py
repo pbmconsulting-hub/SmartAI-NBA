@@ -319,6 +319,8 @@ def odds_to_payout_multiplier(american_odds):
     except ImportError:
         try:
             odds = float(american_odds)
+            if odds == 0:
+                return 1.9091  # Default -110 payout
             if odds < 0:
                 return round(1.0 + (100.0 / abs(odds)), 6)
             else:

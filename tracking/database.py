@@ -16,6 +16,7 @@
 import sqlite3    # Built-in SQLite database (no install needed!)
 import json       # For serializing/deserializing analysis session data
 import os         # For file path operations
+import time       # For retry backoff delays
 import datetime   # For timestamps in analysis session persistence
 from pathlib import Path  # Modern file path handling
 
@@ -35,6 +36,12 @@ except ImportError:
 # It will be created automatically on first run
 DB_DIRECTORY = Path(__file__).parent.parent / "db"
 DB_FILE_PATH = DB_DIRECTORY / "smartai_nba.db"
+
+# Retry configuration for concurrent write safety.
+# SQLite can throw "database is locked" when multiple Streamlit sessions
+# attempt concurrent writes. Retrying with back-off avoids data loss.
+_WRITE_RETRY_ATTEMPTS = 3
+_WRITE_RETRY_DELAY = 0.25  # seconds between retries (doubles each attempt)
 
 # SQL to create the bets table (runs once when app starts)
 # BEGINNER NOTE: SQL is a language for managing databases.
@@ -449,16 +456,26 @@ def insert_bet(bet_data):
         float(bet_data.get("std_devs_from_line", 0.0)),
     )
 
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
-            cursor = connection.cursor()
-            cursor.execute(insert_sql, values)
-            connection.commit()
-            return cursor.lastrowid  # Return the new row's ID
+    for _attempt in range(_WRITE_RETRY_ATTEMPTS):
+        try:
+            with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                cursor = connection.cursor()
+                cursor.execute(insert_sql, values)
+                connection.commit()
+                return cursor.lastrowid  # Return the new row's ID
 
-    except sqlite3.Error as database_error:
-        _logger.error(f"Error inserting bet: {database_error}")
-        return None
+        except sqlite3.OperationalError as op_err:
+            if "locked" in str(op_err).lower() and _attempt < _WRITE_RETRY_ATTEMPTS - 1:
+                _logger.warning(f"insert_bet: database locked, retry {_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}")
+                time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
+                continue
+            _logger.error(f"Error inserting bet: {op_err}")
+            return None
+        except sqlite3.Error as database_error:
+            _logger.error(f"Error inserting bet: {database_error}")
+            return None
+    return None
 
 
 def update_bet_result(bet_id, result, actual_value):
@@ -479,16 +496,26 @@ def update_bet_result(bet_id, result, actual_value):
     WHERE bet_id = ?
     """
 
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
-            cursor = connection.cursor()
-            cursor.execute(update_sql, (result, actual_value, bet_id))
-            connection.commit()
-            return cursor.rowcount > 0  # True if a row was updated
+    for _attempt in range(_WRITE_RETRY_ATTEMPTS):
+        try:
+            with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+                connection.execute("PRAGMA journal_mode=WAL")
+                cursor = connection.cursor()
+                cursor.execute(update_sql, (result, actual_value, bet_id))
+                connection.commit()
+                return cursor.rowcount > 0  # True if a row was updated
 
-    except sqlite3.Error as database_error:
-        _logger.error(f"Error updating bet result: {database_error}")
-        return False
+        except sqlite3.OperationalError as op_err:
+            if "locked" in str(op_err).lower() and _attempt < _WRITE_RETRY_ATTEMPTS - 1:
+                _logger.warning(f"update_bet_result: database locked, retry {_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}")
+                time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
+                continue
+            _logger.error(f"Error updating bet result: {op_err}")
+            return False
+        except sqlite3.Error as database_error:
+            _logger.error(f"Error updating bet result: {database_error}")
+            return False
+    return False
 
 
 def load_all_bets(limit=200):
@@ -953,11 +980,15 @@ def save_daily_snapshot(date_str=None):
             ),
         )
         conn.commit()
-        conn.close()
         return True
     except Exception as exc:
         _logger.error(f"[database] save_daily_snapshot error: {exc}")
         return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 
 def load_daily_snapshots(days=14):
@@ -968,6 +999,7 @@ def load_daily_snapshots(days=14):
     """
     import json
 
+    conn = None
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -982,6 +1014,7 @@ def load_daily_snapshots(days=14):
         rows = cursor.fetchall()
         cols = [d[0] for d in cursor.description]
         conn.close()
+        conn = None
         snapshots = []
         for row in rows:
             s = dict(zip(cols, row))
@@ -1000,6 +1033,12 @@ def load_daily_snapshots(days=14):
     except Exception as exc:
         _logger.error(f"[database] load_daily_snapshots error: {exc}")
         return []
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
 
 
 def purge_old_snapshots(days=30):
@@ -1011,6 +1050,7 @@ def purge_old_snapshots(days=30):
     import datetime as _dt
 
     cutoff = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    conn = None
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -1020,11 +1060,16 @@ def purge_old_snapshots(days=30):
         )
         deleted = cursor.rowcount
         conn.commit()
-        conn.close()
         return deleted
     except Exception as exc:
         _logger.error(f"[database] purge_old_snapshots error: {exc}")
         return 0
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
 
 
 def get_rolling_stats(days=14):

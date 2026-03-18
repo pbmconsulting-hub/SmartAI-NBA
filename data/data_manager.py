@@ -79,6 +79,7 @@ def load_players_data():
     return _load_csv_file(PLAYERS_CSV_PATH)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_props_data():
     """
     Load all prop lines from the props.csv file.
@@ -116,6 +117,7 @@ def load_defensive_ratings_data():
     return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def load_injury_status():
     """
     Load the persisted player injury/availability status map from disk.
@@ -1443,6 +1445,8 @@ def clear_all_caches():
         load_players_data.clear()
         load_teams_data.clear()
         load_defensive_ratings_data.clear()
+        load_props_data.clear()
+        load_injury_status.clear()
     except Exception as _exc:
         logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
 

@@ -298,10 +298,14 @@ def _invalidate_data_caches():
             load_players_data,
             load_teams_data,
             load_defensive_ratings_data,
+            load_props_data,
+            load_injury_status,
         )
         load_players_data.clear()
         load_teams_data.clear()
         load_defensive_ratings_data.clear()
+        load_props_data.clear()
+        load_injury_status.clear()
         _logger.debug("Streamlit data caches cleared after CSV update.")
     except Exception:
         pass  # Cache clearing is best-effort — never block a data fetch
@@ -1436,7 +1440,7 @@ def fetch_player_stats(progress_callback=None):
                                     game_logs=game_log_data,
                                 )
                             except Exception:
-                                pass  # SQLite write failure is non-fatal
+                                _logger.debug("SQLite game log persist failed (non-fatal)")
 
                         # Take only the last 20 games for recency
                         recent_games = game_log_data[:20]

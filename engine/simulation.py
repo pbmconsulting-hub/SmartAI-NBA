@@ -529,7 +529,10 @@ def run_quantum_matrix_simulation(
     # ============================================================
 
     # Raw probability = games over / total games simulated
-    raw_probability_over = count_of_games_over_line / simulations_completed
+    if simulations_completed == 0:
+        raw_probability_over = 0.5
+    else:
+        raw_probability_over = count_of_games_over_line / simulations_completed
 
     # Clamp to [0.01, 0.99] — never 100% certain
     final_probability_over = clamp_probability(raw_probability_over)
@@ -541,8 +544,12 @@ def run_quantum_matrix_simulation(
     _p = final_probability_over
     _z = Z_SCORE_90_CI
     _z2 = _z * _z
-    _center = (_p + _z2 / (2 * _n)) / (1 + _z2 / _n)
-    _margin = _z * math.sqrt(_p * (1 - _p) / _n + _z2 / (4 * _n * _n)) / (1 + _z2 / _n)
+    if _n > 0:
+        _center = (_p + _z2 / (2 * _n)) / (1 + _z2 / _n)
+        _margin = _z * math.sqrt(_p * (1 - _p) / _n + _z2 / (4 * _n * _n)) / (1 + _z2 / _n)
+    else:
+        _center = _p
+        _margin = 0.5
     ci_90_low = max(0.0, _center - _margin)
     ci_90_high = min(1.0, _center + _margin)
 
@@ -1109,7 +1116,7 @@ def simulate_combo_stat(
         if combo_value > prop_line:
             count_over += 1
 
-    raw_prob_over = count_over / number_of_simulations
+    raw_prob_over = count_over / number_of_simulations if number_of_simulations > 0 else 0.5
     final_prob_over = clamp_probability(raw_prob_over)
 
     return {
@@ -1204,7 +1211,7 @@ def simulate_fantasy_score(
         if fantasy_val > prop_line:
             count_over += 1
 
-    raw_prob_over = count_over / number_of_simulations
+    raw_prob_over = count_over / number_of_simulations if number_of_simulations > 0 else 0.5
     final_prob_over = clamp_probability(raw_prob_over)
 
     # Compute the adjusted projected fantasy score
@@ -1303,7 +1310,7 @@ def simulate_double_double(
         if hit:
             count_double_double += 1
 
-    raw_prob = count_double_double / number_of_simulations
+    raw_prob = count_double_double / number_of_simulations if number_of_simulations > 0 else 0.5
     final_prob = clamp_probability(raw_prob)
 
     return {
@@ -1392,7 +1399,7 @@ def simulate_triple_double(
         if hit:
             count_triple_double += 1
 
-    raw_prob = count_triple_double / number_of_simulations
+    raw_prob = count_triple_double / number_of_simulations if number_of_simulations > 0 else 0.5
     final_prob = clamp_probability(raw_prob)
 
     return {
