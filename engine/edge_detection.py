@@ -1508,11 +1508,13 @@ def classify_bet_type(
 
     # line_category is None — backward-compatible path (synthetic / no category).
     # Return "50_50" when risk flags present (old behavior), else "normal".
+    # Note: label is "Standard Line" for consistency with the explicit 50_50/standard
+    # path; is_uncertain=True signals the risk flags via the separate risk_flags key.
     if is_uncertain:
         return {
             "bet_type":        "50_50",
             "bet_type_emoji":  "50/50",
-            "bet_type_label":  "50/50 Bet — Uncertain",
+            "bet_type_label":  "50/50 Bet — Standard Line",
             "goblin":          False,
             "demon":           False,
             "50_50":           True,

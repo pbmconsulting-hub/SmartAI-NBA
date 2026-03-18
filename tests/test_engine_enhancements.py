@@ -1539,7 +1539,7 @@ class TestClassifyBetTypeLineCategoryParam(unittest.TestCase):
                            "Conflicting forces should populate risk_flags")
         # bet_type should still be '50_50', NOT changed by risk flags
         self.assertIn(result["bet_type"], ("50_50", "goblin"),
-                      "Risk flags must not change bet_type away from 50_50")
+                      "Risk flags must not change bet_type to 'demon'; statistical goblin overlay may apply")
 
     def test_conflicting_forces_do_not_change_demon_bet_type(self):
         """Conflicting forces on a demon line do NOT override bet_type='demon'."""

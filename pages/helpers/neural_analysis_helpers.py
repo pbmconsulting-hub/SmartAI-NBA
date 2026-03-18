@@ -771,7 +771,7 @@ def display_prop_analysis_card_qds(result):
         )
 
     # ── Risk flags warning bar (below the bet type badge) ────────
-    _risk_flags = result.get("risk_flags", []) or []
+    _risk_flags = result.get("risk_flags", [])
     if _risk_flags:
         _risk_str = " | ".join(_risk_flags[:2])
         st.markdown(

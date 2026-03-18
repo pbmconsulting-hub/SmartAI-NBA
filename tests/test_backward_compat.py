@@ -240,10 +240,6 @@ class TestSensitivityAnalysisBackwardCompat(unittest.TestCase):
         )
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class TestBetTrackerHelpersBackwardCompat(unittest.TestCase):
     """Bet tracker helper aliases must still work with old function names."""
 
@@ -272,3 +268,7 @@ class TestBetTrackerHelpersBackwardCompat(unittest.TestCase):
         """New get_uncertain_subtype_counts() must be importable."""
         from pages.helpers.bet_tracker_helpers import get_uncertain_subtype_counts
         self.assertTrue(callable(get_uncertain_subtype_counts))
+
+
+if __name__ == "__main__":
+    unittest.main()

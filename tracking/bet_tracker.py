@@ -437,13 +437,13 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
                 + (
                     # Goblin / 50_50 / Demon / Normal classification notes
-                    "50/50 reasons: " + " | ".join(
-                        (res.get("risk_flags") or res.get("bet_type_reasons") or [])[:_MAX_UNCERTAIN_REASONS]
-                    )
-                    if res.get("bet_type") in ("50_50", "demon") and (res.get("risk_flags") or res.get("bet_type_reasons"))
+                    "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
+                    if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")
                     else (
-                        "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
-                        if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")
+                        "50/50 reasons: " + " | ".join(
+                            (res.get("risk_flags") or res.get("bet_type_reasons") or [])[:_MAX_UNCERTAIN_REASONS]
+                        )
+                        if res.get("bet_type") == "50_50" and (res.get("risk_flags") or res.get("bet_type_reasons"))
                         else (
                             "Demon (high ceiling): alt line above standard O/U"
                             if res.get("bet_type") == "demon"
