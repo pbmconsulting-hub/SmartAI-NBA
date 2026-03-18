@@ -28,6 +28,7 @@ from tracking.bet_tracker import (
     resolve_all_analysis_picks,
     get_model_performance_stats,
     log_new_bet,
+    log_props_to_tracker,
     record_bet_result,
 )
 from tracking.database import (
@@ -1483,6 +1484,94 @@ with tab_bets:
 with tab_log:
     st.subheader("➕ Log a New Bet")
 
+    # ── Bulk-add platform props ────────────────────────────────────────
+    _platform_props = st.session_state.get("platform_props", [])
+
+    # Fall back to CSV on disk if session state is empty
+    if not _platform_props:
+        try:
+            from data.data_manager import load_platform_props_from_csv
+            _platform_props = load_platform_props_from_csv()
+        except Exception:
+            _platform_props = []
+
+    if _platform_props:
+        with st.expander(
+            f"📋 Add Platform Props to Bet Tracker ({len(_platform_props)} props available)",
+            expanded=False,
+        ):
+            st.caption(
+                "These are today's live platform props loaded from PrizePicks, "
+                "Underdog, and DraftKings. Click **Add All** to log them as "
+                "PENDING bets so you can track their results."
+            )
+
+            # Summary by platform
+            _by_plat: dict = {}
+            for _p in _platform_props:
+                _pl = str(_p.get("platform", "Unknown"))
+                _by_plat[_pl] = _by_plat.get(_pl, 0) + 1
+            _plat_cols = st.columns(max(len(_by_plat), 1))
+            for _i, (_plname, _cnt) in enumerate(_by_plat.items()):
+                _plat_cols[_i % len(_plat_cols)].metric(_plname, _cnt, help="Props from this platform")
+
+            # Preview table
+            import pandas as _pd_props
+            _preview_rows = [
+                {
+                    "Player": _p.get("player_name", ""),
+                    "Team": _p.get("team", ""),
+                    "Stat": _p.get("stat_type", ""),
+                    "Line": _p.get("line", ""),
+                    "Platform": _p.get("platform", ""),
+                    "Game Date": _p.get("game_date", ""),
+                }
+                for _p in _platform_props
+            ]
+            st.dataframe(
+                _pd_props.DataFrame(_preview_rows),
+                use_container_width=True,
+                hide_index=True,
+                height=min(250, 40 + len(_preview_rows) * 35),
+            )
+
+            _prop_dir = st.radio(
+                "Default Direction",
+                ["OVER", "UNDER"],
+                horizontal=True,
+                key="props_bulk_direction",
+                help="Direction applied to props that don't have one set by the platform.",
+            )
+
+            if st.button(
+                f"➕ Add All {len(_platform_props)} Props to Bet Tracker",
+                type="primary",
+                key="btn_add_all_props",
+            ):
+                with st.spinner("Adding props to bet tracker…"):
+                    _saved, _skipped, _errs = log_props_to_tracker(
+                        _platform_props, direction=_prop_dir
+                    )
+                if _saved:
+                    st.success(
+                        f"✅ Added **{_saved}** prop(s) to the Bet Tracker "
+                        f"({_skipped} duplicate(s) skipped)."
+                    )
+                elif _skipped == len(_platform_props):
+                    st.info("ℹ️ All props are already in the Bet Tracker for today.")
+                else:
+                    st.warning("⚠️ No new props were added.")
+                if _errs:
+                    with st.expander(f"⚠️ {len(_errs)} warning(s)"):
+                        for _e in _errs[:20]:
+                            st.caption(_e)
+    else:
+        st.info(
+            "💡 No platform props loaded yet. Fetch live props from the "
+            "**📡 Live Games** page and then return here to bulk-add them."
+        )
+
+    st.divider()
     analysis_results = st.session_state.get("analysis_results", [])
     player_options = ["— type manually —"]
     if analysis_results:

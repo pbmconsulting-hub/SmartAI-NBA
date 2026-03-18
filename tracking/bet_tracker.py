@@ -1802,3 +1802,145 @@ def save_top_picks_from_analysis(analysis_results):
             )
 
     return saved_count
+
+
+# ============================================================
+# SECTION: Bulk-Log Platform Props
+# ============================================================
+
+def log_props_to_tracker(props_list, direction="OVER"):
+    """
+    Bulk-log a list of platform props into the bet tracker as PENDING bets.
+
+    Each prop becomes one bet entry with:
+      - direction defaulting to OVER (unless the prop dict already has
+        a "direction" key, e.g. from DraftKings odds data)
+      - confidence_score / probability_over / edge_percentage = 0 / 0.5 / 0.0
+        (no model output available — user can update after analysis)
+      - tier = "Bronze" (lowest tier since no model output)
+      - auto_logged = 1 (flagged as system-added, not manually entered)
+
+    Duplicate detection: skips any prop whose (player_name, stat_type,
+    today) triple is already in the ``bets`` table.
+
+    Stat-type normalisation: platform prop stat_type values are already
+    normalised to internal keys by ``data.platform_fetcher`` (e.g.
+    "3-Point Made" → "threes"). If a value is still unrecognised it is
+    skipped and reported in ``errors``.
+
+    Args:
+        props_list (list[dict]): Props from ``platform_props`` session
+            state or ``data/live_props.csv``. Each dict must have at
+            least ``player_name``, ``stat_type``, ``line``, and
+            ``platform``.
+        direction (str): Default direction ("OVER" or "UNDER") to use
+            when the prop dict has no "direction" key. Defaults to
+            "OVER".
+
+    Returns:
+        tuple[int, int, list[str]]: (saved, skipped, errors)
+            saved   — number of props successfully logged
+            skipped — number of duplicates skipped
+            errors  — list of human-readable error strings
+    """
+    if not props_list:
+        return 0, 0, []
+
+    import datetime as _dt
+
+    today_str = _dt.date.today().isoformat()
+
+    # Load existing bets to detect duplicates
+    existing_bets = load_all_bets(limit=2000)
+    existing_keys: set = set()
+    for b in existing_bets:
+        key = (
+            str(b.get("player_name", "")).lower(),
+            str(b.get("stat_type", "")).lower(),
+            str(b.get("bet_date", ""))[:10],
+        )
+        existing_keys.add(key)
+
+    # Normaliser: convert any un-normalised platform name to internal key
+    try:
+        from data.platform_mappings import normalize_stat_type as _norm_stat
+    except ImportError:
+        _norm_stat = None
+
+    saved = 0
+    skipped = 0
+    errors: list = []
+
+    for prop in props_list:
+        player_name = str(prop.get("player_name", "")).strip()
+        if not player_name:
+            errors.append("Skipped prop with missing player name")
+            continue
+
+        # Normalise stat_type: platform_fetcher already does this, but guard
+        # against manually-built or CSV-loaded props that may still be raw.
+        stat_type = str(prop.get("stat_type", "")).strip().lower()
+        if not stat_type:
+            errors.append(f"{player_name}: missing stat_type — skipped")
+            continue
+        if stat_type not in VALID_STAT_TYPES and _norm_stat is not None:
+            stat_type = _norm_stat(stat_type).lower()
+        if stat_type not in VALID_STAT_TYPES:
+            errors.append(
+                f"{player_name}: unrecognised stat type '{prop.get('stat_type', '')}' — skipped"
+            )
+            continue
+
+        prop_line = float(prop.get("line", prop.get("prop_line", 0)) or 0)
+        if prop_line <= 0:
+            errors.append(f"{player_name} ({stat_type}): invalid line {prop_line!r} — skipped")
+            continue
+
+        # Duplicate check
+        dup_key = (player_name.lower(), stat_type, today_str)
+        if dup_key in existing_keys:
+            skipped += 1
+            continue
+
+        bet_direction = str(prop.get("direction", direction)).upper()
+        if bet_direction not in VALID_DIRECTIONS:
+            bet_direction = direction.upper()
+
+        platform = str(prop.get("platform", "PrizePicks"))
+        team = str(prop.get("team", prop.get("player_team", "")))
+        game_date = str(prop.get("game_date", today_str))
+
+        try:
+            ok, msg = log_new_bet(
+                player_name=player_name,
+                stat_type=stat_type,
+                prop_line=prop_line,
+                direction=bet_direction,
+                platform=platform,
+                confidence_score=0.0,
+                probability_over=0.5,
+                edge_percentage=0.0,
+                tier="Bronze",
+                entry_fee=0.0,
+                team=team,
+                notes=f"Added from platform props | game: {game_date}",
+                auto_logged=1,
+                bet_type="normal",
+                std_devs_from_line=0.0,
+            )
+            if ok:
+                existing_keys.add(dup_key)
+                saved += 1
+            else:
+                errors.append(f"{player_name} ({stat_type}): {msg}")
+        except Exception as _exc:
+            errors.append(f"{player_name} ({stat_type}): {_exc}")
+            logging.getLogger(__name__).warning(
+                f"[BetTracker] log_props_to_tracker error for {player_name}: {_exc}"
+            )
+
+    return saved, skipped, errors
+
+# ============================================================
+# END SECTION: Bulk-Log Platform Props
+# ============================================================
