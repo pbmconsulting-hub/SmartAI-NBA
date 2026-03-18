@@ -1863,9 +1863,9 @@ def log_props_to_tracker(props_list, direction="OVER"):
 
     # Normaliser: convert any un-normalised platform name to internal key
     try:
-        from data.platform_mappings import normalize_stat_type as _norm_stat
+        from data.platform_mappings import normalize_stat_type as _norm_stat_type
     except ImportError:
-        _norm_stat = None
+        _norm_stat_type = None
 
     saved = 0
     skipped = 0
@@ -1883,8 +1883,8 @@ def log_props_to_tracker(props_list, direction="OVER"):
         if not stat_type:
             errors.append(f"{player_name}: missing stat_type — skipped")
             continue
-        if stat_type not in VALID_STAT_TYPES and _norm_stat is not None:
-            stat_type = _norm_stat(stat_type).lower()
+        if stat_type not in VALID_STAT_TYPES and _norm_stat_type is not None:
+            stat_type = _norm_stat_type(stat_type).lower()
         if stat_type not in VALID_STAT_TYPES:
             errors.append(
                 f"{player_name}: unrecognised stat type '{prop.get('stat_type', '')}' — skipped"
