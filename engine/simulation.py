@@ -656,10 +656,8 @@ def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=22
             w = matrix_weights.get(name, 0.0)
             adjusted_scenarios.append((name, w, min_red_lo, min_red_hi, stat_lo, stat_hi))
         total_weight = sum(s[1] for s in adjusted_scenarios)
-        if total_weight < 1e-9:
-            # All matrix weights are zero — fall through to base scenario logic
-            matrix_weights = None
-        else:
+        _use_matrix = total_weight >= 1e-9
+        if _use_matrix:
             roll = random.random() * total_weight
             cumulative = 0.0
             for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:

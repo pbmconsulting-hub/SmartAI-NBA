@@ -287,11 +287,12 @@ class TestMathHelpersCDFEdgeCases(unittest.TestCase):
         self.assertIn(result, [0.0, 1.0])
 
     def test_clamp_nan_input(self):
-        """Clamp should handle NaN gracefully — NaN comparisons return False."""
+        """Clamp with NaN: Python max(0.01, NaN) returns 0.01, min(0.99, NaN) returns 0.99,
+        so NaN is clamped to 0.99.  This test documents the actual Python behavior."""
         result = self.clamp(float('nan'))
-        # NaN < 0.01 is False and NaN > 0.99 is False, so max/min pass through NaN.
-        # This is a known Python behavior — document the expected result.
-        self.assertTrue(math.isnan(result) or 0.01 <= result <= 0.99)
+        # In CPython, max(0.01, NaN)=0.01 and min(0.99, NaN)=0.99, so the
+        # overall result is max(0.01, min(0.99, NaN)) = max(0.01, 0.99) = 0.99.
+        self.assertAlmostEqual(result, 0.99, places=2)
 
     def test_skew_normal_zero_std(self):
         """Skew-normal with std=0 should return the mean, not NaN."""

@@ -147,7 +147,8 @@ def calculate_expected_value_with_odds(model_probability, odds, stake=1.0):
     where net_win is derived from the actual odds.
 
     Args:
-        model_probability (float): Model's win probability (0.0 to 1.0)
+        model_probability (float): Model's win probability (0.0 to 1.0).
+            Values outside [0, 1] are silently clamped.
         odds (int or float): American odds (e.g. -110, +150)
         stake (float): Amount wagered. Default 1.0
 
@@ -200,6 +201,11 @@ def devig_probabilities(over_odds, under_odds):
         p_under_raw = american_odds_to_implied_probability(float(under_odds))
         overround = p_over_raw + p_under_raw
 
+        # Guard: when both sides carry extreme positive odds (e.g., +10000/+10000),
+        # each implied probability is ~0.01, making overround ~0.02.  Dividing by
+        # such a small overround amplifies rounding errors.  A 0.01 threshold safely
+        # rejects degenerate markets while still allowing any realistic two-sided
+        # market (normal markets have overround ≥ 1.0).
         if overround < 0.01:
             return (0.5, 0.5)
 
