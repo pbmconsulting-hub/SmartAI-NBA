@@ -51,7 +51,7 @@ def build_stat_performance_rows(stat_perf: dict) -> list:
 
 def build_bet_type_performance_rows(bet_type_perf: dict) -> list:
     """Build table rows for Win Rate by Bet Classification section."""
-    _bt_emoji_map = {"goblin": "Goblin", "50_50": "50/50", "demon": "50/50 (Legacy)", "normal": "Normal"}
+    _bt_emoji_map = {"goblin": "🟢 Goblin", "50_50": "⚖️ 50/50", "demon": "🔥 Demon", "normal": "Normal"}
     return [
         {
             "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -64,9 +64,9 @@ def build_bet_type_performance_rows(bet_type_perf: dict) -> list:
     ]
 
 
-def classify_demon_subtype(notes: str) -> str:
+def classify_uncertain_subtype(notes: str) -> str:
     """
-    Classify a Demon bet's subtype from its notes string.
+    Classify an uncertain pick's risk subtype from its notes string.
 
     Returns one of: "Conflict", "Variance", "Fatigue", "Regression", "Other".
     """
@@ -82,21 +82,31 @@ def classify_demon_subtype(notes: str) -> str:
     return "Other"
 
 
-def get_demon_subtype_counts(demon_bets: list) -> dict:
+# Backward-compat alias
+classify_demon_subtype = classify_uncertain_subtype
+
+
+def get_uncertain_subtype_counts(uncertain_bets: list) -> dict:
     """
-    Count how many demon bets fall into each subtype.
+    Count how many uncertain picks fall into each risk subtype.
 
     Args:
-        demon_bets: List of bet dicts with "notes" field.
+        uncertain_bets: List of bet dicts with "notes" field.
 
     Returns:
         Dict mapping subtype name → count (only non-zero counts included).
     """
     counts: dict = {"Conflict": 0, "Variance": 0, "Fatigue": 0, "Regression": 0, "Other": 0}
-    for bet in demon_bets:
-        subtype = classify_demon_subtype(bet.get("notes", ""))
+    for bet in uncertain_bets:
+        subtype = classify_uncertain_subtype(bet.get("notes", ""))
         counts[subtype] = counts.get(subtype, 0) + 1
     return {k: v for k, v in counts.items() if v > 0}
+
+
+# Backward-compat alias
+def get_demon_subtype_counts(demon_bets: list) -> dict:
+    """Backward-compat alias for get_uncertain_subtype_counts()."""
+    return get_uncertain_subtype_counts(demon_bets)
 
 
 def calculate_win_rate(wins: int, total: int) -> float:

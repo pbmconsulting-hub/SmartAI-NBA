@@ -1597,7 +1597,7 @@ def parse_alt_lines_from_platform_props(props):
     in the props list, the MEDIAN of all available lines is treated as the
     standard line and the remaining lines are classified as:
 
-        ``'standard'`` — this entry IS the standard O/U line (the baseline).
+        ``'50_50'``    — this entry IS the standard O/U line (the baseline).
         ``'goblin'``   — this line is BELOW the standard (safe floor bet;
                          high probability of hitting even if the player
                          misses the standard line).
@@ -1618,7 +1618,7 @@ def parse_alt_lines_from_platform_props(props):
         list[dict]: Same props enriched with two new keys on every entry:
             ``'standard_line'``: float — the median line for this
                 (player, stat, platform) group (the Standard_Line).
-            ``'line_category'``: str — ``'standard'`` | ``'goblin'`` |
+            ``'line_category'``: str — ``'50_50'`` | ``'goblin'`` |
                 ``'demon'``.
 
     Example::
@@ -1634,7 +1634,7 @@ def parse_alt_lines_from_platform_props(props):
         enriched = parse_alt_lines_from_platform_props(props)
         # → [
         #     {..."line": 28.5, "line_category": "goblin",   "standard_line": 31.5},
-        #     {..."line": 31.5, "line_category": "standard", "standard_line": 31.5},
+        #     {..."line": 31.5, "line_category": "50_50",    "standard_line": 31.5},
         #     {..."line": 34.5, "line_category": "demon",    "standard_line": 31.5},
         # ]
     """
@@ -1690,10 +1690,10 @@ def parse_alt_lines_from_platform_props(props):
 
         if std_line is None or std_line <= 0 or prop_line <= 0:
             # Can't categorize without a valid standard line
-            enriched_prop["line_category"] = "standard"
+            enriched_prop["line_category"] = "50_50"
         elif abs(prop_line - std_line) < 0.01:
             # This line IS the standard O/U (within floating-point tolerance)
-            enriched_prop["line_category"] = "standard"
+            enriched_prop["line_category"] = "50_50"
         elif prop_line < std_line:
             # Line is below standard → Goblin_Bet (safe floor)
             enriched_prop["line_category"] = "goblin"

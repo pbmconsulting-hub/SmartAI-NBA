@@ -347,10 +347,10 @@ if selected_picks:
     with _eb_filter_col2:
         _eb_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
+            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
             default=[],
             key="eb_bet_type_filter",
-            help="Filter by bet classification. Select 'Goblin — Easy Money' for the strongest picks. '50/50 — Uncertain' shows conflicting-force picks.",
+            help="Filter by bet classification. 'Goblin' = alt line below standard (safe floor). '50/50' = standard line. 'Demon' = alt line above standard (high ceiling).",
         )
     _filtered_picks = selected_picks
     if _eb_tier_filter:
@@ -358,13 +358,12 @@ if selected_picks:
         _filtered_picks = [p for p in _filtered_picks if p.get("tier") in _eb_tier_names]
     if _eb_bet_type_filter:
         _eb_bt_map = {
-            "Goblin — Easy Money": "goblin",
-            "50/50 — Uncertain":   "50_50",
-            "⚡ Normal":           "normal",
+            "Goblin — Safe Floor":     "goblin",
+            "50/50 — Standard Line":   "50_50",
+            "Demon — High Ceiling":    "demon",
+            "⚡ Normal":               "normal",
         }
         _eb_bt_values = {_eb_bt_map[t] for t in _eb_bet_type_filter if t in _eb_bt_map}
-        if "50_50" in _eb_bt_values:
-            _eb_bt_values.add("demon")  # legacy DB records
         _filtered_picks = [p for p in _filtered_picks if p.get("bet_type", "normal") in _eb_bt_values]
 
 

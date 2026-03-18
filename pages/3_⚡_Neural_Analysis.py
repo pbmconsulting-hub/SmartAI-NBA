@@ -1260,9 +1260,12 @@ if run_analysis:
             ),
         }
 
-        # ── Goblin / Demon Bet Classification ────────────────────────
-        # Classify each pick as a Goblin (easy money), Demon (trap/avoid),
-        # or Normal bet based on statistical criteria.
+        # ── Goblin / 50_50 / Demon Bet Classification ───────────────
+        # Primary classification is driven by line_category (from the
+        # ingestion layer).  Statistical Goblin overlay applies to
+        # standard-line picks.  Risk flags (conflicting forces, variance,
+        # fatigue, regression) are separate from bet_type and feed into
+        # the avoid-list system via is_uncertain.
         try:
             _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
             # Determine the source of the prop line so the classifier can
@@ -1270,6 +1273,9 @@ if run_analysis:
             # Props with no platform or marked as estimated are treated as
             # synthetic to prevent garbage-in/garbage-out Goblin awards.
             _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
+            # Extract line-position category from the ingestion layer
+            _line_category = prop.get("line_category", None)
+            _standard_line = prop.get("standard_line", None)
             # Pull user-configured thresholds from session state (set on Settings page)
             _ss = st.session_state
             _g_std  = _ss.get("goblin_min_std_devs")
@@ -1296,6 +1302,7 @@ if run_analysis:
                 goblin_min_edge=_g_edge,
                 demon_conflict_ratio=_d_conf,
                 demon_regression_pct=_d_regr,
+                line_category=_line_category,
             )
             full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
             full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
@@ -1304,11 +1311,16 @@ if run_analysis:
             full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
             full_result["line_verified"]   = _bet_classification.get("line_verified", True)
             full_result["line_reliability_warning"] = _bet_classification.get("line_reliability_warning")
-            # Demon bets should be added to the avoid list automatically
-            if _bet_classification.get("demon") and not full_result.get("should_avoid"):
+            full_result["line_category"]   = _line_category
+            full_result["standard_line"]   = _standard_line
+            full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
+            full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
+            # Uncertain picks (conflicting forces) are added to the avoid list.
+            # True Demon bets (line above standard) are NOT auto-avoided.
+            if _bet_classification.get("is_uncertain") and not full_result.get("should_avoid"):
                 full_result["should_avoid"] = True
                 full_result["avoid_reasons"] = list(full_result.get("avoid_reasons", [])) + [
-                    f"Demon Bet: {'; '.join(_bet_classification.get('reasons', []))}"
+                    f"Uncertain Pick: {'; '.join(_bet_classification.get('risk_flags', []))}"
                 ]
         except Exception:
             full_result["bet_type"]         = "normal"
@@ -1318,6 +1330,10 @@ if run_analysis:
             full_result["std_devs_from_line"] = 0.0
             full_result["line_verified"]    = True
             full_result["line_reliability_warning"] = None
+            full_result["line_category"]    = None
+            full_result["standard_line"]    = None
+            full_result["risk_flags"]       = []
+            full_result["is_uncertain"]     = False
 
         # ── Capture odds from the original prop (for display) ────────
         full_result["over_odds"]  = prop.get("over_odds",  -110)
@@ -1825,16 +1841,16 @@ if analysis_results:
         st.divider()
 
     # ============================================================
-    # SECTION: 50/50 Bets Warning Section (formerly "Demon Bets")
+    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard O/U)
     # ============================================================
     _demon_picks = [
-        r for r in analysis_results  # Use ALL results, not just displayed
-        if r.get("bet_type") in ("50_50", "demon")  # "demon" = legacy DB records
+        r for r in analysis_results
+        if r.get("bet_type") == "demon"
         and not r.get("player_is_out", False)
     ]
     if _demon_picks:
         with st.expander(
-            f"50/50 Bets Detected ({len(_demon_picks)}) — Conflicting Forces, Use Caution",
+            f"🔥 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -1843,110 +1859,184 @@ if analysis_results:
                     st.image(_DEMON_LOGO_PATH, width=110)
             with _dcol_title:
                 st.markdown(
-                    '<div style="background:rgba(180,0,0,0.15);border:2px solid #ff4444;'
+                    '<div style="background:rgba(255,140,0,0.12);border:2px solid #ff8c00;'
                     'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
-                    '<strong style="color:#ff4444;font-size:1.0rem;">Demon Bets Warning</strong><br>'
-                    '<span style="color:#ffb0b0;font-size:0.85rem;">These picks LOOK appealing but are statistically dangerous. '
-                    'Demon bets have hidden structural risks — hot streak regression, back-to-back fatigue, '
-                    'conflicting forces, or high-variance stats with tiny edges. '
-                    'They are automatically added to your Avoid List.</span>'
+                    '<strong style="color:#ff8c00;font-size:1.0rem;">DEMON BETS — High Ceiling, High Reward</strong><br>'
+                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard Over/Under. '
+                    'The player must exceed a higher threshold to win — lower probability but bigger payout. '
+                    'Use with confidence when the model shows strong edge.</span>'
                     '</div>',
                     unsafe_allow_html=True,
                 )
             st.markdown(
                 get_education_box_html(
                     "What is a Demon Bet?",
-                    "A <strong>Demon bet</strong> LOOKS appealing — maybe a star player has a nice "
-                    "edge — but has hidden danger signals that make it a likely loser. It's a trap.<br><br>"
-                    "<strong>There are 4 types of Demons:</strong><br>"
-                    "1. <strong>Conflict Demon:</strong> The model's forces are fighting each other — "
-                    "nearly 50/50 OVER vs UNDER. It's a coin flip disguised as an edge.<br>"
-                    "2. <strong>Variance Demon:</strong> High-variance stat (3-pointers, steals, blocks) "
-                    "with a tiny edge (&lt;8%). These stats are too random game-to-game.<br>"
-                    "3. <strong>Fatigue Demon:</strong> Back-to-back game + big spread (blowout expected). "
-                    "Player will likely rest in the 4th quarter.<br>"
-                    "4. <strong>Regression Demon:</strong> The line is set at a hot streak value (125%+ of "
-                    "season average). The player is due to come back to earth.<br><br>"
-                    "Demon bets are <em>automatically added to your Avoid List</em>.",
+                    "A <strong>Demon bet</strong> is an alternate sportsbook line set <strong>ABOVE</strong> "
+                    "the standard Over/Under. The player must exceed a higher threshold to win — "
+                    "this means lower probability but bigger payout. Think of it as the "
+                    "'swing for the fences' play.<br><br>"
+                    "<strong>Example:</strong> Standard line is SGA Points O/U 31.5, and the book also "
+                    "offers 34.5 — that 34.5 is a Demon bet (he needs 35+ points to win).<br><br>"
+                    "Use Demon bets when the model shows <em>strong edge and high confidence</em> "
+                    "above a challenging threshold. These are <strong>NOT auto-avoided</strong> — "
+                    "they are legitimate high-ceiling plays.",
                 ),
                 unsafe_allow_html=True,
             )
             for _dp in _demon_picks:
-                _dp_name  = _html.escape(str(_dp.get("player_name", "")))
-                _dp_team  = _html.escape(str(_dp.get("player_team", _dp.get("team", ""))))
-                _dp_stat  = _html.escape(str(_dp.get("stat_type", "")).title())
-                _dp_dir   = _html.escape(str(_dp.get("direction", "OVER")))
-                _dp_line  = _dp.get("line", 0)
-                _dp_proj  = _dp.get("adjusted_projection", 0)
-                _dp_edge  = _dp.get("edge_percentage", 0)
-                # Detect demon type from reasons list
-                _dp_reasons_list = _dp.get("bet_type_reasons", [])
-                _dp_demon_type = "Demon"
-                _dp_type_color = "#ff4444"
-                for _r_text in _dp_reasons_list:
-                    _r_lower = str(_r_text).lower()
-                    if "conflict" in _r_lower or "50/50" in _r_lower or "conflicting" in _r_lower:
-                        _dp_demon_type = "Conflict Demon"
-                        break
-                    elif "variance" in _r_lower or "high-variance" in _r_lower or "random" in _r_lower:
-                        _dp_demon_type = "Variance Demon"
-                        break
-                    elif "fatigue" in _r_lower or "back-to-back" in _r_lower or "b2b" in _r_lower:
-                        _dp_demon_type = "Fatigue Demon"
-                        break
-                    elif "regression" in _r_lower or "hot streak" in _r_lower or "125%" in _r_lower:
-                        _dp_demon_type = "Regression Demon"
-                        break
-                _dp_type_descriptions = {
-                    "Conflict Demon": "Forces nearly 50/50 — a coin flip disguised as an edge.",
-                    "Variance Demon": "High-variance stat with a tiny edge — too random to rely on.",
-                    "Fatigue Demon": "Back-to-back game — player may rest late in a blowout.",
-                    "Regression Demon": "Line set at hot-streak value — player is due to regress.",
-                    "Demon": "Hidden structural risk makes this pick dangerous.",
-                }
-                _dp_type_desc = _dp_type_descriptions.get(_dp_demon_type, "")
-                _dp_reasons_html = "".join(
-                    f'<li style="color:#ffb0b0;font-size:0.82rem;">{_html.escape(str(r))}</li>'
-                    for r in _dp_reasons_list
-                )
+                _dp_name     = _html.escape(str(_dp.get("player_name", "")))
+                _dp_team     = _html.escape(str(_dp.get("player_team", _dp.get("team", ""))))
+                _dp_stat     = _html.escape(str(_dp.get("stat_type", "")).title())
+                _dp_dir      = _html.escape(str(_dp.get("direction", "OVER")))
+                _dp_line     = _dp.get("line", 0)
+                _dp_std_line = _dp.get("standard_line", None)
+                _dp_proj     = _dp.get("adjusted_projection", 0)
+                _dp_edge     = _dp.get("edge_percentage", 0)
+                _dp_risk_flags = _dp.get("risk_flags", [])
                 _dp_team_badge = (
-                    f'<span style="background:rgba(255,68,68,0.15);color:#ff8a80;padding:1px 7px;'
+                    f'<span style="background:rgba(255,140,0,0.15);color:#ffb347;padding:1px 7px;'
                     f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-                    f'border:1px solid rgba(255,68,68,0.3);">{_dp_team}</span>'
+                    f'border:1px solid rgba(255,140,0,0.3);">{_dp_team}</span>'
                     if _dp_team else ""
                 )
+                _std_line_html = (
+                    f'<span style="color:#ffd580;font-size:0.78rem;margin-left:8px;">'
+                    f'(Standard: {_dp_std_line})</span>'
+                    if _dp_std_line else ""
+                )
+                _dp_risk_html = "".join(
+                    f'<li style="color:#ffd580;font-size:0.82rem;">{_html.escape(str(r))}</li>'
+                    for r in _dp_risk_flags
+                ) if _dp_risk_flags else ""
                 st.markdown(
-                    f'<div style="background:rgba(180,0,0,0.08);border:1px solid rgba(255,68,68,0.35);'
+                    f'<div style="background:rgba(255,140,0,0.08);border:1px solid rgba(255,140,0,0.35);'
                     f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;">'
                     f'<div>'
-                    f'<span style="color:#ff6666;font-weight:700;">Demon: {_dp_name}</span>'
+                    f'<span style="color:#ff8c00;font-weight:700;">🔥 {_dp_name}</span>'
                     f'{_dp_team_badge}'
-                    f'<span style="background:#ff4444;color:#fff;padding:2px 8px;border-radius:4px;'
-                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">{_dp_demon_type}</span>'
+                    f'<span style="background:#ff8c00;color:#fff;padding:2px 8px;border-radius:4px;'
+                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">DEMON BET</span>'
                     f'</div>'
                     f'<div style="text-align:right;">'
-                    f'<span style="color:#ffb0b0;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat} '
-                    f'(Proj: {_dp_proj:.1f})</span>'
-                    f'<br><span style="color:#ff4444;font-size:0.8rem;font-weight:600;">'
-                    f'Edge: {_dp_edge:+.1f}%</span>'
+                    f'<span style="color:#ffd580;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat}'
+                    f'{_std_line_html}</span>'
+                    f'<br><span style="color:#ff8c00;font-size:0.8rem;font-weight:600;">'
+                    f'Proj: {_dp_proj:.1f} &nbsp;|&nbsp; Edge: {_dp_edge:+.1f}%</span>'
                     f'</div>'
                     f'</div>'
                     + (
-                        f'<div style="margin-top:6px;padding:5px 9px;background:rgba(255,68,68,0.06);'
-                        f'border-radius:4px;color:#ffb0b0;font-size:0.79rem;font-style:italic;">'
-                        f'⚠️ {_html.escape(_dp_type_desc)}'
+                        f'<div style="margin-top:8px;">'
+                        f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">⚠️ RISK FLAGS:</span>'
+                        f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_risk_html}</ul>'
                         f'</div>'
-                        if _dp_type_desc else ""
+                        if _dp_risk_html else ""
                     )
-                    + f'<div style="margin-top:8px;">'
-                    f'<span style="color:#ff4444;font-size:0.75rem;font-weight:600;">WHY IT\'S A DEMON (AVOID):</span>'
-                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_reasons_html}</ul>'
+                    + f'</div>',
+                    unsafe_allow_html=True,
+                )
+        st.divider()
+
+    # ============================================================
+    # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
+    # ============================================================
+    _uncertain_picks = [
+        r for r in analysis_results
+        if r.get("is_uncertain", False)
+        and not r.get("player_is_out", False)
+    ]
+    if _uncertain_picks:
+        with st.expander(
+            f"⚠️ Uncertain Picks — Risk Flags ({len(_uncertain_picks)}) — Conflicting Signals, Use Caution",
+            expanded=False,
+        ):
+            st.markdown(
+                '<div style="background:rgba(255,193,7,0.10);border:2px solid #ffc107;'
+                'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
+                '<strong style="color:#ffc107;font-size:1.0rem;">UNCERTAIN PICKS — Conflicting Signals</strong><br>'
+                '<span style="color:#ffe082;font-size:0.85rem;">These picks have hidden structural risks: '
+                'conflicting forces, high variance with low edge, fatigue combos, or hot-streak regression. '
+                'They are automatically added to your Avoid List.</span>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                get_education_box_html(
+                    "What are Uncertain Picks (Risk Flags)?",
+                    "Uncertain picks have one or more hidden risk signals that make them dangerous despite "
+                    "appearing to have edge.<br><br>"
+                    "<strong>There are 4 risk patterns:</strong><br>"
+                    "1. <strong>Conflicting Forces:</strong> The model's forces are fighting each other — "
+                    "nearly 50/50 OVER vs UNDER. It's a coin flip disguised as an edge.<br>"
+                    "2. <strong>High Variance:</strong> High-variance stat (3-pointers, steals, blocks) "
+                    "with a tiny edge (&lt;8%). These stats are too random game-to-game.<br>"
+                    "3. <strong>Fatigue:</strong> Back-to-back game + big spread (blowout expected). "
+                    "Player will likely rest in the 4th quarter.<br>"
+                    "4. <strong>Regression:</strong> The line is set at a hot streak value (125%+ of "
+                    "season average). The player is due to come back to earth.<br><br>"
+                    "Uncertain picks are <em>automatically added to your Avoid List</em>.",
+                ),
+                unsafe_allow_html=True,
+            )
+            for _up in _uncertain_picks:
+                _up_name  = _html.escape(str(_up.get("player_name", "")))
+                _up_team  = _html.escape(str(_up.get("player_team", _up.get("team", ""))))
+                _up_stat  = _html.escape(str(_up.get("stat_type", "")).title())
+                _up_dir   = _html.escape(str(_up.get("direction", "OVER")))
+                _up_line  = _up.get("line", 0)
+                _up_proj  = _up.get("adjusted_projection", 0)
+                _up_edge  = _up.get("edge_percentage", 0)
+                _up_flags = _up.get("risk_flags", _up.get("bet_type_reasons", []))
+                _up_team_badge = (
+                    f'<span style="background:rgba(255,193,7,0.15);color:#ffe082;padding:1px 7px;'
+                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
+                    f'border:1px solid rgba(255,193,7,0.3);">{_up_team}</span>'
+                    if _up_team else ""
+                )
+                _up_flags_html = "".join(
+                    f'<li style="color:#ffe082;font-size:0.82rem;">{_html.escape(str(r))}</li>'
+                    for r in _up_flags
+                )
+                # Classify risk type from flag text
+                _up_flag_type = "Uncertain"
+                for _ft in _up_flags:
+                    _ftl = str(_ft).lower()
+                    if "conflict" in _ftl:
+                        _up_flag_type = "Conflicting Forces"
+                        break
+                    elif "variance" in _ftl or "high-variance" in _ftl:
+                        _up_flag_type = "High Variance"
+                        break
+                    elif "fatigue" in _ftl or "back-to-back" in _ftl:
+                        _up_flag_type = "Fatigue Risk"
+                        break
+                    elif "regression" in _ftl or "hot streak" in _ftl or "inflated" in _ftl:
+                        _up_flag_type = "Regression Risk"
+                        break
+                st.markdown(
+                    f'<div style="background:rgba(255,193,7,0.06);border:1px solid rgba(255,193,7,0.35);'
+                    f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<div>'
+                    f'<span style="color:#ffc107;font-weight:700;">⚠️ {_up_name}</span>'
+                    f'{_up_team_badge}'
+                    f'<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:4px;'
+                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">{_up_flag_type}</span>'
+                    f'</div>'
+                    f'<div style="text-align:right;">'
+                    f'<span style="color:#ffe082;font-size:0.85rem;">{_up_dir} {_up_line} {_up_stat} '
+                    f'(Proj: {_up_proj:.1f})</span>'
+                    f'<br><span style="color:#ffc107;font-size:0.8rem;font-weight:600;">'
+                    f'Edge: {_up_edge:+.1f}%</span>'
+                    f'</div>'
+                    f'</div>'
+                    f'<div style="margin-top:8px;">'
+                    f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">RISK FLAGS (AVOID):</span>'
+                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_up_flags_html}</ul>'
                     f'</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
-
         st.divider()
 
     # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─

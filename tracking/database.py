@@ -334,6 +334,33 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already exists — safe to ignore
 
+            # ── Line category column migration ────────────────────────
+            # Add line_category and standard_line columns for the three-tier
+            # Goblin / 50_50 / Demon classification system.
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN line_category TEXT DEFAULT '50_50'"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN standard_line REAL"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
+
+            # Remap old "demon" bet_type records (conflicting-forces picks under
+            # the old system) to "50_50" — they were standard-line uncertain picks,
+            # not true Demon bets (line above standard O/U).
+            try:
+                cursor.execute(
+                    "UPDATE bets SET bet_type = '50_50' WHERE bet_type = 'demon'"
+                )
+            except sqlite3.OperationalError:
+                pass
+
             # Save the changes
             connection.commit()
 

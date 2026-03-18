@@ -108,23 +108,28 @@ GLOSSARY = {
         "streak doesn't wipe you out before the edge plays out."
     ),
     "Goblin Bet": (
-        "A Goblin bet is one where the platform's line is so far from reality that it's "
-        "almost free money. Think of it like finding a $20 bill on the ground — the "
-        "sportsbook set the line at a number that's WAY below (or above) where the player "
-        "is actually likely to land. Example: LeBron OVER 12.5 points when he averages 25 "
-        "and the model projects 26.8 — the line is absurdly low, there is an 88% chance he "
-        "goes over. Goblin criteria: projection 2+ standard deviations from the line, "
-        "probability ≥80%, edge ≥25%."
+        "A Goblin bet is an alternate sportsbook line set BELOW the standard Over/Under — "
+        "a safe floor bet. The player only needs to clear a lower threshold to win. "
+        "High probability, lower payout. Think of it as the 'easy money' play. "
+        "Example: Standard line is SGA Points O/U 31.5, and the book also offers 28.5 — "
+        "that 28.5 is a Goblin bet (he only needs 29 points to win). "
+        "Goblin criteria (statistical overlay): projection 2+ standard deviations from the "
+        "line, probability ≥80%, edge ≥25%."
+    ),
+    "50/50 Bet": (
+        "A 50/50 bet is the standard Over/Under line set by the sportsbook — the baseline "
+        "bet. This is the primary line most bettors see. Example: SGA Points O/U 31.5 is "
+        "the 50/50 line. Not a special classification — it's the default. A 50/50 pick may "
+        "also carry risk flags (conflicting forces, variance, fatigue, regression) that are "
+        "shown separately as warnings."
     ),
     "Demon Bet": (
-        "A Demon bet LOOKS appealing on the surface but has hidden danger signals that make "
-        "it a likely loser — it's a trap. There are 4 types: (1) Conflict Demon: the model's "
-        "forces are nearly 50/50, a coin flip disguised as an edge. (2) Variance Demon: "
-        "high-variance stat (threes, steals, blocks) with a tiny edge under 8% — too random "
-        "to rely on. (3) Fatigue Demon: back-to-back game plus a large spread, meaning the "
-        "player may rest in the 4th quarter. (4) Regression Demon: the line is set at a hot "
-        "streak value (125%+ of season average) — the player is due to come back to earth. "
-        "Demon bets are automatically added to your Avoid List."
+        "A Demon bet is an alternate sportsbook line set ABOVE the standard Over/Under — "
+        "a high-ceiling, high-reward play. The player must exceed a higher threshold to win. "
+        "Lower probability but bigger payout. Think of it as the 'swing for the fences' play. "
+        "Example: Standard line is SGA Points O/U 31.5, and the book also offers 34.5 — "
+        "that 34.5 is a Demon bet (he needs 35+ points to win). Use when the model shows "
+        "strong edge and you want maximum upside. Demon bets are NOT auto-avoided."
     ),
 }
 
