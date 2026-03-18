@@ -4,6 +4,13 @@
 
 import math
 
+# Minimum combined overround (sum of both sides' implied probabilities)
+# required for devig to produce stable results. Normal two-sided markets
+# have overround ≥ 1.0; extreme positive odds on both sides (e.g.,
+# +10000/+10000) yield overround ~0.02 — dividing by such a small
+# value amplifies rounding errors into meaningless fair probabilities.
+MIN_VALID_OVERROUND = 0.01
+
 
 def american_odds_to_implied_probability(odds):
     """
@@ -206,7 +213,7 @@ def devig_probabilities(over_odds, under_odds):
         # such a small overround amplifies rounding errors.  A 0.01 threshold safely
         # rejects degenerate markets while still allowing any realistic two-sided
         # market (normal markets have overround ≥ 1.0).
-        if overround < 0.01:
+        if overround < MIN_VALID_OVERROUND:
             return (0.5, 0.5)
 
         # Multiplicative devig: divide each side by the overround

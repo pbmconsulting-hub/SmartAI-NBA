@@ -232,6 +232,9 @@ def _today_str():
 
     NBA prop markets are defined in Eastern Time — a server in UTC would
     shift the date boundary, potentially mis-matching props to the wrong day.
+
+    NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
+    (EDT = UTC-4). Install ``tzdata`` for correct DST handling.
     """
     try:
         from zoneinfo import ZoneInfo

@@ -170,6 +170,9 @@ def _nba_today_et():
     would shift the date boundary by 5 hours, causing late West-Coast
     games (which tip off at 10:30 PM ET / 3:30 AM UTC) to be assigned
     to the wrong calendar day.
+
+    NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
+    (EDT = UTC-4). Install ``tzdata`` for correct DST handling.
     """
     try:
         from zoneinfo import ZoneInfo

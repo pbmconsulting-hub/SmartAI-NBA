@@ -79,16 +79,25 @@ class TestTimezoneAnchoring(unittest.TestCase):
     def test_game_log_cache_utc_timestamp(self):
         """game_log_cache.py should produce UTC timestamps."""
         from data.game_log_cache import save_game_logs_to_cache, load_game_logs_from_cache
-        import tempfile
-        import json
 
-        # Save a test entry
-        saved = save_game_logs_to_cache("test_player_tz", [{"pts": 25}])
-        if saved:
-            # Read back and check timestamp format
-            logs, is_stale = load_game_logs_from_cache("test_player_tz")
-            # Should not crash with mixed tz arithmetic
-            self.assertIsInstance(is_stale, bool)
+        _test_player = "__test_player_tz_audit__"
+        try:
+            # Save a test entry
+            saved = save_game_logs_to_cache(_test_player, [{"pts": 25}])
+            if saved:
+                # Read back and check timestamp format
+                logs, is_stale = load_game_logs_from_cache(_test_player)
+                # Should not crash with mixed tz arithmetic
+                self.assertIsInstance(is_stale, bool)
+        finally:
+            # Clean up test entry from the persistent cache
+            try:
+                from data.game_log_cache import _load_cache_file, _write_cache_file
+                cache = _load_cache_file()
+                cache.pop(_test_player.strip().lower(), None)
+                _write_cache_file(cache)
+            except Exception:
+                pass  # Best-effort cleanup
 
     def test_platform_fetcher_now_str_utc(self):
         """platform_fetcher._now_str() should return a UTC timestamp."""

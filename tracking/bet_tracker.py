@@ -63,6 +63,32 @@ _BACKOFF_INCREMENT = 0.8   # additional seconds per retry (1.2s, 2.0s, 2.8s)
 # ============================================================
 
 
+def _get_eastern_tz():
+    """Return a US/Eastern timezone object for NBA game-date anchoring.
+
+    NBA defines game dates in Eastern Time. This function prefers
+    ``zoneinfo.ZoneInfo`` (DST-aware) and falls back to a fixed UTC-5
+    offset when zoneinfo is unavailable.
+
+    NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
+    time (EDT = UTC-4, roughly March–November). During EDT, dates
+    derived from this fallback may be one hour off near the midnight
+    boundary. If your server runs in UTC and processes games near
+    midnight ET, install ``tzdata`` (``pip install tzdata``) to ensure
+    ``zoneinfo`` is available.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("America/New_York")
+    except ImportError:
+        return datetime.timezone(datetime.timedelta(hours=-5))
+
+
+def _nba_today_et():
+    """Return today's date anchored to US/Eastern time."""
+    return datetime.datetime.now(_get_eastern_tz()).date()
+
+
 # ============================================================
 # SECTION: Unified Stat Column Mapping
 # Maps ALL known internal stat keys AND platform-native aliases
@@ -219,12 +245,7 @@ def log_new_bet(
     # Get today's date as a string in YYYY-MM-DD format.
     # Anchor to US/Eastern: NBA game dates are defined in ET, so a bet
     # logged at 1 AM UTC for a late West Coast game is still "today" in ET.
-    try:
-        from zoneinfo import ZoneInfo
-        _eastern = ZoneInfo("America/New_York")
-    except ImportError:
-        _eastern = datetime.timezone(datetime.timedelta(hours=-5))
-    today_date_string = datetime.datetime.now(_eastern).date().isoformat()
+    today_date_string = _nba_today_et().isoformat()
 
     # Build the bet data dictionary
     bet_data = {
@@ -577,12 +598,7 @@ def auto_resolve_bet_results(date_str=None):
         # Anchor to US/Eastern — NBA game dates are defined in ET.
         # Using UTC or the server's local tz could mismatch by a day
         # when games end after midnight UTC (most East Coast tip-offs).
-        try:
-            from zoneinfo import ZoneInfo
-            _eastern = ZoneInfo("America/New_York")
-        except ImportError:
-            _eastern = _dt.timezone(_dt.timedelta(hours=-5))
-        _today_et = _dt.datetime.now(_eastern).date()
+        _today_et = _nba_today_et()
         date_str = (_today_et - _dt.timedelta(days=1)).isoformat()
 
     resolved_count = 0
@@ -632,12 +648,7 @@ def auto_resolve_bet_results(date_str=None):
 
     # Season string for PlayerGameLog (current season).
     # Use ET-anchored date for season calculation to stay consistent.
-    try:
-        from zoneinfo import ZoneInfo
-        _eastern_tz = ZoneInfo("America/New_York")
-    except ImportError:
-        _eastern_tz = _dt.timezone(_dt.timedelta(hours=-5))
-    _today_et = _dt.datetime.now(_eastern_tz).date()
+    _today_et = _nba_today_et()
     current_year = _today_et.year
     current_month = _today_et.month
     season_year = current_year if current_month >= 10 else current_year - 1
@@ -1790,12 +1801,7 @@ def save_top_picks_from_analysis(analysis_results):
 
     import datetime as _dt
     # Anchor to US/Eastern — NBA game dates are defined in ET.
-    try:
-        from zoneinfo import ZoneInfo
-        _eastern = ZoneInfo("America/New_York")
-    except ImportError:
-        _eastern = _dt.timezone(_dt.timedelta(hours=-5))
-    today_str = _dt.datetime.now(_eastern).strftime("%Y-%m-%d")
+    today_str = _nba_today_et().isoformat()
 
     existing_bets = load_all_bets(limit=500)
     existing_keys = set()
