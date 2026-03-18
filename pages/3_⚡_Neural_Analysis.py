@@ -475,6 +475,12 @@ _DEFAULT_SELECTED_STATS = [
     "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
 ]
 
+
+def _labels_to_stat_keys(labels):
+    """Convert user-facing stat labels to internal stat-type keys."""
+    return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
+
+
 with st.expander("🎯 Pre-Analysis Filters", expanded=True):
     st.markdown(
         '<p style="color:#a0b4d0;font-size:0.85rem;margin-bottom:12px;">'
@@ -520,16 +526,14 @@ with st.expander("🎯 Pre-Analysis Filters", expanded=True):
     st.session_state["funnel_absolute_max"] = _absolute_max
 
     # ── Dynamic feedback: estimate surviving prop count ───────────
-    _funnel_stat_keys = frozenset(
-        _STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in _selected_stat_labels
-    )
+    _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
     _funnel_preview = [
         p for p in current_props
         if str(p.get("stat_type", "")).lower().strip() in _funnel_stat_keys
     ]
     # Apply per-player cap preview
-    _preview_counts: dict = {}
-    _funnel_preview_capped: list = []
+    _preview_counts: dict[str, int] = {}
+    _funnel_preview_capped: list[dict] = []
     for _fp in _funnel_preview:
         _pk = str(_fp.get("player_name", "")).lower().strip()
         if _preview_counts.get(_pk, 0) < _max_per_player:
@@ -697,9 +701,7 @@ if run_analysis:
     # Apply the user's funnel settings from the Pre-Analysis Filters expander
     # via smart_filter_props() in data.platform_fetcher.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
-    _funnel_stat_keys_run = frozenset(
-        _STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in _funnel_stats_selected
-    )
+    _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
     _funnel_max_pp = st.session_state.get("funnel_max_per_player", 3)
     _funnel_abs_max = st.session_state.get("funnel_absolute_max", 150)
 
