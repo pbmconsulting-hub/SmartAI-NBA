@@ -53,8 +53,81 @@ VALID_TIERS = {"Platinum", "Gold", "Silver", "Bronze"}
 RESOLVE_MAX_RETRIES = 3
 RESOLVE_RETRY_DELAY = 2  # seconds between retries
 
+# NBA API call configuration
+NBA_API_TIMEOUT = 60       # seconds — increased from default 30 to handle slow endpoints
+_BACKOFF_BASE = 1.2        # initial delay in seconds between API attempts
+_BACKOFF_INCREMENT = 0.8   # additional seconds per retry (1.2s, 2.0s, 2.8s)
+
 # ============================================================
 # END SECTION: Valid Values for Validation
+# ============================================================
+
+
+# ============================================================
+# SECTION: Unified Stat Column Mapping
+# Maps ALL known internal stat keys AND platform-native aliases
+# to nba_api PlayerGameLog column names.
+# ============================================================
+
+_STAT_COL = {
+    # ── Internal canonical keys ────────────────────────────────
+    "points":           "PTS",
+    "rebounds":         "REB",
+    "assists":          "AST",
+    "threes":           "FG3M",
+    "steals":           "STL",
+    "blocks":           "BLK",
+    "turnovers":        "TOV",
+    "three_pointers":   "FG3M",
+    "minutes":          "MIN",
+    # ── PrizePicks aliases ─────────────────────────────────────
+    "pts":              "PTS",
+    "rebs":             "REB",
+    "asts":             "AST",
+    "blks":             "BLK",
+    "stls":             "STL",
+    "tovs":             "TOV",
+    "3-pt made":        "FG3M",
+    "3pm":              "FG3M",
+    "blocked shots":    "BLK",
+    "free throws made": "FTM",
+    "ftm":              "FTM",
+    # ── DraftKings / Underdog aliases ──────────────────────────
+    "three pointers":   "FG3M",
+    "3-pointers":       "FG3M",
+    "three_point":      "FG3M",
+    "fg3m":             "FG3M",
+    "tov":              "TOV",
+    "stl":              "STL",
+    "blk":              "BLK",
+    "reb":              "REB",
+    "ast":              "AST",
+    "min":              "MIN",
+}
+
+# Game-segment prop patterns that CANNOT be resolved from PlayerGameLog
+# (which only has full-game totals). These are flagged gracefully instead
+# of dumped into the generic "unknown stat" error bucket.
+_SEGMENT_PROP_PATTERNS = [
+    "1st half",
+    "2nd half",
+    "1st quarter",
+    "2nd quarter",
+    "3rd quarter",
+    "4th quarter",
+    "1st 3 minutes",
+    "1st 5 minutes",
+    "1st 10 minutes",
+]
+
+
+def _is_segment_prop(stat_type: str) -> bool:
+    """Return True if stat_type is a game-segment prop that can't be resolved."""
+    lower = stat_type.lower()
+    return any(pattern in lower for pattern in _SEGMENT_PROP_PATTERNS)
+
+# ============================================================
+# END SECTION: Unified Stat Column Mapping
 # ============================================================
 
 
@@ -511,17 +584,17 @@ def auto_resolve_bet_results(date_str=None):
 
     # Import combo/fantasy stat definitions and name normalizer
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
     try:
         from data.data_manager import normalize_player_name as _normalize_name
     except ImportError:
         def _normalize_name(n):
             return n.lower().strip()
 
-    # Build player name → nba_api player_id map (normalized for fuzzy matching)
     _all_nba_players = nba_players_static.get_players()
     _name_to_id = {
         p["full_name"].lower(): p["id"]
@@ -531,17 +604,6 @@ def auto_resolve_bet_results(date_str=None):
     _norm_to_id = {
         _normalize_name(p["full_name"]): p["id"]
         for p in _all_nba_players
-    }
-
-    # Stat key mapping: our stat_type labels → PlayerGameLog column names
-    _STAT_COL = {
-        "points":    "PTS",
-        "rebounds":  "REB",
-        "assists":   "AST",
-        "threes":    "FG3M",
-        "steals":    "STL",
-        "blocks":    "BLK",
-        "turnovers": "TOV",
     }
 
     # Season string for PlayerGameLog (current season)
@@ -596,7 +658,20 @@ def auto_resolve_bet_results(date_str=None):
         is_fantasy = stat_type in FANTASY_SCORING
         stat_col   = _STAT_COL.get(stat_type)
 
+        # Fallback: try normalizing the platform-native name to an internal key
+        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            normalized = _norm_stat_type(stat_type)
+            stat_col = _STAT_COL.get(normalized)
+            if stat_col:
+                stat_type = normalized  # use the normalized key downstream
+
         if not stat_col and not is_combo and not is_fantasy:
+            if _is_segment_prop(stat_type):
+                errors_list.append(
+                    f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
+                    f"cannot resolve from full-game box score"
+                )
+                continue
             errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
             continue
 
@@ -623,13 +698,21 @@ def auto_resolve_bet_results(date_str=None):
             continue
 
         try:
-            _time.sleep(1.0)  # respect nba_api rate limit
-            game_log = playergamelog.PlayerGameLog(
-                player_id=player_id,
-                season=season_str,
-                season_type_all_star="Regular Season",
-            )
-            df = game_log.get_data_frames()[0]
+            for _attempt in range(RESOLVE_MAX_RETRIES):
+                try:
+                    _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                    game_log = playergamelog.PlayerGameLog(
+                        player_id=player_id,
+                        season=season_str,
+                        season_type_all_star="Regular Season",
+                        timeout=NBA_API_TIMEOUT,
+                    )
+                    df = game_log.get_data_frames()[0]
+                    break  # success
+                except Exception as _api_err:
+                    if _attempt == RESOLVE_MAX_RETRIES - 1:
+                        raise  # re-raise on final attempt
+                    continue  # retry
             if df.empty:
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
@@ -749,10 +832,11 @@ def resolve_todays_bets():
 
     # Import combo/fantasy stat definitions
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     # Normalizer for fuzzy matching
     try:
@@ -824,19 +908,6 @@ def resolve_todays_bets():
             logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
-    # Primary stat column map
-    _STAT_COL = {
-        "points":    "PTS",
-        "rebounds":  "REB",
-        "assists":   "AST",
-        "threes":    "FG3M",
-        "steals":    "STL",
-        "blocks":    "BLK",
-        "turnovers": "TOV",
-        "three_pointers": "FG3M",
-        "minutes":   "MIN",
-    }
-
     target_date = _dt.datetime.strptime(today_str, "%Y-%m-%d").date()
 
     for bet in todays_pending:
@@ -850,8 +921,21 @@ def resolve_todays_bets():
         is_fantasy = stat_type in FANTASY_SCORING
         stat_col   = _STAT_COL.get(stat_type)
 
+        # Fallback: try normalizing the platform-native name to an internal key
+        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            normalized = _norm_stat_type(stat_type)
+            stat_col = _STAT_COL.get(normalized)
+            if stat_col:
+                stat_type = normalized  # use the normalized key downstream
+
         if not stat_col and not is_combo and not is_fantasy:
-            summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
+            if _is_segment_prop(stat_type):
+                summary["errors"].append(
+                    f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
+                    f"cannot resolve from full-game box score"
+                )
+            else:
+                summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
             summary["pending"] += 1
             continue
 
@@ -876,24 +960,24 @@ def resolve_todays_bets():
             summary["pending"] += 1
             continue
 
-        # Retry logic: max RESOLVE_MAX_RETRIES attempts with RESOLVE_RETRY_DELAY delay
+        # Retry logic: max RESOLVE_MAX_RETRIES attempts with exponential backoff
         logs = []
         _last_retry_exc = None
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
+                time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                 gl = PlayerGameLog(
                     player_id=player_id,
                     season=season_str,
                     season_type_all_star="Regular Season",
+                    timeout=NBA_API_TIMEOUT,
                 )
                 logs = gl.get_normalized_dict().get("PlayerGameLog", [])
                 break  # success
             except Exception as _retry_exc:
                 _last_retry_exc = _retry_exc
                 _logger.warning(f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} failed for {player_name}: {_retry_exc}")
-                if _attempt < RESOLVE_MAX_RETRIES - 1:
-                    time.sleep(RESOLVE_RETRY_DELAY)
-                else:
+                if _attempt == RESOLVE_MAX_RETRIES - 1:
                     raise  # re-raise on final attempt
 
         try:
@@ -1008,10 +1092,11 @@ def resolve_all_pending_bets():
         return summary
 
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     try:
         from data.data_manager import normalize_player_name as _normalize_name
@@ -1023,12 +1108,6 @@ def resolve_all_pending_bets():
     _all_players = nba_players_static.get_players()
     _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_players}
     _norm_to_id = {_normalize_name(p["full_name"]): p["id"] for p in _all_players}
-
-    _STAT_COL = {
-        "points": "PTS", "rebounds": "REB", "assists": "AST",
-        "threes": "FG3M", "steals": "STL", "blocks": "BLK",
-        "turnovers": "TOV", "three_pointers": "FG3M", "minutes": "MIN",
-    }
 
     import calendar as _cal
     _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
@@ -1101,8 +1180,21 @@ def resolve_all_pending_bets():
             is_fantasy = stat_type in FANTASY_SCORING
             stat_col   = _STAT_COL.get(stat_type)
 
+            # Fallback: try normalizing the platform-native name to an internal key
+            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+                normalized = _norm_stat_type(stat_type)
+                stat_col = _STAT_COL.get(normalized)
+                if stat_col:
+                    stat_type = normalized  # use the normalized key downstream
+
             if not stat_col and not is_combo and not is_fantasy:
-                summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
+                if _is_segment_prop(stat_type):
+                    summary["errors"].append(
+                        f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
+                        f"cannot resolve from full-game box score"
+                    )
+                else:
+                    summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
                 summary["pending"] += 1
                 continue
 
@@ -1125,16 +1217,24 @@ def resolve_all_pending_bets():
 
             cache_key = (player_id, season_str)
             if cache_key not in _log_cache:
-                try:
-                    _time.sleep(1.0)  # Rate limit: 1 second between API calls
-                    gl = playergamelog.PlayerGameLog(
-                        player_id=player_id,
-                        season=season_str,
-                        season_type_all_star="Regular Season",
-                    )
-                    _log_cache[cache_key] = gl.get_data_frames()[0]
-                except Exception as exc:
-                    summary["errors"].append(f"#{bet_id} {player_name}: API error — {exc}")
+                _api_exc = None
+                for _attempt in range(RESOLVE_MAX_RETRIES):
+                    try:
+                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                        gl = playergamelog.PlayerGameLog(
+                            player_id=player_id,
+                            season=season_str,
+                            season_type_all_star="Regular Season",
+                            timeout=NBA_API_TIMEOUT,
+                        )
+                        _log_cache[cache_key] = gl.get_data_frames()[0]
+                        _api_exc = None
+                        break  # success
+                    except Exception as exc:
+                        _api_exc = exc
+                        continue  # retry
+                if _api_exc is not None:
+                    summary["errors"].append(f"#{bet_id} {player_name}: API error — {_api_exc}")
                     summary["pending"] += 1
                     continue
 
@@ -1252,10 +1352,11 @@ def resolve_all_analysis_picks(date_str=None):
         return summary
 
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     try:
         from data.data_manager import normalize_player_name as _normalize_name
@@ -1272,12 +1373,6 @@ def resolve_all_analysis_picks(date_str=None):
     _all_players = nba_players_static.get_players()
     _name_to_id  = {p["full_name"].lower(): p["id"] for p in _all_players}
     _norm_to_id  = {_normalize_name(p["full_name"]): p["id"] for p in _all_players}
-
-    _STAT_COL = {
-        "points": "PTS", "rebounds": "REB", "assists": "AST",
-        "threes": "FG3M", "steals": "STL", "blocks": "BLK",
-        "turnovers": "TOV", "three_pointers": "FG3M", "minutes": "MIN",
-    }
 
     import calendar as _cal
     _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
@@ -1363,10 +1458,23 @@ def resolve_all_analysis_picks(date_str=None):
             is_fantasy = stat_type in FANTASY_SCORING
             stat_col   = _STAT_COL.get(stat_type)
 
+            # Fallback: try normalizing the platform-native name to an internal key
+            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+                normalized = _norm_stat_type(stat_type)
+                stat_col = _STAT_COL.get(normalized)
+                if stat_col:
+                    stat_type = normalized  # use the normalized key downstream
+
             if not stat_col and not is_combo and not is_fantasy:
-                summary["errors"].append(
-                    f"#{pick_id} {player_name}: unknown stat '{stat_type}'"
-                )
+                if _is_segment_prop(stat_type):
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: '{stat_type}' is a game-segment prop — "
+                        f"cannot resolve from full-game box score"
+                    )
+                else:
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: unknown stat '{stat_type}'"
+                    )
                 summary["pending"] += 1
                 continue
 
@@ -1392,17 +1500,25 @@ def resolve_all_analysis_picks(date_str=None):
             # ── Fetch game log (cached per player+season) ─────────────
             cache_key = (player_id, season_str)
             if cache_key not in _log_cache:
-                try:
-                    _time.sleep(1.0)  # respect nba_api rate limit
-                    gl = playergamelog.PlayerGameLog(
-                        player_id=player_id,
-                        season=season_str,
-                        season_type_all_star="Regular Season",
-                    )
-                    _log_cache[cache_key] = gl.get_data_frames()[0]
-                except Exception as exc:
+                _api_exc = None
+                for _attempt in range(RESOLVE_MAX_RETRIES):
+                    try:
+                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                        gl = playergamelog.PlayerGameLog(
+                            player_id=player_id,
+                            season=season_str,
+                            season_type_all_star="Regular Season",
+                            timeout=NBA_API_TIMEOUT,
+                        )
+                        _log_cache[cache_key] = gl.get_data_frames()[0]
+                        _api_exc = None
+                        break  # success
+                    except Exception as exc:
+                        _api_exc = exc
+                        continue  # retry
+                if _api_exc is not None:
                     summary["errors"].append(
-                        f"#{pick_id} {player_name}: API error — {exc}"
+                        f"#{pick_id} {player_name}: API error — {_api_exc}"
                     )
                     summary["pending"] += 1
                     continue
@@ -1686,3 +1802,145 @@ def save_top_picks_from_analysis(analysis_results):
             )
 
     return saved_count
+
+
+# ============================================================
+# SECTION: Bulk-Log Platform Props
+# ============================================================
+
+def log_props_to_tracker(props_list, direction="OVER"):
+    """
+    Bulk-log a list of platform props into the bet tracker as PENDING bets.
+
+    Each prop becomes one bet entry with:
+      - direction defaulting to OVER (unless the prop dict already has
+        a "direction" key, e.g. from DraftKings odds data)
+      - confidence_score / probability_over / edge_percentage = 0 / 0.5 / 0.0
+        (no model output available — user can update after analysis)
+      - tier = "Bronze" (lowest tier since no model output)
+      - auto_logged = 1 (flagged as system-added, not manually entered)
+
+    Duplicate detection: skips any prop whose (player_name, stat_type,
+    today) triple is already in the ``bets`` table.
+
+    Stat-type normalisation: platform prop stat_type values are already
+    normalised to internal keys by ``data.platform_fetcher`` (e.g.
+    "3-Point Made" → "threes"). If a value is still unrecognised it is
+    skipped and reported in ``errors``.
+
+    Args:
+        props_list (list[dict]): Props from ``platform_props`` session
+            state or ``data/live_props.csv``. Each dict must have at
+            least ``player_name``, ``stat_type``, ``line``, and
+            ``platform``.
+        direction (str): Default direction ("OVER" or "UNDER") to use
+            when the prop dict has no "direction" key. Defaults to
+            "OVER".
+
+    Returns:
+        tuple[int, int, list[str]]: (saved, skipped, errors)
+            saved   — number of props successfully logged
+            skipped — number of duplicates skipped
+            errors  — list of human-readable error strings
+    """
+    if not props_list:
+        return 0, 0, []
+
+    import datetime as _dt
+
+    today_str = _dt.date.today().isoformat()
+
+    # Load existing bets to detect duplicates
+    existing_bets = load_all_bets(limit=2000)
+    existing_keys: set = set()
+    for b in existing_bets:
+        key = (
+            str(b.get("player_name", "")).lower(),
+            str(b.get("stat_type", "")).lower(),
+            str(b.get("bet_date", ""))[:10],
+        )
+        existing_keys.add(key)
+
+    # Normaliser: convert any un-normalised platform name to internal key
+    try:
+        from data.platform_mappings import normalize_stat_type as _norm_stat_type
+    except ImportError:
+        _norm_stat_type = None
+
+    saved = 0
+    skipped = 0
+    errors: list = []
+
+    for prop in props_list:
+        player_name = str(prop.get("player_name", "")).strip()
+        if not player_name:
+            errors.append("Skipped prop with missing player name")
+            continue
+
+        # Normalise stat_type: platform_fetcher already does this, but guard
+        # against manually-built or CSV-loaded props that may still be raw.
+        stat_type = str(prop.get("stat_type", "")).strip().lower()
+        if not stat_type:
+            errors.append(f"{player_name}: missing stat_type — skipped")
+            continue
+        if stat_type not in VALID_STAT_TYPES and _norm_stat_type is not None:
+            stat_type = _norm_stat_type(stat_type).lower()
+        if stat_type not in VALID_STAT_TYPES:
+            errors.append(
+                f"{player_name}: unrecognised stat type '{prop.get('stat_type', '')}' — skipped"
+            )
+            continue
+
+        prop_line = float(prop.get("line", prop.get("prop_line", 0)) or 0)
+        if prop_line <= 0:
+            errors.append(f"{player_name} ({stat_type}): invalid line {prop_line!r} — skipped")
+            continue
+
+        # Duplicate check
+        dup_key = (player_name.lower(), stat_type, today_str)
+        if dup_key in existing_keys:
+            skipped += 1
+            continue
+
+        bet_direction = str(prop.get("direction", direction)).upper()
+        if bet_direction not in VALID_DIRECTIONS:
+            bet_direction = direction.upper()
+
+        platform = str(prop.get("platform", "PrizePicks"))
+        team = str(prop.get("team", prop.get("player_team", "")))
+        game_date = str(prop.get("game_date", today_str))
+
+        try:
+            ok, msg = log_new_bet(
+                player_name=player_name,
+                stat_type=stat_type,
+                prop_line=prop_line,
+                direction=bet_direction,
+                platform=platform,
+                confidence_score=0.0,
+                probability_over=0.5,
+                edge_percentage=0.0,
+                tier="Bronze",
+                entry_fee=0.0,
+                team=team,
+                notes=f"Added from platform props | game: {game_date}",
+                auto_logged=1,
+                bet_type="normal",
+                std_devs_from_line=0.0,
+            )
+            if ok:
+                existing_keys.add(dup_key)
+                saved += 1
+            else:
+                errors.append(f"{player_name} ({stat_type}): {msg}")
+        except Exception as _exc:
+            errors.append(f"{player_name} ({stat_type}): {_exc}")
+            logging.getLogger(__name__).warning(
+                f"[BetTracker] log_props_to_tracker error for {player_name}: {_exc}"
+            )
+
+    return saved, skipped, errors
+
+# ============================================================
+# END SECTION: Bulk-Log Platform Props
+# ============================================================
