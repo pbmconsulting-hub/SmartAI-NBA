@@ -266,6 +266,11 @@ if "session_props" not in st.session_state:
 if "fetched_live_picks" not in st.session_state:
     st.session_state["fetched_live_picks"] = []
 
+# ── Global Settings Popover (accessible from sidebar) ─────────
+from utils.components import render_global_settings
+with st.sidebar:
+    render_global_settings()
+
 # ============================================================
 # END SECTION: Initialize App on Startup
 # ============================================================

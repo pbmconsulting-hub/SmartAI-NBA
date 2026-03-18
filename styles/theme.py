@@ -5,7 +5,7 @@
 #          theme with glassmorphism cards, animated glow
 #          effects, and NBA team colors on a clean light
 #          AI-lab background for maximum readability.
-# BRAND:   SmartBetPro NBA by JM5
+# BRAND:   SmartBetPro NBA by Quantum Matrix Engine 5.6
 # USAGE:
 #   from styles.theme import get_global_css, get_player_card_html
 #   st.markdown(get_global_css(), unsafe_allow_html=True)
@@ -219,7 +219,7 @@ def get_global_css():
     - Pulsing live-indicator dot animation with cyan glow
     - Monospace terminal readout class
     - Smooth hover transitions with lift + increased glow
-    - Sidebar "Powered by JM5 Neural Engine" branding with neon accent
+    - Sidebar "Powered by Quantum Matrix Engine 5.6" branding with neon accent
     - Custom dark scrollbar with cyan thumb
 
     Returns:
@@ -368,7 +368,7 @@ h1, h2, h3, h4, h5, h6 {
     text-overflow: unset !important;
 }
 [data-testid="stSidebar"]::after {
-    content: "⚡ Powered by JM5 Neural Engine";
+    content: "⚡ Powered by Quantum Matrix Engine 5.6";
     display: block;
     position: fixed;
     bottom: 18px;
@@ -1376,7 +1376,7 @@ button[kind="primary"]:hover {
 
 /* ─── Sidebar NBA Branding ────────────────────────────────── */
 /* Adds "🏀 Smart Pick Pro — NBA Edition" below the   */
-/* existing "⚡ Powered by JM5 Neural Engine" text.           */
+/* existing "⚡ Powered by Quantum Matrix Engine 5.6" text.   */
 [data-testid="stSidebar"]::before {
     content: "🏀 Smart Pick Pro · NBA Edition";
     display: block;
@@ -3187,7 +3187,7 @@ def get_game_report_html(game=None, analysis_results=None):
         <span class="qds-metric-score">{conf:.0f}/100</span>
       </div>
       <p class="qds-metric-justification">
-        JM5 Neural Engine rating integrating sample size, matchup clarity, and simulation stability.
+        Quantum Matrix Engine 5.6 rating integrating sample size, matchup clarity, and simulation stability.
       </p>
     </div>
   </div>
@@ -3363,7 +3363,7 @@ def get_game_report_html(game=None, analysis_results=None):
         </span>
         <div class="qds-framework">
           <i class="fas fa-brain"></i>
-          <span>SAFE SCORE™ AI · JM5 NEURAL ENGINE v1.0</span>
+          <span>SAFE SCORE™ AI · QUANTUM MATRIX ENGINE 5.6</span>
           <i class="fas fa-atom"></i>
         </div>
       </div>
@@ -3420,7 +3420,7 @@ def get_game_report_html(game=None, analysis_results=None):
         <div>
           <h3 class="qds-section-title"><i class="fas fa-chart-network"></i> KEY MATCHUP INSIGHTS</h3>
           <p class="qds-matchup-text">
-            SmartBetPro's JM5 Neural Engine has run 1,000+ Monte Carlo simulations for this matchup.
+            SmartBetPro's Quantum Matrix Engine 5.6 has run 1,000+ Monte Carlo simulations for this matchup.
             The top-ranked props below reflect the strongest signal-to-noise ratio across all analysed players —
             each selected based on edge vs the posted line, recent form, and matchup-specific factors.
           </p>
@@ -3527,7 +3527,7 @@ def get_game_report_html(game=None, analysis_results=None):
           <p class="qds-final-text">
             "These aren't locks — they're engineered plays. Built with matchup logic, stress-tested
             through 1,000+ Monte Carlo simulations, and reinforced with real market edge.
-            The JM5 Neural Engine has identified {len(top_picks)} high-probability props for
+            The Quantum Matrix Engine 5.6 has identified {len(top_picks)} high-probability props for
             {_html.escape(matchup_label)}, each with a SAFE Score™ of {_ss(top_picks[0].get('confidence_score', 75)) if top_picks else '—'}/10 or better.
             Play disciplined, size appropriately, and trust the process."
           </p>
@@ -3920,7 +3920,7 @@ def get_qds_matchup_header_html(away_team, home_team, game_info=""):
         f'<div class="qds-na-header">'
         f'<div style="font-size:0.72rem;color:var(--qds-text-muted);'
         f'text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">'
-        f'SmartBetPro Neural Engine™ — Tonight\'s Game</div>'
+        f'SmartBetPro Quantum Matrix Engine 5.6 — Tonight\'s Game</div>'
         f'<div class="qds-na-matchup">'
         # Away team
         f'<div class="qds-na-team-block">'
