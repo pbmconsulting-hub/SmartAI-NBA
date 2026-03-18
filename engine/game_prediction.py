@@ -508,15 +508,15 @@ def _simulate_single_game(
 
         # Safety cap: max 3 OT periods (extremely rare in NBA)
         if ot_periods >= 3:
-            # BEGINNER NOTE: After 3 OT periods, if scores are still within
-            # 0.5 pts (floating point tie), we add a small home-court boost
-            # of 1.0 to the home team. This edge-case handler is distinct
-            # from the main tie-resolution logic in predict_game() — it only
-            # activates after 3 OT periods of genuine simulation, which is
-            # statistically equivalent to a coin-flip and represents a valid
-            # home-court edge in sudden-death situations.
             if abs(home_score - away_score) < 0.5:
-                home_score += 1.0   # edge-case home-court tie resolution after 3 OT
+                # Resolve via weighted coin flip based on offensive ratings
+                home_strength = max(home_adj_ortg, 1.0)
+                away_strength = max(away_adj_ortg, 1.0)
+                home_win_prob = home_strength / (home_strength + away_strength)
+                if random.random() < home_win_prob:
+                    home_score += 1.0
+                else:
+                    away_score += 1.0
             break
 
     return home_score, away_score, went_to_ot

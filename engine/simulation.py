@@ -386,10 +386,9 @@ def run_quantum_matrix_simulation(
     # Counter for games where player goes OVER the prop line
     count_of_games_over_line = 0
 
-    # Convergence tracking: check every CONVERGENCE_CHECK_INTERVAL simulations
-    # whether the running probability has stabilized (early-exit optimisation).
-    prev_prob_checkpoint = 0.0
-    simulations_completed = number_of_simulations  # updated on early exit
+    # Convergence tracking variables removed — simulation always runs to completion
+    # to guarantee p90 accuracy for high-ceiling alternate lines.
+    simulations_completed = number_of_simulations
 
     # 1E: Running sum for mean+std convergence tracking
     _running_sum = 0.0
@@ -519,22 +518,6 @@ def run_quantum_matrix_simulation(
         # 1E: Track running stats for mean+std convergence
         _running_sum += simulated_game_stat
         _running_sum_sq += simulated_game_stat ** 2
-
-        # --- Step 6: Convergence Check (every CONVERGENCE_CHECK_INTERVAL simulations) ---
-        # If the running probability has stabilised, stop early to save time.
-        # IMPORTANT: Do NOT exit early when the probability is within 5% of 0.5
-        # because this is exactly where the edge decision (OVER vs UNDER) is
-        # made — an early exit here could lock in a false edge.
-        sims_done = sim_index + 1
-        if sims_done % CONVERGENCE_CHECK_INTERVAL == 0 and sims_done >= 500:
-            current_prob = count_of_games_over_line / sims_done
-            # Skip convergence check for props near the 50% decision boundary
-            _near_50 = abs(current_prob - 0.5) < 0.05
-            if not _near_50 and abs(current_prob - prev_prob_checkpoint) < CONVERGENCE_THRESHOLD:
-                simulations_completed = sims_done
-                _logger.debug("Converged at %d sims (probability converged)", sims_done)
-                break
-            prev_prob_checkpoint = current_prob
 
     # ============================================================
     # END SECTION: Run Simulation Loop

@@ -586,16 +586,21 @@ def should_avoid_prop(
     _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
     if platform and platform in _NO_VIG_PLATFORMS:
         effective_vig = 0.0
-    elif over_odds and over_odds != -110:
+    elif platform is None:
+        # No platform specified → treat as DFS (no per-leg vig)
+        effective_vig = 0.0
+    elif over_odds is not None and over_odds != -110:
         # Derive vig from actual DraftKings odds (e.g. -130 → breakeven 56.5%)
         # Vig = implied_prob - 0.5 (excess above fair 50/50)
         try:
             _odds = float(over_odds)
             _implied = abs(_odds) / (abs(_odds) + 100.0) if _odds < 0 else 100.0 / (_odds + 100.0)
-            # Vig = implied_prob excess above a fair 50/50 coin flip
             effective_vig = max(0.0, (_implied - 0.5) * 100.0)
         except (ValueError, TypeError):
             effective_vig = VIG_ADJUSTMENT_PCT
+    elif over_odds == -110:
+        # Standard -110 odds → standard vig
+        effective_vig = VIG_ADJUSTMENT_PCT
     else:
         effective_vig = VIG_ADJUSTMENT_PCT
 
