@@ -700,7 +700,8 @@ def auto_resolve_bet_results(date_str=None):
         try:
             for _attempt in range(RESOLVE_MAX_RETRIES):
                 try:
-                    _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                    if _attempt > 0:
+                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                     game_log = playergamelog.PlayerGameLog(
                         player_id=player_id,
                         season=season_str,
@@ -852,10 +853,12 @@ def resolve_todays_bets():
 
     # Try to use nba_api live scoreboard to find final games
     final_game_ids: set = set()
+    _scoreboard_available = False
     try:
         from nba_api.live.nba.endpoints.scoreboard import ScoreBoard
         sb = ScoreBoard()
         games_data = sb.get_dict().get("scoreboard", {}).get("games", [])
+        _scoreboard_available = True
         for g in games_data:
             status = g.get("gameStatus", 0)
             if status == 3 or str(g.get("gameStatusText", "")).strip().lower() == "final":
@@ -870,6 +873,7 @@ def resolve_todays_bets():
         try:
             from nba_api.stats.endpoints import ScoreboardV2
             sb2 = ScoreboardV2(game_date=today_str)
+            _scoreboard_available = True
             for row in sb2.get_normalized_dict().get("GameHeader", []):
                 if str(row.get("GAME_STATUS_TEXT", "")).strip().lower() in ("final", "final/ot"):
                     gid = str(row.get("GAME_ID", ""))
@@ -877,6 +881,15 @@ def resolve_todays_bets():
                         final_game_ids.add(gid)
         except Exception as exc2:
             summary["errors"].append(f"ScoreboardV2 unavailable: {exc2}")
+
+    # Short-circuit: if the scoreboard responded but no games are Final yet,
+    # skip the expensive per-player API calls and tell the user clearly.
+    if _scoreboard_available and not final_game_ids:
+        summary["pending"] = len(todays_pending)
+        summary["errors"].append(
+            "No games are Final yet today — try again after today's games finish."
+        )
+        return summary
 
     # Current NBA season string (e.g. "2024-25")
     _now = _dt.date.today()
@@ -965,7 +978,8 @@ def resolve_todays_bets():
         _last_retry_exc = None
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
-                time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                if _attempt > 0:
+                    time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                 gl = PlayerGameLog(
                     player_id=player_id,
                     season=season_str,
@@ -1220,7 +1234,8 @@ def resolve_all_pending_bets():
                 _api_exc = None
                 for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
-                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                        if _attempt > 0:
+                            _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                         gl = playergamelog.PlayerGameLog(
                             player_id=player_id,
                             season=season_str,
@@ -1300,7 +1315,7 @@ def resolve_all_pending_bets():
     return summary
 
 
-def resolve_all_analysis_picks(date_str=None):
+def resolve_all_analysis_picks(date_str=None, include_today=False):
     """
     Resolve pending rows in the ``all_analysis_picks`` table.
 
@@ -1323,6 +1338,9 @@ def resolve_all_analysis_picks(date_str=None):
             resolved (allows re-checking a past night's results).
             When ``None`` (default), all pending picks across all dates are
             resolved.
+        include_today (bool): When ``True`` and ``date_str`` is ``None``,
+            today's picks are included even if games may not be final yet.
+            Defaults to ``False`` (today is skipped on automatic runs).
 
     Returns:
         dict: {
@@ -1434,8 +1452,10 @@ def resolve_all_analysis_picks(date_str=None):
 
         # When no specific date was requested, skip today — games may not
         # be final yet.  When the user explicitly asks for a date (even
-        # today) we trust them and proceed.
-        if date_str is None and target_date >= _dt.date.today():
+        # today) we trust them and proceed.  The `include_today` flag
+        # allows callers (e.g. an explicit "Resolve All" button) to opt in.
+        should_skip_today = date_str is None and not include_today and target_date >= _dt.date.today()
+        if should_skip_today:
             summary["pending"] += len(picks)
             continue
 
@@ -1503,7 +1523,8 @@ def resolve_all_analysis_picks(date_str=None):
                 _api_exc = None
                 for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
-                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                        if _attempt > 0:
+                            _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                         gl = playergamelog.PlayerGameLog(
                             player_id=player_id,
                             season=season_str,
