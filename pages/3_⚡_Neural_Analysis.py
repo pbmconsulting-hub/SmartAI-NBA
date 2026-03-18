@@ -133,6 +133,11 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+# ── Global Settings Popover (accessible from sidebar) ─────────
+from utils.components import render_global_settings
+with st.sidebar:
+    render_global_settings()
+
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user
 try:
@@ -280,7 +285,7 @@ minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 st.markdown(
     '<h2 style="font-family:\'Orbitron\',sans-serif;color:#00ffd5;'
     'margin-bottom:4px;">⚡ Neural Analysis</h2>'
-    '<p style="color:#a0b4d0;margin-top:0;">SmartBetPro Neural Engine™ — Powered by N.A.N. (Neural Analysis Network) — '
+    '<p style="color:#a0b4d0;margin-top:0;">SmartBetPro Quantum Matrix Engine 5.6 — Powered by N.A.N. (Neural Analysis Network) — '
     'Quantum Matrix Engine 5.6 Prop Analysis with Quantum Design System</p>',
     unsafe_allow_html=True,
 )
@@ -449,6 +454,103 @@ with st.expander("📖 How Neural Analysis Works — Framework Logic"):
     st.markdown(get_qds_framework_logic_html(), unsafe_allow_html=True)
 
 # ============================================================
+# SECTION: Pre-Analysis Prop Funnel
+# ============================================================
+
+# Available stat type options (human-readable labels → internal keys)
+_STAT_TYPE_OPTIONS = [
+    "Points", "Rebounds", "Assists", "Threes",
+    "Steals", "Blocks", "Turnovers",
+    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
+]
+_STAT_LABEL_TO_KEY = {
+    "Points": "points", "Rebounds": "rebounds", "Assists": "assists",
+    "Threes": "threes", "Steals": "steals", "Blocks": "blocks",
+    "Turnovers": "turnovers", "Pts+Reb+Ast": "points_rebounds_assists",
+    "Pts+Reb": "points_rebounds", "Pts+Ast": "points_assists",
+    "Reb+Ast": "rebounds_assists",
+}
+_DEFAULT_SELECTED_STATS = [
+    "Points", "Rebounds", "Assists", "Threes",
+    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
+]
+
+with st.expander("🎯 Pre-Analysis Filters", expanded=True):
+    st.markdown(
+        '<p style="color:#a0b4d0;font-size:0.85rem;margin-bottom:12px;">'
+        'Narrow the prop pool before running analysis to improve speed and reduce noise.</p>',
+        unsafe_allow_html=True,
+    )
+    _funnel_c1, _funnel_c2, _funnel_c3 = st.columns(3)
+
+    with _funnel_c1:
+        _selected_stat_labels = st.multiselect(
+            "Stat Types",
+            options=_STAT_TYPE_OPTIONS,
+            default=st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS),
+            key="funnel_stat_types_widget",
+            help="Only props for these stat categories will be analyzed.",
+        )
+
+    with _funnel_c2:
+        _max_per_player = st.number_input(
+            "Max Props per Player",
+            min_value=1,
+            max_value=15,
+            value=st.session_state.get("funnel_max_per_player", 3),
+            step=1,
+            key="funnel_max_per_player_widget",
+            help="Prevent the engine from analyzing many alternate lines for a single player.",
+        )
+
+    with _funnel_c3:
+        _absolute_max = st.number_input(
+            "Absolute Max Props",
+            min_value=10,
+            max_value=5000,
+            value=st.session_state.get("funnel_absolute_max", 150),
+            step=10,
+            key="funnel_absolute_max_widget",
+            help="Hard cap on the total number of props sent to the engine.",
+        )
+
+    # Persist funnel settings to session state
+    st.session_state["funnel_stat_types"] = _selected_stat_labels
+    st.session_state["funnel_max_per_player"] = _max_per_player
+    st.session_state["funnel_absolute_max"] = _absolute_max
+
+    # ── Dynamic feedback: estimate surviving prop count ───────────
+    _funnel_stat_keys = frozenset(
+        _STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in _selected_stat_labels
+    )
+    _funnel_preview = [
+        p for p in current_props
+        if str(p.get("stat_type", "")).lower().strip() in _funnel_stat_keys
+    ]
+    # Apply per-player cap preview
+    _preview_counts: dict = {}
+    _funnel_preview_capped: list = []
+    for _fp in _funnel_preview:
+        _pk = str(_fp.get("player_name", "")).lower().strip()
+        if _preview_counts.get(_pk, 0) < _max_per_player:
+            _funnel_preview_capped.append(_fp)
+            _preview_counts[_pk] = _preview_counts.get(_pk, 0) + 1
+    _funnel_surviving = min(len(_funnel_preview_capped), _absolute_max)
+    _funnel_original = len(current_props)
+    _funnel_delta = _funnel_surviving - _funnel_original if _funnel_original > 0 else 0
+
+    st.metric(
+        label="Props Surviving Filter",
+        value=f"{_funnel_surviving:,} / {_funnel_original:,}",
+        delta=f"{_funnel_delta:,} filtered" if _funnel_delta < 0 else "No reduction",
+        delta_color="normal" if _funnel_delta >= 0 else "inverse",
+    )
+
+# ============================================================
+# END SECTION: Pre-Analysis Prop Funnel
+# ============================================================
+
+# ============================================================
 # SECTION: Analysis Runner
 # ============================================================
 
@@ -590,6 +692,38 @@ if run_analysis:
             f"**{_plat}**: {_n}" for _plat, _n in sorted(_plat_counts.items())
         )
         st.caption(f"📊 Analyzing: {_plat_summary}")
+
+    # ── Pre-Analysis Funnel: stat types + per-player cap + absolute max ──
+    # Apply the user's funnel settings from the Pre-Analysis Filters expander
+    # via smart_filter_props() in data.platform_fetcher.
+    _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
+    _funnel_stat_keys_run = frozenset(
+        _STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in _funnel_stats_selected
+    )
+    _funnel_max_pp = st.session_state.get("funnel_max_per_player", 3)
+    _funnel_abs_max = st.session_state.get("funnel_absolute_max", 150)
+
+    from data.platform_fetcher import smart_filter_props as _smart_filter
+    _before_funnel = len(props_to_analyze)
+    props_to_analyze, _funnel_summary = _smart_filter(
+        all_props=props_to_analyze,
+        players_data=players_data,
+        todays_games=todays_games,
+        injury_map=st.session_state.get("injury_status_map", {}),
+        max_props_per_player=_funnel_max_pp,
+        stat_types=_funnel_stat_keys_run,
+        deduplicate_cross_platform=True,
+    )
+    # Enforce absolute max cap
+    if len(props_to_analyze) > _funnel_abs_max:
+        props_to_analyze = props_to_analyze[:_funnel_abs_max]
+    _after_funnel = len(props_to_analyze)
+    if _before_funnel > _after_funnel:
+        st.info(
+            f"🎯 **Pre-Analysis Funnel**: Reduced **{_before_funnel}** → **{_after_funnel}** props "
+            f"(stat types: {len(_funnel_stat_keys_run)}, max/player: {_funnel_max_pp}, "
+            f"abs max: {_funnel_abs_max})."
+        )
 
     total_props_count    = len(props_to_analyze)
     if total_props_count == 0:
@@ -2368,7 +2502,7 @@ if analysis_results:
                 / len(top_picks_for_verdict), 1
             )
             summary    = (
-                f"The Neural Engine identified {len(top_picks_for_verdict)} high-confidence "
+                f"The Quantum Matrix Engine 5.6 identified {len(top_picks_for_verdict)} high-confidence "
                 f"props led by {top_names}, with a composite confidence score of {avg_conf}/100. "
                 f"Layer 5 injury validation and Quantum Matrix Engine 5.6 simulation align on these selections."
             )
