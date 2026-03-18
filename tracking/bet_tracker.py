@@ -53,6 +53,11 @@ VALID_TIERS = {"Platinum", "Gold", "Silver", "Bronze"}
 RESOLVE_MAX_RETRIES = 3
 RESOLVE_RETRY_DELAY = 2  # seconds between retries
 
+# NBA API call configuration
+NBA_API_TIMEOUT = 60       # seconds — increased from default 30 to handle slow endpoints
+_BACKOFF_BASE = 1.2        # initial delay in seconds between API attempts
+_BACKOFF_INCREMENT = 0.8   # additional seconds per retry (1.2s, 2.0s, 2.8s)
+
 # ============================================================
 # END SECTION: Valid Values for Validation
 # ============================================================
@@ -579,17 +584,17 @@ def auto_resolve_bet_results(date_str=None):
 
     # Import combo/fantasy stat definitions and name normalizer
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
     try:
         from data.data_manager import normalize_player_name as _normalize_name
     except ImportError:
         def _normalize_name(n):
             return n.lower().strip()
 
-    # Build player name → nba_api player_id map (normalized for fuzzy matching)
     _all_nba_players = nba_players_static.get_players()
     _name_to_id = {
         p["full_name"].lower(): p["id"]
@@ -654,15 +659,11 @@ def auto_resolve_bet_results(date_str=None):
         stat_col   = _STAT_COL.get(stat_type)
 
         # Fallback: try normalizing the platform-native name to an internal key
-        if not stat_col and not is_combo and not is_fantasy:
-            try:
-                from data.platform_mappings import normalize_stat_type as _norm_stat
-                normalized = _norm_stat(stat_type)
-                stat_col = _STAT_COL.get(normalized)
-                if stat_col:
-                    stat_type = normalized  # use the normalized key downstream
-            except ImportError:
-                pass
+        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            normalized = _norm_stat_type(stat_type)
+            stat_col = _STAT_COL.get(normalized)
+            if stat_col:
+                stat_type = normalized  # use the normalized key downstream
 
         if not stat_col and not is_combo and not is_fantasy:
             if _is_segment_prop(stat_type):
@@ -697,20 +698,19 @@ def auto_resolve_bet_results(date_str=None):
             continue
 
         try:
-            _max_retries = 3
-            for _attempt in range(_max_retries):
+            for _attempt in range(RESOLVE_MAX_RETRIES):
                 try:
-                    _time.sleep(1.2 + _attempt * 0.8)
+                    _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                     game_log = playergamelog.PlayerGameLog(
                         player_id=player_id,
                         season=season_str,
                         season_type_all_star="Regular Season",
-                        timeout=60,
+                        timeout=NBA_API_TIMEOUT,
                     )
                     df = game_log.get_data_frames()[0]
                     break  # success
                 except Exception as _api_err:
-                    if _attempt == _max_retries - 1:
+                    if _attempt == RESOLVE_MAX_RETRIES - 1:
                         raise  # re-raise on final attempt
                     continue  # retry
             if df.empty:
@@ -832,10 +832,11 @@ def resolve_todays_bets():
 
     # Import combo/fantasy stat definitions
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     # Normalizer for fuzzy matching
     try:
@@ -921,15 +922,11 @@ def resolve_todays_bets():
         stat_col   = _STAT_COL.get(stat_type)
 
         # Fallback: try normalizing the platform-native name to an internal key
-        if not stat_col and not is_combo and not is_fantasy:
-            try:
-                from data.platform_mappings import normalize_stat_type as _norm_stat
-                normalized = _norm_stat(stat_type)
-                stat_col = _STAT_COL.get(normalized)
-                if stat_col:
-                    stat_type = normalized  # use the normalized key downstream
-            except ImportError:
-                pass
+        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            normalized = _norm_stat_type(stat_type)
+            stat_col = _STAT_COL.get(normalized)
+            if stat_col:
+                stat_type = normalized  # use the normalized key downstream
 
         if not stat_col and not is_combo and not is_fantasy:
             if _is_segment_prop(stat_type):
@@ -968,12 +965,12 @@ def resolve_todays_bets():
         _last_retry_exc = None
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
-                time.sleep(1.2 + _attempt * 0.8)
+                time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                 gl = PlayerGameLog(
                     player_id=player_id,
                     season=season_str,
                     season_type_all_star="Regular Season",
-                    timeout=60,
+                    timeout=NBA_API_TIMEOUT,
                 )
                 logs = gl.get_normalized_dict().get("PlayerGameLog", [])
                 break  # success
@@ -1095,10 +1092,11 @@ def resolve_all_pending_bets():
         return summary
 
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     try:
         from data.data_manager import normalize_player_name as _normalize_name
@@ -1183,15 +1181,11 @@ def resolve_all_pending_bets():
             stat_col   = _STAT_COL.get(stat_type)
 
             # Fallback: try normalizing the platform-native name to an internal key
-            if not stat_col and not is_combo and not is_fantasy:
-                try:
-                    from data.platform_mappings import normalize_stat_type as _norm_stat
-                    normalized = _norm_stat(stat_type)
-                    stat_col = _STAT_COL.get(normalized)
-                    if stat_col:
-                        stat_type = normalized  # use the normalized key downstream
-                except ImportError:
-                    pass
+            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+                normalized = _norm_stat_type(stat_type)
+                stat_col = _STAT_COL.get(normalized)
+                if stat_col:
+                    stat_type = normalized  # use the normalized key downstream
 
             if not stat_col and not is_combo and not is_fantasy:
                 if _is_segment_prop(stat_type):
@@ -1224,14 +1218,14 @@ def resolve_all_pending_bets():
             cache_key = (player_id, season_str)
             if cache_key not in _log_cache:
                 _api_exc = None
-                for _attempt in range(3):
+                for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
-                        _time.sleep(1.2 + _attempt * 0.8)
+                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                         gl = playergamelog.PlayerGameLog(
                             player_id=player_id,
                             season=season_str,
                             season_type_all_star="Regular Season",
-                            timeout=60,
+                            timeout=NBA_API_TIMEOUT,
                         )
                         _log_cache[cache_key] = gl.get_data_frames()[0]
                         _api_exc = None
@@ -1358,10 +1352,11 @@ def resolve_all_analysis_picks(date_str=None):
         return summary
 
     try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
     except ImportError:
         COMBO_STATS = {}
         FANTASY_SCORING = {}
+        _norm_stat_type = None
 
     try:
         from data.data_manager import normalize_player_name as _normalize_name
@@ -1464,15 +1459,11 @@ def resolve_all_analysis_picks(date_str=None):
             stat_col   = _STAT_COL.get(stat_type)
 
             # Fallback: try normalizing the platform-native name to an internal key
-            if not stat_col and not is_combo and not is_fantasy:
-                try:
-                    from data.platform_mappings import normalize_stat_type as _norm_stat
-                    normalized = _norm_stat(stat_type)
-                    stat_col = _STAT_COL.get(normalized)
-                    if stat_col:
-                        stat_type = normalized  # use the normalized key downstream
-                except ImportError:
-                    pass
+            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+                normalized = _norm_stat_type(stat_type)
+                stat_col = _STAT_COL.get(normalized)
+                if stat_col:
+                    stat_type = normalized  # use the normalized key downstream
 
             if not stat_col and not is_combo and not is_fantasy:
                 if _is_segment_prop(stat_type):
@@ -1510,14 +1501,14 @@ def resolve_all_analysis_picks(date_str=None):
             cache_key = (player_id, season_str)
             if cache_key not in _log_cache:
                 _api_exc = None
-                for _attempt in range(3):
+                for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
-                        _time.sleep(1.2 + _attempt * 0.8)
+                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                         gl = playergamelog.PlayerGameLog(
                             player_id=player_id,
                             season=season_str,
                             season_type_all_star="Regular Season",
-                            timeout=60,
+                            timeout=NBA_API_TIMEOUT,
                         )
                         _log_cache[cache_key] = gl.get_data_frames()[0]
                         _api_exc = None
