@@ -2339,7 +2339,7 @@ def get_ai_verdict_card_html(verdict, confidence, explanation):
     <div style="text-align:right;">
       <div class="verdict-confidence">CONFIDENCE</div>
       <div style="font-size:1.1rem;font-weight:800;color:{conf_bar_color};
-                  font-family:'JetBrains Mono','JetBrains Mono','Courier New',monospace;">{confidence:.0f}/100</div>
+                  font-family:'JetBrains Mono','Courier New',monospace;">{confidence:.0f}/100</div>
     </div>
   </div>
   <div style="margin-top:8px;background:rgba(13,18,32,0.80);border-radius:6px;height:6px;overflow:hidden;">
@@ -2581,7 +2581,7 @@ def get_progress_ring_html(percentage, label):
             stroke-dashoffset="{circumference * 0.25:.2f}"
             style="filter:drop-shadow(0 0 4px {ring_color});transition:stroke-dasharray 0.5s ease;"/>
     <text x="36" y="40" text-anchor="middle"
-          font-family="'JetBrains Mono','JetBrains Mono','Courier New',monospace"
+          font-family="'JetBrains Mono','Courier New',monospace"
           font-size="13" font-weight="700"
           fill="{ring_color}">{pct:.0f}%</text>
   </svg>

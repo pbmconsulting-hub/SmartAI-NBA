@@ -292,7 +292,7 @@ st.markdown(f"""
   {_logo_img_tag}
   <div class="hero-hud-text">
     <div class="hero-tagline">Quantum-Powered Prop Analytics</div>
-    <div class="hero-subtext">1,000x Monte Carlo Simulations &bull; Institutional Edge Detection</div>
+    <div class="hero-subtext">1,000&times; Monte Carlo Simulations &bull; Institutional Edge Detection</div>
     <div class="hero-date">📅 {today_str} &nbsp;&bull;&nbsp; 🏟️ {game_count_text}</div>
   </div>
 </div>
