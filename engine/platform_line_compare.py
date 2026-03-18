@@ -159,6 +159,8 @@ def compare_platform_lines(player_name, stat_type, direction, platform_lines):
     line_spread = round(abs(best_line - worst_line), 4)
 
     stat_std = DEFAULT_STAT_STD.get(stat_type.lower(), DEFAULT_STD_FALLBACK)
+    if stat_std <= 0:
+        stat_std = DEFAULT_STD_FALLBACK
     raw_edge = (line_spread / stat_std) * 40.0
     edge_bonus_pct = round(min(raw_edge, 15.0), 2)
 
