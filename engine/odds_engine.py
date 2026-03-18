@@ -2,6 +2,8 @@
 # Odds and implied probability calculations for prop betting.
 # Standard library only — no numpy/scipy/pandas.
 
+import math
+
 
 def american_odds_to_implied_probability(odds):
     """
@@ -20,6 +22,10 @@ def american_odds_to_implied_probability(odds):
     """
     try:
         odds = float(odds)
+        # American odds of exactly 0 are invalid (valid range: <= -100 or >= +100).
+        # Return the standard -110 breakeven to avoid returning 1.0 (certainty).
+        if odds == 0:
+            return 0.5238
         if odds < 0:
             return round(abs(odds) / (abs(odds) + 100.0), 6)
         else:
@@ -153,13 +159,16 @@ def calculate_expected_value_with_odds(model_probability, odds, stake=1.0):
         calculate_expected_value_with_odds(0.60, -110, stake=100) → 9.09
     """
     try:
-        p = float(model_probability)
-        stake = float(stake)
+        p = max(0.0, min(1.0, float(model_probability)))
+        stake = max(0.0, float(stake))
         odds = float(odds)
         net_win = odds_to_payout_multiplier(odds) * stake - stake
         ev = p * net_win - (1.0 - p) * stake
+        # Guard against float overflow from extreme odds (e.g., +99900)
+        if not math.isfinite(ev):
+            return 0.0
         return round(ev, 4)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, OverflowError):
         return 0.0
 
 
@@ -191,7 +200,7 @@ def devig_probabilities(over_odds, under_odds):
         p_under_raw = american_odds_to_implied_probability(float(under_odds))
         overround = p_over_raw + p_under_raw
 
-        if overround <= 0:
+        if overround < 0.01:
             return (0.5, 0.5)
 
         # Multiplicative devig: divide each side by the overround
@@ -280,6 +289,9 @@ def odds_to_payout_multiplier(american_odds):
     """
     try:
         odds = float(american_odds)
+        # American odds of exactly 0 are invalid — return default -110 payout.
+        if odds == 0:
+            return 1.9091
         if odds < 0:
             return round(1.0 + (100.0 / abs(odds)), 6)
         else:
