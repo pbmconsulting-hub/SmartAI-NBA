@@ -4544,6 +4544,19 @@ def get_styled_stats_table_html(rows, columns, title=""):
             return f"{icon} {_h.escape(text)}", True
         return f"{icon} {text}", False
 
+    def _bet_type_lookup_key(raw_key: str) -> str:
+        """Return the normalised key for _BET_TYPE_ICON lookup.
+
+        Tries an exact lower-case match first; if not found, falls back to the
+        last whitespace-separated word so that upstream-prefixed values such as
+        ``"🟢 Goblin"`` still resolve to ``"goblin"``.
+        """
+        key = raw_key.lower()
+        if key in _BET_TYPE_ICON:
+            return key
+        words = key.split()
+        return words[-1] if words else ""
+
     def _win_rate_color(val_str):
         """Return a CSS color based on a win-rate string like '63.0%'."""
         try:
@@ -4581,10 +4594,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
                 cell_color = "#e8f0ff"
             # Bet Type column — add logo icon prefix
             elif col.lower() == "bet type":
-                # Try exact match first; fall back to the last whitespace-separated
-                # word so that prefixed values like "🟢 Goblin" also resolve.
-                key = display_val.lower()
-                icon = _BET_TYPE_ICON.get(key) or _BET_TYPE_ICON.get(key.split()[-1] if key.strip() else "", "")
+                icon = _BET_TYPE_ICON.get(_bet_type_lookup_key(display_val), "")
                 display_val, is_html = _apply_icon(icon, display_val)
                 cell_color = "#e8f0ff"
             elif "win rate" in col.lower() or "win%" in col.lower():
