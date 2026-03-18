@@ -425,11 +425,11 @@ with tab_model_health:
             else:
                 st.caption("No stat type data yet.")
 
-        # Win rate by Goblin / Demon / Normal bet classification
+        # Win rate by Goblin / 50_50 / Demon / Normal bet classification
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
             with st.expander("Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"goblin": "Goblin", "50_50": "50/50", "demon": "50/50 (Legacy)", "normal": "Normal"}
+                _bt_emoji_map = {"goblin": "🟢 Goblin", "50_50": "⚖️ 50/50", "demon": "🔥 Demon", "normal": "Normal"}
                 bt_rows = [
                     {
                         "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -450,30 +450,31 @@ with tab_model_health:
                 # Highlight the key insight
                 _goblin_data = bet_type_perf.get("goblin", {})
                 _demon_data  = bet_type_perf.get("demon", {})
+                _fifty_data  = bet_type_perf.get("50_50", {})
                 _metric_cols = st.columns(3)
                 if _goblin_data.get("total", 0) > 0:
                     _metric_cols[0].metric(
-                        "Goblin Win Rate",
+                        "🟢 Goblin Win Rate",
                         f"{_goblin_data.get('win_rate', 0):.1f}%",
-                        help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets",
+                        help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets (alt line below standard O/U)",
                     )
                 if _demon_data.get("total", 0) > 0:
-                    _demon_total = _demon_data.get("total", 1)
-                    _demon_wins  = _demon_data.get("wins", 0)
-                    _demon_losses = _demon_data.get("losses", 0)
-                    _demon_win_rate  = round(_demon_wins  / max(_demon_total, 1) * 100, 1)
-                    _demon_loss_rate = round(_demon_losses / max(_demon_total, 1) * 100, 1)
+                    _d_total = _demon_data.get("total", 1)
+                    _d_wins  = _demon_data.get("wins", 0)
+                    _d_wr    = round(_d_wins / max(_d_total, 1) * 100, 1)
                     _metric_cols[1].metric(
-                        "Demon Win Rate",
-                        f"{_demon_win_rate:.1f}%",
-                        help=f"Demon bets should rarely win. Based on {_demon_total} logged Demon bets.",
+                        "🔥 Demon Win Rate",
+                        f"{_d_wr:.1f}%",
+                        help=f"Based on {_d_total} logged Demon bets (alt line above standard O/U)",
                     )
+                if _fifty_data.get("total", 0) > 0:
+                    _f_total = _fifty_data.get("total", 1)
+                    _f_wins  = _fifty_data.get("wins", 0)
+                    _f_wr    = round(_f_wins / max(_f_total, 1) * 100, 1)
                     _metric_cols[2].metric(
-                        "Demon Loss Rate",
-                        f"{_demon_loss_rate:.1f}%",
-                        delta=f"Validated: {_demon_loss_rate:.0f}% loss rate",
-                        delta_color="normal",
-                        help=f"A high Demon loss rate validates the system — these are trap bets to avoid.",
+                        "⚖️ 50/50 Win Rate",
+                        f"{_f_wr:.1f}%",
+                        help=f"Based on {_f_total} logged 50/50 bets (standard line picks)",
                     )
 
             # ── Individual Goblin Bet Results ──────────────────────────
@@ -497,10 +498,10 @@ with tab_model_health:
                         with _gbc:
                             st.markdown(get_bet_card_html(_gb), unsafe_allow_html=True)
 
-            # ── Individual 50/50 Bet Results (formerly "Demon") ────────
+            # ── Individual Demon Bet Results (High Ceiling) ─────────────
             _demon_resolved = [
                 b for b in filtered_health
-                if b.get("bet_type", "") in ("50_50", "demon")  # "demon" = legacy
+                if b.get("bet_type", "") == "demon"
                 and b.get("result") in ("WIN", "LOSS", "PUSH")
             ]
             if _demon_resolved:
@@ -509,18 +510,45 @@ with tab_model_health:
                 _dm_pushes = sum(1 for b in _demon_resolved if b.get("result") == "PUSH")
                 _dm_total  = len(_demon_resolved)
                 with st.expander(
-                    f"Demon Picks — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
+                    f"🔥 Demon Bet Results — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
                     f"({round(_dm_wins/_dm_total*100,1) if _dm_total else 0:.1f}% win rate)",
                     expanded=False,
                 ):
                     st.caption(
-                        "**Demon bets** are traps — conflicting forces, high variance, "
-                        "fatigue risk, or hot-streak regression. A **high loss rate validates the system**."
+                        "**Demon bets** are alternate lines set ABOVE the standard O/U — "
+                        "high ceiling, high reward plays. Lower probability but bigger payout."
                     )
-                    # Demon subtype breakdown from notes/reasons
+                    _dmc_a, _dmc_b = st.columns(2)
+                    for _dmi, _dm in enumerate(_demon_resolved):
+                        _dmc = _dmc_a if _dmi % 2 == 0 else _dmc_b
+                        with _dmc:
+                            st.markdown(get_bet_card_html(_dm), unsafe_allow_html=True)
+
+            # ── Individual Uncertain Pick Results (50/50 + risk flags) ──
+            _uncertain_resolved = [
+                b for b in filtered_health
+                if b.get("bet_type", "") == "50_50"
+                and b.get("result") in ("WIN", "LOSS", "PUSH")
+            ]
+            if _uncertain_resolved:
+                _uc_wins   = sum(1 for b in _uncertain_resolved if b.get("result") == "WIN")
+                _uc_losses = sum(1 for b in _uncertain_resolved if b.get("result") == "LOSS")
+                _uc_pushes = sum(1 for b in _uncertain_resolved if b.get("result") == "PUSH")
+                _uc_total  = len(_uncertain_resolved)
+                with st.expander(
+                    f"⚖️ 50/50 Picks — {_uc_wins}W / {_uc_losses}L / {_uc_pushes}P  "
+                    f"({round(_uc_wins/_uc_total*100,1) if _uc_total else 0:.1f}% win rate)",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "**50/50 picks** are the standard O/U line. "
+                        "Picks flagged as uncertain had conflicting forces, high variance, "
+                        "fatigue risk, or hot-streak regression risk."
+                    )
+                    # Uncertain subtype breakdown from notes/reasons
                     _type_counts = {"Conflict": 0, "Variance": 0, "Fatigue": 0, "Regression": 0, "Other": 0}
-                    for _dm in _demon_resolved:
-                        _notes = (_dm.get("notes") or "").lower()
+                    for _uc in _uncertain_resolved:
+                        _notes = (_uc.get("notes") or "").lower()
                         if "conflict" in _notes:
                             _type_counts["Conflict"] += 1
                         elif "variance" in _notes or "high-variance" in _notes:
@@ -535,13 +563,13 @@ with tab_model_health:
                     if _active_types:
                         _tc_cols = st.columns(len(_active_types))
                         for _tci, (_tname, _tcnt) in enumerate(_active_types.items()):
-                            _tc_cols[_tci].metric(f"{_tname}", str(_tcnt), help=f"Demon bets triggered by {_tname} pattern")
+                            _tc_cols[_tci].metric(f"{_tname}", str(_tcnt), help=f"Uncertain picks triggered by {_tname} pattern")
                     st.divider()
-                    _dmc_a, _dmc_b = st.columns(2)
-                    for _dmi, _dm in enumerate(_demon_resolved):
-                        _dmc = _dmc_a if _dmi % 2 == 0 else _dmc_b
-                        with _dmc:
-                            st.markdown(get_bet_card_html(_dm), unsafe_allow_html=True)
+                    _ucc_a, _ucc_b = st.columns(2)
+                    for _uci, _uc in enumerate(_uncertain_resolved):
+                        _ucc = _ucc_a if _uci % 2 == 0 else _ucc_b
+                        with _ucc:
+                            st.markdown(get_bet_card_html(_uc), unsafe_allow_html=True)
 
         # Feature 1: Enhanced tier accuracy report
         try:
@@ -622,7 +650,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
+            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -632,13 +660,12 @@ with tab_ai_picks:
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
         _ai_bt_map = {
-            "Goblin — Easy Money": "goblin",
-            "50/50 — Uncertain":   "50_50",
-            "⚡ Normal":           "normal",
+            "Goblin — Safe Floor":    "goblin",
+            "50/50 — Standard Line":  "50_50",
+            "Demon — High Ceiling":   "demon",
+            "⚡ Normal":              "normal",
         }
         _ai_bt_values = {_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map}
-        if "50_50" in _ai_bt_values:
-            _ai_bt_values.add("demon")  # legacy DB records
         ai_bets = [b for b in ai_bets if b.get("bet_type", "normal") in _ai_bt_values]
 
     if not ai_bets:
@@ -920,7 +947,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
+            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -930,13 +957,12 @@ with tab_all_picks:
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
         _ap_bt_map = {
-            "Goblin — Easy Money": "goblin",
-            "50/50 — Uncertain":   "50_50",
-            "⚡ Normal":           "normal",
+            "Goblin — Safe Floor":    "goblin",
+            "50/50 — Standard Line":  "50_50",
+            "Demon — High Ceiling":   "demon",
+            "⚡ Normal":              "normal",
         }
         _ap_bt_values = {_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map}
-        if "50_50" in _ap_bt_values:
-            _ap_bt_values.add("demon")  # legacy DB records
         all_picks_data = [p for p in all_picks_data if p.get("bet_type", "normal") in _ap_bt_values]
 
     if not all_picks_data:
@@ -1325,7 +1351,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
+            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1345,14 +1371,12 @@ with tab_bets:
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
             _bets_bt_map = {
-                "Goblin — Easy Money": "goblin",
-                "50/50 — Uncertain":   "50_50",
-                "⚡ Normal":           "normal",
+                "Goblin — Safe Floor":    "goblin",
+                "50/50 — Standard Line":  "50_50",
+                "Demon — High Ceiling":   "demon",
+                "⚡ Normal":              "normal",
             }
             _bets_bt_values = {_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map}
-            # Also accept legacy "demon" records when filtering for "50_50"
-            if "50_50" in _bets_bt_values:
-                _bets_bt_values.add("demon")
             filtered_bets = [b for b in filtered_bets if b.get("bet_type", "normal") in _bets_bt_values]
 
         # ── Summary Cards ─────────────────────────────────────────────

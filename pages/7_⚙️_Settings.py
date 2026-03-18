@@ -408,34 +408,34 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 
     with _dc1:
         _demon_min_conflict = st.slider(
-            "Demon: Min Conflict Force Ratio",
+            "Uncertain Risk: Min Conflict Force Ratio",
             min_value=0.5, max_value=1.0,
             value=float(st.session_state.get("demon_conflict_ratio", 0.75)),
             step=0.05,
-            help="Ratio of under vs over forces that triggers a Conflict Demon. Default: 0.75 (75% as strong as the winning side). Lower = more demons detected.",
+            help="Ratio of under vs over forces that triggers an Uncertain Risk flag. Default: 0.75 (75% as strong as the winning side). Lower = more uncertain picks detected.",
         )
         st.session_state["demon_conflict_ratio"] = _demon_min_conflict
         st.caption(f"Conflict detected when under-force ≥ **{_demon_min_conflict:.0%}** of over-force")
 
     with _dc2:
         _demon_regression_pct = st.slider(
-            "Demon: Regression Line Threshold (%)",
+            "Uncertain Risk: Regression Line Threshold (%)",
             min_value=110.0, max_value=150.0,
             value=float(st.session_state.get("demon_regression_pct", 125.0)),
             step=5.0,
-            help="If the prop line is this % above season average, it's flagged as a Regression Demon. Default: 125%",
+            help="If the prop line is this % above season average, it's flagged as a Regression Risk. Default: 125%",
         )
         st.session_state["demon_regression_pct"] = _demon_regression_pct
-        st.caption(f"Line ≥ **{_demon_regression_pct:.0f}%** of season avg → Regression Demon")
+        st.caption(f"Line ≥ **{_demon_regression_pct:.0f}%** of season avg → Regression Risk")
 
     _gc_reset_col, _ = st.columns([1, 2])
     with _gc_reset_col:
-        if st.button("🔄 Reset Goblin/Demon Thresholds to Defaults"):
+        if st.button("🔄 Reset Goblin/Uncertain Risk Thresholds to Defaults"):
             for _k in ("goblin_min_std_devs", "goblin_min_probability_pct", "goblin_min_edge_pct",
                        "demon_conflict_ratio", "demon_regression_pct"):
                 if _k in st.session_state:
                     del st.session_state[_k]
-            st.success("Goblin/Demon thresholds reset to defaults!")
+            st.success("Goblin/Uncertain Risk thresholds reset to defaults!")
             st.rerun()
 
 # ============================================================
@@ -586,8 +586,8 @@ settings_summary = {
     "Goblin Min Std Devs": f"{st.session_state.get('goblin_min_std_devs', 2.0):.2f}σ",
     "Goblin Min Probability": f"{st.session_state.get('goblin_min_probability_pct', 80.0):.0f}%",
     "Goblin Min Edge": f"{st.session_state.get('goblin_min_edge_pct', 25.0):.0f}%",
-    "Demon Conflict Ratio": f"{st.session_state.get('demon_conflict_ratio', 0.75):.0%}",
-    "Demon Regression Threshold": f"{st.session_state.get('demon_regression_pct', 125.0):.0f}%",
+    "Uncertain: Conflict Ratio": f"{st.session_state.get('demon_conflict_ratio', 0.75):.0%}",
+    "Uncertain: Regression Threshold": f"{st.session_state.get('demon_regression_pct', 125.0):.0f}%",
 }
 
 summary_rows = [{"Setting": k, "Value": v} for k, v in settings_summary.items()]

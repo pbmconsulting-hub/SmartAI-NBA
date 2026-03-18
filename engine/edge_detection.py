@@ -1128,11 +1128,13 @@ def calculate_weighted_net_force(directional_forces_result):
 
 
 # ============================================================
-# SECTION: Goblin / Demon Bet Classification
-# BEGINNER NOTE: "Goblin bets" are slam-dunk easy-money plays
-# where the model's projection is FAR above/below the line.
-# "Demon bets" are trap plays that LOOK good but have hidden
-# risks that make them dangerous to bet.
+# SECTION: Goblin / 50_50 / Demon Bet Classification
+# BEGINNER NOTE:
+# "Goblin bets" = alt lines BELOW the standard O/U — safe floor bets.
+# "50/50 bets" = the standard Over/Under line itself — the baseline.
+# "Demon bets" = alt lines ABOVE the standard O/U — high ceiling bets.
+# Risk flags (conflicting forces, variance, fatigue, regression) are
+# separate from classification and feed into the avoid-list system.
 # ============================================================
 
 # Thresholds for Goblin classification
@@ -1148,12 +1150,21 @@ GOBLIN_MIN_EDGE               = 25.0   # Edge must be ≥25%
 GOBLIN_LINE_MIN_RATIO = 0.25   # Line must be ≥25% of season average
 GOBLIN_LINE_MAX_RATIO = 4.0    # Line must be ≤4× the season average
 
-# Thresholds for Demon classification
-DEMON_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% of each other = conflicting
-DEMON_HIGH_VAR_MAX_EDGE        = 8.0    # High-variance stats with edge <8% = demon
-DEMON_HIGH_VAR_STATS           = {"threes", "steals", "blocks"}
-DEMON_BLOWOUT_SPREAD_THRESHOLD = 10.0   # Spread >10 pts on a back-to-back = demon
-DEMON_HOT_STREAK_RATIO         = 1.25   # Line at 125%+ of season avg = likely regressing hot streak
+# Thresholds for Uncertain (risk-flag) detection
+# These replace the old "Demon" classification thresholds — conflicting
+# forces / variance / fatigue / regression are RISK FLAGS, not bet types.
+UNCERTAIN_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% of each other = conflicting
+UNCERTAIN_HIGH_VAR_MAX_EDGE        = 8.0    # High-variance stats with edge <8% = uncertain
+UNCERTAIN_HIGH_VAR_STATS           = {"threes", "steals", "blocks"}
+UNCERTAIN_BLOWOUT_SPREAD_THRESHOLD = 10.0   # Spread >10 pts on a back-to-back = uncertain
+UNCERTAIN_HOT_STREAK_RATIO         = 1.25   # Line at 125%+ of season avg = likely regressing
+
+# Backward-compat aliases — old "DEMON_*" names still importable
+DEMON_CONFLICT_RATIO_THRESHOLD = UNCERTAIN_CONFLICT_RATIO_THRESHOLD
+DEMON_HIGH_VAR_MAX_EDGE        = UNCERTAIN_HIGH_VAR_MAX_EDGE
+DEMON_HIGH_VAR_STATS           = UNCERTAIN_HIGH_VAR_STATS
+DEMON_BLOWOUT_SPREAD_THRESHOLD = UNCERTAIN_BLOWOUT_SPREAD_THRESHOLD
+DEMON_HOT_STREAK_RATIO         = UNCERTAIN_HOT_STREAK_RATIO
 
 
 def classify_bet_type(
@@ -1176,25 +1187,34 @@ def classify_bet_type(
     goblin_min_edge=None,
     demon_conflict_ratio=None,
     demon_regression_pct=None,
+    # Line-position category from the ingestion layer (parse_alt_lines_from_platform_props).
+    # PRIMARY classification driver when set:
+    #   "goblin"   → line BELOW standard O/U  (safe floor)
+    #   "50_50"    → the standard O/U line itself
+    #   "standard" → alias for "50_50"
+    #   "demon"    → line ABOVE standard O/U  (high ceiling)
+    #   None       → no category available; fall back to statistical-only logic
+    line_category=None,
 ) -> dict:
     """
-    Classify a prop bet as a Goblin, 50/50, or Normal bet.
+    Classify a prop bet as Goblin, 50/50, Demon, or Normal.
 
-    Goblin bets are extreme statistical edges — the model's projection is so far
-    from the line that it represents a near-guaranteed outcome.  These
-    are the "easy money" plays that books occasionally leave open.
+    Three-tier system (driven by line_category when provided):
+      Goblin  — alternate line set BELOW the standard O/U (safe floor, high
+                probability, lower payout).  Can also be awarded via
+                statistical overlay when the model shows 2σ+, ≥80% prob,
+                ≥25% edge on a standard line.
+      50/50   — the standard Over/Under line itself (the baseline).
+      Demon   — alternate line set ABOVE the standard O/U (high ceiling,
+                lower probability, higher payout).
 
-    50/50 bets (formerly called "Demon" in legacy code) are picks where
-    conflicting forces make the outcome uncertain — they look appealing on
-    the surface but have hidden structural risks.  Use
-    ``categorize_alt_lines()`` to identify true Demon bets (alternate lines
-    offered ABOVE the standard O/U) and Goblin bets (alternate lines BELOW
-    the standard O/U).
+    Risk flags (conflicting forces, high variance, fatigue, regression) are
+    computed independently and returned as ``risk_flags`` / ``is_uncertain``.
+    They do NOT change the ``bet_type`` — they feed into the avoid-list system.
 
-    A Goblin classification is BLOCKED when the prop_line looks synthetic
-    or unreliable (zero, wildly below/above the player's season average).
-    This prevents garbage-in/garbage-out misclassifications caused by
-    stale, default, or auto-generated lines.
+    A Goblin statistical overlay is BLOCKED when the prop_line looks
+    synthetic or unreliable (zero, wildly below/above the player's season
+    average) to prevent garbage-in/garbage-out misclassifications.
 
     Args:
         probability_over (float): Model P(over), 0–1
@@ -1210,28 +1230,40 @@ def classify_bet_type(
         season_average (float or None): Player's season average for this stat
         line_source (str or None): Where the line came from (e.g. 'PrizePicks',
             'Underdog', 'DraftKings', 'synthetic').  'synthetic' (or None with
-            a suspicious line) will block Goblin classification.
+            a suspicious line) will block Goblin statistical overlay.
+        line_category (str or None): Position of this line relative to the
+            standard O/U — 'goblin', '50_50', 'standard', 'demon', or None.
 
     Returns:
         dict: {
-            'bet_type': 'goblin' | '50_50' | 'normal',
+            'bet_type': 'goblin' | '50_50' | 'demon' | 'normal',
             'bet_type_emoji': str,
             'bet_type_label': str,
             'goblin': bool,
-            'demon': bool,   # True when bet_type is '50_50' (legacy compat key)
+            'demon': bool,   # True when bet_type == 'demon' (line above standard)
             '50_50': bool,
+            'line_category': str | None,
+            'risk_flags': list[str],   # conflicting-forces / uncertainty reasons
+            'is_uncertain': bool,      # True when any risk flag is triggered
             'reasons': list[str],
             'std_devs_from_line': float,
             'line_verified': bool,
             'line_reliability_warning': str | None,
         }
 
-    Example (Goblin):
-        Line 12.5 pts, projection 28 pts, std 7 → 2.2 std devs above line,
-        probability 88%, edge 38% → Goblin
+    Example (Goblin via line_category):
+        line_category='goblin' → Goblin Bet — Safe Floor immediately.
 
-    Example (50/50 — formerly "Demon"):
-        Back-to-back + spread 14 pts → blowout + fatigue → 50/50 uncertain
+    Example (Demon via line_category):
+        line_category='demon' → Demon Bet — High Ceiling immediately.
+
+    Example (Goblin via statistical overlay):
+        Standard line, projection 2.5σ above, probability 88%, edge 38%
+        → statistical Goblin overlay triggered.
+
+    Example (50/50 with risk flags):
+        Standard line, back-to-back + spread 14 pts → is_uncertain=True,
+        risk_flags populated, bet_type='50_50'.
     """
     stat_type_lower = str(stat_type).lower() if stat_type else ""
 
@@ -1239,8 +1271,8 @@ def classify_bet_type(
     _goblin_std_thresh  = goblin_min_std_devs if goblin_min_std_devs is not None else GOBLIN_MIN_STD_DEVS_FROM_LINE
     _goblin_prob_thresh = goblin_min_probability if goblin_min_probability is not None else GOBLIN_MIN_PROBABILITY
     _goblin_edge_thresh = goblin_min_edge if goblin_min_edge is not None else GOBLIN_MIN_EDGE
-    _demon_conflict     = demon_conflict_ratio if demon_conflict_ratio is not None else DEMON_CONFLICT_RATIO_THRESHOLD
-    _demon_regression   = demon_regression_pct if demon_regression_pct is not None else (DEMON_HOT_STREAK_RATIO * 100.0)
+    _uncertain_conflict  = demon_conflict_ratio if demon_conflict_ratio is not None else UNCERTAIN_CONFLICT_RATIO_THRESHOLD
+    _uncertain_regression = demon_regression_pct if demon_regression_pct is not None else (UNCERTAIN_HOT_STREAK_RATIO * 100.0)
 
     # ── Compute how many std devs the projection is from the line ──
     std_devs_from_line = 0.0
@@ -1306,12 +1338,16 @@ def classify_bet_type(
             line_reliability_warning = _ratio_warn
 
     # ============================================================
-    # GOBLIN CHECK
+    # GOBLIN CHECK (statistical overlay for standard-line picks)
     # A "Goblin bet" requires ALL three conditions to be met:
     #   1. Projection is ≥2 std devs from the line in favorable direction
     #   2. Probability is ≥80%
     #   3. Edge is ≥25%
     #   4. The prop_line must be verified (not synthetic/default)
+    # This check is applied for standard-line picks (line_category in
+    # ("50_50", "standard", None)) and also for bare-goblin line_category
+    # picks to confirm the badge. For line_category="goblin" the badge is
+    # awarded by line position — stats criteria are not required.
     # ============================================================
     is_goblin = False
     goblin_reasons = []
@@ -1338,56 +1374,43 @@ def classify_bet_type(
             f"Edge: {abs_edge:.1f}% (threshold: {_goblin_edge_thresh:.0f}%)"
         )
 
-    if is_goblin:
-        return {
-            "bet_type":        "goblin",
-            "bet_type_emoji":  "Goblin",
-            "bet_type_label":  "Goblin Bet — Easy Money",
-            "goblin":          True,
-            "demon":           False,
-            "reasons":         goblin_reasons,
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   True,
-            "line_reliability_warning": None,
-        }
-
     # ============================================================
-    # DEMON CHECK
-    # A "Demon bet" qualifies if ANY of the four risk patterns apply.
+    # RISK FLAGS (formerly "Demon check")
+    # These four patterns detect structural uncertainty and are attached
+    # to the result as `risk_flags` / `is_uncertain`. They do NOT change
+    # `bet_type` — they feed into the avoid-list system via callers.
     # ============================================================
-    demon_reasons = []
+    risk_flags = []
 
     # Pattern 1: Conflicting directional forces (nearly 50/50 split)
     over_strength  = directional_forces_result.get("over_strength",  0)
     under_strength = directional_forces_result.get("under_strength", 0)
     if over_strength > 0 and under_strength > 0:
         conflict_ratio = min(over_strength, under_strength) / max(over_strength, under_strength)
-        if conflict_ratio >= _demon_conflict:
-            demon_reasons.append(
+        if conflict_ratio >= _uncertain_conflict:
+            risk_flags.append(
                 f"Conflicting forces: OVER ({over_strength:.1f}) vs UNDER ({under_strength:.1f}) "
                 f"are nearly balanced ({conflict_ratio*100:.0f}% overlap) — no clear edge direction"
             )
 
     # Pattern 2: High-variance stat type with low edge
-    if stat_type_lower in DEMON_HIGH_VAR_STATS and abs_edge < DEMON_HIGH_VAR_MAX_EDGE:
-        demon_reasons.append(
+    if stat_type_lower in UNCERTAIN_HIGH_VAR_STATS and abs_edge < UNCERTAIN_HIGH_VAR_MAX_EDGE:
+        risk_flags.append(
             f"{stat_type_lower.title()} is a high-variance stat with only {abs_edge:.1f}% edge "
-            f"(threshold: {DEMON_HIGH_VAR_MAX_EDGE:.0f}%) — too unpredictable to bet with low edge"
+            f"(threshold: {UNCERTAIN_HIGH_VAR_MAX_EDGE:.0f}%) — too unpredictable to bet with low edge"
         )
 
     # Pattern 3: Back-to-back with large blowout spread
     is_back_to_back = rest_days == 0
     abs_spread = abs(vegas_spread)
-    if is_back_to_back and abs_spread > DEMON_BLOWOUT_SPREAD_THRESHOLD:
-        demon_reasons.append(
+    if is_back_to_back and abs_spread > UNCERTAIN_BLOWOUT_SPREAD_THRESHOLD:
+        risk_flags.append(
             f"Back-to-back game (rest_days=0) with a {abs_spread:.0f}-pt spread — "
             "blowout + fatigue combo is a significant risk for missing this stat"
         )
 
     # Pattern 4: Line set at recent hot streak value likely to regress
-    # If recent form ratio is very high (player on hot streak) AND the line
-    # is already pushed up to match that hot streak, regression is likely.
-    _hot_streak_ratio_threshold = _demon_regression / 100.0  # convert pct → ratio
+    _hot_streak_ratio_threshold = _uncertain_regression / 100.0  # convert pct → ratio
     if (
         recent_form_ratio is not None
         and recent_form_ratio >= _hot_streak_ratio_threshold
@@ -1395,31 +1418,108 @@ def classify_bet_type(
         and season_average > 0
         and prop_line > 0
     ):
-        # The line is inflated to match the hot streak — but the hot streak
-        # itself makes it a regression candidate
         line_vs_avg_ratio = prop_line / season_average if season_average > 0 else 1.0
         if line_vs_avg_ratio >= _hot_streak_ratio_threshold:
-            demon_reasons.append(
+            risk_flags.append(
                 f"Line ({prop_line}) inflated to match recent hot streak "
                 f"(recent form {recent_form_ratio:.2f}x, season avg {season_average:.1f}) — "
                 f"hot streaks regress; line is priced at peak, not true average"
             )
 
-    is_demon = len(demon_reasons) > 0
+    is_uncertain = len(risk_flags) > 0
 
-    if is_demon:
+    # ============================================================
+    # PRIMARY CLASSIFICATION — driven by line_category
+    # ============================================================
+    _norm_category = str(line_category).lower() if line_category is not None else None
+
+    if _norm_category == "goblin":
+        # Alt line BELOW standard O/U — Goblin Bet (safe floor)
         return {
-            # Renamed from "demon" → "50_50": the old classification was based on
-            # conflicting statistical forces, not line position. True "Demon" bets
-            # are now defined as alternate lines ABOVE the standard O/U (see
-            # categorize_alt_lines()). These conflicting-forces picks are "50/50 bets".
+            "bet_type":        "goblin",
+            "bet_type_emoji":  "Goblin",
+            "bet_type_label":  "Goblin Bet — Safe Floor",
+            "goblin":          True,
+            "demon":           False,
+            "50_50":           False,
+            "line_category":   line_category,
+            "risk_flags":      risk_flags,
+            "is_uncertain":    is_uncertain,
+            "reasons":         goblin_reasons if goblin_reasons else ["Alt line set BELOW the standard O/U — safe floor"],
+            "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   line_verified,
+            "line_reliability_warning": line_reliability_warning,
+        }
+
+    if _norm_category == "demon":
+        # Alt line ABOVE standard O/U — Demon Bet (high ceiling)
+        return {
+            "bet_type":        "demon",
+            "bet_type_emoji":  "Demon",
+            "bet_type_label":  "Demon Bet — High Ceiling",
+            "goblin":          False,
+            "demon":           True,  # True = real Demon (line above standard O/U)
+            "50_50":           False,
+            "line_category":   line_category,
+            "risk_flags":      risk_flags,
+            "is_uncertain":    is_uncertain,
+            "reasons":         ["Alt line set ABOVE the standard O/U — high ceiling"],
+            "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   line_verified,
+            "line_reliability_warning": line_reliability_warning,
+        }
+
+    # line_category is "50_50", "standard", or None —
+    # standard-line pick.  Goblin statistical overlay applies here.
+    if is_goblin:
+        return {
+            "bet_type":        "goblin",
+            "bet_type_emoji":  "Goblin",
+            "bet_type_label":  "Goblin Bet — Safe Floor",
+            "goblin":          True,
+            "demon":           False,
+            "50_50":           False,
+            "line_category":   line_category,
+            "risk_flags":      risk_flags,
+            "is_uncertain":    is_uncertain,
+            "reasons":         goblin_reasons,
+            "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   True,
+            "line_reliability_warning": None,
+        }
+
+    if _norm_category in ("50_50", "standard"):
+        # Standard sportsbook line — 50/50 Bet
+        return {
+            "bet_type":        "50_50",
+            "bet_type_emoji":  "50/50",
+            "bet_type_label":  "50/50 Bet — Standard Line",
+            "goblin":          False,
+            "demon":           False,
+            "50_50":           True,
+            "line_category":   line_category,
+            "risk_flags":      risk_flags,
+            "is_uncertain":    is_uncertain,
+            "reasons":         risk_flags,
+            "std_devs_from_line": round(std_devs_from_line, 2),
+            "line_verified":   line_verified,
+            "line_reliability_warning": line_reliability_warning,
+        }
+
+    # line_category is None — backward-compatible path (synthetic / no category).
+    # Return "50_50" when risk flags present (old behavior), else "normal".
+    if is_uncertain:
+        return {
             "bet_type":        "50_50",
             "bet_type_emoji":  "50/50",
             "bet_type_label":  "50/50 Bet — Uncertain",
             "goblin":          False,
-            "demon":           True,   # kept for backward compat (legacy callers)
+            "demon":           False,
             "50_50":           True,
-            "reasons":         demon_reasons,
+            "line_category":   line_category,
+            "risk_flags":      risk_flags,
+            "is_uncertain":    True,
+            "reasons":         risk_flags,
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
             "line_reliability_warning": line_reliability_warning,
@@ -1433,6 +1533,9 @@ def classify_bet_type(
         "goblin":          False,
         "demon":           False,
         "50_50":           False,
+        "line_category":   line_category,
+        "risk_flags":      [],
+        "is_uncertain":    False,
         "reasons":         [],
         "std_devs_from_line": round(std_devs_from_line, 2),
         "line_verified":   line_verified,

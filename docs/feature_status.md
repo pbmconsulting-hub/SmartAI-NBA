@@ -8,12 +8,12 @@ This document tracks which features are complete, in-progress, or planned.
 |--------|---------|--------|
 | `engine/simulation.py` | Quantum Matrix Engine 5.6 (run_quantum_matrix_simulation) | Complete |
 | `engine/confidence.py` | 8-weight + 4-penalty SAFE Score | Complete |
-| `engine/edge_detection.py` | Directional force analysis, Goblin/Demon classification | Complete |
+| `engine/edge_detection.py` | Directional force analysis, Goblin / 50_50 / Demon three-tier classification (line-position-based) | Complete |
 | `engine/correlation.py` | Correlation-adjusted Kelly + parlay correlation | Complete |
 | `engine/projections.py` | Player stat projections with injury/rest adjustments | Complete |
 | `data/platform_fetcher.py` | PrizePicks, Underdog, DraftKings live prop fetching | Complete |
 | `data/data_manager.py` | Props generation + platform player filtering | Complete |
-| `tracking/bet_tracker.py` | Bet logging, auto-resolve, Goblin/Demon/tier tracking | Complete |
+| `tracking/bet_tracker.py` | Bet logging, auto-resolve, Goblin / 50_50 / Demon / Normal tier tracking | Complete |
 | `engine/backtester.py` | Historical backtest engine | Complete |
 | `engine/entry_optimizer.py` | Parlay entry optimization | Complete |
 

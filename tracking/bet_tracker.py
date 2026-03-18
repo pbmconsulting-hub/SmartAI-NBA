@@ -313,7 +313,8 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # SECTION: Auto-Log Analysis Results
 # ============================================================
 
-_MAX_DEMON_REASONS = 2   # max bet_type_reasons to include in notes for Demon bets
+_MAX_UNCERTAIN_REASONS = 2   # max risk_flags to include in notes for uncertain picks
+_MAX_DEMON_REASONS = _MAX_UNCERTAIN_REASONS  # backward-compat alias
 _MAX_GOBLIN_REASONS = 1  # max bet_type_reasons to include in notes for Goblin bets
 
 def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
@@ -435,13 +436,19 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
                 f"Auto-logged by SmartAI. "
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
                 + (
-                    # "50_50" is the renamed "demon" (conflicting forces) classification
-                    "50/50 reasons: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_DEMON_REASONS])
-                    if res.get("bet_type") in ("50_50", "demon") and res.get("bet_type_reasons")
+                    # Goblin / 50_50 / Demon / Normal classification notes
+                    "50/50 reasons: " + " | ".join(
+                        (res.get("risk_flags") or res.get("bet_type_reasons") or [])[:_MAX_UNCERTAIN_REASONS]
+                    )
+                    if res.get("bet_type") in ("50_50", "demon") and (res.get("risk_flags") or res.get("bet_type_reasons"))
                     else (
                         "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
                         if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")
-                        else ""
+                        else (
+                            "Demon (high ceiling): alt line above standard O/U"
+                            if res.get("bet_type") == "demon"
+                            else ""
+                        )
                     )
                 )
             ),
