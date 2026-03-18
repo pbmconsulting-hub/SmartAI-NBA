@@ -1695,11 +1695,14 @@ def parse_alt_lines_from_platform_props(props):
             # This line IS the standard O/U (within floating-point tolerance)
             enriched_prop["line_category"] = "50_50"
         elif prop_line < std_line:
-            # Line is below standard → Goblin_Bet (safe floor)
+            # Line is STRICTLY below standard → Goblin_Bet (safe floor)
             enriched_prop["line_category"] = "goblin"
-        else:
-            # Line is above standard → Demon_Bet (high risk / high reward)
+        elif prop_line > std_line:
+            # Line is STRICTLY above standard → Demon_Bet (high risk / high reward)
             enriched_prop["line_category"] = "demon"
+        else:
+            # Exact match that slipped past tolerance check — treat as 50_50
+            enriched_prop["line_category"] = "50_50"
 
         enriched.append(enriched_prop)
 
