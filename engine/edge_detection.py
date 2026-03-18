@@ -1200,6 +1200,11 @@ def classify_bet_type(
     #   "demon"    → line ABOVE standard O/U  (high ceiling)
     #   None       → no category available; fall back to statistical-only logic
     line_category=None,
+    # Simulation percentile cutoffs — used to compute absolute floor/ceiling
+    # boundaries that must NOT be bet past.  Populated from the Quantum Matrix
+    # Engine output (percentile_10, percentile_90).
+    sim_percentile_10=None,
+    sim_percentile_90=None,
 ) -> dict:
     """
     Classify a prop bet as Goblin, 50/50, Demon, or Normal.
@@ -1238,6 +1243,10 @@ def classify_bet_type(
             a suspicious line) will block Goblin statistical overlay.
         line_category (str or None): Position of this line relative to the
             standard O/U — 'goblin', '50_50', 'standard', 'demon', or None.
+        sim_percentile_10 (float or None): 10th-percentile simulation output
+            (bad-game floor).  Used to compute the Goblin absolute floor.
+        sim_percentile_90 (float or None): 90th-percentile simulation output
+            (great-game ceiling).  Used to compute the Demon absolute ceiling.
 
     Returns:
         dict: {
@@ -1254,6 +1263,8 @@ def classify_bet_type(
             'std_devs_from_line': float,
             'line_verified': bool,
             'line_reliability_warning': str | None,
+            'goblin_floor': float | None,   # Absolute floor — do NOT bet Goblin past this
+            'demon_ceiling': float | None,  # Absolute ceiling — do NOT bet Demon past this
         }
 
     Example (Goblin via line_category):
@@ -1434,6 +1445,23 @@ def classify_bet_type(
     is_uncertain = len(risk_flags) > 0
 
     # ============================================================
+    # SIMULATOR CUTOFF COMPUTATION — Goblin Floor & Demon Ceiling
+    # ============================================================
+    # Goblin floor = p10 − 1σ  (the absolute mathematical floor;
+    #   a Goblin line below this value is statistically unsafe).
+    # Demon ceiling = p90 + 1σ  (the absolute mathematical ceiling;
+    #   a Demon line above this value requires near-impossible performance).
+    _goblin_floor = None
+    _demon_ceiling = None
+    _safe_std = stat_standard_deviation if stat_standard_deviation > 0 else 0.0
+    if sim_percentile_10 is not None:
+        _goblin_floor = round(sim_percentile_10 - _safe_std, 1)
+        if _goblin_floor < 0:
+            _goblin_floor = 0.0
+    if sim_percentile_90 is not None:
+        _demon_ceiling = round(sim_percentile_90 + _safe_std, 1)
+
+    # ============================================================
     # PRIMARY CLASSIFICATION — driven by line_category
     # ============================================================
     _norm_category = str(line_category).lower() if line_category is not None else None
@@ -1454,6 +1482,8 @@ def classify_bet_type(
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
             "line_reliability_warning": line_reliability_warning,
+            "goblin_floor":    _goblin_floor,
+            "demon_ceiling":   _demon_ceiling,
         }
 
     if _norm_category == "demon":
@@ -1472,6 +1502,8 @@ def classify_bet_type(
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
             "line_reliability_warning": line_reliability_warning,
+            "goblin_floor":    _goblin_floor,
+            "demon_ceiling":   _demon_ceiling,
         }
 
     # line_category is "50_50", "standard", or None —
@@ -1491,6 +1523,8 @@ def classify_bet_type(
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   True,
             "line_reliability_warning": None,
+            "goblin_floor":    _goblin_floor,
+            "demon_ceiling":   _demon_ceiling,
         }
 
     if _norm_category in ("50_50", "standard"):
@@ -1509,6 +1543,8 @@ def classify_bet_type(
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
             "line_reliability_warning": line_reliability_warning,
+            "goblin_floor":    _goblin_floor,
+            "demon_ceiling":   _demon_ceiling,
         }
 
     # line_category is None — backward-compatible path (synthetic / no category).
@@ -1530,6 +1566,8 @@ def classify_bet_type(
             "std_devs_from_line": round(std_devs_from_line, 2),
             "line_verified":   line_verified,
             "line_reliability_warning": line_reliability_warning,
+            "goblin_floor":    _goblin_floor,
+            "demon_ceiling":   _demon_ceiling,
         }
 
     # Normal bet — no special classification
@@ -1547,6 +1585,8 @@ def classify_bet_type(
         "std_devs_from_line": round(std_devs_from_line, 2),
         "line_verified":   line_verified,
         "line_reliability_warning": line_reliability_warning,
+        "goblin_floor":    _goblin_floor,
+        "demon_ceiling":   _demon_ceiling,
     }
 
 

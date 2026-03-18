@@ -1303,6 +1303,8 @@ if run_analysis:
                 demon_conflict_ratio=_d_conf,
                 demon_regression_pct=_d_regr,
                 line_category=_line_category,
+                sim_percentile_10=simulation_output.get("percentile_10"),
+                sim_percentile_90=simulation_output.get("percentile_90"),
             )
             full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
             full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
@@ -1315,6 +1317,8 @@ if run_analysis:
             full_result["standard_line"]   = _standard_line
             full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
             full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
+            full_result["goblin_floor"]    = _bet_classification.get("goblin_floor")
+            full_result["demon_ceiling"]   = _bet_classification.get("demon_ceiling")
             # Uncertain picks (conflicting forces) are added to the avoid list.
             # True Demon bets (line above standard) are NOT auto-avoided.
             if _bet_classification.get("is_uncertain") and not full_result.get("should_avoid"):
@@ -1334,6 +1338,8 @@ if run_analysis:
             full_result["standard_line"]    = None
             full_result["risk_flags"]       = []
             full_result["is_uncertain"]     = False
+            full_result["goblin_floor"]     = None
+            full_result["demon_ceiling"]    = None
 
         # ── Capture odds from the original prop (for display) ────────
         full_result["over_odds"]  = prop.get("over_odds",  -110)
@@ -1790,6 +1796,7 @@ if analysis_results:
                 _under_odds = _gp.get("under_odds", -110)
                 _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
                 _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
+                _gp_goblin_floor = _gp.get("goblin_floor")
                 # Plain-English reason sentence
                 _gp_plain_reason = (
                     f"Line is set at {_gp_line}"
@@ -1834,7 +1841,18 @@ if analysis_results:
                     f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
                     f'<ul style="margin:4px 0 0 16px;padding:0;">{_gp_reasons_html}</ul>'
                     f'</div>'
-                    f'</div>',
+                    + (
+                        f'<div style="margin-top:8px;padding:8px 12px;background:rgba(255,235,59,0.10);'
+                        f'border:1px solid rgba(255,235,59,0.35);border-radius:6px;">'
+                        f'<span style="color:#fdd835;font-size:0.78rem;font-weight:700;">'
+                        f'⚠️ FLOOR CUTOFF:</span> '
+                        f'<span style="color:#fff9c4;font-size:0.78rem;">'
+                        f'Do not bet a Goblin past <strong>{_gp_goblin_floor}</strong> — '
+                        f'simulator p10 floor boundary (lines below this are statistically unsafe).'
+                        f'</span></div>'
+                        if _gp_goblin_floor is not None else ""
+                    )
+                    + f'</div>',
                     unsafe_allow_html=True,
                 )
             st.markdown(f"*{len(_goblin_picks)} Goblin pick(s) found on this slate.*")
@@ -1893,6 +1911,7 @@ if analysis_results:
                 _dp_proj     = _dp.get("adjusted_projection", 0)
                 _dp_edge     = _dp.get("edge_percentage", 0)
                 _dp_risk_flags = _dp.get("risk_flags", [])
+                _dp_demon_ceiling = _dp.get("demon_ceiling")
                 _dp_team_badge = (
                     f'<span style="background:rgba(255,140,0,0.15);color:#ffb347;padding:1px 7px;'
                     f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
@@ -1931,6 +1950,17 @@ if analysis_results:
                         f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_risk_html}</ul>'
                         f'</div>'
                         if _dp_risk_html else ""
+                    )
+                    + (
+                        f'<div style="margin-top:8px;padding:8px 12px;background:rgba(244,67,54,0.10);'
+                        f'border:1px solid rgba(244,67,54,0.35);border-radius:6px;">'
+                        f'<span style="color:#ef5350;font-size:0.78rem;font-weight:700;">'
+                        f'🚫 CEILING CUTOFF:</span> '
+                        f'<span style="color:#ffcdd2;font-size:0.78rem;">'
+                        f'Do not bet a Demon past <strong>{_dp_demon_ceiling}</strong> — '
+                        f'simulator p90 ceiling boundary (lines above this require statistically impossible performance).'
+                        f'</span></div>'
+                        if _dp_demon_ceiling is not None else ""
                     )
                     + f'</div>',
                     unsafe_allow_html=True,
