@@ -481,6 +481,14 @@ def _labels_to_stat_keys(labels):
     return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
 
 
+# ── Initialize funnel session-state defaults (once) ──────────────
+if "funnel_stat_types" not in st.session_state:
+    st.session_state["funnel_stat_types"] = list(_DEFAULT_SELECTED_STATS)
+if "funnel_max_per_player" not in st.session_state:
+    st.session_state["funnel_max_per_player"] = 3
+if "funnel_absolute_max" not in st.session_state:
+    st.session_state["funnel_absolute_max"] = 150
+
 with st.expander("🎯 Pre-Analysis Filters", expanded=True):
     st.markdown(
         '<p style="color:#a0b4d0;font-size:0.85rem;margin-bottom:12px;">'
@@ -493,8 +501,7 @@ with st.expander("🎯 Pre-Analysis Filters", expanded=True):
         _selected_stat_labels = st.multiselect(
             "Stat Types",
             options=_STAT_TYPE_OPTIONS,
-            default=st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS),
-            key="funnel_stat_types_widget",
+            key="funnel_stat_types",
             help="Only props for these stat categories will be analyzed.",
         )
 
@@ -503,9 +510,8 @@ with st.expander("🎯 Pre-Analysis Filters", expanded=True):
             "Max Props per Player",
             min_value=1,
             max_value=15,
-            value=st.session_state.get("funnel_max_per_player", 3),
             step=1,
-            key="funnel_max_per_player_widget",
+            key="funnel_max_per_player",
             help="Prevent the engine from analyzing many alternate lines for a single player.",
         )
 
@@ -514,16 +520,10 @@ with st.expander("🎯 Pre-Analysis Filters", expanded=True):
             "Absolute Max Props",
             min_value=10,
             max_value=5000,
-            value=st.session_state.get("funnel_absolute_max", 150),
             step=10,
-            key="funnel_absolute_max_widget",
+            key="funnel_absolute_max",
             help="Hard cap on the total number of props sent to the engine.",
         )
-
-    # Persist funnel settings to session state
-    st.session_state["funnel_stat_types"] = _selected_stat_labels
-    st.session_state["funnel_max_per_player"] = _max_per_player
-    st.session_state["funnel_absolute_max"] = _absolute_max
 
     # ── Dynamic feedback: estimate surviving prop count ───────────
     _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
