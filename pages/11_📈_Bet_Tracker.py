@@ -1963,7 +1963,7 @@ with tab_achievements:
     )
 
     # ── Load all resolved bets ─────────────────────────────────────
-    _ach_all_bets = load_all_picks() + load_bets()
+    _ach_all_bets = load_all_analysis_picks() + load_all_bets()
     _ach_resolved = [
         b for b in _ach_all_bets
         if b.get("result") in ("WIN", "LOSS", "PUSH")

@@ -66,23 +66,30 @@ MIN_MINUTES_FLOOR = 0.0             # DNP risk — can go to 0 in extreme blowou
 # ============================================================
 
 # ============================================================
-# INTEGRATION CHECKLIST: Lines to delete from engine/projections.py
-# when minutes_model.py is fully integrated
-# ============================================================
-# 1. BACK_TO_BACK_FATIGUE_MULTIPLIER constant (line ~64) — replaced by
-#    BACK_TO_BACK_MINUTES_REDUCTION in this module
-# 2. BLOWOUT_SPREAD_THRESHOLD constant (line ~67) — replaced by
-#    BLOWOUT_SPREAD_MILD/MODERATE/HEAVY/EXTREME in this module
-# 3. The `if played_yesterday: rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER`
-#    block (lines ~616-618) — minutes_model handles B2B internally
-# 4. The blowout-risk note generation block that uses BLOWOUT_SPREAD_THRESHOLD
-#    (search for `BLOWOUT_SPREAD_THRESHOLD` in build_player_projection) —
-#    minutes_model's blowout_risk output replaces this
-# 5. The `altitude_fatigue_penalty` application to `rest_factor` (line ~623) —
-#    minutes_model should own all fatigue adjustments
-# 6. The `minutes_adjustment_factor` parameter multiplication in `_off_mult()`
-#    (line ~720) — minutes_model provides projected_minutes directly,
-#    eliminating the need for a multiplicative factor
+# INTEGRATION CHECKLIST: When minutes_model.py is fully integrated,
+# DELETE the following from engine/projections.py to avoid double-penalizing
+# minutes for blowouts, rest, or teammate injuries:
+#
+# 1. Lines ~676-682: spread_minutes_factor calculation
+#    (spread_minutes_factor = 0.94 / 0.97 based on vegas_spread)
+#    → minutes_model.py handles blowout-risk minutes reduction internally.
+#
+# 2. Lines ~693-699: projected_minutes calculation that multiplies
+#    season_minutes_average * rest_factor * minutes_adjustment_factor * spread_minutes_factor
+#    → Replace with: projected_minutes = minutes_model.predict_minutes(...)
+#
+# 3. Lines ~686-691: Rotation tracker minutes adjustment block
+#    (_ROTATION_TRACKER_AVAILABLE check and rotation_adjustment)
+#    → minutes_model.py subsumes rotation tracking data.
+#
+# 4. Lines ~618-619: rest_factor *= BACK_TO_BACK_FATIGUE_MULTIPLIER
+#    → Keep rest_factor for STAT adjustments, but do NOT apply it to
+#      projected_minutes (minutes_model handles fatigue internally).
+#      Split rest_factor into rest_stat_factor and rest_minutes_factor.
+#
+# 5. Lines ~623: altitude_fatigue_penalty applied to rest_factor
+#    → Same split as #4: altitude fatigue should only affect stats,
+#      not minutes (minutes_model accounts for altitude).
 # ============================================================
 
 

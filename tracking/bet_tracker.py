@@ -1605,18 +1605,11 @@ def save_top_picks_from_analysis(analysis_results):
     """
     Save top picks from Neural Analysis into the bet tracker as AI-logged picks.
 
-    Iterates analysis_results and inserts picks that meet the minimum quality bar
-    (tier is Platinum/Gold, probability_over >= 0.60) as PENDING bets with
-    source='AI_AUTO'. Duplicate picks (same player + stat + date) are skipped.
-
-    BEGINNER NOTE: This is how the AI Picks tab in the Bet Tracker gets populated.
-    The Neural Analysis page runs models and produces results; this function
-    automatically saves the best ones so you can track model performance over time.
+    Uses log_new_bet() for schema compliance. Only saves Platinum/Gold picks
+    with probability_over >= 0.60.
 
     Args:
-        analysis_results (list of dict): Results from Neural Analysis. Each dict
-            should have keys: player_name, stat_type, line, direction, tier,
-            probability_over, platform (optional), edge (optional).
+        analysis_results (list of dict): Results from Neural Analysis.
 
     Returns:
         int: Number of picks successfully saved.
@@ -1630,7 +1623,6 @@ def save_top_picks_from_analysis(analysis_results):
     import datetime as _dt
     today_str = _dt.datetime.now().strftime("%Y-%m-%d")
 
-    # Load existing bets to avoid duplicates
     existing_bets = load_all_bets(limit=500)
     existing_keys = set()
     for b in existing_bets:
@@ -1646,9 +1638,7 @@ def save_top_picks_from_analysis(analysis_results):
         tier = result.get("tier", "")
         prob = float(result.get("probability_over", 0) or 0)
 
-        if tier not in AUTO_TIERS:
-            continue
-        if prob < MIN_PROBABILITY:
+        if tier not in AUTO_TIERS or prob < MIN_PROBABILITY:
             continue
 
         player_name = str(result.get("player_name", "")).strip()
@@ -1656,35 +1646,43 @@ def save_top_picks_from_analysis(analysis_results):
         if not player_name or not stat_type:
             continue
 
-        # Check for duplicate
         dup_key = (player_name.lower(), stat_type, today_str)
         if dup_key in existing_keys:
             continue
 
         direction = str(result.get("direction", "OVER")).upper()
-        line = float(result.get("line", 0) or 0)
+        prop_line = float(result.get("line", 0) or 0)
         platform = str(result.get("platform", "PrizePicks"))
-        edge = float(result.get("edge", 0) or 0)
+        edge = float(result.get("edge_percentage", result.get("edge", 0)) or 0)
+        confidence = float(result.get("confidence_score", 0) or 0)
         bet_type = str(result.get("bet_type", "normal"))
-        notes = f"AI auto-logged | edge={edge:.1f}% | prob={prob:.1%}"
+        std_devs = float(result.get("std_devs_from_line", 0.0))
+        team = str(result.get("player_team", result.get("team", "")))
 
         try:
-            insert_bet({
-                "player_name": player_name,
-                "stat_type": stat_type,
-                "line": line,
-                "direction": direction,
-                "tier": tier,
-                "platform": platform,
-                "result": "PENDING",
-                "notes": notes,
-                "source": "AI_AUTO",
-                "probability": prob,
-                "bet_type": bet_type,
-            })
-            existing_keys.add(dup_key)
-            saved_count += 1
+            ok, _msg = log_new_bet(
+                player_name=player_name,
+                stat_type=stat_type,
+                prop_line=prop_line,
+                direction=direction,
+                platform=platform,
+                confidence_score=confidence,
+                probability_over=prob,
+                edge_percentage=edge,
+                tier=tier,
+                entry_fee=0.0,
+                team=team,
+                notes=f"AI auto-logged | edge={edge:.1f}% | prob={prob:.1%}",
+                auto_logged=1,
+                bet_type=bet_type,
+                std_devs_from_line=std_devs,
+            )
+            if ok:
+                existing_keys.add(dup_key)
+                saved_count += 1
         except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
+            logging.getLogger(__name__).warning(
+                f"[BetTracker] save_top_picks error for {player_name}: {_exc}"
+            )
 
     return saved_count
