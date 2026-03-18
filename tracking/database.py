@@ -855,6 +855,7 @@ def save_daily_snapshot(date_str=None):
     if date_str is None:
         date_str = _dt.date.today().isoformat()
 
+    conn = None
     try:
         conn = get_database_connection()
         cursor = conn.cursor()
@@ -986,7 +987,8 @@ def save_daily_snapshot(date_str=None):
         return False
     finally:
         try:
-            conn.close()
+            if conn is not None:
+                conn.close()
         except Exception:
             pass
 

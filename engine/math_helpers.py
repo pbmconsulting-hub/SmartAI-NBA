@@ -404,11 +404,11 @@ def calculate_platform_edge_percentage(probability_over, platform=None, over_odd
         try:
             odds_float = float(over_odds)
             if odds_float < 0:
-                denom = abs(odds_float) + 100.0
-                baseline = abs(odds_float) / denom if denom > 0 else _DEFAULT_PLATFORM_BASELINE
+                baseline = abs(odds_float) / (abs(odds_float) + 100.0)
+            elif odds_float + 100.0 > 0:
+                baseline = 100.0 / (odds_float + 100.0)
             else:
-                denom = odds_float + 100.0
-                baseline = 100.0 / denom if denom > 0 else _DEFAULT_PLATFORM_BASELINE
+                baseline = _DEFAULT_PLATFORM_BASELINE
         except (ValueError, TypeError):
             baseline = _DEFAULT_PLATFORM_BASELINE
     elif platform:
