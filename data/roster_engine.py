@@ -50,7 +50,7 @@ def _current_nba_season():
     the season is current_year-(current_year+1). Otherwise it's (current_year-1)-current_year.
     Example: October 2024 → '2024-25'; April 2025 → '2024-25'.
     """
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone.utc)
     if now.month >= 10:
         start_year = now.year
     else:
@@ -319,7 +319,7 @@ class RosterEngine:
 
         # Invalidate active-roster cache
         self._active_rosters = {}
-        self._last_refresh = datetime.datetime.now()
+        self._last_refresh = datetime.datetime.now(datetime.timezone.utc)
         out_count = sum(1 for v in self._injury_map.values() if v.get("status") in EXCLUDE_STATUSES)
         _logger.info(
             f"RosterEngine.refresh() complete: {len(self._injury_map)} injured/flagged players "

@@ -216,8 +216,15 @@ def log_new_bet(
     # SECTION: Build and Save the Bet
     # ============================================================
 
-    # Get today's date as a string in YYYY-MM-DD format
-    today_date_string = datetime.date.today().isoformat()
+    # Get today's date as a string in YYYY-MM-DD format.
+    # Anchor to US/Eastern: NBA game dates are defined in ET, so a bet
+    # logged at 1 AM UTC for a late West Coast game is still "today" in ET.
+    try:
+        from zoneinfo import ZoneInfo
+        _eastern = ZoneInfo("America/New_York")
+    except ImportError:
+        _eastern = datetime.timezone(datetime.timedelta(hours=-5))
+    today_date_string = datetime.datetime.now(_eastern).date().isoformat()
 
     # Build the bet data dictionary
     bet_data = {
@@ -567,7 +574,16 @@ def auto_resolve_bet_results(date_str=None):
     import datetime as _dt
 
     if date_str is None:
-        date_str = (_dt.date.today() - _dt.timedelta(days=1)).isoformat()
+        # Anchor to US/Eastern — NBA game dates are defined in ET.
+        # Using UTC or the server's local tz could mismatch by a day
+        # when games end after midnight UTC (most East Coast tip-offs).
+        try:
+            from zoneinfo import ZoneInfo
+            _eastern = ZoneInfo("America/New_York")
+        except ImportError:
+            _eastern = _dt.timezone(_dt.timedelta(hours=-5))
+        _today_et = _dt.datetime.now(_eastern).date()
+        date_str = (_today_et - _dt.timedelta(days=1)).isoformat()
 
     resolved_count = 0
     errors_list = []
@@ -614,9 +630,16 @@ def auto_resolve_bet_results(date_str=None):
         for p in _all_nba_players
     }
 
-    # Season string for PlayerGameLog (current season)
-    current_year = _dt.date.today().year
-    current_month = _dt.date.today().month
+    # Season string for PlayerGameLog (current season).
+    # Use ET-anchored date for season calculation to stay consistent.
+    try:
+        from zoneinfo import ZoneInfo
+        _eastern_tz = ZoneInfo("America/New_York")
+    except ImportError:
+        _eastern_tz = _dt.timezone(_dt.timedelta(hours=-5))
+    _today_et = _dt.datetime.now(_eastern_tz).date()
+    current_year = _today_et.year
+    current_month = _today_et.month
     season_year = current_year if current_month >= 10 else current_year - 1
     season_str = f"{season_year}-{str(season_year + 1)[-2:]}"
 
@@ -1766,7 +1789,13 @@ def save_top_picks_from_analysis(analysis_results):
     MIN_PROBABILITY = 0.60
 
     import datetime as _dt
-    today_str = _dt.datetime.now().strftime("%Y-%m-%d")
+    # Anchor to US/Eastern — NBA game dates are defined in ET.
+    try:
+        from zoneinfo import ZoneInfo
+        _eastern = ZoneInfo("America/New_York")
+    except ImportError:
+        _eastern = _dt.timezone(_dt.timedelta(hours=-5))
+    today_str = _dt.datetime.now(_eastern).strftime("%Y-%m-%d")
 
     existing_bets = load_all_bets(limit=500)
     existing_keys = set()

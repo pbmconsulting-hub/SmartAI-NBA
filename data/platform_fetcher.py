@@ -228,13 +228,22 @@ def _fetch_with_retry(url, headers=None, params=None, timeout=None):
 # ============================================================
 
 def _today_str():
-    """Return today's date as an ISO string ('YYYY-MM-DD')."""
-    return datetime.date.today().isoformat()
+    """Return today's date as an ISO string ('YYYY-MM-DD'), anchored to US/Eastern.
+
+    NBA prop markets are defined in Eastern Time — a server in UTC would
+    shift the date boundary, potentially mis-matching props to the wrong day.
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        _eastern = ZoneInfo("America/New_York")
+    except ImportError:
+        _eastern = datetime.timezone(datetime.timedelta(hours=-5))
+    return datetime.datetime.now(_eastern).date().isoformat()
 
 
 def _now_str():
-    """Return the current datetime as an ISO string."""
-    return datetime.datetime.now().isoformat(timespec="seconds")
+    """Return the current UTC datetime as an ISO string."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
 
 # ============================================================
