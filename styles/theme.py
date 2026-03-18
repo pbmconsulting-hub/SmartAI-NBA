@@ -262,6 +262,25 @@ def get_global_css():
     0%   { background-position: -200% center; }
     100% { background-position: 200% center; }
 }
+/* ── "The Pulse" — live-indicator glow dot ─────────────────── */
+@keyframes thePulse {
+    0%, 100% { box-shadow: 0 0 4px 1px rgba(0,255,157,0.60); opacity: 1; }
+    50%      { box-shadow: 0 0 12px 4px rgba(0,255,157,0.90); opacity: 0.7; }
+}
+/* ── State-aware fade-in-up: plays once, no thrash on rerun ── */
+@keyframes ssFadeInUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PILLAR 1 — Streamlit Chrome Obliteration
+   ═══════════════════════════════════════════════════════════ */
+#MainMenu { visibility: hidden !important; }
+header[data-testid="stHeader"] { display: none !important; }
+footer { display: none !important; }
+.stDeployButton { display: none !important; }
+.block-container { padding-top: 1rem !important; }
 
 /* ─── Base / Body ─────────────────────────────────────────── */
 html, body, [class*="css"] {
@@ -283,6 +302,15 @@ html, body, [class*="css"] {
     background: radial-gradient(ellipse at 30% 10%, rgba(0,240,255,0.03) 0%, transparent 45%),
                 radial-gradient(ellipse at 70% 90%, rgba(200,0,255,0.025) 0%, transparent 50%),
                 radial-gradient(ellipse at center, #0a0e18 0%, #070A13 100%);
+}
+
+/* All JetBrains Mono / monospace text gets tabular-nums for alignment */
+[style*="JetBrains"], .stat-readout, .prob-value, .edge-badge,
+.dist-p10, .dist-p50, .dist-p90, .dist-label,
+.summary-value, .status-card-value, .nba-stat-number,
+.verdict-confidence, .hero-subtext, .hero-date,
+code, pre, .monospace {
+    font-variant-numeric: tabular-nums !important;
 }
 
 /* Streamlit text defaults on dark background */
@@ -350,7 +378,7 @@ h1, h2, h3, h4, h5, h6 {
     box-sizing: border-box;
     text-align: center;
     font-size: 0.68rem;
-    font-family: 'JetBrains Mono', 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-weight: 700;
     color: rgba(0,240,255,0.70) !important;
     letter-spacing: 0.08em;
@@ -361,24 +389,70 @@ h1, h2, h3, h4, h5, h6 {
 /* ─── Streamlit native elements on dark bg ───────────────── */
 /* Metric glassmorphic card treatment */
 [data-testid="stMetric"] {
-    background: rgba(13,18,32,0.55);
-    border: 1px solid rgba(0,240,255,0.12);
+    background: rgba(15,23,42,0.55);
+    border: 1px solid rgba(255,255,255,0.05);
     border-radius: 14px;
     padding: 18px 20px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 0 20px rgba(0,240,255,0.05), 0 4px 20px rgba(0,0,0,0.35);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 20px rgba(0,240,255,0.04), 0 4px 20px rgba(0,0,0,0.30);
     transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
 }
 [data-testid="stMetric"]:hover {
-    border-color: rgba(0,240,255,0.28);
-    box-shadow: 0 0 28px rgba(0,240,255,0.12), 0 6px 24px rgba(0,0,0,0.45);
+    border-color: rgba(0,240,255,0.20);
+    box-shadow: 0 0 28px rgba(0,240,255,0.10), 0 6px 24px rgba(0,0,0,0.40);
     transform: translateY(-3px);
 }
-[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; font-size: 1.4rem !important; font-family: 'JetBrains Mono', 'Courier New', monospace !important; }
-[data-testid="stMetricLabel"] { color: #8a9bb8 !important; font-size: 0.85rem !important; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Inter', sans-serif !important; }
-[data-testid="stMetricDelta"] { font-family: 'JetBrains Mono', monospace !important; }
-.stAlert { background: rgba(13,18,32,0.85) !important; border-radius: 10px !important; border: 1px solid rgba(0,240,255,0.15) !important; color: #e0eeff !important; font-size: 1rem !important; padding: 14px 18px !important; }
+[data-testid="stMetricValue"] { color: rgba(255,255,255,0.95) !important; font-size: 1.4rem !important; font-family: 'JetBrains Mono', 'Courier New', monospace !important; font-variant-numeric: tabular-nums !important; }
+[data-testid="stMetricLabel"] { color: #94A3B8 !important; font-size: 0.82rem !important; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'Inter', sans-serif !important; }
+[data-testid="stMetricDelta"] { font-family: 'JetBrains Mono', monospace !important; font-variant-numeric: tabular-nums !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   PILLAR 2 — Terminal-Style Alert Overrides
+   ═══════════════════════════════════════════════════════════ */
+.stAlert { background: rgba(15,23,42,0.90) !important; border-radius: 8px !important; border: none !important; color: #e0eeff !important; font-size: 0.95rem !important; padding: 14px 18px !important; backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; }
+/* st.error → red neon left-border */
+[data-testid="stAlert"][data-baseweb*="negative"],
+div[data-testid="stNotification"][data-type="error"],
+.stAlert .st-emotion-cache-1gulkj5 {
+    border-left: 3px solid #ef4444 !important;
+    background: rgba(239,68,68,0.06) !important;
+}
+/* st.warning → amber neon left-border */
+[data-testid="stAlert"][data-baseweb*="warning"],
+div[data-testid="stNotification"][data-type="warning"] {
+    border-left: 3px solid #f59e0b !important;
+    background: rgba(245,158,11,0.06) !important;
+}
+/* st.success → green neon left-border */
+[data-testid="stAlert"][data-baseweb*="positive"],
+div[data-testid="stNotification"][data-type="success"] {
+    border-left: 3px solid #00ff9d !important;
+    background: rgba(0,255,157,0.05) !important;
+}
+/* st.info → cyan neon left-border */
+[data-testid="stAlert"][data-baseweb*="informational"],
+div[data-testid="stNotification"][data-type="info"] {
+    border-left: 3px solid #00f0ff !important;
+    background: rgba(0,240,255,0.05) !important;
+}
+
+/* "The Pulse" — animated live-indicator dot */
+.the-pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #00ff9d;
+    animation: thePulse 1.8s ease-in-out infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+    flex-shrink: 0;
+}
+/* State-aware fade: only plays once, no thrash on Streamlit reruns */
+.ss-fade-in-up {
+    animation: ssFadeInUp 0.4s ease both;
+}
 .stExpander { background: rgba(13,18,32,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
 .stExpander summary, .stExpander [data-testid="stExpanderToggleIcon"] + span { color: #e0eeff !important; font-size: 1rem !important; font-weight: 600 !important; }
 button[kind="primary"] {
@@ -389,19 +463,19 @@ button[kind="primary"] {
     font-weight: 700 !important;
     letter-spacing: 0.04em !important;
     box-shadow: 0 0 16px rgba(0,255,213,0.30) !important;
-    transition: transform 0.2s ease, box-shadow 0.25s ease !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
 }
 button[kind="primary"]:hover {
-    transform: scale(1.03) !important;
-    box-shadow: 0 0 28px rgba(0,255,213,0.50), 0 4px 16px rgba(0,0,0,0.4) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 0 28px rgba(0,255,213,0.50), 0 6px 20px rgba(0,0,0,0.4) !important;
 }
-/* Secondary / default buttons */
+/* Secondary / default buttons — tactile hover */
 .stButton > button {
-    transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
 .stButton > button:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 4px 16px rgba(0,240,255,0.15) !important;
+    box-shadow: 0 4px 20px rgba(0,240,255,0.15) !important;
 }
 /* Tab labels */
 [data-testid="stTab"] button {
@@ -423,19 +497,26 @@ button[kind="primary"]:hover {
     font-size: 0.92rem !important;
     color: #e0eeff !important;
     font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    font-variant-numeric: tabular-nums !important;
     border-color: rgba(0,240,255,0.06) !important;
+    transition: border-color 0.15s ease !important;
 }
 [data-testid="stDataFrame"] th {
-    font-size: 0.78rem !important;
-    color: #8a9bb8 !important;
+    font-size: 0.75rem !important;
+    color: #94A3B8 !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.10em !important;
+    letter-spacing: 1px !important;
     font-family: 'Inter', sans-serif !important;
     font-weight: 700 !important;
     background: rgba(7,10,19,0.90) !important;
     border-color: rgba(0,240,255,0.08) !important;
 }
-.stDataFrame, .stTable { background: rgba(13,18,32,0.85) !important; color: #e0eeff !important; }
+/* Row hover glow — subtle neon-cyan bottom border guides the eye */
+[data-testid="stDataFrame"] tr:hover td {
+    border-bottom-color: rgba(0,240,255,0.30) !important;
+    background: rgba(0,240,255,0.03) !important;
+}
+.stDataFrame, .stTable { background: rgba(15,23,42,0.85) !important; color: #e0eeff !important; }
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {
@@ -507,7 +588,7 @@ button[kind="primary"]:hover {
     font-size: 0.88rem;
     color: rgba(192,208,232,0.80);
     margin-top: 6px;
-    font-family: 'JetBrains Mono', 'JetBrains Mono', 'Courier New', monospace;
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     letter-spacing: 0.06em;
 }
 .circuit-dot {
