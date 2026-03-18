@@ -31,6 +31,13 @@ MAX_MATCHUP_ADJUSTMENT = 0.20   # 20% max up or down
 MATCHUP_HISTORY_WEIGHT = 0.60   # 60% of the adjustment from matchup history
 SEASON_AVG_WEIGHT = 0.40        # 40% from season average (regression to mean)
 
+# Scale factor for ratio-based favorability score.
+# Maps avg_vs_team / season_average ratio to 0-100 scale:
+#   ratio = 1.0  → raw_score = 50 (neutral)
+#   ratio = 1.2  → raw_score = 80 (+20% above avg → strongly favourable)
+#   ratio = 0.8  → raw_score = 20 (-20% below avg → strongly unfavourable)
+FAVORABILITY_RATIO_SCALE = 150.0
+
 # ============================================================
 # END SECTION: Module-Level Constants
 # ============================================================
@@ -123,7 +130,7 @@ def _std_dev(values):
 # SECTION: Matchup History Analysis
 # ============================================================
 
-def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs):
+def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs, season_average=None):
     """
     Filter a player's game logs to games vs a specific opponent and compute
     matchup stats for the requested stat type.
@@ -205,27 +212,31 @@ def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs)
 
     # ── Matchup favorability score (0-100) ───────────────────────────────
     # 50 = neutral. Higher = player tends to outperform vs this team.
-    # Score is driven by how consistent the outperformance is relative to
-    # the standard deviation across those games. We avoid leaking the
-    # season average here (it is not always available), so we use an
-    # internal normalisation: z-score the mean against std, then map to
-    # [0, 100] with a logistic-ish transform.
-    if std_vs_team > 0:
-        # Coefficient of variation acts as a rough stability proxy
-        cv = std_vs_team / avg_vs_team if avg_vs_team != 0 else 1.0
-        # Lower CV = more consistent = higher score
-        stability = max(0.0, 1.0 - cv)
-    else:
-        stability = 1.0
+    # Score is driven by the ratio of avg_vs_team / season_average when
+    # the season average is provided, otherwise falls back to the
+    # coefficient-of-variation stability approach.
 
     # Sample-size confidence: asymptotes toward 1.0 with more games
     sample_confidence = 1.0 - (1.0 / (1.0 + (games_found - MIN_GAMES_FOR_MATCHUP) * 0.3))
 
-    # Blend into a 0-100 score centred at 50 (neutral)
-    # Above-average performance nudges toward 100; we simply report the
-    # combination of stability and sample confidence as a quality signal.
-    matchup_favorability_score = round(50.0 + stability * sample_confidence * 25.0, 1)
-    matchup_favorability_score = max(0.0, min(100.0, matchup_favorability_score))
+    # Matchup favorability driven by avg_vs_team / season_average ratio
+    if season_average and season_average > 0 and avg_vs_team is not None:
+        ratio = avg_vs_team / season_average
+        # Map ratio to 0-100 scale using FAVORABILITY_RATIO_SCALE:
+        #   ratio=1.0 → 50 (neutral), ratio=1.2 → 80+, ratio=0.8 → 20-
+        raw_score = 50.0 + (ratio - 1.0) * FAVORABILITY_RATIO_SCALE
+        # Regress toward 50 when sample size is small
+        matchup_favorability_score = round(50.0 + (raw_score - 50.0) * sample_confidence, 1)
+        matchup_favorability_score = max(0.0, min(100.0, matchup_favorability_score))
+    else:
+        # No season average provided — fall back to old stability-based approach
+        if std_vs_team > 0:
+            cv = std_vs_team / avg_vs_team if avg_vs_team != 0 else 1.0
+            stability = max(0.0, 1.0 - cv)
+        else:
+            stability = 1.0
+        matchup_favorability_score = round(50.0 + stability * sample_confidence * 25.0, 1)
+        matchup_favorability_score = max(0.0, min(100.0, matchup_favorability_score))
 
     return {
         "player_name":               player_name,
@@ -282,7 +293,7 @@ def calculate_matchup_adjustment(
         return 1.0
 
     history = get_player_vs_team_history(
-        player_name, opponent_team, stat_type, game_logs
+        player_name, opponent_team, stat_type, game_logs, season_average=season_average
     )
 
     # Cold start or no usable stat values → neutral

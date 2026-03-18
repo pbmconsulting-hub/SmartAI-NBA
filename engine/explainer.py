@@ -10,6 +10,8 @@
 # Standard library only
 import math
 
+from engine.math_helpers import calculate_platform_edge_percentage
+
 
 # ============================================================
 # SECTION: Narrative Templates
@@ -561,7 +563,7 @@ def generate_pick_explanation(
     recent_form_ratio = projection_result.get("recent_form_ratio")
 
     # ── Calculate edge ───────────────────────────────────────
-    edge = prob_pct - 50.0
+    edge = calculate_platform_edge_percentage(prob_over, platform)
 
     # ── Calculate stat std dev ───────────────────────────────
     stat_std = float(player_data.get(f"{stat_type}_std", season_avg * 0.35) or season_avg * 0.35)

@@ -452,9 +452,8 @@ def build_player_projection(
                 if not vals:
                     return season_val
                 decay_avg = calculate_recency_weighted_average(vals)
-                streak_mult = detect_streak(vals, decay_avg)
                 blended = RECENCY_WEIGHT * decay_avg + SEASON_WEIGHT_HI * season_val
-                return blended * streak_mult
+                return blended
 
             # Use decay-weighted points to compute recent-form ratio
             pts_vals = _extract_vals(recent_form_games, form_key_map["points"])
@@ -584,8 +583,8 @@ def build_player_projection(
         altitude_pace_boost = 0.02          # +2% pace boost for all players
         notes.append("⛰️ Denver altitude game — visiting team fatigue penalty applied")
     elif player_team_raw in _ALTITUDE_TEAMS and is_home_game:
-        # Nuggets at home in Denver → home pace boost (no fatigue for home team)
-        altitude_pace_boost = 0.015   # +1.5% pace boost for home team at altitude
+        # Nuggets at home in Denver → same pace boost as visiting team
+        altitude_pace_boost = 0.02   # +2% pace boost (unified for BOTH teams)
     elif opponent_team_abbreviation.upper().strip() in _ALTITUDE_TEAMS and is_home_game:
         # Nuggets visiting (away game at Denver) — handled by visiting team case above
         pass
@@ -704,6 +703,16 @@ def build_player_projection(
     # Retrieve stat-specific home/away adjustment factors
     _home_factor_map = _HOME_FACTORS if is_home_game else _AWAY_FACTORS
 
+    # Build per-stat defense factors using stat-specific defensive columns
+    # (e.g., vs_PG_reb for rebounds, vs_PG_ast for assists).
+    # Falls back to 1.0 (neutral) when the specific column is not available.
+    _stat_defense_factors = {
+        stat: _get_stat_defense_adjustment_factor(
+            opponent_team_abbreviation, player_position, stat, defensive_ratings_data
+        )
+        for stat in ("points", "rebounds", "assists", "threes", "steals", "blocks")
+    }
+
     # Combine all factors into one multiplier for offensive stats
     # W8/C1: minutes_adjustment_factor boosts projections when a key
     # teammate is OUT (more usage) or applies a slight discount when
@@ -711,8 +720,9 @@ def build_player_projection(
     def _off_mult(stat_name):
         """Build a stat-specific offensive multiplier using the per-stat home/away factor."""
         ha = _home_factor_map.get(stat_name, home_away_factor)
+        stat_def = _stat_defense_factors.get(stat_name, defense_factor)
         return (
-            defense_factor
+            stat_def
             * pace_factor
             * game_total_factor
             * (1.0 + ha)
@@ -730,12 +740,12 @@ def build_player_projection(
     _def_ha_steals = _home_factor_map.get("steals", home_away_factor * 0.2)
     _def_ha_blocks = _home_factor_map.get("blocks", home_away_factor * 0.2)
     projected_steals = season_steals_average * (
-        pace_factor * defense_factor * rest_factor
+        pace_factor * _stat_defense_factors.get("steals", defense_factor) * rest_factor
         * (1.0 + _def_ha_steals)
         * minutes_adjustment_factor
     )
     projected_blocks = season_blocks_average * (
-        pace_factor * defense_factor * rest_factor
+        pace_factor * _stat_defense_factors.get("blocks", defense_factor) * rest_factor
         * (1.0 + _def_ha_blocks)
         * minutes_adjustment_factor
     )
@@ -813,6 +823,62 @@ def _get_defense_adjustment_factor(
             return float(factor_value)
 
     # If opponent not found, return 1.0 (neutral)
+    return 1.0
+
+
+def _get_stat_defense_adjustment_factor(
+    opponent_team_abbreviation,
+    player_position,
+    stat_type,
+    defensive_ratings_data,
+):
+    """
+    Look up how well the opponent defends this player's position for a SPECIFIC stat.
+
+    Uses per-stat defensive columns (e.g., vs_PG_reb for a PG's rebounds,
+    vs_PG_ast for assists) rather than the single vs_{pos}_pts column used by
+    _get_defense_adjustment_factor.  Falls back to 1.0 (neutral) — NOT the
+    points multiplier — when the stat-specific column is absent.
+
+    Args:
+        opponent_team_abbreviation (str): 3-letter team code
+        player_position (str): PG, SG, SF, PF, or C
+        stat_type (str): Stat name — 'points', 'rebounds', 'assists', 'threes',
+                         'steals', or 'blocks'
+        defensive_ratings_data (list of dict): Defensive rating rows
+
+    Returns:
+        float: Adjustment multiplier (1.0 = neutral)
+    """
+    # Map internal stat names to defensive CSV column suffixes
+    _STAT_COL_MAP = {
+        "points":   "pts",
+        "rebounds": "reb",
+        "assists":  "ast",
+        "steals":   "stl",
+        "blocks":   "blk",
+    }
+    # Note: 'threes' has no per-stat defensive column in the CSV, so it falls
+    # through to the 1.0 neutral return below (no cross-contamination with pts).
+
+    col_suffix = _STAT_COL_MAP.get(stat_type)
+    if col_suffix is None:
+        return 1.0  # Unknown stat — neutral
+
+    column_name = f"vs_{player_position}_{col_suffix}"
+
+    for team_row in defensive_ratings_data:
+        if team_row.get("abbreviation", "") == opponent_team_abbreviation:
+            raw = team_row.get(column_name)
+            if raw is None:
+                # Stat-specific column not present → neutral (do NOT use pts column)
+                return 1.0
+            try:
+                return float(raw)
+            except (TypeError, ValueError):
+                return 1.0
+
+    # Opponent not found → neutral
     return 1.0
 
 
