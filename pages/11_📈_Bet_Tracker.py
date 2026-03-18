@@ -923,19 +923,32 @@ with tab_all_picks:
     # ── Historical picks from DB (persistent) ────────────────────────
     db_all_picks = load_all_analysis_picks(days=30)
 
-    # Prefer DB picks for historical view; session picks for live view
-    ap_source_radio = st.radio(
-        "Show:",
-        ["Today's Analysis (live session)", "30-Day History (database)"],
-        horizontal=True,
-        key="ap_source_radio",
-    )
-    if ap_source_radio == "Today's Analysis (live session)":
-        all_picks_data = session_picks
-        _date_field = None  # session picks don't have a date field
-    else:
-        all_picks_data = db_all_picks
-        _date_field = "pick_date"
+    # ── Build combined dataset for aggregate metrics ───────────────────
+    # Deduplicate by (player_name, stat_type, prop_line, direction, pick_date)
+    _seen_keys: set = set()
+    _combined_picks: list = []
+    for _cp in db_all_picks:
+        _key = (
+            _cp.get("player_name", ""),
+            _cp.get("stat_type", ""),
+            str(_cp.get("prop_line") or _cp.get("line", "")),
+            _cp.get("direction", ""),
+            _cp.get("pick_date", ""),
+        )
+        if _key not in _seen_keys:
+            _seen_keys.add(_key)
+            _combined_picks.append(_cp)
+    for _cp in session_picks:
+        _key = (
+            _cp.get("player_name", ""),
+            _cp.get("stat_type", ""),
+            str(_cp.get("prop_line") or _cp.get("line", "")),
+            _cp.get("direction", ""),
+            _cp.get("pick_date", ""),
+        )
+        if _key not in _seen_keys:
+            _seen_keys.add(_key)
+            _combined_picks.append(_cp)
 
     # ── Tier Filter & Bet Classification Filter ───────────────────────────
     _ap_filter_col1, _ap_filter_col2 = st.columns(2)
@@ -955,6 +968,9 @@ with tab_all_picks:
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
         )
+
+    # Apply filters to the combined dataset used for aggregate metrics
+    all_picks_data = list(_combined_picks)
     if _ap_tier_filter:
         _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
@@ -995,7 +1011,7 @@ with tab_all_picks:
         _ap_streak = 0
         _ap_resolved_sorted = sorted(
             [p for p in all_picks_data if p.get("result") in ("WIN", "LOSS")],
-            key=lambda p: p.get(_date_field or "pick_date", "") if _date_field else "",
+            key=lambda p: p.get("pick_date", ""),
             reverse=True,
         )
         if _ap_resolved_sorted:
@@ -1253,7 +1269,7 @@ with tab_all_picks:
                             "Line":      _gpick.get("line") or _gpick.get("prop_line", ""),
                             "Direction": _gpick.get("direction", ""),
                             "Result":    "✅ Win" if _gr == "WIN" else ("❌ Loss" if _gr == "LOSS" else ("🔄 Push" if _gr == "PUSH" else "⏳ Pending")),
-                            "Date":      _gpick.get(_date_field or "pick_date", ""),
+                            "Date":      _gpick.get("pick_date", ""),
                         })
                     st.markdown(
                         get_styled_stats_table_html(
@@ -1288,7 +1304,7 @@ with tab_all_picks:
                             "Line":      _dpick.get("line") or _dpick.get("prop_line", ""),
                             "Direction": _dpick.get("direction", ""),
                             "Result":    "✅ Win" if _dr == "WIN" else ("❌ Loss" if _dr == "LOSS" else ("🔄 Push" if _dr == "PUSH" else "⏳ Pending")),
-                            "Date":      _dpick.get(_date_field or "pick_date", ""),
+                            "Date":      _dpick.get("pick_date", ""),
                         })
                     st.markdown(
                         get_styled_stats_table_html(
@@ -1307,41 +1323,67 @@ with tab_all_picks:
 
         st.divider()
 
+        # ── Source toggle (controls per-day detail section only) ──────
+        ap_source_radio = st.radio(
+            "Show detailed picks:",
+            ["30-Day History (database)", "Today's Analysis (live session)"],
+            horizontal=True,
+            key="ap_source_radio",
+        )
+
         # ── Per-day sections ──────────────────────────────────────────
-        if _date_field:
+        if ap_source_radio == "30-Day History (database)":
             # Group DB picks by date
-            _by_date_ap: dict = {}
-            for _p in all_picks_data:
-                _d = _p.get(_date_field, "Unknown")
-                _by_date_ap.setdefault(_d, []).append(_p)
-            for _ap_date in sorted(_by_date_ap.keys(), reverse=True):
-                _day_data = _by_date_ap[_ap_date]
-                _d_w = sum(1 for p in _day_data if p.get("result") == "WIN")
-                _d_l = sum(1 for p in _day_data if p.get("result") == "LOSS")
-                _d_res = _d_w + _d_l
-                _d_wr = f" — {_d_w / max(_d_res,1)*100:.0f}% win rate" if _d_res > 0 else ""
-                with st.expander(
-                    f"📅 {_ap_date} · {len(_day_data)} picks · ✅{_d_w} ❌{_d_l}{_d_wr}"
-                ):
-                    _ca, _cb = st.columns(2)
-                    for _idx, _pick in enumerate(_day_data):
-                        # Remap pick_date → bet_date so get_bet_card_html renders date correctly
-                        _pick_card = dict(_pick)
-                        if "bet_date" not in _pick_card:
-                            _pick_card["bet_date"] = _pick_card.get("pick_date", "")
-                        _col = _ca if _idx % 2 == 0 else _cb
-                        with _col:
-                            st.markdown(
-                                get_bet_card_html(_pick_card),
-                                unsafe_allow_html=True,
-                            )
+            _detail_picks = db_all_picks
+            if _ap_tier_filter:
+                _detail_picks = [p for p in _detail_picks if p.get("tier") in _ap_tier_names]
+            if _ap_bet_type_filter:
+                _detail_picks = [p for p in _detail_picks if p.get("bet_type", "normal") in _ap_bt_values]
+            if _detail_picks:
+                _by_date_ap: dict = {}
+                for _p in _detail_picks:
+                    _d = _p.get("pick_date", "Unknown")
+                    _by_date_ap.setdefault(_d, []).append(_p)
+                for _ap_date in sorted(_by_date_ap.keys(), reverse=True):
+                    _day_data = _by_date_ap[_ap_date]
+                    _d_w = sum(1 for p in _day_data if p.get("result") == "WIN")
+                    _d_l = sum(1 for p in _day_data if p.get("result") == "LOSS")
+                    _d_res = _d_w + _d_l
+                    _d_wr = f" — {_d_w / max(_d_res,1)*100:.0f}% win rate" if _d_res > 0 else ""
+                    with st.expander(
+                        f"📅 {_ap_date} · {len(_day_data)} picks · ✅{_d_w} ❌{_d_l}{_d_wr}"
+                    ):
+                        _ca, _cb = st.columns(2)
+                        for _idx, _pick in enumerate(_day_data):
+                            # Remap pick_date → bet_date so get_bet_card_html renders date correctly
+                            _pick_card = dict(_pick)
+                            if "bet_date" not in _pick_card:
+                                _pick_card["bet_date"] = _pick_card.get("pick_date", "")
+                            _col = _ca if _idx % 2 == 0 else _cb
+                            with _col:
+                                st.markdown(
+                                    get_bet_card_html(_pick_card),
+                                    unsafe_allow_html=True,
+                                )
+            else:
+                st.info("📭 No database picks found for this time range.")
         else:
             # Session picks: show all in two-column grid
-            _col_a, _col_b = st.columns(2)
-            for _idx, _pick in enumerate(all_picks_data):
-                _col = _col_a if _idx % 2 == 0 else _col_b
-                with _col:
-                    st.markdown(get_bet_card_html(_pick), unsafe_allow_html=True)
+            _session_detail = list(session_picks)
+            if _ap_tier_filter:
+                _session_detail = [p for p in _session_detail if p.get("tier") in _ap_tier_names]
+            if _ap_bet_type_filter:
+                _session_detail = [p for p in _session_detail if p.get("bet_type", "normal") in _ap_bt_values]
+            if _session_detail:
+                _col_a, _col_b = st.columns(2)
+                for _idx, _pick in enumerate(_session_detail):
+                    _col = _col_a if _idx % 2 == 0 else _col_b
+                    with _col:
+                        st.markdown(get_bet_card_html(_pick), unsafe_allow_html=True)
+            else:
+                st.info(
+                    "📭 No live session picks to display. Run **Neural Analysis** to generate picks."
+                )
 
 # ============================================================
 # END SECTION: All Picks Tab
