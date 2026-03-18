@@ -4523,6 +4523,40 @@ def get_styled_stats_table_html(rows, columns, title=""):
         "bronze":   "🥉",
     }
 
+    _BET_TYPE_ICON = {
+        "goblin": get_logo_img_tag(GOBLIN_LOGO_PATH, width=16, alt="Goblin"),
+        "demon":  get_logo_img_tag(DEMON_LOGO_PATH, width=16, alt="Demon"),
+        "50_50":  "⚖️",
+        "normal": "",
+    }
+
+    def _apply_icon(icon, text):
+        """Prepend icon to text.  Returns (html_string, is_html).
+
+        When *icon* is a trusted ``<img>`` tag, the text portion is
+        HTML-escaped and the combined value is returned with ``is_html=True``
+        so the caller can skip a second escape pass.  Plain-text icons are
+        simply concatenated without marking the result as HTML.
+        """
+        if not icon:
+            return text, False
+        if "<img" in icon:
+            return f"{icon} {_h.escape(text)}", True
+        return f"{icon} {text}", False
+
+    def _bet_type_lookup_key(raw_key: str) -> str:
+        """Return the normalised key for _BET_TYPE_ICON lookup.
+
+        Tries an exact lower-case match first; if not found, falls back to the
+        last whitespace-separated word so that upstream-prefixed values such as
+        ``"🟢 Goblin"`` still resolve to ``"goblin"``.
+        """
+        key = raw_key.lower()
+        if key in _BET_TYPE_ICON:
+            return key
+        words = key.split()
+        return words[-1] if words else ""
+
     def _win_rate_color(val_str):
         """Return a CSS color based on a win-rate string like '63.0%'."""
         try:
@@ -4551,11 +4585,17 @@ def get_styled_stats_table_html(rows, columns, title=""):
         for col in columns:
             raw_val = row.get(col, "")
             display_val = str(raw_val)
+            is_html = False
 
-            # Tier column — add emoji prefix
+            # Tier column — add emoji/icon prefix
             if col.lower() == "tier":
-                emoji = _TIER_EMOJI.get(display_val.lower(), "")
-                display_val = f"{emoji} {display_val}" if emoji else display_val
+                icon = _TIER_EMOJI.get(display_val.lower(), "")
+                display_val, is_html = _apply_icon(icon, display_val)
+                cell_color = "#e8f0ff"
+            # Bet Type column — add logo icon prefix
+            elif col.lower() == "bet type":
+                icon = _BET_TYPE_ICON.get(_bet_type_lookup_key(display_val), "")
+                display_val, is_html = _apply_icon(icon, display_val)
                 cell_color = "#e8f0ff"
             elif "win rate" in col.lower() or "win%" in col.lower():
                 cell_color = _win_rate_color(display_val)
@@ -4566,11 +4606,12 @@ def get_styled_stats_table_html(rows, columns, title=""):
             else:
                 cell_color = "rgba(255,255,255,0.85)"
 
+            cell_content = display_val if is_html else _h.escape(display_val)
             cells.append(
                 f'<td style="padding:7px 14px;color:{cell_color};'
                 f'font-family:Montserrat,sans-serif;font-size:0.88rem;'
                 f'border-bottom:1px solid rgba(255,255,255,0.05);">'
-                f'{_h.escape(display_val)}</td>'
+                f'{cell_content}</td>'
             )
         body_rows.append(
             f'<tr style="background:{row_bg};">{"".join(cells)}</tr>'
