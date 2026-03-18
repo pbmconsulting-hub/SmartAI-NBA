@@ -1082,16 +1082,55 @@ with tab_all_picks:
                     ),
                     unsafe_allow_html=True,
                 )
-                _tier_spot_cols = st.columns(len(_tier_rows))
+                _tier_spot_cols = st.columns(4)
                 _tier_icons = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
-                for _ti, _tr in enumerate(_tier_rows):
-                    _tier_spot_cols[_ti].metric(
-                        f"{_tier_icons.get(_tr['Tier'], '')} {_tr['Tier']}",
-                        _tr["Win Rate"],
-                        help=f"{_tr['Wins']}W / {_tr['Losses']}L ({_tr['Total']} picks)",
-                    )
+                for _ti, _tn in enumerate(["Platinum", "Gold", "Silver", "Bronze"]):
+                    _tr = next((r for r in _tier_rows if r["Tier"] == _tn), None)
+                    if _tr:
+                        _tier_spot_cols[_ti].metric(
+                            f"{_tier_icons.get(_tn, '')} {_tn}",
+                            _tr["Win Rate"],
+                            help=f"{_tn}: {_tr['Wins']}W / {_tr['Losses']}L ({_tr['Total']} total picks)",
+                        )
             else:
                 st.caption("No tier data yet.")
+
+        # ── Win Rate by Platform ──────────────────────────────────────
+        _ap_plat_data: dict = {}
+        for _p in all_picks_data:
+            _plat = str(_p.get("platform") or "Unknown")
+            _res  = _p.get("result")
+            if _plat not in _ap_plat_data:
+                _ap_plat_data[_plat] = {"wins": 0, "losses": 0, "total": 0}
+            _ap_plat_data[_plat]["total"] += 1
+            if _res == "WIN":
+                _ap_plat_data[_plat]["wins"] += 1
+            elif _res == "LOSS":
+                _ap_plat_data[_plat]["losses"] += 1
+        if _ap_plat_data:
+            with st.expander("🎰 Win Rate by Platform", expanded=True):
+                _plat_rows = [
+                    {
+                        "Platform": _plat,
+                        "Total":    d["total"],
+                        "Wins":     d["wins"],
+                        "Win Rate": (
+                            f"{d['wins'] / max(d['wins'] + d['losses'], 1) * 100:.1f}%"
+                            if d["wins"] + d["losses"] > 0 else "—"
+                        ),
+                    }
+                    for _plat, d in sorted(_ap_plat_data.items())
+                ]
+                st.markdown(
+                    get_styled_stats_table_html(
+                        _plat_rows,
+                        ["Platform", "Total", "Wins", "Win Rate"],
+                    ),
+                    unsafe_allow_html=True,
+                )
+        else:
+            with st.expander("🎰 Win Rate by Platform", expanded=True):
+                st.caption("No platform data yet.")
 
         # ── Win Rate by Stat Type ──────────────────────────────────────
         with st.expander("📐 Win Rate by Stat Type", expanded=False):
@@ -1099,20 +1138,18 @@ with tab_all_picks:
             for _stype in sorted({p.get("stat_type", "unknown") for p in all_picks_data}):
                 _s_picks = [p for p in all_picks_data if p.get("stat_type") == _stype]
                 _s_w = sum(1 for p in _s_picks if p.get("result") == "WIN")
-                _s_l = sum(1 for p in _s_picks if p.get("result") == "LOSS")
-                _s_res = _s_w + _s_l
+                _s_res = sum(1 for p in _s_picks if p.get("result") in ("WIN", "LOSS"))
                 _stat_rows.append({
                     "Stat Type": _stype.replace("_", " ").title(),
                     "Total": len(_s_picks),
                     "Wins": _s_w,
-                    "Losses": _s_l,
                     "Win Rate": f"{_s_w / max(_s_res, 1) * 100:.1f}%" if _s_res > 0 else "—",
                 })
             if _stat_rows:
                 st.markdown(
                     get_styled_stats_table_html(
                         _stat_rows,
-                        ["Stat Type", "Total", "Wins", "Losses", "Win Rate"],
+                        ["Stat Type", "Total", "Wins", "Win Rate"],
                     ),
                     unsafe_allow_html=True,
                 )
@@ -1160,94 +1197,113 @@ with tab_all_picks:
                     unsafe_allow_html=True,
                 )
                 _ap_bt_metric_cols = st.columns(3)
-                for _bti, _btkey in enumerate(["goblin", "demon", "50_50"]):
-                    _btd = _ap_bt_data.get(_btkey, {})
-                    if _btd.get("total", 0) > 0:
-                        _bt_wr = round(
-                            _btd["wins"] / max(_btd["wins"] + _btd["losses"], 1) * 100, 1
-                        )
-                        _bt_label = {
-                            "goblin": "🟢 Goblin Win Rate",
-                            "demon":  "🔥 Demon Win Rate",
-                            "50_50":  "⚖️ 50/50 Win Rate",
-                        }[_btkey]
-                        _ap_bt_metric_cols[_bti].metric(
-                            _bt_label,
-                            f"{_bt_wr:.1f}%",
-                            help=f"Based on {_btd['total']} {_btkey} picks",
-                        )
-
-        # ── Win Rate by Platform ──────────────────────────────────────
-        _ap_plat_data: dict = {}
-        for _p in all_picks_data:
-            _plat = str(_p.get("platform") or "Unknown")
-            _res  = _p.get("result")
-            if _plat not in _ap_plat_data:
-                _ap_plat_data[_plat] = {"wins": 0, "losses": 0, "total": 0}
-            _ap_plat_data[_plat]["total"] += 1
-            if _res == "WIN":
-                _ap_plat_data[_plat]["wins"] += 1
-            elif _res == "LOSS":
-                _ap_plat_data[_plat]["losses"] += 1
-        if _ap_plat_data:
-            with st.expander("🎰 Win Rate by Platform", expanded=False):
-                _plat_rows = [
-                    {
-                        "Platform": _plat,
-                        "Total":    d["total"],
-                        "Wins":     d["wins"],
-                        "Losses":   d["losses"],
-                        "Win Rate": (
-                            f"{d['wins'] / max(d['wins'] + d['losses'], 1) * 100:.1f}%"
-                            if d["wins"] + d["losses"] > 0 else "—"
-                        ),
-                    }
-                    for _plat, d in sorted(_ap_plat_data.items())
-                ]
-                st.markdown(
-                    get_styled_stats_table_html(
-                        _plat_rows,
-                        ["Platform", "Total", "Wins", "Losses", "Win Rate"],
-                    ),
-                    unsafe_allow_html=True,
-                )
-
-        # ── Bet Type Distribution ─────────────────────────────────────
-        _ap_total_picks = len(all_picks_data)
-        if _ap_total_picks > 0:
-            _ap_dist_data: dict = {}
-            for _p in all_picks_data:
-                _bt = str(_p.get("bet_type") or "normal")
-                _ap_dist_data[_bt] = _ap_dist_data.get(_bt, 0) + 1
-            _ap_bt_dist_display = {
-                "goblin": "🟢 Goblin",
-                "50_50":  "⚖️ 50/50",
-                "demon":  "🔥 Demon",
-                "normal": "Normal",
-            }
-            with st.expander("📊 Bet Type Distribution", expanded=False):
-                _dist_rows = [
-                    {
-                        "Bet Type":   _ap_bt_dist_display.get(_bt, _bt.title()),
-                        "Picks":      cnt,
-                        "% of Total": f"{cnt / _ap_total_picks * 100:.1f}%",
-                    }
-                    for _bt, cnt in sorted(_ap_dist_data.items(), key=lambda x: -x[1])
-                ]
-                st.markdown(
-                    get_styled_stats_table_html(
-                        _dist_rows,
-                        ["Bet Type", "Picks", "% of Total"],
-                    ),
-                    unsafe_allow_html=True,
-                )
-                _dist_cols = st.columns(len(_dist_rows))
-                for _di, _dr in enumerate(_dist_rows):
-                    _dist_cols[_di].metric(
-                        _dr["Bet Type"],
-                        _dr["Picks"],
-                        help=f"{_dr['% of Total']} of all picks",
+                _goblin_d = _ap_bt_data.get("goblin", {})
+                _demon_d  = _ap_bt_data.get("demon", {})
+                _fifty_d  = _ap_bt_data.get("50_50", {})
+                if _goblin_d.get("total", 0) > 0:
+                    _g_wr = round(
+                        _goblin_d["wins"] / max(_goblin_d["wins"] + _goblin_d["losses"], 1) * 100, 1
                     )
+                    _ap_bt_metric_cols[0].metric(
+                        "🟢 Goblin Win Rate",
+                        f"{_g_wr:.1f}%",
+                        help=f"Based on {_goblin_d['total']} logged Goblin bets (alt line below standard O/U)",
+                    )
+                if _demon_d.get("total", 0) > 0:
+                    _d_wr = round(
+                        _demon_d["wins"] / max(_demon_d["wins"] + _demon_d["losses"], 1) * 100, 1
+                    )
+                    _ap_bt_metric_cols[1].metric(
+                        "🔥 Demon Win Rate",
+                        f"{_d_wr:.1f}%",
+                        help=f"Based on {_demon_d['total']} logged Demon bets (alt line above standard O/U)",
+                    )
+                if _fifty_d.get("total", 0) > 0:
+                    _f_wr = round(
+                        _fifty_d["wins"] / max(_fifty_d["wins"] + _fifty_d["losses"], 1) * 100, 1
+                    )
+                    _ap_bt_metric_cols[2].metric(
+                        "⚖️ 50/50 Win Rate",
+                        f"{_f_wr:.1f}%",
+                        help=f"Based on {_fifty_d['total']} logged 50/50 bets (standard O/U line)",
+                    )
+
+            # ── Goblin Bet Results ────────────────────────────────────
+            _ap_goblin_picks = [
+                p for p in all_picks_data if p.get("bet_type") == "goblin"
+            ]
+            if _ap_goblin_picks:
+                _apg_wins    = sum(1 for p in _ap_goblin_picks if p.get("result") == "WIN")
+                _apg_losses  = sum(1 for p in _ap_goblin_picks if p.get("result") == "LOSS")
+                _apg_pending = sum(1 for p in _ap_goblin_picks if not p.get("result"))
+                with st.expander(
+                    f"🧌 Goblin Bet Results — {_apg_wins}W / {_apg_losses}L / {_apg_pending} Pending",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "**Goblin bets** are alternate lines set BELOW the standard O/U — "
+                        "safe floor plays with higher probability."
+                    )
+                    _apg_result_rows = []
+                    for _gpick in _ap_goblin_picks:
+                        _gr = _gpick.get("result") or ""
+                        _apg_result_rows.append({
+                            "Player":    _gpick.get("player_name", ""),
+                            "Stat":      (_gpick.get("stat_type") or "").replace("_", " ").title(),
+                            "Line":      _gpick.get("line") or _gpick.get("prop_line", ""),
+                            "Direction": _gpick.get("direction", ""),
+                            "Result":    "✅ Win" if _gr == "WIN" else ("❌ Loss" if _gr == "LOSS" else ("🔄 Push" if _gr == "PUSH" else "⏳ Pending")),
+                            "Date":      _gpick.get(_date_field or "pick_date", ""),
+                        })
+                    st.markdown(
+                        get_styled_stats_table_html(
+                            _apg_result_rows,
+                            ["Player", "Stat", "Line", "Direction", "Result", "Date"],
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+            # ── Demon Bet Results ─────────────────────────────────────
+            _ap_demon_picks = [
+                p for p in all_picks_data if p.get("bet_type") == "demon"
+            ]
+            if _ap_demon_picks:
+                _apd_wins    = sum(1 for p in _ap_demon_picks if p.get("result") == "WIN")
+                _apd_losses  = sum(1 for p in _ap_demon_picks if p.get("result") == "LOSS")
+                _apd_pending = sum(1 for p in _ap_demon_picks if not p.get("result"))
+                with st.expander(
+                    f"🔥 Demon Bet Results — {_apd_wins}W / {_apd_losses}L / {_apd_pending} Pending",
+                    expanded=False,
+                ):
+                    st.caption(
+                        "**Demon bets** are alternate lines set ABOVE the standard O/U — "
+                        "high ceiling, high reward plays. Lower probability but bigger payout."
+                    )
+                    _apd_result_rows = []
+                    for _dpick in _ap_demon_picks:
+                        _dr = _dpick.get("result") or ""
+                        _apd_result_rows.append({
+                            "Player":    _dpick.get("player_name", ""),
+                            "Stat":      (_dpick.get("stat_type") or "").replace("_", " ").title(),
+                            "Line":      _dpick.get("line") or _dpick.get("prop_line", ""),
+                            "Direction": _dpick.get("direction", ""),
+                            "Result":    "✅ Win" if _dr == "WIN" else ("❌ Loss" if _dr == "LOSS" else ("🔄 Push" if _dr == "PUSH" else "⏳ Pending")),
+                            "Date":      _dpick.get(_date_field or "pick_date", ""),
+                        })
+                    st.markdown(
+                        get_styled_stats_table_html(
+                            _apd_result_rows,
+                            ["Player", "Stat", "Line", "Direction", "Result", "Date"],
+                        ),
+                        unsafe_allow_html=True,
+                    )
+
+        # ── Model Tier Accuracy placeholder ──────────────────────────
+        with st.expander("📊 Model Tier Accuracy", expanded=False):
+            st.info(
+                "Coming soon — this section will compare predicted tier accuracy "
+                "vs actual results over time."
+            )
 
         st.divider()
 

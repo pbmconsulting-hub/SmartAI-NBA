@@ -1633,7 +1633,7 @@ def get_tier_badge_html(tier, tier_emoji=None):
     """
     tier_emojis = {
         "Platinum": "💎",
-        "Gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
+        "Gold": "🥇",
         "Silver": "🥈",
         "Bronze": "🥉",
     }
@@ -4340,7 +4340,7 @@ def get_bet_card_html(bet, show_live_status=False):
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'
 
     # Tier badge
-    tier_emojis = {"platinum": "💎", "gold": get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"), "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
+    tier_emojis = {"platinum": "💎", "gold": "🥇", "silver": "🥈", "bronze": "🥉", "avoid": "⛔"}
     tier_emoji = tier_emojis.get(tier_lower, "🏅")
     tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
 
@@ -4518,7 +4518,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
 
     _TIER_EMOJI = {
         "platinum": "💎",
-        "gold":     get_logo_img_tag("assets/NewGold_Logo.png", width=16, alt="Gold"),
+        "gold":     "🥇",
         "silver":   "🥈",
         "bronze":   "🥉",
     }

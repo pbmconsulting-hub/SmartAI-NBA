@@ -465,17 +465,20 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
         tier = res.get("tier", "Bronze")
         confidence = res.get("confidence_score", 0)
         bet_type = res.get("bet_type", "normal")
-        # Demon bets bypass all edge filters — their alt line is set above the
-        # standard O/U so negative edge is expected and they should still be tracked.
-        is_demon = bet_type == "demon"
-        # Only log picks where edge is positive (demons are exempt)
-        if edge <= 0 and not is_demon:
+        # Goblin and Demon bets bypass the minimum edge threshold filter to
+        # ensure they are always tracked.  Goblin bets use alt lines set below
+        # the standard O/U (higher probability, but may not hit the minimum_edge
+        # parameter).  Demon bets use alt lines set above the standard O/U so
+        # negative edge is expected and they must bypass the positive-edge check.
+        is_special_bet = bet_type in ("goblin", "demon")
+        # Only log picks where edge is positive (goblin/demon exempt)
+        if edge <= 0 and not is_special_bet:
             continue
         # Only auto-log recognised tiers
         if tier not in AUTO_LOG_TIERS:
             continue
-        # Apply tier-specific minimum edge thresholds (demons bypass all filters)
-        if not is_demon:
+        # Apply tier-specific minimum edge thresholds (goblin/demon bypass all filters)
+        if not is_special_bet:
             if tier == "Silver":
                 min_required_edge = SILVER_MIN_EDGE
             elif tier == "Bronze":
