@@ -445,6 +445,36 @@ if selected_picks:
                 for p in selected_probs:
                     combined_prob *= p
                 st.metric("All-Hit Probability", f"{combined_prob*100:.1f}%")
+
+            # Phase 3: DFS Flex Breakeven Thresholds
+            _eb_n_picks = len(picks_to_include)
+            _eb_dfs_results = [p for p in picks_to_include if p.get("dfs_parlay_ev")]
+            if _eb_dfs_results and _eb_n_picks >= 3:
+                try:
+                    from engine.odds_engine import calculate_dfs_breakeven_probability
+                    _eb_plat = quick_platform.replace(" (Flex)", "").replace(" (Power)", "")
+                    _eb_be = calculate_dfs_breakeven_probability(_eb_plat, min(_eb_n_picks, 6))
+                    _eb_be_prob = _eb_be.get("breakeven_per_leg", 0.5) * 100
+                    _eb_payout = _eb_be.get("all_hit_payout", 1.0)
+                    # Per-leg average probability
+                    _eb_avg_leg = (sum(selected_probs) / len(selected_probs) * 100) if selected_probs else 50
+                    _eb_beats = _eb_avg_leg > _eb_be_prob
+                    _eb_color = "#00ff9d" if _eb_beats else "#ff5e00"
+                    _eb_icon = "✅" if _eb_beats else "⚠️"
+                    st.markdown(
+                        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);'
+                        f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:8px 14px;margin:8px 0;">'
+                        f'<span style="color:#64748b;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                        f'📈 DFS {_eb_plat} · {_eb_n_picks}-Pick Flex</span><br>'
+                        f'<span style="color:{_eb_color};font-size:0.88rem;font-weight:800;'
+                        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+                        f'{_eb_icon} Avg leg: {_eb_avg_leg:.0f}%  ·  Breakeven: {_eb_be_prob:.0f}%</span>'
+                        f'<span style="color:#475569;font-size:0.65rem;margin-left:8px;">'
+                        f'({_eb_payout:.1f}× payout)</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                except (ImportError, Exception):
+                    pass
             
             # Correlation check
             corr_risk = calculate_correlation_risk(picks_to_include)
@@ -827,7 +857,7 @@ _generate_clicked = st.button(
 )
 
 if _generate_clicked:
-    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly
+    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly, calculate_dfs_ev
     from engine.math_helpers import clamp_probability
     import html as _ehtml
 
@@ -850,6 +880,11 @@ if _generate_clicked:
         _best_ev = max(_all_evs) if _all_evs else 0
         _avg_ev_c = "#00ff9d" if _avg_ev > 0 else "#ff5e00"
         _best_ev_c = "#00ff9d" if _best_ev > 0 else "#ff5e00"
+
+        # DFS aggregate across all slips (Phase 4)
+        _all_dfs_edges = [s.get("dfs_avg_edge", 0) for s in _slips if s.get("dfs_leg_edges")]
+        _avg_dfs_edge = (sum(_all_dfs_edges) / len(_all_dfs_edges) * 100) if _all_dfs_edges else 0
+        _avg_dfs_edge_c = "#00ff9d" if _avg_dfs_edge > 0 else "#ff5e00"
 
         st.markdown(
             '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">'
@@ -885,6 +920,14 @@ if _generate_clicked:
             f'<div style="color:#c0d0e8;font-size:1.15rem;font-weight:800;'
             f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
             f'">{_avg_prob * 100:.1f}%</div></div>'
+            # DFS Avg Edge (Phase 4)
+            '<div style="flex:1;min-width:110px;background:linear-gradient(135deg,#070A13,#0F172A);'
+            'border:1px solid rgba(0,255,157,0.12);border-radius:8px;padding:10px 14px;text-align:center;">'
+            '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            'DFS Edge</div>'
+            f'<div style="color:{_avg_dfs_edge_c};font-size:1.15rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+            f'">{"+" if _avg_dfs_edge > 0 else ""}{_avg_dfs_edge:.1f}%</div></div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -911,7 +954,21 @@ if _generate_clicked:
         _slip_wager = round(_slip_kelly_frac * _slip_bankroll, 2) if _slip_kelly_frac > 0 else 0.0
         _slip_expected_payout = round(_slip_entry_fee * (1.0 + _ev), 2)
 
+        # ── DFS Platform EV (against actual payout table) ─────────
+        _dfs_leg_probs = []
+        for _pk in _picks:
+            _pk_dir = _pk.get("direction", "OVER")
+            _pk_prob = _pk.get("probability_over", 0.5)
+            _dfs_leg_probs.append(_pk_prob if _pk_dir == "OVER" else (1.0 - _pk_prob))
+        _dfs_ev_result = calculate_dfs_ev(
+            _dfs_leg_probs, platform=_opt_platform,
+            entry_fee=_slip_entry_fee,
+        )
+        _dfs_ev_val = _dfs_ev_result.get("expected_value", 0.0)
+        _dfs_roi = _dfs_ev_result.get("roi_pct", 0.0)
+
         # ── Digital Betting Ticket ────────────────────────────────
+        _dfs_edges = _best.get("dfs_leg_edges", [])
         _legs_html = ""
         for _idx, _pk in enumerate(_picks, 1):
             _pk_name = _ehtml.escape(str(_pk.get("player_name", "?")))
@@ -933,6 +990,27 @@ if _generate_clicked:
             _edge_c = "#00ff9d" if _pk_edge > 0 else "#ff5e00"
             _edge_s = "+" if _pk_edge > 0 else ""
 
+            _pk_dir_label = "MORE" if _pk_dir == "OVER" else "LESS"
+
+            # Per-leg DFS breakeven badge (Phase 4)
+            _dfs_badge = ""
+            if _idx - 1 < len(_dfs_edges) and _dfs_edges[_idx - 1] is not None:
+                _le = _dfs_edges[_idx - 1]
+                _le_beats = _le.get("beats_breakeven", False)
+                _le_edge = _le.get("edge_vs_breakeven", 0) * 100
+                if _le_beats:
+                    _dfs_badge = (
+                        f'<span style="color:#00ff9d;font-size:0.60rem;margin-left:4px;" '
+                        f'title="Beats {_slip_size}-pick breakeven by {_le_edge:+.1f}%">'
+                        f'✅ BE+{_le_edge:.0f}%</span>'
+                    )
+                else:
+                    _dfs_badge = (
+                        f'<span style="color:#ff5e00;font-size:0.60rem;margin-left:4px;" '
+                        f'title="Below {_slip_size}-pick breakeven by {_le_edge:.1f}%">'
+                        f'⚠️ BE{_le_edge:+.0f}%</span>'
+                    )
+
             _legs_html += (
                 f'<div style="display:flex;justify-content:space-between;align-items:center;'
                 f'padding:8px 12px;border-bottom:1px solid rgba(148,163,184,0.08);">'
@@ -940,14 +1018,14 @@ if _generate_clicked:
                 f'<span style="color:#e2e8f0;font-weight:600;font-size:0.84rem;">{_pk_name}</span>'
                 f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_pk_team}</span><br>'
                 f'<span style="color:#94a3b8;font-size:0.76rem;">{_pk_stat} '
-                f'<span style="color:{"#00f0ff" if _pk_dir == "OVER" else "#ff5e00"};">{_pk_dir}</span> '
+                f'<span style="color:{"#00f0ff" if _pk_dir == "OVER" else "#ff5e00"};">{_pk_dir_label}</span> '
                 f'<span style="font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
                 f'{_pk_line}</span></span></div>'
                 f'<div style="text-align:right;">'
                 f'<span style="color:{_tc};font-size:0.72rem;font-weight:700;">{_pk_tier}</span>'
                 f'<span style="color:{_edge_c};font-size:0.68rem;margin-left:5px;'
                 f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
-                f'{_edge_s}{_pk_edge:.1f}%</span><br>'
+                f'{_edge_s}{_pk_edge:.1f}%</span>{_dfs_badge}<br>'
                 f'<span style="color:#94a3b8;font-size:0.72rem;font-family:\'JetBrains Mono\',monospace;'
                 f'font-variant-numeric:tabular-nums;">{_pk_prob_dir*100:.0f}%</span></div></div>'
             )
@@ -1026,6 +1104,42 @@ if _generate_clicked:
             f'</div>'
             f'{_penalty_note}'
             f'{_kelly_row}'
+            # DFS Platform EV
+            f'<div style="margin-top:6px;padding-top:6px;'
+            f'border-top:1px solid rgba(0,240,255,0.08);">'
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+            f'<div>'
+            f'<span style="color:#64748b;font-size:0.60rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'DFS EV ({_opt_platform})</span><br>'
+            f'<span style="color:{"#00ff9d" if _dfs_ev_val > 0 else "#ff5e00"};font-size:0.9rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{"+" if _dfs_ev_val > 0 else ""}{_dfs_ev_val:.2f}</span></div>'
+            f'<div style="text-align:right;">'
+            f'<span style="color:#64748b;font-size:0.60rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'DFS ROI</span><br>'
+            f'<span style="color:{"#00ff9d" if _dfs_roi > 0 else "#ff5e00"};font-size:0.9rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{"+" if _dfs_roi > 0 else ""}{_dfs_roi:.1f}%</span></div>'
+            f'</div></div>'
+            # DFS per-leg breakeven summary (Phase 4)
+            + (
+                f'<div style="margin-top:4px;padding-top:4px;'
+                f'border-top:1px solid rgba(0,255,157,0.06);">'
+                f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+                f'<span style="color:#64748b;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.06em;">'
+                f'LEGS vs {_slip_size}-PICK BREAKEVEN</span>'
+                f'<span style="color:{"#00ff9d" if _best.get("dfs_legs_beat_breakeven", 0) == _slip_size else "#94a3b8"};'
+                f'font-size:0.72rem;font-weight:700;font-family:\'JetBrains Mono\',monospace;">'
+                f'{_best.get("dfs_legs_beat_breakeven", 0)}/{_slip_size} ✅'
+                f'</span>'
+                f'<span style="color:{"#00ff9d" if _best.get("dfs_avg_edge", 0) > 0 else "#ff5e00"};'
+                f'font-size:0.68rem;font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'avg {"+" if _best.get("dfs_avg_edge", 0) > 0 else ""}'
+                f'{_best.get("dfs_avg_edge", 0) * 100:.1f}%</span>'
+                f'</div></div>'
+                if _best.get("dfs_leg_edges") and any(e for e in _best.get("dfs_leg_edges", []) if e is not None)
+                else ""
+            ) +
             f'</div></div>'
         )
 

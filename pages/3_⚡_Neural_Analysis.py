@@ -316,14 +316,14 @@ with st.expander("📖 How to Use This Page", expanded=False):
     3. Each prop is simulated 1,000+ times to calculate probability
     
     **Reading Results:**
-    - **Probability**: % chance the stat goes OVER the line (>55% = meaningful edge)
+    - **Probability**: % chance the stat goes MORE than the line (>55% = meaningful edge)
     - **Edge**: How much better than 50/50 your edge is (higher = better value)
     - **Confidence Score**: 0-100 composite score (70+ = high confidence)
     - **Tier**: Platinum (85+) > Gold (70+) > Silver (55+) > Bronze
     
     **Directional Forces:**
-    - Green arrows = factors pushing OVER (weak defense, fast pace, etc.)
-    - Red arrows = factors pushing UNDER (tough defense, injury risk, etc.)
+    - Green arrows = factors pushing MORE (weak defense, fast pace, etc.)
+    - Red arrows = factors pushing LESS (tough defense, injury risk, etc.)
     
     **Ensemble Model 🧬:**
     - When game logs are available, the 3-model ensemble is used (season avg + recent form + matchup history)
@@ -767,6 +767,17 @@ if run_analysis:
         prop_line   = float(prop.get("line", 0))
         platform    = prop.get("platform", "PrizePicks")
 
+        # Phase 2: Use quarantined main line when available
+        _raw_target = prop.get("prop_target_line")
+        prop_target_line = None
+        if _raw_target is not None:
+            try:
+                _ptl = float(_raw_target)
+                if _ptl > 0:
+                    prop_target_line = _ptl
+            except (ValueError, TypeError):
+                pass
+
         # ── Injury gate ───────────────────────────────────────────
         injury_map        = st.session_state.get("injury_status_map", {})
         player_status_info = get_player_status(player_name, injury_map)
@@ -1135,6 +1146,8 @@ if run_analysis:
                 projected_minutes=_flat_sim_minutes,
                 minutes_std=4.0,
                 recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
+                prop_target_line=prop_target_line,
+                platform=platform,
                 **_sim_kwargs,
             )
 
@@ -1409,6 +1422,21 @@ if run_analysis:
             # Simulation array for synthetic pricing / slider
             "simulated_results": simulation_output.get("simulated_results", []),
         }
+
+        # ── Phase 2: DFS Fixed-Payout Metrics ───────────────────────
+        # Stamp quarantined target line + DFS parlay EV metrics so the
+        # downstream UI can display breakeven thresholds per flex tier.
+        if simulation_output.get("prop_target_line"):
+            full_result["prop_target_line"] = simulation_output["prop_target_line"]
+            full_result["probability_over_target"] = simulation_output.get(
+                "probability_over_target", probability_over
+            )
+        if simulation_output.get("dfs_breakevens"):
+            full_result["dfs_breakevens"] = simulation_output["dfs_breakevens"]
+        if simulation_output.get("dfs_parlay_ev"):
+            full_result["dfs_parlay_ev"] = simulation_output["dfs_parlay_ev"]
+        if simulation_output.get("dfs_platform"):
+            full_result["dfs_platform"] = simulation_output["dfs_platform"]
 
         # ── Goblin / 50_50 / Demon Bet Classification ───────────────
         # Primary classification is driven by line_category (from the
@@ -1730,16 +1758,47 @@ if analysis_results:
     )
     unmatched_count  = sum(1 for r in analysis_results if not r.get("player_matched", True))
 
+    # Phase 3: DFS aggregate metrics
+    _dfs_results = [r for r in displayed_results if r.get("dfs_parlay_ev")]
+    _beats_be_count = sum(
+        1 for r in _dfs_results
+        if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
+    )
+
     st.subheader(f"📊 Results: {len(displayed_results)} picks (of {total_analyzed} analyzed)")
 
     sum_col1, sum_col2, sum_col3, sum_col4, sum_col5, sum_col6, sum_col7 = st.columns(7)
     sum_col1.metric("Showing",     len(displayed_results))
-    sum_col2.metric("⬆️ OVER",    total_over_picks)
-    sum_col3.metric("⬇️ UNDER",   total_under_picks)
+    sum_col2.metric("⬆️ MORE",    total_over_picks)
+    sum_col3.metric("⬇️ LESS",   total_under_picks)
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
     sum_col6.metric("Goblin",   goblin_count)
     sum_col7.metric("Demon",    demon_count)
+
+    # Phase 3: DFS Edge row (only shown when DFS metrics exist)
+    if _dfs_results:
+        _avg_dfs_edge = sum(
+            (r.get("dfs_parlay_ev") or {}).get("tiers", {}).get(
+                (r.get("dfs_parlay_ev") or {}).get("best_tier", 3), {}
+            ).get("edge_vs_breakeven", 0) * 100
+            for r in _dfs_results
+            if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
+        ) / max(_beats_be_count, 1)
+        _dfs_edge_c = "#00ff9d" if _avg_dfs_edge > 0 else "#ff5e00"
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);'
+            f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:10px 16px;margin:6px 0;">'
+            f'<span style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'📈 DFS FLEX EDGE</span>'
+            f'<span style="color:#475569;font-size:0.68rem;margin-left:8px;">'
+            f'{_beats_be_count}/{len(_dfs_results)} legs beat breakeven</span>'
+            f'<span style="color:{_dfs_edge_c};font-size:0.82rem;font-weight:800;margin-left:12px;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+            f'Avg Edge: {_avg_dfs_edge:+.1f}%</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Slate Summary Dashboard ────────────────────────────────
     silver_count  = sum(1 for r in displayed_results if r.get("tier") == "Silver")
@@ -1760,7 +1819,7 @@ if analysis_results:
         _bp_name  = _html.escape(str(best_pick.get("player_name", "")))
         _bp_stat  = _html.escape(str(best_pick.get("stat_type", "")).title())
         _bp_line  = best_pick.get("line", 0)
-        _bp_dir   = "Over" if best_pick.get("direction") == "OVER" else "Under"
+        _bp_dir   = "More" if best_pick.get("direction") == "OVER" else "Less"
         _bp_conf  = best_pick.get("confidence_score", 0)
         _bp_tier  = best_pick.get("tier", "")
         _bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
@@ -2034,7 +2093,7 @@ if analysis_results:
         st.divider()
 
     # ============================================================
-    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard O/U)
+    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard M/L)
     # ============================================================
     _demon_picks = [
         r for r in analysis_results
@@ -2043,7 +2102,7 @@ if analysis_results:
     ]
     if _demon_picks:
         with st.expander(
-            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
+            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard M/L",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -2055,7 +2114,7 @@ if analysis_results:
                     '<div style="background:rgba(255,140,0,0.12);border:2px solid #ff8c00;'
                     'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
                     '<strong style="color:#ff8c00;font-size:1.0rem;">DEMON BETS — High Ceiling, High Reward</strong><br>'
-                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard Over/Under. '
+                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard More/Less. '
                     'The player must exceed a higher threshold to win — lower probability but bigger payout. '
                     'Use with confidence when the model shows strong edge.</span>'
                     '</div>',
@@ -2064,11 +2123,11 @@ if analysis_results:
             st.markdown(
                 get_education_box_html(
                     "What is a Demon Bet?",
-                    "A <strong>Demon bet</strong> is an alternate sportsbook line set <strong>ABOVE</strong> "
-                    "the standard Over/Under. The player must exceed a higher threshold to win — "
+                    "A <strong>Demon bet</strong> is an alternate line set <strong>ABOVE</strong> "
+                    "the standard More/Less. The player must exceed a higher threshold to win — "
                     "this means lower probability but bigger payout. Think of it as the "
                     "'swing for the fences' play.<br><br>"
-                    "<strong>Example:</strong> Standard line is SGA Points O/U 31.5, and the book also "
+                    "<strong>Example:</strong> Standard line is SGA Points M/L 31.5, and the platform also "
                     "offers 34.5 — that 34.5 is a Demon bet (he needs 35+ points to win).<br><br>"
                     "Use Demon bets when the model shows <em>strong edge and high confidence</em> "
                     "above a challenging threshold. These are <strong>NOT auto-avoided</strong> — "
@@ -2185,7 +2244,7 @@ if analysis_results:
                     "appearing to have edge.<br><br>"
                     "<strong>There are 4 risk patterns:</strong><br>"
                     "1. <strong>Conflicting Forces:</strong> The model's forces are fighting each other — "
-                    "nearly 50/50 OVER vs UNDER. It's a coin flip disguised as an edge.<br>"
+                    "nearly 50/50 MORE vs LESS. It's a coin flip disguised as an edge.<br>"
                     "2. <strong>High Variance:</strong> High-variance stat (3-pointers, steals, blocks) "
                     "with a tiny edge (&lt;8%). These stats are too random game-to-game.<br>"
                     "3. <strong>Fatigue:</strong> Back-to-back game + big spread (blowout expected). "
@@ -2441,7 +2500,7 @@ if analysis_results:
             for r in non_out_results:
                 _stat     = r.get("stat_type", "")
                 _emoji    = _STAT_EMOJI.get(_stat, "🏀")
-                _dir      = "Over" if r.get("direction") == "OVER" else "Under"
+                _dir      = "More" if r.get("direction") == "OVER" else "Less"
                 _label    = (
                     f"{r.get('player_name', '')} — "
                     f"{_emoji} {_dir} {r.get('line', '')} {_stat.title()}"

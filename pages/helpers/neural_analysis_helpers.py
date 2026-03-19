@@ -202,12 +202,12 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
             '<div style="display:flex;gap:5px;margin-bottom:8px;">'
             f'<div style="{_fcol_css}background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.12);">'
             '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#00f0ff;margin-bottom:3px;">▲ OVER</div>'
+            'color:#00f0ff;margin-bottom:3px;">▲ MORE</div>'
             f'{_force_items(over_forces)}'
             '</div>'
             f'<div style="{_fcol_css}background:rgba(255,94,0,0.04);border:1px solid rgba(255,94,0,0.12);">'
             '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#ff5e00;margin-bottom:3px;">▼ UNDER</div>'
+            'color:#ff5e00;margin-bottom:3px;">▼ LESS</div>'
             f'{_force_items(under_forces)}'
             '</div>'
             '</div>'
@@ -282,6 +282,115 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
         pass
 
     return dist_html + forces_html + breakdown_html + kelly_html
+
+
+def _build_dfs_metrics_html(result):
+    """Build an HTML strip showing DFS parlay EV metrics from Phase 2.
+
+    Renders the quarantined target-line probability, best flex tier,
+    per-leg DFS edge vs breakeven, and Kelly fraction.  Returns an
+    empty string when no DFS metrics are present on the result dict.
+
+    Args:
+        result (dict): Full analysis result dict (must include
+            ``dfs_parlay_ev`` and/or ``dfs_breakevens`` from Phase 2).
+
+    Returns:
+        str: HTML snippet for the DFS metrics strip, or ``""``.
+    """
+    parlay = result.get("dfs_parlay_ev")
+    if not parlay:
+        return ""
+
+    tiers = parlay.get("tiers", {})
+    best_tier = parlay.get("best_tier")
+    kelly_frac = parlay.get("kelly_fraction", 0.0)
+    platform = result.get("dfs_platform") or result.get("platform", "")
+    prob_target = result.get("probability_over_target")
+    target_line = result.get("prop_target_line")
+
+    # Build tier pills — one per tier (3-6), highlighting the best
+    tier_pills = []
+    for n in (3, 4, 5, 6):
+        t = tiers.get(n) or tiers.get(str(n))
+        if not t:
+            continue
+        beats = t.get("beats_breakeven", False)
+        edge = t.get("edge_vs_breakeven", 0) * 100
+        be_prob = t.get("breakeven", 0) * 100
+        is_best = (n == best_tier)
+        if is_best:
+            bg = "rgba(0,255,157,0.15)"
+            border = "rgba(0,255,157,0.5)"
+            color = "#00ff9d"
+        elif beats:
+            bg = "rgba(0,198,255,0.08)"
+            border = "rgba(0,198,255,0.25)"
+            color = "#00C6FF"
+        else:
+            bg = "rgba(100,116,139,0.08)"
+            border = "rgba(100,116,139,0.25)"
+            color = "#64748b"
+        pill = (
+            f'<div style="flex:1;min-width:68px;text-align:center;padding:4px 6px;'
+            f'background:{bg};border:1px solid {border};border-radius:6px;">'
+            f'<div style="color:{color};font-size:0.68rem;font-weight:700;'
+            f"font-family:'JetBrains Mono',monospace;\">"
+            f'{n}-Pick{"  ★" if is_best else ""}</div>'
+            f'<div style="color:{color};font-size:0.78rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+            f'{edge:+.1f}%</div>'
+            f'<div style="color:#475569;font-size:0.58rem;">BE {be_prob:.0f}%</div>'
+            f'</div>'
+        )
+        tier_pills.append(pill)
+
+    if not tier_pills:
+        return ""
+
+    pills_html = (
+        '<div style="display:flex;gap:6px;margin-top:4px;">'
+        + "".join(tier_pills)
+        + '</div>'
+    )
+
+    # Header line with platform + target probability
+    header_parts = [f'<span style="color:#64748b;font-size:0.7rem;text-transform:uppercase;'
+                     f'letter-spacing:0.08em;">📈 DFS FLEX EV</span>']
+    if platform:
+        header_parts.append(
+            f'<span style="color:#475569;font-size:0.65rem;margin-left:6px;">'
+            f'({_html.escape(str(platform))})</span>'
+        )
+    if prob_target is not None and target_line is not None:
+        _pt_pct = float(prob_target) * 100
+        header_parts.append(
+            f'<span style="color:#00f0ff;font-size:0.65rem;margin-left:auto;'
+            f"font-family:'JetBrains Mono',monospace;\">"
+            f'P(hit {float(target_line):.1f}) = {_pt_pct:.0f}%</span>'
+        )
+
+    header_html = (
+        '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">'
+        + "".join(header_parts)
+        + '</div>'
+    )
+
+    # Kelly line for DFS
+    kelly_html = ""
+    if best_tier and kelly_frac > 0:
+        kelly_pct = kelly_frac * 100
+        kelly_html = (
+            f'<div style="color:#475569;font-size:0.62rem;margin-top:3px;">'
+            f'Kelly: {kelly_pct:.2f}% · Best: {best_tier}-Pick Flex</div>'
+        )
+
+    return (
+        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);'
+        f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:8px 12px;margin:6px 0;">'
+        + header_html + pills_html + kelly_html +
+        f'</div>'
+    )
 
 
 def _build_result_metrics(result):
@@ -604,11 +713,11 @@ def _render_qds_full_breakdown_html(result):
         '<table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:15px;">'
         '<tr>'
         '<td style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;border-left:3px solid #00f0ff;vertical-align:top;width:50%;">'
-        '<div style="color:#00f0ff;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔵 Forces OVER</div>'
+        '<div style="color:#00f0ff;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔵 Forces MORE</div>'
         + _forces_html(over_forces) +
         '</td>'
         '<td style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;border-left:3px solid #ff5e00;vertical-align:top;width:50%;">'
-        '<div style="color:#ff5e00;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔴 Forces UNDER</div>'
+        '<div style="color:#ff5e00;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔴 Forces LESS</div>'
         + _forces_html(under_forces) +
         '</td>'
         '</tr>'
@@ -1008,7 +1117,7 @@ def display_prop_analysis_card_qds(result):
 
     # ── Prop description string ──────────────────────────────────
     stat_emoji = _STAT_EMOJI.get(stat, "🏀")
-    dir_label  = "Over" if direction == "OVER" else "Under"
+    dir_label  = "More" if direction == "OVER" else "Less"
     prop_text  = f"{stat_emoji} {dir_label} {line} {stat.title()}"
 
     # ── Ensemble / model badges ───────────────────────────────────
@@ -1153,6 +1262,11 @@ def display_prop_analysis_card_qds(result):
         except Exception:
             pass
 
+        # ── DFS Flex EV Metrics Strip (Phase 3) ──────────────────
+        _dfs_strip = _build_dfs_metrics_html(result)
+        if _dfs_strip:
+            st.markdown(_dfs_strip, unsafe_allow_html=True)
+
         # ── Synthetic Odds Slider ────────────────────────────────
         _sim_array = result.get("simulated_results", [])
         if _sim_array and len(_sim_array) >= 10:
@@ -1228,7 +1342,7 @@ def display_prop_analysis_card_qds(result):
             _fc1, _fc2 = st.columns(2)
             with _fc1:
                 st.markdown(
-                    f'<div style="color:#00ff9d;font-size:0.8rem;font-weight:700;">⬆️ OVER Forces ({len(_over_forces_list)})</div>',
+                    f'<div style="color:#00ff9d;font-size:0.8rem;font-weight:700;">⬆️ MORE Forces ({len(_over_forces_list)})</div>',
                     unsafe_allow_html=True,
                 )
                 for _f in _over_forces_list[:5]:
@@ -1236,7 +1350,7 @@ def display_prop_analysis_card_qds(result):
                     st.markdown(f'<div style="color:#a0d0b0;font-size:0.77rem;">• {_html.escape(str(_fname))}</div>', unsafe_allow_html=True)
             with _fc2:
                 st.markdown(
-                    f'<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">⬇️ UNDER Forces ({len(_under_forces_list)})</div>',
+                    f'<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">⬇️ LESS Forces ({len(_under_forces_list)})</div>',
                     unsafe_allow_html=True,
                 )
                 for _f in _under_forces_list[:5]:

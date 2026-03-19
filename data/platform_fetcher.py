@@ -150,6 +150,16 @@ ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 # so we default to -110 for their implied probability calculations.
 _DEFAULT_AMERICAN_ODDS = -110
 
+# ── Data Quarantine Thresholds ─────────────────────────────────────────────
+# Lines with odds worse than QUARANTINE_ODDS_FLOOR (heavy favorites) or
+# better than QUARANTINE_ODDS_CEILING (long-shots) are extreme alternate
+# lines — NOT the standard DFS board.  Strip them to prevent the engine
+# from hallucinating "fake" bets on lines that no DFS platform actually
+# offers as standard plays.
+QUARANTINE_ODDS_FLOOR   = -300   # Drop any line with odds < -300
+QUARANTINE_ODDS_CEILING = +250   # Drop any line with odds > +250
+_EQUILIBRIUM_ODDS       = -110   # The "Main Line" target (closest to this wins)
+
 # Retry configuration for API calls with exponential backoff
 # BEGINNER NOTE: Networks fail occasionally. Retrying with increasing delays
 # handles temporary blips without hammering the server.
@@ -1765,6 +1775,135 @@ _DEFAULT_STAT_TYPES = frozenset({
 })
 
 
+def quarantine_props(
+    props,
+    odds_floor=QUARANTINE_ODDS_FLOOR,
+    odds_ceiling=QUARANTINE_ODDS_CEILING,
+    equilibrium=_EQUILIBRIUM_ODDS,
+):
+    """
+    Apply a strict Data Quarantine to raw props from any platform.
+
+    The quarantine prevents the engine from analysing extreme alternate
+    lines that no DFS platform actually offers as standard plays.  It
+    enforces three rules:
+
+    1. **Hard Drop** — Remove any line whose ``over_odds`` or
+       ``under_odds`` fall outside the ``[odds_floor, odds_ceiling]``
+       window (default -300 to +250).  These are extreme alt-lines, not
+       standard DFS boards.
+
+    2. **Main Line Lock** — For each unique (player, stat_type) pair,
+       select the single line whose ``over_odds`` are closest to
+       ``equilibrium`` (default -110).  This is the "Main Line" that
+       DFS platforms display as their standard More/Less board.
+
+    3. **prop_target_line** — The surviving line value is stamped on
+       each prop as ``prop_target_line`` (float).  All downstream EV,
+       simulation, and Kelly calculations MUST use this field.
+
+    If a player+stat has **no** line surviving the hard-drop, the
+    player is silently dropped for that stat type (prevents UI
+    crashes from missing data).
+
+    Args:
+        props (list[dict]): Raw props (each must have ``over_odds``,
+            ``under_odds``, ``line``, ``player_name``, ``stat_type``).
+        odds_floor (int): Most-negative American odds allowed (default -300).
+        odds_ceiling (int): Most-positive American odds allowed (default +250).
+        equilibrium (int): Target equilibrium odds for main-line selection
+            (default -110).
+
+    Returns:
+        tuple: (quarantined_props, quarantine_summary)
+            quarantined_props (list[dict]): Props that pass quarantine,
+                each enriched with ``prop_target_line``.
+            quarantine_summary (dict): Counts at each step.
+    """
+    summary = {
+        "input_count": len(props),
+        "after_hard_drop": 0,
+        "after_main_line_lock": 0,
+        "dropped_no_valid_line": 0,
+    }
+
+    if not props:
+        return [], summary
+
+    # ── Step 1: Hard Drop — remove extreme odds ─────────────────────────
+    surviving = []
+    for p in props:
+        try:
+            over_o = float(p.get("over_odds", _DEFAULT_AMERICAN_ODDS))
+        except (ValueError, TypeError):
+            over_o = float(_DEFAULT_AMERICAN_ODDS)
+        try:
+            under_o = float(p.get("under_odds", _DEFAULT_AMERICAN_ODDS))
+        except (ValueError, TypeError):
+            under_o = float(_DEFAULT_AMERICAN_ODDS)
+
+        # Odds worse than floor (e.g. -400 < -300) → drop
+        if over_o < odds_floor or under_o < odds_floor:
+            continue
+        # Odds better than ceiling (e.g. +300 > +250) → drop
+        if over_o > odds_ceiling or under_o > odds_ceiling:
+            continue
+
+        surviving.append(p)
+
+    summary["after_hard_drop"] = len(surviving)
+
+    # ── Step 2: Main Line Lock — select the line closest to equilibrium ──
+    # Group by (player_name_lower, stat_type_lower)
+    groups: dict = {}
+    for p in surviving:
+        key = (
+            str(p.get("player_name", "")).lower().strip(),
+            str(p.get("stat_type", "")).lower().strip(),
+        )
+        groups.setdefault(key, []).append(p)
+
+    quarantined: list = []
+    dropped_count = 0
+
+    for _key, group in groups.items():
+        # Pick the line whose over_odds are closest to equilibrium
+        best = None
+        best_distance = float("inf")
+        for p in group:
+            try:
+                over_o = float(p.get("over_odds", _DEFAULT_AMERICAN_ODDS))
+            except (ValueError, TypeError):
+                over_o = float(_DEFAULT_AMERICAN_ODDS)
+            distance = abs(over_o - equilibrium)
+            if distance < best_distance:
+                best_distance = distance
+                best = p
+
+        if best is None:
+            dropped_count += 1
+            continue
+
+        # Stamp the surviving prop with prop_target_line
+        enriched = dict(best)
+        try:
+            enriched["prop_target_line"] = float(best.get("line", 0))
+        except (ValueError, TypeError):
+            dropped_count += 1
+            continue
+
+        if enriched["prop_target_line"] <= 0:
+            dropped_count += 1
+            continue
+
+        quarantined.append(enriched)
+
+    summary["after_main_line_lock"] = len(quarantined)
+    summary["dropped_no_valid_line"] = dropped_count
+
+    return quarantined, summary
+
+
 def smart_filter_props(
     all_props,
     players_data=None,
@@ -1835,6 +1974,7 @@ def smart_filter_props(
     original_count = len(all_props)
     summary: dict = {
         "original_count": original_count,
+        "after_quarantine": original_count,
         "after_team_filter": original_count,
         "after_injury_filter": original_count,
         "after_dedup": original_count,
@@ -1846,6 +1986,10 @@ def smart_filter_props(
 
     if not all_props:
         return [], summary
+
+    # ── Step 0: Data Quarantine — hard-drop extreme odds + lock main line ─
+    quarantined, q_summary = quarantine_props(all_props)
+    summary["after_quarantine"] = len(quarantined)
 
     # ── Step 1: Filter to tonight's teams ───────────────────────────────
     # Build the set of teams playing tonight (with common abbreviation aliases)
@@ -1875,7 +2019,7 @@ def smart_filter_props(
 
     if tonight_teams:
         team_filtered = [
-            p for p in all_props
+            p for p in quarantined
             if (
                 not p.get("team")  # keep props with no team info (can't filter)
                 or str(p.get("team", "")).upper().strip() in tonight_teams
@@ -1883,7 +2027,7 @@ def smart_filter_props(
         ]
     else:
         # No game data — can't filter by team; keep all
-        team_filtered = list(all_props)
+        team_filtered = list(quarantined)
 
     summary["after_team_filter"] = len(team_filtered)
 
