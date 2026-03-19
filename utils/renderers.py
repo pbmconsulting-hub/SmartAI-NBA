@@ -34,6 +34,10 @@ def _build_single_card_html(result, index=0):
     """
     Build a single Quantum Card HTML string from an analysis result dict.
 
+    Renders the **Full Breakdown** view: distribution percentiles, expected
+    value, standard deviation, individual directional forces, score
+    breakdown bars, and Demon (👹) / Goblin (🟢) tagging.
+
     Args:
         result (dict): A single prop analysis result from the engine.
         index (int): The card's position index (used for stagger delay).
@@ -74,6 +78,33 @@ def _build_single_card_html(result, index=0):
     except (ValueError, TypeError):
         edge_display = "—"
 
+    # ── Distribution & EV metrics ────────────────────────────────
+    p10 = result.get("percentile_10", 0) or 0
+    p50 = result.get("percentile_50", 0) or 0
+    p90 = result.get("percentile_90", 0) or 0
+    std_dev = result.get("simulated_std", result.get("std_dev", 0)) or 0
+    adj_proj = result.get("adjusted_projection", 0) or 0
+    try:
+        p10_d = f"{float(p10):.1f}"
+    except (ValueError, TypeError):
+        p10_d = "—"
+    try:
+        p50_d = f"{float(p50):.1f}"
+    except (ValueError, TypeError):
+        p50_d = "—"
+    try:
+        p90_d = f"{float(p90):.1f}"
+    except (ValueError, TypeError):
+        p90_d = "—"
+    try:
+        std_d = f"{float(std_dev):.1f}"
+    except (ValueError, TypeError):
+        std_d = "—"
+    try:
+        proj_d = f"{float(adj_proj):.1f}"
+    except (ValueError, TypeError):
+        proj_d = "—"
+
     # Bet type + prediction text (Goblin/Demon)
     bet_type = result.get("bet_type", "normal")
     prediction = _escape(result.get("prediction", ""))
@@ -85,7 +116,7 @@ def _build_single_card_html(result, index=0):
             prediction = _escape(f"I predict the stat will do at LEAST {true_line:g}")
     elif bet_type == "demon":
         pred_class = "qcm-prediction-demon"
-        pred_icon = "🔴"
+        pred_icon = "👹"
         if not prediction and true_line > 0:
             prediction = _escape(f"I predict the stat will do at MOST {true_line:g}")
     else:
@@ -97,6 +128,17 @@ def _build_single_card_html(result, index=0):
         prediction_html = (
             f'<div class="qcm-prediction {pred_class}">'
             f'{pred_icon} {prediction}</div>'
+        )
+
+    # ── Demon-specific card class and ceiling ────────────────────
+    demon_card_cls = " qcm-card-demon" if bet_type == "demon" else ""
+    demon_ceiling = result.get("demon_ceiling")
+    demon_ceiling_html = ""
+    if bet_type == "demon" and demon_ceiling is not None:
+        demon_ceiling_html = (
+            '<div class="qcm-demon-ceiling">'
+            f'🚫 Ceiling: {_escape(str(demon_ceiling))} — do not bet past this line'
+            '</div>'
         )
 
     # Stagger delay: 20ms per card, capped at 2s for 100 cards
@@ -111,7 +153,64 @@ def _build_single_card_html(result, index=0):
             direction = "OVER"
     direction_escaped = _escape(direction.upper())
 
-    return f"""<div class="qcm-card" style="animation-delay:{delay_ms}ms;">
+    # ── Forces HTML (individual force lists) ─────────────────────
+    forces = result.get("forces", {}) or {}
+    over_forces = forces.get("over_forces", []) or []
+    under_forces = forces.get("under_forces", []) or []
+
+    def _force_items(force_list):
+        if not force_list:
+            return '<span class="qcm-force-none">None</span>'
+        parts = []
+        for f in force_list:
+            if not isinstance(f, dict):
+                continue
+            strength = max(1, min(5, round(float(f.get("strength", 1) or 1))))
+            stars = "⭐" * strength
+            name = _escape(str(f.get("name", "") or ""))
+            parts.append(f'<div class="qcm-force-item">{stars} {name}</div>')
+        return "".join(parts) if parts else '<span class="qcm-force-none">None</span>'
+
+    forces_html = (
+        '<div class="qcm-forces">'
+        '<div class="qcm-forces-col qcm-forces-over">'
+        '<div class="qcm-forces-label">▲ OVER</div>'
+        f'{_force_items(over_forces)}'
+        '</div>'
+        '<div class="qcm-forces-col qcm-forces-under">'
+        '<div class="qcm-forces-label">▼ UNDER</div>'
+        f'{_force_items(under_forces)}'
+        '</div>'
+        '</div>'
+    )
+
+    # ── Score breakdown bars ─────────────────────────────────────
+    breakdown = result.get("score_breakdown", {}) or {}
+    breakdown_html = ""
+    if breakdown:
+        bars = []
+        for factor, score in breakdown.items():
+            label = _escape(
+                factor.replace("_score", "").replace("_", " ").title()
+            )
+            bar_w = min(100, max(0, float(score or 0)))
+            if bar_w >= 70:
+                bar_c = "#00f0ff"
+            elif bar_w >= 40:
+                bar_c = "#ff5e00"
+            else:
+                bar_c = "#ff4444"
+            bars.append(
+                f'<div class="qcm-breakdown-row">'
+                f'<span class="qcm-breakdown-label">{label}</span>'
+                f'<span class="qcm-breakdown-score">{score:.0f}</span>'
+                f'<div class="qcm-breakdown-track">'
+                f'<div class="qcm-breakdown-fill" style="width:{bar_w:.1f}%;background:{bar_c};"></div>'
+                f'</div></div>'
+            )
+        breakdown_html = '<div class="qcm-breakdown">' + "".join(bars) + '</div>'
+
+    return f"""<div class="qcm-card{demon_card_cls}" style="animation-delay:{delay_ms}ms;">
   <div class="qcm-card-header">
     <span class="qcm-player-name">{player_name}</span>
     <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
@@ -126,6 +225,7 @@ def _build_single_card_html(result, index=0):
     <span class="qcm-true-line-value">{true_line_display}</span>
   </div>
   {prediction_html}
+  {demon_ceiling_html}
   <div class="qcm-metrics">
     <div class="qcm-metric">
       <div class="qcm-metric-val">{prob_pct}</div>
@@ -140,6 +240,15 @@ def _build_single_card_html(result, index=0):
       <div class="qcm-metric-lbl">Edge</div>
     </div>
   </div>
+  <div class="qcm-dist-row">
+    <div class="qcm-dist-cell"><div class="qcm-dist-val">{p10_d}</div><div class="qcm-dist-lbl">P10</div></div>
+    <div class="qcm-dist-cell qcm-dist-median"><div class="qcm-dist-val">{p50_d}</div><div class="qcm-dist-lbl">MED</div></div>
+    <div class="qcm-dist-cell"><div class="qcm-dist-val">{p90_d}</div><div class="qcm-dist-lbl">P90</div></div>
+    <div class="qcm-dist-cell"><div class="qcm-dist-val">{std_d}</div><div class="qcm-dist-lbl">σ</div></div>
+    <div class="qcm-dist-cell qcm-dist-proj"><div class="qcm-dist-val">{proj_d}</div><div class="qcm-dist-lbl">Proj</div></div>
+  </div>
+  {forces_html}
+  {breakdown_html}
 </div>"""
 
 

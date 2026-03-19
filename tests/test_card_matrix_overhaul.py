@@ -236,7 +236,7 @@ class TestQuantumCardMatrixCSS(unittest.TestCase):
         self.assertIn("display: grid", QUANTUM_CARD_MATRIX_CSS)
         self.assertIn("grid-template-columns", QUANTUM_CARD_MATRIX_CSS)
         self.assertIn("auto-fill", QUANTUM_CARD_MATRIX_CSS)
-        self.assertIn("minmax(300px", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("minmax(340px", QUANTUM_CARD_MATRIX_CSS)
 
     def test_css_contains_fade_animation(self):
         from styles.theme import QUANTUM_CARD_MATRIX_CSS
@@ -262,15 +262,21 @@ class TestQuantumCardMatrixCSS(unittest.TestCase):
 
 
 class TestPlatformFetcherCapAndAsync(unittest.TestCase):
-    """Tests for data/platform_fetcher.py 500-cap and async features."""
+    """Tests for data/platform_fetcher.py async features and alt-line enrichment."""
 
-    def test_500_cap_constant_in_sync_fetch(self):
-        """Verify that fetch_all_platform_props enforces 500-prop cap."""
+    def test_no_intake_cap_in_sync_fetch(self):
+        """Verify fetch_all_platform_props no longer enforces a hard intake cap.
+
+        The 500-bet quota is now an *output* target enforced in the analysis
+        loop, not an input cap in the fetcher.
+        """
         import inspect
         from data.platform_fetcher import fetch_all_platform_props
         source = inspect.getsource(fetch_all_platform_props)
-        self.assertIn("500", source)
-        self.assertIn("MAX_PROP_CAPACITY", source)
+        # The function should still reference alt-line enrichment
+        self.assertIn("parse_alt_lines_from_platform_props", source)
+        # The function should NOT enforce an intake cap anymore
+        self.assertNotIn("MAX_PROP_CAPACITY", source)
 
     def test_async_fetch_function_exists(self):
         from data.platform_fetcher import fetch_all_platforms_async

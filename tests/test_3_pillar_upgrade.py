@@ -146,19 +146,19 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertNotIn("Absolute Max Props", source)
         self.assertNotIn("funnel_absolute_max", source)
 
-    def test_hardcoded_500_cap(self):
-        """Neural Analysis page should enforce a hardcoded 500-prop cap via _QME_MAX_PROPS."""
+    def test_output_quota_constant(self):
+        """Neural Analysis page should define an output quota via _QME_MIN_OUTPUT_BETS."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("_QME_MAX_PROPS = 500", source)
+        self.assertIn("_QME_MIN_OUTPUT_BETS = 500", source)
 
     def test_funnel_dynamic_metric(self):
-        """Neural Analysis page should show a dynamic metric for locked props."""
+        """Neural Analysis page should show a dynamic metric for the output target."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("PROPS LOCKED FOR QME 5.6 SIMULATION", source)
+        self.assertIn("Output Target", source)
 
     def test_smart_filter_wired_in_runner(self):
         """The analysis runner should call smart_filter_props with funnel settings."""

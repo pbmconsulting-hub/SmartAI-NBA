@@ -506,8 +506,11 @@ def _labels_to_stat_keys(labels):
     return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
 
 
-# Maximum props passed to the QME 5.6 simulation engine
-_QME_MAX_PROPS = 500
+# Guaranteed minimum output of high-confidence bets from the QME 5.6 engine.
+# The engine will process as many raw props as necessary until this target is
+# reached (or all props are exhausted).  This is an OUTPUT quota, not an
+# input cap.
+_QME_MIN_OUTPUT_BETS = 500
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -543,17 +546,20 @@ with st.expander("🎯 Market Filters", expanded=True):
         help="Only props for these stat categories will be analyzed.",
     )
 
-    # ── 500-Prop Cached Funnel ───────────────────────────────────
+    # ── Prop Funnel — no intake cap; output quota enforced downstream ─
     _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
     _filtered_props, _funnel_summary = _cached_smart_filter(
         tuple(current_props),
         tuple(sorted(_funnel_stat_keys)),
     )
-    final_props = _filtered_props[:_QME_MAX_PROPS]
+    # Pass ALL filtered props to the engine — the analysis loop will
+    # stop only when _QME_MIN_OUTPUT_BETS high-confidence bets are
+    # found (or all props are exhausted).
+    final_props = _filtered_props
 
     st.metric(
-        label=f"⚡ PROPS LOCKED FOR QME 5.6 SIMULATION (max {_QME_MAX_PROPS})",
-        value=f"{len(final_props):,} / {_QME_MAX_PROPS:,}",
+        label=f"⚡ PROPS IN FUNNEL — Output Target: {_QME_MIN_OUTPUT_BETS} bets",
+        value=f"{len(final_props):,}",
         delta=f"{len(final_props) - len(current_props):,} filtered" if len(current_props) > len(final_props) else "No reduction",
         delta_color="normal" if len(final_props) >= len(current_props) else "inverse",
     )
@@ -705,9 +711,11 @@ if run_analysis:
         )
         st.caption(f"📊 Analyzing: {_plat_summary}")
 
-    # ── Pre-Analysis Funnel: stat types + hardcoded 500-prop cap ──
+    # ── Pre-Analysis Funnel: stat types only (no intake cap) ────
     # Apply the user's stat-type selection from the Market Filters expander
-    # via smart_filter_props() in data.platform_fetcher.
+    # via smart_filter_props() in data.platform_fetcher.  The pipeline
+    # ingests ALL available props; the 500-bet quota is enforced at the
+    # OUTPUT stage so that the engine processes enough to reach the target.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
     _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
 
@@ -721,14 +729,13 @@ if run_analysis:
         stat_types=_funnel_stat_keys_run,
         deduplicate_cross_platform=True,
     )
-    # Enforce hardcoded 500-prop cap
-    if len(props_to_analyze) > _QME_MAX_PROPS:
-        props_to_analyze = props_to_analyze[:_QME_MAX_PROPS]
+    # No intake cap — process all available props until the output
+    # quota (_QME_MIN_OUTPUT_BETS) is met or all props are exhausted.
     _after_funnel = len(props_to_analyze)
     if _before_funnel > _after_funnel:
         st.info(
             f"🎯 **Pre-Analysis Funnel**: Reduced **{_before_funnel}** → **{_after_funnel}** props "
-            f"(stat types: {len(_funnel_stat_keys_run)}, max: {_QME_MAX_PROPS})."
+            f"(stat types: {len(_funnel_stat_keys_run)}). Output target: {_QME_MIN_OUTPUT_BETS} bets."
         )
 
     total_props_count    = len(props_to_analyze)
@@ -2032,7 +2039,7 @@ if analysis_results:
     ]
     if _demon_picks:
         with st.expander(
-            f"🔥 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
+            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -2102,11 +2109,11 @@ if analysis_results:
                     f'<div>'
                     f'<span style="background:rgba(244,67,54,0.25);color:#ef5350;padding:2px 8px;'
                     f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
-                    f'border:1px solid rgba(244,67,54,0.5);">🔴 Demon</span>'
-                    f'<span style="color:#ff8c00;font-weight:700;">🔥 {_dp_name}</span>'
+                    f'border:1px solid rgba(244,67,54,0.5);">👹 Demon</span>'
+                    f'<span style="color:#ff8c00;font-weight:700;">👹 {_dp_name}</span>'
                     f'{_dp_team_badge}'
                     f'<span style="background:#ff8c00;color:#fff;padding:2px 8px;border-radius:4px;'
-                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">DEMON BET</span>'
+                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">👹 DEMON BET</span>'
                     f'</div>'
                     f'<div style="text-align:right;">'
                     f'<span style="color:#ffd580;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat}'
