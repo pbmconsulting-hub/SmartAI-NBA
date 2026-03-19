@@ -1479,8 +1479,10 @@ if run_analysis:
             full_result["alt_lines"] = _alt_lines
             _best_alt = _alt_lines.get("best_alt", {})
             full_result["prediction"] = _best_alt.get("prediction", "")
-            # Also store the prediction from the edge_detection formatter
-            # based on the classified bet_type (may differ from simulation best)
+            # Override: when the bet classification says this prop IS a
+            # goblin/demon, use the strict prediction string from the
+            # edge_detection formatter (anchored to the actual prop line)
+            # rather than the simulation-best line which may differ.
             _bt = full_result.get("bet_type", "normal")
             if _bt in ("goblin", "demon"):
                 full_result["prediction"] = format_goblin_demon_prediction(_bt, prop_line)

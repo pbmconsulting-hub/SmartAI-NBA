@@ -649,7 +649,7 @@ def generate_alt_line_probabilities(simulation_output, base_line):
     goblin_lines = []
     for offset in GOBLIN_OFFSETS:
         g_line = round(base_line + offset, 1)  # offset is negative
-        if g_line < 0:
+        if g_line <= 0:
             # NBA prop lines use half-point increments; 0.5 is the lowest
             # meaningful threshold (a player must record at least 1 stat).
             g_line = 0.5
