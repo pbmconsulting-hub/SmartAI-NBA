@@ -452,6 +452,180 @@ def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
         }
 
 
+# ── DFS Fixed-Payout Tables ──────────────────────────────────────────────
+# These are the actual payout multipliers for each DFS platform.
+# Used by calculate_dfs_ev() to compute expected value against the real
+# payouts that DFS players receive (NOT sportsbook singles math).
+
+DFS_PAYOUT_TABLES = {
+    "PrizePicks": {
+        3: {3: 2.25, 2: 1.25, 1: 0.0, 0: 0.0},
+        4: {4: 5.0, 3: 1.50, 2: 0.40, 1: 0.0, 0: 0.0},
+        5: {5: 10.0, 4: 2.0, 3: 0.40, 2: 0.0, 1: 0.0, 0: 0.0},
+        6: {6: 25.0, 5: 2.0, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    },
+    "Underdog": {
+        3: {3: 2.25, 2: 1.20, 1: 0.0, 0: 0.0},
+        4: {4: 5.0, 3: 1.50, 2: 0.0, 1: 0.0, 0: 0.0},
+        5: {5: 10.0, 4: 2.0, 3: 0.50, 2: 0.0, 1: 0.0, 0: 0.0},
+        6: {6: 25.0, 5: 2.5, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    },
+    "DraftKings": {
+        3: {3: 2.50, 2: 0.0, 1: 0.0, 0: 0.0},
+        4: {4: 5.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+        5: {5: 10.0, 4: 1.5, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+        6: {6: 25.0, 5: 2.0, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    },
+}
+
+
+def calculate_dfs_breakeven_probability(platform="PrizePicks", pick_count=3):
+    """
+    Calculate the per-leg breakeven probability for a DFS flex entry.
+
+    In DFS parlays the house edge is baked into the payout table, not into
+    per-line juice.  The breakeven probability is the per-leg win rate at
+    which the expected payout exactly equals the entry fee ($1).
+
+    For an N-pick flex where hitting all N pays ``M×``, the break-even
+    per-leg probability is approximately ``(1/M)^(1/N)``.  This function
+    also accounts for partial-win payouts (flex) by summing the weighted
+    payout across all hit counts.
+
+    Args:
+        platform (str): ``"PrizePicks"``, ``"Underdog"``, or ``"DraftKings"``.
+        pick_count (int): Number of picks in the entry (3–6).
+
+    Returns:
+        dict: {
+            'breakeven_per_leg': float  (per-leg prob needed to break even),
+            'all_hit_payout': float     (payout multiplier when all legs hit),
+            'platform': str,
+            'pick_count': int,
+        }
+    """
+    table = DFS_PAYOUT_TABLES.get(platform, DFS_PAYOUT_TABLES["PrizePicks"])
+    tier = table.get(pick_count)
+    if not tier:
+        return {
+            "breakeven_per_leg": 0.50,
+            "all_hit_payout": 1.0,
+            "platform": platform,
+            "pick_count": pick_count,
+        }
+
+    all_hit_payout = tier.get(pick_count, 1.0)
+
+    # Binary search for the per-leg probability p where E[payout] = 1.0
+    lo, hi = 0.01, 0.99
+    for _ in range(64):
+        mid = (lo + hi) / 2.0
+        ev = _dfs_flex_ev_at_prob(mid, pick_count, tier)
+        if ev < 1.0:
+            lo = mid
+        else:
+            hi = mid
+    breakeven = round((lo + hi) / 2.0, 6)
+
+    return {
+        "breakeven_per_leg": _safe_float(breakeven, 0.5),
+        "all_hit_payout": _safe_float(all_hit_payout, 1.0),
+        "platform": platform,
+        "pick_count": pick_count,
+    }
+
+
+def _dfs_flex_ev_at_prob(per_leg_prob, n, tier):
+    """Expected payout for a DFS flex entry when each leg wins with *per_leg_prob*."""
+    p = max(0.001, min(0.999, per_leg_prob))
+    q = 1.0 - p
+    ev = 0.0
+    for hits in range(n + 1):
+        multiplier = tier.get(hits, 0.0)
+        if multiplier <= 0:
+            continue
+        # Binomial: C(n, hits) * p^hits * q^(n-hits)
+        coeff = 1
+        for i in range(hits):
+            coeff = coeff * (n - i) // (i + 1)
+        ev += coeff * (p ** hits) * (q ** (n - hits)) * multiplier
+    return ev
+
+
+def calculate_dfs_ev(leg_probabilities, platform="PrizePicks", pick_count=None, entry_fee=1.0):
+    """
+    Calculate the expected value of a DFS flex entry using the platform's
+    actual payout table — NOT sportsbook singles math.
+
+    This is the correct EV for PrizePicks, Underdog, and DraftKings Pick6
+    entries.  The calculation sums the probability-weighted payout for
+    every possible number of correct legs (0 through N).
+
+    Args:
+        leg_probabilities (list[float]): Per-leg model probabilities
+            (each 0.0–1.0), e.g. ``[0.62, 0.58, 0.71]`` for a 3-pick.
+        platform (str): ``"PrizePicks"``, ``"Underdog"``, or ``"DraftKings"``.
+        pick_count (int or None): Override the number of picks (defaults to
+            ``len(leg_probabilities)``).
+        entry_fee (float): Dollar amount of the entry (default $1.00).
+
+    Returns:
+        dict: {
+            'expected_value': float    (EV in dollars),
+            'expected_payout': float   (expected gross return),
+            'roi_pct': float           (return on investment %),
+            'all_hit_prob': float      (probability every leg hits),
+            'platform': str,
+            'pick_count': int,
+        }
+    """
+    if not leg_probabilities:
+        return {"expected_value": 0.0, "expected_payout": 0.0, "roi_pct": 0.0,
+                "all_hit_prob": 0.0, "platform": platform, "pick_count": 0}
+
+    n = pick_count or len(leg_probabilities)
+    table = DFS_PAYOUT_TABLES.get(platform, DFS_PAYOUT_TABLES["PrizePicks"])
+    tier = table.get(n)
+    if not tier:
+        return {"expected_value": 0.0, "expected_payout": 0.0, "roi_pct": 0.0,
+                "all_hit_prob": 0.0, "platform": platform, "pick_count": n}
+
+    probs = [max(0.001, min(0.999, float(p))) for p in leg_probabilities[:n]]
+
+    # Enumerate all 2^n outcomes
+    expected_payout = 0.0
+    all_hit_prob = 1.0
+    for p in probs:
+        all_hit_prob *= p
+
+    for mask in range(1 << n):
+        hits = bin(mask).count("1")
+        multiplier = tier.get(hits, 0.0)
+        if multiplier <= 0:
+            continue
+        # Probability of this exact outcome
+        outcome_prob = 1.0
+        for i in range(n):
+            if mask & (1 << i):
+                outcome_prob *= probs[i]
+            else:
+                outcome_prob *= (1.0 - probs[i])
+        expected_payout += outcome_prob * multiplier
+
+    expected_payout_dollars = expected_payout * float(entry_fee)
+    ev = expected_payout_dollars - float(entry_fee)
+    roi = (ev / float(entry_fee)) * 100.0 if float(entry_fee) > 0 else 0.0
+
+    return {
+        "expected_value": _safe_float(round(ev, 4)),
+        "expected_payout": _safe_float(round(expected_payout_dollars, 4)),
+        "roi_pct": _safe_float(round(roi, 2)),
+        "all_hit_prob": _safe_float(round(all_hit_prob, 6)),
+        "platform": platform,
+        "pick_count": n,
+    }
+
+
 def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
     """
     Generate optimal 2-to-5-man slips from a list of analysed props.

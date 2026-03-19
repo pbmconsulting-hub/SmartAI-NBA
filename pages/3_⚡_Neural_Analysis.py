@@ -316,14 +316,14 @@ with st.expander("📖 How to Use This Page", expanded=False):
     3. Each prop is simulated 1,000+ times to calculate probability
     
     **Reading Results:**
-    - **Probability**: % chance the stat goes OVER the line (>55% = meaningful edge)
+    - **Probability**: % chance the stat goes MORE than the line (>55% = meaningful edge)
     - **Edge**: How much better than 50/50 your edge is (higher = better value)
     - **Confidence Score**: 0-100 composite score (70+ = high confidence)
     - **Tier**: Platinum (85+) > Gold (70+) > Silver (55+) > Bronze
     
     **Directional Forces:**
-    - Green arrows = factors pushing OVER (weak defense, fast pace, etc.)
-    - Red arrows = factors pushing UNDER (tough defense, injury risk, etc.)
+    - Green arrows = factors pushing MORE (weak defense, fast pace, etc.)
+    - Red arrows = factors pushing LESS (tough defense, injury risk, etc.)
     
     **Ensemble Model 🧬:**
     - When game logs are available, the 3-model ensemble is used (season avg + recent form + matchup history)
@@ -1734,8 +1734,8 @@ if analysis_results:
 
     sum_col1, sum_col2, sum_col3, sum_col4, sum_col5, sum_col6, sum_col7 = st.columns(7)
     sum_col1.metric("Showing",     len(displayed_results))
-    sum_col2.metric("⬆️ OVER",    total_over_picks)
-    sum_col3.metric("⬇️ UNDER",   total_under_picks)
+    sum_col2.metric("⬆️ MORE",    total_over_picks)
+    sum_col3.metric("⬇️ LESS",   total_under_picks)
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
     sum_col6.metric("Goblin",   goblin_count)
@@ -1760,7 +1760,7 @@ if analysis_results:
         _bp_name  = _html.escape(str(best_pick.get("player_name", "")))
         _bp_stat  = _html.escape(str(best_pick.get("stat_type", "")).title())
         _bp_line  = best_pick.get("line", 0)
-        _bp_dir   = "Over" if best_pick.get("direction") == "OVER" else "Under"
+        _bp_dir   = "More" if best_pick.get("direction") == "OVER" else "Less"
         _bp_conf  = best_pick.get("confidence_score", 0)
         _bp_tier  = best_pick.get("tier", "")
         _bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
@@ -2034,7 +2034,7 @@ if analysis_results:
         st.divider()
 
     # ============================================================
-    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard O/U)
+    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard M/L)
     # ============================================================
     _demon_picks = [
         r for r in analysis_results
@@ -2043,7 +2043,7 @@ if analysis_results:
     ]
     if _demon_picks:
         with st.expander(
-            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
+            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard M/L",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -2055,7 +2055,7 @@ if analysis_results:
                     '<div style="background:rgba(255,140,0,0.12);border:2px solid #ff8c00;'
                     'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
                     '<strong style="color:#ff8c00;font-size:1.0rem;">DEMON BETS — High Ceiling, High Reward</strong><br>'
-                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard Over/Under. '
+                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard More/Less. '
                     'The player must exceed a higher threshold to win — lower probability but bigger payout. '
                     'Use with confidence when the model shows strong edge.</span>'
                     '</div>',
@@ -2064,11 +2064,11 @@ if analysis_results:
             st.markdown(
                 get_education_box_html(
                     "What is a Demon Bet?",
-                    "A <strong>Demon bet</strong> is an alternate sportsbook line set <strong>ABOVE</strong> "
-                    "the standard Over/Under. The player must exceed a higher threshold to win — "
+                    "A <strong>Demon bet</strong> is an alternate line set <strong>ABOVE</strong> "
+                    "the standard More/Less. The player must exceed a higher threshold to win — "
                     "this means lower probability but bigger payout. Think of it as the "
                     "'swing for the fences' play.<br><br>"
-                    "<strong>Example:</strong> Standard line is SGA Points O/U 31.5, and the book also "
+                    "<strong>Example:</strong> Standard line is SGA Points M/L 31.5, and the platform also "
                     "offers 34.5 — that 34.5 is a Demon bet (he needs 35+ points to win).<br><br>"
                     "Use Demon bets when the model shows <em>strong edge and high confidence</em> "
                     "above a challenging threshold. These are <strong>NOT auto-avoided</strong> — "
@@ -2185,7 +2185,7 @@ if analysis_results:
                     "appearing to have edge.<br><br>"
                     "<strong>There are 4 risk patterns:</strong><br>"
                     "1. <strong>Conflicting Forces:</strong> The model's forces are fighting each other — "
-                    "nearly 50/50 OVER vs UNDER. It's a coin flip disguised as an edge.<br>"
+                    "nearly 50/50 MORE vs LESS. It's a coin flip disguised as an edge.<br>"
                     "2. <strong>High Variance:</strong> High-variance stat (3-pointers, steals, blocks) "
                     "with a tiny edge (&lt;8%). These stats are too random game-to-game.<br>"
                     "3. <strong>Fatigue:</strong> Back-to-back game + big spread (blowout expected). "
@@ -2441,7 +2441,7 @@ if analysis_results:
             for r in non_out_results:
                 _stat     = r.get("stat_type", "")
                 _emoji    = _STAT_EMOJI.get(_stat, "🏀")
-                _dir      = "Over" if r.get("direction") == "OVER" else "Under"
+                _dir      = "More" if r.get("direction") == "OVER" else "Less"
                 _label    = (
                     f"{r.get('player_name', '')} — "
                     f"{_emoji} {_dir} {r.get('line', '')} {_stat.title()}"

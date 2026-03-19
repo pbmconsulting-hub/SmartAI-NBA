@@ -827,7 +827,7 @@ _generate_clicked = st.button(
 )
 
 if _generate_clicked:
-    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly
+    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly, calculate_dfs_ev
     from engine.math_helpers import clamp_probability
     import html as _ehtml
 
@@ -911,6 +911,19 @@ if _generate_clicked:
         _slip_wager = round(_slip_kelly_frac * _slip_bankroll, 2) if _slip_kelly_frac > 0 else 0.0
         _slip_expected_payout = round(_slip_entry_fee * (1.0 + _ev), 2)
 
+        # ── DFS Platform EV (against actual payout table) ─────────
+        _dfs_leg_probs = []
+        for _pk in _picks:
+            _pk_dir = _pk.get("direction", "OVER")
+            _pk_prob = _pk.get("probability_over", 0.5)
+            _dfs_leg_probs.append(_pk_prob if _pk_dir == "OVER" else (1.0 - _pk_prob))
+        _dfs_ev_result = calculate_dfs_ev(
+            _dfs_leg_probs, platform=_opt_platform,
+            entry_fee=_slip_entry_fee,
+        )
+        _dfs_ev_val = _dfs_ev_result.get("expected_value", 0.0)
+        _dfs_roi = _dfs_ev_result.get("roi_pct", 0.0)
+
         # ── Digital Betting Ticket ────────────────────────────────
         _legs_html = ""
         for _idx, _pk in enumerate(_picks, 1):
@@ -933,6 +946,8 @@ if _generate_clicked:
             _edge_c = "#00ff9d" if _pk_edge > 0 else "#ff5e00"
             _edge_s = "+" if _pk_edge > 0 else ""
 
+            _pk_dir_label = "MORE" if _pk_dir == "OVER" else "LESS"
+
             _legs_html += (
                 f'<div style="display:flex;justify-content:space-between;align-items:center;'
                 f'padding:8px 12px;border-bottom:1px solid rgba(148,163,184,0.08);">'
@@ -940,7 +955,7 @@ if _generate_clicked:
                 f'<span style="color:#e2e8f0;font-weight:600;font-size:0.84rem;">{_pk_name}</span>'
                 f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_pk_team}</span><br>'
                 f'<span style="color:#94a3b8;font-size:0.76rem;">{_pk_stat} '
-                f'<span style="color:{"#00f0ff" if _pk_dir == "OVER" else "#ff5e00"};">{_pk_dir}</span> '
+                f'<span style="color:{"#00f0ff" if _pk_dir == "OVER" else "#ff5e00"};">{_pk_dir_label}</span> '
                 f'<span style="font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
                 f'{_pk_line}</span></span></div>'
                 f'<div style="text-align:right;">'
@@ -1026,6 +1041,23 @@ if _generate_clicked:
             f'</div>'
             f'{_penalty_note}'
             f'{_kelly_row}'
+            # DFS Platform EV
+            f'<div style="margin-top:6px;padding-top:6px;'
+            f'border-top:1px solid rgba(0,240,255,0.08);">'
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+            f'<div>'
+            f'<span style="color:#64748b;font-size:0.60rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'DFS EV ({_opt_platform})</span><br>'
+            f'<span style="color:{"#00ff9d" if _dfs_ev_val > 0 else "#ff5e00"};font-size:0.9rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{"+" if _dfs_ev_val > 0 else ""}{_dfs_ev_val:.2f}</span></div>'
+            f'<div style="text-align:right;">'
+            f'<span style="color:#64748b;font-size:0.60rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'DFS ROI</span><br>'
+            f'<span style="color:{"#00ff9d" if _dfs_roi > 0 else "#ff5e00"};font-size:0.9rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{"+" if _dfs_roi > 0 else ""}{_dfs_roi:.1f}%</span></div>'
+            f'</div></div>'
             f'</div></div>'
         )
 

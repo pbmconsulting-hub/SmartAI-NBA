@@ -202,12 +202,12 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
             '<div style="display:flex;gap:5px;margin-bottom:8px;">'
             f'<div style="{_fcol_css}background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.12);">'
             '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#00f0ff;margin-bottom:3px;">▲ OVER</div>'
+            'color:#00f0ff;margin-bottom:3px;">▲ MORE</div>'
             f'{_force_items(over_forces)}'
             '</div>'
             f'<div style="{_fcol_css}background:rgba(255,94,0,0.04);border:1px solid rgba(255,94,0,0.12);">'
             '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#ff5e00;margin-bottom:3px;">▼ UNDER</div>'
+            'color:#ff5e00;margin-bottom:3px;">▼ LESS</div>'
             f'{_force_items(under_forces)}'
             '</div>'
             '</div>'
@@ -604,11 +604,11 @@ def _render_qds_full_breakdown_html(result):
         '<table style="width:100%;border-collapse:separate;border-spacing:8px;margin-bottom:15px;">'
         '<tr>'
         '<td style="padding:12px;background:rgba(0,240,255,0.05);border-radius:6px;border-left:3px solid #00f0ff;vertical-align:top;width:50%;">'
-        '<div style="color:#00f0ff;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔵 Forces OVER</div>'
+        '<div style="color:#00f0ff;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔵 Forces MORE</div>'
         + _forces_html(over_forces) +
         '</td>'
         '<td style="padding:12px;background:rgba(255,94,0,0.05);border-radius:6px;border-left:3px solid #ff5e00;vertical-align:top;width:50%;">'
-        '<div style="color:#ff5e00;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔴 Forces UNDER</div>'
+        '<div style="color:#ff5e00;font-weight:600;font-size:0.85rem;margin-bottom:8px;">🔴 Forces LESS</div>'
         + _forces_html(under_forces) +
         '</td>'
         '</tr>'
@@ -1008,7 +1008,7 @@ def display_prop_analysis_card_qds(result):
 
     # ── Prop description string ──────────────────────────────────
     stat_emoji = _STAT_EMOJI.get(stat, "🏀")
-    dir_label  = "Over" if direction == "OVER" else "Under"
+    dir_label  = "More" if direction == "OVER" else "Less"
     prop_text  = f"{stat_emoji} {dir_label} {line} {stat.title()}"
 
     # ── Ensemble / model badges ───────────────────────────────────
@@ -1228,7 +1228,7 @@ def display_prop_analysis_card_qds(result):
             _fc1, _fc2 = st.columns(2)
             with _fc1:
                 st.markdown(
-                    f'<div style="color:#00ff9d;font-size:0.8rem;font-weight:700;">⬆️ OVER Forces ({len(_over_forces_list)})</div>',
+                    f'<div style="color:#00ff9d;font-size:0.8rem;font-weight:700;">⬆️ MORE Forces ({len(_over_forces_list)})</div>',
                     unsafe_allow_html=True,
                 )
                 for _f in _over_forces_list[:5]:
@@ -1236,7 +1236,7 @@ def display_prop_analysis_card_qds(result):
                     st.markdown(f'<div style="color:#a0d0b0;font-size:0.77rem;">• {_html.escape(str(_fname))}</div>', unsafe_allow_html=True)
             with _fc2:
                 st.markdown(
-                    f'<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">⬇️ UNDER Forces ({len(_under_forces_list)})</div>',
+                    f'<div style="color:#ff6b6b;font-size:0.8rem;font-weight:700;">⬇️ LESS Forces ({len(_under_forces_list)})</div>',
                     unsafe_allow_html=True,
                 )
                 for _f in _under_forces_list[:5]:
