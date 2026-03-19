@@ -1,0 +1,259 @@
+# ============================================================
+# FILE: tests/test_phase1_retry_and_index.py
+# PURPOSE: Tests for Phase 1 improvements:
+#          1) Sync fetch functions use _fetch_with_retry (exponential backoff)
+#          2) Pre-indexed player lookup for O(1) fuzzy matching
+# ============================================================
+
+import pathlib
+import sys
+import unittest
+from unittest.mock import MagicMock
+
+
+def _ensure_streamlit_mock():
+    """Inject a lightweight streamlit mock if not installed."""
+    if "streamlit" not in sys.modules:
+        mock_st = MagicMock()
+        mock_st.session_state = {}
+        mock_st.cache_data = lambda **kw: (lambda f: f)
+        sys.modules["streamlit"] = mock_st
+
+
+# ============================================================
+# Section 1: Sync Fetch Functions Use _fetch_with_retry
+# ============================================================
+
+class TestSyncFetchRetryIntegration(unittest.TestCase):
+    """Verify that synchronous platform fetch functions call _fetch_with_retry
+    instead of raw requests.get, ensuring exponential backoff on 429/5xx."""
+
+    def setUp(self):
+        _ensure_streamlit_mock()
+        self.src = (
+            pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        )
+        self.content = self.src.read_text(encoding="utf-8")
+
+    def test_fetch_with_retry_function_exists(self):
+        """_fetch_with_retry helper must be defined in platform_fetcher.py."""
+        self.assertIn(
+            "def _fetch_with_retry(",
+            self.content,
+            "_fetch_with_retry function should be defined",
+        )
+
+    def test_fetch_with_retry_has_exponential_backoff(self):
+        """_fetch_with_retry must implement exponential backoff (2 ** attempt)."""
+        self.assertIn(
+            "2 ** attempt",
+            self.content,
+            "_fetch_with_retry should use exponential backoff",
+        )
+
+    def test_fetch_with_retry_handles_429(self):
+        """_fetch_with_retry must handle HTTP 429 rate limit responses."""
+        self.assertIn("status_code == 429", self.content)
+
+    def test_prizepicks_uses_fetch_with_retry(self):
+        """PrizePicks sync fetcher should call _fetch_with_retry, not raw requests.get."""
+        # Find the PrizePicks fetch section (between the function def and parsing)
+        pp_start = self.content.find("def fetch_prizepicks_props(")
+        pp_end = self.content.find("# ── Parse the response", pp_start)
+        pp_section = self.content[pp_start:pp_end]
+
+        self.assertIn(
+            "_fetch_with_retry(",
+            pp_section,
+            "PrizePicks fetcher should use _fetch_with_retry for retry logic",
+        )
+
+    def test_underdog_uses_fetch_with_retry(self):
+        """Underdog sync fetcher should call _fetch_with_retry, not raw requests.get."""
+        ud_start = self.content.find("def fetch_underdog_props(")
+        ud_end = self.content.find("# ── Parse the response", ud_start)
+        ud_section = self.content[ud_start:ud_end]
+
+        self.assertIn(
+            "_fetch_with_retry(",
+            ud_section,
+            "Underdog fetcher should use _fetch_with_retry for retry logic",
+        )
+
+    def test_draftkings_events_uses_fetch_with_retry(self):
+        """DraftKings events fetch should call _fetch_with_retry."""
+        dk_start = self.content.find("def fetch_draftkings_props(")
+        # The events fetch is Step 1, before the per-event loop
+        step1_marker = "Step 1: Get list of today"
+        step1_pos = self.content.find(step1_marker, dk_start)
+        step2_marker = "Step 2: Fetch player props"
+        step2_pos = self.content.find(step2_marker, dk_start)
+        events_section = self.content[step1_pos:step2_pos]
+
+        self.assertIn(
+            "_fetch_with_retry(",
+            events_section,
+            "DraftKings events fetch should use _fetch_with_retry",
+        )
+
+    def test_draftkings_props_uses_fetch_with_retry(self):
+        """DraftKings per-event props fetch should call _fetch_with_retry."""
+        dk_start = self.content.find("def fetch_draftkings_props(")
+        step2_marker = "Step 2: Fetch player props"
+        step2_pos = self.content.find(step2_marker, dk_start)
+        # Find the next function definition to bound the search
+        next_func = self.content.find("\ndef ", step2_pos + 1)
+        props_section = self.content[step2_pos:next_func]
+
+        self.assertIn(
+            "_fetch_with_retry(",
+            props_section,
+            "DraftKings per-event props fetch should use _fetch_with_retry",
+        )
+
+    def test_fetch_with_retry_handles_none_response(self):
+        """Sync fetch functions must handle None return from _fetch_with_retry."""
+        # After switching to _fetch_with_retry, callers must check for None
+        # (returned when all retries are exhausted)
+        pp_start = self.content.find("def fetch_prizepicks_props(")
+        pp_end = self.content.find("# ── Parse the response", pp_start)
+        pp_section = self.content[pp_start:pp_end]
+        self.assertIn(
+            "response is None",
+            pp_section,
+            "PrizePicks must handle None return from _fetch_with_retry",
+        )
+
+
+# ============================================================
+# Section 2: Pre-Indexed Player Fuzzy Lookup
+# ============================================================
+
+class TestPlayerIndexedLookup(unittest.TestCase):
+    """Verify that find_player_by_name_fuzzy uses pre-computed indices
+    for O(1) exact, alias, and normalized lookups."""
+
+    def setUp(self):
+        _ensure_streamlit_mock()
+        from data.data_manager import (
+            find_player_by_name_fuzzy,
+            normalize_player_name,
+            _build_player_index,
+            _player_index_cache,
+        )
+        self.fuzzy = find_player_by_name_fuzzy
+        self.normalize = normalize_player_name
+        self.build_index = _build_player_index
+        self.index_cache = _player_index_cache
+
+        self.players = [
+            {"name": "LeBron James", "team": "LAL", "points_avg": "25.0"},
+            {"name": "Stephen Curry", "team": "GSW", "points_avg": "28.0"},
+            {"name": "Nikola Jokić", "team": "DEN", "points_avg": "26.0"},
+            {"name": "Nicolas Claxton", "team": "BKN", "points_avg": "10.0"},
+            {"name": "Jaren Jackson Jr.", "team": "MEM", "points_avg": "22.0"},
+            {"name": "Shai Gilgeous-Alexander", "team": "OKC", "points_avg": "31.0"},
+        ]
+
+    def test_build_index_returns_three_dicts(self):
+        """_build_player_index returns (lower_index, alias_index, normalized_index)."""
+        lower_idx, alias_idx, norm_idx = self.build_index(self.players)
+        self.assertIsInstance(lower_idx, dict)
+        self.assertIsInstance(alias_idx, dict)
+        self.assertIsInstance(norm_idx, dict)
+
+    def test_lower_index_keys(self):
+        """Lower index should contain lowered player names."""
+        lower_idx, _, _ = self.build_index(self.players)
+        self.assertIn("lebron james", lower_idx)
+        self.assertIn("stephen curry", lower_idx)
+
+    def test_alias_index_resolves_nicknames(self):
+        """Alias index should resolve known nicknames to player dicts."""
+        _, alias_idx, _ = self.build_index(self.players)
+        # "steph" → "stephen curry" alias
+        self.assertIn("steph", alias_idx)
+        self.assertEqual(alias_idx["steph"]["name"], "Stephen Curry")
+
+    def test_normalized_index_handles_unicode(self):
+        """Normalized index should map unicode-stripped names to players."""
+        _, _, norm_idx = self.build_index(self.players)
+        # "Nikola Jokić" → normalized "nikola jokic"
+        self.assertIn("nikola jokic", norm_idx)
+
+    def test_exact_match(self):
+        """Pass 1: exact case-insensitive match (O(1))."""
+        result = self.fuzzy(self.players, "LeBron James")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "LeBron James")
+
+    def test_alias_match(self):
+        """Pass 2: alias lookup for common nicknames (O(1))."""
+        result = self.fuzzy(self.players, "steph")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Stephen Curry")
+
+    def test_sga_alias(self):
+        """Alias 'sga' should resolve to Shai Gilgeous-Alexander."""
+        result = self.fuzzy(self.players, "sga")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Shai Gilgeous-Alexander")
+
+    def test_normalized_unicode_match(self):
+        """Pass 3: normalized match handles unicode accents."""
+        result = self.fuzzy(self.players, "Nikola Jokic")  # no accent
+        self.assertIsNotNone(result)
+        self.assertEqual(result["team"], "DEN")
+
+    def test_nic_claxton_alias(self):
+        """'Nic Claxton' alias should resolve to 'Nicolas Claxton'."""
+        result = self.fuzzy(self.players, "Nic Claxton")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Nicolas Claxton")
+
+    def test_suffix_stripped_match(self):
+        """Pass 3: suffix stripping should match 'Jaren Jackson' to 'Jaren Jackson Jr.'"""
+        result = self.fuzzy(self.players, "Jaren Jackson")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["team"], "MEM")
+
+    def test_none_player_name(self):
+        """None or empty player_name should return None."""
+        self.assertIsNone(self.fuzzy(self.players, None))
+        self.assertIsNone(self.fuzzy(self.players, ""))
+
+    def test_not_found(self):
+        """Unknown player should return None."""
+        result = self.fuzzy(self.players, "Unknown Player XYZ")
+        self.assertIsNone(result)
+
+    def test_index_cache_reuse(self):
+        """Index cache should be reused for the same players_list object."""
+        # First call builds the cache
+        self.fuzzy(self.players, "LeBron James")
+        cached_id = self.index_cache["list_id"]
+        self.assertEqual(cached_id, id(self.players))
+
+        # Second call should reuse the cache (same list object)
+        self.fuzzy(self.players, "Stephen Curry")
+        self.assertEqual(self.index_cache["list_id"], cached_id)
+
+    def test_index_cache_invalidated_on_new_list(self):
+        """Index cache should rebuild when a different players_list is passed."""
+        self.fuzzy(self.players, "LeBron James")
+        old_id = self.index_cache["list_id"]
+
+        # New list object → cache should rebuild
+        new_players = list(self.players)  # shallow copy = different id()
+        self.fuzzy(new_players, "LeBron James")
+        self.assertNotEqual(self.index_cache["list_id"], old_id)
+
+    def test_partial_substring_match(self):
+        """Pass 4: partial/substring fallback should work for partial names."""
+        result = self.fuzzy(self.players, "Gilgeous-Alexander")
+        self.assertIsNotNone(result)
+        self.assertEqual(result["team"], "OKC")
+
+
+if __name__ == "__main__":
+    unittest.main()
