@@ -5,6 +5,21 @@
 import math
 import itertools
 
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Prevents NaN or ±inf from leaking out of odds/Kelly calculations
+    into the UI layer.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
 # Minimum combined overround (sum of both sides' implied probabilities)
 # required for devig to produce stable results. Normal two-sided markets
 # have overround ≥ 1.0; extreme positive odds on both sides (e.g.,
@@ -352,11 +367,11 @@ def calculate_fractional_kelly(model_prob, book_odds, multiplier=0.25):
         fractional = full_kelly * mult
 
         return {
-            "kelly_fraction": round(full_kelly, 6),
-            "fractional_kelly": round(fractional, 6),
+            "kelly_fraction": _safe_float(round(full_kelly, 6)),
+            "fractional_kelly": _safe_float(round(fractional, 6)),
             "multiplier": mult,
-            "ev_per_unit": round(ev_per_unit, 6),
-            "edge": round(edge, 6),
+            "ev_per_unit": _safe_float(round(ev_per_unit, 6)),
+            "edge": _safe_float(round(edge, 6)),
         }
     except (ValueError, TypeError, ZeroDivisionError):
         return {
@@ -421,9 +436,9 @@ def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
         fair_odds = implied_probability_to_american_odds(prob)
 
         return {
-            "win_probability": round(prob, 6),
-            "fair_odds": fair_odds,
-            "target_line": target,
+            "win_probability": _safe_float(round(prob, 6), 0.5),
+            "fair_odds": _safe_float(fair_odds, 100.0),
+            "target_line": _safe_float(target),
             "direction": d,
             "sample_size": n,
         }

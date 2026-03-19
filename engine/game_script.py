@@ -22,6 +22,17 @@ import math
 import random
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Module-Level Constants
 # ============================================================
@@ -343,11 +354,11 @@ def simulate_game_script(player_projection, game_context, num_simulations=500):
 
     return {
         'simulated_values': simulated_values,
-        'mean': round(mean_val, 3),
-        'std': round(std_val, 3),
-        'p10': round(p10_val, 3),
-        'p90': round(p90_val, 3),
-        'blowout_game_rate': round(blowout_rate, 4),
+        'mean': round(_safe_float(mean_val, 0.0), 3),
+        'std': round(_safe_float(std_val, 1.0), 3),
+        'p10': round(_safe_float(p10_val, 0.0), 3),
+        'p90': round(_safe_float(p90_val, 0.0), 3),
+        'blowout_game_rate': round(_safe_float(blowout_rate, 0.0), 4),
         'player_tier': player_tier,
     }
 
@@ -406,11 +417,11 @@ def blend_with_flat_simulation(game_script_results, flat_simulation_results, ble
     blended_std  = blend_weight * gs_std  + flat_weight * flat_std
 
     return {
-        'blended_mean':      round(blended_mean, 3),
-        'blended_std':       round(blended_std, 3),
-        'game_script_mean':  round(gs_mean, 3),
-        'flat_mean':         round(flat_mean, 3),
-        'blend_weight':      blend_weight,
+        'blended_mean':      round(_safe_float(blended_mean, 0.0), 3),
+        'blended_std':       round(_safe_float(blended_std, 1.0), 3),
+        'game_script_mean':  round(_safe_float(gs_mean, 0.0), 3),
+        'flat_mean':         round(_safe_float(flat_mean, 0.0), 3),
+        'blend_weight':      _safe_float(blend_weight, 0.0),
     }
 
 # ============================================================

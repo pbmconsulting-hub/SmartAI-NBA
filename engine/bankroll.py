@@ -22,6 +22,21 @@
 import math
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Last-line-of-defence guard that prevents NaN or ±inf from leaking
+    out of the bankroll engine into downstream UI / allocation code.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Kelly Constants
 # ============================================================
@@ -98,7 +113,7 @@ def calculate_kelly_fraction(win_probability, payout_multiplier, kelly_fraction_
         fractional_kelly = full_kelly / divisor
 
         # Hard cap: never exceed MAX_PER_ENTRY_FRACTION of bankroll
-        return round(min(fractional_kelly, MAX_PER_ENTRY_FRACTION), 6)
+        return _safe_float(round(min(fractional_kelly, MAX_PER_ENTRY_FRACTION), 6), 0.0)
 
     except Exception:
         return 0.0
@@ -180,9 +195,9 @@ def get_bankroll_allocation(entries, bankroll, kelly_fraction_mode='quarter'):
             expected_profit = recommended_bet * (p * gross - 1.0)
 
             enriched = dict(entry)
-            enriched['recommended_bet'] = recommended_bet
-            enriched['kelly_fraction'] = round(kf * scale, 6)
-            enriched['expected_profit'] = round(expected_profit, 2)
+            enriched['recommended_bet'] = _safe_float(recommended_bet, 0.0)
+            enriched['kelly_fraction'] = _safe_float(round(kf * scale, 6), 0.0)
+            enriched['expected_profit'] = _safe_float(round(expected_profit, 2), 0.0)
             enriched['kelly_mode'] = kelly_fraction_mode
             result.append(enriched)
 
@@ -273,13 +288,13 @@ def get_session_risk_summary(entries, bankroll):
             risk_of_ruin_estimate = min(1.0, max(0.0, math.exp(exponent)))
 
         return {
-            'total_at_risk': round(total_at_risk, 2),
-            'total_at_risk_pct': round(total_at_risk / bankroll, 4) if bankroll > 0 else 0.0,
-            'expected_profit': round(expected_profit, 2),
-            'prob_positive_session': round(prob_positive_session, 4),
-            'worst_case_loss': round(worst_case_loss, 2),
-            'best_case_gain': round(best_case_gain, 2),
-            'risk_of_ruin_estimate': round(risk_of_ruin_estimate, 4),
+            'total_at_risk': _safe_float(round(total_at_risk, 2), 0.0),
+            'total_at_risk_pct': _safe_float(round(total_at_risk / bankroll, 4) if bankroll > 0 else 0.0, 0.0),
+            'expected_profit': _safe_float(round(expected_profit, 2), 0.0),
+            'prob_positive_session': _safe_float(round(prob_positive_session, 4), 0.0),
+            'worst_case_loss': _safe_float(round(worst_case_loss, 2), 0.0),
+            'best_case_gain': _safe_float(round(best_case_gain, 2), 0.0),
+            'risk_of_ruin_estimate': _safe_float(round(risk_of_ruin_estimate, 4), 0.0),
             'num_entries': len(entries),
         }
 

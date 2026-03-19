@@ -9,9 +9,22 @@
 from __future__ import annotations
 
 import logging
+import math as _math
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if _math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
 
 # ─── Streak & Form Constants ──────────────────────────────────
 _STREAK_WINDOW = 5        # games used to define "recent form"
@@ -139,12 +152,12 @@ def get_recent_form_vs_line(
         form_label = "Neutral ➡️"
 
     return {
-        "window": window,
-        "hits": hits,
-        "misses": misses,
-        "hit_rate": hit_rate,
-        "avg_vs_line": round(avg_val, 1),
-        "avg_margin": round(avg_margin, 1),
+        "window": int(window),
+        "hits": int(hits),
+        "misses": int(misses),
+        "hit_rate": _safe_float(hit_rate),
+        "avg_vs_line": _safe_float(round(avg_val, 1)),
+        "avg_margin": _safe_float(round(avg_margin, 1)),
         "results": results,
         "form_label": form_label,
         "streak": _compute_streak(results),
@@ -213,7 +226,7 @@ def grade_matchup(
         }
     """
     if opponent_def_rating is None or not all_def_ratings:
-        return {"grade": "N/A", "label": "No Data", "percentile": 0.5, "color_class": "grade-na"}
+        return {"grade": "N/A", "label": "No Data", "percentile": _safe_float(0.5, 0.5), "color_class": "grade-na"}
 
     sorted_ratings = sorted(all_def_ratings)
     n = len(sorted_ratings)
@@ -223,13 +236,13 @@ def grade_matchup(
     percentile = rank / max(n - 1, 1)
 
     if percentile >= _GRADE_EASY_THRESHOLD:
-        return {"grade": "A", "label": "Elite Matchup 🎯", "percentile": percentile, "color_class": "grade-a"}
+        return {"grade": "A", "label": "Elite Matchup 🎯", "percentile": _safe_float(percentile, 0.5), "color_class": "grade-a"}
     elif percentile >= _GRADE_GOOD_THRESHOLD:
-        return {"grade": "B", "label": "Good Matchup ✅", "percentile": percentile, "color_class": "grade-b"}
+        return {"grade": "B", "label": "Good Matchup ✅", "percentile": _safe_float(percentile, 0.5), "color_class": "grade-b"}
     elif percentile >= _GRADE_AVERAGE_THRESHOLD:
-        return {"grade": "C", "label": "Average Matchup ➡️", "percentile": percentile, "color_class": "grade-c"}
+        return {"grade": "C", "label": "Average Matchup ➡️", "percentile": _safe_float(percentile, 0.5), "color_class": "grade-c"}
     else:
-        return {"grade": "D", "label": "Tough Matchup ⚠️", "percentile": percentile, "color_class": "grade-d"}
+        return {"grade": "D", "label": "Tough Matchup ⚠️", "percentile": _safe_float(percentile, 0.5), "color_class": "grade-d"}
 
 
 # ============================================================
@@ -290,7 +303,7 @@ def get_availability_context(
         "badge_class": badge_class,
         "badge_label": badge_label,
         "injury_note": info.get("injury_note") or info.get("injury") or "",
-        "games_missed": int(info.get("games_missed") or 0),
+        "games_missed": int(_safe_float(info.get("games_missed"), 0)),
         "return_date": info.get("return_date") or "",
         "is_active": is_active,
         "is_flagged": is_flagged,
@@ -326,8 +339,8 @@ def assess_line_value(
             "direction": "—",
             "value_label": "No Data",
             "value_class": "val-neutral",
-            "season_avg": season_avg,
-            "prop_line": prop_line,
+            "season_avg": _safe_float(season_avg),
+            "prop_line": _safe_float(prop_line),
             "diff": 0.0,
         }
 
@@ -352,13 +365,13 @@ def assess_line_value(
             label, cls = "Fair / Marginal", "val-neutral"
 
     return {
-        "edge_pct": round(edge_pct, 1),
+        "edge_pct": _safe_float(round(edge_pct, 1)),
         "direction": direction,
         "value_label": label,
         "value_class": cls,
-        "season_avg": round(season_avg, 1),
-        "prop_line": round(prop_line, 1),
-        "diff": round(diff, 1),
+        "season_avg": _safe_float(round(season_avg, 1)),
+        "prop_line": _safe_float(round(prop_line, 1)),
+        "diff": _safe_float(round(diff, 1)),
     }
 
 

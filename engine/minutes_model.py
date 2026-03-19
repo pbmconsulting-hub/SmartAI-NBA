@@ -29,6 +29,17 @@ except ImportError:
     _HAS_ROTATION_TRACKER = False
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Minutes Model Constants
 # ============================================================
@@ -242,13 +253,13 @@ def project_player_minutes(player_data, game_context, teammate_status=None, game
     minutes_ceiling = round(min(MAX_MINUTES_CAP, projected + 1.5 * minutes_std), 1)
 
     return {
-        'projected_minutes': round(projected, 1),
-        'minutes_std': minutes_std,
-        'minutes_floor': minutes_floor,
-        'minutes_ceiling': minutes_ceiling,
-        'base_minutes': round(base_minutes, 1),
+        'projected_minutes': _safe_float(round(projected, 1), 0.0),
+        'minutes_std': _safe_float(minutes_std, 3.0),
+        'minutes_floor': _safe_float(minutes_floor, 0.0),
+        'minutes_ceiling': _safe_float(minutes_ceiling, 48.0),
+        'base_minutes': _safe_float(round(base_minutes, 1), 0.0),
         'adjustment_notes': adjustment_notes,
-        'blowout_risk': blowout_risk,
+        'blowout_risk': _safe_float(blowout_risk, 0.15),
     }
 
 

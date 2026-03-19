@@ -12,6 +12,21 @@ import math        # For rounding and floor
 import statistics  # For stdev in multi-source agreement bonus (3B)
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Last-line-of-defence guard that prevents NaN or ±inf from leaking
+    out of the confidence engine into downstream UI / rendering code.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Confidence Score Constants
 # Define the weights for each factor in our confidence model.
@@ -539,24 +554,24 @@ def calculate_confidence_score(
     # ============================================================
 
     return {
-        "confidence_score": final_score,
+        "confidence_score": _safe_float(final_score, 0.0),
         "tier": tier_name,
         "tier_emoji": tier_emoji,
         "direction": bet_direction,
         "recommendation": recommendation,
         "should_avoid": should_avoid,
         "avoid_reasons": avoid_reasons,
-        "sample_size_discount": round(sample_size_discount, 3),
-        "probability_agreement_bonus": round(probability_agreement_bonus, 2),
-        "streak_adjustment": round(streak_adjustment, 2),
+        "sample_size_discount": _safe_float(round(sample_size_discount, 3), 1.0),
+        "probability_agreement_bonus": _safe_float(round(probability_agreement_bonus, 2), 0.0),
+        "streak_adjustment": _safe_float(round(streak_adjustment, 2), 0.0),
         "score_breakdown": {
-            "probability_score": round(probability_score, 1),
-            "edge_score": round(edge_score, 1),
-            "directional_score": round(directional_score, 1),
-            "matchup_score": round(matchup_score, 1),
-            "historical_score": round(historical_score, 1),
-            "sample_size_score": round(sample_size_score, 1),
-            "recent_form_score": round(recent_form_score, 1),
+            "probability_score": _safe_float(round(probability_score, 1), 0.0),
+            "edge_score": _safe_float(round(edge_score, 1), 0.0),
+            "directional_score": _safe_float(round(directional_score, 1), 50.0),
+            "matchup_score": _safe_float(round(matchup_score, 1), 50.0),
+            "historical_score": _safe_float(round(historical_score, 1), 50.0),
+            "sample_size_score": _safe_float(round(sample_size_score, 1), 50.0),
+            "recent_form_score": _safe_float(round(recent_form_score, 1), 50.0),
         },
     }
 
@@ -792,7 +807,7 @@ def calculate_risk_score(confidence_result, edge_pct, cv, platform=None) -> dict
         risk_factors.append(f"Low tier ({tier})")
 
     return {
-        "risk_score": risk,
+        "risk_score": _safe_float(risk, 5.0),
         "risk_label": risk_label,
         "risk_factors": risk_factors,
     }

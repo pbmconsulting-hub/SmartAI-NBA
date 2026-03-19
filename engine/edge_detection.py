@@ -11,6 +11,22 @@
 # Standard library only
 import math  # For rounding calculations
 
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Last-line-of-defence guard that prevents NaN or ±inf from leaking
+    out of the edge detection engine into downstream scoring code.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Module-Level Constants
 # ============================================================
@@ -404,11 +420,11 @@ def analyze_directional_forces(
         "under_forces": all_under_forces,
         "over_count": over_count,
         "under_count": under_count,
-        "over_strength": round(over_total_strength, 2),
-        "under_strength": round(under_total_strength, 2),
+        "over_strength": _safe_float(round(over_total_strength, 2), 0.0),
+        "under_strength": _safe_float(round(under_total_strength, 2), 0.0),
         "net_direction": net_direction,
-        "net_strength": round(net_strength, 2),
-        "conflict_severity": round(conflict_severity, 3),
+        "net_strength": _safe_float(round(net_strength, 2), 0.0),
+        "conflict_severity": _safe_float(round(conflict_severity, 3), 0.0),
     }
 
     # ============================================================
@@ -472,8 +488,8 @@ def estimate_closing_line_value(current_line, model_projection, hours_to_game=No
     clv_edge = current_line - estimated_close
 
     return {
-        "estimated_closing_line": round(estimated_close, 3),
-        "clv_edge": round(clv_edge, 3),
+        "estimated_closing_line": _safe_float(round(estimated_close, 3), 0.0),
+        "clv_edge": _safe_float(round(clv_edge, 3), 0.0),
         "is_positive_clv": clv_edge > 0,
     }
 
@@ -1007,7 +1023,7 @@ def calculate_confidence_adjusted_edge(raw_edge_pct, confidence_score):
     if confidence_score <= 0:
         return 0.0
     adjusted = raw_edge_pct * (max(0.0, min(100.0, confidence_score)) / 100.0)
-    return round(adjusted, 3)
+    return _safe_float(round(adjusted, 3), 0.0)
 
 
 def detect_coin_flip(projection, prop_line, stat_std, stat_type=None):
@@ -1054,13 +1070,13 @@ def detect_coin_flip(projection, prop_line, stat_std, stat_type=None):
         )
         return {
             "is_coin_flip": True,
-            "std_devs_from_line": round(std_devs, 3),
+            "std_devs_from_line": _safe_float(round(std_devs, 3), 0.0),
             "message": msg,
         }
 
     return {
         "is_coin_flip": False,
-        "std_devs_from_line": round(std_devs, 3),
+        "std_devs_from_line": _safe_float(round(std_devs, 3), 0.0),
         "message": "",
     }
 
@@ -1120,9 +1136,9 @@ def calculate_weighted_net_force(directional_forces_result):
     dominant = "OVER" if net >= 0 else "UNDER"
 
     return {
-        "weighted_over_score": round(weighted_over, 3),
-        "weighted_under_score": round(weighted_under, 3),
-        "weighted_net": round(net, 3),
+        "weighted_over_score": _safe_float(round(weighted_over, 3), 0.0),
+        "weighted_under_score": _safe_float(round(weighted_under, 3), 0.0),
+        "weighted_net": _safe_float(round(net, 3), 0.0),
         "dominant_direction": dominant,
     }
 

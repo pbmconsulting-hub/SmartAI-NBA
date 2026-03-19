@@ -300,14 +300,17 @@ def fetch_prizepicks_props(league="NBA"):
         data = _cached
     else:
         try:
-            response = requests.get(
+            # Use _fetch_with_retry for exponential backoff on 429/5xx
+            response = _fetch_with_retry(
                 PRIZEPICKS_URL,
                 headers=headers,
-                timeout=REQUEST_TIMEOUT_SECONDS,
                 params={"league_id": 7, "per_page": 250, "single_stat": "true"},
                 # BEGINNER NOTE: league_id=7 is NBA on PrizePicks.
                 # per_page=250 gets more projections in one call.
             )
+            if response is None:
+                _logger.warning("[PrizePicks] All retries exhausted. Skipping.")
+                return []
             response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
             data = response.json()
             _cache_set(PRIZEPICKS_URL, data)
@@ -448,11 +451,14 @@ def fetch_underdog_props(league="NBA"):
         data = _cached_ud
     else:
         try:
-            response = requests.get(
+            # Use _fetch_with_retry for exponential backoff on 429/5xx
+            response = _fetch_with_retry(
                 UNDERDOG_URL,
                 headers=_BASE_HEADERS,
-                timeout=REQUEST_TIMEOUT_SECONDS,
             )
+            if response is None:
+                _logger.warning("[Underdog] All retries exhausted. Skipping.")
+                return []
             response.raise_for_status()
             data = response.json()
             _cache_set(UNDERDOG_URL, data)
@@ -603,12 +609,15 @@ def fetch_draftkings_props(api_key=None):
     # ── Step 1: Get list of today's NBA events ─────────────────
     events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
     try:
-        events_resp = requests.get(
+        # Use _fetch_with_retry for exponential backoff on 429/5xx
+        events_resp = _fetch_with_retry(
             events_url,
             headers=_BASE_HEADERS,
             params={"apiKey": api_key},
-            timeout=REQUEST_TIMEOUT_SECONDS,
         )
+        if events_resp is None:
+            _logger.warning("[DraftKings] All retries exhausted for events. Skipping.")
+            return []
         events_resp.raise_for_status()
         events = events_resp.json()
 
@@ -691,7 +700,8 @@ def fetch_draftkings_props(api_key=None):
             event_data = _cached_dk
         else:
             try:
-                props_resp = requests.get(
+                # Use _fetch_with_retry for exponential backoff on 429/5xx
+                props_resp = _fetch_with_retry(
                     props_url,
                     headers=_BASE_HEADERS,
                     params={
@@ -701,8 +711,10 @@ def fetch_draftkings_props(api_key=None):
                         "bookmakers": "draftkings",
                         "oddsFormat": "american",
                     },
-                    timeout=REQUEST_TIMEOUT_SECONDS,
                 )
+                if props_resp is None:
+                    _logger.warning(f"[DraftKings] All retries exhausted for event {event_id}. Skipping.")
+                    continue
                 props_resp.raise_for_status()
                 event_data = props_resp.json()
                 _cache_set(props_url, event_data)

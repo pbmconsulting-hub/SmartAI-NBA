@@ -16,6 +16,7 @@
 # Standard library imports (no install needed — built into Python)
 import csv          # For reading and writing CSV files
 import json         # For reading and writing JSON files (timestamps, etc.)
+import math         # For isfinite checks in safe_avg
 import time         # For adding delays between API calls
 import datetime     # For timestamps and date handling
 import statistics   # For calculating standard deviations
@@ -1195,7 +1196,9 @@ def fetch_player_recent_form(player_id, last_n_games=10):
             return {}
 
         def safe_avg(values):
-            return round(sum(values) / len(values), 1) if values else 0.0
+            """Average a list of numeric values, ignoring None/NaN entries."""
+            clean = [v for v in values if v is not None and isinstance(v, (int, float)) and math.isfinite(v)]
+            return round(sum(clean) / len(clean), 1) if clean else 0.0
 
         pts_list = [float(g.get("PTS", 0) or 0) for g in recent]
         reb_list = [float(g.get("REB", 0) or 0) for g in recent]

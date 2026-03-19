@@ -113,7 +113,18 @@ def is_cache_stale(player_name):
 
 
 def _load_cache_file():
-    """Load the raw cache JSON file."""
+    """Load the raw cache JSON file.
+
+    Also cleans up any stale ``.tmp`` file left behind by a crashed
+    ``_write_cache_file`` call — a lingering ``.tmp`` is harmless but
+    wastes disk space and could confuse operators.
+    """
+    _tmp = _CACHE_FILE + ".tmp"
+    if os.path.exists(_tmp):
+        try:
+            os.remove(_tmp)
+        except OSError:
+            pass
     if not os.path.exists(_CACHE_FILE):
         return {}
     try:

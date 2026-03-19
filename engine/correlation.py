@@ -17,6 +17,18 @@
 import math
 import statistics
 
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # Maximum correlation adjustment magnitude (conservative cap)
 MAX_CORRELATION_ADJUSTMENT = 0.15  # 15% max adjustment to joint probability
 
@@ -651,7 +663,7 @@ def get_correlation_summary(picks, correlation_matrix):
 
     return {
         "risk_level": risk_level,
-        "avg_correlation": round(avg, 4),
+        "avg_correlation": _safe_float(round(avg, 4), 0.0),
         "correlated_pairs": pairs,
         "description": desc,
     }
@@ -731,9 +743,9 @@ def get_correlation_confidence(picks, correlation_matrix):
         risk_level = "high"
 
     return {
-        "correlation_confidence": round(corr_confidence, 1),
+        "correlation_confidence": _safe_float(round(corr_confidence, 1), 50.0),
         "correlation_risk_level": risk_level,
-        "diversification_score": round(diversification_score, 3),
+        "diversification_score": _safe_float(round(diversification_score, 3), 0.0),
     }
 
 
@@ -801,9 +813,9 @@ def correlation_adjusted_kelly(picks, bankroll, correlation_matrix):
     adjusted_kelly = min(0.25, max(0.0, adjusted_kelly))
 
     return {
-        "kelly_fraction": round(adjusted_kelly, 4),
-        "recommended_bet": round(adjusted_kelly * bankroll, 2),
-        "correlation_discount": round(correlation_discount, 4),
+        "kelly_fraction": _safe_float(round(adjusted_kelly, 4), 0.0),
+        "recommended_bet": _safe_float(round(adjusted_kelly * bankroll, 2), 0.0),
+        "correlation_discount": _safe_float(round(correlation_discount, 4), 1.0),
     }
 
 

@@ -16,6 +16,17 @@
 import math
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Module-Level Constants
 # ============================================================
@@ -136,8 +147,8 @@ def compare_platform_lines(player_name, stat_type, direction, platform_lines):
             "best_platform":         None,
             "best_line":             None,
             "worst_line":            None,
-            "line_spread":           0.0,
-            "edge_bonus_pct":        0.0,
+            "line_spread":           _safe_float(0.0, 0.0),
+            "edge_bonus_pct":        _safe_float(0.0, 0.0),
             "all_platforms":         [],
             "has_meaningful_spread": False,
         }
@@ -174,10 +185,10 @@ def compare_platform_lines(player_name, stat_type, direction, platform_lines):
         "stat_type":             stat_type,
         "direction":             direction,
         "best_platform":         best_platform,
-        "best_line":             best_line,
-        "worst_line":            worst_line,
-        "line_spread":           line_spread,
-        "edge_bonus_pct":        edge_bonus_pct,
+        "best_line":             _safe_float(best_line, 0.0) if best_line is not None else None,
+        "worst_line":            _safe_float(worst_line, 0.0) if worst_line is not None else None,
+        "line_spread":           _safe_float(line_spread, 0.0),
+        "edge_bonus_pct":        _safe_float(edge_bonus_pct, 0.0),
         "all_platforms":         all_platforms,
         "has_meaningful_spread": line_spread >= MIN_MEANINGFUL_LINE_DIFF,
     }
@@ -231,8 +242,8 @@ def calculate_line_shopping_value(
         "worst_platform":  None,
         "best_line":       None,
         "worst_line":      None,
-        "prob_improvement": 0.0,
-        "ev_gain_dollars": 0.0,
+        "prob_improvement": _safe_float(0.0, 0.0),
+        "ev_gain_dollars": _safe_float(0.0, 0.0),
     }
 
     if not platform_lines or stat_std <= 0:
@@ -268,10 +279,10 @@ def calculate_line_shopping_value(
     return {
         "best_platform":    best_platform,
         "worst_platform":   worst_platform,
-        "best_line":        best_line,
-        "worst_line":       worst_line,
-        "prob_improvement": prob_improvement,
-        "ev_gain_dollars":  ev_gain_dollars,
+        "best_line":        _safe_float(best_line, 0.0) if best_line is not None else None,
+        "worst_line":       _safe_float(worst_line, 0.0) if worst_line is not None else None,
+        "prob_improvement": _safe_float(prob_improvement, 0.0),
+        "ev_gain_dollars":  _safe_float(ev_gain_dollars, 0.0),
     }
 
 

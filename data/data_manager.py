@@ -390,15 +390,61 @@ def normalize_player_name(name):
     return name
 
 
+def _build_player_index(players_list):
+    """
+    Build pre-computed lookup indices for a players list.
+
+    Returns three dicts so that find_player_by_name_fuzzy() can resolve
+    most lookups in O(1) instead of scanning the entire list per call.
+    This is critical when matching 6,000+ props against 500+ players.
+
+    Returns:
+        tuple: (lower_index, alias_index, normalized_index) where each maps
+        a string key → player dict.
+    """
+    lower_index = {}       # lowered name → player
+    normalized_index = {}  # normalized name → player
+
+    for player in players_list:
+        raw_name = player.get("name", "")
+        lname = raw_name.lower().strip()
+        nname = normalize_player_name(raw_name)
+
+        # First player wins for each key (stable ordering)
+        if lname and lname not in lower_index:
+            lower_index[lname] = player
+        if nname and nname not in normalized_index:
+            normalized_index[nname] = player
+
+    # Alias index: resolve each alias target to a player via the lower index
+    alias_index = {}
+    for alias_key, canonical in NAME_ALIASES.items():
+        if alias_key not in alias_index and canonical in lower_index:
+            alias_index[alias_key] = lower_index[canonical]
+
+    return lower_index, alias_index, normalized_index
+
+
+# Module-level cache for the player index. Invalidated when the
+# players_list identity (id) changes (e.g., after a data reload).
+import threading as _threading
+_player_index_lock = _threading.Lock()
+_player_index_cache = {"list_id": None, "index": (None, None, None)}
+
+
 def find_player_by_name_fuzzy(players_list, player_name):
     """
     Find a player using fuzzy / normalized name matching.
 
     Matching order (first match wins):
-    1. Exact case-insensitive match
-    2. Alias lookup (common nickname / platform name variants)
-    3. Normalized name match (strip suffixes + unicode)
-    4. Partial / substring match on normalized names
+    1. Exact case-insensitive match (O(1) via index)
+    2. Alias lookup (O(1) via index)
+    3. Normalized name match (O(1) via index)
+    4. Partial / substring match on normalized names (O(n) fallback)
+
+    The first three passes use pre-computed dict indices built once per
+    players_list, making repeated calls (e.g., matching 6,000 props)
+    close to O(m) instead of O(m × n).
 
     Args:
         players_list (list of dict): Loaded player data
@@ -414,33 +460,39 @@ def find_player_by_name_fuzzy(players_list, player_name):
     if not player_name:
         return None
 
+    # ── Lazily build / cache the index for this players_list ──
+    list_id = id(players_list)
+    with _player_index_lock:
+        if _player_index_cache["list_id"] != list_id:
+            _player_index_cache["index"] = _build_player_index(players_list)
+            _player_index_cache["list_id"] = list_id
+
+    lower_index, alias_index, normalized_index = _player_index_cache["index"]
+
     search_lower = player_name.lower().strip()
 
-    # --- Pass 1: Exact case-insensitive ---
-    for player in players_list:
-        if player.get("name", "").lower().strip() == search_lower:
-            return player
+    # --- Pass 1: Exact case-insensitive (O(1)) ---
+    match = lower_index.get(search_lower)
+    if match is not None:
+        return match
 
-    # --- Pass 2: Alias lookup ---
-    alias_target = NAME_ALIASES.get(search_lower)
-    if alias_target:
-        for player in players_list:
-            if player.get("name", "").lower().strip() == alias_target:
-                return player
+    # --- Pass 2: Alias lookup (O(1)) ---
+    match = alias_index.get(search_lower)
+    if match is not None:
+        return match
 
-    # --- Pass 3: Normalized name match (strip suffixes + unicode) ---
+    # --- Pass 3: Normalized name match (O(1)) ---
     search_normalized = normalize_player_name(player_name)
-    for player in players_list:
-        stored_normalized = normalize_player_name(player.get("name", ""))
-        if stored_normalized == search_normalized and search_normalized:
-            return player
+    match = normalized_index.get(search_normalized)
+    if match is not None and search_normalized:
+        return match
 
-    # --- Pass 4: Partial / substring match on normalized names ---
-    for player in players_list:
-        stored_normalized = normalize_player_name(player.get("name", ""))
-        if (search_normalized in stored_normalized or stored_normalized in search_normalized) \
-                and len(search_normalized) > 3:
-            return player
+    # --- Pass 4: Partial / substring match on normalized names (O(n) fallback) ---
+    if len(search_normalized) > 3:
+        for player in players_list:
+            stored_normalized = normalize_player_name(player.get("name", ""))
+            if (search_normalized in stored_normalized or stored_normalized in search_normalized):
+                return player
 
     return None
 
