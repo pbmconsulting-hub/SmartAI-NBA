@@ -911,6 +911,11 @@ def fetch_all_platform_props(
         )
         all_props = all_props[:MAX_PROP_CAPACITY]
 
+    # ── Enrich with alt-line categories (goblin / 50_50 / demon) ──
+    # Stamp each prop with line_category and standard_line so that
+    # downstream classify_bet_type() can assign Demon / Goblin bets.
+    all_props = parse_alt_lines_from_platform_props(all_props)
+
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")
     return all_props
 
@@ -1259,6 +1264,9 @@ async def fetch_all_platforms_async(
             f"[Async] Capping props from {len(all_props)} → {MAX_PROP_CAPACITY}"
         )
         all_props = all_props[:MAX_PROP_CAPACITY]
+
+    # ── Enrich with alt-line categories (goblin / 50_50 / demon) ──
+    all_props = parse_alt_lines_from_platform_props(all_props)
 
     _logger.info(f"[Async] Total props fetched: {len(all_props)}")
     return all_props
