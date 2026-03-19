@@ -110,8 +110,9 @@ st.markdown("""
     letter-spacing: 0.03em;
 }
 .spp-hero-logo {
-    width: 72px;
-    height: 72px;
+    width: 3600px;
+    height: auto;
+    max-width: 80%;
     object-fit: contain;
     border-radius: 50%;
     box-shadow: 0 0 18px rgba(0,240,255,0.30);
@@ -120,7 +121,7 @@ st.markdown("""
 /* Responsive: stack on mobile */
 @media (max-width: 640px) {
     .hero-hud { flex-direction: column; text-align: center; padding: 24px 20px; }
-    .spp-hero-logo { width: 56px; height: 56px; }
+    .spp-hero-logo { width: 2800px; max-width: 80%; }
 }
 /* Status card — dark glass panel */
 .status-card {
@@ -297,7 +298,7 @@ st.markdown(f"""
   {_logo_img_tag}
   <div class="hero-hud-text">
     <div class="hero-tagline">Quantum-Powered Prop Analytics</div>
-    <div class="hero-subtext">1,000&times; Monte Carlo Simulations &bull; Institutional Edge Detection</div>
+    <div class="hero-subtext">1,000 Quantum Matrix Engine Simulations &bull; Institutional Edge Detection</div>
     <div class="hero-date">📅 {today_str} &nbsp;&bull;&nbsp; 🏟️ {game_count_text}</div>
   </div>
 </div>

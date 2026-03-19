@@ -386,6 +386,20 @@ h1, h2, h3, h4, h5, h6 {
     text-shadow: 0 0 8px rgba(0,240,255,0.5);
 }
 
+/* ─── Sidebar Logo — enlarged 125× per branding directive ── */
+[data-testid="stLogo"] {
+    max-width: none !important;
+    width: auto !important;
+    height: auto !important;
+}
+[data-testid="stLogo"] img {
+    max-height: 9000px !important;
+    height: auto !important;
+    width: 9000px !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
 /* ─── Streamlit native elements on dark bg ───────────────── */
 /* Metric glassmorphic card treatment */
 [data-testid="stMetric"] {
@@ -658,8 +672,9 @@ button[kind="primary"]:hover {
 }
 /* Logo circle thumbnail inside the hero header */
 .spp-hero-logo {
-    width: 72px;
-    height: 72px;
+    width: 3600px;
+    height: auto;
+    max-width: 80%;
     object-fit: contain;
     border-radius: 50%;
     box-shadow: 0 0 18px rgba(0,240,255,0.35), 0 0 8px rgba(200,16,46,0.25);

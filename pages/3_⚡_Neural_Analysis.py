@@ -29,10 +29,12 @@ from engine.simulation import (
     simulate_fantasy_score,
     simulate_double_double,
     simulate_triple_double,
+    generate_alt_line_probabilities,
+    format_alt_line_prediction,
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, format_goblin_demon_prediction
 
 try:
     from engine.rotation_tracker import track_minutes_trend
@@ -1468,6 +1470,26 @@ if run_analysis:
         full_result["over_odds"]  = prop.get("over_odds",  -110)
         full_result["under_odds"] = prop.get("under_odds", -110)
 
+        # ── Alt-Line Probability Generation (Goblin & Demon) ─────────
+        # Generate 3 Goblin lines (L-1, L-2, L-3) and 3 Demon lines
+        # (L+2, L+4, L+6) from the base prop line.  Probabilities are
+        # computed from the raw simulation distribution.
+        try:
+            _alt_lines = generate_alt_line_probabilities(simulation_output, prop_line)
+            full_result["alt_lines"] = _alt_lines
+            _best_alt = _alt_lines.get("best_alt", {})
+            _best_type = _best_alt.get("type", "base")
+            _best_line = _best_alt.get("line", prop_line)
+            full_result["prediction"] = _best_alt.get("prediction", "")
+            # Also store the prediction from the edge_detection formatter
+            # based on the classified bet_type (may differ from simulation best)
+            _bt = full_result.get("bet_type", "normal")
+            if _bt in ("goblin", "demon"):
+                full_result["prediction"] = format_goblin_demon_prediction(_bt, prop_line)
+        except Exception:
+            full_result["alt_lines"] = {}
+            full_result["prediction"] = ""
+
 
         try:
             _clv_penalties = get_stat_type_clv_penalties(days=90)
@@ -1924,12 +1946,11 @@ if analysis_results:
                 _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
                 _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
                 _gp_goblin_floor = _gp.get("goblin_floor")
-                # Plain-English reason sentence
-                _gp_plain_reason = (
-                    f"Line is set at {_gp_line}"
-                    + (f", but {_gp_name} averages {_gp_season_avg:.1f} and we project {_gp_proj:.1f}." if _gp_season_avg else f", but we project {_gp_proj:.1f}.")
-                    + " The gap is massive — easy money."
-                )
+                # Strict prediction string — "at LEAST" for Goblin bets
+                _gp_prediction = _gp.get("prediction", "")
+                if not _gp_prediction:
+                    _gp_prediction = f"I predict the stat will do at LEAST {_gp_line}"
+                _gp_plain_reason = _gp_prediction
                 _gp_team_badge = (
                     f'<span style="background:rgba(76,175,80,0.2);color:#81c784;padding:1px 7px;'
                     f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
@@ -1941,6 +1962,9 @@ if analysis_results:
                     f'padding:14px 18px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
                     f'<div>'
+                    f'<span style="background:rgba(76,175,80,0.25);color:#4caf50;padding:2px 8px;'
+                    f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
+                    f'border:1px solid rgba(76,175,80,0.5);">🟢 Goblin</span>'
                     f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
                     f'{_gp_team_badge}'
                     f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
@@ -1960,9 +1984,10 @@ if analysis_results:
                     f'Odds: {_odds_str}</span>'
                     f'</div>'
                     f'</div>'
-                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.08);'
-                    f'border-radius:4px;color:#a5d6a7;font-size:0.8rem;font-style:italic;">'
-                    f'💡 {_html.escape(_gp_plain_reason)}'
+                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.12);'
+                    f'border:1px solid rgba(76,175,80,0.3);'
+                    f'border-radius:4px;color:#a5d6a7;font-size:0.85rem;font-weight:600;">'
+                    f'🔮 Prediction: {_html.escape(_gp_plain_reason)}'
                     f'</div>'
                     f'<div style="margin-top:8px;">'
                     f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
@@ -2054,11 +2079,18 @@ if analysis_results:
                     f'<li style="color:#ffd580;font-size:0.82rem;">{_html.escape(str(r))}</li>'
                     for r in _dp_risk_flags
                 ) if _dp_risk_flags else ""
+                # Strict prediction string — "at MOST" for Demon bets
+                _dp_prediction = _dp.get("prediction", "")
+                if not _dp_prediction:
+                    _dp_prediction = f"I predict the stat will do at MOST {_dp_line}"
                 st.markdown(
                     f'<div style="background:rgba(255,140,0,0.08);border:1px solid rgba(255,140,0,0.35);'
                     f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
                     f'<div style="display:flex;justify-content:space-between;align-items:center;">'
                     f'<div>'
+                    f'<span style="background:rgba(244,67,54,0.25);color:#ef5350;padding:2px 8px;'
+                    f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
+                    f'border:1px solid rgba(244,67,54,0.5);">🔴 Demon</span>'
                     f'<span style="color:#ff8c00;font-weight:700;">🔥 {_dp_name}</span>'
                     f'{_dp_team_badge}'
                     f'<span style="background:#ff8c00;color:#fff;padding:2px 8px;border-radius:4px;'
@@ -2070,6 +2102,11 @@ if analysis_results:
                     f'<br><span style="color:#ff8c00;font-size:0.8rem;font-weight:600;">'
                     f'Proj: {_dp_proj:.1f} &nbsp;|&nbsp; Edge: {_dp_edge:+.1f}%</span>'
                     f'</div>'
+                    f'</div>'
+                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(255,140,0,0.12);'
+                    f'border:1px solid rgba(255,140,0,0.3);'
+                    f'border-radius:4px;color:#ffd580;font-size:0.85rem;font-weight:600;">'
+                    f'🔮 Prediction: {_html.escape(_dp_prediction)}'
                     f'</div>'
                     + (
                         f'<div style="margin-top:8px;">'
