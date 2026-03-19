@@ -427,6 +427,8 @@ def _build_player_index(players_list):
 
 # Module-level cache for the player index. Invalidated when the
 # players_list identity (id) changes (e.g., after a data reload).
+import threading as _threading
+_player_index_lock = _threading.Lock()
 _player_index_cache = {"list_id": None, "index": (None, None, None)}
 
 
@@ -460,9 +462,10 @@ def find_player_by_name_fuzzy(players_list, player_name):
 
     # ── Lazily build / cache the index for this players_list ──
     list_id = id(players_list)
-    if _player_index_cache["list_id"] != list_id:
-        _player_index_cache["index"] = _build_player_index(players_list)
-        _player_index_cache["list_id"] = list_id
+    with _player_index_lock:
+        if _player_index_cache["list_id"] != list_id:
+            _player_index_cache["index"] = _build_player_index(players_list)
+            _player_index_cache["list_id"] = list_id
 
     lower_index, alias_index, normalized_index = _player_index_cache["index"]
 

@@ -57,10 +57,10 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
 
     def test_prizepicks_uses_fetch_with_retry(self):
         """PrizePicks sync fetcher should call _fetch_with_retry, not raw requests.get."""
-        # Find the PrizePicks fetch section (between the function def and parsing)
+        # Find the PrizePicks fetch section (bounded by function defs)
         pp_start = self.content.find("def fetch_prizepicks_props(")
-        pp_end = self.content.find("# ── Parse the response", pp_start)
-        pp_section = self.content[pp_start:pp_end]
+        pp_next_func = self.content.find("\ndef ", pp_start + 1)
+        pp_section = self.content[pp_start:pp_next_func]
 
         self.assertIn(
             "_fetch_with_retry(",
@@ -71,8 +71,8 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
     def test_underdog_uses_fetch_with_retry(self):
         """Underdog sync fetcher should call _fetch_with_retry, not raw requests.get."""
         ud_start = self.content.find("def fetch_underdog_props(")
-        ud_end = self.content.find("# ── Parse the response", ud_start)
-        ud_section = self.content[ud_start:ud_end]
+        ud_next_func = self.content.find("\ndef ", ud_start + 1)
+        ud_section = self.content[ud_start:ud_next_func]
 
         self.assertIn(
             "_fetch_with_retry(",
@@ -116,8 +116,8 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
         # After switching to _fetch_with_retry, callers must check for None
         # (returned when all retries are exhausted)
         pp_start = self.content.find("def fetch_prizepicks_props(")
-        pp_end = self.content.find("# ── Parse the response", pp_start)
-        pp_section = self.content[pp_start:pp_end]
+        pp_next_func = self.content.find("\ndef ", pp_start + 1)
+        pp_section = self.content[pp_start:pp_next_func]
         self.assertIn(
             "response is None",
             pp_section,
