@@ -688,6 +688,12 @@ def auto_resolve_bet_results(date_str=None):
             logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
         return None
 
+    # ── Pre-fetch all unique player game logs in parallel ───────
+    # Collect unique (player_id, player_name) pairs that need API calls
+    _fetch_tasks = []  # list of (bet, player_id, stat_type_info)
+    _player_ids_to_fetch = set()
+    _bet_prep = []  # (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+
     for bet in pending_bets:
         bet_id      = bet.get("bet_id")
         player_name = bet.get("player_name", "")
@@ -739,24 +745,50 @@ def auto_resolve_bet_results(date_str=None):
             errors_list.append(f"#{bet_id} {player_name}: player not found in nba_api")
             continue
 
+        _player_ids_to_fetch.add(player_id)
+        _bet_prep.append((bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+
+    # ── Parallel game-log fetch using ThreadPoolExecutor ──────
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    _game_log_cache = {}  # player_id → DataFrame (or None on error)
+
+    def _fetch_player_log(pid):
+        """Fetch a single player's game log with retry + backoff."""
+        for _attempt in range(RESOLVE_MAX_RETRIES):
+            try:
+                if _attempt > 0:
+                    _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
+                game_log = playergamelog.PlayerGameLog(
+                    player_id=pid,
+                    season=season_str,
+                    season_type_all_star="Regular Season",
+                    timeout=NBA_API_TIMEOUT,
+                )
+                return pid, game_log.get_data_frames()[0]
+            except Exception:
+                if _attempt == RESOLVE_MAX_RETRIES - 1:
+                    return pid, None
+        return pid, None
+
+    _unique_ids = list(_player_ids_to_fetch)
+    with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids) or 1)) as executor:
+        futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
+        for future in as_completed(futures):
+            try:
+                pid, df_result = future.result()
+                _game_log_cache[pid] = df_result
+            except Exception:
+                _game_log_cache[futures[future]] = None
+
+    # ── Resolve bets from cached game logs ────────────────────
+    for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+        bet_id      = bet.get("bet_id")
+        player_name = bet.get("player_name", "")
+
         try:
-            for _attempt in range(RESOLVE_MAX_RETRIES):
-                try:
-                    if _attempt > 0:
-                        _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                    game_log = playergamelog.PlayerGameLog(
-                        player_id=player_id,
-                        season=season_str,
-                        season_type_all_star="Regular Season",
-                        timeout=NBA_API_TIMEOUT,
-                    )
-                    df = game_log.get_data_frames()[0]
-                    break  # success
-                except Exception as _api_err:
-                    if _attempt == RESOLVE_MAX_RETRIES - 1:
-                        raise  # re-raise on final attempt
-                    continue  # retry
-            if df.empty:
+            df = _game_log_cache.get(player_id)
+            if df is None or df.empty:
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
@@ -965,6 +997,10 @@ def resolve_todays_bets():
 
     target_date = _dt.datetime.strptime(today_str, "%Y-%m-%d").date()
 
+    # ── Pre-validate bets and collect unique player IDs for batch fetch ──
+    _bet_prep = []  # (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    _player_ids_to_fetch = set()
+
     for bet in todays_pending:
         bet_id      = bet.get("id") or bet.get("bet_id")
         player_name = bet.get("player_name", "")
@@ -1015,28 +1051,54 @@ def resolve_todays_bets():
             summary["pending"] += 1
             continue
 
-        # Retry logic: max RESOLVE_MAX_RETRIES attempts with exponential backoff
-        logs = []
-        _last_retry_exc = None
+        _player_ids_to_fetch.add(player_id)
+        _bet_prep.append((bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+
+    # ── Parallel game-log fetch using ThreadPoolExecutor ──────
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    _game_log_cache = {}  # player_id → list[dict] (normalized game log rows)
+
+    def _fetch_player_log(pid):
+        """Fetch a single player's game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
                     time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
                 gl = PlayerGameLog(
-                    player_id=player_id,
+                    player_id=pid,
                     season=season_str,
                     season_type_all_star="Regular Season",
                     timeout=NBA_API_TIMEOUT,
                 )
-                logs = gl.get_normalized_dict().get("PlayerGameLog", [])
-                break  # success
+                return pid, gl.get_normalized_dict().get("PlayerGameLog", [])
             except Exception as _retry_exc:
-                _last_retry_exc = _retry_exc
-                _logger.warning(f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} failed for {player_name}: {_retry_exc}")
+                _logger.warning(
+                    f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} "
+                    f"failed for player_id={pid}: {_retry_exc}"
+                )
                 if _attempt == RESOLVE_MAX_RETRIES - 1:
-                    raise  # re-raise on final attempt
+                    return pid, None
+        return pid, None
+
+    _unique_ids = list(_player_ids_to_fetch)
+    if _unique_ids:
+        with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids))) as executor:
+            futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
+            for future in as_completed(futures):
+                try:
+                    pid, log_data = future.result()
+                    _game_log_cache[pid] = log_data
+                except Exception:
+                    _game_log_cache[futures[future]] = None
+
+    # ── Resolve bets from cached game logs ────────────────────
+    for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+        bet_id      = bet.get("id") or bet.get("bet_id")
+        player_name = bet.get("player_name", "")
 
         try:
+            logs = _game_log_cache.get(player_id)
             if not logs:
                 summary["pending"] += 1
                 continue
