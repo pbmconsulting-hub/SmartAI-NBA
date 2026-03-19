@@ -169,6 +169,13 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertIn("_funnel_stat_keys_run", source)
         self.assertNotIn("_funnel_max_pp", source)
 
+    def test_no_per_player_cap_in_neural_analysis(self):
+        """Neural Analysis should pass max_props_per_player=None (no per-player cap)."""
+        import pathlib
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        source = na_path.read_text(encoding="utf-8")
+        self.assertIn("max_props_per_player=None", source)
+
 
 class TestSmartFilterPropsIntegration(unittest.TestCase):
     """Unit tests for smart_filter_props with funnel parameters."""
@@ -209,6 +216,24 @@ class TestSmartFilterPropsIntegration(unittest.TestCase):
         )
         lebron_props = [p for p in filtered if p["player_name"] == "LeBron"]
         self.assertLessEqual(len(lebron_props), 2)
+
+    def test_no_per_player_cap_when_none(self):
+        """Passing max_props_per_player=None should skip the per-player cap."""
+        props = [
+            {"player_name": "LeBron", "stat_type": "points", "team": "", "line": 25},
+            {"player_name": "LeBron", "stat_type": "rebounds", "team": "", "line": 8},
+            {"player_name": "LeBron", "stat_type": "assists", "team": "", "line": 7},
+            {"player_name": "LeBron", "stat_type": "threes", "team": "", "line": 2},
+            {"player_name": "LeBron", "stat_type": "steals", "team": "", "line": 1},
+            {"player_name": "LeBron", "stat_type": "blocks", "team": "", "line": 1},
+            {"player_name": "LeBron", "stat_type": "turnovers", "team": "", "line": 3},
+        ]
+        filtered, summary = self.filter_fn(
+            all_props=props,
+            max_props_per_player=None,
+        )
+        lebron_props = [p for p in filtered if p["player_name"] == "LeBron"]
+        self.assertEqual(len(lebron_props), 7)
 
     def test_empty_props(self):
         """Empty prop list should return empty result."""

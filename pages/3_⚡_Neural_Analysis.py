@@ -505,6 +505,7 @@ def _cached_smart_filter(props_tuple, stat_types_tuple):
         all_props=props_list,
         todays_games=None,   # Already filtered by session
         injury_map=None,     # Already filtered upstream
+        max_props_per_player=None,  # No per-player cap
         stat_types=stat_types_set,
     )
     return filtered, summary
@@ -702,6 +703,7 @@ if run_analysis:
         players_data=players_data,
         todays_games=todays_games,
         injury_map=st.session_state.get("injury_status_map", {}),
+        max_props_per_player=None,  # No per-player cap
         stat_types=_funnel_stat_keys_run,
         deduplicate_cross_platform=True,
     )
