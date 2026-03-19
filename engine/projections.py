@@ -790,6 +790,8 @@ def build_player_projection(
         "game_total_factor": _safe_float(round(game_total_factor, 4), 1.0),
         "blowout_risk": _safe_float(round(blowout_risk, 4)),
         "overall_adjustment": _safe_float(round(offensive_stat_multiplier, 4), 1.0),
+        # recent_form_ratio is None when recency data is unavailable; preserve
+        # that sentinel so downstream code can distinguish "no data" from "0.0".
         "recent_form_ratio": _safe_float(recent_form_ratio) if recent_form_ratio is not None else None,
         # W8/C4: Minutes adjustment factors for injury/restriction transparency
         "minutes_adjustment_factor": _safe_float(round(minutes_adjustment_factor, 4), 1.0),

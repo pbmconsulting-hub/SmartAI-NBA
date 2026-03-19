@@ -584,6 +584,8 @@ def run_quantum_matrix_simulation(
         "percentile_90": _safe_float(calculate_percentile(all_simulated_game_results, 90)),
         "adjusted_projection": _safe_float(adjusted_stat_projection),
         "combined_adjustment": _safe_float(combined_adjustment_multiplier, 1.0),
+        # CI bounds: low defaults to 0.0 (floor), high defaults to 1.0 (ceiling)
+        # because the interval represents a probability range [0, 1].
         "ci_90_low": _safe_float(round(ci_90_low, 4)),
         "ci_90_high": _safe_float(round(ci_90_high, 4), 1.0),
         "simulations_run": simulations_completed,
