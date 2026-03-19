@@ -130,21 +130,28 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertIn("Stat Types", source)
         self.assertIn("_STAT_TYPE_OPTIONS", source)
 
-    def test_funnel_max_per_player(self):
-        """Neural Analysis page should have a max-props-per-player control."""
+    def test_funnel_max_per_player_removed(self):
+        """Neural Analysis page should NOT have a user-facing max-props-per-player control."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("Max Props per Player", source)
-        self.assertIn("funnel_max_per_player", source)
+        self.assertNotIn("Max Props per Player", source)
+        self.assertNotIn("funnel_max_per_player", source)
 
-    def test_funnel_absolute_max(self):
-        """Neural Analysis page should have an absolute-max-props control."""
+    def test_funnel_absolute_max_removed(self):
+        """Neural Analysis page should NOT have an absolute-max-props control."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("Absolute Max Props", source)
-        self.assertIn("funnel_absolute_max", source)
+        self.assertNotIn("Absolute Max Props", source)
+        self.assertNotIn("funnel_absolute_max", source)
+
+    def test_hardcoded_500_cap(self):
+        """Neural Analysis page should enforce a hardcoded 500-prop cap via _QME_MAX_PROPS."""
+        import pathlib
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        source = na_path.read_text(encoding="utf-8")
+        self.assertIn("_QME_MAX_PROPS = 500", source)
 
     def test_funnel_dynamic_metric(self):
         """Neural Analysis page should show a dynamic metric for locked props."""
@@ -160,7 +167,6 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("smart_filter_props", source)
         self.assertIn("_funnel_stat_keys_run", source)
-        self.assertIn("_funnel_max_pp", source)
 
 
 class TestSmartFilterPropsIntegration(unittest.TestCase):
