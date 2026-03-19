@@ -36,6 +36,7 @@
 import time       # For delays between API calls (rate limiting)
 import datetime   # For timestamps on fetched props
 import os         # For reading environment variables (API keys)
+import asyncio    # For concurrent fetching across platforms
 
 # Third-party HTTP library — must be installed (pip install requests)
 # 'requests' is used by roster_engine.py already and listed in requirements.
@@ -44,6 +45,13 @@ try:
     REQUESTS_AVAILABLE = True
 except ImportError:
     REQUESTS_AVAILABLE = False
+
+# Async HTTP library for concurrent platform fetching (pip install aiohttp)
+try:
+    import aiohttp
+    AIOHTTP_AVAILABLE = True
+except ImportError:
+    AIOHTTP_AVAILABLE = False
 
 # Import our platform stat-name normalizer
 # This converts "3-Point Made" → "threes", "Pts+Rebs" → "points_rebounds", etc.
@@ -893,11 +901,371 @@ def fetch_all_platform_props(
     if progress_callback:
         progress_callback(total_steps, total_steps, f"Done! {len(all_props)} props fetched.")
 
+    # ── 500-Prop Hard Cap ──────────────────────────────────────────
+    # Enforce maximum capacity to prevent downstream rendering and
+    # WebSocket overload. Slice BEFORE passing to the engine.
+    MAX_PROP_CAPACITY = 500
+    if len(all_props) > MAX_PROP_CAPACITY:
+        _logger.info(
+            f"[Master] Capping props from {len(all_props)} → {MAX_PROP_CAPACITY}"
+        )
+        all_props = all_props[:MAX_PROP_CAPACITY]
+
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")
     return all_props
 
 # ============================================================
 # END SECTION: Master Fetch Function
+# ============================================================
+
+
+# ============================================================
+# SECTION: Asynchronous Multi-Platform Fetcher
+# ============================================================
+
+# Concurrency limiter — prevents IP rate-limiting while maintaining speed.
+_ASYNC_SEMAPHORE_LIMIT = 5
+
+
+async def _async_fetch_json(session, url, headers=None, params=None):
+    """
+    Fetch JSON from a URL using an aiohttp session with retry logic.
+
+    Args:
+        session (aiohttp.ClientSession): The shared HTTP session.
+        url (str): Target URL.
+        headers (dict, optional): HTTP headers.
+        params (dict, optional): URL query parameters.
+
+    Returns:
+        dict or None: Parsed JSON on success, None on failure.
+    """
+    _headers = headers or dict(_BASE_HEADERS)
+    for attempt in range(MAX_API_RETRIES + 1):
+        try:
+            async with session.get(
+                url, headers=_headers, params=params,
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS),
+            ) as resp:
+                if resp.status == 429 or resp.status >= 500:
+                    if attempt < MAX_API_RETRIES:
+                        delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)
+                        _logger.warning(
+                            f"[Async] HTTP {resp.status} on attempt {attempt+1} "
+                            f"for {url} — retrying in {delay:.1f}s"
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    return None
+                resp.raise_for_status()
+                return await resp.json()
+        except Exception as exc:
+            if attempt < MAX_API_RETRIES:
+                delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)
+                _logger.warning(
+                    f"[Async] Error on attempt {attempt+1} for {url}: {exc} "
+                    f"— retrying in {delay:.1f}s"
+                )
+                await asyncio.sleep(delay)
+            else:
+                _logger.error(f"[Async] All retries exhausted for {url}: {exc}")
+    return None
+
+
+async def _async_fetch_prizepicks(session, semaphore):
+    """Fetch PrizePicks props asynchronously."""
+    async with semaphore:
+        headers = dict(_BASE_HEADERS)
+        headers["Referer"] = "https://app.prizepicks.com/"
+        params = {"league_id": 7, "per_page": 250, "single_stat": "true"}
+
+        data = await _async_fetch_json(session, PRIZEPICKS_URL, headers=headers, params=params)
+        if not data:
+            return []
+
+        projections = data.get("data", [])
+        included = data.get("included", [])
+        player_lookup = {}
+        for item in included:
+            if item.get("type") == "new_player":
+                pid = item.get("id", "")
+                attrs = item.get("attributes", {})
+                player_lookup[pid] = {
+                    "name": attrs.get("name", ""),
+                    "team": attrs.get("team", attrs.get("team_name", "")),
+                }
+
+        props = []
+        today = _today_str()
+        fetched_at = _now_str()
+        for proj in projections:
+            if proj.get("type") != "projection":
+                continue
+            attrs = proj.get("attributes", {})
+            league_name = attrs.get("league", attrs.get("league_name", "")).upper()
+            if "NBA" not in league_name and league_name:
+                continue
+            relationships = proj.get("relationships", {})
+            player_rel = relationships.get("new_player", {}).get("data", {})
+            player_id = player_rel.get("id", "")
+            player_info = player_lookup.get(player_id, {})
+            player_name = player_info.get("name", attrs.get("description", "")).strip()
+            team = player_info.get("team", "").strip().upper()
+            if not player_name:
+                continue
+            raw_stat = attrs.get("stat_type", "")
+            stat_type = normalize_stat_type(raw_stat, "PrizePicks")
+            # TRUE LINE KILL SWITCH: extract line_score → fallback chain
+            try:
+                _raw_line = attrs.get("line_score",
+                                      attrs.get("stat_projection",
+                                                attrs.get("points")))
+                if _raw_line is None:
+                    continue  # KILL SWITCH: no line → discard
+                true_line = float(_raw_line)
+            except (ValueError, TypeError, KeyError):
+                continue  # KILL SWITCH: invalid line → discard
+            if true_line <= 0:
+                continue  # KILL SWITCH: non-positive line → discard
+            props.append({
+                "player_name": player_name, "team": team,
+                "stat_type": stat_type, "line": true_line,
+                "platform": "PrizePicks", "game_date": today,
+                "fetched_at": fetched_at,
+                "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+                "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
+            })
+        _logger.info(f"[Async-PrizePicks] Fetched {len(props)} NBA props.")
+        return props
+
+
+async def _async_fetch_underdog(session, semaphore):
+    """Fetch Underdog Fantasy props asynchronously."""
+    async with semaphore:
+        data = await _async_fetch_json(session, UNDERDOG_URL)
+        if not data:
+            return []
+
+        lines = data.get("over_under_lines", [])
+        appearances = {}
+        for ap in data.get("appearances", []):
+            appearances[ap.get("id", "")] = ap
+
+        props = []
+        today = _today_str()
+        fetched_at = _now_str()
+        for line_item in lines:
+            sport_id = str(line_item.get("sport_id", line_item.get("sport", ""))).upper()
+            if "NBA" not in sport_id and sport_id:
+                continue
+            player_name = line_item.get("title", "").strip()
+            ap_id = line_item.get("appearance_id", "")
+            ap_data = appearances.get(ap_id, {})
+            team = ap_data.get("team_abbreviation", ap_data.get("team", "")).strip().upper()
+            if not player_name:
+                continue
+            raw_stat = line_item.get("display_stat", line_item.get("stat_type", ""))
+            stat_type = normalize_stat_type(raw_stat, "Underdog")
+            # TRUE LINE KILL SWITCH: stat_value → fallback chain
+            try:
+                _raw_line = line_item.get("stat_value",
+                                          line_item.get("o_u_value",
+                                                        line_item.get("stat_projection")))
+                if _raw_line is None:
+                    continue  # KILL SWITCH
+                true_line = float(_raw_line)
+            except (ValueError, TypeError, KeyError):
+                continue  # KILL SWITCH
+            if true_line <= 0:
+                continue  # KILL SWITCH
+            props.append({
+                "player_name": player_name, "team": team,
+                "stat_type": stat_type, "line": true_line,
+                "platform": "Underdog", "game_date": today,
+                "fetched_at": fetched_at,
+                "over_odds": line_item.get("price", line_item.get("over_price", _DEFAULT_AMERICAN_ODDS)),
+                "under_odds": line_item.get("under_price", _DEFAULT_AMERICAN_ODDS),
+            })
+        _logger.info(f"[Async-Underdog] Fetched {len(props)} NBA props.")
+        return props
+
+
+async def _async_fetch_draftkings(session, semaphore, api_key=None):
+    """Fetch DraftKings Pick6 props asynchronously via The Odds API."""
+    if not api_key:
+        try:
+            import streamlit as st
+            api_key = st.session_state.get("odds_api_key", "").strip() or None
+        except Exception:
+            pass
+    if not api_key:
+        api_key = os.environ.get("ODDS_API_KEY", "").strip() or None
+    if not api_key:
+        _logger.warning("[Async-DraftKings] No Odds API key configured.")
+        return []
+
+    async with semaphore:
+        events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
+        events = await _async_fetch_json(
+            session, events_url, params={"apiKey": api_key}
+        )
+        if not events:
+            return []
+
+    MARKETS = ",".join([
+        "player_points", "player_rebounds", "player_assists",
+        "player_threes", "player_blocks", "player_steals",
+        "player_turnovers", "player_points_rebounds_assists",
+        "player_points_rebounds", "player_points_assists",
+    ])
+    _MARKET_TO_STAT = {
+        "player_points": "points", "player_rebounds": "rebounds",
+        "player_assists": "assists", "player_threes": "threes",
+        "player_blocks": "blocks", "player_steals": "steals",
+        "player_turnovers": "turnovers",
+        "player_points_rebounds_assists": "points_rebounds_assists",
+        "player_points_rebounds": "points_rebounds",
+        "player_points_assists": "points_assists",
+    }
+
+    props = []
+    today = _today_str()
+    fetched_at = _now_str()
+
+    for event in events:
+        event_id = event.get("id", "")
+        if not event_id:
+            continue
+        async with semaphore:
+            props_url = (
+                f"{ODDS_API_BASE_URL}/sports/basketball_nba/events/{event_id}/odds"
+            )
+            event_data = await _async_fetch_json(
+                session, props_url,
+                params={
+                    "apiKey": api_key, "regions": "us",
+                    "markets": MARKETS, "bookmakers": "draftkings",
+                    "oddsFormat": "american",
+                },
+            )
+            if not event_data:
+                continue
+
+        for bookmaker in event_data.get("bookmakers", []):
+            if bookmaker.get("key", "") != "draftkings":
+                continue
+            for market in bookmaker.get("markets", []):
+                market_key = market.get("key", "")
+                stat_type = _MARKET_TO_STAT.get(market_key)
+                if not stat_type:
+                    continue
+                over_map = {}
+                under_map = {}
+                for outcome in market.get("outcomes", []):
+                    player_name = outcome.get("name", "").strip()
+                    if not player_name:
+                        continue
+                    # TRUE LINE KILL SWITCH: point → validate
+                    try:
+                        _raw_line = outcome.get("point")
+                        if _raw_line is None:
+                            continue  # KILL SWITCH
+                        true_line = float(_raw_line)
+                    except (ValueError, TypeError, KeyError):
+                        continue  # KILL SWITCH
+                    if true_line <= 0:
+                        continue  # KILL SWITCH
+                    direction = outcome.get("description", "").lower()
+                    price = outcome.get("price", _DEFAULT_AMERICAN_ODDS)
+                    key = (player_name, true_line)
+                    if direction == "over":
+                        over_map[key] = price
+                    elif direction == "under":
+                        under_map[key] = price
+                for (player_name, true_line), over_price in over_map.items():
+                    under_price = under_map.get(
+                        (player_name, true_line), _DEFAULT_AMERICAN_ODDS
+                    )
+                    props.append({
+                        "player_name": player_name, "team": "",
+                        "stat_type": stat_type, "line": true_line,
+                        "platform": "DraftKings", "game_date": today,
+                        "fetched_at": fetched_at,
+                        "over_odds": over_price, "under_odds": under_price,
+                    })
+
+    _logger.info(f"[Async-DraftKings] Fetched {len(props)} NBA props.")
+    return props
+
+
+async def fetch_all_platforms_async(
+    include_prizepicks=True,
+    include_underdog=True,
+    include_draftkings=True,
+    odds_api_key=None,
+):
+    """
+    Fetch live prop lines from all enabled platforms concurrently
+    using aiohttp and asyncio.
+
+    Uses a Semaphore(5) to prevent IP rate-limiting while maintaining
+    maximum speed. Enforces a hard cap of 500 props.
+
+    Args:
+        include_prizepicks (bool): Fetch from PrizePicks. Default True.
+        include_underdog (bool): Fetch from Underdog Fantasy. Default True.
+        include_draftkings (bool): Fetch from DraftKings. Default True.
+        odds_api_key (str, optional): The Odds API key for DraftKings.
+
+    Returns:
+        list[dict]: All fetched props, capped at 500.
+    """
+    if not AIOHTTP_AVAILABLE:
+        _logger.warning(
+            "[Async] aiohttp not available, falling back to synchronous fetch."
+        )
+        return fetch_all_platform_props(
+            include_prizepicks=include_prizepicks,
+            include_underdog=include_underdog,
+            include_draftkings=include_draftkings,
+            odds_api_key=odds_api_key,
+        )
+
+    semaphore = asyncio.Semaphore(_ASYNC_SEMAPHORE_LIMIT)
+    tasks = []
+
+    async with aiohttp.ClientSession() as session:
+        if include_prizepicks:
+            tasks.append(_async_fetch_prizepicks(session, semaphore))
+        if include_underdog:
+            tasks.append(_async_fetch_underdog(session, semaphore))
+        if include_draftkings:
+            tasks.append(_async_fetch_draftkings(session, semaphore, api_key=odds_api_key))
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    all_props = []
+    for result in results:
+        if isinstance(result, Exception):
+            _logger.error(f"[Async] Platform fetch failed: {result}")
+            continue
+        if isinstance(result, list):
+            all_props.extend(result)
+
+    # ── 500-Prop Hard Cap ──────────────────────────────────────────
+    MAX_PROP_CAPACITY = 500
+    if len(all_props) > MAX_PROP_CAPACITY:
+        _logger.info(
+            f"[Async] Capping props from {len(all_props)} → {MAX_PROP_CAPACITY}"
+        )
+        all_props = all_props[:MAX_PROP_CAPACITY]
+
+    _logger.info(f"[Async] Total props fetched: {len(all_props)}")
+    return all_props
+
+
+# ============================================================
+# END SECTION: Asynchronous Multi-Platform Fetcher
 # ============================================================
 
 

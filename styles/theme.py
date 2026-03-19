@@ -5102,3 +5102,189 @@ def get_intel_strip_html(
 # ============================================================
 # END SECTION: Player Intelligence CSS & HTML Helpers
 # ============================================================
+
+
+# ============================================================
+# SECTION: Quantum Card Matrix — CSS Grid + Glassmorphic Cards
+# ============================================================
+
+QUANTUM_CARD_MATRIX_CSS = """
+/* ═══════════════════════════════════════════════════════════
+   QUANTUM CARD MATRIX — High-Capacity Grid Renderer
+   500-Prop Capacity with Staggered Waterfall Animation
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+.qcm-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    padding: 8px 0;
+    width: 100%;
+}
+
+@keyframes qcm-fade-in-up {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.qcm-card {
+    background: rgba(11, 14, 26, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    padding: 18px 20px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 240, 255, 0.04);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    animation: qcm-fade-in-up 0.4s ease both;
+    font-family: 'Inter', sans-serif;
+    color: #e0eeff;
+}
+.qcm-card:hover {
+    border-color: rgba(0, 240, 255, 0.25);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
+    transform: translateY(-2px);
+}
+
+.qcm-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.qcm-player-name {
+    font-size: 1.0rem;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70%;
+}
+.qcm-tier-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-tier-platinum { background: rgba(0, 240, 255, 0.15); color: #00f0ff; border: 1px solid rgba(0, 240, 255, 0.30); }
+.qcm-tier-gold     { background: rgba(255, 215, 0, 0.15); color: #FFD700; border: 1px solid rgba(255, 215, 0, 0.30); }
+.qcm-tier-silver   { background: rgba(192, 192, 192, 0.15); color: #C0C0C0; border: 1px solid rgba(192, 192, 192, 0.30); }
+.qcm-tier-bronze   { background: rgba(205, 127, 50, 0.15); color: #CD7F32; border: 1px solid rgba(205, 127, 50, 0.30); }
+
+.qcm-stat-type {
+    font-size: 0.78rem;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-stat-type .qcm-team {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+.qcm-stat-type .qcm-platform {
+    color: #475569;
+    font-size: 0.68rem;
+}
+
+.qcm-true-line-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: rgba(0, 240, 255, 0.06);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 8px;
+}
+.qcm-true-line-label {
+    font-size: 0.72rem;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-true-line-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #00f0ff;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.qcm-prediction {
+    font-size: 0.80rem;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.qcm-prediction-goblin {
+    background: rgba(0, 255, 157, 0.08);
+    border: 1px solid rgba(0, 255, 157, 0.20);
+    color: #00ff9d;
+}
+.qcm-prediction-demon {
+    background: rgba(255, 94, 0, 0.08);
+    border: 1px solid rgba(255, 94, 0, 0.20);
+    color: #ff5e00;
+}
+.qcm-prediction-neutral {
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    color: #94A3B8;
+}
+
+.qcm-metrics {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.qcm-metric {
+    flex: 1;
+    min-width: 60px;
+    text-align: center;
+    padding: 6px 4px;
+    background: rgba(15, 23, 42, 0.50);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.qcm-metric-val {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+.qcm-metric-lbl {
+    font-size: 0.62rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+}
+
+/* Responsive stacking */
+@media (max-width: 640px) {
+    .qcm-grid {
+        grid-template-columns: 1fr;
+    }
+}
+"""
+
+
+def get_quantum_card_matrix_css():
+    """Return the Quantum Card Matrix CSS for injection via st.markdown."""
+    return f"<style>{QUANTUM_CARD_MATRIX_CSS}</style>"
+
+# ============================================================
+# END SECTION: Quantum Card Matrix CSS
+# ============================================================

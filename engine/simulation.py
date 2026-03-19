@@ -726,6 +726,70 @@ def format_alt_line_prediction(line, bet_type):
         return f"I predict the stat will do at MOST {line}"
     return ""
 
+
+def generate_contextual_goblin_demon(true_line, direction="over"):
+    """
+    Generate directional Goblin and Demon alt-lines from the verified
+    true line, applying contextual math based on bet direction.
+
+    Directional rules:
+      * **MORE (Over):**
+        - Goblin = true_line - 1 → "I predict the stat will do at LEAST {goblin_line}"
+        - Demon  = true_line + 2 → "I predict the stat will do at MOST {demon_line}"
+      * **LESS (Under):**
+        - Goblin = true_line + 1 → "I predict the stat will do at MOST {goblin_line}"
+        - Demon  = true_line - 2 → "I predict the stat will do at LEAST {demon_line}"
+
+    Args:
+        true_line (float): The verified sportsbook projection line.
+        direction (str): "over" / "more" for Over bets,
+                         "under" / "less" for Under bets.
+                         Default "over".
+
+    Returns:
+        dict: {
+            'true_line': float,
+            'direction': str,
+            'goblin_line': float,
+            'goblin_prediction': str,
+            'demon_line': float,
+            'demon_prediction': str,
+        }
+    """
+    try:
+        true_line = float(true_line)
+    except (ValueError, TypeError):
+        true_line = 0.0
+
+    direction_norm = str(direction).strip().lower()
+    is_over = direction_norm in ("over", "more")
+
+    if is_over:
+        goblin_line = round(true_line - 1.0, 1)
+        demon_line = round(true_line + 2.0, 1)
+        goblin_prediction = f"I predict the stat will do at LEAST {goblin_line}"
+        demon_prediction = f"I predict the stat will do at MOST {demon_line}"
+    else:
+        goblin_line = round(true_line + 1.0, 1)
+        demon_line = round(true_line - 2.0, 1)
+        goblin_prediction = f"I predict the stat will do at MOST {goblin_line}"
+        demon_prediction = f"I predict the stat will do at LEAST {demon_line}"
+
+    # Ensure lines are non-negative (NBA stat lines >= 0.5)
+    if goblin_line < 0.5:
+        goblin_line = 0.5
+    if demon_line < 0.5:
+        demon_line = 0.5
+
+    return {
+        "true_line": true_line,
+        "direction": "over" if is_over else "under",
+        "goblin_line": goblin_line,
+        "goblin_prediction": goblin_prediction,
+        "demon_line": demon_line,
+        "demon_prediction": demon_prediction,
+    }
+
 # ============================================================
 # END SECTION: Alt-Line Probability Generation
 # ============================================================

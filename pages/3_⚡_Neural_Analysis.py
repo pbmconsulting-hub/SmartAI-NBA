@@ -117,6 +117,8 @@ from styles.theme import (
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 from data.platform_fetcher import smart_filter_props as _smart_filter_props
+from utils.renderers import compile_card_matrix as _compile_card_matrix
+from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
 # ── Section logo paths ────────────────────────────────────────────────────────
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
@@ -2459,62 +2461,25 @@ if analysis_results:
 
     st.divider()
 
-    # ── Prop Cards — grouped by player when 10+ results ──────────
-    # When there are many props (10+), group them by player with
-    # collapsible expanders to keep the page scannable.
-    # Fewer than 10 props display in a flat list as before.
-    _PLAYER_GROUP_THRESHOLD = 10
+    # ── Prop Cards — Single-Shot HTML Card Matrix Renderer ────────
+    # Uses compile_card_matrix() to build a single HTML string with
+    # CSS Grid layout. Sliced to Top 50 to prevent WebSocketClosedError.
     _non_out_display = [r for r in displayed_results if not r.get("player_is_out", False)]
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
 
-    if len(_non_out_display) >= _PLAYER_GROUP_THRESHOLD:
-        # Group by player
-        _by_player: dict = {}
-        for _r in _non_out_display:
-            _pname = _r.get("player_name", "Unknown")
-            _by_player.setdefault(_pname, []).append(_r)
+    # Single-shot card matrix injection for active (non-OUT) props
+    _card_matrix_html = _compile_card_matrix(_non_out_display, max_cards=50)
+    st.markdown(_card_matrix_html, unsafe_allow_html=True)
 
+    # Show OUT players at the bottom (small count, safe for per-card render)
+    if _out_display:
         st.markdown(
-            f'<div style="font-size:0.82rem;color:#8a9bb8;margin-bottom:10px;">'
-            f'📊 {len(_non_out_display)} picks across {len(_by_player)} player(s). '
-            f'Grouped by player — click to expand.'
-            f'</div>',
+            '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
+            '⚠️ OUT / Inactive Players</div>',
             unsafe_allow_html=True,
         )
-
-        for _pname, _pgroup in _by_player.items():
-            _best_conf = max(r.get("confidence_score", 0) for r in _pgroup)
-            _best_tier = max(
-                (r.get("tier", "Bronze") for r in _pgroup),
-                key=lambda t: {"Platinum": 4, "Gold": 3, "Silver": 2, "Bronze": 1}.get(t, 0),
-            )
-            _tier_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_best_tier, "🏀")
-            _has_goblin = any(r.get("bet_type") == "goblin" for r in _pgroup)
-            _has_demon  = any(r.get("bet_type") in ("50_50", "demon") for r in _pgroup)
-            _goblin_tag = " Goblin" if _has_goblin else ""
-            _demon_tag  = " Demon" if _has_demon else ""
-            _team_tag   = f" [{_pgroup[0].get('player_team', '')}]" if _pgroup[0].get("player_team") else ""
-            _exp_label  = (
-                f"{_tier_emoji} {_pname}{_team_tag} — "
-                f"{len(_pgroup)} prop(s) · SAFE {_best_conf:.0f}/100"
-                + _goblin_tag + _demon_tag
-            )
-            with st.expander(_exp_label, expanded=(_best_tier in ("Platinum", "Gold") or _has_goblin)):
-                for _pr in _pgroup:
-                    display_prop_analysis_card_qds(_pr)
-                    st.markdown('<div style="height:4px;"></div>', unsafe_allow_html=True)
-    else:
-        # Flat list for fewer than 10 props
-        for result in _non_out_display:
-            display_prop_analysis_card_qds(result)
-            st.markdown(
-                '<div style="height:6px;"></div>',
-                unsafe_allow_html=True,
-            )
-
-    # Show OUT players at the bottom
-    for result in _out_display:
-        display_prop_analysis_card_qds(result)
+        _out_matrix_html = _compile_card_matrix(_out_display, max_cards=10)
+        st.markdown(_out_matrix_html, unsafe_allow_html=True)
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()

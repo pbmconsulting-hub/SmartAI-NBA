@@ -13,6 +13,7 @@ font = "sans serif"
 
 [server]
 headless = true
+maxMessageSize = 1000
 
 [browser]
 gatherUsageStats = false
