@@ -392,10 +392,14 @@ h1, h2, h3, h4, h5, h6 {
     width: auto !important;
     height: auto !important;
 }
-[data-testid="stLogo"] img {
-    max-width: 100% !important;
+[data-testid="stLogo"] img,
+[data-testid="stSidebarHeader"] img {
+    width: 100% !important;
+    max-width: 220px !important;
     height: auto !important;
     object-fit: contain !important;
+    transform: scale(1.2);
+    margin-left: -5px;
 }
 
 /* ─── Streamlit native elements on dark bg ───────────────── */

@@ -370,20 +370,27 @@ def fetch_prizepicks_props(league="NBA"):
         raw_stat = attrs.get("stat_type", "")
         stat_type = normalize_stat_type(raw_stat, "PrizePicks")
 
-        # The line value (the threshold to bet over/under)
+        # Extract the sportsbook's true Over/Under projection line.
+        # PrizePicks stores it under "line_score"; fall back to
+        # "stat_projection" or "points" if present.
         try:
-            line = float(attrs.get("line_score", 0))
-        except (ValueError, TypeError):
+            _raw_line = attrs.get("line_score",
+                                  attrs.get("stat_projection",
+                                            attrs.get("points")))
+            if _raw_line is None:
+                continue  # No projection line available — silently discard
+            true_line = float(_raw_line)
+        except (ValueError, TypeError, KeyError):
             continue  # Skip if line is not a valid number
 
-        if line <= 0:
+        if true_line <= 0:
             continue  # Skip invalid lines
 
         props.append({
             "player_name": player_name,
             "team": team,
             "stat_type": stat_type,
-            "line": line,
+            "line": true_line,
             "platform": "PrizePicks",
             "game_date": today,
             "fetched_at": fetched_at,
@@ -493,20 +500,27 @@ def fetch_underdog_props(league="NBA"):
         raw_stat = line_item.get("display_stat", line_item.get("stat_type", ""))
         stat_type = normalize_stat_type(raw_stat, "Underdog")
 
-        # The line value
+        # Extract the sportsbook's true Over/Under projection line.
+        # Underdog uses "stat_value" primarily; fall back to "o_u_value"
+        # or "stat_projection" if present.
         try:
-            line = float(line_item.get("stat_value", line_item.get("o_u_value", 0)))
-        except (ValueError, TypeError):
+            _raw_line = line_item.get("stat_value",
+                                      line_item.get("o_u_value",
+                                                    line_item.get("stat_projection")))
+            if _raw_line is None:
+                continue  # No projection line available — silently discard
+            true_line = float(_raw_line)
+        except (ValueError, TypeError, KeyError):
             continue  # Skip invalid lines
 
-        if line <= 0:
+        if true_line <= 0:
             continue
 
         props.append({
             "player_name": player_name,
             "team": team,
             "stat_type": stat_type,
-            "line": line,
+            "line": true_line,
             "platform": "Underdog",
             "game_date": today,
             "fetched_at": fetched_at,
@@ -726,17 +740,22 @@ def fetch_draftkings_props(api_key=None):
                     if not player_name:
                         continue
 
+                    # Extract the sportsbook's true projection line.
+                    # The Odds API uses "point" for the prop line value.
                     try:
-                        line = float(outcome.get("point", 0))
-                    except (ValueError, TypeError):
+                        _raw_line = outcome.get("point")
+                        if _raw_line is None:
+                            continue  # No projection line — silently discard
+                        true_line = float(_raw_line)
+                    except (ValueError, TypeError, KeyError):
                         continue
 
-                    if line <= 0:
+                    if true_line <= 0:
                         continue
 
                     direction = outcome.get("description", "").lower()
                     price = outcome.get("price", _DEFAULT_AMERICAN_ODDS)
-                    key = (player_name, line)
+                    key = (player_name, true_line)
 
                     if direction == "over":
                         over_map[key] = price
@@ -744,19 +763,19 @@ def fetch_draftkings_props(api_key=None):
                         under_map[key] = price
 
                 # Build one prop dict per Over outcome, attaching the matching Under price
-                for (player_name, line), over_price in over_map.items():
-                    _has_under = (player_name, line) in under_map
-                    under_price = under_map.get((player_name, line), _DEFAULT_AMERICAN_ODDS)
+                for (player_name, true_line), over_price in over_map.items():
+                    _has_under = (player_name, true_line) in under_map
+                    under_price = under_map.get((player_name, true_line), _DEFAULT_AMERICAN_ODDS)
                     if not _has_under:
                         _logger.debug(
-                            f"[DraftKings] No Under outcome found for {player_name} {stat_type} {line} "
+                            f"[DraftKings] No Under outcome found for {player_name} {stat_type} {true_line} "
                             f"— defaulting under_odds to {_DEFAULT_AMERICAN_ODDS}"
                         )
                     props.append({
                         "player_name": player_name,
                         "team": "",  # Odds API doesn't include team in player props
                         "stat_type": stat_type,
-                        "line": line,
+                        "line": true_line,
                         "platform": "DraftKings",
                         "game_date": today,
                         "fetched_at": fetched_at,
