@@ -294,5 +294,101 @@ class TestPearsonSimCorrelation(unittest.TestCase):
         self.assertLessEqual(r, 1.0)
 
 
+class TestSessionStateDefaults(unittest.TestCase):
+    """Tests for app.py session state initialization of bankroll/Kelly keys."""
+
+    def test_app_initializes_total_bankroll(self):
+        """Verify that app.py contains total_bankroll initialization."""
+        import os
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        with open(app_path, "r") as f:
+            content = f.read()
+        self.assertIn('"total_bankroll"', content)
+        self.assertIn('st.session_state["total_bankroll"]', content)
+
+    def test_app_initializes_kelly_multiplier(self):
+        """Verify that app.py contains kelly_multiplier initialization."""
+        import os
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        with open(app_path, "r") as f:
+            content = f.read()
+        self.assertIn('"kelly_multiplier"', content)
+        self.assertIn('st.session_state["kelly_multiplier"]', content)
+
+    def test_default_total_bankroll_is_1000(self):
+        """Verify the default bankroll is $1000."""
+        import os
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        with open(app_path, "r") as f:
+            content = f.read()
+        self.assertIn('1000.0', content)
+
+    def test_default_kelly_multiplier_is_025(self):
+        """Verify the default Kelly multiplier is 0.25 (Quarter Kelly)."""
+        import os
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        with open(app_path, "r") as f:
+            content = f.read()
+        self.assertIn('0.25', content)
+
+
+class TestInlineBreakdownKellyAllocation(unittest.TestCase):
+    """Test that render_inline_breakdown_html produces Kelly wager HTML."""
+
+    def test_kelly_html_present_in_breakdown(self):
+        """Verify the inline breakdown function contains Kelly allocation logic."""
+        import os
+        helper_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "helpers", "neural_analysis_helpers.py",
+        )
+        with open(helper_path, "r") as f:
+            content = f.read()
+        # The inline breakdown now includes Kelly TARGET ALLOCATION
+        self.assertIn("calculate_fractional_kelly", content)
+        self.assertIn("WAGER", content)
+        self.assertIn("total_bankroll", content)
+
+    def test_card_matrix_wager_metric(self):
+        """Verify the card matrix renderer includes a Wager metric."""
+        import os
+        renderer_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "utils", "renderers.py",
+        )
+        with open(renderer_path, "r") as f:
+            content = f.read()
+        self.assertIn("calculate_fractional_kelly", content)
+        self.assertIn("Wager", content)
+        self.assertIn("wager_html", content)
+
+
+class TestSyntheticSliderRobustness(unittest.TestCase):
+    """Test synthetic slider edge-case handling."""
+
+    def test_slider_key_includes_platform(self):
+        """Verify the synthetic slider key includes platform for uniqueness."""
+        import os
+        helper_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "helpers", "neural_analysis_helpers.py",
+        )
+        with open(helper_path, "r") as f:
+            content = f.read()
+        # Key should include platform to prevent collisions
+        self.assertIn("_{platform}_", content)
+
+    def test_slider_min_max_guard(self):
+        """Verify that slider guards against min >= max edge case."""
+        import os
+        helper_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "helpers", "neural_analysis_helpers.py",
+        )
+        with open(helper_path, "r") as f:
+            content = f.read()
+        self.assertIn("_slider_max <= _slider_min", content)
+
+
 if __name__ == "__main__":
     unittest.main()

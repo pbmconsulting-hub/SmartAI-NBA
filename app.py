@@ -254,6 +254,10 @@ if "minimum_edge_threshold" not in st.session_state:
     st.session_state["minimum_edge_threshold"] = 5.0
 if "entry_fee" not in st.session_state:
     st.session_state["entry_fee"] = 10.0
+if "total_bankroll" not in st.session_state:
+    st.session_state["total_bankroll"] = 1000.0
+if "kelly_multiplier" not in st.session_state:
+    st.session_state["kelly_multiplier"] = 0.25
 if "selected_platforms" not in st.session_state:
     st.session_state["selected_platforms"] = ["PrizePicks", "Underdog", "DraftKings"]
 if "todays_games" not in st.session_state:

@@ -247,7 +247,41 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
         if bars:
             breakdown_html = '<div style="margin-top:2px;">' + "".join(bars) + '</div>'
 
-    return dist_html + forces_html + breakdown_html
+    # ── Kelly TARGET ALLOCATION row ──────────────────────────────
+    kelly_html = ""
+    try:
+        import streamlit as _st_mod
+        from engine.odds_engine import calculate_fractional_kelly
+        _direction = result.get("direction", "OVER")
+        _book_odds = (result.get("over_odds", -110)
+                      if _direction == "OVER"
+                      else result.get("under_odds", -110))
+        _model_prob = (result.get("probability_over", 0.5)
+                       if _direction == "OVER"
+                       else (1.0 - result.get("probability_over", 0.5)))
+        _bankroll = float(_st_mod.session_state.get("total_bankroll", 1000.0))
+        _kelly_mult = float(_st_mod.session_state.get("kelly_multiplier", 0.25))
+        _kelly = calculate_fractional_kelly(_model_prob, _book_odds, _kelly_mult)
+        _wager = round(_kelly["fractional_kelly"] * _bankroll, 2)
+        if _wager > 0:
+            _fk_pct = _kelly["fractional_kelly"] * 100
+            kelly_html = (
+                '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;'
+                'padding:6px 10px;background:linear-gradient(135deg,#070A13,#0F172A);'
+                'border:1px solid rgba(0,198,255,0.20);border-radius:6px;">'
+                '<span style="color:#64748b;font-size:0.62rem;text-transform:uppercase;'
+                'letter-spacing:0.06em;flex-shrink:0;">🎯 WAGER</span>'
+                f'<span style="color:#00C6FF;font-size:0.92rem;font-weight:800;'
+                f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+                f'">${_wager:,.2f}</span>'
+                f'<span style="color:#475569;font-size:0.58rem;margin-left:auto;">'
+                f'{_fk_pct:.1f}% of ${_bankroll:,.0f}</span>'
+                '</div>'
+            )
+    except Exception:
+        pass
+
+    return dist_html + forces_html + breakdown_html + kelly_html
 
 
 def _build_result_metrics(result):
@@ -1128,7 +1162,15 @@ def display_prop_analysis_card_qds(result):
                 _p90 = float(result.get("percentile_90", _base_line + 5))
                 _slider_min = max(0.0, round(_p10 - 2.0, 1))
                 _slider_max = round(_p90 + 2.0, 1)
-                _slider_key = f"synth_{result.get('player_name', '')}_{stat}_{line}"
+                # Guard: ensure valid slider range (min < max)
+                if _slider_max <= _slider_min:
+                    _slider_max = _slider_min + 5.0
+                # Clamp base_line inside slider range
+                _base_line = max(_slider_min, min(_slider_max, _base_line))
+                _slider_key = (
+                    f"synth_{result.get('player_name', '')}_{stat}_{line}"
+                    f"_{platform}_{direction}"
+                )
                 _target = st.slider(
                     "🔬 Synthetic Line",
                     min_value=_slider_min,
