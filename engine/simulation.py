@@ -239,6 +239,8 @@ def run_quantum_matrix_simulation(
     enable_fatigue_curve=True,
     vegas_spread=None,
     game_total=None,
+    prop_target_line=None,
+    platform=None,
 ) -> dict:
     """
     Run a full Quantum Matrix Engine 5.6 simulation for one player's one stat.
@@ -299,6 +301,15 @@ def run_quantum_matrix_simulation(
         game_total (float, optional): Vegas over/under total. Combined with
             vegas_spread for spread-total matrix weighting (1A).
             Defaults to None (uses 225.0 baseline).
+        prop_target_line (float, optional): Quarantined main line from the
+            DFS platform (set by ``quarantine_props()``).  When provided,
+            probability evaluation and DFS metrics are computed STRICTLY
+            against this line instead of ``prop_line``.  This prevents the
+            engine from evaluating extreme alternate lines.
+        platform (str, optional): DFS platform name (``"PrizePicks"``,
+            ``"Underdog"``, ``"DraftKings"``).  When provided alongside
+            ``prop_target_line``, DFS-specific flex breakeven thresholds
+            and parlay EV metrics are embedded in the output dict.
 
     Returns:
         dict: Simulation results containing:
@@ -590,6 +601,57 @@ def run_quantum_matrix_simulation(
         "ci_90_high": _safe_float(round(ci_90_high, 4), 1.0),
         "simulations_run": simulations_completed,
     }
+
+    # ── Phase 2: DFS parlay metrics ─────────────────────────────────────
+    # When prop_target_line is provided (from quarantine), re-evaluate
+    # probability STRICTLY against the quarantined main line and embed
+    # DFS-specific breakeven + parlay EV metrics.
+    _effective_target = None
+    if prop_target_line is not None:
+        try:
+            _effective_target = float(prop_target_line)
+        except (ValueError, TypeError):
+            _effective_target = None
+
+    if _effective_target is not None and _effective_target > 0:
+        # Re-count probability against the quarantined target line
+        _target_hits = sum(
+            1 for v in all_simulated_game_results if v > _effective_target
+        )
+        _target_prob = _target_hits / max(simulations_completed, 1)
+        _target_prob = max(0.01, min(0.99, _target_prob))
+
+        simulation_results["prop_target_line"] = _safe_float(_effective_target)
+        simulation_results["probability_over_target"] = _safe_float(
+            round(_target_prob, 6), 0.5
+        )
+
+        # Embed DFS flex breakeven thresholds per tier
+        _plat = str(platform or "PrizePicks")
+        try:
+            from engine.odds_engine import (
+                calculate_dfs_breakeven_probability,
+                calculate_dfs_parlay_ev_from_sim,
+            )
+
+            # Per-tier breakeven thresholds
+            _dfs_breakevens = {}
+            for _tier_n in (3, 4, 5, 6):
+                _be = calculate_dfs_breakeven_probability(_plat, _tier_n)
+                _dfs_breakevens[_tier_n] = _safe_float(
+                    _be.get("breakeven_per_leg", 0.5), 0.5
+                )
+
+            simulation_results["dfs_breakevens"] = _dfs_breakevens
+            simulation_results["dfs_platform"] = _plat
+
+            # Full parlay metrics from the target-line probability
+            _parlay_ev = calculate_dfs_parlay_ev_from_sim(
+                _target_prob, platform=_plat
+            )
+            simulation_results["dfs_parlay_ev"] = _parlay_ev
+        except ImportError:
+            pass  # odds_engine not available — skip DFS metrics
 
     return simulation_results
 

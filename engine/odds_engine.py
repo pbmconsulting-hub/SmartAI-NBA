@@ -623,6 +623,104 @@ def calculate_dfs_ev(leg_probabilities, platform="PrizePicks", pick_count=None, 
     }
 
 
+def calculate_dfs_parlay_ev_from_sim(
+    model_probability,
+    platform="PrizePicks",
+    direction="OVER",
+):
+    """
+    Compute per-leg DFS metrics from a simulation probability.
+
+    This is the **Phase 2 Fixed-Payout Quant** bridge between the Monte
+    Carlo simulation array and the DFS flex payout tables.  Given a
+    model probability for one leg, it returns:
+
+    * The DFS breakeven probability for each flex tier (3-6 pick)
+    * Whether this leg *beats* each tier's breakeven
+    * The per-leg EV contribution for each tier
+    * Fractional Kelly sizing against the platform's effective odds
+
+    This replaces the old sportsbook-singles EV approach with math that
+    reflects the actual DFS payout structure.
+
+    Args:
+        model_probability (float): Model's win probability for the
+            chosen direction (0.0–1.0), as output by the Monte Carlo
+            simulation (e.g. ``simulation_output["probability_over"]``).
+        platform (str): ``"PrizePicks"``, ``"Underdog"``, or
+            ``"DraftKings"``.  Default ``"PrizePicks"``.
+        direction (str): ``"OVER"`` or ``"UNDER"`` — used only for
+            labelling; the math is symmetric.
+
+    Returns:
+        dict: {
+            'model_probability': float,
+            'platform': str,
+            'direction': str,
+            'tiers': {
+                3: {'breakeven': float, 'beats_breakeven': bool,
+                    'edge_vs_breakeven': float, 'all_hit_payout': float},
+                4: { ... },
+                5: { ... },
+                6: { ... },
+            },
+            'best_tier': int or None  (tier with largest edge, or None),
+            'kelly_fraction': float   (fractional Kelly for best tier),
+        }
+
+    Example:
+        >>> calculate_dfs_parlay_ev_from_sim(0.62, "PrizePicks")
+        {'model_probability': 0.62, 'tiers': {3: {'breakeven': 0.55, ...}}, ...}
+    """
+    try:
+        p = max(0.001, min(0.999, float(model_probability)))
+    except (ValueError, TypeError):
+        p = 0.5
+
+    tiers = {}
+    best_tier = None
+    best_edge = -999.0
+
+    for pick_count in (3, 4, 5, 6):
+        be_result = calculate_dfs_breakeven_probability(platform, pick_count)
+        be_prob = be_result.get("breakeven_per_leg", 0.5)
+        all_hit_payout = be_result.get("all_hit_payout", 1.0)
+        edge = round(p - be_prob, 6)
+        beats = p > be_prob
+
+        tiers[pick_count] = {
+            "breakeven": _safe_float(round(be_prob, 6), 0.5),
+            "beats_breakeven": beats,
+            "edge_vs_breakeven": _safe_float(round(edge, 6)),
+            "all_hit_payout": _safe_float(all_hit_payout, 1.0),
+        }
+
+        if beats and edge > best_edge:
+            best_edge = edge
+            best_tier = pick_count
+
+    # Kelly sizing against the best tier's effective odds
+    kelly_frac = 0.0
+    if best_tier is not None:
+        tier_payout = tiers[best_tier]["all_hit_payout"]
+        if tier_payout > 1.0:
+            # Convert all-hit payout to effective American odds for Kelly
+            effective_odds = implied_probability_to_american_odds(
+                tiers[best_tier]["breakeven"]
+            )
+            kelly_result = calculate_fractional_kelly(p, effective_odds, 0.25)
+            kelly_frac = kelly_result.get("fractional_kelly", 0.0)
+
+    return {
+        "model_probability": _safe_float(round(p, 6), 0.5),
+        "platform": platform,
+        "direction": direction.upper() if direction else "OVER",
+        "tiers": tiers,
+        "best_tier": best_tier,
+        "kelly_fraction": _safe_float(round(kelly_frac, 6)),
+    }
+
+
 def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
     """
     Generate optimal 2-to-5-man slips from a list of analysed props.

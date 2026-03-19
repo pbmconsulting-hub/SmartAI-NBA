@@ -767,6 +767,17 @@ if run_analysis:
         prop_line   = float(prop.get("line", 0))
         platform    = prop.get("platform", "PrizePicks")
 
+        # Phase 2: Use quarantined main line when available
+        _raw_target = prop.get("prop_target_line")
+        prop_target_line = None
+        if _raw_target is not None:
+            try:
+                _ptl = float(_raw_target)
+                if _ptl > 0:
+                    prop_target_line = _ptl
+            except (ValueError, TypeError):
+                pass
+
         # ── Injury gate ───────────────────────────────────────────
         injury_map        = st.session_state.get("injury_status_map", {})
         player_status_info = get_player_status(player_name, injury_map)
@@ -1135,6 +1146,8 @@ if run_analysis:
                 projected_minutes=_flat_sim_minutes,
                 minutes_std=4.0,
                 recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
+                prop_target_line=prop_target_line,
+                platform=platform,
                 **_sim_kwargs,
             )
 
@@ -1409,6 +1422,21 @@ if run_analysis:
             # Simulation array for synthetic pricing / slider
             "simulated_results": simulation_output.get("simulated_results", []),
         }
+
+        # ── Phase 2: DFS Fixed-Payout Metrics ───────────────────────
+        # Stamp quarantined target line + DFS parlay EV metrics so the
+        # downstream UI can display breakeven thresholds per flex tier.
+        if simulation_output.get("prop_target_line"):
+            full_result["prop_target_line"] = simulation_output["prop_target_line"]
+            full_result["probability_over_target"] = simulation_output.get(
+                "probability_over_target", probability_over
+            )
+        if simulation_output.get("dfs_breakevens"):
+            full_result["dfs_breakevens"] = simulation_output["dfs_breakevens"]
+        if simulation_output.get("dfs_parlay_ev"):
+            full_result["dfs_parlay_ev"] = simulation_output["dfs_parlay_ev"]
+        if simulation_output.get("dfs_platform"):
+            full_result["dfs_platform"] = simulation_output["dfs_platform"]
 
         # ── Goblin / 50_50 / Demon Bet Classification ───────────────
         # Primary classification is driven by line_category (from the
