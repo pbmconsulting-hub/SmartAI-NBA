@@ -1758,6 +1758,13 @@ if analysis_results:
     )
     unmatched_count  = sum(1 for r in analysis_results if not r.get("player_matched", True))
 
+    # Phase 3: DFS aggregate metrics
+    _dfs_results = [r for r in displayed_results if r.get("dfs_parlay_ev")]
+    _beats_be_count = sum(
+        1 for r in _dfs_results
+        if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
+    )
+
     st.subheader(f"📊 Results: {len(displayed_results)} picks (of {total_analyzed} analyzed)")
 
     sum_col1, sum_col2, sum_col3, sum_col4, sum_col5, sum_col6, sum_col7 = st.columns(7)
@@ -1768,6 +1775,30 @@ if analysis_results:
     sum_col5.metric("Gold 🥇",     gold_count)
     sum_col6.metric("Goblin",   goblin_count)
     sum_col7.metric("Demon",    demon_count)
+
+    # Phase 3: DFS Edge row (only shown when DFS metrics exist)
+    if _dfs_results:
+        _avg_dfs_edge = sum(
+            (r.get("dfs_parlay_ev") or {}).get("tiers", {}).get(
+                (r.get("dfs_parlay_ev") or {}).get("best_tier", 3), {}
+            ).get("edge_vs_breakeven", 0) * 100
+            for r in _dfs_results
+            if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
+        ) / max(_beats_be_count, 1)
+        _dfs_edge_c = "#00ff9d" if _avg_dfs_edge > 0 else "#ff5e00"
+        st.markdown(
+            f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);'
+            f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:10px 16px;margin:6px 0;">'
+            f'<span style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'📈 DFS FLEX EDGE</span>'
+            f'<span style="color:#475569;font-size:0.68rem;margin-left:8px;">'
+            f'{_beats_be_count}/{len(_dfs_results)} legs beat breakeven</span>'
+            f'<span style="color:{_dfs_edge_c};font-size:0.82rem;font-weight:800;margin-left:12px;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+            f'Avg Edge: {_avg_dfs_edge:+.1f}%</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # ── Slate Summary Dashboard ────────────────────────────────
     silver_count  = sum(1 for r in displayed_results if r.get("tier") == "Silver")

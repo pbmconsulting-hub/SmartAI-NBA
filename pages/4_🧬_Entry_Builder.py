@@ -445,6 +445,36 @@ if selected_picks:
                 for p in selected_probs:
                     combined_prob *= p
                 st.metric("All-Hit Probability", f"{combined_prob*100:.1f}%")
+
+            # Phase 3: DFS Flex Breakeven Thresholds
+            _eb_n_picks = len(picks_to_include)
+            _eb_dfs_results = [p for p in picks_to_include if p.get("dfs_parlay_ev")]
+            if _eb_dfs_results and _eb_n_picks >= 3:
+                try:
+                    from engine.odds_engine import calculate_dfs_breakeven_probability
+                    _eb_plat = quick_platform.replace(" (Flex)", "").replace(" (Power)", "")
+                    _eb_be = calculate_dfs_breakeven_probability(_eb_plat, min(_eb_n_picks, 6))
+                    _eb_be_prob = _eb_be.get("breakeven_per_leg", 0.5) * 100
+                    _eb_payout = _eb_be.get("all_hit_payout", 1.0)
+                    # Per-leg average probability
+                    _eb_avg_leg = (sum(selected_probs) / len(selected_probs) * 100) if selected_probs else 50
+                    _eb_beats = _eb_avg_leg > _eb_be_prob
+                    _eb_color = "#00ff9d" if _eb_beats else "#ff5e00"
+                    _eb_icon = "✅" if _eb_beats else "⚠️"
+                    st.markdown(
+                        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);'
+                        f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:8px 14px;margin:8px 0;">'
+                        f'<span style="color:#64748b;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                        f'📈 DFS {_eb_plat} · {_eb_n_picks}-Pick Flex</span><br>'
+                        f'<span style="color:{_eb_color};font-size:0.88rem;font-weight:800;'
+                        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+                        f'{_eb_icon} Avg leg: {_eb_avg_leg:.0f}%  ·  Breakeven: {_eb_be_prob:.0f}%</span>'
+                        f'<span style="color:#475569;font-size:0.65rem;margin-left:8px;">'
+                        f'({_eb_payout:.1f}× payout)</span></div>',
+                        unsafe_allow_html=True,
+                    )
+                except (ImportError, Exception):
+                    pass
             
             # Correlation check
             corr_risk = calculate_correlation_risk(picks_to_include)
