@@ -335,7 +335,8 @@ class TestMixedDfsNonDfsProps(unittest.TestCase):
             p["player_name"] = f"PlainPlayer_{i}"
         mixed = dfs_props + plain_props
         slips = generate_optimal_slip(mixed, platform="PrizePicks")
-        # At least some slips should have a mix of None and dict edges
+        # Across all slips, we expect to see both None edges (plain props)
+        # and dict edges (DFS props), since the combinator pairs them
         has_none = False
         has_dict = False
         for slip in slips:
@@ -344,8 +345,9 @@ class TestMixedDfsNonDfsProps(unittest.TestCase):
                     has_none = True
                 else:
                     has_dict = True
-        # With 2 DFS + 2 non-DFS, there should be mixed slips
-        self.assertTrue(has_none or has_dict, "Mixed props should produce some edge data")
+        # With 2 DFS + 2 non-DFS, combinator creates mixed slips
+        self.assertTrue(has_none and has_dict,
+                        "Mixed props should produce both None and dict edge entries")
 
 
 if __name__ == "__main__":
