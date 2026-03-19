@@ -909,7 +909,7 @@ if _generate_clicked:
         )
         _slip_kelly_frac = _slip_kelly_result.get("fractional_kelly", 0.0)
         _slip_wager = round(_slip_kelly_frac * _slip_bankroll, 2) if _slip_kelly_frac > 0 else 0.0
-        _slip_expected_payout = round(_slip_entry_fee * (1.0 + _ev), 2) if _ev > 0 else round(_slip_entry_fee * (1.0 + _ev), 2)
+        _slip_expected_payout = round(_slip_entry_fee * (1.0 + _ev), 2)
 
         # ── Digital Betting Ticket ────────────────────────────────
         _legs_html = ""
