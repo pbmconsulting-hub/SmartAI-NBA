@@ -276,6 +276,16 @@ defensive_ratings_data = load_defensive_ratings_data()
 current_props  = load_props_from_session(st.session_state)
 todays_games   = st.session_state.get("todays_games", [])
 
+# ── Safety net: enrich with alt-line categories if missing ──────
+# Props saved before the enrichment pipeline was wired may lack
+# line_category.  Re-enrich to ensure Goblin / Demon classification
+# works correctly downstream.
+if current_props and not any(p.get("line_category") for p in current_props):
+    try:
+        from data.platform_fetcher import parse_alt_lines_from_platform_props
+        current_props = parse_alt_lines_from_platform_props(current_props)
+    except ImportError:
+        pass
 simulation_depth = st.session_state.get("simulation_depth", 2000)
 minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 

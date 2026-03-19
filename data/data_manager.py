@@ -1242,6 +1242,7 @@ LIVE_PROPS_CSV_PATH = DATA_DIRECTORY / "live_props.csv"
 # CSV columns for platform props
 _PLATFORM_PROPS_COLUMNS = [
     "player_name", "team", "stat_type", "line", "platform", "game_date", "fetched_at",
+    "line_category", "standard_line",
 ]
 
 
