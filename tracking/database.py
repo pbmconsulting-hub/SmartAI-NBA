@@ -1257,7 +1257,9 @@ def insert_analysis_picks(analysis_results):
                     f"{_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}"
                 )
                 time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
-                inserted = 0  # reset counter for fresh retry
+                # Reset: the fresh retry re-reads existing keys so
+                # deduplication is re-applied and no duplicates arise.
+                inserted = 0
                 continue
             _logger.warning(f"insert_analysis_picks error (non-fatal): {op_err}")
         except Exception as err:
@@ -1680,7 +1682,9 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
                     f"{_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}"
                 )
                 time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
-                inserted = 0  # reset counter for fresh retry
+                # Reset: INSERT OR REPLACE handles deduplication, so
+                # re-inserting the same rows is idempotent.
+                inserted = 0
                 continue
             _logger.warning(f"save_player_game_logs_to_db error (non-fatal): {op_err}")
         except Exception as err:
