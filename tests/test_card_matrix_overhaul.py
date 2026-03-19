@@ -324,8 +324,7 @@ class TestConfigToml(unittest.TestCase):
         )
         with open(config_path) as f:
             content = f.read()
-        self.assertIn("maxMessageSize", content)
-        self.assertIn("1000", content)
+        self.assertIn("maxMessageSize = 1000", content)
 
 
 class TestFormatAltLinePrediction(unittest.TestCase):

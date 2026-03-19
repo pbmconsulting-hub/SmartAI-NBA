@@ -105,7 +105,10 @@ def _build_single_card_html(result, index=0):
     # Direction label
     direction = result.get("direction", "")
     if not direction:
-        direction = "OVER" if prob_over and float(prob_over) >= 0.5 else "UNDER"
+        try:
+            direction = "OVER" if prob_over and float(prob_over) >= 0.5 else "UNDER"
+        except (ValueError, TypeError):
+            direction = "OVER"
     direction_escaped = _escape(direction.upper())
 
     return f"""<div class="qcm-card" style="animation-delay:{delay_ms}ms;">
