@@ -775,11 +775,12 @@ def auto_resolve_bet_results(date_str=None):
     with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids) or 1)) as executor:
         futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
         for future in as_completed(futures):
+            pid = futures[future]
             try:
-                pid, df_result = future.result()
+                _, df_result = future.result()
                 _game_log_cache[pid] = df_result
             except Exception:
-                _game_log_cache[futures[future]] = None
+                _game_log_cache[pid] = None
 
     # ── Resolve bets from cached game logs ────────────────────
     for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
@@ -1086,11 +1087,12 @@ def resolve_todays_bets():
         with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids))) as executor:
             futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
             for future in as_completed(futures):
+                pid = futures[future]
                 try:
-                    pid, log_data = future.result()
+                    _, log_data = future.result()
                     _game_log_cache[pid] = log_data
                 except Exception:
-                    _game_log_cache[futures[future]] = None
+                    _game_log_cache[pid] = None
 
     # ── Resolve bets from cached game logs ────────────────────
     for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
