@@ -1445,13 +1445,10 @@ if run_analysis:
             full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
             full_result["goblin_floor"]    = _bet_classification.get("goblin_floor")
             full_result["demon_ceiling"]   = _bet_classification.get("demon_ceiling")
-            # Uncertain picks (conflicting forces) are added to the avoid list.
-            # True Demon bets (line above standard) are NOT auto-avoided.
-            if _bet_classification.get("is_uncertain") and not full_result.get("should_avoid"):
-                full_result["should_avoid"] = True
-                full_result["avoid_reasons"] = list(full_result.get("avoid_reasons", [])) + [
-                    f"Uncertain Pick: {'; '.join(_bet_classification.get('risk_flags', []))}"
-                ]
+            # Risk flags (conflicting forces, high-variance stat, etc.) are
+            # informational — they appear on the card UI as warnings but do NOT
+            # block the pick from being displayed or auto-logged.  The genuine
+            # should_avoid decision comes from should_avoid_prop() only.
         except Exception:
             full_result["bet_type"]         = "normal"
             full_result["bet_type_emoji"]   = ""
@@ -1634,24 +1631,22 @@ if analysis_results:
     with _na_filter_col2:
         _na_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Easy Money", "⚡ Normal", "50/50 — Uncertain"],
+            ["Goblin — Easy Money", "Demon — High Ceiling", "⚡ Normal", "50/50 — Uncertain"],
             default=[],
             key="na_bet_type_filter",
-            help="Filter by bet type. Leave empty to show all. '50/50 — Uncertain' shows conflicting-force picks (formerly 'Demon — Trap/Avoid').",
+            help="Filter by bet type. Leave empty to show all.",
         )
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
     if _na_bet_type_filter:
         _na_bt_map = {
-            "Goblin — Easy Money": "goblin",
-            "50/50 — Uncertain":   "50_50",
-            "⚡ Normal":           "normal",
+            "Goblin — Easy Money":   "goblin",
+            "Demon — High Ceiling":  "demon",
+            "50/50 — Uncertain":     "50_50",
+            "⚡ Normal":             "normal",
         }
         _na_bt_values = {_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map}
-        # Also accept legacy "demon" records when filtering for "50_50"
-        if "50_50" in _na_bt_values:
-            _na_bt_values.add("demon")
         displayed_results = [r for r in displayed_results if r.get("bet_type", "normal") in _na_bt_values]
 
     # Sort by confidence score descending
@@ -1841,6 +1836,12 @@ if analysis_results:
                     st.write(", ".join(unmatched_names_deduped))
 
     st.divider()
+
+    if not displayed_results:
+        st.warning(
+            "📭 **No picks match the current filters.** All analyzed props were filtered out. "
+            "Try switching to **All picks** above, or loosen the Tier / Bet Classification filters."
+        )
 
     # ============================================================
     # SECTION: 🧌 Goblin Picks — Extreme Edge "Easy Money" Bets

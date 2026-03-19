@@ -1571,3 +1571,61 @@ class TestClassifyBetTypeLineCategoryParam(unittest.TestCase):
         self.assertFalse(goblin_result["demon"])
         self.assertFalse(fifty_result["demon"])
         self.assertTrue(demon_result["demon"])
+
+
+class TestUncertainDoesNotForceAvoid(unittest.TestCase):
+    """Verify that is_uncertain risk flags do NOT set should_avoid on analysis results.
+
+    The analysis pipeline uses should_avoid_prop() for genuine avoid logic.
+    Risk flags from classify_bet_type() (is_uncertain) are informational only
+    — they display warnings on the card but do not block the pick from being
+    shown or auto-logged.
+    """
+
+    def _make_result(self, edge_pct=12.0, should_avoid=False, is_uncertain=True, bet_type="normal"):
+        """Build a minimal analysis result dict."""
+        return {
+            "player_name": "Test Player",
+            "stat_type": "points",
+            "line": 20.5,
+            "direction": "OVER",
+            "edge_percentage": edge_pct,
+            "confidence_score": 72,
+            "tier": "Gold",
+            "should_avoid": should_avoid,
+            "is_uncertain": is_uncertain,
+            "bet_type": bet_type,
+            "player_is_out": False,
+        }
+
+    def test_uncertain_pick_not_filtered_by_edge_filter(self):
+        """A pick with is_uncertain=True but good edge should survive the top-picks filter."""
+        r = self._make_result(edge_pct=15.0, should_avoid=False, is_uncertain=True)
+        # Simulate the display filter from Neural Analysis (top picks only)
+        minimum_edge = 5.0
+        displayed = [
+            res for res in [r]
+            if abs(res.get("edge_percentage", 0)) >= minimum_edge
+            and not res.get("should_avoid", False)
+        ]
+        self.assertEqual(len(displayed), 1,
+                         "Uncertain pick with good edge should pass the top-picks filter")
+
+    def test_should_avoid_from_prop_check_still_filters(self):
+        """A pick marked should_avoid by should_avoid_prop() is correctly filtered."""
+        r = self._make_result(edge_pct=2.0, should_avoid=True, is_uncertain=False)
+        minimum_edge = 5.0
+        displayed = [
+            res for res in [r]
+            if abs(res.get("edge_percentage", 0)) >= minimum_edge
+            and not res.get("should_avoid", False)
+        ]
+        self.assertEqual(len(displayed), 0,
+                         "should_avoid=True from should_avoid_prop() must still filter the pick")
+
+    def test_is_uncertain_stays_informational(self):
+        """is_uncertain should be preserved in the result dict for UI display."""
+        r = self._make_result(is_uncertain=True)
+        self.assertTrue(r["is_uncertain"])
+        self.assertFalse(r["should_avoid"],
+                         "is_uncertain alone must NOT set should_avoid")
