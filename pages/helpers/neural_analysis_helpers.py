@@ -103,6 +103,153 @@ _STAT_EMOJI = {
 }
 
 
+def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=True):
+    """Generate an inline HTML breakdown block for any analysis card.
+
+    Returns an HTML string containing:
+    - Distribution row: P10, Median, P90, σ, Projection
+    - Directional forces: OVER / UNDER force lists with star ratings
+    - Score breakdown: confidence-factor progress bars
+
+    This is used by the Best Single Bets, Goblin, Demon, and Uncertain
+    sections so that every card shows the full quantitative picture
+    without requiring the user to expand anything.
+
+    Args:
+        result (dict): Full analysis result from the simulation loop.
+        accent_color (str): Primary accent CSS colour for headers.
+        show_forces (bool): Whether to include the forces columns.
+
+    Returns:
+        str: HTML string safe for ``st.markdown(..., unsafe_allow_html=True)``.
+    """
+    p10 = result.get("percentile_10", 0) or 0
+    p50 = result.get("percentile_50", 0) or 0
+    p90 = result.get("percentile_90", 0) or 0
+    std = result.get("simulated_std", result.get("std_dev", 0)) or 0
+    proj = result.get("adjusted_projection", result.get("projected_stat", 0)) or 0
+
+    try:
+        p10_d = f"{float(p10):.1f}"
+    except (ValueError, TypeError):
+        p10_d = "—"
+    try:
+        p50_d = f"{float(p50):.1f}"
+    except (ValueError, TypeError):
+        p50_d = "—"
+    try:
+        p90_d = f"{float(p90):.1f}"
+    except (ValueError, TypeError):
+        p90_d = "—"
+    try:
+        std_d = f"{float(std):.1f}"
+    except (ValueError, TypeError):
+        std_d = "—"
+    try:
+        proj_d = f"{float(proj):.1f}"
+    except (ValueError, TypeError):
+        proj_d = "—"
+
+    # ── distribution row ─────────────────────────────────────────
+    _cell_css = (
+        "text-align:center;padding:5px 4px;background:rgba(15,23,42,0.60);"
+        "border-radius:5px;border:1px solid rgba(255,255,255,0.04);"
+        "flex:1;min-width:48px;"
+    )
+    _val_css = (
+        "font-size:0.82rem;font-weight:700;font-family:'JetBrains Mono',monospace;"
+        "font-variant-numeric:tabular-nums;"
+    )
+    _lbl_css = "font-size:0.58rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;"
+    dist_html = (
+        '<div style="display:flex;gap:4px;margin-top:10px;margin-bottom:8px;">'
+        f'<div style="{_cell_css}"><div style="{_val_css}color:#c0d0e8;">{p10_d}</div><div style="{_lbl_css}">P10</div></div>'
+        f'<div style="{_cell_css}"><div style="{_val_css}color:#00f0ff;">{p50_d}</div><div style="{_lbl_css}">MED</div></div>'
+        f'<div style="{_cell_css}"><div style="{_val_css}color:#c0d0e8;">{p90_d}</div><div style="{_lbl_css}">P90</div></div>'
+        f'<div style="{_cell_css}"><div style="{_val_css}color:#ffffff;">{std_d}</div><div style="{_lbl_css}">σ</div></div>'
+        f'<div style="{_cell_css}"><div style="{_val_css}color:#ff5e00;">{proj_d}</div><div style="{_lbl_css}">Proj</div></div>'
+        '</div>'
+    )
+
+    # ── directional forces ───────────────────────────────────────
+    forces_html = ""
+    if show_forces:
+        forces = result.get("forces", {}) or {}
+        over_forces = forces.get("over_forces", []) or []
+        under_forces = forces.get("under_forces", []) or []
+
+        def _force_items(flist):
+            if not flist:
+                return '<span style="color:#475569;font-size:0.7rem;font-style:italic;">None</span>'
+            parts = []
+            for f in flist:
+                if not isinstance(f, dict):
+                    continue
+                strength = max(1, min(5, round(float(f.get("strength", 1)))))
+                stars = "⭐" * strength
+                name = _html.escape(str(f.get("name", "") or ""))
+                parts.append(
+                    f'<div style="color:#c0d0e8;font-size:0.7rem;line-height:1.35;margin-bottom:1px;">'
+                    f'{stars} {name}</div>'
+                )
+            return "".join(parts) if parts else '<span style="color:#475569;font-size:0.7rem;font-style:italic;">None</span>'
+
+        _fcol_css = (
+            "flex:1;padding:7px 9px;border-radius:5px;"
+            "font-family:'JetBrains Mono',monospace;min-height:36px;"
+        )
+        forces_html = (
+            '<div style="display:flex;gap:5px;margin-bottom:8px;">'
+            f'<div style="{_fcol_css}background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.12);">'
+            '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
+            'color:#00f0ff;margin-bottom:3px;">▲ OVER</div>'
+            f'{_force_items(over_forces)}'
+            '</div>'
+            f'<div style="{_fcol_css}background:rgba(255,94,0,0.04);border:1px solid rgba(255,94,0,0.12);">'
+            '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
+            'color:#ff5e00;margin-bottom:3px;">▼ UNDER</div>'
+            f'{_force_items(under_forces)}'
+            '</div>'
+            '</div>'
+        )
+
+    # ── score breakdown bars ─────────────────────────────────────
+    breakdown = result.get("score_breakdown", {}) or {}
+    breakdown_html = ""
+    if breakdown:
+        bars = []
+        for factor, score in breakdown.items():
+            try:
+                score_f = float(score or 0)
+            except (ValueError, TypeError):
+                continue
+            label = _html.escape(
+                factor.replace("_score", "").replace("_", " ").title()
+            )
+            bar_w = min(100, max(0, score_f))
+            if bar_w >= 70:
+                bar_c = "#00f0ff"
+            elif bar_w >= 40:
+                bar_c = "#ff5e00"
+            else:
+                bar_c = "#ff4444"
+            bars.append(
+                '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;'
+                "font-family:'JetBrains Mono',monospace;\">"
+                f'<span style="font-size:0.62rem;color:#94A3B8;width:62px;flex-shrink:0;'
+                f'text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{label}</span>'
+                f'<span style="font-size:0.62rem;color:{accent_color};font-weight:600;'
+                f'width:22px;flex-shrink:0;text-align:right;">{score_f:.0f}</span>'
+                f'<div style="flex:1;height:4px;background:rgba(26,32,53,0.80);border-radius:2px;overflow:hidden;">'
+                f'<div style="height:4px;width:{bar_w:.1f}%;background:{bar_c};border-radius:2px;"></div>'
+                '</div></div>'
+            )
+        if bars:
+            breakdown_html = '<div style="margin-top:2px;">' + "".join(bars) + '</div>'
+
+    return dist_html + forces_html + breakdown_html
+
+
 def _build_result_metrics(result):
     """Build the 4-item metrics list for a QDS prop card."""
     stat_type  = result.get("stat_type", "points").lower()

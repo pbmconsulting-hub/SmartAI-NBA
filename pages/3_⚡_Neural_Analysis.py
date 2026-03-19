@@ -259,6 +259,7 @@ from pages.helpers.neural_analysis_helpers import (
     _build_bonus_factors,
     _build_entry_strategy,
     _render_qds_full_breakdown_html,
+    render_inline_breakdown_html as _render_inline_breakdown,
     display_prop_analysis_card_qds,
 )
 # ============================================================
@@ -2023,6 +2024,7 @@ if analysis_results:
                         f'</span></div>'
                         if _gp_goblin_floor is not None else ""
                     )
+                    + _render_inline_breakdown(_gp, accent_color="#4caf50")
                     + f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2145,6 +2147,7 @@ if analysis_results:
                         f'</span></div>'
                         if _dp_demon_ceiling is not None else ""
                     )
+                    + _render_inline_breakdown(_dp, accent_color="#ff8c00")
                     + f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2247,7 +2250,8 @@ if analysis_results:
                     f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">RISK FLAGS (AVOID):</span>'
                     f'<ul style="margin:4px 0 0 16px;padding:0;">{_up_flags_html}</ul>'
                     f'</div>'
-                    f'</div>',
+                    + _render_inline_breakdown(_up, accent_color="#ffc107")
+                    + f'</div>',
                     unsafe_allow_html=True,
                 )
         st.divider()
@@ -2305,22 +2309,51 @@ if analysis_results:
             _sb_conf  = _sb.get("confidence_score", 0)
             _sb_edge  = _sb.get("edge_percentage", 0)
             _sb_emoji = _sb.get("tier_emoji", "🥈")
+            _sb_prob  = _sb.get("probability_over", 0.5)
+            _sb_prob_dir = _sb_prob if _sb_dir == "OVER" else (1.0 - _sb_prob)
+            _sb_proj  = _sb.get("adjusted_projection", 0)
+            _sb_platform = _html.escape(str(_sb.get("platform", "")))
+            _sb_team  = _html.escape(str(_sb.get("player_team", _sb.get("team", ""))))
+            _sb_bet_type = _sb.get("bet_type", "normal")
+            _sb_bet_icon = {"goblin": "🟢", "demon": "👹"}.get(_sb_bet_type, "")
+            _sb_breakdown_html = _render_inline_breakdown(_sb, accent_color=_sb_color)
             st.markdown(
-                f'<div style="background:#14192b;border-radius:8px;padding:12px 16px;'
-                f'margin-bottom:10px;border-left:4px solid {_sb_color};">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<div style="background:#14192b;border-radius:10px;padding:14px 18px;'
+                f'margin-bottom:12px;border-left:4px solid {_sb_color};'
+                f'border:1px solid rgba(255,255,255,0.08);">'
+                # ── Header row: name + stat + badges ──────────────────
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
                 f'<div>'
-                f'<span style="color:{_sb_color};font-weight:700;font-size:1rem;">{_sb_emoji} {_sb_name}</span>'
-                f'<span style="color:#c0d0e8;font-size:0.9rem;margin-left:10px;">'
-                f'{_sb_dir} {_sb_line} {_sb_stat}</span>'
-                f'</div>'
+                f'<span style="color:{_sb_color};font-weight:700;font-size:1.05rem;">'
+                f'{_sb_emoji} {_sb_name}</span>'
+                f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_sb_team}</span>'
+                + (f'<span style="margin-left:6px;">{_sb_bet_icon}</span>' if _sb_bet_icon else "")
+                + f'</div>'
                 f'<div style="text-align:right;">'
                 f'<span style="background:{_sb_color};color:#0a0f1a;padding:2px 8px;border-radius:4px;'
                 f'font-size:0.78rem;font-weight:700;">SAFE {_sb_conf:.0f}/100</span>'
-                f'<span style="color:#00f0ff;font-size:0.78rem;margin-left:8px;">Edge {_sb_edge:+.1f}%</span>'
                 f'</div>'
                 f'</div>'
-                f'</div>',
+                # ── Prop line row ─────────────────────────────────────
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:8px 10px;background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.10);'
+                f'border-radius:6px;margin-bottom:4px;">'
+                f'<span style="color:#94A3B8;font-size:0.78rem;font-family:\'JetBrains Mono\',monospace;'
+                f'text-transform:uppercase;letter-spacing:0.06em;">'
+                f'{_sb_dir} {_sb_line} {_sb_stat}'
+                + (f' · {_sb_platform}' if _sb_platform else "")
+                + f'</span>'
+                f'<span style="font-family:\'JetBrains Mono\',monospace;">'
+                f'<span style="color:#00f0ff;font-size:0.78rem;font-weight:600;">Edge {_sb_edge:+.1f}%</span>'
+                f'<span style="color:#94A3B8;font-size:0.72rem;margin-left:8px;">'
+                f'P({_sb_dir.title()}): {_sb_prob_dir*100:.0f}%</span>'
+                f'<span style="color:#ff5e00;font-size:0.72rem;margin-left:8px;">'
+                f'Proj: {_sb_proj:.1f}</span>'
+                f'</span>'
+                f'</div>'
+                # ── Full breakdown: distribution + forces + scores ────
+                + _sb_breakdown_html
+                + f'</div>',
                 unsafe_allow_html=True,
             )
 
