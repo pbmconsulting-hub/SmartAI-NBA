@@ -754,6 +754,12 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
                 - ``combined_probability``: float
                 - ``correlation_penalty``: float (1.0 = no penalty)
                 - ``fair_odds``: float (American odds of the slip)
+                - ``dfs_leg_edges``: list of (dict or None) per leg — each
+                  dict has ``beats_breakeven``, ``edge_vs_breakeven``,
+                  ``breakeven``, ``probability``; None when DFS data absent
+                - ``dfs_legs_beat_breakeven``: int — count of legs that beat
+                  the slip-tier's DFS breakeven
+                - ``dfs_avg_edge``: float — mean per-leg edge vs breakeven
     """
     try:
         from engine.entry_optimizer import (
@@ -840,6 +846,39 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
                 max(0.001, min(0.999, combined_prob))
             )
 
+            # ── per-leg DFS breakeven edge (Phase 4) ──
+            # If picks carry dfs_parlay_ev from Phase 2, compute which
+            # legs beat the breakeven for this slip's tier and the avg edge.
+            dfs_leg_edges = []
+            for pk, p_dir_prob in zip(picks, probs):
+                parlay_data = pk.get("dfs_parlay_ev")
+                if parlay_data:
+                    tier_data = parlay_data.get("tiers", {}).get(slip_size) or \
+                                parlay_data.get("tiers", {}).get(str(slip_size))
+                    if tier_data:
+                        dfs_leg_edges.append({
+                            "beats_breakeven": tier_data.get("beats_breakeven", False),
+                            "edge_vs_breakeven": _safe_float(
+                                tier_data.get("edge_vs_breakeven", 0), 0
+                            ),
+                            "breakeven": _safe_float(
+                                tier_data.get("breakeven", 0.5), 0.5
+                            ),
+                            "probability": round(p_dir_prob, 4),
+                        })
+                    else:
+                        dfs_leg_edges.append(None)
+                else:
+                    dfs_leg_edges.append(None)
+
+            # Aggregate DFS metrics for the slip
+            _valid_edges = [e for e in dfs_leg_edges if e is not None]
+            legs_beat_be = sum(1 for e in _valid_edges if e["beats_breakeven"])
+            avg_dfs_edge = (
+                round(sum(e["edge_vs_breakeven"] for e in _valid_edges) / len(_valid_edges), 6)
+                if _valid_edges else 0.0
+            )
+
             all_slips.append({
                 "slip_size": slip_size,
                 "picks": picks,
@@ -847,6 +886,9 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
                 "combined_probability": round(combined_prob, 6),
                 "correlation_penalty": round(correlation_penalty, 4),
                 "fair_odds": fair_slip_odds,
+                "dfs_leg_edges": dfs_leg_edges,
+                "dfs_legs_beat_breakeven": legs_beat_be,
+                "dfs_avg_edge": _safe_float(avg_dfs_edge),
             })
 
     # Sort by cumulative EV descending, return top 10
