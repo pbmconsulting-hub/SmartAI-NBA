@@ -167,6 +167,7 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("smart_filter_props", source)
         self.assertIn("_funnel_stat_keys_run", source)
+        self.assertNotIn("_funnel_max_pp", source)
 
 
 class TestSmartFilterPropsIntegration(unittest.TestCase):
