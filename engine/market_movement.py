@@ -19,8 +19,20 @@
 
 import json
 import datetime
+import math
 import os
 from pathlib import Path
+
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
 
 
 # ============================================================
@@ -185,11 +197,11 @@ def detect_line_movement(player_name, stat_type, initial_line, current_line, mod
 
     return {
         'movement_direction':    movement_direction,
-        'movement_magnitude':    round(movement_magnitude, 4),
-        'movement_pct':          round(movement_pct, 2),
+        'movement_magnitude':    _safe_float(round(movement_magnitude, 4), 0.0),
+        'movement_pct':          _safe_float(round(movement_pct, 2), 0.0),
         'agrees_with_model':     agrees_with_model,
         'sharp_money_signal':    sharp_money_signal,
-        'confidence_adjustment': confidence_adjustment,
+        'confidence_adjustment': _safe_float(confidence_adjustment, 0.0),
         'interpretation':        interpretation,
     }
 
@@ -307,10 +319,10 @@ def get_movement_summary(player_name, stat_type, platform=None):
     return {
         'has_movement_data': True,
         'snapshots':         all_snapshots,
-        'initial_line':      initial_line,
-        'current_line':      current_line,
-        'movement':          round(movement, 4),
-        'time_span_hours':   round(time_span_hours, 2) if time_span_hours is not None else None,
+        'initial_line':      _safe_float(initial_line, 0.0) if initial_line is not None else None,
+        'current_line':      _safe_float(current_line, 0.0) if current_line is not None else None,
+        'movement':          _safe_float(round(movement, 4), 0.0) if movement is not None else None,
+        'time_span_hours':   _safe_float(round(time_span_hours, 2), 0.0) if time_span_hours is not None else None,
     }
 
 # ============================================================
