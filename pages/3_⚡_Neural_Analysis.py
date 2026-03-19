@@ -1478,8 +1478,6 @@ if run_analysis:
             _alt_lines = generate_alt_line_probabilities(simulation_output, prop_line)
             full_result["alt_lines"] = _alt_lines
             _best_alt = _alt_lines.get("best_alt", {})
-            _best_type = _best_alt.get("type", "base")
-            _best_line = _best_alt.get("line", prop_line)
             full_result["prediction"] = _best_alt.get("prediction", "")
             # Also store the prediction from the edge_detection formatter
             # based on the classified bet_type (may differ from simulation best)

@@ -110,9 +110,8 @@ st.markdown("""
     letter-spacing: 0.03em;
 }
 .spp-hero-logo {
-    width: 3600px;
-    height: auto;
     max-width: 80%;
+    height: auto;
     object-fit: contain;
     border-radius: 50%;
     box-shadow: 0 0 18px rgba(0,240,255,0.30);
@@ -121,7 +120,7 @@ st.markdown("""
 /* Responsive: stack on mobile */
 @media (max-width: 640px) {
     .hero-hud { flex-direction: column; text-align: center; padding: 24px 20px; }
-    .spp-hero-logo { width: 2800px; max-width: 80%; }
+    .spp-hero-logo { max-width: 80%; }
 }
 /* Status card — dark glass panel */
 .status-card {
