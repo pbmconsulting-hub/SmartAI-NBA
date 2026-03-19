@@ -11,6 +11,9 @@
 # Standard library imports only
 import random   # For randomizing game scenarios (minutes, pace)
 import math     # For mathematical rounding and calculations
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 def _safe_float(value, fallback=0.0):
@@ -651,7 +654,9 @@ def run_quantum_matrix_simulation(
             )
             simulation_results["dfs_parlay_ev"] = _parlay_ev
         except ImportError:
-            pass  # odds_engine not available — skip DFS metrics
+            _logger.warning(
+                "DFS metrics skipped: engine.odds_engine not available"
+            )
 
     return simulation_results
 
