@@ -223,40 +223,11 @@ class TestGenerateOptimalSlip(unittest.TestCase):
 
 
 class TestPearsonSimCorrelation(unittest.TestCase):
-    """Tests for pages/13_🗺️_Correlation_Matrix.py pearson_sim_correlation()."""
+    """Tests for engine/correlation.py pearson_sim_correlation()."""
 
-    @classmethod
-    def setUpClass(cls):
-        # Import the function directly from the module file
-        import importlib.util
-        import os
-        spec = importlib.util.spec_from_file_location(
-            "corr_matrix",
-            os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                "pages", "13_🗺️_Correlation_Matrix.py",
-            ),
-        )
-        # We can't import the full Streamlit page; extract the function.
-        # Instead, replicate the function logic here for testability.
-        pass
-
-    def _pearson(self, a, b):
-        """Local copy of pearson_sim_correlation for testing."""
-        n = min(len(a), len(b))
-        if n < 3:
-            return 0.0
-        a = a[:n]
-        b = b[:n]
-        mean_a = sum(a) / n
-        mean_b = sum(b) / n
-        num = sum((a[i] - mean_a) * (b[i] - mean_b) for i in range(n))
-        den_a = math.sqrt(sum((v - mean_a) ** 2 for v in a))
-        den_b = math.sqrt(sum((v - mean_b) ** 2 for v in b))
-        if den_a < 1e-9 or den_b < 1e-9:
-            return 0.0
-        r = num / (den_a * den_b)
-        return max(-1.0, min(1.0, round(r, 4)))
+    def setUp(self):
+        from engine.correlation import pearson_sim_correlation
+        self._pearson = pearson_sim_correlation
 
     def test_perfect_positive_correlation(self):
         a = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -292,6 +263,13 @@ class TestPearsonSimCorrelation(unittest.TestCase):
         r = self._pearson(a, b)
         self.assertGreaterEqual(r, -1.0)
         self.assertLessEqual(r, 1.0)
+
+    def test_result_rounded_to_4_dp(self):
+        a = [1.0, 2.0, 3.0, 4.0, 5.0]
+        b = [5.0, 3.0, 1.0, 4.0, 2.0]
+        r = self._pearson(a, b)
+        # Verify result is rounded to at most 4 decimal places
+        self.assertEqual(r, round(r, 4))
 
 
 class TestSessionStateDefaults(unittest.TestCase):
@@ -394,6 +372,211 @@ class TestSyntheticSliderRobustness(unittest.TestCase):
         self.assertIn("_slider_max = _slider_min + 5.0", content)
         # Base line must be clamped inside slider range
         self.assertIn("_base_line = max(_slider_min", content)
+
+
+# ============================================================
+# MODULE 3 Enhancement Tests
+# ============================================================
+
+class TestCorrelationMatrixPageImports(unittest.TestCase):
+    """Verify the Correlation Matrix page imports from engine, not inline."""
+
+    def test_page_imports_from_engine(self):
+        """Verify the page imports pearson_sim_correlation from engine."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("from engine.correlation import", content)
+        self.assertIn("pearson_sim_correlation", content)
+
+    def test_page_no_inline_pearson(self):
+        """Verify the old inline pearson function is removed from the page."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        # Should NOT contain a local 'def pearson_sim_correlation'
+        self.assertNotIn("def pearson_sim_correlation", content)
+
+    def test_page_imports_parlay_and_kelly(self):
+        """Verify the page imports parlay and Kelly functions."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("adjust_parlay_probability", content)
+        self.assertIn("correlation_adjusted_kelly", content)
+
+    def test_page_has_game_filter(self):
+        """Verify the page has game-level filtering."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("Filter by Game", content)
+        self.assertIn("_game_groups", content)
+
+    def test_page_has_summary_stats(self):
+        """Verify the page has correlation summary statistics bar."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("Mean r", content)
+        self.assertIn("Max r", content)
+        self.assertIn("Min r", content)
+        self.assertIn("Pairs", content)
+
+    def test_page_has_parlay_impact_section(self):
+        """Verify the page has a Parlay Impact panel."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("Parlay Impact", content)
+        self.assertIn("Independent Joint Prob", content)
+        self.assertIn("Correlation-Adjusted Prob", content)
+
+    def test_page_has_kelly_section(self):
+        """Verify the page has Correlation-Adjusted Kelly section."""
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "13_🗺️_Correlation_Matrix.py",
+        )
+        with open(page_path, "r") as f:
+            content = f.read()
+        self.assertIn("Correlation-Adjusted Kelly", content)
+        self.assertIn("Recommended Wager", content)
+        self.assertIn("Correlation Discount", content)
+
+
+class TestPearsonSimCorrelationEngine(unittest.TestCase):
+    """Tests for the pearson_sim_correlation exported from engine/correlation.py."""
+
+    def setUp(self):
+        from engine.correlation import pearson_sim_correlation
+        self.fn = pearson_sim_correlation
+
+    def test_delegates_to_calculate_pearson_correlation(self):
+        """Confirm pearson_sim_correlation wraps calculate_pearson_correlation."""
+        from engine.correlation import calculate_pearson_correlation
+        a = [1.0, 3.0, 5.0, 7.0, 9.0]
+        b = [2.0, 4.0, 6.0, 8.0, 10.0]
+        raw = calculate_pearson_correlation(a, b)
+        wrapped = self.fn(a, b)
+        self.assertAlmostEqual(wrapped, round(raw, 4), places=4)
+
+    def test_returns_rounded_result(self):
+        a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        b = [7.0, 5.0, 3.0, 2.0, 6.0, 1.0, 4.0]
+        r = self.fn(a, b)
+        self.assertEqual(r, round(r, 4))
+
+
+class TestParlayImpactIntegration(unittest.TestCase):
+    """Tests for adjust_parlay_probability used in the Correlation Matrix."""
+
+    def setUp(self):
+        from engine.correlation import adjust_parlay_probability
+        self.fn = adjust_parlay_probability
+
+    def test_independent_returns_product(self):
+        """When correlation matrix is identity, result ≈ product."""
+        probs = [0.6, 0.7]
+        matrix = [[1.0, 0.0], [0.0, 1.0]]
+        result = self.fn(probs, matrix)
+        naive = 0.6 * 0.7
+        # Should be very close to naive (identity = no corr adjustment)
+        self.assertAlmostEqual(result, naive, places=3)
+
+    def test_positive_correlation_increases_probability(self):
+        """Positive correlation should increase the joint probability."""
+        probs = [0.6, 0.7]
+        corr = [[1.0, 0.5], [0.5, 1.0]]
+        result = self.fn(probs, corr)
+        naive = 0.6 * 0.7
+        self.assertGreater(result, naive)
+
+    def test_negative_correlation_decreases_probability(self):
+        """Negative correlation should decrease the joint probability."""
+        probs = [0.6, 0.7]
+        corr = [[1.0, -0.5], [-0.5, 1.0]]
+        result = self.fn(probs, corr)
+        naive = 0.6 * 0.7
+        self.assertLess(result, naive)
+
+    def test_single_prop_returns_itself(self):
+        """Single prop returns its own probability."""
+        result = self.fn([0.65], [[1.0]])
+        self.assertAlmostEqual(result, 0.65, places=2)
+
+
+class TestCorrelationAdjustedKelly(unittest.TestCase):
+    """Tests for correlation_adjusted_kelly used in the Correlation Matrix."""
+
+    def setUp(self):
+        from engine.correlation import correlation_adjusted_kelly
+        self.fn = correlation_adjusted_kelly
+
+    def test_returns_expected_keys(self):
+        picks = [{"win_probability": 0.6, "odds_decimal": 1.91}]
+        result = self.fn(picks, 1000, [[1.0]])
+        for key in ["kelly_fraction", "recommended_bet", "correlation_discount"]:
+            self.assertIn(key, result)
+
+    def test_higher_correlation_reduces_fraction(self):
+        """Higher pairwise correlation should reduce the Kelly fraction."""
+        picks = [
+            {"win_probability": 0.6, "odds_decimal": 1.91},
+            {"win_probability": 0.65, "odds_decimal": 2.0},
+        ]
+        low_corr = [[1.0, 0.1], [0.1, 1.0]]
+        high_corr = [[1.0, 0.8], [0.8, 1.0]]
+        result_low = self.fn(picks, 1000, low_corr)
+        result_high = self.fn(picks, 1000, high_corr)
+        self.assertGreaterEqual(
+            result_low["kelly_fraction"],
+            result_high["kelly_fraction"],
+        )
+
+    def test_discount_below_one_with_correlation(self):
+        """Correlation discount should be < 1 when picks are correlated."""
+        picks = [
+            {"win_probability": 0.6, "odds_decimal": 1.91},
+            {"win_probability": 0.65, "odds_decimal": 2.0},
+        ]
+        corr = [[1.0, 0.6], [0.6, 1.0]]
+        result = self.fn(picks, 1000, corr)
+        self.assertLess(result["correlation_discount"], 1.0)
+
+    def test_zero_bankroll_returns_zero(self):
+        picks = [{"win_probability": 0.6, "odds_decimal": 1.91}]
+        result = self.fn(picks, 0, [[1.0]])
+        self.assertEqual(result["recommended_bet"], 0.0)
+
+    def test_empty_picks_returns_zero(self):
+        result = self.fn([], 1000, [])
+        self.assertEqual(result["recommended_bet"], 0.0)
 
 
 if __name__ == "__main__":

@@ -805,3 +805,28 @@ def correlation_adjusted_kelly(picks, bankroll, correlation_matrix):
         "recommended_bet": round(adjusted_kelly * bankroll, 2),
         "correlation_discount": round(correlation_discount, 4),
     }
+
+
+# ============================================================
+# SECTION: Simulation-Array Pearson Correlation
+# ============================================================
+
+def pearson_sim_correlation(array_a, array_b):
+    """
+    Pearson correlation between two Monte Carlo simulation arrays.
+
+    Thin wrapper around :func:`calculate_pearson_correlation` that
+    rounds the result to four decimal places — matching the precision
+    expected by the Correlation Matrix page.
+
+    Args:
+        array_a (list of float): Player A simulation results
+            (typically 1,000 values from the QME engine).
+        array_b (list of float): Player B simulation results.
+
+    Returns:
+        float: Pearson *r* (−1.0 … +1.0), rounded to 4 dp.
+            Returns 0.0 when fewer than 3 paired observations exist.
+    """
+    r = calculate_pearson_correlation(array_a, array_b)
+    return round(r, 4)
