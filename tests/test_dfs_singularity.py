@@ -195,8 +195,9 @@ class TestDfsEv:
         from engine.odds_engine import calculate_dfs_ev
         pp = calculate_dfs_ev([0.60, 0.60, 0.60], platform="PrizePicks")
         ud = calculate_dfs_ev([0.60, 0.60, 0.60], platform="Underdog")
-        # They have different partial payouts so EVs differ
-        assert pp["expected_value"] != ud["expected_value"] or True  # may be close
+        # Both should produce valid results with non-zero payout
+        assert pp["expected_payout"] > 0
+        assert ud["expected_payout"] > 0
 
     def test_calculate_dfs_ev_4_5_6_pick(self):
         """EV calculations work for 4, 5, 6 pick entries."""

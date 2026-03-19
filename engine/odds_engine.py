@@ -545,10 +545,7 @@ def _dfs_flex_ev_at_prob(per_leg_prob, n, tier):
         if multiplier <= 0:
             continue
         # Binomial: C(n, hits) * p^hits * q^(n-hits)
-        coeff = 1
-        for i in range(hits):
-            coeff = coeff * (n - i) // (i + 1)
-        ev += coeff * (p ** hits) * (q ** (n - hits)) * multiplier
+        ev += math.comb(n, hits) * (p ** hits) * (q ** (n - hits)) * multiplier
     return ev
 
 

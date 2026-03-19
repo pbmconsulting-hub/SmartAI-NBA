@@ -111,14 +111,14 @@ GLOSSARY = {
         "A Goblin bet is an alternate line set BELOW the standard More/Less — "
         "a safe floor bet. The player only needs to clear a lower threshold to win. "
         "High probability, lower payout. Think of it as the 'easy money' play. "
-        "Example: Standard line is SGA Points M/L 31.5, and the platform also offers 28.5 — "
+        "Example: Standard line is SGA Points More/Less 31.5, and the platform also offers 28.5 — "
         "that 28.5 is a Goblin bet (he only needs 29 points to win). "
         "Goblin criteria (statistical overlay): projection 2+ standard deviations from the "
         "line, probability ≥80%, edge ≥25%."
     ),
     "50/50 Bet": (
         "A 50/50 bet is the standard More/Less line set by the platform — the baseline "
-        "bet. This is the primary line most bettors see. Example: SGA Points M/L 31.5 is "
+        "bet. This is the primary line most bettors see. Example: SGA Points More/Less 31.5 is "
         "the 50/50 line. Not a special classification — it's the default. A 50/50 pick may "
         "also carry risk flags (conflicting forces, variance, fatigue, regression) that are "
         "shown separately as warnings."
@@ -127,7 +127,7 @@ GLOSSARY = {
         "A Demon bet is an alternate line set ABOVE the standard More/Less — "
         "a high-ceiling, high-reward play. The player must exceed a higher threshold to win. "
         "Lower probability but bigger payout. Think of it as the 'swing for the fences' play. "
-        "Example: Standard line is SGA Points M/L 31.5, and the platform also offers 34.5 — "
+        "Example: Standard line is SGA Points More/Less 31.5, and the platform also offers 34.5 — "
         "that 34.5 is a Demon bet (he needs 35+ points to win). Use when the model shows "
         "strong edge and you want maximum upside. Demon bets are NOT auto-avoided."
     ),
