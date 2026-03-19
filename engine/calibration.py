@@ -18,6 +18,21 @@
 import math
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Last-line-of-defence guard that prevents NaN or ±inf from leaking
+    out of the calibration engine into downstream scoring code.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Calibration Constants
 # ============================================================
@@ -448,10 +463,10 @@ def get_isotonic_calibration_curve(days=90):
         for mid in sorted(source_curve.keys()):
             data = source_curve[mid]
             curve_list.append({
-                "predicted": data["predicted"],
-                "actual": round(data["actual"], 4),
+                "predicted": _safe_float(data["predicted"], 0.5),
+                "actual": _safe_float(round(data["actual"], 4), 0.5),
                 "count": data["count"],
-                "gap": round(data["actual"] - data["predicted"], 4),
+                "gap": _safe_float(round(data["actual"] - data["predicted"], 4), 0.0),
             })
 
         return {
@@ -526,7 +541,7 @@ def get_calibration_adjustment(raw_probability, days=90, stat_type=None):
             # Convert probability difference to confidence-score points (same scale)
             adjustment = (raw - calibrated_prob) * 100.0
             adjustment = max(-_stat_cap, min(_stat_cap, adjustment))
-            return round(adjustment, 2)
+            return _safe_float(round(adjustment, 2), 0.0)
 
         # ── Coarse fallback: original 10% bucket logic ──
         curve = _build_calibration_curve(records)
@@ -554,7 +569,7 @@ def get_calibration_adjustment(raw_probability, days=90, stat_type=None):
         # Cap the adjustment using per-stat cap
         adjustment = max(-_stat_cap, min(_stat_cap, adjustment))
 
-        return round(adjustment, 2)
+        return _safe_float(round(adjustment, 2), 0.0)
 
     except Exception:
         return 0.0  # Always safe to return 0 on any error
@@ -597,7 +612,7 @@ def get_calibration_summary(days=90):
             "has_data": bool(curve),
             "total_bets": total,
             "calibration_curve": curve,
-            "overall_accuracy": round(overall_accuracy, 4) if overall_accuracy else None,
+            "overall_accuracy": _safe_float(round(overall_accuracy, 4), None) if overall_accuracy else None,
             "overconfidence_buckets": overconfident,
         }
     except Exception:
