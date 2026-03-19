@@ -19,6 +19,17 @@
 import math
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Module-Level Constants
 # ============================================================
@@ -90,9 +101,9 @@ def _model_a_season_avg(player_data, game_context, game_logs):
     weight_hint = min(1.0, games_played / 40.0)  # Full weight at 40+ games
 
     return {
-        "projection": round(max(0.0, projection), 2),
-        "variance": round(max(0.1, variance), 4),
-        "weight_hint": round(weight_hint, 4),
+        "projection": _safe_float(round(max(0.0, projection), 2), 0.0),
+        "variance": _safe_float(round(max(0.1, variance), 4), 1.0),
+        "weight_hint": _safe_float(round(weight_hint, 4), 0.5),
         "model": "season_avg",
     }
 
@@ -152,9 +163,9 @@ def _model_b_recent_form(player_data, game_context, game_logs):
         std_key = f"{stat_type}_std"
         season_std = float(player_data.get(std_key, season_avg * 0.35) or season_avg * 0.35)
         return {
-            "projection": round(max(0.0, season_avg), 2),
-            "variance": round(max(0.1, season_std ** 2), 4),
-            "weight_hint": 0.0,   # Zero weight — no recent data
+            "projection": _safe_float(round(max(0.0, season_avg), 2), 0.0),
+            "variance": _safe_float(round(max(0.1, season_std ** 2), 4), 1.0),
+            "weight_hint": _safe_float(0.0, 0.5),
             "model": "recent_form_fallback",
         }
 
@@ -186,9 +197,9 @@ def _model_b_recent_form(player_data, game_context, game_logs):
     weight_hint = min(1.0, n / 10.0)
 
     return {
-        "projection": round(max(0.0, projection), 2),
-        "variance": round(max(0.1, recent_var), 4),
-        "weight_hint": round(weight_hint, 4),
+        "projection": _safe_float(round(max(0.0, projection), 2), 0.0),
+        "variance": _safe_float(round(max(0.1, recent_var), 4), 1.0),
+        "weight_hint": _safe_float(round(weight_hint, 4), 0.5),
         "model": "recent_form",
     }
 
@@ -249,9 +260,9 @@ def _model_c_matchup_history(player_data, game_context, game_logs):
         std_key = f"{stat_type}_std"
         season_std = float(player_data.get(std_key, season_avg * 0.35) or season_avg * 0.35)
         return {
-            "projection": round(max(0.0, season_avg), 2),
-            "variance": round(max(0.1, season_std ** 2), 4),
-            "weight_hint": 0.0,  # Zero weight — no matchup data
+            "projection": _safe_float(round(max(0.0, season_avg), 2), 0.0),
+            "variance": _safe_float(round(max(0.1, season_std ** 2), 4), 1.0),
+            "weight_hint": _safe_float(0.0, 0.5),
             "model": "matchup_fallback",
         }
 
@@ -264,9 +275,9 @@ def _model_c_matchup_history(player_data, game_context, game_logs):
     weight_hint = min(0.80, n * 0.08)
 
     return {
-        "projection": round(max(0.0, matchup_avg), 2),
-        "variance": round(max(0.1, matchup_var), 4),
-        "weight_hint": round(weight_hint, 4),
+        "projection": _safe_float(round(max(0.0, matchup_avg), 2), 0.0),
+        "variance": _safe_float(round(max(0.1, matchup_var), 4), 1.0),
+        "weight_hint": _safe_float(round(weight_hint, 4), 0.5),
         "model": "matchup_history",
     }
 
@@ -312,8 +323,8 @@ def _blend_models_inverse_variance(model_outputs):
         # No active models — use the first model's output directly
         m = model_outputs[0] if model_outputs else {}
         return {
-            "blended_projection": float(m.get("projection", 0.0)),
-            "blended_variance": float(m.get("variance", 1.0)),
+            "blended_projection": _safe_float(m.get("projection", 0.0), 0.0),
+            "blended_variance": _safe_float(m.get("variance", 1.0), 1.0),
             "model_weights": {},
             "effective_models": 0,
         }
@@ -321,8 +332,8 @@ def _blend_models_inverse_variance(model_outputs):
     if len(active_models) == 1:
         m = active_models[0]
         return {
-            "blended_projection": float(m.get("projection", 0.0)),
-            "blended_variance": float(m.get("variance", 1.0)),
+            "blended_projection": _safe_float(m.get("projection", 0.0), 0.0),
+            "blended_variance": _safe_float(m.get("variance", 1.0), 1.0),
             "model_weights": {m.get("model", "?"): 1.0},
             "effective_models": 1,
         }
@@ -360,8 +371,8 @@ def _blend_models_inverse_variance(model_outputs):
     }
 
     return {
-        "blended_projection": round(max(0.0, blended_proj), 2),
-        "blended_variance": round(max(0.01, blended_var), 4),
+        "blended_projection": _safe_float(round(max(0.0, blended_proj), 2), 0.0),
+        "blended_variance": _safe_float(round(max(0.01, blended_var), 4), 1.0),
         "model_weights": model_weights,
         "effective_models": len(active_models),
     }
@@ -405,18 +416,18 @@ def calculate_model_disagreement(model_outputs):
 
     if len(projections) < 2:
         return {
-            "disagreement_score": 0.0,
-            "max_divergence": 0.0,
-            "confidence_penalty": 0.0,
+            "disagreement_score": _safe_float(0.0, 0.0),
+            "max_divergence": _safe_float(0.0, 0.0),
+            "confidence_penalty": _safe_float(0.0, 0.0),
             "description": "Only one model — no disagreement to measure",
         }
 
     mean_proj = sum(projections) / len(projections)
     if mean_proj <= 0:
         return {
-            "disagreement_score": 0.0,
-            "max_divergence": 0.0,
-            "confidence_penalty": 0.0,
+            "disagreement_score": _safe_float(0.0, 0.0),
+            "max_divergence": _safe_float(0.0, 0.0),
+            "confidence_penalty": _safe_float(0.0, 0.0),
             "description": "Zero mean projection — cannot compute disagreement",
         }
 
@@ -449,9 +460,9 @@ def calculate_model_disagreement(model_outputs):
         desc = "🚨 Models strongly disagree — significant uncertainty, lower confidence"
 
     return {
-        "disagreement_score": round(disagreement_score, 4),
-        "max_divergence": round(max_div, 4),
-        "confidence_penalty": round(confidence_penalty, 2),
+        "disagreement_score": _safe_float(round(disagreement_score, 4), 0.0),
+        "max_divergence": _safe_float(round(max_div, 4), 0.0),
+        "confidence_penalty": _safe_float(round(confidence_penalty, 2), 0.0),
         "description": desc,
     }
 
@@ -542,13 +553,13 @@ def get_ensemble_projection(player_data, game_context, game_logs=None):
     confidence_adjustment = disagreement["confidence_penalty"]
 
     return {
-        "ensemble_projection": blend_result["blended_projection"],
-        "ensemble_std": round(ensemble_std, 3),
+        "ensemble_projection": _safe_float(blend_result["blended_projection"], 0.0),
+        "ensemble_std": _safe_float(round(ensemble_std, 3), 1.0),
         "model_outputs": model_outputs,
         "model_weights": blend_result["model_weights"],
         "effective_models": blend_result["effective_models"],
         "disagreement": disagreement,
-        "confidence_adjustment": round(confidence_adjustment, 2),
+        "confidence_adjustment": _safe_float(round(confidence_adjustment, 2), 0.0),
     }
 
 
