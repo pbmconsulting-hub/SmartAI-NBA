@@ -321,7 +321,8 @@ class TestSessionStateDefaults(unittest.TestCase):
         app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
         with open(app_path, "r") as f:
             content = f.read()
-        self.assertIn('1000.0', content)
+        # Verify the specific initialization pattern
+        self.assertIn('st.session_state["total_bankroll"] = 1000.0', content)
 
     def test_default_kelly_multiplier_is_025(self):
         """Verify the default Kelly multiplier is 0.25 (Quarter Kelly)."""
@@ -329,7 +330,8 @@ class TestSessionStateDefaults(unittest.TestCase):
         app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
         with open(app_path, "r") as f:
             content = f.read()
-        self.assertIn('0.25', content)
+        # Verify the specific initialization pattern
+        self.assertIn('st.session_state["kelly_multiplier"] = 0.25', content)
 
 
 class TestInlineBreakdownKellyAllocation(unittest.TestCase):
@@ -387,7 +389,11 @@ class TestSyntheticSliderRobustness(unittest.TestCase):
         )
         with open(helper_path, "r") as f:
             content = f.read()
+        # The guard must exist: when slider_max <= slider_min, expand range
         self.assertIn("_slider_max <= _slider_min", content)
+        self.assertIn("_slider_max = _slider_min + 5.0", content)
+        # Base line must be clamped inside slider range
+        self.assertIn("_base_line = max(_slider_min", content)
 
 
 if __name__ == "__main__":
