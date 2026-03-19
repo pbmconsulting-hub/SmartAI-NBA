@@ -584,5 +584,124 @@ class TestCorrelationAdjustedKelly(unittest.TestCase):
         self.assertEqual(result["recommended_bet"], 0.0)
 
 
+# ============================================================
+# MODULE 4: Auto-Slip Optimizer Enhancement Tests
+# ============================================================
+
+class TestAutoSlipOptimizerPageFeatures(unittest.TestCase):
+    """Verify MODULE 4 enhancements exist in Entry Builder page."""
+
+    def _read_page(self):
+        import os
+        page_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "pages", "4_🧬_Entry_Builder.py",
+        )
+        with open(page_path, "r") as f:
+            return f.read()
+
+    def test_page_imports_calculate_fractional_kelly(self):
+        """Verify the auto-slip section imports calculate_fractional_kelly."""
+        content = self._read_page()
+        self.assertIn("calculate_fractional_kelly", content)
+
+    def test_page_imports_clamp_probability(self):
+        """Verify the auto-slip section imports clamp_probability."""
+        content = self._read_page()
+        self.assertIn("clamp_probability", content)
+
+    def test_page_has_kelly_target_allocation(self):
+        """Verify the optimal ticket displays a TARGET ALLOCATION."""
+        content = self._read_page()
+        self.assertIn("TARGET ALLOCATION", content)
+
+    def test_page_has_expected_payout(self):
+        """Verify the optimal ticket displays EXPECTED PAYOUT."""
+        content = self._read_page()
+        self.assertIn("EXPECTED PAYOUT", content)
+
+    def test_page_has_kelly_percent(self):
+        """Verify the optimal ticket displays KELLY %."""
+        content = self._read_page()
+        self.assertIn("KELLY %", content)
+
+    def test_page_reads_total_bankroll(self):
+        """Verify the auto-slip reads total_bankroll from session state."""
+        content = self._read_page()
+        self.assertIn("total_bankroll", content)
+
+    def test_page_reads_kelly_multiplier(self):
+        """Verify the auto-slip reads kelly_multiplier from session state."""
+        content = self._read_page()
+        self.assertIn("kelly_multiplier", content)
+
+    def test_page_reads_entry_fee(self):
+        """Verify the auto-slip reads entry_fee from session state."""
+        content = self._read_page()
+        self.assertIn("entry_fee", content)
+
+    def test_page_has_slip_summary_stats(self):
+        """Verify the slip summary statistics bar exists."""
+        content = self._read_page()
+        self.assertIn("Slips Generated", content)
+        self.assertIn("Best EV", content)
+        self.assertIn("Avg EV", content)
+        self.assertIn("Avg All-Hit", content)
+
+    def test_page_has_per_leg_edge(self):
+        """Verify the per-leg edge % is displayed in the ticket."""
+        content = self._read_page()
+        self.assertIn("edge_percentage", content)
+
+    def test_alternative_slips_show_prob_and_odds(self):
+        """Verify alternative slips show probability and fair odds."""
+        content = self._read_page()
+        self.assertIn("_alt_prob", content)
+        self.assertIn("_alt_odds", content)
+        self.assertIn("_alt_penalty", content)
+
+
+class TestCalculateFractionalKellyForSlip(unittest.TestCase):
+    """Test Kelly integration for the optimal slip wager calculation."""
+
+    def setUp(self):
+        from engine.odds_engine import calculate_fractional_kelly
+        self.calc = calculate_fractional_kelly
+
+    def test_slip_prob_with_fair_odds(self):
+        """Slip probability (e.g. 0.20) with positive fair odds gives kelly."""
+        result = self.calc(0.35, 200, 0.25)
+        # At 35% prob and +200, there is an edge
+        self.assertGreater(result["fractional_kelly"], 0.0)
+
+    def test_low_prob_no_edge(self):
+        """Very low probability against market odds yields zero kelly."""
+        result = self.calc(0.10, 500, 0.25)
+        # At 10% prob and +500 (breakeven ~16.7%), no edge
+        self.assertEqual(result["fractional_kelly"], 0.0)
+
+    def test_parlay_odds_kelly(self):
+        """Simulating parlay: low prob, high odds, with edge."""
+        # A 4-leg parlay might have ~15% prob at +800 fair odds
+        result = self.calc(0.15, 500, 0.25)
+        # 15% prob at +500 (breakeven ~16.7%): no edge → 0
+        self.assertEqual(result["fractional_kelly"], 0.0)
+
+    def test_high_ev_slip_kelly(self):
+        """High EV slip: good probability exceeding implied odds."""
+        # 30% prob at +200 (breakeven 33%): no edge → 0
+        result = self.calc(0.40, 200, 0.25)
+        # 40% prob at +200 (breakeven 33%): has edge
+        self.assertGreater(result["fractional_kelly"], 0.0)
+
+    def test_wager_amount_calculation(self):
+        """Verify wager = fractional_kelly * bankroll."""
+        bankroll = 1000.0
+        result = self.calc(0.60, -110, 0.25)
+        frac = result["fractional_kelly"]
+        wager = round(frac * bankroll, 2)
+        self.assertEqual(wager, round(frac * bankroll, 2))
+
+
 if __name__ == "__main__":
     unittest.main()
