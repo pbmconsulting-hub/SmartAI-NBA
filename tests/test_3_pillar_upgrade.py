@@ -116,11 +116,11 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     """Verify the pre-analysis filter funnel is wired in Neural Analysis."""
 
     def test_funnel_expander_exists(self):
-        """Neural Analysis page should have a Pre-Analysis Filters expander."""
+        """Neural Analysis page should have a Market Filters expander."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn('Pre-Analysis Filters', source)
+        self.assertIn('Market Filters', source)
 
     def test_funnel_stat_multiselect(self):
         """Neural Analysis page should have a stat type multiselect widget."""
@@ -147,11 +147,11 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertIn("funnel_absolute_max", source)
 
     def test_funnel_dynamic_metric(self):
-        """Neural Analysis page should show a dynamic metric for surviving props."""
+        """Neural Analysis page should show a dynamic metric for locked props."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("Props Surviving Filter", source)
+        self.assertIn("PROPS LOCKED FOR QME 5.6 SIMULATION", source)
 
     def test_smart_filter_wired_in_runner(self):
         """The analysis runner should call smart_filter_props with funnel settings."""
