@@ -9,6 +9,7 @@
 import math
 import sys
 import os
+import types
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -16,7 +17,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 def _ensure_streamlit_mock():
     """Mock streamlit if not available (for CI/headless environments)."""
-    import types
     if "streamlit" not in sys.modules:
         mock_st = types.ModuleType("streamlit")
         mock_st.cache_data = lambda *a, **kw: (lambda f: f)
