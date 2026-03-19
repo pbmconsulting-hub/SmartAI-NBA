@@ -247,7 +247,41 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
         if bars:
             breakdown_html = '<div style="margin-top:2px;">' + "".join(bars) + '</div>'
 
-    return dist_html + forces_html + breakdown_html
+    # ── Kelly TARGET ALLOCATION row ──────────────────────────────
+    kelly_html = ""
+    try:
+        import streamlit as _st_mod
+        from engine.odds_engine import calculate_fractional_kelly
+        _direction = result.get("direction", "OVER")
+        _book_odds = (result.get("over_odds", -110)
+                      if _direction == "OVER"
+                      else result.get("under_odds", -110))
+        _model_prob = (result.get("probability_over", 0.5)
+                       if _direction == "OVER"
+                       else (1.0 - result.get("probability_over", 0.5)))
+        _bankroll = float(_st_mod.session_state.get("total_bankroll", 1000.0))
+        _kelly_mult = float(_st_mod.session_state.get("kelly_multiplier", 0.25))
+        _kelly = calculate_fractional_kelly(_model_prob, _book_odds, _kelly_mult)
+        _wager = round(_kelly["fractional_kelly"] * _bankroll, 2)
+        if _wager > 0:
+            _fk_pct = _kelly["fractional_kelly"] * 100
+            kelly_html = (
+                '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;'
+                'padding:6px 10px;background:linear-gradient(135deg,#070A13,#0F172A);'
+                'border:1px solid rgba(0,198,255,0.20);border-radius:6px;">'
+                '<span style="color:#64748b;font-size:0.62rem;text-transform:uppercase;'
+                'letter-spacing:0.06em;flex-shrink:0;">🎯 WAGER</span>'
+                f'<span style="color:#00C6FF;font-size:0.92rem;font-weight:800;'
+                f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+                f'">${_wager:,.2f}</span>'
+                f'<span style="color:#475569;font-size:0.58rem;margin-left:auto;">'
+                f'{_fk_pct:.1f}% of ${_bankroll:,.0f}</span>'
+                '</div>'
+            )
+    except Exception:
+        pass
+
+    return dist_html + forces_html + breakdown_html + kelly_html
 
 
 def _build_result_metrics(result):
@@ -1093,6 +1127,77 @@ def display_prop_analysis_card_qds(result):
             f"📊 Prob: {_prob_pct:.0f}% · Edge: {_edge_pct:+.1f}% · "
             f"Proj: {_proj_val:.1f}{_gp_str}"
         )
+
+        # ── [TARGET ALLOCATION] — Kelly Criterion wager ──────────
+        try:
+            from engine.odds_engine import calculate_fractional_kelly, calculate_synthetic_odds
+            _bankroll = float(st.session_state.get("total_bankroll", 1000.0))
+            _kelly_mult = float(st.session_state.get("kelly_multiplier", 0.25))
+            _book_odds = result.get("over_odds", -110) if direction == "OVER" else result.get("under_odds", -110)
+            _model_prob = result.get("probability_over", 0.5) if direction == "OVER" else (1.0 - result.get("probability_over", 0.5))
+            _kelly_result = calculate_fractional_kelly(_model_prob, _book_odds, _kelly_mult)
+            _wager = round(_kelly_result["fractional_kelly"] * _bankroll, 2)
+            _wager_display = f"${_wager:,.2f}" if _wager > 0 else "$0.00"
+            _fk_pct = _kelly_result["fractional_kelly"] * 100
+            st.markdown(
+                f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);border:1px solid rgba(0,198,255,0.25);'
+                f'border-radius:8px;padding:8px 12px;margin:6px 0;">'
+                f'<span style="color:#64748b;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                f'🎯 TARGET ALLOCATION</span><br>'
+                f'<span style="color:#00C6FF;font-size:1.15rem;font-weight:800;font-family:\'JetBrains Mono\',monospace;'
+                f'font-variant-numeric:tabular-nums;">{_wager_display}</span>'
+                f'<span style="color:#475569;font-size:0.68rem;margin-left:6px;">'
+                f'({_fk_pct:.1f}% of ${_bankroll:,.0f})</span></div>',
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            pass
+
+        # ── Synthetic Odds Slider ────────────────────────────────
+        _sim_array = result.get("simulated_results", [])
+        if _sim_array and len(_sim_array) >= 10:
+            try:
+                _base_line = float(result.get("line", 0))
+                _p10 = float(result.get("percentile_10", _base_line - 5))
+                _p90 = float(result.get("percentile_90", _base_line + 5))
+                _slider_min = max(0.0, round(_p10 - 2.0, 1))
+                _slider_max = round(_p90 + 2.0, 1)
+                # Guard: ensure valid slider range (min < max)
+                if _slider_max <= _slider_min:
+                    _slider_max = _slider_min + 5.0
+                # Clamp base_line inside slider range
+                _base_line = max(_slider_min, min(_slider_max, _base_line))
+                _slider_key = (
+                    f"synth_{result.get('player_name', '')}_{stat}_{line}"
+                    f"_{platform}_{direction}"
+                )
+                _target = st.slider(
+                    "🔬 Synthetic Line",
+                    min_value=_slider_min,
+                    max_value=_slider_max,
+                    value=_base_line,
+                    step=0.5,
+                    key=_slider_key,
+                    help="Slide to explore fair-value odds at different prop lines.",
+                )
+                _synth = calculate_synthetic_odds(_sim_array, _target, direction)
+                _synth_odds = _synth["fair_odds"]
+                _synth_prob = _synth["win_probability"] * 100
+                _odds_str = f"+{_synth_odds:.0f}" if _synth_odds > 0 else f"{_synth_odds:.0f}"
+                st.markdown(
+                    f'<div style="text-align:center;padding:6px 10px;background:rgba(0,198,255,0.06);'
+                    f'border:1px solid rgba(0,198,255,0.18);border-radius:6px;margin-top:4px;">'
+                    f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                    f'FAIR VALUE AT {_target:.1f}</span><br>'
+                    f'<span style="color:#00C6FF;font-size:1.3rem;font-weight:900;font-family:\'JetBrains Mono\',monospace;'
+                    f'font-variant-numeric:tabular-nums;text-shadow:0 0 12px rgba(0,198,255,0.5);">'
+                    f'{_odds_str}</span>'
+                    f'<span style="color:#475569;font-size:0.68rem;margin-left:6px;">'
+                    f'({_synth_prob:.1f}%)</span></div>',
+                    unsafe_allow_html=True,
+                )
+            except Exception:
+                pass
 
     # ── Confidence Score Breakdown Expander ───────────────────────
     _score_bd = result.get("score_breakdown", {})

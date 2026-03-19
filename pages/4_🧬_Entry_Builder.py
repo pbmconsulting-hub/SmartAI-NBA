@@ -783,3 +783,289 @@ elif selected_pick_labels:
 # ============================================================
 # END SECTION: Custom Entry Builder
 # ============================================================
+
+
+# ============================================================
+# SECTION: Auto-Slip Optimizer
+# ============================================================
+
+st.divider()
+
+st.markdown(
+    '<div style="background:linear-gradient(135deg,rgba(7,10,19,0.92),rgba(15,23,42,0.88));'
+    'border:1px solid rgba(0,255,157,0.18);border-radius:12px;padding:20px 24px;'
+    'backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);margin-bottom:16px;">'
+    '<h2 style="color:#00ff9d;margin:0 0 6px;font-family:Inter,sans-serif;font-weight:800;">'
+    '🚀 Auto-Slip Optimizer</h2>'
+    '<p style="color:#94a3b8;font-size:0.84rem;margin:0;">'
+    'Generates the mathematically optimal ticket from tonight\'s props using '
+    'combinatorial EV analysis with intra-game correlation weighting.</p></div>',
+    unsafe_allow_html=True,
+)
+
+_opt_c1, _opt_c2 = st.columns(2)
+with _opt_c1:
+    _opt_platform = st.selectbox(
+        "Platform",
+        options=["PrizePicks", "Underdog", "DraftKings"],
+        index=0,
+        key="auto_slip_platform",
+    )
+with _opt_c2:
+    _opt_entry_type = st.selectbox(
+        "Entry Type",
+        options=["Flex Play", "Power Play"],
+        index=0,
+        key="auto_slip_entry_type",
+    )
+
+_generate_clicked = st.button(
+    "⚡  GENERATE OPTIMAL SLIP",
+    use_container_width=True,
+    type="primary",
+    key="generate_optimal_slip_btn",
+)
+
+if _generate_clicked:
+    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly
+    from engine.math_helpers import clamp_probability
+    import html as _ehtml
+
+    with st.spinner("🔬 Running combinatorial optimizer..."):
+        _slips = generate_optimal_slip(qualifying_picks, platform=_opt_platform)
+
+    if not _slips:
+        st.warning("Not enough qualifying picks to generate an optimal slip.")
+    else:
+        # ── Slip Summary Statistics Bar ───────────────────────────
+        _all_evs = [s["cumulative_ev"] for s in _slips]
+        _all_probs = [s["combined_probability"] for s in _slips]
+        _size_counts = {}
+        for s in _slips:
+            _size_counts[s["slip_size"]] = _size_counts.get(s["slip_size"], 0) + 1
+        _size_dist = " · ".join(f'{sz}-man: {ct}' for sz, ct in sorted(_size_counts.items()))
+
+        _avg_ev = sum(_all_evs) / len(_all_evs) if _all_evs else 0
+        _avg_prob = sum(_all_probs) / len(_all_probs) if _all_probs else 0
+        _best_ev = max(_all_evs) if _all_evs else 0
+        _avg_ev_c = "#00ff9d" if _avg_ev > 0 else "#ff5e00"
+        _best_ev_c = "#00ff9d" if _best_ev > 0 else "#ff5e00"
+
+        st.markdown(
+            '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">'
+            # Total slips
+            '<div style="flex:1;min-width:110px;background:linear-gradient(135deg,#070A13,#0F172A);'
+            'border:1px solid rgba(148,163,184,0.12);border-radius:8px;padding:10px 14px;text-align:center;">'
+            '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            'Slips Generated</div>'
+            f'<div style="color:#c0d0e8;font-size:1.15rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+            f'">{len(_slips)}</div></div>'
+            # Best EV
+            '<div style="flex:1;min-width:110px;background:linear-gradient(135deg,#070A13,#0F172A);'
+            'border:1px solid rgba(0,255,157,0.18);border-radius:8px;padding:10px 14px;text-align:center;">'
+            '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            'Best EV</div>'
+            f'<div style="color:{_best_ev_c};font-size:1.15rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+            f'">{"+" if _best_ev > 0 else ""}{_best_ev * 100:.1f}%</div></div>'
+            # Avg EV
+            '<div style="flex:1;min-width:110px;background:linear-gradient(135deg,#070A13,#0F172A);'
+            'border:1px solid rgba(0,240,255,0.15);border-radius:8px;padding:10px 14px;text-align:center;">'
+            '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            'Avg EV</div>'
+            f'<div style="color:{_avg_ev_c};font-size:1.15rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+            f'">{"+" if _avg_ev > 0 else ""}{_avg_ev * 100:.1f}%</div></div>'
+            # Avg All-Hit Prob
+            '<div style="flex:1;min-width:110px;background:linear-gradient(135deg,#070A13,#0F172A);'
+            'border:1px solid rgba(148,163,184,0.12);border-radius:8px;padding:10px 14px;text-align:center;">'
+            '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            'Avg All-Hit</div>'
+            f'<div style="color:#c0d0e8;font-size:1.15rem;font-weight:800;'
+            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
+            f'">{_avg_prob * 100:.1f}%</div></div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        _best = _slips[0]
+        _picks = _best["picks"]
+        _ev = _best["cumulative_ev"]
+        _prob = _best["combined_probability"]
+        _penalty = _best["correlation_penalty"]
+        _fair_odds = _best["fair_odds"]
+        _slip_size = _best["slip_size"]
+
+        _ev_color = "#00ff9d" if _ev > 0 else "#ff5e00"
+        _ev_sign = "+" if _ev > 0 else ""
+
+        # ── Kelly TARGET ALLOCATION for the slip ──────────────────
+        _slip_bankroll = float(st.session_state.get("total_bankroll", 1000.0))
+        _slip_kelly_mult = float(st.session_state.get("kelly_multiplier", 0.25))
+        _slip_entry_fee = float(st.session_state.get("entry_fee", 10.0))
+        _slip_kelly_result = calculate_fractional_kelly(
+            clamp_probability(_prob), _fair_odds, _slip_kelly_mult,
+        )
+        _slip_kelly_frac = _slip_kelly_result.get("fractional_kelly", 0.0)
+        _slip_wager = round(_slip_kelly_frac * _slip_bankroll, 2) if _slip_kelly_frac > 0 else 0.0
+        _slip_expected_payout = round(_slip_entry_fee * (1.0 + _ev), 2)
+
+        # ── Digital Betting Ticket ────────────────────────────────
+        _legs_html = ""
+        for _idx, _pk in enumerate(_picks, 1):
+            _pk_name = _ehtml.escape(str(_pk.get("player_name", "?")))
+            _pk_stat = _ehtml.escape(str(_pk.get("stat_type", "")).title())
+            _pk_dir = _pk.get("direction", "OVER")
+            _pk_line = _pk.get("line", 0)
+            _pk_prob = _pk.get("probability_over", 0.5)
+            _pk_prob_dir = _pk_prob if _pk_dir == "OVER" else (1.0 - _pk_prob)
+            _pk_conf = _pk.get("confidence_score", 50)
+            _pk_tier = _pk.get("tier", "Bronze")
+            _pk_edge = _pk.get("edge_percentage", 0)
+            _pk_team = _ehtml.escape(str(_pk.get("player_team", _pk.get("team", ""))))
+
+            _tier_colors = {
+                "Platinum": "#00f0ff", "Gold": "#ffd700", "Silver": "#c0c0c0",
+                "Bronze": "#cd7f32", "Diamond": "#b9f2ff",
+            }
+            _tc = _tier_colors.get(_pk_tier, "#94a3b8")
+            _edge_c = "#00ff9d" if _pk_edge > 0 else "#ff5e00"
+            _edge_s = "+" if _pk_edge > 0 else ""
+
+            _legs_html += (
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:8px 12px;border-bottom:1px solid rgba(148,163,184,0.08);">'
+                f'<div style="flex:1;">'
+                f'<span style="color:#e2e8f0;font-weight:600;font-size:0.84rem;">{_pk_name}</span>'
+                f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_pk_team}</span><br>'
+                f'<span style="color:#94a3b8;font-size:0.76rem;">{_pk_stat} '
+                f'<span style="color:{"#00f0ff" if _pk_dir == "OVER" else "#ff5e00"};">{_pk_dir}</span> '
+                f'<span style="font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'{_pk_line}</span></span></div>'
+                f'<div style="text-align:right;">'
+                f'<span style="color:{_tc};font-size:0.72rem;font-weight:700;">{_pk_tier}</span>'
+                f'<span style="color:{_edge_c};font-size:0.68rem;margin-left:5px;'
+                f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'{_edge_s}{_pk_edge:.1f}%</span><br>'
+                f'<span style="color:#94a3b8;font-size:0.72rem;font-family:\'JetBrains Mono\',monospace;'
+                f'font-variant-numeric:tabular-nums;">{_pk_prob_dir*100:.0f}%</span></div></div>'
+            )
+
+        _odds_str = f"+{_fair_odds:.0f}" if _fair_odds > 0 else f"{_fair_odds:.0f}"
+        _penalty_note = (
+            f'<span style="color:#ff5e00;font-size:0.68rem;">'
+            f'⚠️ Correlation penalty: {(1-_penalty)*100:.0f}%</span>'
+            if _penalty < 1.0 else ""
+        )
+
+        # ── Kelly wager row (only shown when positive) ────────────
+        _kelly_row = ""
+        if _slip_wager > 0:
+            _kelly_row = (
+                f'<div style="margin-top:8px;padding-top:8px;'
+                f'border-top:1px solid rgba(0,198,255,0.12);">'
+                f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+                f'<div>'
+                f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                f'TARGET ALLOCATION</span><br>'
+                f'<span style="color:#00C6FF;font-size:1.1rem;font-weight:800;'
+                f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'${_slip_wager:,.2f}</span></div>'
+                f'<div style="text-align:center;">'
+                f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                f'EXPECTED PAYOUT</span><br>'
+                f'<span style="color:#e2e8f0;font-size:1rem;font-weight:700;'
+                f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'${_slip_expected_payout:,.2f}</span></div>'
+                f'<div style="text-align:right;">'
+                f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+                f'KELLY %</span><br>'
+                f'<span style="color:#94a3b8;font-size:0.85rem;font-weight:600;'
+                f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                f'{_slip_kelly_frac*100:.2f}%</span></div>'
+                f'</div></div>'
+            )
+
+        _ticket_html = (
+            f'<div style="background:#070A13;border:2px solid #0F172A;border-radius:12px;'
+            f'overflow:hidden;max-width:520px;margin:16px auto;'
+            f'box-shadow:0 4px 24px rgba(0,0,0,0.4);">'
+            # Header
+            f'<div style="background:linear-gradient(135deg,#0F172A,#1e293b);'
+            f'padding:14px 18px;border-bottom:2px solid rgba(0,255,157,0.15);">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+            f'<span style="color:#00ff9d;font-weight:800;font-size:1rem;font-family:Inter,sans-serif;">'
+            f'🎫 OPTIMAL {_slip_size}-MAN SLIP</span>'
+            f'<span style="color:#64748b;font-size:0.72rem;">{_opt_platform} · {_opt_entry_type}</span>'
+            f'</div></div>'
+            # Legs
+            f'<div style="padding:4px 0;">{_legs_html}</div>'
+            # Footer
+            f'<div style="background:#0F172A;padding:14px 18px;'
+            f'border-top:1px solid rgba(148,163,184,0.08);">'
+            f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+            f'<div>'
+            f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'CUMULATIVE EV</span><br>'
+            f'<span style="color:{_ev_color};font-size:1.3rem;font-weight:900;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{_ev_sign}{_ev*100:.1f}%</span></div>'
+            f'<div style="text-align:center;">'
+            f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'ALL-HIT PROB</span><br>'
+            f'<span style="color:#e2e8f0;font-size:1rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{_prob*100:.1f}%</span></div>'
+            f'<div style="text-align:right;">'
+            f'<span style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">'
+            f'FAIR ODDS</span><br>'
+            f'<span style="color:#00C6FF;font-size:1rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+            f'{_odds_str}</span></div>'
+            f'</div>'
+            f'{_penalty_note}'
+            f'{_kelly_row}'
+            f'</div></div>'
+        )
+
+        st.markdown(_ticket_html, unsafe_allow_html=True)
+
+        # Show runner-up slips
+        if len(_slips) > 1:
+            with st.expander(f"📊 {len(_slips)-1} Alternative Slips", expanded=False):
+                for _alt_idx, _alt in enumerate(_slips[1:], 2):
+                    _alt_ev = _alt["cumulative_ev"]
+                    _alt_sz = _alt["slip_size"]
+                    _alt_prob = _alt["combined_probability"]
+                    _alt_odds = _alt["fair_odds"]
+                    _alt_penalty = _alt["correlation_penalty"]
+                    _alt_names = ", ".join(
+                        _ehtml.escape(str(p.get("player_name", "?"))) for p in _alt["picks"]
+                    )
+                    _alt_ev_c = "#00ff9d" if _alt_ev > 0 else "#ff5e00"
+                    _alt_s = "+" if _alt_ev > 0 else ""
+                    _alt_odds_str = f"+{_alt_odds:.0f}" if _alt_odds > 0 else f"{_alt_odds:.0f}"
+                    _alt_penalty_tag = (
+                        f' <span style="color:#ff5e00;font-size:0.62rem;">⚠ corr {(1-_alt_penalty)*100:.0f}%</span>'
+                        if _alt_penalty < 1.0 else ""
+                    )
+                    st.markdown(
+                        f'<div style="padding:8px 10px;border-bottom:1px solid rgba(148,163,184,0.06);">'
+                        f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+                        f'<span style="color:#94a3b8;font-size:0.76rem;">#{_alt_idx} · {_alt_sz}-man</span>'
+                        f'<div>'
+                        f'<span style="color:{_alt_ev_c};font-weight:700;font-size:0.82rem;'
+                        f'font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
+                        f'{_alt_s}{_alt_ev*100:.1f}%</span>'
+                        f'<span style="color:#64748b;font-size:0.68rem;margin-left:8px;">'
+                        f'{_alt_prob*100:.1f}% · {_alt_odds_str}</span>'
+                        f'{_alt_penalty_tag}'
+                        f'</div></div>'
+                        f'<span style="color:#64748b;font-size:0.72rem;">{_alt_names}</span></div>',
+                        unsafe_allow_html=True,
+                    )
+
+# ============================================================
+# END SECTION: Auto-Slip Optimizer
+# ============================================================

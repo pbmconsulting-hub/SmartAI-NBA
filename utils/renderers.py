@@ -214,6 +214,32 @@ def _build_single_card_html(result, index=0):
             )
         breakdown_html = '<div class="qcm-breakdown">' + "".join(bars) + '</div>'
 
+    # ── Kelly TARGET ALLOCATION metric ──────────────────────────
+    wager_html = ""
+    try:
+        import streamlit as _st_mod
+        from engine.odds_engine import calculate_fractional_kelly
+        _dir = direction.upper() if direction else "OVER"
+        _odds = (result.get("over_odds", -110)
+                 if _dir == "OVER"
+                 else result.get("under_odds", -110))
+        _prob = (float(prob_over)
+                 if _dir == "OVER"
+                 else (1.0 - float(prob_over)))
+        _bk = float(_st_mod.session_state.get("total_bankroll", 1000.0))
+        _km = float(_st_mod.session_state.get("kelly_multiplier", 0.25))
+        _kr = calculate_fractional_kelly(_prob, _odds, _km)
+        _wager = round(_kr["fractional_kelly"] * _bk, 2)
+        if _wager > 0:
+            wager_html = (
+                f'<div class="qcm-metric">'
+                f'<div class="qcm-metric-val" style="color:#00C6FF;">${_wager:,.0f}</div>'
+                f'<div class="qcm-metric-lbl">Wager</div>'
+                f'</div>'
+            )
+    except Exception:
+        pass
+
     return f"""<div class="qcm-card{demon_card_cls}" style="animation-delay:{delay_ms}ms;">
   <div class="qcm-card-header">
     <span class="qcm-player-name">{player_name}</span>
@@ -243,6 +269,7 @@ def _build_single_card_html(result, index=0):
       <div class="qcm-metric-val">{edge_display}</div>
       <div class="qcm-metric-lbl">Edge</div>
     </div>
+    {wager_html}
   </div>
   <div class="qcm-dist-row">
     <div class="qcm-dist-cell"><div class="qcm-dist-val">{p10_d}</div><div class="qcm-dist-lbl">P10</div></div>

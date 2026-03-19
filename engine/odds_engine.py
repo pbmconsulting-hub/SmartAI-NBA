@@ -3,6 +3,7 @@
 # Standard library only — no numpy/scipy/pandas.
 
 import math
+import itertools
 
 # Minimum combined overround (sum of both sides' implied probabilities)
 # required for devig to produce stable results. Normal two-sided markets
@@ -281,6 +282,292 @@ def calculate_half_kelly_ev(model_probability, odds, bankroll=1.0):
     except (ValueError, TypeError):
         return {"kelly_fraction": 0.0, "half_kelly_fraction": 0.0,
                 "half_kelly_stake": 0.0, "ev": 0.0}
+
+
+def calculate_fractional_kelly(model_prob, book_odds, multiplier=0.25):
+    """
+    Calculate the Fractional Kelly Criterion wager.
+
+    Full Kelly fraction: f = (b*p - q) / b
+    where p = win probability, b = net payout ratio, q = 1 - p.
+    The result is scaled by ``multiplier`` (e.g. 0.25 for Quarter Kelly).
+
+    Negative-EV situations are clamped to a $0.00 wager.
+    Divide-by-zero and degenerate inputs are handled gracefully.
+
+    Args:
+        model_prob (float): Model's win probability (0.0 to 1.0).
+        book_odds (float): American odds on the bet (e.g. -110, +150).
+        multiplier (float): Kelly fraction multiplier (0.0 to 1.0).
+            Default 0.25 (Quarter Kelly, recommended for retail bettors).
+
+    Returns:
+        dict: {
+            'kelly_fraction': float (full Kelly as fraction of bankroll),
+            'fractional_kelly': float (fraction after applying multiplier),
+            'multiplier': float (the multiplier used),
+            'ev_per_unit': float (expected value per $1 staked),
+            'edge': float (model_prob minus implied probability),
+        }
+        All fractions are 0.0 when the bet has no mathematical edge.
+
+    Examples:
+        calculate_fractional_kelly(0.62, -110) → ~2.8% fractional Kelly
+        calculate_fractional_kelly(0.40, -110) → 0.0 (negative EV)
+    """
+    try:
+        p = float(model_prob)
+        p = max(0.001, min(0.999, p))
+        q = 1.0 - p
+        mult = max(0.0, min(1.0, float(multiplier)))
+
+        payout = odds_to_payout_multiplier(float(book_odds))
+        b = payout - 1.0  # net payout ratio
+
+        # Guard: non-positive net payout → no sensible bet
+        if b <= 0.0:
+            return {
+                "kelly_fraction": 0.0,
+                "fractional_kelly": 0.0,
+                "multiplier": mult,
+                "ev_per_unit": 0.0,
+                "edge": 0.0,
+            }
+
+        full_kelly = (b * p - q) / b
+        ev_per_unit = p * b - q
+        implied = american_odds_to_implied_probability(float(book_odds))
+        edge = p - implied
+
+        # Negative Kelly → no edge → clamp to zero
+        if full_kelly <= 0.0:
+            return {
+                "kelly_fraction": 0.0,
+                "fractional_kelly": 0.0,
+                "multiplier": mult,
+                "ev_per_unit": round(ev_per_unit, 6),
+                "edge": round(edge, 6),
+            }
+
+        fractional = full_kelly * mult
+
+        return {
+            "kelly_fraction": round(full_kelly, 6),
+            "fractional_kelly": round(fractional, 6),
+            "multiplier": mult,
+            "ev_per_unit": round(ev_per_unit, 6),
+            "edge": round(edge, 6),
+        }
+    except (ValueError, TypeError, ZeroDivisionError):
+        return {
+            "kelly_fraction": 0.0,
+            "fractional_kelly": 0.0,
+            "multiplier": float(multiplier) if multiplier else 0.25,
+            "ev_per_unit": 0.0,
+            "edge": 0.0,
+        }
+
+
+def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
+    """
+    Calculate fair-value American odds from a Monte Carlo simulation array.
+
+    Counts the proportion of simulated outcomes that satisfy the target
+    condition and converts the resulting probability to American odds.
+
+    Args:
+        sim_array (list of float): Raw simulated stat values from the
+            Monte Carlo engine (typically 1,000 runs).
+        target_line (float): The prop line to evaluate against.
+        direction (str): ``"OVER"`` counts results > target_line;
+            ``"UNDER"`` counts results <= target_line.
+
+    Returns:
+        dict: {
+            'win_probability': float (0.0 to 1.0),
+            'fair_odds': float (American odds, e.g. -150 or +130),
+            'target_line': float,
+            'direction': str,
+            'sample_size': int,
+        }
+        Returns +100/0.50 defaults when the array is empty.
+
+    Examples:
+        calculate_synthetic_odds([20, 22, 18, 25, 19], 19.5, "OVER")
+        → win_probability ~0.60, fair_odds ~ -150
+    """
+    try:
+        if not sim_array:
+            return {
+                "win_probability": 0.5,
+                "fair_odds": 100.0,
+                "target_line": float(target_line),
+                "direction": direction.upper(),
+                "sample_size": 0,
+            }
+
+        target = float(target_line)
+        n = len(sim_array)
+        d = direction.upper().strip()
+
+        if d == "UNDER":
+            hits = sum(1 for v in sim_array if v <= target)
+        else:
+            hits = sum(1 for v in sim_array if v > target)
+
+        raw_prob = hits / n
+        # Clamp to (0.01, 0.99) to avoid infinite or undefined odds
+        prob = max(0.01, min(0.99, raw_prob))
+        fair_odds = implied_probability_to_american_odds(prob)
+
+        return {
+            "win_probability": round(prob, 6),
+            "fair_odds": fair_odds,
+            "target_line": target,
+            "direction": d,
+            "sample_size": n,
+        }
+    except (ValueError, TypeError, ZeroDivisionError):
+        return {
+            "win_probability": 0.5,
+            "fair_odds": 100.0,
+            "target_line": float(target_line) if target_line else 0.0,
+            "direction": direction.upper() if direction else "OVER",
+            "sample_size": 0,
+        }
+
+
+def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
+    """
+    Generate optimal 2-to-5-man slips from a list of analysed props.
+
+    Uses ``itertools.combinations`` to evaluate every combination of
+    2 through 5 props.  Each combination is scored by its cumulative
+    expected value against the platform's fixed payout table.
+    Intra-game correlation is heavily penalised (same-game picks
+    share variance, reducing true EV).
+
+    Args:
+        filtered_props_list (list of dict): Each dict must contain at
+            minimum:
+                - ``probability_over`` (float)
+                - ``direction`` (str, ``"OVER"`` or ``"UNDER"``)
+                - ``player_name`` (str)
+                - ``stat_type`` (str)
+                - ``player_team`` or ``team`` (str)
+                - ``opponent`` (str, optional)
+                - ``confidence_score`` (float, optional)
+                - ``edge_percentage`` (float, optional)
+        platform (str): One of ``"PrizePicks"``, ``"Underdog"``,
+            ``"DraftKings"``.  Default ``"PrizePicks"``.
+
+    Returns:
+        list of dict: Top slips sorted by cumulative EV (descending),
+            each containing:
+                - ``slip_size``: int (2-5)
+                - ``picks``: list of pick dicts
+                - ``cumulative_ev``: float (expected profit per $1)
+                - ``combined_probability``: float
+                - ``correlation_penalty``: float (1.0 = no penalty)
+                - ``fair_odds``: float (American odds of the slip)
+    """
+    try:
+        from engine.entry_optimizer import (
+            PLATFORM_FLEX_TABLES,
+            PRIZEPICKS_POWER_PAYOUT_TABLE,
+            calculate_entry_expected_value,
+        )
+    except ImportError:
+        return []
+
+    if not filtered_props_list or len(filtered_props_list) < 2:
+        return []
+
+    payout_tables = PLATFORM_FLEX_TABLES.get(platform, PLATFORM_FLEX_TABLES.get("PrizePicks", {}))
+    power_table = PRIZEPICKS_POWER_PAYOUT_TABLE if platform == "PrizePicks" else {}
+
+    all_slips = []
+
+    # Cap the pool to keep combinatorics tractable
+    pool = sorted(
+        filtered_props_list,
+        key=lambda p: abs(p.get("edge_percentage", 0)),
+        reverse=True,
+    )[:25]
+
+    for slip_size in range(2, min(6, len(pool) + 1)):
+        table = payout_tables.get(slip_size)
+        # Fall back to power table for 2-leg (PrizePicks has no 2-leg flex)
+        if not table and slip_size in power_table:
+            table = power_table[slip_size]
+        if not table:
+            continue
+
+        for combo in itertools.combinations(range(len(pool)), slip_size):
+            picks = [pool[i] for i in combo]
+
+            # ── enforce unique players ──
+            seen_players = set()
+            skip = False
+            for pk in picks:
+                pname = pk.get("player_name", "").lower().strip()
+                if pname in seen_players:
+                    skip = True
+                    break
+                seen_players.add(pname)
+            if skip:
+                continue
+
+            # ── compute directional probabilities ──
+            probs = []
+            for pk in picks:
+                if pk.get("direction", "OVER") == "OVER":
+                    probs.append(max(0.01, min(0.99, pk.get("probability_over", 0.5))))
+                else:
+                    probs.append(max(0.01, min(0.99, 1.0 - pk.get("probability_over", 0.5))))
+
+            # ── intra-game correlation penalty ──
+            game_counts = {}
+            for pk in picks:
+                team = (pk.get("player_team") or pk.get("team", "")).upper().strip()
+                opp = pk.get("opponent", "").upper().strip()
+                key = frozenset([team, opp]) if (team and opp) else frozenset([team])
+                game_counts[key] = game_counts.get(key, 0) + 1
+
+            correlation_penalty = 1.0
+            for cnt in game_counts.values():
+                if cnt >= 3:
+                    # 15% penalty — 3+ correlated legs share game-level variance
+                    correlation_penalty *= 0.85
+                elif cnt == 2:
+                    # 7% penalty — 2 same-game legs share moderate variance
+                    correlation_penalty *= 0.93
+
+            # ── cumulative EV ──
+            ev_result = calculate_entry_expected_value(probs, table, 1.0)
+            raw_ev = ev_result.get("expected_value_dollars", 0.0)
+            cumulative_ev = raw_ev * correlation_penalty
+
+            combined_prob = 1.0
+            for pr in probs:
+                combined_prob *= pr
+
+            fair_slip_odds = implied_probability_to_american_odds(
+                max(0.001, min(0.999, combined_prob))
+            )
+
+            all_slips.append({
+                "slip_size": slip_size,
+                "picks": picks,
+                "cumulative_ev": round(cumulative_ev, 4),
+                "combined_probability": round(combined_prob, 6),
+                "correlation_penalty": round(correlation_penalty, 4),
+                "fair_odds": fair_slip_odds,
+            })
+
+    # Sort by cumulative EV descending, return top 10
+    all_slips.sort(key=lambda s: s["cumulative_ev"], reverse=True)
+    return all_slips[:10]
 
 
 def odds_to_payout_multiplier(american_odds):
