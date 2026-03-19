@@ -14,6 +14,21 @@
 import math  # For rounding and calculation helpers
 import logging
 
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    Prevents NaN or ±inf from leaking out of projection calculations
+    into the simulation and UI layers.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
 try:
     from engine.rotation_tracker import get_minutes_adjustment
     _ROTATION_TRACKER_AVAILABLE = True
@@ -754,28 +769,30 @@ def build_player_projection(
     # Keep single offensive_stat_multiplier for backward compatibility in return dict
     offensive_stat_multiplier = _off_mult("points")
 
-    # Round to 1 decimal place for readability
+    # Round to 1 decimal place for readability.
+    # Every numeric field is funnelled through _safe_float() so that
+    # NaN / ±inf never escapes to the simulation or UI layer.
     projections = {
-        "projected_points": round(projected_points, 1),
-        "projected_rebounds": round(projected_rebounds, 1),
-        "projected_assists": round(projected_assists, 1),
-        "projected_threes": round(projected_threes, 1),
-        "projected_steals": round(projected_steals, 1),
-        "projected_blocks": round(projected_blocks, 1),
-        "projected_turnovers": round(projected_turnovers, 1),
+        "projected_points": _safe_float(round(projected_points, 1)),
+        "projected_rebounds": _safe_float(round(projected_rebounds, 1)),
+        "projected_assists": _safe_float(round(projected_assists, 1)),
+        "projected_threes": _safe_float(round(projected_threes, 1)),
+        "projected_steals": _safe_float(round(projected_steals, 1)),
+        "projected_blocks": _safe_float(round(projected_blocks, 1)),
+        "projected_turnovers": _safe_float(round(projected_turnovers, 1)),
         # C1: Projected minutes for tonight (used by C8 minutes-first sim)
-        "projected_minutes": projected_minutes,
+        "projected_minutes": _safe_float(projected_minutes),
         # Store all factors for transparency (shown in app)
-        "pace_factor": round(pace_factor, 4),
-        "defense_factor": round(defense_factor, 4),
-        "home_away_factor": round(home_away_factor, 4),
-        "rest_factor": round(rest_factor, 4),
-        "game_total_factor": round(game_total_factor, 4),
-        "blowout_risk": round(blowout_risk, 4),
-        "overall_adjustment": round(offensive_stat_multiplier, 4),
-        "recent_form_ratio": recent_form_ratio,
+        "pace_factor": _safe_float(round(pace_factor, 4), 1.0),
+        "defense_factor": _safe_float(round(defense_factor, 4), 1.0),
+        "home_away_factor": _safe_float(round(home_away_factor, 4)),
+        "rest_factor": _safe_float(round(rest_factor, 4), 1.0),
+        "game_total_factor": _safe_float(round(game_total_factor, 4), 1.0),
+        "blowout_risk": _safe_float(round(blowout_risk, 4)),
+        "overall_adjustment": _safe_float(round(offensive_stat_multiplier, 4), 1.0),
+        "recent_form_ratio": _safe_float(recent_form_ratio) if recent_form_ratio is not None else None,
         # W8/C4: Minutes adjustment factors for injury/restriction transparency
-        "minutes_adjustment_factor": round(minutes_adjustment_factor, 4),
+        "minutes_adjustment_factor": _safe_float(round(minutes_adjustment_factor, 4), 1.0),
         "teammate_out_notes": teammate_out_notes or [],
         "notes": notes,
         # C6: Bayesian shrinkage metadata

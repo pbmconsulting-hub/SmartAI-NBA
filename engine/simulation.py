@@ -12,6 +12,21 @@
 import random   # For randomizing game scenarios (minutes, pace)
 import math     # For mathematical rounding and calculations
 
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* if it is a finite float, otherwise *fallback*.
+
+    This is the last-line-of-defence guard that prevents NaN or ±inf
+    from leaking out of the simulation engine into downstream UI code.
+    """
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
 try:
     from utils.logger import get_logger
     _logger = get_logger(__name__)
@@ -555,21 +570,22 @@ def run_quantum_matrix_simulation(
     ci_90_low = max(0.0, _center - _margin)
     ci_90_high = min(1.0, _center + _margin)
 
-    # Build the results dictionary
+    # Build the results dictionary — every scalar is funnelled through
+    # _safe_float() so that NaN / ±inf never escapes to the UI layer.
     simulation_results = {
         "simulated_results": all_simulated_game_results,
-        "probability_over": final_probability_over,
-        "simulated_mean": calculate_mean(all_simulated_game_results),
-        "simulated_std": calculate_standard_deviation(all_simulated_game_results),
-        "percentile_10": calculate_percentile(all_simulated_game_results, 10),
-        "percentile_25": calculate_percentile(all_simulated_game_results, 25),
-        "percentile_50": calculate_percentile(all_simulated_game_results, 50),
-        "percentile_75": calculate_percentile(all_simulated_game_results, 75),
-        "percentile_90": calculate_percentile(all_simulated_game_results, 90),
-        "adjusted_projection": adjusted_stat_projection,
-        "combined_adjustment": combined_adjustment_multiplier,
-        "ci_90_low": round(ci_90_low, 4),
-        "ci_90_high": round(ci_90_high, 4),
+        "probability_over": _safe_float(final_probability_over, 0.5),
+        "simulated_mean": _safe_float(calculate_mean(all_simulated_game_results)),
+        "simulated_std": _safe_float(calculate_standard_deviation(all_simulated_game_results)),
+        "percentile_10": _safe_float(calculate_percentile(all_simulated_game_results, 10)),
+        "percentile_25": _safe_float(calculate_percentile(all_simulated_game_results, 25)),
+        "percentile_50": _safe_float(calculate_percentile(all_simulated_game_results, 50)),
+        "percentile_75": _safe_float(calculate_percentile(all_simulated_game_results, 75)),
+        "percentile_90": _safe_float(calculate_percentile(all_simulated_game_results, 90)),
+        "adjusted_projection": _safe_float(adjusted_stat_projection),
+        "combined_adjustment": _safe_float(combined_adjustment_multiplier, 1.0),
+        "ci_90_low": _safe_float(round(ci_90_low, 4)),
+        "ci_90_high": _safe_float(round(ci_90_high, 4), 1.0),
         "simulations_run": simulations_completed,
     }
 
@@ -654,7 +670,7 @@ def generate_alt_line_probabilities(simulation_output, base_line):
             # meaningful threshold (a player must record at least 1 stat).
             g_line = 0.5
         count_gte = sum(1 for s in simulated_results if s >= g_line)
-        prob = count_gte / n
+        prob = _safe_float(count_gte / n, 0.5)
         prob = max(0.01, min(0.99, prob))
         goblin_lines.append({
             "line": g_line,
@@ -668,7 +684,7 @@ def generate_alt_line_probabilities(simulation_output, base_line):
     for offset in DEMON_OFFSETS:
         d_line = round(base_line + offset, 1)  # offset is positive
         count_lte = sum(1 for s in simulated_results if s <= d_line)
-        prob = count_lte / n
+        prob = _safe_float(count_lte / n, 0.5)
         prob = max(0.01, min(0.99, prob))
         demon_lines.append({
             "line": d_line,
