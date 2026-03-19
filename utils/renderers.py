@@ -165,7 +165,7 @@ def _build_single_card_html(result, index=0):
         for f in force_list:
             if not isinstance(f, dict):
                 continue
-            strength = max(1, min(5, round(float(f.get("strength", 1) or 1))))
+            strength = max(1, min(5, round(float(f.get("strength", 1)))))
             stars = "⭐" * strength
             name = _escape(str(f.get("name", "") or ""))
             parts.append(f'<div class="qcm-force-item">{stars} {name}</div>')
@@ -190,10 +190,14 @@ def _build_single_card_html(result, index=0):
     if breakdown:
         bars = []
         for factor, score in breakdown.items():
+            try:
+                score_f = float(score or 0)
+            except (ValueError, TypeError):
+                continue
             label = _escape(
                 factor.replace("_score", "").replace("_", " ").title()
             )
-            bar_w = min(100, max(0, float(score or 0)))
+            bar_w = min(100, max(0, score_f))
             if bar_w >= 70:
                 bar_c = "#00f0ff"
             elif bar_w >= 40:
@@ -203,7 +207,7 @@ def _build_single_card_html(result, index=0):
             bars.append(
                 f'<div class="qcm-breakdown-row">'
                 f'<span class="qcm-breakdown-label">{label}</span>'
-                f'<span class="qcm-breakdown-score">{score:.0f}</span>'
+                f'<span class="qcm-breakdown-score">{score_f:.0f}</span>'
                 f'<div class="qcm-breakdown-track">'
                 f'<div class="qcm-breakdown-fill" style="width:{bar_w:.1f}%;background:{bar_c};"></div>'
                 f'</div></div>'
