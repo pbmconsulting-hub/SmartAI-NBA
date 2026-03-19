@@ -537,8 +537,10 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
             correlation_penalty = 1.0
             for cnt in game_counts.values():
                 if cnt >= 3:
+                    # 15% penalty — 3+ correlated legs share game-level variance
                     correlation_penalty *= 0.85
                 elif cnt == 2:
+                    # 7% penalty — 2 same-game legs share moderate variance
                     correlation_penalty *= 0.93
 
             # ── cumulative EV ──

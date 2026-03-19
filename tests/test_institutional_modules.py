@@ -186,7 +186,7 @@ class TestGenerateOptimalSlip(unittest.TestCase):
         result = self.gen(self._make_props(10))
         self.assertLessEqual(len(result), 10)
 
-    def test_same_game_picks_penalised(self):
+    def test_same_game_picks_penalized(self):
         props = [
             {"player_name": "A", "stat_type": "pts", "probability_over": 0.65,
              "direction": "OVER", "player_team": "LAL", "opponent": "GSW", "edge_percentage": 8.0},

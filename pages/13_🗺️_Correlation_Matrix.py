@@ -88,7 +88,7 @@ st.markdown(
 )
 
 # ============================================================
-# SECTION: Pull analysed results from session state
+# SECTION: Pull analyzed results from session state
 # ============================================================
 
 _results = st.session_state.get("analysis_results", [])
