@@ -16,6 +16,17 @@
 import math
 
 
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
 # ============================================================
 # SECTION: Module-Level Constants
 # ============================================================
@@ -179,11 +190,11 @@ def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs,
             "player_name":               player_name,
             "opponent_team":             opponent_team,
             "stat_type":                 stat_type,
-            "games_found":               games_found,
+            "games_found":               int(games_found),
             "avg_vs_team":               None,
-            "std_vs_team":               0.0,
-            "sample_size":               games_found,
-            "matchup_favorability_score": 50.0,  # neutral score on cold start
+            "std_vs_team":               _safe_float(0.0, 0.0),
+            "sample_size":               int(games_found),
+            "matchup_favorability_score": _safe_float(50.0, 50.0),
             "cold_start":                True,
         }
 
@@ -199,11 +210,11 @@ def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs,
             "player_name":               player_name,
             "opponent_team":             opponent_team,
             "stat_type":                 stat_type,
-            "games_found":               games_found,
+            "games_found":               int(games_found),
             "avg_vs_team":               None,
-            "std_vs_team":               0.0,
+            "std_vs_team":               _safe_float(0.0, 0.0),
             "sample_size":               0,
-            "matchup_favorability_score": 50.0,
+            "matchup_favorability_score": _safe_float(50.0, 50.0),
             "cold_start":                True,
         }
 
@@ -242,11 +253,11 @@ def get_player_vs_team_history(player_name, opponent_team, stat_type, game_logs,
         "player_name":               player_name,
         "opponent_team":             opponent_team,
         "stat_type":                 stat_type,
-        "games_found":               games_found,
-        "avg_vs_team":               round(avg_vs_team, 3),
-        "std_vs_team":               round(std_vs_team, 3),
-        "sample_size":               len(stat_values),
-        "matchup_favorability_score": matchup_favorability_score,
+        "games_found":               int(games_found),
+        "avg_vs_team":               _safe_float(round(avg_vs_team, 3), 0.0) if avg_vs_team is not None else None,
+        "std_vs_team":               _safe_float(round(std_vs_team, 3), 0.0),
+        "sample_size":               int(len(stat_values)),
+        "matchup_favorability_score": _safe_float(matchup_favorability_score, 50.0),
         "cold_start":                False,
     }
 
@@ -354,7 +365,7 @@ def get_matchup_force_signal(adjustment_factor):
             label = "Moderate OVER matchup edge"
         else:
             label = "Slight OVER matchup edge"
-        return {"direction": "OVER", "strength": round(strength, 3), "label": label}
+        return {"direction": "OVER", "strength": _safe_float(round(strength, 3), 0.0), "label": label}
 
     if adjustment_factor < 0.95:
         strength = min((1.0 - adjustment_factor) * 5.0, 1.0)
@@ -364,9 +375,9 @@ def get_matchup_force_signal(adjustment_factor):
             label = "Moderate UNDER matchup edge"
         else:
             label = "Slight UNDER matchup edge"
-        return {"direction": "UNDER", "strength": round(strength, 3), "label": label}
+        return {"direction": "UNDER", "strength": _safe_float(round(strength, 3), 0.0), "label": label}
 
-    return {"direction": "NEUTRAL", "strength": 0.0, "label": "No significant matchup edge"}
+    return {"direction": "NEUTRAL", "strength": _safe_float(0.0, 0.0), "label": "No significant matchup edge"}
 
 # ============================================================
 # END SECTION: Matchup History Analysis
