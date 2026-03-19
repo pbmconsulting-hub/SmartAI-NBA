@@ -44,6 +44,7 @@ from engine.correlation import (
     adjust_parlay_probability,
     correlation_adjusted_kelly,
 )
+from engine.math_helpers import clamp_probability
 
 
 # ============================================================
@@ -359,7 +360,7 @@ for lbl in _selected:
         p = float(res.get("probability_over", 0.5))
     else:
         p = 1.0 - float(res.get("probability_over", 0.5))
-    _parlay_probs.append(max(0.01, min(0.99, p)))
+    _parlay_probs.append(clamp_probability(p))
     _parlay_labels.append(lbl)
 
 # Compute independent vs correlated joint probability

@@ -265,11 +265,16 @@ class TestPearsonSimCorrelation(unittest.TestCase):
         self.assertLessEqual(r, 1.0)
 
     def test_result_rounded_to_4_dp(self):
-        a = [1.0, 2.0, 3.0, 4.0, 5.0]
-        b = [5.0, 3.0, 1.0, 4.0, 2.0]
+        # Use arrays that produce a Pearson r with high decimal precision
+        a = [1.0, 2.3, 3.7, 4.1, 5.9, 6.2, 7.8]
+        b = [2.1, 3.4, 5.6, 4.9, 7.3, 8.1, 9.5]
         r = self._pearson(a, b)
-        # Verify result is rounded to at most 4 decimal places
+        # round(r, 4) should equal r itself (already rounded)
         self.assertEqual(r, round(r, 4))
+        # Confirm there are at most 4 decimal digits
+        r_str = f"{r:.10f}".rstrip("0")
+        decimal_part = r_str.split(".")[-1] if "." in r_str else ""
+        self.assertLessEqual(len(decimal_part), 4)
 
 
 class TestSessionStateDefaults(unittest.TestCase):
