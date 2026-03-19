@@ -43,6 +43,48 @@ DB_FILE_PATH = DB_DIRECTORY / "smartai_nba.db"
 _WRITE_RETRY_ATTEMPTS = 3
 _WRITE_RETRY_DELAY = 0.25  # seconds between retries (doubles each attempt)
 
+
+def _execute_write(sql, params=(), *, caller="write"):
+    """Execute a single INSERT / UPDATE with locked-database retry.
+
+    Centralises the retry-with-backoff loop that was previously inlined
+    in ``insert_bet`` and ``update_bet_result``, so every write path
+    gets the same concurrency protection.
+
+    Args:
+        sql (str): The SQL statement to execute.
+        params (tuple): Bind parameters.
+        caller (str): Label for log messages.
+
+    Returns:
+        sqlite3.Cursor | None: The cursor on success, or *None* after
+        all retries are exhausted.
+    """
+    for _attempt in range(_WRITE_RETRY_ATTEMPTS):
+        try:
+            conn = sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+            conn.commit()
+            conn.close()
+            return cursor
+        except sqlite3.OperationalError as op_err:
+            if "locked" in str(op_err).lower() and _attempt < _WRITE_RETRY_ATTEMPTS - 1:
+                _logger.warning(
+                    f"{caller}: database locked, retry "
+                    f"{_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}"
+                )
+                time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
+                continue
+            _logger.error(f"{caller} error: {op_err}")
+            return None
+        except sqlite3.Error as db_err:
+            _logger.error(f"{caller} error: {db_err}")
+            return None
+    return None
+
+
 # SQL to create the bets table (runs once when app starts)
 # BEGINNER NOTE: SQL is a language for managing databases.
 # CREATE TABLE IF NOT EXISTS = only create if it doesn't exist yet
@@ -644,15 +686,8 @@ def insert_prediction(prediction_data):
         prediction_data.get("probability_predicted", 0.5),
         prediction_data.get("notes", ""),
     )
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
-            cursor = connection.cursor()
-            cursor.execute(insert_sql, values)
-            connection.commit()
-            return cursor.lastrowid
-    except sqlite3.Error as database_error:
-        _logger.error(f"Error inserting prediction: {database_error}")
-        return None
+    cursor = _execute_write(insert_sql, values, caller="insert_prediction")
+    return cursor.lastrowid if cursor else None
 
 
 def update_prediction_outcome(prediction_id, was_correct, actual_value):
@@ -672,15 +707,12 @@ def update_prediction_outcome(prediction_id, was_correct, actual_value):
     SET was_correct = ?, actual_value = ?
     WHERE prediction_id = ?
     """
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
-            cursor = connection.cursor()
-            cursor.execute(update_sql, (1 if was_correct else 0, actual_value, prediction_id))
-            connection.commit()
-            return True
-    except sqlite3.Error as database_error:
-        _logger.error(f"Error updating prediction outcome: {database_error}")
-        return False
+    cursor = _execute_write(
+        update_sql,
+        (1 if was_correct else 0, actual_value, prediction_id),
+        caller="update_prediction_outcome",
+    )
+    return cursor is not None
 
 
 def get_calibration_adjustment(stat_type=None, min_samples=20):
@@ -868,7 +900,17 @@ def save_daily_snapshot(date_str=None):
         rows = cursor.fetchall()
         cols = [d[0] for d in cursor.description]
         bets = [dict(zip(cols, row)) for row in rows]
+    except Exception as exc:
+        _logger.error(f"[database] save_daily_snapshot read error: {exc}")
+        return False
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
 
+    try:
         total = len(bets)
         wins = sum(1 for b in bets if b.get("result") == "WIN")
         losses = sum(1 for b in bets if b.get("result") == "LOSS")
@@ -945,8 +987,7 @@ def save_daily_snapshot(date_str=None):
                 "result": worst.get("result", ""),
             })
 
-        cursor.execute(
-            """
+        _upsert_sql = """
             INSERT INTO daily_snapshots
                 (snapshot_date, total_picks, wins, losses, pushes, pending,
                  win_rate, platform_breakdown, tier_breakdown, stat_type_breakdown,
@@ -964,33 +1005,26 @@ def save_daily_snapshot(date_str=None):
                 stat_type_breakdown = excluded.stat_type_breakdown,
                 best_pick          = excluded.best_pick,
                 worst_pick         = excluded.worst_pick
-            """,
-            (
-                date_str,
-                total,
-                wins,
-                losses,
-                pushes,
-                pending,
-                win_rate,
-                json.dumps(platform_breakdown),
-                json.dumps(tier_breakdown),
-                json.dumps(stat_type_breakdown),
-                best_pick,
-                worst_pick,
-            ),
+            """
+        _upsert_params = (
+            date_str,
+            total,
+            wins,
+            losses,
+            pushes,
+            pending,
+            win_rate,
+            json.dumps(platform_breakdown),
+            json.dumps(tier_breakdown),
+            json.dumps(stat_type_breakdown),
+            best_pick,
+            worst_pick,
         )
-        conn.commit()
-        return True
+        result = _execute_write(_upsert_sql, _upsert_params, caller="save_daily_snapshot")
+        return result is not None
     except Exception as exc:
         _logger.error(f"[database] save_daily_snapshot error: {exc}")
         return False
-    finally:
-        try:
-            if conn is not None:
-                conn.close()
-        except Exception:
-            pass
 
 
 def load_daily_snapshots(days=14):
@@ -1164,58 +1198,71 @@ def insert_analysis_picks(analysis_results):
     today_str = _dt.date.today().isoformat()
     inserted = 0
 
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            # Load today's existing keys to deduplicate — use case-insensitive SQL collation
-            existing = set()
-            for row in conn.execute(
-                "SELECT lower(player_name), stat_type, prop_line, direction "
-                "FROM all_analysis_picks WHERE pick_date = ?",
-                (today_str,),
-            ).fetchall():
-                existing.add((row[0], row[1], float(row[2] or 0), row[3]))
+    for _attempt in range(_WRITE_RETRY_ATTEMPTS):
+        try:
+            with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                # Load today's existing keys to deduplicate — use case-insensitive SQL collation
+                existing = set()
+                for row in conn.execute(
+                    "SELECT lower(player_name), stat_type, prop_line, direction "
+                    "FROM all_analysis_picks WHERE pick_date = ?",
+                    (today_str,),
+                ).fetchall():
+                    existing.add((row[0], row[1], float(row[2] or 0), row[3]))
 
-            for r in analysis_results:
-                key = (
-                    r.get("player_name", "").lower(),
-                    r.get("stat_type", ""),
-                    float(r.get("line", 0) or 0),
-                    r.get("direction", "OVER"),
-                )
-                if key in existing:
-                    continue
-                conn.execute(
-                    """
-                    INSERT INTO all_analysis_picks
-                        (pick_date, player_name, team, stat_type, prop_line,
-                         direction, platform, confidence_score, probability_over,
-                         edge_percentage, tier, result, actual_value, notes,
-                         bet_type, std_devs_from_line)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
-                    """,
-                    (
-                        today_str,
-                        r.get("player_name", ""),
-                        r.get("player_team", r.get("team", "")),
+                for r in analysis_results:
+                    key = (
+                        r.get("player_name", "").lower(),
                         r.get("stat_type", ""),
                         float(r.get("line", 0) or 0),
                         r.get("direction", "OVER"),
-                        r.get("platform", ""),
-                        float(r.get("confidence_score", 0) or 0),
-                        float(r.get("probability_over", 0.5) or 0.5),
-                        float(r.get("edge_percentage", 0) or 0),
-                        r.get("tier", "Bronze"),
-                        f"Auto-stored by Smart Pick Pro. SAFE Score: {r.get('confidence_score', 0):.0f}",
-                        r.get("bet_type", "normal"),
-                        float(r.get("std_devs_from_line", 0.0)),
-                    ),
+                    )
+                    if key in existing:
+                        continue
+                    conn.execute(
+                        """
+                        INSERT INTO all_analysis_picks
+                            (pick_date, player_name, team, stat_type, prop_line,
+                             direction, platform, confidence_score, probability_over,
+                             edge_percentage, tier, result, actual_value, notes,
+                             bet_type, std_devs_from_line)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?, ?)
+                        """,
+                        (
+                            today_str,
+                            r.get("player_name", ""),
+                            r.get("player_team", r.get("team", "")),
+                            r.get("stat_type", ""),
+                            float(r.get("line", 0) or 0),
+                            r.get("direction", "OVER"),
+                            r.get("platform", ""),
+                            float(r.get("confidence_score", 0) or 0),
+                            float(r.get("probability_over", 0.5) or 0.5),
+                            float(r.get("edge_percentage", 0) or 0),
+                            r.get("tier", "Bronze"),
+                            f"Auto-stored by Smart Pick Pro. SAFE Score: {r.get('confidence_score', 0):.0f}",
+                            r.get("bet_type", "normal"),
+                            float(r.get("std_devs_from_line", 0.0)),
+                        ),
+                    )
+                    existing.add(key)
+                    inserted += 1
+                conn.commit()
+            break  # success — exit retry loop
+        except sqlite3.OperationalError as op_err:
+            if "locked" in str(op_err).lower() and _attempt < _WRITE_RETRY_ATTEMPTS - 1:
+                _logger.warning(
+                    f"insert_analysis_picks: database locked, retry "
+                    f"{_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}"
                 )
-                existing.add(key)
-                inserted += 1
-            conn.commit()
-    except Exception as err:
-        _logger.warning(f"insert_analysis_picks error (non-fatal): {err}")
+                time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
+                inserted = 0  # reset counter for fresh retry
+                continue
+            _logger.warning(f"insert_analysis_picks error (non-fatal): {op_err}")
+        except Exception as err:
+            _logger.warning(f"insert_analysis_picks error (non-fatal): {err}")
+            break  # non-retryable error
 
     return inserted
 
@@ -1382,17 +1429,15 @@ def save_analysis_session(analysis_results, todays_games=None, selected_picks=No
         _games_json = json.dumps(todays_games or [], default=str)
         _picks_json = json.dumps(selected_picks or [], default=str)
         _prop_count = len(analysis_results)
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            cursor = conn.execute(
-                """INSERT INTO analysis_sessions
-                   (analysis_timestamp, analysis_results_json, todays_games_json,
-                    selected_picks_json, prop_count)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (_ts, _results_json, _games_json, _picks_json, _prop_count),
-            )
-            conn.commit()
-            return cursor.lastrowid
+        cursor = _execute_write(
+            """INSERT INTO analysis_sessions
+               (analysis_timestamp, analysis_results_json, todays_games_json,
+                selected_picks_json, prop_count)
+               VALUES (?, ?, ?, ?, ?)""",
+            (_ts, _results_json, _games_json, _picks_json, _prop_count),
+            caller="save_analysis_session",
+        )
+        return cursor.lastrowid if cursor else -1
     except Exception as _err:
         _logger.warning(f"save_analysis_session error (non-fatal): {_err}")
         return -1
@@ -1472,38 +1517,35 @@ def save_backtest_result(backtest_result):
         edge_win_rates_json = json.dumps(backtest_result.get("edge_win_rates", {}))
         pick_log_json = json.dumps(backtest_result.get("pick_log", []))
 
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO backtest_results (
-                    run_timestamp, season, stat_types_json, min_edge, tier_filter,
-                    total_picks, wins, losses, win_rate, roi, total_pnl,
-                    tier_win_rates_json, stat_win_rates_json, edge_win_rates_json,
-                    pick_log_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run_ts,
-                    backtest_result.get("season", ""),
-                    stat_types_json,
-                    backtest_result.get("min_edge", 0.05),
-                    backtest_result.get("tier_filter"),
-                    backtest_result.get("total_picks", 0),
-                    backtest_result.get("wins", 0),
-                    backtest_result.get("losses", 0),
-                    backtest_result.get("win_rate", 0.0),
-                    backtest_result.get("roi", 0.0),
-                    backtest_result.get("total_pnl", 0.0),
-                    tier_win_rates_json,
-                    stat_win_rates_json,
-                    edge_win_rates_json,
-                    pick_log_json,
-                )
-            )
-            conn.commit()
-            return cursor.lastrowid
+        cursor = _execute_write(
+            """
+            INSERT INTO backtest_results (
+                run_timestamp, season, stat_types_json, min_edge, tier_filter,
+                total_picks, wins, losses, win_rate, roi, total_pnl,
+                tier_win_rates_json, stat_win_rates_json, edge_win_rates_json,
+                pick_log_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_ts,
+                backtest_result.get("season", ""),
+                stat_types_json,
+                backtest_result.get("min_edge", 0.05),
+                backtest_result.get("tier_filter"),
+                backtest_result.get("total_picks", 0),
+                backtest_result.get("wins", 0),
+                backtest_result.get("losses", 0),
+                backtest_result.get("win_rate", 0.0),
+                backtest_result.get("roi", 0.0),
+                backtest_result.get("total_pnl", 0.0),
+                tier_win_rates_json,
+                stat_win_rates_json,
+                edge_win_rates_json,
+                pick_log_json,
+            ),
+            caller="save_backtest_result",
+        )
+        return cursor.lastrowid if cursor else None
     except Exception as _err:
         _logger.error(f"save_backtest_result error: {_err}")
         return None
@@ -1595,42 +1637,55 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
     fetched_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     inserted = 0
 
-    try:
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
-            conn.execute("PRAGMA journal_mode=WAL")
-            for g in game_logs:
-                conn.execute(
-                    """
-                    INSERT OR REPLACE INTO player_game_logs
-                        (player_id, player_name, game_date, opponent,
-                         minutes, points, rebounds, assists, threes,
-                         steals, blocks, turnovers, fg_pct, ft_pct,
-                         plus_minus, fetched_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        str(player_id),
-                        str(player_name),
-                        str(g.get("game_date", g.get("GAME_DATE", ""))),
-                        str(g.get("opponent", g.get("MATCHUP", ""))),
-                        _safe_float(g.get("minutes", g.get("MIN", g.get("min")))),
-                        _safe_int(g.get("points",    g.get("PTS", g.get("pts")))),
-                        _safe_int(g.get("rebounds",  g.get("REB", g.get("reb")))),
-                        _safe_int(g.get("assists",   g.get("AST", g.get("ast")))),
-                        _safe_int(g.get("threes",    g.get("FG3M", g.get("fg3m")))),
-                        _safe_int(g.get("steals",    g.get("STL", g.get("stl")))),
-                        _safe_int(g.get("blocks",    g.get("BLK", g.get("blk")))),
-                        _safe_int(g.get("turnovers", g.get("TOV", g.get("tov")))),
-                        _safe_float(g.get("fg_pct",  g.get("FG_PCT", g.get("fg_pct")))),
-                        _safe_float(g.get("ft_pct",  g.get("FT_PCT", g.get("ft_pct")))),
-                        _safe_int(g.get("plus_minus", g.get("PLUS_MINUS", g.get("plus_minus")))),
-                        fetched_at,
-                    ),
+    for _attempt in range(_WRITE_RETRY_ATTEMPTS):
+        try:
+            with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                for g in game_logs:
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO player_game_logs
+                            (player_id, player_name, game_date, opponent,
+                             minutes, points, rebounds, assists, threes,
+                             steals, blocks, turnovers, fg_pct, ft_pct,
+                             plus_minus, fetched_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(player_id),
+                            str(player_name),
+                            str(g.get("game_date", g.get("GAME_DATE", ""))),
+                            str(g.get("opponent", g.get("MATCHUP", ""))),
+                            _safe_float(g.get("minutes", g.get("MIN", g.get("min")))),
+                            _safe_int(g.get("points",    g.get("PTS", g.get("pts")))),
+                            _safe_int(g.get("rebounds",  g.get("REB", g.get("reb")))),
+                            _safe_int(g.get("assists",   g.get("AST", g.get("ast")))),
+                            _safe_int(g.get("threes",    g.get("FG3M", g.get("fg3m")))),
+                            _safe_int(g.get("steals",    g.get("STL", g.get("stl")))),
+                            _safe_int(g.get("blocks",    g.get("BLK", g.get("blk")))),
+                            _safe_int(g.get("turnovers", g.get("TOV", g.get("tov")))),
+                            _safe_float(g.get("fg_pct",  g.get("FG_PCT", g.get("fg_pct")))),
+                            _safe_float(g.get("ft_pct",  g.get("FT_PCT", g.get("ft_pct")))),
+                            _safe_int(g.get("plus_minus", g.get("PLUS_MINUS", g.get("plus_minus")))),
+                            fetched_at,
+                        ),
+                    )
+                    inserted += 1
+                conn.commit()
+            break  # success — exit retry loop
+        except sqlite3.OperationalError as op_err:
+            if "locked" in str(op_err).lower() and _attempt < _WRITE_RETRY_ATTEMPTS - 1:
+                _logger.warning(
+                    f"save_player_game_logs_to_db: database locked, retry "
+                    f"{_attempt + 1}/{_WRITE_RETRY_ATTEMPTS}"
                 )
-                inserted += 1
-            conn.commit()
-    except Exception as err:
-        _logger.warning(f"save_player_game_logs_to_db error (non-fatal): {err}")
+                time.sleep(_WRITE_RETRY_DELAY * (2 ** _attempt))
+                inserted = 0  # reset counter for fresh retry
+                continue
+            _logger.warning(f"save_player_game_logs_to_db error (non-fatal): {op_err}")
+        except Exception as err:
+            _logger.warning(f"save_player_game_logs_to_db error (non-fatal): {err}")
+            break  # non-retryable error
 
     return inserted
 
