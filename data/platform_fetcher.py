@@ -901,15 +901,11 @@ def fetch_all_platform_props(
     if progress_callback:
         progress_callback(total_steps, total_steps, f"Done! {len(all_props)} props fetched.")
 
-    # ── 500-Prop Hard Cap ──────────────────────────────────────────
-    # Enforce maximum capacity to prevent downstream rendering and
-    # WebSocket overload. Slice BEFORE passing to the engine.
-    MAX_PROP_CAPACITY = 500
-    if len(all_props) > MAX_PROP_CAPACITY:
-        _logger.info(
-            f"[Master] Capping props from {len(all_props)} → {MAX_PROP_CAPACITY}"
-        )
-        all_props = all_props[:MAX_PROP_CAPACITY]
+    # ── Alt-line enrichment — no hard cap on raw intake ──────────
+    # The pipeline no longer caps the number of fetched props at the
+    # ingestion stage.  The 500-bet minimum-output quota is enforced
+    # downstream in the analysis loop so that the engine processes as
+    # many raw props as necessary until the target is reached.
 
     # ── Enrich with alt-line categories (goblin / 50_50 / demon) ──
     # Stamp each prop with line_category and standard_line so that
@@ -1257,15 +1253,9 @@ async def fetch_all_platforms_async(
         if isinstance(result, list):
             all_props.extend(result)
 
-    # ── 500-Prop Hard Cap ──────────────────────────────────────────
-    MAX_PROP_CAPACITY = 500
-    if len(all_props) > MAX_PROP_CAPACITY:
-        _logger.info(
-            f"[Async] Capping props from {len(all_props)} → {MAX_PROP_CAPACITY}"
-        )
-        all_props = all_props[:MAX_PROP_CAPACITY]
-
-    # ── Enrich with alt-line categories (goblin / 50_50 / demon) ──
+    # ── Alt-line enrichment — no hard cap on raw intake ──────────
+    # The pipeline no longer caps props at the ingestion stage.  The
+    # 500-bet minimum-output quota is enforced downstream.
     all_props = parse_alt_lines_from_platform_props(all_props)
 
     _logger.info(f"[Async] Total props fetched: {len(all_props)}")

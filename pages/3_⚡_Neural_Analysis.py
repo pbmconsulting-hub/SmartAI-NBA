@@ -259,6 +259,7 @@ from pages.helpers.neural_analysis_helpers import (
     _build_bonus_factors,
     _build_entry_strategy,
     _render_qds_full_breakdown_html,
+    render_inline_breakdown_html as _render_inline_breakdown,
     display_prop_analysis_card_qds,
 )
 # ============================================================
@@ -506,8 +507,11 @@ def _labels_to_stat_keys(labels):
     return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
 
 
-# Maximum props passed to the QME 5.6 simulation engine
-_QME_MAX_PROPS = 500
+# Guaranteed minimum output of high-confidence bets from the QME 5.6 engine.
+# The engine will process as many raw props as necessary until this target is
+# reached (or all props are exhausted).  This is an OUTPUT quota, not an
+# input cap.
+_QME_MIN_OUTPUT_BETS = 500
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -543,17 +547,20 @@ with st.expander("🎯 Market Filters", expanded=True):
         help="Only props for these stat categories will be analyzed.",
     )
 
-    # ── 500-Prop Cached Funnel ───────────────────────────────────
+    # ── Prop Funnel — no intake cap; output quota enforced downstream ─
     _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
     _filtered_props, _funnel_summary = _cached_smart_filter(
         tuple(current_props),
         tuple(sorted(_funnel_stat_keys)),
     )
-    final_props = _filtered_props[:_QME_MAX_PROPS]
+    # Pass ALL filtered props to the engine — the analysis loop will
+    # stop only when _QME_MIN_OUTPUT_BETS high-confidence bets are
+    # found (or all props are exhausted).
+    final_props = _filtered_props
 
     st.metric(
-        label=f"⚡ PROPS LOCKED FOR QME 5.6 SIMULATION (max {_QME_MAX_PROPS})",
-        value=f"{len(final_props):,} / {_QME_MAX_PROPS:,}",
+        label=f"⚡ PROPS IN FUNNEL — Output Target: {_QME_MIN_OUTPUT_BETS} bets",
+        value=f"{len(final_props):,}",
         delta=f"{len(final_props) - len(current_props):,} filtered" if len(current_props) > len(final_props) else "No reduction",
         delta_color="normal" if len(final_props) >= len(current_props) else "inverse",
     )
@@ -705,9 +712,11 @@ if run_analysis:
         )
         st.caption(f"📊 Analyzing: {_plat_summary}")
 
-    # ── Pre-Analysis Funnel: stat types + hardcoded 500-prop cap ──
+    # ── Pre-Analysis Funnel: stat types only (no intake cap) ────
     # Apply the user's stat-type selection from the Market Filters expander
-    # via smart_filter_props() in data.platform_fetcher.
+    # via smart_filter_props() in data.platform_fetcher.  The pipeline
+    # ingests ALL available props; the 500-bet quota is enforced at the
+    # OUTPUT stage so that the engine processes enough to reach the target.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
     _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
 
@@ -721,14 +730,13 @@ if run_analysis:
         stat_types=_funnel_stat_keys_run,
         deduplicate_cross_platform=True,
     )
-    # Enforce hardcoded 500-prop cap
-    if len(props_to_analyze) > _QME_MAX_PROPS:
-        props_to_analyze = props_to_analyze[:_QME_MAX_PROPS]
+    # No intake cap — process all available props until the output
+    # quota (_QME_MIN_OUTPUT_BETS) is met or all props are exhausted.
     _after_funnel = len(props_to_analyze)
     if _before_funnel > _after_funnel:
         st.info(
             f"🎯 **Pre-Analysis Funnel**: Reduced **{_before_funnel}** → **{_after_funnel}** props "
-            f"(stat types: {len(_funnel_stat_keys_run)}, max: {_QME_MAX_PROPS})."
+            f"(stat types: {len(_funnel_stat_keys_run)}). Output target: {_QME_MIN_OUTPUT_BETS} bets."
         )
 
     total_props_count    = len(props_to_analyze)
@@ -2016,6 +2024,7 @@ if analysis_results:
                         f'</span></div>'
                         if _gp_goblin_floor is not None else ""
                     )
+                    + _render_inline_breakdown(_gp, accent_color="#4caf50")
                     + f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2032,7 +2041,7 @@ if analysis_results:
     ]
     if _demon_picks:
         with st.expander(
-            f"🔥 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
+            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard O/U",
             expanded=False,
         ):
             _dcol_logo, _dcol_title = st.columns([1, 6])
@@ -2102,11 +2111,11 @@ if analysis_results:
                     f'<div>'
                     f'<span style="background:rgba(244,67,54,0.25);color:#ef5350;padding:2px 8px;'
                     f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
-                    f'border:1px solid rgba(244,67,54,0.5);">🔴 Demon</span>'
-                    f'<span style="color:#ff8c00;font-weight:700;">🔥 {_dp_name}</span>'
+                    f'border:1px solid rgba(244,67,54,0.5);">👹 Demon</span>'
+                    f'<span style="color:#ff8c00;font-weight:700;">👹 {_dp_name}</span>'
                     f'{_dp_team_badge}'
                     f'<span style="background:#ff8c00;color:#fff;padding:2px 8px;border-radius:4px;'
-                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">DEMON BET</span>'
+                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">👹 DEMON BET</span>'
                     f'</div>'
                     f'<div style="text-align:right;">'
                     f'<span style="color:#ffd580;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat}'
@@ -2138,6 +2147,7 @@ if analysis_results:
                         f'</span></div>'
                         if _dp_demon_ceiling is not None else ""
                     )
+                    + _render_inline_breakdown(_dp, accent_color="#ff8c00")
                     + f'</div>',
                     unsafe_allow_html=True,
                 )
@@ -2240,7 +2250,8 @@ if analysis_results:
                     f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">RISK FLAGS (AVOID):</span>'
                     f'<ul style="margin:4px 0 0 16px;padding:0;">{_up_flags_html}</ul>'
                     f'</div>'
-                    f'</div>',
+                    + _render_inline_breakdown(_up, accent_color="#ffc107")
+                    + f'</div>',
                     unsafe_allow_html=True,
                 )
         st.divider()
@@ -2298,22 +2309,51 @@ if analysis_results:
             _sb_conf  = _sb.get("confidence_score", 0)
             _sb_edge  = _sb.get("edge_percentage", 0)
             _sb_emoji = _sb.get("tier_emoji", "🥈")
+            _sb_prob  = _sb.get("probability_over", 0.5)
+            _sb_prob_dir = _sb_prob if _sb_dir == "OVER" else (1.0 - _sb_prob)
+            _sb_proj  = _sb.get("adjusted_projection", 0)
+            _sb_platform = _html.escape(str(_sb.get("platform", "")))
+            _sb_team  = _html.escape(str(_sb.get("player_team", _sb.get("team", ""))))
+            _sb_bet_type = _sb.get("bet_type", "normal")
+            _sb_bet_icon = {"goblin": "🟢", "demon": "👹"}.get(_sb_bet_type, "")
+            _sb_breakdown_html = _render_inline_breakdown(_sb, accent_color=_sb_color)
             st.markdown(
-                f'<div style="background:#14192b;border-radius:8px;padding:12px 16px;'
-                f'margin-bottom:10px;border-left:4px solid {_sb_color};">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<div style="background:#14192b;border-radius:10px;padding:14px 18px;'
+                f'margin-bottom:12px;border-left:4px solid {_sb_color};'
+                f'border:1px solid rgba(255,255,255,0.08);">'
+                # ── Header row: name + stat + badges ──────────────────
+                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
                 f'<div>'
-                f'<span style="color:{_sb_color};font-weight:700;font-size:1rem;">{_sb_emoji} {_sb_name}</span>'
-                f'<span style="color:#c0d0e8;font-size:0.9rem;margin-left:10px;">'
-                f'{_sb_dir} {_sb_line} {_sb_stat}</span>'
-                f'</div>'
+                f'<span style="color:{_sb_color};font-weight:700;font-size:1.05rem;">'
+                f'{_sb_emoji} {_sb_name}</span>'
+                f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_sb_team}</span>'
+                + (f'<span style="margin-left:6px;">{_sb_bet_icon}</span>' if _sb_bet_icon else "")
+                + f'</div>'
                 f'<div style="text-align:right;">'
                 f'<span style="background:{_sb_color};color:#0a0f1a;padding:2px 8px;border-radius:4px;'
                 f'font-size:0.78rem;font-weight:700;">SAFE {_sb_conf:.0f}/100</span>'
-                f'<span style="color:#00f0ff;font-size:0.78rem;margin-left:8px;">Edge {_sb_edge:+.1f}%</span>'
                 f'</div>'
                 f'</div>'
-                f'</div>',
+                # ── Prop line row ─────────────────────────────────────
+                f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                f'padding:8px 10px;background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.10);'
+                f'border-radius:6px;margin-bottom:4px;">'
+                f'<span style="color:#94A3B8;font-size:0.78rem;font-family:\'JetBrains Mono\',monospace;'
+                f'text-transform:uppercase;letter-spacing:0.06em;">'
+                f'{_sb_dir} {_sb_line} {_sb_stat}'
+                + (f' · {_sb_platform}' if _sb_platform else "")
+                + f'</span>'
+                f'<span style="font-family:\'JetBrains Mono\',monospace;">'
+                f'<span style="color:#00f0ff;font-size:0.78rem;font-weight:600;">Edge {_sb_edge:+.1f}%</span>'
+                f'<span style="color:#94A3B8;font-size:0.72rem;margin-left:8px;">'
+                f'P({_sb_dir.title()}): {_sb_prob_dir*100:.0f}%</span>'
+                f'<span style="color:#ff5e00;font-size:0.72rem;margin-left:8px;">'
+                f'Proj: {_sb_proj:.1f}</span>'
+                f'</span>'
+                f'</div>'
+                # ── Full breakdown: distribution + forces + scores ────
+                + _sb_breakdown_html
+                + f'</div>',
                 unsafe_allow_html=True,
             )
 

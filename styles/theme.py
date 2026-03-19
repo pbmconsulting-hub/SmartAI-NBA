@@ -5111,13 +5111,13 @@ def get_intel_strip_html(
 QUANTUM_CARD_MATRIX_CSS = """
 /* ═══════════════════════════════════════════════════════════
    QUANTUM CARD MATRIX — High-Capacity Grid Renderer
-   500-Prop Capacity with Staggered Waterfall Animation
+   Full Breakdown Cards with Distribution, Forces & Scores
    ═══════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
 .qcm-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
     gap: 16px;
     padding: 8px 0;
     width: 100%;
@@ -5145,6 +5145,34 @@ QUANTUM_CARD_MATRIX_CSS = """
     border-color: rgba(0, 240, 255, 0.25);
     box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
     transform: translateY(-2px);
+}
+
+/* ── Demon Card Override ────────────────────────────────── */
+.qcm-card-demon {
+    border-color: rgba(255, 94, 0, 0.30);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 20px rgba(255, 94, 0, 0.10);
+}
+.qcm-card-demon:hover {
+    border-color: rgba(255, 94, 0, 0.50);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 28px rgba(255, 94, 0, 0.18);
+}
+.qcm-card-demon .qcm-player-name { color: #ff8c00; }
+.qcm-card-demon .qcm-true-line-row {
+    background: rgba(255, 94, 0, 0.08);
+    border-color: rgba(255, 94, 0, 0.25);
+}
+.qcm-card-demon .qcm-true-line-value { color: #ff5e00; }
+
+.qcm-demon-ceiling {
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: #ef5350;
+    background: rgba(244, 67, 54, 0.08);
+    border: 1px solid rgba(244, 67, 54, 0.25);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    font-weight: 600;
 }
 
 .qcm-card-header {
@@ -5247,6 +5275,7 @@ QUANTUM_CARD_MATRIX_CSS = """
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    margin-bottom: 10px;
 }
 .qcm-metric {
     flex: 1;
@@ -5272,10 +5301,131 @@ QUANTUM_CARD_MATRIX_CSS = """
     margin-top: 2px;
 }
 
+/* ── Distribution Percentile Row ─────────────────────────── */
+.qcm-dist-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+.qcm-dist-cell {
+    flex: 1;
+    text-align: center;
+    padding: 5px 2px;
+    background: rgba(15, 23, 42, 0.60);
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.qcm-dist-val {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #c0d0e8;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+.qcm-dist-lbl {
+    font-size: 0.56rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 1px;
+}
+.qcm-dist-median .qcm-dist-val { color: #00f0ff; }
+.qcm-dist-proj .qcm-dist-val { color: #ff5e00; }
+
+/* ── Forces Columns ──────────────────────────────────────── */
+.qcm-forces {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.qcm-forces-col {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 40px;
+}
+.qcm-forces-over {
+    background: rgba(0, 240, 255, 0.04);
+    border: 1px solid rgba(0, 240, 255, 0.12);
+}
+.qcm-forces-under {
+    background: rgba(255, 94, 0, 0.04);
+    border: 1px solid rgba(255, 94, 0, 0.12);
+}
+.qcm-forces-label {
+    font-weight: 700;
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+    color: #94A3B8;
+}
+.qcm-forces-over .qcm-forces-label { color: #00f0ff; }
+.qcm-forces-under .qcm-forces-label { color: #ff5e00; }
+
+.qcm-force-item {
+    color: #c0d0e8;
+    margin-bottom: 2px;
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+.qcm-force-none {
+    color: #475569;
+    font-size: 0.68rem;
+    font-style: italic;
+}
+
+/* ── Score Breakdown Bars ────────────────────────────────── */
+.qcm-breakdown {
+    margin-top: 2px;
+}
+.qcm-breakdown-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-breakdown-label {
+    font-size: 0.62rem;
+    color: #94A3B8;
+    width: 65px;
+    flex-shrink: 0;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.qcm-breakdown-score {
+    font-size: 0.62rem;
+    color: #ff5e00;
+    font-weight: 600;
+    width: 24px;
+    flex-shrink: 0;
+    text-align: right;
+}
+.qcm-breakdown-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(26, 32, 53, 0.80);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.qcm-breakdown-fill {
+    height: 4px;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
 /* Responsive stacking */
 @media (max-width: 640px) {
     .qcm-grid {
         grid-template-columns: 1fr;
+    }
+    .qcm-forces {
+        flex-direction: column;
     }
 }
 """
