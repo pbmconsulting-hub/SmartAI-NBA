@@ -511,12 +511,58 @@ button[kind="primary"]:hover {
     background: rgba(7,10,19,0.90) !important;
     border-color: rgba(0,240,255,0.08) !important;
 }
-/* Row hover glow — subtle neon-cyan bottom border guides the eye */
+/* Row hover glow — neon-cyan highlight */
 [data-testid="stDataFrame"] tr:hover td {
     border-bottom-color: rgba(0,240,255,0.30) !important;
-    background: rgba(0,240,255,0.03) !important;
+    background: rgba(0,240,255,0.06) !important;
 }
+/* Strip native table borders */
+[data-testid="stDataFrame"] table { border-collapse: collapse !important; }
+[data-testid="stDataFrame"] th,
+[data-testid="stDataFrame"] td { border: none !important; }
 .stDataFrame, .stTable { background: rgba(15,23,42,0.85) !important; color: #e0eeff !important; }
+
+/* ─── Tier Badges ─────────────────────────────────────────── */
+.tier-platinum {
+    background: linear-gradient(135deg, rgba(0,240,255,0.12), rgba(0,255,157,0.08));
+    border: 1px solid rgba(0,240,255,0.35);
+    color: #00f0ff;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: pulse-platinum 2.5s ease-in-out infinite;
+}
+.tier-gold {
+    background: linear-gradient(135deg, rgba(255,94,0,0.12), rgba(255,215,0,0.08));
+    border: 1px solid rgba(255,94,0,0.35);
+    color: #ff5e00;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: pulse-gold 2.5s ease-in-out infinite;
+}
+.tier-silver {
+    background: linear-gradient(135deg, rgba(148,163,184,0.12), rgba(200,216,240,0.08));
+    border: 1px solid rgba(148,163,184,0.25);
+    color: #94A3B8;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+/* ─── State-aware fade-in-up — plays once on initial load ─── */
+.qds-fade-in {
+    animation: ssFadeInUp 0.5s ease both;
+    animation-fill-mode: both;
+}
 
 /* ─── Analysis Card (smartai-card) ───────────────────────── */
 .smartai-card {

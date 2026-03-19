@@ -114,6 +114,7 @@ from styles.theme import (
 )
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
+from data.platform_fetcher import smart_filter_props as _smart_filter_props
 
 # ── Section logo paths ────────────────────────────────────────────────────────
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
@@ -462,23 +463,51 @@ _STAT_TYPE_OPTIONS = [
     "Points", "Rebounds", "Assists", "Threes",
     "Steals", "Blocks", "Turnovers",
     "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
+    "Blk+Stl", "Fantasy Points",
 ]
 _STAT_LABEL_TO_KEY = {
-    "Points": "points", "Rebounds": "rebounds", "Assists": "assists",
-    "Threes": "threes", "Steals": "steals", "Blocks": "blocks",
-    "Turnovers": "turnovers", "Pts+Reb+Ast": "points_rebounds_assists",
-    "Pts+Reb": "points_rebounds", "Pts+Ast": "points_assists",
+    "Points": "points",
+    "Rebounds": "rebounds",
+    "Assists": "assists",
+    "Threes": "threes",
+    "Steals": "steals",
+    "Blocks": "blocks",
+    "Turnovers": "turnovers",
+    "Pts+Reb+Ast": "points_rebounds_assists",
+    "Pts+Reb": "points_rebounds",
+    "Pts+Ast": "points_assists",
     "Reb+Ast": "rebounds_assists",
+    "Blk+Stl": "blocks_steals",
+    "Fantasy Points": "fantasy_points",
 }
 _DEFAULT_SELECTED_STATS = [
-    "Points", "Rebounds", "Assists", "Threes",
-    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
+    "Points", "Pts+Reb+Ast", "Rebounds", "Threes",
+    "Assists", "Reb+Ast", "Pts+Ast", "Blocks",
+    "Steals", "Blk+Stl", "Fantasy Points",
 ]
 
 
 def _labels_to_stat_keys(labels):
     """Convert user-facing stat labels to internal stat-type keys."""
     return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
+
+
+# Maximum props passed to the QME 5.6 simulation engine
+_QME_MAX_PROPS = 500
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_smart_filter(props_tuple, stat_types_tuple):
+    """Cache-friendly wrapper for smart_filter_props."""
+    props_list = list(props_tuple)
+    stat_types_set = set(stat_types_tuple) if stat_types_tuple else None
+    filtered, summary = _smart_filter_props(
+        all_props=props_list,
+        todays_games=None,   # Already filtered by session
+        injury_map=None,     # Already filtered upstream
+        stat_types=stat_types_set,
+    )
+    return filtered, summary
 
 
 # ── Initialize funnel session-state defaults (once) ──────────────
@@ -489,7 +518,7 @@ if "funnel_max_per_player" not in st.session_state:
 if "funnel_absolute_max" not in st.session_state:
     st.session_state["funnel_absolute_max"] = 150
 
-with st.expander("🎯 Pre-Analysis Filters", expanded=True):
+with st.expander("🎯 Market Filters", expanded=True):
     st.markdown(
         '<p style="color:#a0b4d0;font-size:0.85rem;margin-bottom:12px;">'
         'Narrow the prop pool before running analysis to improve speed and reduce noise.</p>',
@@ -525,29 +554,19 @@ with st.expander("🎯 Pre-Analysis Filters", expanded=True):
             help="Hard cap on the total number of props sent to the engine.",
         )
 
-    # ── Dynamic feedback: estimate surviving prop count ───────────
+    # ── 500-Prop Cached Funnel ───────────────────────────────────
     _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
-    _funnel_preview = [
-        p for p in current_props
-        if str(p.get("stat_type", "")).lower().strip() in _funnel_stat_keys
-    ]
-    # Apply per-player cap preview
-    _preview_counts: dict[str, int] = {}
-    _funnel_preview_capped: list[dict] = []
-    for _fp in _funnel_preview:
-        _pk = str(_fp.get("player_name", "")).lower().strip()
-        if _preview_counts.get(_pk, 0) < _max_per_player:
-            _funnel_preview_capped.append(_fp)
-            _preview_counts[_pk] = _preview_counts.get(_pk, 0) + 1
-    _funnel_surviving = min(len(_funnel_preview_capped), _absolute_max)
-    _funnel_original = len(current_props)
-    _funnel_delta = _funnel_surviving - _funnel_original if _funnel_original > 0 else 0
+    _filtered_props, _funnel_summary = _cached_smart_filter(
+        tuple(current_props),
+        tuple(sorted(_funnel_stat_keys)),
+    )
+    final_props = _filtered_props[:_QME_MAX_PROPS]
 
     st.metric(
-        label="Props Surviving Filter",
-        value=f"{_funnel_surviving:,} / {_funnel_original:,}",
-        delta=f"{_funnel_delta:,} filtered" if _funnel_delta < 0 else "No reduction",
-        delta_color="normal" if _funnel_delta >= 0 else "inverse",
+        label=f"⚡ PROPS LOCKED FOR QME 5.6 SIMULATION (max {_QME_MAX_PROPS})",
+        value=f"{len(final_props):,} / {_QME_MAX_PROPS:,}",
+        delta=f"{len(final_props) - len(current_props):,} filtered" if len(current_props) > len(final_props) else "No reduction",
+        delta_color="normal" if len(final_props) >= len(current_props) else "inverse",
     )
 
 # ============================================================
@@ -565,7 +584,7 @@ with run_col:
         "🚀 Run Analysis",
         type="primary",
         width="stretch",
-        disabled=(len(current_props) == 0),
+        disabled=(len(final_props) == 0),
         help="Analyze all loaded props with Quantum Matrix Engine 5.6",
     )
 
@@ -616,21 +635,21 @@ if run_analysis:
 
     if playing_teams_expanded:
         props_to_analyze = [
-            p for p in current_props
+            p for p in final_props
             if (
                 not playing_teams_expanded  # if no games loaded, include all
                 or p.get("team", "").upper().strip() in playing_teams_expanded
                 or not p.get("team", "").strip()  # include props with no team set
             )
         ]
-        skipped_count = len(current_props) - len(props_to_analyze)
+        skipped_count = len(final_props) - len(props_to_analyze)
         if skipped_count > 0:
             st.info(
                 f"ℹ️ Skipping **{skipped_count}** prop(s) for teams not playing tonight. "
                 f"Analyzing **{len(props_to_analyze)}** prop(s) for tonight's {len(todays_games)} game(s)."
             )
     else:
-        props_to_analyze = current_props  # Fallback: no games loaded
+        props_to_analyze = list(final_props)  # Fallback: no games loaded
 
     # ── Also skip confirmed Out/IR/Doubtful players via injury map ─────
     # If injury_map_pre is empty (failed to load), do NOT filter — just proceed.
@@ -698,16 +717,15 @@ if run_analysis:
         st.caption(f"📊 Analyzing: {_plat_summary}")
 
     # ── Pre-Analysis Funnel: stat types + per-player cap + absolute max ──
-    # Apply the user's funnel settings from the Pre-Analysis Filters expander
+    # Apply the user's funnel settings from the Market Filters expander
     # via smart_filter_props() in data.platform_fetcher.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
     _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
     _funnel_max_pp = st.session_state.get("funnel_max_per_player", 3)
     _funnel_abs_max = st.session_state.get("funnel_absolute_max", 150)
 
-    from data.platform_fetcher import smart_filter_props as _smart_filter
     _before_funnel = len(props_to_analyze)
-    props_to_analyze, _funnel_summary = _smart_filter(
+    props_to_analyze, _funnel_summary = _smart_filter_props(
         all_props=props_to_analyze,
         players_data=players_data,
         todays_games=todays_games,

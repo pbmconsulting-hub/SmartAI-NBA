@@ -46,12 +46,25 @@ def render_global_settings():
             on_change=_sync_edge_threshold,
         )
 
+        # ── Entry Fee ─────────────────────────────────────────────
+        st.number_input(
+            "Entry Fee ($)",
+            min_value=1.0,
+            max_value=1000.0,
+            step=1.0,
+            value=float(st.session_state.get("entry_fee", 10.0)),
+            key="entry_fee_widget",
+            help="Default dollar amount per entry for EV calculations.",
+            on_change=_sync_entry_fee,
+        )
+
         st.caption("Changes apply on next analysis run.")
 
 
 # ── on_change callbacks ──────────────────────────────────────────
 # These propagate widget values into the canonical session-state keys
-# that the rest of the app reads (simulation_depth, minimum_edge_threshold).
+# that the rest of the app reads (simulation_depth, minimum_edge_threshold,
+# entry_fee).
 
 def _sync_sim_depth():
     st.session_state["simulation_depth"] = st.session_state["sim_depth_widget"]
@@ -59,3 +72,7 @@ def _sync_sim_depth():
 
 def _sync_edge_threshold():
     st.session_state["minimum_edge_threshold"] = st.session_state["edge_threshold_widget"]
+
+
+def _sync_entry_fee():
+    st.session_state["entry_fee"] = st.session_state["entry_fee_widget"]
