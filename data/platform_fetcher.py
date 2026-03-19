@@ -1387,7 +1387,7 @@ def smart_filter_props(
          player+stat combination (or a single representative if averaging).
          Tags the surviving prop with all platforms that offer it.
       4. Filter to selected stat types (defaults to core stats).
-      5. Cap props per player at max_props_per_player.
+      5. Cap props per player at max_props_per_player (if set).
 
     Args:
         all_props (list[dict]): Full prop list from fetch_all_platform_props().
@@ -1398,8 +1398,9 @@ def smart_filter_props(
         injury_map (dict, optional): Player-name → injury-status mapping.
             Keys are lowercase player names; values are status strings
             (e.g., "Out", "Injured Reserve", "Questionable").
-        max_props_per_player (int): Maximum stat types to keep per player.
-            Default is 5. Range 1–15.
+        max_props_per_player (int or None): Maximum stat types to keep per
+            player.  Default is 5. Range 1–15.  Pass None to skip the
+            per-player cap entirely.
         stat_types (set or list, optional): Stat types to include.
             Defaults to _DEFAULT_STAT_TYPES. Pass None to use defaults.
         deduplicate_cross_platform (bool): If True (default), collapse
@@ -1554,27 +1555,31 @@ def smart_filter_props(
         "blocks": 9, "turnovers": 10,
     }
 
-    # Clamp max_props_per_player to a reasonable range (1–100).
-    # The docstring documents 1-15 as typical, but we allow up to 100
-    # for power users who want to disable the cap without changing code.
-    _MAX = min(100, max(1, int(max_props_per_player)))
-    player_counts: dict = {}
-    capped: list = []
+    if max_props_per_player is None:
+        # No per-player cap — pass all stat-filtered props through
+        capped = stat_filtered
+    else:
+        # Clamp max_props_per_player to a reasonable range (1–100).
+        # The docstring documents 1-15 as typical, but we allow up to 100
+        # for power users who want to disable the cap without changing code.
+        _MAX = min(100, max(1, int(max_props_per_player)))
+        player_counts: dict = {}
+        capped: list = []
 
-    # Sort to ensure priority stat types come first for each player
-    stat_filtered_sorted = sorted(
-        stat_filtered,
-        key=lambda p: _STAT_PRIORITY.get(
-            str(p.get("stat_type", "")).lower().strip(), 99
-        ),
-    )
+        # Sort to ensure priority stat types come first for each player
+        stat_filtered_sorted = sorted(
+            stat_filtered,
+            key=lambda p: _STAT_PRIORITY.get(
+                str(p.get("stat_type", "")).lower().strip(), 99
+            ),
+        )
 
-    for prop in stat_filtered_sorted:
-        player_key = str(prop.get("player_name", "")).lower().strip()
-        count = player_counts.get(player_key, 0)
-        if count < _MAX:
-            capped.append(prop)
-            player_counts[player_key] = count + 1
+        for prop in stat_filtered_sorted:
+            player_key = str(prop.get("player_name", "")).lower().strip()
+            count = player_counts.get(player_key, 0)
+            if count < _MAX:
+                capped.append(prop)
+                player_counts[player_key] = count + 1
 
     summary["after_per_player_cap"] = len(capped)
     summary["final_count"] = len(capped)

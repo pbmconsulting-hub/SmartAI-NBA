@@ -463,7 +463,7 @@ _STAT_TYPE_OPTIONS = [
     "Points", "Rebounds", "Assists", "Threes",
     "Steals", "Blocks", "Turnovers",
     "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
-    "Blk+Stl", "Fantasy Points",
+    "Fantasy Points",
 ]
 _STAT_LABEL_TO_KEY = {
     "Points": "points",
@@ -477,13 +477,13 @@ _STAT_LABEL_TO_KEY = {
     "Pts+Reb": "points_rebounds",
     "Pts+Ast": "points_assists",
     "Reb+Ast": "rebounds_assists",
-    "Blk+Stl": "blocks_steals",
     "Fantasy Points": "fantasy_points",
 }
 _DEFAULT_SELECTED_STATS = [
-    "Points", "Pts+Reb+Ast", "Rebounds", "Threes",
-    "Assists", "Reb+Ast", "Pts+Ast", "Blocks",
-    "Steals", "Blk+Stl", "Fantasy Points",
+    "Points", "Rebounds", "Assists", "Threes",
+    "Steals", "Blocks", "Turnovers",
+    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
+    "Fantasy Points",
 ]
 
 
@@ -505,6 +505,7 @@ def _cached_smart_filter(props_tuple, stat_types_tuple):
         all_props=props_list,
         todays_games=None,   # Already filtered by session
         injury_map=None,     # Already filtered upstream
+        max_props_per_player=None,  # No per-player cap
         stat_types=stat_types_set,
     )
     return filtered, summary
@@ -513,10 +514,6 @@ def _cached_smart_filter(props_tuple, stat_types_tuple):
 # ── Initialize funnel session-state defaults (once) ──────────────
 if "funnel_stat_types" not in st.session_state:
     st.session_state["funnel_stat_types"] = list(_DEFAULT_SELECTED_STATS)
-if "funnel_max_per_player" not in st.session_state:
-    st.session_state["funnel_max_per_player"] = 3
-if "funnel_absolute_max" not in st.session_state:
-    st.session_state["funnel_absolute_max"] = 150
 
 with st.expander("🎯 Market Filters", expanded=True):
     st.markdown(
@@ -524,35 +521,13 @@ with st.expander("🎯 Market Filters", expanded=True):
         'Narrow the prop pool before running analysis to improve speed and reduce noise.</p>',
         unsafe_allow_html=True,
     )
-    _funnel_c1, _funnel_c2, _funnel_c3 = st.columns(3)
 
-    with _funnel_c1:
-        _selected_stat_labels = st.multiselect(
-            "Stat Types",
-            options=_STAT_TYPE_OPTIONS,
-            key="funnel_stat_types",
-            help="Only props for these stat categories will be analyzed.",
-        )
-
-    with _funnel_c2:
-        _max_per_player = st.number_input(
-            "Max Props per Player",
-            min_value=1,
-            max_value=15,
-            step=1,
-            key="funnel_max_per_player",
-            help="Prevent the engine from analyzing many alternate lines for a single player.",
-        )
-
-    with _funnel_c3:
-        _absolute_max = st.number_input(
-            "Absolute Max Props",
-            min_value=10,
-            max_value=5000,
-            step=10,
-            key="funnel_absolute_max",
-            help="Hard cap on the total number of props sent to the engine.",
-        )
+    _selected_stat_labels = st.multiselect(
+        "Stat Types",
+        options=_STAT_TYPE_OPTIONS,
+        key="funnel_stat_types",
+        help="Only props for these stat categories will be analyzed.",
+    )
 
     # ── 500-Prop Cached Funnel ───────────────────────────────────
     _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
@@ -716,13 +691,11 @@ if run_analysis:
         )
         st.caption(f"📊 Analyzing: {_plat_summary}")
 
-    # ── Pre-Analysis Funnel: stat types + per-player cap + absolute max ──
-    # Apply the user's funnel settings from the Market Filters expander
+    # ── Pre-Analysis Funnel: stat types + hardcoded 500-prop cap ──
+    # Apply the user's stat-type selection from the Market Filters expander
     # via smart_filter_props() in data.platform_fetcher.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
     _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
-    _funnel_max_pp = st.session_state.get("funnel_max_per_player", 3)
-    _funnel_abs_max = st.session_state.get("funnel_absolute_max", 150)
 
     _before_funnel = len(props_to_analyze)
     props_to_analyze, _funnel_summary = _smart_filter_props(
@@ -730,19 +703,18 @@ if run_analysis:
         players_data=players_data,
         todays_games=todays_games,
         injury_map=st.session_state.get("injury_status_map", {}),
-        max_props_per_player=_funnel_max_pp,
+        max_props_per_player=None,  # No per-player cap
         stat_types=_funnel_stat_keys_run,
         deduplicate_cross_platform=True,
     )
-    # Enforce absolute max cap
-    if len(props_to_analyze) > _funnel_abs_max:
-        props_to_analyze = props_to_analyze[:_funnel_abs_max]
+    # Enforce hardcoded 500-prop cap
+    if len(props_to_analyze) > _QME_MAX_PROPS:
+        props_to_analyze = props_to_analyze[:_QME_MAX_PROPS]
     _after_funnel = len(props_to_analyze)
     if _before_funnel > _after_funnel:
         st.info(
             f"🎯 **Pre-Analysis Funnel**: Reduced **{_before_funnel}** → **{_after_funnel}** props "
-            f"(stat types: {len(_funnel_stat_keys_run)}, max/player: {_funnel_max_pp}, "
-            f"abs max: {_funnel_abs_max})."
+            f"(stat types: {len(_funnel_stat_keys_run)}, max: {_QME_MAX_PROPS})."
         )
 
     total_props_count    = len(props_to_analyze)
