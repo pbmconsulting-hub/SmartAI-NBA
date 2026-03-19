@@ -58,6 +58,36 @@ def render_global_settings():
             on_change=_sync_entry_fee,
         )
 
+        st.divider()
+
+        # ── Total Bankroll ────────────────────────────────────────
+        st.number_input(
+            "Total Bankroll ($)",
+            min_value=10.0,
+            max_value=1_000_000.0,
+            step=50.0,
+            value=float(st.session_state.get("total_bankroll", 1000.0)),
+            key="total_bankroll_widget",
+            help="Your total bankroll in dollars. Used for Kelly Criterion bet sizing.",
+            on_change=_sync_total_bankroll,
+        )
+
+        # ── Kelly Multiplier ──────────────────────────────────────
+        st.slider(
+            "Kelly Multiplier",
+            min_value=0.1,
+            max_value=1.0,
+            step=0.05,
+            value=float(st.session_state.get("kelly_multiplier", 0.25)),
+            key="kelly_multiplier_widget",
+            help=(
+                "Fraction of the full Kelly bet to use. "
+                "0.25 = Quarter Kelly (conservative, recommended). "
+                "1.0 = Full Kelly (aggressive, higher variance)."
+            ),
+            on_change=_sync_kelly_multiplier,
+        )
+
         st.caption("Changes apply on next analysis run.")
 
 
@@ -76,3 +106,11 @@ def _sync_edge_threshold():
 
 def _sync_entry_fee():
     st.session_state["entry_fee"] = st.session_state["entry_fee_widget"]
+
+
+def _sync_total_bankroll():
+    st.session_state["total_bankroll"] = st.session_state["total_bankroll_widget"]
+
+
+def _sync_kelly_multiplier():
+    st.session_state["kelly_multiplier"] = st.session_state["kelly_multiplier_widget"]
