@@ -1673,6 +1673,28 @@ def categorize_alt_lines(standard_line, available_lines):
     }
 
 
+def format_goblin_demon_prediction(bet_type, line):
+    """
+    Strict prediction string formatter for Goblin/Demon bets.
+
+    Goblin (lowered line) → "I predict the stat will do at LEAST {line}"
+    Demon  (raised line)  → "I predict the stat will do at MOST {line}"
+    Other                 → "" (empty string)
+
+    Args:
+        bet_type (str): One of 'goblin', 'demon', '50_50', 'normal'.
+        line (float): The prop line value.
+
+    Returns:
+        str: The prediction string, or empty if not a Goblin/Demon bet.
+    """
+    if bet_type == "goblin":
+        return f"I predict the stat will do at LEAST {line}"
+    elif bet_type == "demon":
+        return f"I predict the stat will do at MOST {line}"
+    return ""
+
+
 # ============================================================
 # END SECTION: Goblin / Demon Bet Classification
 # ============================================================
