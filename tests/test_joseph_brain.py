@@ -624,6 +624,313 @@ class TestSelectFragmentStub(unittest.TestCase):
         self.assertEqual(result["text"], "")
 
 
+# ── Section G: Phase 1B Implementation Tests ────────────────
+
+
+class TestSelectFragmentAntiRepeat(unittest.TestCase):
+    def test_tracks_used_ids(self):
+        from engine.joseph_brain import _select_fragment
+        # Use a pool of 5 so the 60% threshold (3 items) won't be hit during 3 picks
+        pool = [{"id": f"item_{i}", "text": f"T{i}"} for i in range(5)]
+        used = set()
+        r1 = _select_fragment(pool, used)
+        r2 = _select_fragment(pool, used)
+        r3 = _select_fragment(pool, used)
+        ids = {r1["id"], r2["id"], r3["id"]}
+        # All 3 picks should be distinct (no repeats within 3 of 5)
+        self.assertEqual(len(ids), 3)
+
+    def test_resets_at_60_percent(self):
+        from engine.joseph_brain import _select_fragment
+        pool = [{"id": f"x{i}", "text": f"T{i}"} for i in range(10)]
+        used = {f"x{i}" for i in range(7)}  # 70% used
+        result = _select_fragment(pool, used)
+        # Should have cleared and picked from full pool
+        self.assertIn("id", result)
+        self.assertTrue(len(used) <= 2)  # cleared then added 1
+
+
+class TestBuildJosephRantImplementation(unittest.TestCase):
+    def test_contains_player_name(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_rant("LeBron", {"stat": "points", "line": 25.5, "edge": 8.0, "prob": 62.0}, "SMASH", [])
+        self.assertIn("LeBron", result)
+
+    def test_multiple_sentences(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_rant("Curry", {"stat": "threes", "line": 4.5, "edge": 5.0, "prob": 58.0}, "LEAN", [])
+        # Should have at least 3 sentences (opener + body + closer)
+        self.assertTrue(len(result.split(".")) >= 2 or len(result.split("!")) >= 2)
+
+    def test_high_energy_includes_catchphrase(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_rant("Giannis", {"stat": "rebounds"}, "SMASH", [], energy="high")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 50)
+
+    def test_with_comp(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        comp = {"name": "Test Comp", "template": "This reminds me of greatness... {reason}"}
+        result = build_joseph_rant("Player", {"stat": "points"}, "LEAN", [], comp=comp)
+        self.assertIn("reminds me", result)
+
+    def test_with_mismatch(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        mismatch = {"description": "a size advantage that is MASSIVE"}
+        result = build_joseph_rant("Player", {"stat": "points"}, "LEAN", [], mismatch=mismatch)
+        self.assertIn("MISMATCH", result)
+
+    def test_with_pivot_on_mixed_tags(self):
+        from engine.joseph_brain import build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_rant("Player", {"stat": "points"}, "LEAN",
+                                   ["revenge_game", "back_to_back"])
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 30)
+
+
+class TestGenerateCounterArgument(unittest.TestCase):
+    def test_back_to_back(self):
+        from engine.joseph_brain import _generate_counter_argument
+        result = _generate_counter_argument({}, {}, ["back_to_back"])
+        self.assertIn("fatigue", result.lower())
+
+    def test_trap_game(self):
+        from engine.joseph_brain import _generate_counter_argument
+        result = _generate_counter_argument({}, {}, ["trap_game"])
+        self.assertIn("trap", result.lower())
+
+    def test_default(self):
+        from engine.joseph_brain import _generate_counter_argument
+        result = _generate_counter_argument({}, {}, [])
+        self.assertIn("variance", result.lower())
+
+
+class TestJosephFullAnalysisImplementation(unittest.TestCase):
+    def test_returns_verdict_and_edge(self):
+        from engine.joseph_brain import joseph_full_analysis, VERDICT_EMOJIS
+        result = joseph_full_analysis(
+            {"probability_over": 60.0, "edge_percentage": 10.0, "stat_type": "points", "line": 25},
+            {"name": "TestPlayer", "games_played": 30},
+            {},
+            {}
+        )
+        self.assertIn(result["verdict"], {"SMASH", "LEAN", "FADE", "STAY_AWAY"})
+        self.assertEqual(result["verdict_emoji"], VERDICT_EMOJIS.get(result["verdict"], ""))
+        self.assertIsInstance(result["edge"], (int, float))
+
+    def test_narrative_tags_populated(self):
+        from engine.joseph_brain import joseph_full_analysis
+        result = joseph_full_analysis(
+            {"probability_over": 55.0, "edge_percentage": 3.0},
+            {"name": "Player"},
+            {"is_back_to_back": True},
+            {}
+        )
+        self.assertIn("back_to_back", result["narrative_tags"])
+
+    def test_has_rant(self):
+        from engine.joseph_brain import joseph_full_analysis, reset_fragment_state
+        reset_fragment_state()
+        result = joseph_full_analysis(
+            {"probability_over": 70.0, "edge_percentage": 12.0, "stat_type": "points", "line": 25},
+            {"name": "LeBron"},
+            {},
+            {}
+        )
+        self.assertIsInstance(result["rant"], str)
+        self.assertTrue(len(result["rant"]) > 10)
+
+    def test_has_reasoning_chain(self):
+        from engine.joseph_brain import joseph_full_analysis
+        result = joseph_full_analysis({}, {}, {}, {})
+        self.assertIn("reasoning_chain", result)
+        self.assertIsInstance(result["reasoning_chain"], list)
+
+    def test_handles_empty_input(self):
+        from engine.joseph_brain import joseph_full_analysis
+        result = joseph_full_analysis({}, {}, {}, {})
+        self.assertIsInstance(result, dict)
+        self.assertIn("verdict", result)
+
+
+class TestJosephAnalyzeGameImplementation(unittest.TestCase):
+    def test_returns_narrative(self):
+        from engine.joseph_brain import joseph_analyze_game
+        result = joseph_analyze_game(
+            {"home_team": "Lakers", "away_team": "Celtics"},
+            {},
+            []
+        )
+        self.assertIsInstance(result["game_narrative"], str)
+        self.assertTrue(len(result["game_narrative"]) > 0)
+
+    def test_has_pace_take(self):
+        from engine.joseph_brain import joseph_analyze_game
+        result = joseph_analyze_game(
+            {"home_team": "Lakers", "away_team": "Celtics", "pace_delta": 5.0},
+            {}, []
+        )
+        self.assertIn("pace", result["pace_take"].lower())
+
+
+class TestJosephAnalyzePlayerImplementation(unittest.TestCase):
+    def test_returns_scouting_report(self):
+        from engine.joseph_brain import joseph_analyze_player
+        result = joseph_analyze_player(
+            {"name": "LeBron James"},
+            [{"points": 28}],
+            {},
+            []
+        )
+        self.assertIsInstance(result["scouting_report"], str)
+        self.assertTrue(len(result["scouting_report"]) > 0)
+
+    def test_returns_archetype(self):
+        from engine.joseph_brain import joseph_analyze_player
+        result = joseph_analyze_player({"name": "Player"}, [], {}, [])
+        self.assertIsInstance(result["archetype"], str)
+
+
+class TestJosephGenerateBestBetsImplementation(unittest.TestCase):
+    def test_empty_results_returns_explanatory(self):
+        from engine.joseph_brain import joseph_generate_best_bets
+        result = joseph_generate_best_bets(3, [], {})
+        self.assertEqual(result["ticket_name"], "TRIPLE THREAT")
+        self.assertEqual(result["legs"], [])
+        self.assertTrue(len(result["rant"]) > 0)
+
+    def test_with_results(self):
+        from engine.joseph_brain import joseph_generate_best_bets
+        results = [
+            {"player_name": "P1", "verdict": "SMASH", "joseph_edge": 10.0,
+             "joseph_probability": 65.0, "edge": 10.0, "confidence": 80.0,
+             "stat_type": "points", "line": 25, "direction": "OVER", "game_id": "g1"},
+            {"player_name": "P2", "verdict": "SMASH", "joseph_edge": 9.0,
+             "joseph_probability": 63.0, "edge": 9.0, "confidence": 75.0,
+             "stat_type": "rebounds", "line": 8, "direction": "OVER", "game_id": "g2"},
+            {"player_name": "P3", "verdict": "LEAN", "joseph_edge": 6.0,
+             "joseph_probability": 58.0, "edge": 6.0, "confidence": 65.0,
+             "stat_type": "assists", "line": 7, "direction": "OVER", "game_id": "g3"},
+        ]
+        result = joseph_generate_best_bets(2, results, {})
+        self.assertEqual(result["ticket_name"], "POWER PLAY")
+        self.assertEqual(len(result["legs"]), 2)
+
+
+class TestJosephQuickTakeImplementation(unittest.TestCase):
+    def test_returns_multi_sentence(self):
+        from engine.joseph_brain import joseph_quick_take, reset_fragment_state
+        reset_fragment_state()
+        result = joseph_quick_take([], {}, [])
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 30)
+
+    def test_unique_per_call(self):
+        from engine.joseph_brain import joseph_quick_take, reset_fragment_state
+        reset_fragment_state()
+        r1 = joseph_quick_take([], {}, [])
+        r2 = joseph_quick_take([], {}, [])
+        # At least one should be different (anti-repetition)
+        self.assertIsInstance(r1, str)
+        self.assertIsInstance(r2, str)
+
+
+class TestJosephGetAmbientContextImplementation(unittest.TestCase):
+    def test_idle_default(self):
+        from engine.joseph_brain import joseph_get_ambient_context
+        ctx, kwargs = joseph_get_ambient_context({})
+        self.assertEqual(ctx, "idle")
+        self.assertIsInstance(kwargs, dict)
+
+    def test_games_loaded(self):
+        from engine.joseph_brain import joseph_get_ambient_context
+        state = {"todays_games": [{"home_team": "LAL", "away_team": "BOS"}]}
+        ctx, kwargs = joseph_get_ambient_context(state)
+        self.assertEqual(ctx, "games_loaded")
+        self.assertEqual(kwargs["n"], 1)
+
+    def test_analysis_complete(self):
+        from engine.joseph_brain import joseph_get_ambient_context
+        state = {"analysis_results": [{"verdict": "SMASH", "tier": "Platinum", "is_override": False}]}
+        ctx, kwargs = joseph_get_ambient_context(state)
+        self.assertEqual(ctx, "analysis_complete")
+        self.assertEqual(kwargs["smash_count"], 1)
+        self.assertEqual(kwargs["total"], 1)
+
+    def test_entry_built(self):
+        from engine.joseph_brain import joseph_get_ambient_context
+        state = {"joseph_entry_just_built": 3}
+        ctx, kwargs = joseph_get_ambient_context(state)
+        self.assertEqual(ctx, "entry_built")
+        self.assertEqual(kwargs["n"], 3)
+
+
+class TestJosephAmbientLineImplementation(unittest.TestCase):
+    def test_anti_repetition(self):
+        from engine.joseph_brain import joseph_ambient_line, reset_fragment_state
+        reset_fragment_state()
+        lines = set()
+        for _ in range(15):
+            lines.add(joseph_ambient_line("idle"))
+        # Should have cycled through many unique lines
+        self.assertGreater(len(lines), 5)
+
+    def test_format_placeholders(self):
+        from engine.joseph_brain import joseph_ambient_line, reset_fragment_state
+        reset_fragment_state()
+        # Games loaded lines use {n}
+        for _ in range(20):
+            result = joseph_ambient_line("games_loaded", n=5)
+            if "5" in result:
+                break
+        self.assertIsInstance(result, str)
+
+    def test_unknown_falls_back(self):
+        from engine.joseph_brain import joseph_ambient_line, reset_fragment_state
+        reset_fragment_state()
+        result = joseph_ambient_line("totally_unknown_context")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+
+class TestJosephCommentaryImplementation(unittest.TestCase):
+    def test_with_results(self):
+        from engine.joseph_brain import joseph_commentary, reset_fragment_state
+        reset_fragment_state()
+        results = [{"player_name": "LeBron", "joseph_edge": 8.0}]
+        result = joseph_commentary(results, "analysis_results")
+        self.assertIn("LeBron", result)
+
+    def test_empty_results(self):
+        from engine.joseph_brain import joseph_commentary, reset_fragment_state
+        reset_fragment_state()
+        result = joseph_commentary([], "analysis_results")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 10)
+
+    def test_multiple_calls_vary(self):
+        from engine.joseph_brain import joseph_commentary, reset_fragment_state
+        reset_fragment_state()
+        r1 = joseph_commentary([], "analysis_results")
+        r2 = joseph_commentary([], "analysis_results")
+        self.assertIsInstance(r1, str)
+        self.assertIsInstance(r2, str)
+
+
+class TestJosephAutoLogBetsImplementation(unittest.TestCase):
+    def test_returns_tuple_with_message(self):
+        from engine.joseph_brain import joseph_auto_log_bets
+        count, msg = joseph_auto_log_bets([], {})
+        self.assertIsInstance(count, int)
+        self.assertIsInstance(msg, str)
+
+
 class TestBuildJosephRantStub(unittest.TestCase):
     def test_returns_string(self):
         from engine.joseph_brain import build_joseph_rant

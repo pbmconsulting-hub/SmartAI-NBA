@@ -1,16 +1,18 @@
 """
 engine/joseph_brain.py
-Joseph M. Smith Brain — Data Pools, Constants & Function Stubs (Layer 4, Parts A–F)
+Joseph M. Smith Brain — Data Pools, Constants & Function Implementations (Layer 4, Parts A–F)
 
 PURPOSE
 -------
 Joseph's reasoning brain — fragment pools for combinatorial rant building,
 body-template libraries keyed by verdict, ambient/commentary colour pools,
-and stub signatures for every public function that Phase 1B will implement.
+historical comp database, constants, and fully implemented functions for
+the 8-step reasoning loop, game/player analysis, best-bet generation,
+ambient context detection, and reactive commentary.
 
 Every data structure is FULLY populated.  No ``pass``, no ``...``, no ``# TODO``.
-The file is importable and every stub returns a type-correct default so
-downstream callers won't crash.
+Every function is FULLY implemented with real logic and graceful error handling.
+The file is importable and every function returns a type-correct result.
 """
 
 # ═══════════════════════════════════════════════════════════════
@@ -684,7 +686,7 @@ TICKET_NAMES = {
 
 
 # ═══════════════════════════════════════════════════════════════
-# FUNCTION STUBS  (Phase 1B will fill bodies)
+# IMPLEMENTED FUNCTIONS — Fragment pickers + verdict + rant + analysis stubs
 # ═══════════════════════════════════════════════════════════════
 
 def _pick_fragment(pool, pool_name):
@@ -984,7 +986,7 @@ def reset_fragment_state():
 
 
 # ═══════════════════════════════════════════════════════════════
-# F) NEW FUNCTION STUBS — Phase 1B will fill bodies
+# F) FUNCTION IMPLEMENTATIONS — Phase 1B
 # ═══════════════════════════════════════════════════════════════
 
 
@@ -1003,8 +1005,15 @@ def _select_fragment(pool: list, used_set: set) -> dict:
     dict
         The selected fragment dict with ``"id"`` and ``"text"`` keys.
     """
-    # IMPLEMENTATION: Phase 1B
-    return pool[0] if pool else {"id": "fallback", "text": ""}
+    if not pool:
+        return {"id": "fallback", "text": ""}
+    available = [f for f in pool if f["id"] not in used_set]
+    if not available or len(used_set) > 0.6 * len(pool):
+        used_set.clear()
+        available = pool.copy()
+    selected = random.choice(available)
+    used_set.add(selected["id"])
+    return selected
 
 
 def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: list,
@@ -1037,8 +1046,124 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
     str
         The assembled multi-sentence Joseph rant.
     """
-    # IMPLEMENTATION: Phase 1B
-    return f"Joseph M. Smith likes {player}. {verdict}!"
+    try:
+        used_set = _used_fragments.setdefault("rant", set())
+
+        # 1. Select opener
+        opener = _select_fragment(OPENER_POOL, used_set)
+        opener_text = opener.get("text", "")
+        if opener_text and not opener_text.rstrip().endswith("..."):
+            opener_text = opener_text.rstrip().rstrip(".") + "..."
+
+        # 2. Select body sentences based on energy
+        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 3}.get(energy, 2)
+        templates = BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
+        stat = prop.get("stat", prop.get("stat_type", ""))
+        line = prop.get("line", "")
+        edge = prop.get("edge", prop.get("edge_percentage", ""))
+        prob = prop.get("prob", prop.get("probability_over", ""))
+        body_sentences = []
+        used_indices = set()
+        for _ in range(min(body_count, len(templates))):
+            avail = [i for i in range(len(templates)) if i not in used_indices]
+            if not avail:
+                break
+            idx = random.choice(avail)
+            used_indices.add(idx)
+            try:
+                sentence = templates[idx].format(
+                    player=player, stat=stat, line=line, edge=edge, prob=prob
+                )
+            except (KeyError, IndexError):
+                sentence = templates[idx]
+            body_sentences.append(sentence)
+
+        # 3. Check for counter-point pivot (positive + negative tags present)
+        positive_tags = {"revenge_game", "contract_year", "nationally_televised",
+                         "rivalry", "playoff_implications", "pace_up"}
+        negative_tags = {"trap_game", "back_to_back", "altitude", "blowout_risk", "pace_down"}
+        has_positive = any(t in positive_tags for t in narrative_tags)
+        has_negative = any(t in negative_tags for t in narrative_tags)
+        pivot_text = ""
+        if has_positive and has_negative:
+            pivot = _select_fragment(PIVOT_POOL, used_set)
+            pivot_text = pivot.get("text", "")
+
+        # 4. Select closer
+        closer = _select_fragment(CLOSER_POOL, used_set)
+        closer_text = " \u2014 " + closer.get("text", "")
+
+        # 5. Catchphrases based on energy
+        catchphrases = []
+        if energy in ("high", "nuclear"):
+            cp = _select_fragment(CATCHPHRASE_POOL, used_set)
+            catchphrases.append(cp.get("text", ""))
+        if energy == "nuclear":
+            cp2 = _select_fragment(CATCHPHRASE_POOL, used_set)
+            catchphrases.append(cp2.get("text", ""))
+
+        # 6. Comp reference
+        comp_text = ""
+        if comp is not None:
+            try:
+                comp_text = comp["template"].format(
+                    comp_name=comp.get("name", ""),
+                    reason="the matchup profile is IDENTICAL"
+                )
+            except (KeyError, IndexError):
+                comp_text = ""
+
+        # 7. Mismatch sentence
+        mismatch_text = ""
+        if mismatch is not None:
+            desc = mismatch.get("description", "It is GLARING")
+            mismatch_text = f"And the MISMATCH? {desc}!"
+
+        # 8. Assemble
+        parts = [opener_text]
+        parts.extend(body_sentences)
+        if pivot_text:
+            parts.append(pivot_text)
+        if comp_text:
+            parts.append(comp_text)
+        if mismatch_text:
+            parts.append(mismatch_text)
+        parts.extend(catchphrases)
+        parts.append(closer_text)
+
+        return " ".join(p for p in parts if p)
+    except Exception:
+        return f"Joseph M. Smith likes {player}. {verdict}!"
+
+
+def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: list) -> str:
+    """Build a 1-sentence counter-argument for balance.
+
+    Parameters
+    ----------
+    player : dict
+        Player data dict.
+    prop_data : dict
+        Prop data with stat, line, edge, etc.
+    narrative_tags : list[str]
+        Active narrative tags.
+
+    Returns
+    -------
+    str
+        A single counter-argument sentence.
+    """
+    if "back_to_back" in narrative_tags:
+        return "The fatigue factor on a back-to-back CANNOT be ignored."
+    if "trap_game" in narrative_tags:
+        return "Motivation could be an issue in a trap game scenario."
+    if "blowout_risk" in narrative_tags:
+        return "If this game gets out of hand, minutes could be CUT."
+    if "altitude" in narrative_tags:
+        return "Playing at altitude in Denver is a REAL factor that affects performance."
+    if "pace_down" in narrative_tags:
+        return "A slower pace environment limits OPPORTUNITIES for production."
+    return "Standard variance means even good edges lose 35-40% of the time."
 
 
 def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
@@ -1067,19 +1192,253 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         ``is_override``, ``edge``, ``confidence``, ``rant``,
         ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``.
     """
-    # IMPLEMENTATION: Phase 1B
-    return {
-        "verdict": "LEAN",
-        "verdict_emoji": VERDICT_EMOJIS["LEAN"],
-        "is_override": False,
-        "edge": 0.0,
-        "confidence": 50.0,
-        "rant": "",
-        "dawg_factor": 0.0,
-        "narrative_tags": [],
-        "comp": None,
-        "grade": "C",
-    }
+    try:
+        # Step 1 — OBSERVE
+        qme_prob = _safe_float(analysis_result.get("probability_over", 50.0))
+        qme_edge = _safe_float(analysis_result.get("edge_percentage", 0.0))
+        confidence_score = _safe_float(analysis_result.get("confidence_score", 50.0))
+        tier = str(analysis_result.get("tier", "Bronze"))
+        stat_type = str(analysis_result.get("stat_type", ""))
+        line = analysis_result.get("line", 0)
+        direction = str(analysis_result.get("direction", "OVER"))
+
+        # Step 2 — FRAME
+        try:
+            narrative_tags = detect_narrative_tags(player, game, teams_data)
+        except Exception:
+            narrative_tags = []
+        if not narrative_tags:
+            narrative_tags = []
+        if game.get("is_back_to_back"):
+            if "back_to_back" not in narrative_tags:
+                narrative_tags.append("back_to_back")
+        if game.get("is_nationally_televised"):
+            if "nationally_televised" not in narrative_tags:
+                narrative_tags.append("nationally_televised")
+        pace_delta = _safe_float(game.get("pace_delta", 0.0))
+        if pace_delta > 2.0 and "pace_up" not in narrative_tags:
+            narrative_tags.append("pace_up")
+        elif pace_delta < -2.0 and "pace_down" not in narrative_tags:
+            narrative_tags.append("pace_down")
+
+        # Step 3 — RETRIEVE
+        try:
+            player_grade = joseph_grade_player(player, game, teams_data)
+        except Exception:
+            player_grade = {"grade": "C", "archetype": "Unknown", "score": 50.0,
+                            "gravity": 50.0, "switchability": 50.0}
+        archetype = player_grade.get("archetype", "Unknown")
+
+        # Find matching comp
+        comp = None
+        if JOSEPH_COMPS_DATABASE:
+            arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
+            stat_matches = [c for c in arch_matches if c.get("stat_context") == stat_type]
+            if stat_matches:
+                comp = random.choice(stat_matches)
+            elif arch_matches:
+                comp = random.choice(arch_matches)
+            else:
+                comp = random.choice(JOSEPH_COMPS_DATABASE)
+
+        # Step 4 — MODEL
+        try:
+            game_strategy = analyze_game_strategy(game, teams_data)
+        except Exception:
+            game_strategy = {"scheme": "unknown", "strategy": "unknown",
+                             "scheme_match": 0.0, "mismatch_tags": [],
+                             "regime_adjustment": 0.0}
+
+        dawg_adjustment = sum(DAWG_FACTOR_TABLE.get(tag, 0.0) for tag in narrative_tags)
+        dawg_adjustment = max(-5.0, min(5.0, dawg_adjustment))
+
+        mismatch_boost = 0.0
+        mismatch_alert = None
+        mismatch_grade = player_grade.get("mismatch_grade", "C")
+        if mismatch_grade in ("A+", "A"):
+            mismatch_boost = 1.5
+            mismatch_alert = f"{player.get('name', 'Player')} has a SIGNIFICANT mismatch advantage"
+        elif mismatch_grade == "B":
+            mismatch_boost = 0.5
+
+        regime_adj = _safe_float(game_strategy.get("regime_adjustment", 0.0))
+
+        games_played = _safe_float(player.get("games_played", 20))
+        sample_dampening = 0.0
+        if games_played < 10:
+            sample_dampening = -1.0 * (10 - games_played) / 10
+
+        joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening
+        joseph_prob = max(1.0, min(99.0, joseph_prob))
+
+        implied_line = _safe_float(analysis_result.get("implied_probability", 50.0))
+        joseph_edge = joseph_prob - implied_line
+
+        # Step 5 — ADJUST
+        edge_delta = abs(joseph_edge - qme_edge)
+        is_override = edge_delta > 3.0
+        override_direction = None
+        if is_override:
+            override_direction = "UPGRADE" if joseph_edge > qme_edge else "DOWNGRADE"
+
+        # Step 6 — CONCLUDE
+        if joseph_edge >= 8.0:
+            verdict = "SMASH"
+        elif joseph_edge >= 5.0:
+            verdict = "LEAN"
+        elif joseph_edge >= 2.0:
+            verdict = "FADE"
+        else:
+            verdict = "STAY_AWAY"
+        verdict_emoji = VERDICT_EMOJIS.get(verdict, "")
+
+        prop_data = {
+            "stat": stat_type,
+            "line": line,
+            "edge": round(joseph_edge, 1),
+            "prob": round(joseph_prob, 1),
+            "direction": direction,
+        }
+
+        counter_argument = _generate_counter_argument(player, prop_data, narrative_tags)
+
+        risk_factors = []
+        if "back_to_back" in narrative_tags:
+            risk_factors.append("Back-to-back fatigue risk")
+        if "trap_game" in narrative_tags:
+            risk_factors.append("Trap game — low motivation risk")
+        if "blowout_risk" in narrative_tags:
+            risk_factors.append("Blowout risk may reduce minutes")
+        if games_played < 15:
+            risk_factors.append(f"Small sample size ({int(games_played)} games)")
+        if not risk_factors:
+            risk_factors.append("Standard variance applies")
+
+        # Step 7 — EXPLAIN
+        energy_level = "nuclear" if verdict == "SMASH" else "high" if verdict == "LEAN" else "medium" if verdict == "FADE" else "low"
+        if is_override:
+            energy_level = "nuclear"
+
+        rant_verdict = "OVERRIDE" if is_override else verdict
+        rant_text = build_joseph_rant(
+            player=player.get("name", "Player"),
+            prop=prop_data,
+            verdict=rant_verdict,
+            narrative_tags=narrative_tags,
+            mismatch={"description": mismatch_alert} if mismatch_alert else None,
+            comp=comp,
+            energy=energy_level,
+        )
+
+        one_liner = (
+            f"{player.get('name', 'Player')} {prop_data['direction']} {prop_data['line']} "
+            f"{prop_data['stat']}: {verdict_emoji} {verdict} ({round(joseph_edge, 1)}% edge)"
+        )
+
+        override_explanation = None
+        if is_override:
+            override_explanation = (
+                f"Joseph OVERRIDES the engine ({override_direction}): "
+                f"QME edge was {round(qme_edge, 1)}% but Joseph sees {round(joseph_edge, 1)}%. "
+                f"Delta: {round(edge_delta, 1)}%."
+            )
+
+        condensed_summary = (
+            f"{verdict_emoji} {verdict} \u2014 {player.get('name', 'Player')} "
+            f"{prop_data['direction']} {prop_data['line']} {prop_data['stat']} "
+            f"({round(joseph_edge, 1)}% edge, {round(joseph_prob, 1)}% probability)"
+        )
+
+        # Step 8 — TRACK
+        reasoning_chain = [
+            {"step": 1, "name": "OBSERVE", "detail": f"QME: {round(qme_prob, 1)}% prob, {round(qme_edge, 1)}% edge, tier={tier}"},
+            {"step": 2, "name": "FRAME", "detail": f"Tags: {narrative_tags}"},
+            {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}"},
+            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}"},
+            {"step": 5, "name": "ADJUST", "detail": f"Joseph edge={round(joseph_edge, 1)}%, Override={is_override}"},
+            {"step": 6, "name": "CONCLUDE", "detail": f"Verdict={verdict}, Risks={risk_factors}"},
+            {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}"},
+            {"step": 8, "name": "TRACK", "detail": "Reasoning chain logged"},
+        ]
+
+        try:
+            log_prediction({
+                "player": player.get("name", ""),
+                "stat_type": stat_type,
+                "line": line,
+                "direction": direction,
+                "verdict": verdict,
+                "joseph_edge": round(joseph_edge, 2),
+                "joseph_prob": round(joseph_prob, 2),
+                "qme_edge": round(qme_edge, 2),
+                "is_override": is_override,
+            })
+        except Exception:
+            pass
+
+        nerd_stats = {
+            "qme_probability": round(qme_prob, 2),
+            "joseph_probability": round(joseph_prob, 2),
+            "dawg_adjustment": round(dawg_adjustment, 2),
+            "mismatch_boost": round(mismatch_boost, 2),
+            "regime_adjustment": round(regime_adj, 2),
+            "sample_dampening": round(sample_dampening, 2),
+            "games_played": int(games_played),
+            "implied_line": round(implied_line, 2),
+        }
+
+        return {
+            "verdict": verdict,
+            "verdict_emoji": verdict_emoji,
+            "is_override": is_override,
+            "override_direction": override_direction,
+            "override_explanation": override_explanation,
+            "edge": round(joseph_edge, 2),
+            "joseph_edge": round(joseph_edge, 2),
+            "qme_edge": round(qme_edge, 2),
+            "confidence": round(confidence_score, 2),
+            "joseph_probability": round(joseph_prob, 2),
+            "rant": rant_text,
+            "one_liner": one_liner,
+            "condensed_summary": condensed_summary,
+            "counter_argument": counter_argument,
+            "risk_factors": risk_factors,
+            "dawg_factor": round(dawg_adjustment, 2),
+            "narrative_tags": narrative_tags,
+            "comp": comp,
+            "grade": player_grade.get("grade", "C"),
+            "archetype": archetype,
+            "energy_level": energy_level,
+            "reasoning_chain": reasoning_chain,
+            "nerd_stats": nerd_stats,
+        }
+    except Exception as exc:
+        logger.warning("joseph_full_analysis failed: %s", exc)
+        return {
+            "verdict": "LEAN",
+            "verdict_emoji": VERDICT_EMOJIS.get("LEAN", ""),
+            "is_override": False,
+            "override_direction": None,
+            "override_explanation": None,
+            "edge": 0.0,
+            "joseph_edge": 0.0,
+            "qme_edge": 0.0,
+            "confidence": 50.0,
+            "joseph_probability": 50.0,
+            "rant": "",
+            "one_liner": "",
+            "condensed_summary": "",
+            "counter_argument": "Standard variance means even good edges lose 35-40% of the time.",
+            "risk_factors": ["Standard variance applies"],
+            "dawg_factor": 0.0,
+            "narrative_tags": [],
+            "comp": None,
+            "grade": "C",
+            "archetype": "Unknown",
+            "energy_level": "medium",
+            "reasoning_chain": [],
+            "nerd_stats": {},
+        }
 
 
 def joseph_analyze_game(game: dict, teams_data: dict,
@@ -1101,14 +1460,132 @@ def joseph_analyze_game(game: dict, teams_data: dict,
         Game-level analysis with keys: ``game_narrative``, ``pace_take``,
         ``scheme_analysis``, ``blowout_risk``, ``best_props``.
     """
-    # IMPLEMENTATION: Phase 1B
-    return {
-        "game_narrative": "",
-        "pace_take": "",
-        "scheme_analysis": "",
-        "blowout_risk": "",
-        "best_props": [],
-    }
+    try:
+        home = game.get("home_team", game.get("home", "Home"))
+        away = game.get("away_team", game.get("away", "Away"))
+        game_id = game.get("game_id", game.get("id", ""))
+
+        # Run game strategy
+        try:
+            strategy = analyze_game_strategy(game, teams_data)
+        except Exception:
+            strategy = {"scheme": "unknown", "strategy": "unknown",
+                        "scheme_match": 0.0, "mismatch_tags": []}
+
+        scheme = strategy.get("scheme", "unknown")
+        pace = _safe_float(game.get("pace_delta", 0.0))
+
+        # Filter results for this game
+        game_props = []
+        for r in (analysis_results or []):
+            r_game = r.get("game_id", r.get("game", ""))
+            if r_game == game_id or not game_id:
+                game_props.append(r)
+
+        # Sort by edge descending and get top 3
+        sorted_props = sorted(game_props, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+        best_props = sorted_props[:3]
+
+        # Run full analysis on top props if not already analyzed
+        for i, prop in enumerate(best_props):
+            if "verdict" not in prop or "rant" not in prop:
+                player_data = prop.get("player_data", prop.get("player", {}))
+                try:
+                    best_props[i] = joseph_full_analysis(prop, player_data, game, teams_data)
+                except Exception:
+                    pass
+
+        # Generate narratives
+        game_narrative = (
+            f"{away} at {home} is a game I've been watching CLOSELY. "
+            f"The scheme profile says '{scheme}' and the matchups are INTRIGUING. "
+            f"I see {len(game_props)} props on the board and the edges are REAL."
+        )
+
+        if pace > 2.0:
+            pace_take = f"This game projects to be UP-TEMPO with a pace delta of +{round(pace, 1)}. That means MORE possessions and MORE opportunities for production."
+        elif pace < -2.0:
+            pace_take = f"SLOW it down! Pace delta is {round(pace, 1)} — fewer possessions means fewer chances to hit props. Be SELECTIVE."
+        else:
+            pace_take = "Pace is NEUTRAL here. No significant advantage or disadvantage from tempo."
+
+        scheme_analysis = f"The defensive scheme is '{scheme}'. "
+        if strategy.get("mismatch_tags"):
+            scheme_analysis += f"I see mismatches in {', '.join(strategy['mismatch_tags'][:2])}. That's where the VALUE is."
+        else:
+            scheme_analysis += "No glaring mismatches but the matchup data tells a story."
+
+        spread = _safe_float(game.get("spread", 0.0))
+        blowout_risk_text = ""
+        if abs(spread) >= BLOWOUT_DIFFERENTIAL_MILD:
+            blowout_risk_text = (
+                f"WARNING: The spread is {spread} — blowout risk is ELEVATED. "
+                f"Starters could sit in the fourth quarter. Be CAREFUL with player props."
+            )
+        elif abs(spread) >= 8:
+            blowout_risk_text = f"The spread of {spread} suggests a competitive but lopsided game. Monitor minute projections."
+
+        # Betting angle and game total
+        betting_angle = "Focus on the BEST individual matchups rather than game-level bets tonight."
+        if best_props:
+            top = best_props[0]
+            pname = top.get("player_name", top.get("name", "top pick"))
+            betting_angle = f"My best angle for this game is {pname}. The edge profile is the STRONGEST here."
+
+        game_total = _safe_float(game.get("total", game.get("over_under", 220.0)))
+        joseph_game_total_take = f"The total is set at {game_total}. "
+        if pace > 2.0:
+            joseph_game_total_take += "With the pace profile, I LEAN towards the over."
+        elif pace < -2.0:
+            joseph_game_total_take += "Slower pace tells me the under has VALUE."
+        else:
+            joseph_game_total_take += "I don't have a strong lean on the total tonight."
+
+        joseph_spread_take = f"{home} at {spread} — "
+        if abs(spread) < 3:
+            joseph_spread_take += "this is a COIN FLIP game and I love the drama."
+        elif spread < -7:
+            joseph_spread_take += f"{home} is a HEAVY favourite. Blowout risk is on the radar."
+        else:
+            joseph_spread_take += "the line looks FAIR based on what I see."
+
+        risk_warning = "Standard variance applies — even the best edges lose sometimes."
+        if blowout_risk_text:
+            risk_warning = "Blowout risk is the PRIMARY concern for this game."
+        elif "back_to_back" in str(game):
+            risk_warning = "Back-to-back fatigue could affect production across the board."
+
+        condensed_summary = (
+            f"{away} at {home}: {game_narrative.split('.')[0]}. "
+            f"{pace_take.split('.')[0]}. "
+            f"{'BLOWOUT RISK elevated. ' if blowout_risk_text else ''}"
+            f"Top play: {best_props[0].get('player_name', 'TBD') if best_props else 'TBD'}."
+        )
+
+        return {
+            "game_narrative": game_narrative,
+            "pace_take": pace_take,
+            "scheme_analysis": scheme_analysis,
+            "blowout_risk": blowout_risk_text,
+            "best_props": best_props,
+            "betting_angle": betting_angle,
+            "joseph_game_total_take": joseph_game_total_take,
+            "joseph_spread_take": joseph_spread_take,
+            "risk_warning": risk_warning,
+            "condensed_summary": condensed_summary,
+            "home": home,
+            "away": away,
+            "game_id": game_id,
+        }
+    except Exception as exc:
+        logger.warning("joseph_analyze_game failed: %s", exc)
+        return {
+            "game_narrative": "",
+            "pace_take": "",
+            "scheme_analysis": "",
+            "blowout_risk": "",
+            "best_props": [],
+        }
 
 
 def joseph_analyze_player(player: dict, games: list, teams_data: dict,
@@ -1132,15 +1609,150 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         Player-level analysis with keys: ``scouting_report``, ``archetype``,
         ``grade``, ``gravity``, ``trend``, ``narrative_tags``.
     """
-    # IMPLEMENTATION: Phase 1B
-    return {
-        "scouting_report": "",
-        "archetype": "Unknown",
-        "grade": "C",
-        "gravity": 50.0,
-        "trend": "neutral",
-        "narrative_tags": [],
-    }
+    try:
+        player_name = player.get("name", player.get("player_name", "Player"))
+
+        # Grade the player
+        tonight_game = games[0] if games else {}
+        try:
+            grade_result = joseph_grade_player(player, tonight_game, teams_data)
+        except Exception:
+            grade_result = {"grade": "C", "archetype": "Unknown", "score": 50.0,
+                            "gravity": 50.0, "switchability": 50.0}
+
+        archetype = grade_result.get("archetype", "Unknown")
+        grade = grade_result.get("grade", "C")
+        gravity = _safe_float(grade_result.get("gravity", 50.0))
+
+        # Filter analysis_results for this player
+        player_props = []
+        for r in (analysis_results or []):
+            r_name = r.get("player_name", r.get("name", ""))
+            if r_name == player_name or not r_name:
+                player_props.append(r)
+
+        # Sort by edge to find best and alternatives
+        sorted_props = sorted(player_props, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+        best_prop = sorted_props[0] if sorted_props else None
+        alt_props = sorted_props[1:3] if len(sorted_props) > 1 else []
+
+        # Run full analysis on best prop if needed
+        best_analysis = None
+        if best_prop:
+            try:
+                best_analysis = joseph_full_analysis(best_prop, player, tonight_game, teams_data)
+            except Exception:
+                best_analysis = None
+
+        # Detect narrative tags
+        try:
+            narrative_tags = detect_narrative_tags(player, tonight_game, teams_data)
+        except Exception:
+            narrative_tags = []
+        if not narrative_tags:
+            narrative_tags = []
+
+        # Find historical comp
+        comp = None
+        if JOSEPH_COMPS_DATABASE:
+            arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
+            comp = random.choice(arch_matches) if arch_matches else random.choice(JOSEPH_COMPS_DATABASE)
+
+        # Determine trend
+        if len(games) >= 3:
+            recent_avg = sum(_safe_float(g.get("points", g.get("pts", 0))) for g in games[:3]) / 3
+            season_avg = _safe_float(player.get("points_avg", player.get("pts_avg", recent_avg)))
+            if recent_avg > season_avg * 1.1:
+                trend = "trending_up"
+            elif recent_avg < season_avg * 0.9:
+                trend = "trending_down"
+            else:
+                trend = "stable"
+        else:
+            trend = "neutral"
+
+        # Build scouting report
+        scouting_parts = [
+            f"{player_name} is a {archetype} that I grade as a '{grade}' tonight.",
+            f"His gravity score is {round(gravity, 1)} which tells you about his impact on the DEFENSE.",
+        ]
+        if comp:
+            try:
+                comp_text = comp["template"].format(reason=f"{player_name} has the same profile")
+            except (KeyError, IndexError):
+                comp_text = f"I see similarities to {comp.get('name', 'a historical great')}."
+            scouting_parts.append(comp_text)
+        if trend == "trending_up":
+            scouting_parts.append(f"{player_name} has been COOKING lately. The recent form is ELITE.")
+        elif trend == "trending_down":
+            scouting_parts.append(f"{player_name} has been in a SLUMP. The recent numbers are CONCERNING.")
+        else:
+            scouting_parts.append(f"{player_name} has been CONSISTENT. No major swings in either direction.")
+        if best_analysis:
+            scouting_parts.append(
+                f"My top play on him tonight: {best_analysis.get('verdict', 'LEAN')} "
+                f"with {best_analysis.get('edge', 0)}% edge."
+            )
+        scouting_report = " ".join(scouting_parts)
+
+        # Tonight's matchup take
+        opponent = tonight_game.get("opponent", tonight_game.get("away_team", "opponent"))
+        tonight_matchup_take = (
+            f"{player_name} faces {opponent} tonight. "
+            f"As a {archetype}, the matchup profile {'FAVOURS' if gravity > 60 else 'is NEUTRAL for'} him. "
+            f"{'The narrative tags suggest extra motivation!' if any(t in ('revenge_game', 'nationally_televised', 'rivalry') for t in narrative_tags) else 'Standard game-day context applies.'}"
+        )
+
+        # Risk factors
+        risk_factors = []
+        if "back_to_back" in narrative_tags:
+            risk_factors.append("Back-to-back fatigue")
+        if "trap_game" in narrative_tags:
+            risk_factors.append("Trap game motivation concern")
+        if "blowout_risk" in narrative_tags:
+            risk_factors.append("Blowout risk — potential minutes reduction")
+        if trend == "trending_down":
+            risk_factors.append("Recent form trending downward")
+        if not risk_factors:
+            risk_factors.append("No elevated risk factors identified")
+
+        fun_fact = f"{player_name} profiles as a {archetype} — "
+        if comp:
+            fun_fact += f"think of {comp.get('name', 'a historical great')} in a similar situation."
+        else:
+            fun_fact += "a profile that historically performs WELL in this matchup type."
+
+        condensed_summary = (
+            f"{player_name} ({archetype}, Grade: {grade}): "
+            f"{'TRENDING UP' if trend == 'trending_up' else 'TRENDING DOWN' if trend == 'trending_down' else 'STABLE'}. "
+            f"{'Best play: ' + best_analysis.get('one_liner', '') if best_analysis else 'No top play identified.'}"
+        )
+
+        return {
+            "scouting_report": scouting_report,
+            "archetype": archetype,
+            "grade": grade,
+            "gravity": round(gravity, 2),
+            "trend": trend,
+            "narrative_tags": narrative_tags,
+            "best_prop": best_analysis,
+            "alt_props": alt_props,
+            "tonight_matchup_take": tonight_matchup_take,
+            "risk_factors": risk_factors,
+            "fun_fact": fun_fact,
+            "comp": comp,
+            "condensed_summary": condensed_summary,
+        }
+    except Exception as exc:
+        logger.warning("joseph_analyze_player failed: %s", exc)
+        return {
+            "scouting_report": "",
+            "archetype": "Unknown",
+            "grade": "C",
+            "gravity": 50.0,
+            "trend": "neutral",
+            "narrative_tags": [],
+        }
 
 
 def joseph_generate_best_bets(leg_count: int, analysis_results: list,
@@ -1162,14 +1774,221 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
         Ticket recommendation with keys: ``ticket_name``, ``legs``,
         ``total_ev``, ``correlation_score``, ``rant``.
     """
-    # IMPLEMENTATION: Phase 1B
-    return {
-        "ticket_name": TICKET_NAMES.get(leg_count, "TICKET"),
-        "legs": [],
-        "total_ev": 0.0,
-        "correlation_score": 0.0,
-        "rant": "",
-    }
+    try:
+        ticket_name = TICKET_NAMES.get(leg_count, "TICKET")
+
+        if not analysis_results:
+            return {
+                "ticket_name": ticket_name,
+                "legs": [],
+                "total_ev": 0.0,
+                "correlation_score": 0.0,
+                "rant": f"I need more data to build a {ticket_name}. Run the analysis first!",
+                "joseph_confidence": 0.0,
+                "why_these_legs": "Not enough qualifying props to build a ticket.",
+                "risk_disclaimer": "No ticket generated.",
+                "nerd_stats": {},
+                "alternative_tickets": [],
+                "condensed_card": {"ticket_name": ticket_name, "legs": [], "pitch": "Need more data."},
+            }
+
+        # Run full analysis on results that don't have verdicts
+        analyzed = []
+        for r in analysis_results:
+            if "verdict" in r and "joseph_edge" in r:
+                analyzed.append(r)
+            else:
+                try:
+                    player_data = r.get("player_data", r.get("player", {}))
+                    game_data = r.get("game_data", r.get("game", {}))
+                    full = joseph_full_analysis(r, player_data, game_data, teams_data)
+                    full["player_name"] = r.get("player_name", r.get("name", ""))
+                    full["game_id"] = r.get("game_id", r.get("game", ""))
+                    analyzed.append(full)
+                except Exception:
+                    analyzed.append(r)
+
+        # Filter by verdict rules based on leg count
+        allowed_verdicts = set()
+        if leg_count <= 2:
+            allowed_verdicts = {"SMASH"}
+        elif leg_count <= 4:
+            allowed_verdicts = {"SMASH", "LEAN"}
+        else:
+            allowed_verdicts = {"SMASH", "LEAN", "FADE"}
+
+        qualifying = [
+            r for r in analyzed
+            if r.get("verdict", "") in allowed_verdicts
+            and "trap_game" not in (r.get("narrative_tags", []) or [])
+        ]
+
+        if len(qualifying) < leg_count:
+            # Relax to include more
+            qualifying = [
+                r for r in analyzed
+                if r.get("verdict", "") in {"SMASH", "LEAN", "FADE"}
+                and "trap_game" not in (r.get("narrative_tags", []) or [])
+            ]
+
+        if len(qualifying) < leg_count:
+            return {
+                "ticket_name": ticket_name,
+                "legs": [],
+                "total_ev": 0.0,
+                "correlation_score": 0.0,
+                "rant": f"Not enough qualifying legs for a {ticket_name}. I need at least {leg_count} plays that pass my filter.",
+                "joseph_confidence": 0.0,
+                "why_these_legs": f"Only {len(qualifying)} props qualify — need {leg_count}.",
+                "risk_disclaimer": f"A {leg_count}-leg parlay requires high-quality legs. Be patient.",
+                "nerd_stats": {},
+                "alternative_tickets": [],
+                "condensed_card": {"ticket_name": ticket_name, "legs": [], "pitch": "Not enough qualifying legs."},
+            }
+
+        # Sort by edge descending
+        qualifying.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge", 0))), reverse=True)
+
+        # Find best combination using itertools.combinations
+        best_combo = None
+        best_score = -999.0
+        candidates = qualifying[:min(15, len(qualifying))]  # limit search space
+
+        for combo in itertools.combinations(range(len(candidates)), min(leg_count, len(candidates))):
+            legs = [candidates[i] for i in combo]
+            edge_sum = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in legs)
+
+            # Game concentration penalty: max 2 per game
+            game_counts = {}
+            for l in legs:
+                gid = l.get("game_id", l.get("game", "unknown"))
+                game_counts[gid] = game_counts.get(gid, 0) + 1
+            concentration_penalty = sum(max(0, c - 2) * 3.0 for c in game_counts.values())
+
+            score = edge_sum - concentration_penalty
+            if score > best_score:
+                best_score = score
+                best_combo = legs
+
+        if not best_combo:
+            best_combo = candidates[:leg_count]
+
+        # Calculate combined probability
+        combined_prob = 1.0
+        for leg in best_combo:
+            leg_prob = _safe_float(leg.get("joseph_probability", leg.get("probability_over", 55.0))) / 100.0
+            combined_prob *= max(0.01, min(0.99, leg_prob))
+
+        # Attempt correlation adjustment
+        try:
+            correlation_adj = adjust_parlay_probability(combined_prob, best_combo)
+            if correlation_adj > 0:
+                combined_prob = correlation_adj
+        except Exception:
+            pass
+
+        # Calculate expected value
+        try:
+            ev_result = calculate_entry_expected_value(best_combo, leg_count)
+            total_ev = _safe_float(ev_result.get("expected_value_dollars", 0.0))
+        except Exception:
+            # Simple EV fallback: payout * prob - entry_fee
+            payout_mult = {2: 3.0, 3: 5.0, 4: 10.0, 5: 20.0, 6: 40.0}.get(leg_count, 3.0)
+            entry_fee = 10.0
+            total_ev = round(payout_mult * entry_fee * combined_prob - entry_fee, 2)
+
+        # Synergy score
+        total_edge = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in best_combo)
+        avg_edge = total_edge / max(1, len(best_combo))
+        synergy_score = min(100.0, avg_edge * 10)
+
+        # Joseph confidence
+        confidence_values = [_safe_float(l.get("confidence", 50.0)) for l in best_combo]
+        joseph_confidence = sum(confidence_values) / max(1, len(confidence_values))
+
+        # Build pitch
+        top_player = best_combo[0].get("player_name", best_combo[0].get("name", "my top pick")) if best_combo else "nobody"
+        joseph_pitch = (
+            f"THIS is my {ticket_name}! I've got {leg_count} legs of FIRE led by {top_player}. "
+            f"Combined edge of {round(total_edge, 1)}% — this is WHERE the money is!"
+        )
+
+        why_these_legs = (
+            f"I selected these {leg_count} legs because they have the HIGHEST combined edge "
+            f"({round(total_edge, 1)}%) with manageable game concentration. "
+            f"{'All SMASH picks!' if all(l.get('verdict') == 'SMASH' for l in best_combo) else 'A mix of my best verdicts.'}"
+        )
+
+        risk_disclaimer = {
+            2: "A 2-leg parlay is the SAFEST structure. Two strong plays, simple math.",
+            3: "Three legs means each play has to HIT. Make sure you're comfortable with ALL of them.",
+            4: "Four legs is getting AGGRESSIVE. The payout is juicy but the risk is REAL.",
+            5: "Five legs? You better LOVE every single one of these plays. High risk, high reward.",
+            6: "THE FULL SEND! Six legs is a LOTTERY TICKET. Only play with money you can afford to lose.",
+        }.get(leg_count, "Parlays carry inherent risk. Bet responsibly.")
+
+        nerd_stats = {
+            "combined_probability": round(combined_prob * 100, 2),
+            "total_edge": round(total_edge, 2),
+            "average_edge": round(avg_edge, 2),
+            "synergy_score": round(synergy_score, 2),
+            "joseph_confidence": round(joseph_confidence, 2),
+        }
+
+        # Format legs for output
+        leg_summaries = []
+        for l in best_combo:
+            leg_summaries.append({
+                "player_name": l.get("player_name", l.get("name", "")),
+                "stat_type": l.get("stat_type", l.get("stat", "")),
+                "line": l.get("line", 0),
+                "direction": l.get("direction", "OVER"),
+                "verdict": l.get("verdict", "LEAN"),
+                "joseph_edge": round(_safe_float(l.get("joseph_edge", l.get("edge", 0))), 1),
+            })
+
+        # Alternative tickets (next 3 best combos, simplified)
+        alternative_tickets = []
+        alt_candidates = [c for c in candidates if c not in best_combo]
+        if len(alt_candidates) >= leg_count:
+            for alt_start in range(0, min(3, len(alt_candidates) - leg_count + 1)):
+                alt_legs = alt_candidates[alt_start:alt_start + leg_count]
+                if len(alt_legs) == leg_count:
+                    alt_edge = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in alt_legs)
+                    alternative_tickets.append({
+                        "legs": [l.get("player_name", "") for l in alt_legs],
+                        "total_edge": round(alt_edge, 1),
+                    })
+
+        condensed_card = {
+            "ticket_name": ticket_name,
+            "legs": [f"{l['player_name']} {l['direction']} {l['line']} {l['stat_type']}" for l in leg_summaries],
+            "pitch": f"{ticket_name}: {leg_count} legs, {round(total_edge, 1)}% combined edge. LET'S GO!",
+        }
+
+        return {
+            "ticket_name": ticket_name,
+            "legs": leg_summaries,
+            "total_ev": round(total_ev, 2),
+            "correlation_score": round(synergy_score, 2),
+            "rant": joseph_pitch,
+            "joseph_confidence": round(joseph_confidence, 2),
+            "why_these_legs": why_these_legs,
+            "risk_disclaimer": risk_disclaimer,
+            "nerd_stats": nerd_stats,
+            "alternative_tickets": alternative_tickets,
+            "condensed_card": condensed_card,
+            "combined_probability": round(combined_prob * 100, 2),
+        }
+    except Exception as exc:
+        logger.warning("joseph_generate_best_bets failed: %s", exc)
+        return {
+            "ticket_name": TICKET_NAMES.get(leg_count, "TICKET"),
+            "legs": [],
+            "total_ev": 0.0,
+            "correlation_score": 0.0,
+            "rant": "",
+        }
 
 
 def joseph_quick_take(analysis_results: list, teams_data: dict,
@@ -1190,8 +2009,64 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
     str
         A 3-4 sentence Joseph M. Smith monologue.
     """
-    # IMPLEMENTATION: Phase 1B
-    return "Joseph M. Smith is ready for tonight's slate."
+    try:
+        take_openers = [
+            "Joseph M. Smith has STUDIED tonight's slate and here's what I see...",
+            "Tonight's games? Let me BREAK it down for you...",
+            "I've been through EVERY number tonight and I have TAKES...",
+            "The board is SET and Joseph M. Smith is READY to talk...",
+            "You want to know what I think about tonight? HERE IT IS...",
+        ]
+        used_set = _used_fragments.setdefault("quick_take", set())
+        avail_openers = [i for i in range(len(take_openers)) if i not in used_set]
+        if not avail_openers or len(used_set) > 3:
+            used_set.clear()
+            avail_openers = list(range(len(take_openers)))
+        opener_idx = random.choice(avail_openers)
+        used_set.add(opener_idx)
+        opener = take_openers[opener_idx]
+
+        # Find best SMASH pick
+        smash_picks = [r for r in (analysis_results or [])
+                       if r.get("verdict") == "SMASH"]
+        smash_picks.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+
+        # Find best fade/stay_away
+        avoid_picks = [r for r in (analysis_results or [])
+                       if r.get("verdict") in ("FADE", "STAY_AWAY")]
+        avoid_picks.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge", 0))))
+
+        # Middle sentences
+        if smash_picks:
+            top = smash_picks[0]
+            pname = top.get("player_name", top.get("name", "my top pick"))
+            edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+            middle1 = f"My STRONGEST play tonight is {pname} — I see a {edge}% edge and I'm going ALL IN on it!"
+        else:
+            middle1 = f"I see {len(todays_games or [])} games tonight and the edges are DEVELOPING. Let the analysis run!"
+
+        if avoid_picks:
+            avoid = avoid_picks[0]
+            aname = avoid.get("player_name", avoid.get("name", "one play"))
+            middle2 = f"But STAY AWAY from {aname} — that's a TRAP and I can smell it from here!"
+        elif len(analysis_results or []) > 3:
+            lean_picks = [r for r in analysis_results if r.get("verdict") == "LEAN"]
+            if lean_picks:
+                bold = lean_picks[0]
+                bname = bold.get("player_name", bold.get("name", "a sleeper"))
+                middle2 = f"My BOLD prediction: {bname} is going to SURPRISE people tonight. Watch for it!"
+            else:
+                middle2 = "The slate is COMPETITIVE and I see value scattered across MULTIPLE games."
+        else:
+            middle2 = "Load the slate and let me work — Joseph M. Smith delivers EVERY night!"
+
+        # Closer
+        closer_frag = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+        closer = closer_frag.get("text", "And I say that with GREAT conviction!")
+
+        return f"{opener} {middle1} {middle2} {closer}"
+    except Exception:
+        return "Joseph M. Smith is ready for tonight's slate."
 
 
 def joseph_get_ambient_context(session_state: dict) -> tuple:
@@ -1210,8 +2085,55 @@ def joseph_get_ambient_context(session_state: dict) -> tuple:
     tuple[str, dict]
         A (context_key, kwargs) tuple for ``joseph_ambient_line``.
     """
-    # IMPLEMENTATION: Phase 1B
-    return ("idle", {})
+    try:
+        # Premium pitch check
+        try:
+            from utils.auth import is_premium_user
+        except ImportError:
+            def is_premium_user():
+                return True
+        try:
+            if not is_premium_user() and random.random() < 0.3:
+                return ("premium_pitch", {})
+        except Exception:
+            pass
+
+        # Entry just built
+        if session_state.get("joseph_entry_just_built"):
+            n = session_state.pop("joseph_entry_just_built", 0)
+            return ("entry_built", {"n": n})
+
+        # Analysis complete
+        analysis_results = session_state.get("analysis_results", [])
+        if analysis_results:
+            smash_count = sum(1 for r in analysis_results if r.get("verdict") == "SMASH")
+            platinum = sum(1 for r in analysis_results if r.get("tier") == "Platinum")
+            override_count = sum(1 for r in analysis_results if r.get("is_override"))
+            logged_count = session_state.get("joseph_logged_count", 0)
+            total = len(analysis_results)
+            grade = min(10, max(1, smash_count + platinum))
+            return ("analysis_complete", {
+                "smash_count": smash_count,
+                "platinum": platinum,
+                "total": total,
+                "override_count": override_count,
+                "logged_count": logged_count,
+                "grade": grade,
+            })
+
+        # Games loaded
+        todays_games = session_state.get("todays_games", [])
+        if todays_games:
+            n = len(todays_games)
+            first_game = todays_games[0] if todays_games else {}
+            away = first_game.get("away_team", "Away")
+            home = first_game.get("home_team", "Home")
+            return ("games_loaded", {"n": n, "away": away, "home": home})
+
+        # Default: idle
+        return ("idle", {})
+    except Exception:
+        return ("idle", {})
 
 
 def joseph_ambient_line(context: str, **kwargs) -> str:
@@ -1229,9 +2151,25 @@ def joseph_ambient_line(context: str, **kwargs) -> str:
     str
         A filled ambient commentary line.
     """
-    # IMPLEMENTATION: Phase 1B
-    lines = AMBIENT_POOLS.get(context, AMBIENT_POOLS["idle"])
-    return lines[0] if lines else ""
+    try:
+        lines = AMBIENT_POOLS.get(context, AMBIENT_POOLS.get("idle", []))
+        if not lines:
+            return ""
+        used = _used_ambient.setdefault(context, set())
+        available_indices = [i for i in range(len(lines)) if i not in used]
+        if not available_indices or len(used) > 0.6 * len(lines):
+            used.clear()
+            available_indices = list(range(len(lines)))
+        idx = random.choice(available_indices)
+        used.add(idx)
+        line = lines[idx]
+        try:
+            return line.format(**kwargs)
+        except (KeyError, IndexError):
+            return line
+    except Exception:
+        lines = AMBIENT_POOLS.get("idle", [])
+        return lines[0] if lines else ""
 
 
 def joseph_commentary(results: list, context_type: str) -> str:
@@ -1253,8 +2191,44 @@ def joseph_commentary(results: list, context_type: str) -> str:
     str
         A 2-4 sentence Joseph commentary block.
     """
-    # IMPLEMENTATION: Phase 1B
-    return "Joseph M. Smith has thoughts on this."
+    try:
+        # Select opener with anti-repetition
+        openers = COMMENTARY_OPENER_POOL.get(context_type, COMMENTARY_OPENER_POOL.get("analysis_results", []))
+        if not openers:
+            openers = ["Joseph M. Smith has something to SAY..."]
+        used = _used_commentary.setdefault(context_type, set())
+        available_indices = [i for i in range(len(openers)) if i not in used]
+        if not available_indices or len(used) > 0.6 * len(openers):
+            used.clear()
+            available_indices = list(range(len(openers)))
+        idx = random.choice(available_indices)
+        used.add(idx)
+        opener = openers[idx]
+
+        # Build body sentences
+        body1 = ""
+        body2 = ""
+        if results:
+            # Find top result by edge
+            sorted_results = sorted(results, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+            top = sorted_results[0]
+            pname = top.get("player_name", top.get("name", "someone"))
+            edge = round(_safe_float(top.get("joseph_edge", top.get("edge_percentage", top.get("edge", 0)))), 1)
+            body1 = f"I'm looking at {pname} and the edge is {edge}%. "
+            if len(sorted_results) > 1:
+                second = sorted_results[1]
+                sname = second.get("player_name", second.get("name", "another player"))
+                body2 = f"Also keep your eye on {sname}. "
+        else:
+            body1 = "The data tells a story and I'm READING it. "
+
+        # Select closer
+        closer_frag = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+        closer = closer_frag.get("text", "And I say that with GREAT conviction!")
+
+        return f"{opener} {body1}{body2}{closer}"
+    except Exception:
+        return "Joseph M. Smith has thoughts on this."
 
 
 def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
@@ -1272,5 +2246,10 @@ def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
     tuple[int, str]
         (count_logged, status_message) tuple.
     """
-    # IMPLEMENTATION: Phase 1B
-    return (0, "Joseph bets module not installed yet")
+    try:
+        from engine.joseph_bets import joseph_auto_log_bets as _log
+        return _log(joseph_results, session_state)
+    except ImportError:
+        return (0, "Joseph bets module not installed yet")
+    except Exception as exc:
+        return (0, f"Joseph auto-log error: {exc}")
