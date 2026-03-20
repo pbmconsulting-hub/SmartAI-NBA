@@ -1439,7 +1439,7 @@ def discard_stale_props(props, max_age_seconds=_STALE_THRESHOLD_SECONDS):
             fresh_props (list[dict]): Props that pass the freshness check.
             stale_summary (dict): ``{"input": int, "fresh": int, "stale": int}``.
     """
-    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    now = datetime.datetime.now(datetime.timezone.utc)
     fresh: list = []
     stale_count = 0
 
@@ -1451,9 +1451,10 @@ def discard_stale_props(props, max_age_seconds=_STALE_THRESHOLD_SECONDS):
             continue
 
         try:
-            # Accept common ISO-8601 variants (with/without 'T', with/without 'Z')
-            ts_clean = str(ts_str).replace("Z", "").replace("z", "")
-            ts = datetime.datetime.fromisoformat(ts_clean)
+            ts = datetime.datetime.fromisoformat(str(ts_str))
+            # Ensure timezone-aware for comparison — assume UTC if naive
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=datetime.timezone.utc)
         except (ValueError, TypeError):
             # Unparseable timestamp → keep prop (defensive)
             fresh.append(prop)

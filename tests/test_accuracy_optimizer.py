@@ -120,7 +120,7 @@ class TestStaleDataKillSwitch:
 
     def test_fresh_props_kept(self):
         from data.platform_fetcher import discard_stale_props
-        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        now = datetime.datetime.now(datetime.timezone.utc)
         ts = now.isoformat()
         props = [self._make_prop(fetched_at=ts)]
         fresh, summary = discard_stale_props(props)
@@ -130,7 +130,7 @@ class TestStaleDataKillSwitch:
     def test_stale_props_discarded(self):
         from data.platform_fetcher import discard_stale_props
         old_time = (
-            datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            datetime.datetime.now(datetime.timezone.utc)
             - datetime.timedelta(seconds=300)
         )
         ts = old_time.isoformat()
@@ -150,7 +150,7 @@ class TestStaleDataKillSwitch:
     def test_last_updated_preferred_over_fetched_at(self):
         """last_updated takes precedence over fetched_at."""
         from data.platform_fetcher import discard_stale_props
-        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        now = datetime.datetime.now(datetime.timezone.utc)
         fresh_ts = now.isoformat()
         stale_ts = (now - datetime.timedelta(seconds=300)).isoformat()
         # last_updated is stale, fetched_at is fresh → should be discarded
@@ -161,7 +161,7 @@ class TestStaleDataKillSwitch:
 
     def test_custom_threshold(self):
         from data.platform_fetcher import discard_stale_props
-        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        now = datetime.datetime.now(datetime.timezone.utc)
         ts = (now - datetime.timedelta(seconds=60)).isoformat()
         props = [self._make_prop(fetched_at=ts)]
         # 60s old with 120s threshold → fresh
@@ -353,7 +353,7 @@ class TestSmartFilterIntegration:
 
     def _make_prop(self, player="Player A", stat="points", line=24.5,
                    platform="PrizePicks"):
-        now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        now = datetime.datetime.now(datetime.timezone.utc)
         return {
             "player_name": player, "stat_type": stat, "line": line,
             "platform": platform, "over_odds": -110, "under_odds": -110,
@@ -371,7 +371,7 @@ class TestSmartFilterIntegration:
     def test_stale_props_removed_in_pipeline(self):
         from data.platform_fetcher import smart_filter_props
         old_time = (
-            datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            datetime.datetime.now(datetime.timezone.utc)
             - datetime.timedelta(seconds=300)
         )
         props = [
