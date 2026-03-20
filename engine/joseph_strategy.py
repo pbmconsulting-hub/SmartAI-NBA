@@ -609,15 +609,18 @@ def _find_team_data(abbreviation: str, teams_data: list) -> dict:
     Returns:
         The matching team dictionary, or an empty dict if not found.
     """
-    if not teams_data:
-        return {}
-    for team in teams_data:
-        team_abbr = team.get("abbreviation", team.get("team", ""))
-        if team_abbr.upper() == abbreviation.upper():
-            return team
-    _logger.warning(
-        "[JosephStrategy] Team '%s' not found in teams_data", abbreviation
-    )
+    try:
+        if not teams_data:
+            return {}
+        for team in teams_data:
+            team_abbr = team.get("abbreviation", team.get("team", ""))
+            if team_abbr.upper() == abbreviation.upper():
+                return team
+        _logger.warning(
+            "[JosephStrategy] Team '%s' not found in teams_data", abbreviation
+        )
+    except Exception:
+        _logger.debug("[JosephStrategy] _find_team_data error for '%s'", abbreviation)
     return {}
 
 
@@ -698,58 +701,62 @@ def _build_game_narrative(
     Returns:
         A multi-sentence narrative string.
     """
-    sentences = []
+    try:
+        sentences = []
 
-    # Sentence 1: matchup intro
-    sentences.append(
-        f"{away_team} visits {home_team} in what projects as a "
-        f"{pace_label.replace('_', '-')}-paced contest."
-    )
-
-    # Sentence 2: pace detail
-    sentences.append(
-        f"The combined pace projection sits at {pace_projection:.1f} possessions, "
-        f"pointing toward a game total around {game_total_est:.0f} points."
-    )
-
-    # Sentence 3: spread context
-    if spread_est < -5:
+        # Sentence 1: matchup intro
         sentences.append(
-            f"{home_team} is a solid favorite with an estimated spread of {spread_est:.1f}."
-        )
-    elif spread_est > 5:
-        sentences.append(
-            f"{away_team} comes in as the favorite with {home_team} getting "
-            f"{abs(spread_est):.1f} points."
-        )
-    else:
-        sentences.append(
-            f"The spread of {spread_est:.1f} signals a closely contested matchup."
+            f"{away_team} visits {home_team} in what projects as a "
+            f"{pace_label.replace('_', '-')}-paced contest."
         )
 
-    # Sentence 4: blowout risk
-    if blowout_probability > 0.30:
+        # Sentence 2: pace detail
         sentences.append(
-            "There is a meaningful blowout risk, which could limit star "
-            "minutes in the fourth quarter."
-        )
-    elif blowout_probability > 0.15:
-        sentences.append(
-            "A moderate blowout chance exists — monitor the game script for "
-            "garbage-time implications."
-        )
-    else:
-        sentences.append(
-            "Both teams should stay competitive throughout, keeping starters "
-            "engaged deep into the game."
+            f"The combined pace projection sits at {pace_projection:.1f} possessions, "
+            f"pointing toward a game total around {game_total_est:.0f} points."
         )
 
-    # Sentence 5: wrap-up
-    sentences.append(
-        "Adjust player prop targets accordingly based on pace and game flow."
-    )
+        # Sentence 3: spread context
+        if spread_est < -5:
+            sentences.append(
+                f"{home_team} is a solid favorite with an estimated spread of {spread_est:.1f}."
+            )
+        elif spread_est > 5:
+            sentences.append(
+                f"{away_team} comes in as the favorite with {home_team} getting "
+                f"{abs(spread_est):.1f} points."
+            )
+        else:
+            sentences.append(
+                f"The spread of {spread_est:.1f} signals a closely contested matchup."
+            )
 
-    return " ".join(sentences)
+        # Sentence 4: blowout risk
+        if blowout_probability > 0.30:
+            sentences.append(
+                "There is a meaningful blowout risk, which could limit star "
+                "minutes in the fourth quarter."
+            )
+        elif blowout_probability > 0.15:
+            sentences.append(
+                "A moderate blowout chance exists — monitor the game script for "
+                "garbage-time implications."
+            )
+        else:
+            sentences.append(
+                "Both teams should stay competitive throughout, keeping starters "
+                "engaged deep into the game."
+            )
+
+        # Sentence 5: wrap-up
+        sentences.append(
+            "Adjust player prop targets accordingly based on pace and game flow."
+        )
+
+        return " ".join(sentences)
+    except Exception:
+        _logger.debug("[JosephStrategy] _build_game_narrative error")
+        return f"{away_team} at {home_team} — game narrative unavailable."
 
 
 def _determine_betting_angle(
@@ -767,12 +774,15 @@ def _determine_betting_angle(
     Returns:
         A single betting-angle recommendation string.
     """
-    if blowout_probability > 0.35:
-        return "Watch for GARBAGE TIME — star minutes could be limited"
-    if pace_label in ("shootout", "uptempo"):
-        return "The TOTAL is the play — this game is going FAST"
-    if abs(spread_est) > 7:
-        return "Take the DOG — blowout spreads are hard to cover"
-    if pace_label in ("grind", "rock_fight"):
-        return "UNDER is the angle — expect a defensive battle"
+    try:
+        if blowout_probability > 0.35:
+            return "Watch for GARBAGE TIME — star minutes could be limited"
+        if pace_label in ("shootout", "uptempo"):
+            return "The TOTAL is the play — this game is going FAST"
+        if abs(spread_est) > 7:
+            return "Take the DOG — blowout spreads are hard to cover"
+        if pace_label in ("grind", "rock_fight"):
+            return "UNDER is the angle — expect a defensive battle"
+    except Exception:
+        _logger.debug("[JosephStrategy] _determine_betting_angle error")
     return "Look for PLAYER PROPS — the game script is neutral"

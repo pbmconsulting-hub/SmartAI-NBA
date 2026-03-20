@@ -50,6 +50,10 @@ def letter_grade(score: float) -> str:
     Returns:
         A letter-grade string from ``"A+"`` down to ``"F"``.
     """
+    try:
+        score = float(score)
+    except (TypeError, ValueError):
+        return "F"
     if score >= 95:
         return "A+"
     if score >= 90:
@@ -200,13 +204,16 @@ def _determine_scheme_fit(archetype: str, scheme: dict) -> str:
     Returns:
         One of ``'exploitable'``, ``'problematic'``, or ``'neutral'``.
     """
-    primary = scheme.get("primary_scheme", "man_to_man") if scheme else "man_to_man"
-    favorable = _FAVORABLE_MATCHUPS.get(archetype, [])
-    unfavorable = _UNFAVORABLE_MATCHUPS.get(archetype, [])
-    if primary in favorable:
-        return "exploitable"
-    if primary in unfavorable:
-        return "problematic"
+    try:
+        primary = scheme.get("primary_scheme", "man_to_man") if scheme else "man_to_man"
+        favorable = _FAVORABLE_MATCHUPS.get(archetype, [])
+        unfavorable = _UNFAVORABLE_MATCHUPS.get(archetype, [])
+        if primary in favorable:
+            return "exploitable"
+        if primary in unfavorable:
+            return "problematic"
+    except Exception:
+        _logger.debug("[JosephEval] _determine_scheme_fit error, returning neutral")
     return "neutral"
 
 
