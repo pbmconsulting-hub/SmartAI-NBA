@@ -375,5 +375,155 @@ class TestImportFallbacks(unittest.TestCase):
         self.assertEqual(BLOWOUT_DIFFERENTIAL_HEAVY, 20)
 
 
+# ── Section B new: AMBIENT_POOLS (6 contexts × 15 lines) ───
+
+
+class TestAmbientPools(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import AMBIENT_POOLS
+        self.pool = AMBIENT_POOLS
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.pool, dict)
+
+    def test_has_all_six_contexts(self):
+        expected = {"idle", "games_loaded", "analysis_complete",
+                    "entry_built", "premium_pitch", "commentary_on_results"}
+        self.assertEqual(set(self.pool.keys()), expected)
+
+    def test_each_context_has_15_lines(self):
+        for key, lines in self.pool.items():
+            self.assertEqual(len(lines), 15, f"{key} has {len(lines)} lines, expected 15")
+
+    def test_all_strings(self):
+        for key, lines in self.pool.items():
+            for line in lines:
+                self.assertIsInstance(line, str)
+                self.assertTrue(len(line) > 0, f"Empty string in {key}")
+
+    def test_idle_no_placeholders(self):
+        """Idle lines are static (no format placeholders)."""
+        for line in self.pool["idle"]:
+            self.assertNotIn("{", line, f"Unexpected placeholder in idle: {line}")
+
+    def test_games_loaded_has_n_placeholder(self):
+        """At least some games_loaded lines use {n}."""
+        n_lines = [l for l in self.pool["games_loaded"] if "{n}" in l]
+        self.assertGreater(len(n_lines), 0)
+
+    def test_analysis_complete_has_placeholders(self):
+        """analysis_complete lines reference {smash_count} or {total}."""
+        all_text = " ".join(self.pool["analysis_complete"])
+        self.assertIn("{smash_count}", all_text)
+        self.assertIn("{total}", all_text)
+
+    def test_premium_pitch_no_player_placeholders(self):
+        """premium_pitch lines are generic upsell — no {player}."""
+        for line in self.pool["premium_pitch"]:
+            self.assertNotIn("{player}", line)
+
+    def test_commentary_on_results_has_player(self):
+        """At least some commentary_on_results lines use {player}."""
+        p_lines = [l for l in self.pool["commentary_on_results"] if "{player}" in l]
+        self.assertGreater(len(p_lines), 0)
+
+
+# ── Section C new: COMMENTARY_OPENER_POOL ───────────────────
+
+
+class TestCommentaryOpenerPool(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import COMMENTARY_OPENER_POOL
+        self.pool = COMMENTARY_OPENER_POOL
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.pool, dict)
+
+    def test_has_all_four_context_types(self):
+        expected = {"analysis_results", "entry_built", "optimal_slip",
+                    "ticket_generated"}
+        self.assertEqual(set(self.pool.keys()), expected)
+
+    def test_each_context_has_5_templates(self):
+        for key, templates in self.pool.items():
+            self.assertEqual(len(templates), 5, f"{key} has {len(templates)}, expected 5")
+
+    def test_all_strings(self):
+        for key, templates in self.pool.items():
+            for t in templates:
+                self.assertIsInstance(t, str)
+                self.assertTrue(len(t) > 0)
+
+
+# ── Section D new: JOSEPH_COMPS_DATABASE ────────────────────
+
+
+class TestJosephCompsDatabase(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import JOSEPH_COMPS_DATABASE
+        self.db = JOSEPH_COMPS_DATABASE
+
+    def test_is_list(self):
+        self.assertIsInstance(self.db, list)
+
+    def test_at_least_50_entries(self):
+        self.assertGreaterEqual(len(self.db), 50)
+
+    def test_required_keys(self):
+        """Every entry has all six required keys."""
+        required_keys = {"name", "archetype", "stat_context", "tier",
+                         "narrative", "template"}
+        for i, entry in enumerate(self.db):
+            self.assertEqual(set(entry.keys()), required_keys,
+                             f"Entry {i} ({entry.get('name', '?')}) missing keys")
+
+    def test_all_values_are_strings(self):
+        for entry in self.db:
+            for k, v in entry.items():
+                self.assertIsInstance(v, str, f"{entry['name']}.{k} not a string")
+                self.assertTrue(len(v) > 0, f"{entry['name']}.{k} is empty")
+
+    def test_all_13_archetypes_present(self):
+        archetypes = {e["archetype"] for e in self.db}
+        expected = {"Alpha Scorer", "Floor General", "Glass Cleaner",
+                    "3-and-D Wing", "Stretch Big", "Rim Protector",
+                    "Sixth Man Spark", "Two-Way Wing", "Pick-and-Roll Big",
+                    "Shot Creator", "Playmaking Wing", "Defensive Anchor",
+                    "High-Usage Ball Handler"}
+        self.assertEqual(archetypes, expected)
+
+    def test_each_archetype_at_least_3(self):
+        from collections import Counter
+        counts = Counter(e["archetype"] for e in self.db)
+        for arch, cnt in counts.items():
+            self.assertGreaterEqual(cnt, 3, f"{arch} has only {cnt} entries")
+
+    def test_required_players_referenced(self):
+        all_text = " ".join(e["name"] + " " + e["template"] for e in self.db)
+        required = ["Curry", "LeBron", "Jordan", "Kobe", "KD", "Giannis",
+                     "Jokic", "Embiid", "Harden", "Luka", "Tatum",
+                     "Iverson", "Nash", "Stockton", "Duncan", "Garnett",
+                     "Magic", "Bird", "Shaq", "Hakeem", "Wade", "CP3",
+                     "Kawhi", "PG13", "Dirk"]
+        for player in required:
+            self.assertIn(player, all_text, f"Player {player} not referenced")
+
+    def test_tier_values_valid(self):
+        valid_tiers = {"Platinum", "Gold", "Silver"}
+        for entry in self.db:
+            self.assertIn(entry["tier"], valid_tiers,
+                          f"{entry['name']} has invalid tier {entry['tier']}")
+
+    def test_templates_have_reason_placeholder(self):
+        """Every template includes {reason}."""
+        for entry in self.db:
+            self.assertIn("{reason}", entry["template"],
+                          f"{entry['name']} template missing {{reason}}")
+
+    def test_unique_names(self):
+        names = [e["name"] for e in self.db]
+        self.assertEqual(len(names), len(set(names)), "Duplicate names found")
+
+
 if __name__ == "__main__":
     unittest.main()
