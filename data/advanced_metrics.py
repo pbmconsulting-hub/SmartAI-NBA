@@ -119,6 +119,7 @@ COACH_REVENGE: dict = {
     "Nate McMillan": ["IND", "POR"],
 }
 
+# "SLC" is kept as an alias — some game feeds use city codes instead of team codes
 ALTITUDE_MAP: dict = {"DEN": 1.03, "UTA": 1.015, "SLC": 1.015, "PHX": 1.005}
 
 TIMEZONE_MAP: dict = {
@@ -138,6 +139,31 @@ TIMEZONE_MAP: dict = {
 # ============================================================
 # SECTION: Utility Functions
 # ============================================================
+
+# Multiplier approximates team-possession share for a single player
+_USAGE_RATE_MULTIPLIER = 2.0
+
+
+def _estimate_usage_rate(fga: float, fta: float, tov: float,
+                         minutes: float) -> float:
+    """Simplified per-player usage-rate estimate.
+
+    Formula: ``100 * (FGA + 0.44*FTA + TOV) / max(MIN, 1) * multiplier``
+
+    The 2.0 multiplier scales individual possessions into a percentage
+    that approximates the share of team possessions used while on court.
+
+    Args:
+        fga:     Field-goal attempts per game.
+        fta:     Free-throw attempts per game.
+        tov:     Turnovers per game.
+        minutes: Minutes per game.
+
+    Returns:
+        float: Estimated usage rate percentage.
+    """
+    return 100.0 * (fga + 0.44 * fta + tov) / max(minutes, 1) * _USAGE_RATE_MULTIPLIER
+
 
 def normalize(value: float, min_val: float, max_val: float,
               out_min: float = 0.0, out_max: float = 100.0) -> float:
@@ -196,7 +222,7 @@ def classify_player_archetype(player: dict) -> str:
         stocks = stl + blk
 
         # Simplified usage-rate estimate
-        usage_rate_est = 100.0 * (fga + 0.44 * fta + tov) / max(minutes, 1) * 2.0
+        usage_rate_est = _estimate_usage_rate(fga, fta, tov, minutes)
 
         # Assist-to-turnover ratio
         assist_to_turnover = ast / max(tov, 0.5)
@@ -449,7 +475,7 @@ def enrich_player_god_mode(player: dict, games: list, teams: dict) -> dict:
         # ============================================================
 
         # Usage rate estimate (simplified)
-        usage_rate_est = 100.0 * (fga + 0.44 * fta + tov) / max(minutes, 1) * 2.0
+        usage_rate_est = _estimate_usage_rate(fga, fta, tov, minutes)
         enriched["usage_rate_est"] = round(usage_rate_est, 2)
 
         # True shooting percentage
