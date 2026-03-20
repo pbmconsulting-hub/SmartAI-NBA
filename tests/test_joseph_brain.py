@@ -525,5 +525,249 @@ class TestJosephCompsDatabase(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)), "Duplicate names found")
 
 
+# ── Section E: Constants ────────────────────────────────────
+
+
+class TestDawgFactorTable(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import DAWG_FACTOR_TABLE
+        self.table = DAWG_FACTOR_TABLE
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.table, dict)
+
+    def test_has_required_keys(self):
+        expected = {"revenge_game", "contract_year", "nationally_televised",
+                    "rivalry", "playoff_implications", "pace_up",
+                    "trap_game", "back_to_back", "altitude",
+                    "blowout_risk", "pace_down"}
+        self.assertEqual(set(self.table.keys()), expected)
+
+    def test_values_are_floats(self):
+        for key, val in self.table.items():
+            self.assertIsInstance(val, (int, float), f"{key} is not numeric")
+
+    def test_revenge_game_positive(self):
+        self.assertGreater(self.table["revenge_game"], 0)
+
+    def test_trap_game_negative(self):
+        self.assertLess(self.table["trap_game"], 0)
+
+    def test_specific_values(self):
+        self.assertAlmostEqual(self.table["revenge_game"], 2.5)
+        self.assertAlmostEqual(self.table["trap_game"], -3.0)
+        self.assertAlmostEqual(self.table["back_to_back"], -1.5)
+
+
+class TestVerdictEmojis(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import VERDICT_EMOJIS
+        self.emojis = VERDICT_EMOJIS
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.emojis, dict)
+
+    def test_has_all_verdicts(self):
+        for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY"):
+            self.assertIn(v, self.emojis)
+
+    def test_values_are_strings(self):
+        for k, v in self.emojis.items():
+            self.assertIsInstance(v, str)
+            self.assertTrue(len(v) > 0)
+
+    def test_specific_emojis(self):
+        self.assertEqual(self.emojis["SMASH"], "\U0001f525")
+        self.assertEqual(self.emojis["LEAN"], "\u2705")
+        self.assertEqual(self.emojis["STAY_AWAY"], "\U0001f6ab")
+
+
+class TestTicketNames(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import TICKET_NAMES
+        self.names = TICKET_NAMES
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.names, dict)
+
+    def test_has_required_keys(self):
+        for k in (2, 3, 4, 5, 6):
+            self.assertIn(k, self.names)
+
+    def test_values_are_strings(self):
+        for k, v in self.names.items():
+            self.assertIsInstance(v, str)
+            self.assertTrue(len(v) > 0)
+
+    def test_specific_names(self):
+        self.assertEqual(self.names[2], "POWER PLAY")
+        self.assertEqual(self.names[3], "TRIPLE THREAT")
+        self.assertEqual(self.names[6], "THE FULL SEND")
+
+
+# ── Section F: New function stubs ───────────────────────────
+
+
+class TestSelectFragmentStub(unittest.TestCase):
+    def test_returns_dict(self):
+        from engine.joseph_brain import _select_fragment
+        pool = [{"id": "test_01", "text": "Hello"}]
+        result = _select_fragment(pool, set())
+        self.assertIsInstance(result, dict)
+        self.assertIn("id", result)
+        self.assertIn("text", result)
+
+    def test_empty_pool_returns_fallback(self):
+        from engine.joseph_brain import _select_fragment
+        result = _select_fragment([], set())
+        self.assertEqual(result["id"], "fallback")
+        self.assertEqual(result["text"], "")
+
+
+class TestBuildJosephRantStub(unittest.TestCase):
+    def test_returns_string(self):
+        from engine.joseph_brain import build_joseph_rant
+        result = build_joseph_rant("LeBron", {"stat_type": "points"}, "SMASH", [])
+        self.assertIsInstance(result, str)
+        self.assertIn("LeBron", result)
+
+
+class TestJosephFullAnalysisStub(unittest.TestCase):
+    def test_returns_dict_with_required_keys(self):
+        from engine.joseph_brain import joseph_full_analysis
+        result = joseph_full_analysis({}, {}, {}, {})
+        self.assertIsInstance(result, dict)
+        for key in ("verdict", "verdict_emoji", "is_override", "edge",
+                     "confidence", "rant", "dawg_factor", "narrative_tags",
+                     "comp", "grade"):
+            self.assertIn(key, result)
+
+    def test_verdict_emoji_matches_verdict(self):
+        from engine.joseph_brain import joseph_full_analysis, VERDICT_EMOJIS
+        result = joseph_full_analysis({}, {}, {}, {})
+        self.assertEqual(result["verdict_emoji"],
+                         VERDICT_EMOJIS.get(result["verdict"], ""))
+
+
+class TestJosephAnalyzeGameStub(unittest.TestCase):
+    def test_returns_dict_with_required_keys(self):
+        from engine.joseph_brain import joseph_analyze_game
+        result = joseph_analyze_game({}, {}, [])
+        self.assertIsInstance(result, dict)
+        for key in ("game_narrative", "pace_take", "scheme_analysis",
+                     "blowout_risk", "best_props"):
+            self.assertIn(key, result)
+
+
+class TestJosephAnalyzePlayerStub(unittest.TestCase):
+    def test_returns_dict_with_required_keys(self):
+        from engine.joseph_brain import joseph_analyze_player
+        result = joseph_analyze_player({}, [], {}, [])
+        self.assertIsInstance(result, dict)
+        for key in ("scouting_report", "archetype", "grade",
+                     "gravity", "trend", "narrative_tags"):
+            self.assertIn(key, result)
+
+
+class TestJosephGenerateBestBetsStub(unittest.TestCase):
+    def test_returns_dict_with_required_keys(self):
+        from engine.joseph_brain import joseph_generate_best_bets
+        result = joseph_generate_best_bets(3, [], {})
+        self.assertIsInstance(result, dict)
+        for key in ("ticket_name", "legs", "total_ev",
+                     "correlation_score", "rant"):
+            self.assertIn(key, result)
+
+    def test_ticket_name_matches(self):
+        from engine.joseph_brain import joseph_generate_best_bets, TICKET_NAMES
+        for n in (2, 3, 4, 5, 6):
+            result = joseph_generate_best_bets(n, [], {})
+            self.assertEqual(result["ticket_name"], TICKET_NAMES[n])
+
+
+class TestJosephQuickTakeStub(unittest.TestCase):
+    def test_returns_string(self):
+        from engine.joseph_brain import joseph_quick_take
+        result = joseph_quick_take([], {}, [])
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+
+class TestJosephGetAmbientContextStub(unittest.TestCase):
+    def test_returns_tuple(self):
+        from engine.joseph_brain import joseph_get_ambient_context
+        result = joseph_get_ambient_context({})
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], str)
+        self.assertIsInstance(result[1], dict)
+
+
+class TestJosephAmbientLineStub(unittest.TestCase):
+    def test_returns_string(self):
+        from engine.joseph_brain import joseph_ambient_line
+        result = joseph_ambient_line("idle")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+    def test_fallback_to_idle(self):
+        from engine.joseph_brain import joseph_ambient_line
+        result = joseph_ambient_line("nonexistent")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+
+class TestJosephCommentaryStub(unittest.TestCase):
+    def test_returns_string(self):
+        from engine.joseph_brain import joseph_commentary
+        result = joseph_commentary([], "analysis_results")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 0)
+
+
+class TestJosephAutoLogBetsStub(unittest.TestCase):
+    def test_returns_tuple(self):
+        from engine.joseph_brain import joseph_auto_log_bets
+        result = joseph_auto_log_bets([], {})
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result[0], int)
+        self.assertIsInstance(result[1], str)
+
+
+# ── Import fallbacks for new exports ────────────────────────
+
+
+class TestNewExportsImportable(unittest.TestCase):
+    def test_all_new_constants_importable(self):
+        from engine.joseph_brain import (
+            DAWG_FACTOR_TABLE, VERDICT_EMOJIS, TICKET_NAMES,
+        )
+        self.assertIsInstance(DAWG_FACTOR_TABLE, dict)
+        self.assertIsInstance(VERDICT_EMOJIS, dict)
+        self.assertIsInstance(TICKET_NAMES, dict)
+
+    def test_all_new_functions_importable(self):
+        from engine.joseph_brain import (
+            _select_fragment, build_joseph_rant,
+            joseph_full_analysis, joseph_analyze_game,
+            joseph_analyze_player, joseph_generate_best_bets,
+            joseph_quick_take, joseph_get_ambient_context,
+            joseph_ambient_line, joseph_commentary,
+            joseph_auto_log_bets,
+        )
+        self.assertTrue(callable(_select_fragment))
+        self.assertTrue(callable(build_joseph_rant))
+        self.assertTrue(callable(joseph_full_analysis))
+        self.assertTrue(callable(joseph_analyze_game))
+        self.assertTrue(callable(joseph_analyze_player))
+        self.assertTrue(callable(joseph_generate_best_bets))
+        self.assertTrue(callable(joseph_quick_take))
+        self.assertTrue(callable(joseph_get_ambient_context))
+        self.assertTrue(callable(joseph_ambient_line))
+        self.assertTrue(callable(joseph_commentary))
+        self.assertTrue(callable(joseph_auto_log_bets))
+
+
 if __name__ == "__main__":
     unittest.main()

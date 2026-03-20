@@ -1,6 +1,6 @@
 """
 engine/joseph_brain.py
-Joseph M. Smith Brain — Data Pools, Constants & Function Stubs (Layer 4, Parts A–B)
+Joseph M. Smith Brain — Data Pools, Constants & Function Stubs (Layer 4, Parts A–F)
 
 PURPOSE
 -------
@@ -649,6 +649,39 @@ JOSEPH_COMPS_DATABASE = [
     {"name": "Scottie Pippen Two-Way Excellence", "archetype": "Playmaking Wing", "stat_context": "steals", "tier": "Gold", "narrative": "Elite perimeter defender and playmaker", "template": "Pippen was the ultimate TWO-WAY wing. Defense AND playmaking... {reason}"},
 ]
 
+# ═══════════════════════════════════════════════════════════════
+# E) CONSTANTS — Dawg Factor, Verdict Emojis, Ticket Names
+# ═══════════════════════════════════════════════════════════════
+
+DAWG_FACTOR_TABLE = {
+    "revenge_game": +2.5,
+    "contract_year": +1.5,
+    "nationally_televised": +1.0,
+    "rivalry": +0.5,
+    "playoff_implications": +0.5,
+    "pace_up": +0.5,
+    "trap_game": -3.0,
+    "back_to_back": -1.5,
+    "altitude": -1.0,
+    "blowout_risk": -2.0,
+    "pace_down": -0.5,
+}
+
+VERDICT_EMOJIS = {
+    "SMASH": "\U0001f525",
+    "LEAN": "\u2705",
+    "FADE": "\u26a0\ufe0f",
+    "STAY_AWAY": "\U0001f6ab",
+}
+
+TICKET_NAMES = {
+    2: "POWER PLAY",
+    3: "TRIPLE THREAT",
+    4: "THE QUAD",
+    5: "HIGH FIVE",
+    6: "THE FULL SEND",
+}
+
 
 # ═══════════════════════════════════════════════════════════════
 # FUNCTION STUBS  (Phase 1B will fill bodies)
@@ -948,3 +981,296 @@ def reset_fragment_state():
     _used_fragments.clear()
     _used_ambient.clear()
     _used_commentary.clear()
+
+
+# ═══════════════════════════════════════════════════════════════
+# F) NEW FUNCTION STUBS — Phase 1B will fill bodies
+# ═══════════════════════════════════════════════════════════════
+
+
+def _select_fragment(pool: list, used_set: set) -> dict:
+    """Select random fragment from pool, excluding used IDs. Reset if >60% exhausted.
+
+    Parameters
+    ----------
+    pool : list[dict]
+        Fragment pool (each entry has ``"id"`` and ``"text"`` keys).
+    used_set : set
+        Set of already-used fragment IDs.
+
+    Returns
+    -------
+    dict
+        The selected fragment dict with ``"id"`` and ``"text"`` keys.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return pool[0] if pool else {"id": "fallback", "text": ""}
+
+
+def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: list,
+                      mismatch: dict | None = None, comp: dict | None = None,
+                      energy: str = "medium") -> str:
+    """Build a unique 4-8 sentence Joseph rant using combinatorial fragment assembly.
+
+    Combines opener, body template, pivot, catchphrase, and closer fragments
+    to form a multi-sentence rant personalised to the player/prop/verdict.
+
+    Parameters
+    ----------
+    player : str
+        Player display name.
+    prop : dict
+        Prop dict with ``stat_type``, ``line``, etc.
+    verdict : str
+        Verdict key (``"SMASH"``, ``"LEAN"``, ``"FADE"``, ``"STAY_AWAY"``).
+    narrative_tags : list[str]
+        List of narrative tags (e.g. ``["revenge_game", "pace_up"]``).
+    mismatch : dict or None
+        Mismatch data from strategy analysis.
+    comp : dict or None
+        Historical comp entry from JOSEPH_COMPS_DATABASE.
+    energy : str
+        Energy level (``"low"``, ``"medium"``, ``"high"``).
+
+    Returns
+    -------
+    str
+        The assembled multi-sentence Joseph rant.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return f"Joseph M. Smith likes {player}. {verdict}!"
+
+
+def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
+                         teams_data: dict) -> dict:
+    """THE 8-STEP REASONING LOOP. Returns complete analysis dict.
+
+    Steps: (1) edge detection, (2) confidence scoring, (3) grading,
+    (4) narrative tagging, (5) dawg factor, (6) mismatch detection,
+    (7) historical comp, (8) rant generation.
+
+    Parameters
+    ----------
+    analysis_result : dict
+        Raw analysis result from the Quantum Matrix Engine.
+    player : dict
+        Player data dict with season stats.
+    game : dict
+        Game context dict.
+    teams_data : dict
+        All teams data for matchup analysis.
+
+    Returns
+    -------
+    dict
+        Complete analysis with keys: ``verdict``, ``verdict_emoji``,
+        ``is_override``, ``edge``, ``confidence``, ``rant``,
+        ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return {
+        "verdict": "LEAN",
+        "verdict_emoji": VERDICT_EMOJIS.get("LEAN", "✅"),
+        "is_override": False,
+        "edge": 0.0,
+        "confidence": 50.0,
+        "rant": "",
+        "dawg_factor": 0.0,
+        "narrative_tags": [],
+        "comp": None,
+        "grade": "C",
+    }
+
+
+def joseph_analyze_game(game: dict, teams_data: dict,
+                        analysis_results: list) -> dict:
+    """Game-level analysis for Studio Game Mode + sidebar widget.
+
+    Parameters
+    ----------
+    game : dict
+        Game data dict with home/away teams.
+    teams_data : dict
+        All teams data for context.
+    analysis_results : list[dict]
+        List of all prop analysis results for this game.
+
+    Returns
+    -------
+    dict
+        Game-level analysis with keys: ``game_narrative``, ``pace_take``,
+        ``scheme_analysis``, ``blowout_risk``, ``best_props``.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return {
+        "game_narrative": "",
+        "pace_take": "",
+        "scheme_analysis": "",
+        "blowout_risk": "",
+        "best_props": [],
+    }
+
+
+def joseph_analyze_player(player: dict, games: list, teams_data: dict,
+                          analysis_results: list) -> dict:
+    """Player-level analysis for Studio Player Mode + sidebar widget.
+
+    Parameters
+    ----------
+    player : dict
+        Player data dict with season stats and game logs.
+    games : list[dict]
+        Recent game logs.
+    teams_data : dict
+        All teams data for context.
+    analysis_results : list[dict]
+        Analysis results for this player's props.
+
+    Returns
+    -------
+    dict
+        Player-level analysis with keys: ``scouting_report``, ``archetype``,
+        ``grade``, ``gravity``, ``trend``, ``narrative_tags``.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return {
+        "scouting_report": "",
+        "archetype": "Unknown",
+        "grade": "C",
+        "gravity": 50.0,
+        "trend": "neutral",
+        "narrative_tags": [],
+    }
+
+
+def joseph_generate_best_bets(leg_count: int, analysis_results: list,
+                              teams_data: dict) -> dict:
+    """Generate Joseph's recommended ticket for Studio Build My Bets.
+
+    Parameters
+    ----------
+    leg_count : int
+        Number of legs for the ticket (2-6).
+    analysis_results : list[dict]
+        All analysis results to select from.
+    teams_data : dict
+        All teams data for correlation analysis.
+
+    Returns
+    -------
+    dict
+        Ticket recommendation with keys: ``ticket_name``, ``legs``,
+        ``total_ev``, ``correlation_score``, ``rant``.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return {
+        "ticket_name": TICKET_NAMES.get(leg_count, "TICKET"),
+        "legs": [],
+        "total_ev": 0.0,
+        "correlation_score": 0.0,
+        "rant": "",
+    }
+
+
+def joseph_quick_take(analysis_results: list, teams_data: dict,
+                      todays_games: list) -> str:
+    """Generate a unique 3-4 sentence monologue about tonight's slate.
+
+    Parameters
+    ----------
+    analysis_results : list[dict]
+        All prop analysis results.
+    teams_data : dict
+        All teams data.
+    todays_games : list[dict]
+        Tonight's games.
+
+    Returns
+    -------
+    str
+        A 3-4 sentence Joseph M. Smith monologue.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return "Joseph M. Smith is ready for tonight's slate."
+
+
+def joseph_get_ambient_context(session_state: dict) -> tuple:
+    """Determine ambient context from session state.
+
+    Inspects the session state to decide which ambient context is active
+    (idle, games_loaded, analysis_complete, entry_built, premium_pitch).
+
+    Parameters
+    ----------
+    session_state : dict
+        Streamlit session state dict.
+
+    Returns
+    -------
+    tuple[str, dict]
+        A (context_key, kwargs) tuple for ``joseph_ambient_line``.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return ("idle", {})
+
+
+def joseph_ambient_line(context: str, **kwargs) -> str:
+    """Select and fill an ambient line from AMBIENT_POOLS.
+
+    Parameters
+    ----------
+    context : str
+        Context key into AMBIENT_POOLS (e.g. ``"idle"``, ``"games_loaded"``).
+    **kwargs
+        Format kwargs to fill placeholders (e.g. ``n=5``).
+
+    Returns
+    -------
+    str
+        A filled ambient commentary line.
+    """
+    # IMPLEMENTATION: Phase 1B
+    lines = AMBIENT_POOLS.get(context, AMBIENT_POOLS["idle"])
+    return lines[0] if lines else ""
+
+
+def joseph_commentary(results: list, context_type: str) -> str:
+    """Generate 2-4 sentence reactive commentary.
+
+    Selects an opener from COMMENTARY_OPENER_POOL and appends
+    result-specific commentary sentences.
+
+    Parameters
+    ----------
+    results : list[dict]
+        Analysis results to comment on.
+    context_type : str
+        Context type key into COMMENTARY_OPENER_POOL
+        (e.g. ``"analysis_results"``, ``"entry_built"``).
+
+    Returns
+    -------
+    str
+        A 2-4 sentence Joseph commentary block.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return "Joseph M. Smith has thoughts on this."
+
+
+def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
+    """Pass-through to engine.joseph_bets.joseph_auto_log_bets().
+
+    Parameters
+    ----------
+    joseph_results : list[dict]
+        Joseph's analysis results to auto-log.
+    session_state : dict
+        Streamlit session state dict.
+
+    Returns
+    -------
+    tuple[int, str]
+        (count_logged, status_message) tuple.
+    """
+    # IMPLEMENTATION: Phase 1B
+    return (0, "Joseph bets module not installed yet")
