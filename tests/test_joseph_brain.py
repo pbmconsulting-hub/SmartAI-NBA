@@ -255,6 +255,11 @@ class TestDetermineVerdictStub(unittest.TestCase):
         self.assertIsInstance(v, str)
         self.assertIn(v, {"SMASH", "LEAN", "FADE", "STAY_AWAY", "OVERRIDE"})
 
+    def test_avoid_returns_stay_away(self):
+        from engine.joseph_brain import determine_verdict
+        v = determine_verdict(10.0, 80.0, avoid=True)
+        self.assertEqual(v, "STAY_AWAY")
+
 
 class TestBuildRantStub(unittest.TestCase):
     def test_returns_string(self):

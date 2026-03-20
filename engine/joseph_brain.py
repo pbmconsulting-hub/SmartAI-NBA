@@ -250,6 +250,7 @@ CATCHPHRASE_POOL = [
     {"id": "catch_13", "text": "He's a FIRST-BALLOT Hall of Famer in my book!"},
 ]
 
+# Placeholders used in templates: {player}, {stat}, {line}, {edge}, {prob}
 BODY_TEMPLATES = {
     "SMASH": [
         "{player} OVER {line} {stat}? That's not even a QUESTION! {edge}% edge — the numbers are SCREAMING at you!",
@@ -397,6 +398,7 @@ STAT_COMMENTARY_POOL = {
 # D) VERDICT THRESHOLDS & CONFIGURATION
 # ═══════════════════════════════════════════════════════════════
 
+# Edge is in percentage points (e.g. 8.0 = 8 %), confidence is 0-100 scale.
 VERDICT_THRESHOLDS = {
     "SMASH": {"min_edge": 8.0, "min_confidence": 70.0},
     "LEAN": {"min_edge": 4.0, "min_confidence": 55.0},
@@ -522,6 +524,8 @@ def determine_verdict(edge, confidence_score, avoid=False):
     str
         One of ``"SMASH"``, ``"LEAN"``, ``"FADE"``, ``"STAY_AWAY"``, ``"OVERRIDE"``.
     """
+    if avoid:
+        return "STAY_AWAY"
     return "LEAN"
 
 
