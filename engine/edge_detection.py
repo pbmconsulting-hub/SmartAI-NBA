@@ -1478,131 +1478,26 @@ def classify_bet_type(
         _demon_ceiling = round(sim_percentile_90 + _safe_std, 1)
 
     # ============================================================
-    # PRIMARY CLASSIFICATION — driven by line_category
+    # UNIFIED CLASSIFICATION — Goblin/Demon/50_50 tiers removed.
+    # All props return "standard" bet_type.  The True More/Less
+    # Line is the sole anchor for Model Projection vs Line math.
     # ============================================================
-    _norm_category = str(line_category).lower() if line_category is not None else None
-
-    if _norm_category == "goblin":
-        # Alt line BELOW standard O/U — Goblin Bet (safe floor)
-        return {
-            "bet_type":        "goblin",
-            "bet_type_emoji":  "Goblin",
-            "bet_type_label":  "Goblin Bet — Safe Floor",
-            "goblin":          True,
-            "demon":           False,
-            "50_50":           False,
-            "line_category":   line_category,
-            "risk_flags":      risk_flags,
-            "is_uncertain":    is_uncertain,
-            "reasons":         goblin_reasons if goblin_reasons else ["Alt line set BELOW the standard O/U — safe floor"],
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   line_verified,
-            "line_reliability_warning": line_reliability_warning,
-            "goblin_floor":    _goblin_floor,
-            "demon_ceiling":   _demon_ceiling,
-        }
-
-    if _norm_category == "demon":
-        # Alt line ABOVE standard O/U — Demon Bet (high ceiling)
-        return {
-            "bet_type":        "demon",
-            "bet_type_emoji":  "Demon",
-            "bet_type_label":  "Demon Bet — High Ceiling",
-            "goblin":          False,
-            "demon":           True,  # True = real Demon (line above standard O/U)
-            "50_50":           False,
-            "line_category":   line_category,
-            "risk_flags":      risk_flags,
-            "is_uncertain":    is_uncertain,
-            "reasons":         ["Alt line set ABOVE the standard O/U — high ceiling"],
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   line_verified,
-            "line_reliability_warning": line_reliability_warning,
-            "goblin_floor":    _goblin_floor,
-            "demon_ceiling":   _demon_ceiling,
-        }
-
-    # line_category is "50_50", "standard", or None —
-    # standard-line pick.  Goblin statistical overlay applies here.
-    if is_goblin:
-        return {
-            "bet_type":        "goblin",
-            "bet_type_emoji":  "Goblin",
-            "bet_type_label":  "Goblin Bet — Safe Floor",
-            "goblin":          True,
-            "demon":           False,
-            "50_50":           False,
-            "line_category":   line_category,
-            "risk_flags":      risk_flags,
-            "is_uncertain":    is_uncertain,
-            "reasons":         goblin_reasons,
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   True,
-            "line_reliability_warning": None,
-            "goblin_floor":    _goblin_floor,
-            "demon_ceiling":   _demon_ceiling,
-        }
-
-    if _norm_category in ("50_50", "standard"):
-        # Standard sportsbook line — 50/50 Bet
-        return {
-            "bet_type":        "50_50",
-            "bet_type_emoji":  "50/50",
-            "bet_type_label":  "50/50 Bet — Standard Line",
-            "goblin":          False,
-            "demon":           False,
-            "50_50":           True,
-            "line_category":   line_category,
-            "risk_flags":      risk_flags,
-            "is_uncertain":    is_uncertain,
-            "reasons":         risk_flags,
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   line_verified,
-            "line_reliability_warning": line_reliability_warning,
-            "goblin_floor":    _goblin_floor,
-            "demon_ceiling":   _demon_ceiling,
-        }
-
-    # line_category is None — backward-compatible path (synthetic / no category).
-    # Return "50_50" when risk flags present (old behavior), else "normal".
-    # Note: label is "Standard Line" for consistency with the explicit 50_50/standard
-    # path; is_uncertain=True signals the risk flags via the separate risk_flags key.
-    if is_uncertain:
-        return {
-            "bet_type":        "50_50",
-            "bet_type_emoji":  "50/50",
-            "bet_type_label":  "50/50 Bet — Standard Line",
-            "goblin":          False,
-            "demon":           False,
-            "50_50":           True,
-            "line_category":   line_category,
-            "risk_flags":      risk_flags,
-            "is_uncertain":    True,
-            "reasons":         risk_flags,
-            "std_devs_from_line": round(std_devs_from_line, 2),
-            "line_verified":   line_verified,
-            "line_reliability_warning": line_reliability_warning,
-            "goblin_floor":    _goblin_floor,
-            "demon_ceiling":   _demon_ceiling,
-        }
-
-    # Normal bet — no special classification
     return {
-        "bet_type":        "normal",
+        "bet_type":        "standard",
         "bet_type_emoji":  "",
-        "bet_type_label":  "Normal Bet",
+        "bet_type_label":  "Standard Bet",
         "goblin":          False,
         "demon":           False,
         "50_50":           False,
         "line_category":   line_category,
-        "risk_flags":      [],
-        "is_uncertain":    False,
-        "reasons":         [],
+        "risk_flags":      risk_flags,
+        "is_uncertain":    is_uncertain,
+        "reasons":         risk_flags if risk_flags else [],
         "std_devs_from_line": round(std_devs_from_line, 2),
         "line_verified":   line_verified,
         "line_reliability_warning": line_reliability_warning,
-        "goblin_floor":    _goblin_floor,
-        "demon_ceiling":   _demon_ceiling,
+        "goblin_floor":    None,
+        "demon_ceiling":   None,
     }
 
 

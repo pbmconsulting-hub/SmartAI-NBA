@@ -105,23 +105,12 @@ def _build_single_card_html(result, index=0):
     except (ValueError, TypeError):
         proj_d = "—"
 
-    # Bet type + prediction text (Goblin/Demon)
-    bet_type = result.get("bet_type", "normal")
+    # Bet type + prediction text (tiered Goblin/Demon removed — all standard)
+    bet_type = result.get("bet_type", "standard")
     prediction = _escape(result.get("prediction", ""))
 
-    if bet_type == "goblin":
-        pred_class = "qcm-prediction-goblin"
-        pred_icon = "🟢"
-        if not prediction and true_line > 0:
-            prediction = _escape(f"I predict the stat will do at LEAST {true_line:g}")
-    elif bet_type == "demon":
-        pred_class = "qcm-prediction-demon"
-        pred_icon = "👹"
-        if not prediction and true_line > 0:
-            prediction = _escape(f"I predict the stat will do at MOST {true_line:g}")
-    else:
-        pred_class = "qcm-prediction-neutral"
-        pred_icon = "⚪"
+    pred_class = "qcm-prediction-neutral"
+    pred_icon = "⚪"
 
     prediction_html = ""
     if prediction:
@@ -130,16 +119,9 @@ def _build_single_card_html(result, index=0):
             f'{pred_icon} {prediction}</div>'
         )
 
-    # ── Demon-specific card class and ceiling ────────────────────
-    demon_card_cls = " qcm-card-demon" if bet_type == "demon" else ""
-    demon_ceiling = result.get("demon_ceiling")
+    # Demon-specific card elements removed (tier system removed)
+    demon_card_cls = ""
     demon_ceiling_html = ""
-    if bet_type == "demon" and demon_ceiling is not None:
-        demon_ceiling_html = (
-            '<div class="qcm-demon-ceiling">'
-            f'🚫 Ceiling: {_escape(str(demon_ceiling))} — do not bet past this line'
-            '</div>'
-        )
 
     # Stagger delay: 20ms per card, capped at 2s for 100 cards
     delay_ms = min(index * 20, 2000)
@@ -283,14 +265,14 @@ def _build_single_card_html(result, index=0):
 </div>"""
 
 
-def compile_card_matrix(results, max_cards=50):
+def compile_card_matrix(results, max_cards=None):
     """
     Compile a list of prop-analysis result dicts into a single HTML string
     with CSS Grid layout for high-capacity rendering.
 
-    This function iterates through up to *max_cards* results and wraps
-    each in the Quantum Card HTML template. All cards are joined into
-    one ``master_html_string`` for injection via a single
+    This function iterates through *all* results (or up to *max_cards* if
+    specified) and wraps each in the Quantum Card HTML template. All cards
+    are joined into one ``master_html_string`` for injection via a single
     ``st.markdown(html, unsafe_allow_html=True)`` call.
 
     Args:
@@ -299,8 +281,8 @@ def compile_card_matrix(results, max_cards=50):
             ``stat_type``, ``prop_line``, ``tier``, ``confidence_score``,
             ``probability_over``, ``edge_percentage``, ``bet_type``,
             ``prediction``.
-        max_cards (int): Maximum number of cards to render. Default 50.
-            Prevents WebSocket overload on large datasets.
+        max_cards (int or None): Maximum number of cards to render.
+            Default None renders ALL results.
 
     Returns:
         str: A single HTML string containing all cards wrapped in a CSS
@@ -313,8 +295,8 @@ def compile_card_matrix(results, max_cards=50):
             "No analysis results to display.</div>"
         )
 
-    # Slice to max_cards to prevent WebSocket overload
-    display_results = results[:max_cards]
+    # Render all results (or cap at max_cards when explicitly provided)
+    display_results = results if max_cards is None else results[:max_cards]
 
     # Build all card HTML strings
     card_strings = [

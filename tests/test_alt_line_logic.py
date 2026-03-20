@@ -36,39 +36,31 @@ class TestGenerateAltLineProbabilities(unittest.TestCase):
         sim = self._mock_sim_output([10.0] * 100, 0.8)
         result = self.gen(sim, 10.0)
         goblin_lines = [g["line"] for g in result["goblin_lines"]]
-        self.assertEqual(goblin_lines, [9.0, 8.0, 7.0])
+        self.assertEqual(goblin_lines, [])
 
     def test_demon_offsets_correct(self):
         sim = self._mock_sim_output([10.0] * 100, 0.8)
         result = self.gen(sim, 10.0)
         demon_lines = [d["line"] for d in result["demon_lines"]]
-        self.assertEqual(demon_lines, [12.0, 14.0, 16.0])
+        self.assertEqual(demon_lines, [])
 
     def test_three_goblin_three_demon(self):
         sim = self._mock_sim_output([10.0] * 50, 0.5)
         result = self.gen(sim, 10.0)
-        self.assertEqual(len(result["goblin_lines"]), 3)
-        self.assertEqual(len(result["demon_lines"]), 3)
+        self.assertEqual(len(result["goblin_lines"]), 0)
+        self.assertEqual(len(result["demon_lines"]), 0)
 
     def test_goblin_probability_is_gte(self):
-        """Goblin probability = P(stat >= goblin_line)."""
-        # 10 results: 5,6,7,8,9,10,11,12,13,14
+        """Goblin lines are now empty — no probability to check."""
         sim = self._mock_sim_output([float(x) for x in range(5, 15)], 0.6)
         result = self.gen(sim, 7.5)
-        # Goblin L-1 = 6.5 → values >= 6.5 are: 7,8,9,10,11,12,13,14 = 8/10 = 0.8
-        g1 = result["goblin_lines"][0]
-        self.assertEqual(g1["line"], 6.5)
-        self.assertAlmostEqual(g1["probability"], 0.8, places=2)
+        self.assertEqual(result["goblin_lines"], [])
 
     def test_demon_probability_is_lte(self):
-        """Demon probability = P(stat <= demon_line)."""
-        # 10 results: 5,6,7,8,9,10,11,12,13,14
+        """Demon lines are now empty — no probability to check."""
         sim = self._mock_sim_output([float(x) for x in range(5, 15)], 0.6)
         result = self.gen(sim, 7.5)
-        # Demon L+2 = 9.5 → values <= 9.5 are: 5,6,7,8,9 = 5/10 = 0.5
-        d1 = result["demon_lines"][0]
-        self.assertEqual(d1["line"], 9.5)
-        self.assertAlmostEqual(d1["probability"], 0.5, places=2)
+        self.assertEqual(result["demon_lines"], [])
 
     def test_best_alt_has_highest_probability(self):
         sim = self._mock_sim_output([float(x) for x in range(5, 15)], 0.6)
@@ -96,15 +88,10 @@ class TestGenerateAltLineProbabilities(unittest.TestCase):
         self.assertEqual(result["best_alt"]["type"], "base")
 
     def test_negative_goblin_line_floors_at_half(self):
-        """If base line is very low, goblin lines floor at 0.5."""
+        """Goblin lines are now empty — floor logic no longer applies."""
         sim = self._mock_sim_output([1.0, 2.0, 3.0], 0.5)
         result = self.gen(sim, 1.5)
-        # L-2.0 = -0.5 → should floor at 0.5
-        g2 = result["goblin_lines"][1]
-        self.assertGreaterEqual(g2["line"], 0.5)
-        # L-3.0 = -1.5 → should floor at 0.5
-        g3 = result["goblin_lines"][2]
-        self.assertGreaterEqual(g3["line"], 0.5)
+        self.assertEqual(result["goblin_lines"], [])
 
     def test_probabilities_clamped(self):
         """All probabilities should be in [0.01, 0.99]."""
@@ -127,11 +114,11 @@ class TestFormatAltLinePrediction(unittest.TestCase):
 
     def test_goblin_prediction_string(self):
         result = self.fmt(6.5, "goblin")
-        self.assertEqual(result, "I predict the stat will do at LEAST 6.5")
+        self.assertEqual(result, "")
 
     def test_demon_prediction_string(self):
         result = self.fmt(9.5, "demon")
-        self.assertEqual(result, "I predict the stat will do at MOST 9.5")
+        self.assertEqual(result, "")
 
     def test_base_returns_empty(self):
         result = self.fmt(7.5, "base")
@@ -173,11 +160,11 @@ class TestAltLineConstants(unittest.TestCase):
 
     def test_goblin_offsets(self):
         from engine.simulation import GOBLIN_OFFSETS
-        self.assertEqual(GOBLIN_OFFSETS, [-1.0, -2.0, -3.0])
+        self.assertEqual(GOBLIN_OFFSETS, [])
 
     def test_demon_offsets(self):
         from engine.simulation import DEMON_OFFSETS
-        self.assertEqual(DEMON_OFFSETS, [2.0, 4.0, 6.0])
+        self.assertEqual(DEMON_OFFSETS, [])
 
     def test_goblin_lines_subtract(self):
         """Goblin lines should always be base - offset."""

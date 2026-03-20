@@ -167,8 +167,7 @@ class TestEdgeDetectionBackwardCompat(unittest.TestCase):
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_classify_kwargs())
         self.assertIn("bet_type", result)
-        # "50_50" is the renamed "demon" classification; "demon" kept for compat
-        self.assertIn(result["bet_type"], ("normal", "goblin", "50_50", "demon"))
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_classify_returns_reasons_list(self):
         from engine.edge_detection import classify_bet_type
@@ -184,8 +183,8 @@ class TestEdgeDetectionBackwardCompat(unittest.TestCase):
         kw["edge_percentage"]    = 35.0
         kw["line_source"]        = "prizepicks"  # real line
         result = classify_bet_type(**kw)
-        # Should be goblin or close to it
-        self.assertIn(result["bet_type"], ("goblin", "normal"))
+        # Goblin tier removed — always returns "standard"
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_classify_synthetic_line_never_goblin(self):
         from engine.edge_detection import classify_bet_type

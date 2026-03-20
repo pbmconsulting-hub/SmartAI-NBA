@@ -93,9 +93,10 @@ class TestCompileCardMatrix(unittest.TestCase):
     def test_default_max_cards_is_50(self):
         results = [self._sample_result(player_name=f"P{i}") for i in range(60)]
         html = self.compile(results)
+        # Default max_cards is now None — all cards render
         self.assertIn("P0", html)
         self.assertIn("P49", html)
-        self.assertNotIn("P50", html)
+        self.assertIn("P59", html)
 
     def test_html_escaping_prevents_xss(self):
         html = self.compile([self._sample_result(
@@ -137,7 +138,8 @@ class TestCompileCardMatrix(unittest.TestCase):
             prediction="",  # No prediction provided
             prop_line=20.0,
         )])
-        self.assertIn("at LEAST 20", html)
+        # Goblin prediction auto-gen removed; class not used on any element
+        self.assertNotIn('class="qcm-prediction qcm-prediction-goblin"', html)
 
     def test_auto_generates_demon_prediction_when_missing(self):
         html = self.compile([self._sample_result(
@@ -145,7 +147,8 @@ class TestCompileCardMatrix(unittest.TestCase):
             prediction="",
             prop_line=20.0,
         )])
-        self.assertIn("at MOST 20", html)
+        # Demon prediction auto-gen removed; class not used on any element
+        self.assertNotIn('class="qcm-prediction qcm-prediction-demon"', html)
 
 
 class TestContextualGoblinDemon(unittest.TestCase):
@@ -157,49 +160,45 @@ class TestContextualGoblinDemon(unittest.TestCase):
 
     def test_over_direction_goblin_minus_one(self):
         result = self.gen(24.5, direction="over")
-        self.assertAlmostEqual(result["goblin_line"], 23.5)
+        self.assertAlmostEqual(result["goblin_line"], 24.5)
 
     def test_over_direction_demon_plus_two(self):
         result = self.gen(24.5, direction="over")
-        self.assertAlmostEqual(result["demon_line"], 26.5)
+        self.assertAlmostEqual(result["demon_line"], 24.5)
 
     def test_under_direction_goblin_plus_one(self):
         result = self.gen(24.5, direction="under")
-        self.assertAlmostEqual(result["goblin_line"], 25.5)
+        self.assertAlmostEqual(result["goblin_line"], 24.5)
 
     def test_under_direction_demon_minus_two(self):
         result = self.gen(24.5, direction="under")
-        self.assertAlmostEqual(result["demon_line"], 22.5)
+        self.assertAlmostEqual(result["demon_line"], 24.5)
 
     def test_over_goblin_prediction_at_least(self):
         result = self.gen(20.0, direction="over")
-        self.assertIn("at LEAST", result["goblin_prediction"])
-        self.assertIn("19.0", result["goblin_prediction"])
+        self.assertEqual(result["goblin_prediction"], "")
 
     def test_over_demon_prediction_at_most(self):
         result = self.gen(20.0, direction="over")
-        self.assertIn("at MOST", result["demon_prediction"])
-        self.assertIn("22.0", result["demon_prediction"])
+        self.assertEqual(result["demon_prediction"], "")
 
     def test_under_goblin_prediction_at_most(self):
         result = self.gen(20.0, direction="under")
-        self.assertIn("at MOST", result["goblin_prediction"])
-        self.assertIn("21.0", result["goblin_prediction"])
+        self.assertEqual(result["goblin_prediction"], "")
 
     def test_under_demon_prediction_at_least(self):
         result = self.gen(20.0, direction="under")
-        self.assertIn("at LEAST", result["demon_prediction"])
-        self.assertIn("18.0", result["demon_prediction"])
+        self.assertEqual(result["demon_prediction"], "")
 
     def test_more_alias_for_over(self):
         result = self.gen(10.0, direction="more")
         self.assertEqual(result["direction"], "over")
-        self.assertAlmostEqual(result["goblin_line"], 9.0)
+        self.assertAlmostEqual(result["goblin_line"], 10.0)
 
     def test_less_alias_for_under(self):
         result = self.gen(10.0, direction="less")
         self.assertEqual(result["direction"], "under")
-        self.assertAlmostEqual(result["goblin_line"], 11.0)
+        self.assertAlmostEqual(result["goblin_line"], 10.0)
 
     def test_minimum_line_floor(self):
         """Lines should never go below 0.5."""
@@ -341,10 +340,10 @@ class TestFormatAltLinePrediction(unittest.TestCase):
         self.fmt = format_alt_line_prediction
 
     def test_goblin_at_least(self):
-        self.assertIn("at LEAST", self.fmt(23.5, "goblin"))
+        self.assertEqual(self.fmt(23.5, "goblin"), "")
 
     def test_demon_at_most(self):
-        self.assertIn("at MOST", self.fmt(26.5, "demon"))
+        self.assertEqual(self.fmt(26.5, "demon"), "")
 
     def test_base_empty(self):
         self.assertEqual(self.fmt(24.5, "base"), "")

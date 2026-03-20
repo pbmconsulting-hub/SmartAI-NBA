@@ -1701,25 +1701,10 @@ if analysis_results:
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
         )
     with _na_filter_col2:
-        _na_bet_type_filter = st.multiselect(
-            "Bet Classification",
-            ["Goblin — Easy Money", "Demon — High Ceiling", "⚡ Normal", "50/50 — Uncertain"],
-            default=[],
-            key="na_bet_type_filter",
-            help="Filter by bet type. Leave empty to show all.",
-        )
+        pass  # Bet Classification filter removed (tier system removed)
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
-    if _na_bet_type_filter:
-        _na_bt_map = {
-            "Goblin — Easy Money":   "goblin",
-            "Demon — High Ceiling":  "demon",
-            "50/50 — Uncertain":     "50_50",
-            "⚡ Normal":             "normal",
-        }
-        _na_bt_values = {_na_bt_map[t] for t in _na_bet_type_filter if t in _na_bt_map}
-        displayed_results = [r for r in displayed_results if r.get("bet_type", "normal") in _na_bt_values]
 
     # Sort by confidence score descending
     displayed_results.sort(
@@ -1945,274 +1930,6 @@ if analysis_results:
             "📭 **No picks match the current filters.** All analyzed props were filtered out. "
             "Try switching to **All picks** above, or loosen the Tier / Bet Classification filters."
         )
-
-    # ============================================================
-    # SECTION: 🧌 Goblin Picks — Extreme Edge "Easy Money" Bets
-    # ============================================================
-    _goblin_picks = [
-        r for r in displayed_results
-        if r.get("bet_type") == "goblin"
-        and not r.get("player_is_out", False)
-    ]
-    _goblin_picks = sorted(
-        _goblin_picks,
-        key=lambda r: (abs(r.get("edge_percentage", 0)), r.get("confidence_score", 0)),
-        reverse=True,
-    )
-
-    if _goblin_picks:
-        with st.expander(
-            f"Goblin Picks — Easy Money ({len(_goblin_picks)})",
-            expanded=True,
-        ):
-            _gcol_logo, _gcol_title = st.columns([1, 6])
-            with _gcol_logo:
-                if os.path.exists(_GOBLIN_LOGO_PATH):
-                    st.image(_GOBLIN_LOGO_PATH, width=110)
-            with _gcol_title:
-                st.markdown(
-                    '<div style="background:linear-gradient(135deg,#0d1a0d,#102010);'
-                    'border:2px solid #4caf50;border-radius:10px;padding:16px 20px;margin-bottom:12px;">'
-                    '<h3 style="color:#4caf50;font-family:Orbitron,sans-serif;margin:0 0 6px;">Goblin Picks — Easy Money</h3>'
-                    '<p style="color:#a0d0a0;font-size:0.85rem;margin:0;">'
-                    'Extreme-edge bets where the model projection is far beyond the line — '
-                    'massive edge, high probability, the closest thing to a sure bet in sports.'
-                    '</p>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown(
-                get_education_box_html(
-                    "What is a Goblin Bet?",
-                    "A <strong>Goblin bet</strong> is a bet where the platform's line is so far from "
-                    "reality that it's almost free money. Think of it like finding a $20 bill on the "
-                    "ground — the sportsbook set the line at a number that's <em>WAY</em> below (or "
-                    "above) where the player is actually likely to land.<br><br>"
-                    "<strong>Example:</strong> LeBron James OVER 12.5 points when he averages 25 and our "
-                    "model projects 26.8. The line is absurdly low — there's an 88% chance he goes over. "
-                    "That's a Goblin.<br><br>"
-                    "<strong>Criteria:</strong> Model projection is 2+ standard deviations from the line, "
-                    "probability ≥80%, edge ≥25%. Line must be verified (not synthetic/estimated).",
-                ),
-                unsafe_allow_html=True,
-            )
-            for _gp in _goblin_picks:
-                _gp_name   = _html.escape(str(_gp.get("player_name", "")))
-                _gp_team   = _html.escape(str(_gp.get("player_team", _gp.get("team", ""))))
-                _gp_stat   = _html.escape(str(_gp.get("stat_type", "")).title())
-                _gp_dir    = _html.escape(str(_gp.get("direction", "OVER")))
-                _gp_line   = _gp.get("line", 0)
-                _gp_proj   = _gp.get("adjusted_projection", _gp.get("projected_stat", 0))
-                _gp_prob   = _gp.get("probability_over", 0.5) if _gp_dir == "OVER" else 1.0 - _gp.get("probability_over", 0.5)
-                _gp_edge   = abs(_gp.get("edge_percentage", 0))
-                _gp_conf   = _gp.get("confidence_score", 0)
-                _gp_sigma  = abs(_gp.get("std_devs_from_line", 0))
-                _gp_tier   = _html.escape(str(_gp.get("tier", "")))
-                _gp_tier_emoji = _gp.get("tier_emoji", "")
-                _gp_line_verified = _gp.get("line_verified", True)
-                _gp_line_warning  = _gp.get("line_reliability_warning") or ""
-                # Season average for the stat
-                _gp_stat_key = _gp.get("stat_type", "points").lower()
-                _gp_avg_map = {
-                    "points": "season_pts_avg", "rebounds": "season_reb_avg",
-                    "assists": "season_ast_avg", "threes": "season_threes_avg",
-                }
-                _gp_season_avg = float(_gp.get(_gp_avg_map.get(_gp_stat_key, ""), 0) or 0)
-                _gp_reasons_html = "".join(
-                    f'<li style="color:#c8e6c9;font-size:0.8rem;">{_html.escape(str(r))}</li>'
-                    for r in _gp.get("bet_type_reasons", [])
-                )
-                _over_odds  = _gp.get("over_odds",  -110)
-                _under_odds = _gp.get("under_odds", -110)
-                _odds_for_dir = _over_odds if _gp_dir == "OVER" else _under_odds
-                _odds_str = f"+{_odds_for_dir}" if _odds_for_dir > 0 else str(_odds_for_dir)
-                _gp_goblin_floor = _gp.get("goblin_floor")
-                # Strict prediction string — "at LEAST" for Goblin bets
-                _gp_prediction = _gp.get("prediction", "")
-                if not _gp_prediction:
-                    _gp_prediction = f"I predict the stat will do at LEAST {_gp_line}"
-                _gp_plain_reason = _gp_prediction
-                _gp_team_badge = (
-                    f'<span style="background:rgba(76,175,80,0.2);color:#81c784;padding:1px 7px;'
-                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-                    f'border:1px solid rgba(76,175,80,0.4);">{_gp_team}</span>'
-                    if _gp_team else ""
-                )
-                st.markdown(
-                    f'<div style="background:#0d1a0d;border:2px solid #4caf50;border-radius:8px;'
-                    f'padding:14px 18px;margin-bottom:10px;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
-                    f'<div>'
-                    f'<span style="background:rgba(76,175,80,0.25);color:#4caf50;padding:2px 8px;'
-                    f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
-                    f'border:1px solid rgba(76,175,80,0.5);">🟢 Goblin</span>'
-                    f'<span style="color:#4caf50;font-weight:800;font-size:1.05rem;">🧌 {_gp_name}</span>'
-                    f'{_gp_team_badge}'
-                    f'<span style="color:#c8e6c9;font-size:0.9rem;margin-left:10px;">'
-                    f'{_gp_dir} {_gp_line} {_gp_stat}</span>'
-                    f'<span style="color:#a0d0a0;font-size:0.8rem;margin-left:8px;">'
-                    f'(Proj: <strong style="color:#4caf50;">{_gp_proj:.1f}</strong>'
-                    + (f' &nbsp;|&nbsp; Avg: {_gp_season_avg:.1f}' if _gp_season_avg else "")
-                    + f' &nbsp;|&nbsp; {_gp_sigma:.1f}σ from line)</span>'
-                    f'</div>'
-                    f'<div style="text-align:right;">'
-                    f'<span style="background:#4caf50;color:#0a1a0a;padding:3px 10px;border-radius:4px;'
-                    f'font-size:0.8rem;font-weight:700;margin-right:6px;">SAFE {_gp_conf:.0f}/100</span>'
-                    f'<span style="color:#81c784;font-size:0.8rem;">Edge {_gp_edge:+.1f}%</span>'
-                    f'<br><span style="color:#69f0ae;font-size:0.75rem;">'
-                    f'P({_gp_dir.title()}): {_gp_prob*100:.0f}%</span>'
-                    f'<span style="color:#a0d0a0;font-size:0.75rem;margin-left:8px;">'
-                    f'Odds: {_odds_str}</span>'
-                    f'</div>'
-                    f'</div>'
-                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(76,175,80,0.12);'
-                    f'border:1px solid rgba(76,175,80,0.3);'
-                    f'border-radius:4px;color:#a5d6a7;font-size:0.85rem;font-weight:600;">'
-                    f'🔮 Prediction: {_html.escape(_gp_plain_reason)}'
-                    f'</div>'
-                    f'<div style="margin-top:8px;">'
-                    f'<span style="color:#388e3c;font-size:0.75rem;font-weight:600;">WHY IT\'S A GOBLIN:</span>'
-                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_gp_reasons_html}</ul>'
-                    f'</div>'
-                    + (
-                        f'<div style="margin-top:8px;padding:8px 12px;background:rgba(255,235,59,0.10);'
-                        f'border:1px solid rgba(255,235,59,0.35);border-radius:6px;">'
-                        f'<span style="color:#fdd835;font-size:0.78rem;font-weight:700;">'
-                        f'⚠️ FLOOR CUTOFF:</span> '
-                        f'<span style="color:#fff9c4;font-size:0.78rem;">'
-                        f'Do not bet a Goblin past <strong>{_gp_goblin_floor}</strong> — '
-                        f'simulator p10 floor boundary (lines below this are statistically unsafe).'
-                        f'</span></div>'
-                        if _gp_goblin_floor is not None else ""
-                    )
-                    + _render_inline_breakdown(_gp, accent_color="#4caf50")
-                    + f'</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown(f"*{len(_goblin_picks)} Goblin pick(s) found on this slate.*")
-        st.divider()
-
-    # ============================================================
-    # SECTION A: Demon Bets (High Ceiling — line ABOVE standard M/L)
-    # ============================================================
-    _demon_picks = [
-        r for r in analysis_results
-        if r.get("bet_type") == "demon"
-        and not r.get("player_is_out", False)
-    ]
-    if _demon_picks:
-        with st.expander(
-            f"👹 Demon Bets — High Ceiling ({len(_demon_picks)}) — Alt Lines ABOVE Standard M/L",
-            expanded=False,
-        ):
-            _dcol_logo, _dcol_title = st.columns([1, 6])
-            with _dcol_logo:
-                if os.path.exists(_DEMON_LOGO_PATH):
-                    st.image(_DEMON_LOGO_PATH, width=110)
-            with _dcol_title:
-                st.markdown(
-                    '<div style="background:rgba(255,140,0,0.12);border:2px solid #ff8c00;'
-                    'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
-                    '<strong style="color:#ff8c00;font-size:1.0rem;">DEMON BETS — High Ceiling, High Reward</strong><br>'
-                    '<span style="color:#ffd580;font-size:0.85rem;">These are alternate lines set ABOVE the standard More/Less. '
-                    'The player must exceed a higher threshold to win — lower probability but bigger payout. '
-                    'Use with confidence when the model shows strong edge.</span>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown(
-                get_education_box_html(
-                    "What is a Demon Bet?",
-                    "A <strong>Demon bet</strong> is an alternate line set <strong>ABOVE</strong> "
-                    "the standard More/Less. The player must exceed a higher threshold to win — "
-                    "this means lower probability but bigger payout. Think of it as the "
-                    "'swing for the fences' play.<br><br>"
-                    "<strong>Example:</strong> Standard line is SGA Points M/L 31.5, and the platform also "
-                    "offers 34.5 — that 34.5 is a Demon bet (he needs 35+ points to win).<br><br>"
-                    "Use Demon bets when the model shows <em>strong edge and high confidence</em> "
-                    "above a challenging threshold. These are <strong>NOT auto-avoided</strong> — "
-                    "they are legitimate high-ceiling plays.",
-                ),
-                unsafe_allow_html=True,
-            )
-            for _dp in _demon_picks:
-                _dp_name     = _html.escape(str(_dp.get("player_name", "")))
-                _dp_team     = _html.escape(str(_dp.get("player_team", _dp.get("team", ""))))
-                _dp_stat     = _html.escape(str(_dp.get("stat_type", "")).title())
-                _dp_dir      = _html.escape(str(_dp.get("direction", "OVER")))
-                _dp_line     = _dp.get("line", 0)
-                _dp_std_line = _dp.get("standard_line", None)
-                _dp_proj     = _dp.get("adjusted_projection", 0)
-                _dp_edge     = _dp.get("edge_percentage", 0)
-                _dp_risk_flags = _dp.get("risk_flags", [])
-                _dp_demon_ceiling = _dp.get("demon_ceiling")
-                _dp_team_badge = (
-                    f'<span style="background:rgba(255,140,0,0.15);color:#ffb347;padding:1px 7px;'
-                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-                    f'border:1px solid rgba(255,140,0,0.3);">{_dp_team}</span>'
-                    if _dp_team else ""
-                )
-                _std_line_html = (
-                    f'<span style="color:#ffd580;font-size:0.78rem;margin-left:8px;">'
-                    f'(Standard: {_dp_std_line})</span>'
-                    if _dp_std_line else ""
-                )
-                _dp_risk_html = "".join(
-                    f'<li style="color:#ffd580;font-size:0.82rem;">{_html.escape(str(r))}</li>'
-                    for r in _dp_risk_flags
-                ) if _dp_risk_flags else ""
-                # Strict prediction string — "at MOST" for Demon bets
-                _dp_prediction = _dp.get("prediction", "")
-                if not _dp_prediction:
-                    _dp_prediction = f"I predict the stat will do at MOST {_dp_line}"
-                st.markdown(
-                    f'<div style="background:rgba(255,140,0,0.08);border:1px solid rgba(255,140,0,0.35);'
-                    f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    f'<div>'
-                    f'<span style="background:rgba(244,67,54,0.25);color:#ef5350;padding:2px 8px;'
-                    f'border-radius:4px;font-size:0.75rem;font-weight:700;margin-right:8px;'
-                    f'border:1px solid rgba(244,67,54,0.5);">👹 Demon</span>'
-                    f'<span style="color:#ff8c00;font-weight:700;">👹 {_dp_name}</span>'
-                    f'{_dp_team_badge}'
-                    f'<span style="background:#ff8c00;color:#fff;padding:2px 8px;border-radius:4px;'
-                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">👹 DEMON BET</span>'
-                    f'</div>'
-                    f'<div style="text-align:right;">'
-                    f'<span style="color:#ffd580;font-size:0.85rem;">{_dp_dir} {_dp_line} {_dp_stat}'
-                    f'{_std_line_html}</span>'
-                    f'<br><span style="color:#ff8c00;font-size:0.8rem;font-weight:600;">'
-                    f'Proj: {_dp_proj:.1f} &nbsp;|&nbsp; Edge: {_dp_edge:+.1f}%</span>'
-                    f'</div>'
-                    f'</div>'
-                    + f'<div style="margin-top:8px;padding:6px 10px;background:rgba(255,140,0,0.12);'
-                    f'border:1px solid rgba(255,140,0,0.3);'
-                    f'border-radius:4px;color:#ffd580;font-size:0.85rem;font-weight:600;">'
-                    f'🔮 Prediction: {_html.escape(_dp_prediction)}'
-                    f'</div>'
-                    + (
-                        f'<div style="margin-top:8px;">'
-                        f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">⚠️ RISK FLAGS:</span>'
-                        f'<ul style="margin:4px 0 0 16px;padding:0;">{_dp_risk_html}</ul>'
-                        f'</div>'
-                        if _dp_risk_html else ""
-                    )
-                    + (
-                        f'<div style="margin-top:8px;padding:8px 12px;background:rgba(244,67,54,0.10);'
-                        f'border:1px solid rgba(244,67,54,0.35);border-radius:6px;">'
-                        f'<span style="color:#ef5350;font-size:0.78rem;font-weight:700;">'
-                        f'🚫 CEILING CUTOFF:</span> '
-                        f'<span style="color:#ffcdd2;font-size:0.78rem;">'
-                        f'Do not bet a Demon past <strong>{_dp_demon_ceiling}</strong> — '
-                        f'simulator p90 ceiling boundary (lines above this require statistically impossible performance).'
-                        f'</span></div>'
-                        if _dp_demon_ceiling is not None else ""
-                    )
-                    + _render_inline_breakdown(_dp, accent_color="#ff8c00")
-                    + f'</div>',
-                    unsafe_allow_html=True,
-                )
-        st.divider()
 
     # ============================================================
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
@@ -2574,22 +2291,22 @@ if analysis_results:
 
     # ── Prop Cards — Single-Shot HTML Card Matrix Renderer ────────
     # Uses compile_card_matrix() to build a single HTML string with
-    # CSS Grid layout. Sliced to Top 50 to prevent WebSocketClosedError.
+    # CSS Grid layout.  All props rendered (no cap).
     _non_out_display = [r for r in displayed_results if not r.get("player_is_out", False)]
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
 
     # Single-shot card matrix injection for active (non-OUT) props
-    _card_matrix_html = _compile_card_matrix(_non_out_display, max_cards=50)
+    _card_matrix_html = _compile_card_matrix(_non_out_display)
     st.markdown(_card_matrix_html, unsafe_allow_html=True)
 
-    # Show OUT players at the bottom (small count, safe for per-card render)
+    # Show OUT players at the bottom
     if _out_display:
         st.markdown(
             '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
             '⚠️ OUT / Inactive Players</div>',
             unsafe_allow_html=True,
         )
-        _out_matrix_html = _compile_card_matrix(_out_display, max_cards=10)
+        _out_matrix_html = _compile_card_matrix(_out_display)
         st.markdown(_out_matrix_html, unsafe_allow_html=True)
 
     # ── Final Verdict ─────────────────────────────────────────────
