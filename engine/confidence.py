@@ -519,7 +519,7 @@ def calculate_confidence_score(
     if _score_for_tier < DO_NOT_BET_SCORE_THRESHOLD:
         tier_name = "Avoid"
         tier_emoji = "⛔"
-        recommendation = f"Do not bet — very low confidence ({final_score:.0f}/100)"
+        recommendation = f"Low confidence ({final_score:.0f}/100) — proceed with caution"
         avoid_reasons.append(f"Score {final_score:.0f} below Do-Not-Bet threshold ({DO_NOT_BET_SCORE_THRESHOLD})")
 
     # ── C2: Kill switch — downgrade Platinum/Gold below probability floor ─

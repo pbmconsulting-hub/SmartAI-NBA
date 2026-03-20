@@ -1733,8 +1733,6 @@ if analysis_results:
     total_under_picks= sum(1 for r in displayed_results if r.get("direction") == "UNDER")
     platinum_count   = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
     gold_count       = sum(1 for r in displayed_results if r.get("tier") == "Gold")
-    goblin_count     = 0  # Goblin/Demon tiers removed — zero-filter recovery
-    demon_count      = 0
     avg_edge         = (
         sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
         if displayed_results else 0
