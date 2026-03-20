@@ -990,6 +990,15 @@ def reset_fragment_state():
 # ═══════════════════════════════════════════════════════════════
 
 
+def _extract_edge(result: dict) -> float:
+    """Extract edge value from an analysis result dict, checking multiple key names."""
+    return _safe_float(
+        result.get("joseph_edge",
+                    result.get("edge_percentage",
+                               result.get("edge", 0)))
+    )
+
+
 def _select_fragment(pool: list, used_set: set) -> dict:
     """Select random fragment from pool, excluding used IDs. Reset if >60% exhausted.
 
@@ -1007,8 +1016,10 @@ def _select_fragment(pool: list, used_set: set) -> dict:
     """
     if not pool:
         return {"id": "fallback", "text": ""}
+    if len(used_set) > 0.6 * len(pool):
+        used_set.clear()
     available = [f for f in pool if f["id"] not in used_set]
-    if not available or len(used_set) > 0.6 * len(pool):
+    if not available:
         used_set.clear()
         available = pool.copy()
     selected = random.choice(available)
@@ -1053,7 +1064,7 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         opener = _select_fragment(OPENER_POOL, used_set)
         opener_text = opener.get("text", "")
         if opener_text and not opener_text.rstrip().endswith("..."):
-            opener_text = opener_text.rstrip().rstrip(".") + "..."
+            opener_text = opener_text.rstrip(". ") + "..."
 
         # 2. Select body sentences based on energy
         body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 3}.get(energy, 2)
@@ -1483,7 +1494,7 @@ def joseph_analyze_game(game: dict, teams_data: dict,
                 game_props.append(r)
 
         # Sort by edge descending and get top 3
-        sorted_props = sorted(game_props, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+        sorted_props = sorted(game_props, key=lambda x: _extract_edge(x), reverse=True)
         best_props = sorted_props[:3]
 
         # Run full analysis on top props if not already analyzed
@@ -1632,7 +1643,7 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
                 player_props.append(r)
 
         # Sort by edge to find best and alternatives
-        sorted_props = sorted(player_props, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+        sorted_props = sorted(player_props, key=lambda x: _extract_edge(x), reverse=True)
         best_prop = sorted_props[0] if sorted_props else None
         alt_props = sorted_props[1:3] if len(sorted_props) > 1 else []
 
@@ -1847,7 +1858,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             }
 
         # Sort by edge descending
-        qualifying.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge", 0))), reverse=True)
+        qualifying.sort(key=lambda x: _extract_edge(x), reverse=True)
 
         # Find best combination using itertools.combinations
         best_combo = None
@@ -2029,12 +2040,12 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         # Find best SMASH pick
         smash_picks = [r for r in (analysis_results or [])
                        if r.get("verdict") == "SMASH"]
-        smash_picks.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+        smash_picks.sort(key=lambda x: _extract_edge(x), reverse=True)
 
         # Find best fade/stay_away
         avoid_picks = [r for r in (analysis_results or [])
                        if r.get("verdict") in ("FADE", "STAY_AWAY")]
-        avoid_picks.sort(key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge", 0))))
+        avoid_picks.sort(key=lambda x: _extract_edge(x))
 
         # Middle sentences
         if smash_picks:
@@ -2210,7 +2221,7 @@ def joseph_commentary(results: list, context_type: str) -> str:
         body2 = ""
         if results:
             # Find top result by edge
-            sorted_results = sorted(results, key=lambda x: _safe_float(x.get("joseph_edge", x.get("edge_percentage", x.get("edge", 0)))), reverse=True)
+            sorted_results = sorted(results, key=lambda x: _extract_edge(x), reverse=True)
             top = sorted_results[0]
             pname = top.get("player_name", top.get("name", "someone"))
             edge = round(_safe_float(top.get("joseph_edge", top.get("edge_percentage", top.get("edge", 0)))), 1)
