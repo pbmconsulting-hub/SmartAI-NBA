@@ -279,14 +279,13 @@ todays_games   = st.session_state.get("todays_games", [])
 
 # ── Safety net: enrich with alt-line categories if missing ──────
 # Props saved before the enrichment pipeline was wired may lack
-# line_category.  Re-enrich to ensure Goblin / Demon classification
-# works correctly downstream.
+# line_category.  Re-enrich to stamp all props as "standard".
 if current_props and not any(p.get("line_category") for p in current_props):
     try:
         from data.platform_fetcher import parse_alt_lines_from_platform_props
         current_props = parse_alt_lines_from_platform_props(current_props)
     except ImportError:
-        _logger.warning("parse_alt_lines_from_platform_props unavailable — demon/goblin line categories may be missing")
+        _logger.warning("parse_alt_lines_from_platform_props unavailable — line categories may be missing")
 simulation_depth = st.session_state.get("simulation_depth", 2000)
 minimum_edge     = st.session_state.get("minimum_edge_threshold", 5.0)
 
@@ -589,7 +588,7 @@ with filter_col:
         "Show:",
         ["All picks", "Top picks only (edge ≥ threshold)"],
         horizontal=True,
-        index=1,
+        index=0,
     )
 
 if run_analysis:
@@ -1685,7 +1684,6 @@ if analysis_results:
         displayed_results = [
             r for r in analysis_results
             if abs(r.get("edge_percentage", 0)) >= minimum_edge
-            and not r.get("should_avoid", False)
         ]
     else:
         displayed_results = analysis_results
@@ -1735,8 +1733,6 @@ if analysis_results:
     total_under_picks= sum(1 for r in displayed_results if r.get("direction") == "UNDER")
     platinum_count   = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
     gold_count       = sum(1 for r in displayed_results if r.get("tier") == "Gold")
-    goblin_count     = sum(1 for r in analysis_results if r.get("bet_type") == "goblin")
-    demon_count      = sum(1 for r in analysis_results if r.get("bet_type") in ("50_50", "demon"))
     avg_edge         = (
         sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
         if displayed_results else 0
@@ -1752,14 +1748,12 @@ if analysis_results:
 
     st.subheader(f"📊 Results: {len(displayed_results)} picks (of {total_analyzed} analyzed)")
 
-    sum_col1, sum_col2, sum_col3, sum_col4, sum_col5, sum_col6, sum_col7 = st.columns(7)
+    sum_col1, sum_col2, sum_col3, sum_col4, sum_col5 = st.columns(5)
     sum_col1.metric("Showing",     len(displayed_results))
     sum_col2.metric("⬆️ MORE",    total_over_picks)
     sum_col3.metric("⬇️ LESS",   total_under_picks)
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
-    sum_col6.metric("Goblin",   goblin_count)
-    sum_col7.metric("Demon",    demon_count)
 
     # Phase 3: DFS Edge row (only shown when DFS metrics exist)
     if _dfs_results:
