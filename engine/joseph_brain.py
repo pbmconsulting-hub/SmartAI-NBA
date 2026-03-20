@@ -1,6 +1,6 @@
 """
 engine/joseph_brain.py
-Joseph M. Smith Brain — Data Pools, Constants & Function Stubs (Layer 4, Part A)
+Joseph M. Smith Brain — Data Pools, Constants & Function Stubs (Layer 4, Parts A–B)
 
 PURPOSE
 -------
