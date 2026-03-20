@@ -667,8 +667,10 @@ def should_avoid_prop(
             )
             break
 
-    # If any reasons found, recommend avoiding
-    should_avoid = len(avoid_reasons) > 0
+    # Zero-Filter Recovery: never flag a prop as "should_avoid".
+    # Reasons are retained as informational metadata but do NOT block
+    # the prop from rendering on the analysis page.
+    should_avoid = False
 
     return should_avoid, avoid_reasons
 

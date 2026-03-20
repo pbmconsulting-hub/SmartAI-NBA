@@ -929,9 +929,8 @@ def fetch_all_platform_props(
     # downstream in the analysis loop so that the engine processes as
     # many raw props as necessary until the target is reached.
 
-    # ── Enrich with alt-line categories (goblin / 50_50 / demon) ──
-    # Stamp each prop with line_category and standard_line so that
-    # downstream classify_bet_type() can assign Demon / Goblin bets.
+    # ── Enrich with alt-line categories ──────────────────────────
+    # Stamp each prop with line_category ("standard") and standard_line.
     all_props = parse_alt_lines_from_platform_props(all_props)
 
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")

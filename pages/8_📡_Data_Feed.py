@@ -1097,7 +1097,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
             expanded=False,
         ):
             _preview_rows = []
-            for _p in _display_props[:50]:
+            for _p in _display_props:
                 _preview_rows.append({
                     "Player": _p.get("player_name", ""),
                     "Team": _p.get("team", ""),
@@ -1107,11 +1107,6 @@ if _PLATFORM_FETCHER_AVAILABLE:
                     "Date": _p.get("game_date", ""),
                 })
             st.dataframe(_preview_rows, width="stretch", hide_index=True)
-            if len(_display_props) > 50:
-                st.caption(
-                    f"Showing first 50 of {len(_display_props)} props. "
-                    "Go to the 🔬 Prop Scanner to see all."
-                )
 
 # ============================================================
 # END SECTION: Fetch Platform Props

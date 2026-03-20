@@ -466,11 +466,11 @@ def calculate_confidence_score(
     should_avoid = False
     avoid_reasons = []
 
-    # Kill switch 1: coefficient of variation > 0.50 → auto-AVOID
+    # Kill switch 1: coefficient of variation > threshold → informational flag only.
+    # Zero-Filter Recovery: never set should_avoid=True; keep reason as metadata.
     if stat_average > 0:
         cv = stat_standard_deviation / stat_average
         if cv > AUTO_AVOID_CV_THRESHOLD:
-            should_avoid = True
             avoid_reasons.append(f"High variance (CV={cv:.2f} > {AUTO_AVOID_CV_THRESHOLD})")
 
     # Kill switch 2: edge < SILVER_MIN_EDGE_PCT → auto-Bronze
@@ -514,12 +514,12 @@ def calculate_confidence_score(
         tier_emoji = "🥉"
         recommendation = f"Weak {bet_direction} signal — consider avoiding"
 
-    # Do Not Bet: scores below DO_NOT_BET_SCORE_THRESHOLD are explicitly flagged as Avoid
+    # Do Not Bet: scores below DO_NOT_BET_SCORE_THRESHOLD are flagged as
+    # "Avoid" tier but no longer block rendering (Zero-Filter Recovery).
     if _score_for_tier < DO_NOT_BET_SCORE_THRESHOLD:
         tier_name = "Avoid"
         tier_emoji = "⛔"
         recommendation = f"Do not bet — very low confidence ({final_score:.0f}/100)"
-        should_avoid = True
         avoid_reasons.append(f"Score {final_score:.0f} below Do-Not-Bet threshold ({DO_NOT_BET_SCORE_THRESHOLD})")
 
     # ── C2: Kill switch — downgrade Platinum/Gold below probability floor ─
