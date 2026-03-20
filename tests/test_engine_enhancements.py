@@ -1358,17 +1358,17 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
     # ── Single-entry group (no alternates) ────────────────────────
 
     def test_single_line_is_standard(self):
-        """When only one line exists for a player/stat/platform, it is 50_50 (standard)."""
+        """When only one line exists for a player/stat/platform, it is standard."""
         props = [self._make_prop("SGA", "points", 31.5)]
         result = self.parse(props)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["line_category"], "50_50")
+        self.assertEqual(result[0]["line_category"], "standard")
         self.assertAlmostEqual(result[0]["standard_line"], 31.5)
 
     # ── Multi-entry group: alt line categorization ────────────────
 
     def test_below_median_is_goblin(self):
-        """Lines below the median standard line are categorized as 'goblin'."""
+        """All line_category values are now 'standard'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1376,10 +1376,10 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[28.5], "goblin")
+        self.assertEqual(cats[28.5], "standard")
 
     def test_above_median_is_demon(self):
-        """Lines above the median standard line are categorized as 'demon'."""
+        """All line_category values are now 'standard'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1387,10 +1387,10 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[34.5], "demon")
+        self.assertEqual(cats[34.5], "standard")
 
     def test_median_line_is_standard(self):
-        """The median line in a group is categorized as '50_50' (standard line)."""
+        """All line_category values are now 'standard'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1398,7 +1398,7 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[31.5], "50_50")
+        self.assertEqual(cats[31.5], "standard")
 
     # ── Enrichment & structure ────────────────────────────────────
 
@@ -1431,13 +1431,12 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         result = self.parse(props)
         pp = [p for p in result if p["platform"] == "PrizePicks"]
         ud = [p for p in result if p["platform"] == "Underdog"]
-        # Underdog has only one line → must be 50_50 (standard)
-        self.assertEqual(ud[0]["line_category"], "50_50")
-        # PrizePicks has 3 lines; median is 31.5 → 50_50; 28.5 → goblin; 34.5 → demon
+        # All line_category values are now "standard"
+        self.assertEqual(ud[0]["line_category"], "standard")
         pp_cats = {p["line"]: p["line_category"] for p in pp}
-        self.assertEqual(pp_cats[28.5], "goblin")
-        self.assertEqual(pp_cats[31.5], "50_50")
-        self.assertEqual(pp_cats[34.5], "demon")
+        self.assertEqual(pp_cats[28.5], "standard")
+        self.assertEqual(pp_cats[31.5], "standard")
+        self.assertEqual(pp_cats[34.5], "standard")
 
     def test_empty_props_returns_empty(self):
         """Empty input should return an empty list."""
@@ -1472,58 +1471,54 @@ class TestClassifyBetTypeLineCategoryParam(unittest.TestCase):
         )
 
     def test_goblin_line_category_returns_goblin(self):
-        """line_category='goblin' → bet_type == 'goblin' regardless of stats."""
+        """line_category='goblin' → bet_type is now always 'standard'."""
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_kwargs(), line_category="goblin")
-        self.assertEqual(result["bet_type"], "goblin")
-        self.assertEqual(result["bet_type_label"], "Goblin Bet — Safe Floor")
-        self.assertTrue(result["goblin"])
+        self.assertEqual(result["bet_type"], "standard")
+        self.assertFalse(result["goblin"])
         self.assertFalse(result["demon"])
 
     def test_demon_line_category_returns_demon(self):
-        """line_category='demon' → bet_type == 'demon' regardless of stats."""
+        """line_category='demon' → bet_type is now always 'standard'."""
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_kwargs(), line_category="demon")
-        self.assertEqual(result["bet_type"], "demon")
-        self.assertEqual(result["bet_type_label"], "Demon Bet — High Ceiling")
-        self.assertTrue(result["demon"])
+        self.assertEqual(result["bet_type"], "standard")
+        self.assertFalse(result["demon"])
         self.assertFalse(result["goblin"])
 
     def test_fifty_fifty_line_category_returns_fifty_fifty(self):
-        """line_category='50_50' → bet_type == '50_50' when stats are not goblin-level."""
+        """line_category='50_50' → bet_type is now always 'standard'."""
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_kwargs(), line_category="50_50")
-        # Stats are not goblin-level (edge 15% < 25%) so stays as 50_50
-        self.assertEqual(result["bet_type"], "50_50")
+        self.assertEqual(result["bet_type"], "standard")
         self.assertFalse(result["goblin"])
         self.assertFalse(result["demon"])
 
     def test_standard_line_category_returns_fifty_fifty(self):
-        """line_category='standard' → bet_type == '50_50' (standard line alias)."""
+        """line_category='standard' → bet_type is always 'standard'."""
         from engine.edge_detection import classify_bet_type
         result = classify_bet_type(**self._base_kwargs(), line_category="standard")
-        self.assertEqual(result["bet_type"], "50_50")
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_statistical_goblin_overlay_on_standard_line(self):
-        """Standard line with extreme stats still earns the Goblin badge."""
+        """Statistical Goblin overlay removed — always returns 'standard'."""
         from engine.edge_detection import classify_bet_type
         kw = self._base_kwargs()
         kw["projected_stat"] = 30.0   # 2.375 std devs above 20.5
         kw["probability_over"] = 0.88
         kw["edge_percentage"] = 35.0
         result = classify_bet_type(**kw, line_category="50_50")
-        self.assertEqual(result["bet_type"], "goblin",
-                         "Statistical Goblin overlay should trigger on standard line")
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_none_line_category_with_extreme_stats_gives_goblin(self):
-        """line_category=None + extreme stats → statistical Goblin still works."""
+        """line_category=None + extreme stats → always returns 'standard'."""
         from engine.edge_detection import classify_bet_type
         kw = self._base_kwargs()
         kw["projected_stat"] = 30.0
         kw["probability_over"] = 0.88
         kw["edge_percentage"] = 35.0
         result = classify_bet_type(**kw, line_category=None)
-        self.assertEqual(result["bet_type"], "goblin")
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_conflicting_forces_sets_risk_flags(self):
         """Conflicting forces populate risk_flags and is_uncertain, but do NOT change bet_type."""
@@ -1537,22 +1532,20 @@ class TestClassifyBetTypeLineCategoryParam(unittest.TestCase):
                         "Conflicting forces should set is_uncertain=True")
         self.assertGreater(len(result["risk_flags"]), 0,
                            "Conflicting forces should populate risk_flags")
-        # bet_type should still be '50_50', NOT changed by risk flags
-        self.assertIn(result["bet_type"], ("50_50", "goblin"),
-                      "Risk flags must not change bet_type to 'demon'; statistical goblin overlay may apply")
+        # bet_type is always 'standard' now
+        self.assertEqual(result["bet_type"], "standard")
 
     def test_conflicting_forces_do_not_change_demon_bet_type(self):
-        """Conflicting forces on a demon line do NOT override bet_type='demon'."""
+        """Conflicting forces on a demon line → bet_type is always 'standard'."""
         from engine.edge_detection import classify_bet_type
         kw = self._base_kwargs()
         # Balanced forces
         kw["directional_forces_result"] = {"over_strength": 10.0, "under_strength": 9.0}
         kw["line_category"] = "demon"
         result = classify_bet_type(**kw)
-        self.assertEqual(result["bet_type"], "demon",
-                         "Conflicting forces must not override line_category='demon'")
+        self.assertEqual(result["bet_type"], "standard")
         self.assertTrue(result["is_uncertain"],
-                        "Risk flags should still be populated for demon picks")
+                        "Risk flags should still be populated")
 
     def test_return_dict_has_required_keys(self):
         """classify_bet_type() return dict must include the new required keys."""
@@ -1561,16 +1554,22 @@ class TestClassifyBetTypeLineCategoryParam(unittest.TestCase):
         for key in ("bet_type", "risk_flags", "is_uncertain", "line_category",
                     "reasons", "goblin", "demon", "50_50", "std_devs_from_line"):
             self.assertIn(key, result, f"Key '{key}' missing from classify_bet_type() result")
+        self.assertEqual(result["bet_type"], "standard")
+        self.assertFalse(result["goblin"])
+        self.assertFalse(result["demon"])
 
     def test_demon_key_true_only_for_real_demon(self):
-        """'demon' key in return dict should be True ONLY for bet_type == 'demon'."""
+        """'demon' and 'goblin' keys are now always False."""
         from engine.edge_detection import classify_bet_type
         goblin_result = classify_bet_type(**self._base_kwargs(), line_category="goblin")
         fifty_result  = classify_bet_type(**self._base_kwargs(), line_category="50_50")
         demon_result  = classify_bet_type(**self._base_kwargs(), line_category="demon")
         self.assertFalse(goblin_result["demon"])
         self.assertFalse(fifty_result["demon"])
-        self.assertTrue(demon_result["demon"])
+        self.assertFalse(demon_result["demon"])
+        self.assertFalse(goblin_result["goblin"])
+        self.assertFalse(fifty_result["goblin"])
+        self.assertFalse(demon_result["goblin"])
 
 
 class TestUncertainDoesNotForceAvoid(unittest.TestCase):

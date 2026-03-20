@@ -671,123 +671,48 @@ def run_quantum_matrix_simulation(
 # win probabilities for each using the existing simulation output.
 # ============================================================
 
-# Goblin offsets: subtracted from the base line (lowered thresholds)
-GOBLIN_OFFSETS = [-1.0, -2.0, -3.0]
-# Demon offsets: added to the base line (raised thresholds)
-DEMON_OFFSETS = [2.0, 4.0, 6.0]
+# Goblin/Demon offsets removed — all props use the True More/Less Line.
+GOBLIN_OFFSETS = []
+# Demon offsets removed — all props use the True More/Less Line.
+DEMON_OFFSETS = []
 
 
 def generate_alt_line_probabilities(simulation_output, base_line):
     """
-    Generate alternate-line (Goblin & Demon) probabilities from simulation
-    output and a base prop line.
+    Generate alternate-line probabilities from simulation output and a base
+    prop line.
 
-    Uses the raw simulated results to compute:
-      - 3 Goblin lines (L-1, L-2, L-3): P(stat >= goblin_line)
-      - 1 Base line: P(stat > base_line)  [standard over probability]
-      - 3 Demon lines (L+2, L+4, L+6): P(stat <= demon_line)
+    Goblin/Demon alt-line generation has been removed.  This function now
+    returns only the base-line probability.  The return dict keeps the same
+    schema for backward compatibility (empty goblin_lines / demon_lines).
 
     Args:
-        simulation_output (dict): The output dict from
-            ``run_quantum_matrix_simulation``, which must contain
-            ``simulated_results`` (list of float) and ``probability_over``.
+        simulation_output (dict): Output from ``run_quantum_matrix_simulation``.
         base_line (float): The primary sportsbook prop line.
 
     Returns:
         dict: {
             'base_line': float,
             'base_probability': float,
-            'goblin_lines': [
-                {'line': float, 'offset': float, 'probability': float, 'type': 'goblin'},
-                ...
-            ],
-            'demon_lines': [
-                {'line': float, 'offset': float, 'probability': float, 'type': 'demon'},
-                ...
-            ],
-            'best_alt': {
-                'line': float, 'probability': float, 'type': 'goblin'|'demon'|'base',
-                'prediction': str
-            },
+            'goblin_lines': [],
+            'demon_lines': [],
+            'best_alt': {'line': float, 'probability': float,
+                         'type': 'base', 'prediction': ''},
         }
     """
-    simulated_results = simulation_output.get("simulated_results", [])
-    n = len(simulated_results)
     base_prob = simulation_output.get("probability_over", 0.5)
-
-    if n == 0:
-        # No simulation data — return empty structure
-        return {
-            "base_line": base_line,
-            "base_probability": base_prob,
-            "goblin_lines": [],
-            "demon_lines": [],
-            "best_alt": {
-                "line": base_line,
-                "probability": base_prob,
-                "type": "base",
-                "prediction": "",
-            },
-        }
-
-    # --- Goblin lines: P(stat >= goblin_line) ---
-    goblin_lines = []
-    for offset in GOBLIN_OFFSETS:
-        g_line = round(base_line + offset, 1)  # offset is negative
-        if g_line <= 0:
-            # NBA prop lines use half-point increments; 0.5 is the lowest
-            # meaningful threshold (a player must record at least 1 stat).
-            g_line = 0.5
-        count_gte = sum(1 for s in simulated_results if s >= g_line)
-        prob = _safe_float(count_gte / n, 0.5)
-        prob = max(0.01, min(0.99, prob))
-        goblin_lines.append({
-            "line": g_line,
-            "offset": offset,
-            "probability": round(prob, 4),
-            "type": "goblin",
-        })
-
-    # --- Demon lines: P(stat <= demon_line) ---
-    demon_lines = []
-    for offset in DEMON_OFFSETS:
-        d_line = round(base_line + offset, 1)  # offset is positive
-        count_lte = sum(1 for s in simulated_results if s <= d_line)
-        prob = _safe_float(count_lte / n, 0.5)
-        prob = max(0.01, min(0.99, prob))
-        demon_lines.append({
-            "line": d_line,
-            "offset": offset,
-            "probability": round(prob, 4),
-            "type": "demon",
-        })
-
-    # --- Find the best alt-line play (highest probability) ---
-    all_candidates = []
-    all_candidates.append({
-        "line": base_line,
-        "probability": base_prob,
-        "type": "base",
-    })
-    for g in goblin_lines:
-        all_candidates.append(g)
-    for d in demon_lines:
-        all_candidates.append(d)
-
-    best = max(all_candidates, key=lambda c: c["probability"])
-    best_alt = {
-        "line": best["line"],
-        "probability": best["probability"],
-        "type": best["type"],
-        "prediction": format_alt_line_prediction(best["line"], best["type"]),
-    }
 
     return {
         "base_line": base_line,
-        "base_probability": round(base_prob, 4),
-        "goblin_lines": goblin_lines,
-        "demon_lines": demon_lines,
-        "best_alt": best_alt,
+        "base_probability": round(float(base_prob), 4),
+        "goblin_lines": [],
+        "demon_lines": [],
+        "best_alt": {
+            "line": base_line,
+            "probability": float(base_prob),
+            "type": "base",
+            "prediction": "",
+        },
     }
 
 
@@ -795,51 +720,33 @@ def format_alt_line_prediction(line, bet_type):
     """
     Generate the strict natural-language prediction string for an alt-line.
 
+    Goblin/Demon tiers removed — always returns an empty string.  Kept for
+    backward compatibility.
+
     Args:
         line (float): The alternate line value.
         bet_type (str): 'goblin', 'demon', or 'base'.
 
     Returns:
-        str: The prediction string.
-              Goblin → "I predict the stat will do at LEAST {line}"
-              Demon  → "I predict the stat will do at MOST {line}"
-              Base   → "" (empty — no prediction for the standard line)
+        str: Always empty — tiered predictions removed.
     """
-    if bet_type == "goblin":
-        return f"I predict the stat will do at LEAST {line}"
-    elif bet_type == "demon":
-        return f"I predict the stat will do at MOST {line}"
     return ""
 
 
 def generate_contextual_goblin_demon(true_line, direction="over"):
     """
-    Generate directional Goblin and Demon alt-lines from the verified
-    true line, applying contextual math based on bet direction.
+    Backward-compatible stub — Goblin/Demon alt-line generation removed.
 
-    Directional rules:
-      * **MORE (Over):**
-        - Goblin = true_line - 1 → "I predict the stat will do at LEAST {goblin_line}"
-        - Demon  = true_line + 2 → "I predict the stat will do at MOST {demon_line}"
-      * **LESS (Under):**
-        - Goblin = true_line + 1 → "I predict the stat will do at MOST {goblin_line}"
-        - Demon  = true_line - 2 → "I predict the stat will do at LEAST {demon_line}"
+    Returns a dict with the true_line only; goblin/demon lines are set
+    equal to the true_line with empty prediction strings.
 
     Args:
         true_line (float): The verified sportsbook projection line.
-        direction (str): "over" / "more" for Over bets,
-                         "under" / "less" for Under bets.
-                         Default "over".
+        direction (str): "over" / "more" or "under" / "less".
 
     Returns:
-        dict: {
-            'true_line': float,
-            'direction': str,
-            'goblin_line': float,
-            'goblin_prediction': str,
-            'demon_line': float,
-            'demon_prediction': str,
-        }
+        dict with true_line, direction, goblin_line, goblin_prediction,
+        demon_line, demon_prediction (all neutralised).
     """
     try:
         true_line = float(true_line)
@@ -849,30 +756,13 @@ def generate_contextual_goblin_demon(true_line, direction="over"):
     direction_norm = str(direction).strip().lower()
     is_over = direction_norm in ("over", "more")
 
-    if is_over:
-        goblin_line = round(true_line - 1.0, 1)
-        demon_line = round(true_line + 2.0, 1)
-        goblin_prediction = f"I predict the stat will do at LEAST {goblin_line}"
-        demon_prediction = f"I predict the stat will do at MOST {demon_line}"
-    else:
-        goblin_line = round(true_line + 1.0, 1)
-        demon_line = round(true_line - 2.0, 1)
-        goblin_prediction = f"I predict the stat will do at MOST {goblin_line}"
-        demon_prediction = f"I predict the stat will do at LEAST {demon_line}"
-
-    # Ensure lines are non-negative (NBA stat lines >= 0.5)
-    if goblin_line < 0.5:
-        goblin_line = 0.5
-    if demon_line < 0.5:
-        demon_line = 0.5
-
     return {
         "true_line": true_line,
         "direction": "over" if is_over else "under",
-        "goblin_line": goblin_line,
-        "goblin_prediction": goblin_prediction,
-        "demon_line": demon_line,
-        "demon_prediction": demon_prediction,
+        "goblin_line": true_line,
+        "goblin_prediction": "",
+        "demon_line": true_line,
+        "demon_prediction": "",
     }
 
 # ============================================================

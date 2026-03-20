@@ -2246,21 +2246,10 @@ def parse_alt_lines_from_platform_props(props):
         enriched_prop = dict(prop)
         enriched_prop["standard_line"] = std_line
 
-        if std_line is None or std_line <= 0 or prop_line <= 0:
-            # Can't categorize without a valid standard line
-            enriched_prop["line_category"] = "50_50"
-        elif abs(prop_line - std_line) < 0.01:
-            # This line IS the standard O/U (within floating-point tolerance)
-            enriched_prop["line_category"] = "50_50"
-        elif prop_line < std_line:
-            # Line is STRICTLY below standard → Goblin_Bet (safe floor)
-            enriched_prop["line_category"] = "goblin"
-        elif prop_line > std_line:
-            # Line is STRICTLY above standard → Demon_Bet (high risk / high reward)
-            enriched_prop["line_category"] = "demon"
-        else:
-            # Exact match that slipped past tolerance check — treat as 50_50
-            enriched_prop["line_category"] = "50_50"
+        # Tier classification removed — all props are treated as
+        # "standard" regardless of their relationship to the standard
+        # O/U line.  The True More/Less Line remains the primary anchor.
+        enriched_prop["line_category"] = "standard"
 
         enriched.append(enriched_prop)
 
