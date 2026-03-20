@@ -11,7 +11,7 @@ import random
 _logger = logging.getLogger(__name__)
 
 try:
-    from data.advanced_metrics import normalize, detect_narrative_tags
+    from data.advanced_metrics import normalize, detect_narrative_tags, classify_player_archetype
 except ImportError:
     _logger.warning("[JosephStrategy] Could not import from advanced_metrics")
 
@@ -23,6 +23,9 @@ except ImportError:
 
     def detect_narrative_tags(player, game, teams):
         return []
+
+    def classify_player_archetype(player):
+        return "Role Player"
 
 try:
     from engine.math_helpers import _safe_float
@@ -396,7 +399,7 @@ def apply_mismatch_rules(
         archetype = player.get("archetype", "")
 
         if not archetype:
-            archetype = _classify_player_archetype(player)
+            archetype = classify_player_archetype(player)
 
         pace_label = game_strategy.get("pace_label", "average")
         blowout_prob = _safe_float(

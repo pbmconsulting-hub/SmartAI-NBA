@@ -162,7 +162,7 @@ def _estimate_usage_rate(fga: float, fta: float, tov: float,
     Returns:
         float: Estimated usage rate percentage.
     """
-    return 100.0 * (fga + 0.44 * fta + tov) / max(minutes, 1) * _USAGE_RATE_MULTIPLIER
+    return 100.0 * (fga + 0.44 * fta + tov) / (max(minutes, 1) * _USAGE_RATE_MULTIPLIER)
 
 
 def normalize(value: float, min_val: float, max_val: float,
@@ -446,10 +446,12 @@ def enrich_player_god_mode(player: dict, games: list, teams: dict) -> dict:
         enriched = copy.deepcopy(player)
 
         # ---- Kill switch: no prop line → skip enrichment ----
-        prop = enriched.get("prop", {})
-        if not isinstance(prop, dict):
-            prop = {}
-        line = _safe_float(prop.get("line", 0))
+        # Check top-level "line" first, then nested "prop.line".
+        line = _safe_float(enriched.get("line", 0))
+        if line == 0:
+            prop = enriched.get("prop", {})
+            if isinstance(prop, dict):
+                line = _safe_float(prop.get("line", 0))
         if line == 0:
             enriched["enriched"] = False
             return enriched

@@ -103,7 +103,7 @@ def calculate_gravity_score(player: dict) -> float:
     pts = _safe_float(player.get("points_avg", 0))
     minutes = _safe_float(player.get("minutes_avg", 0))
 
-    usage_est = 100 * (fga + 0.44 * fta + tov) / max(minutes, 1) * 2.0
+    usage_est = 100 * (fga + 0.44 * fta + tov) / (max(minutes, 1) * 2.0)
 
     gravity = (
         0.40 * normalize(fg3a * fg3_pct, 0, 4, 0, 100)
@@ -293,7 +293,7 @@ def joseph_grade_player(player: dict, game_context: dict) -> dict:
         ts_pct = pts / max(ts_denom, 1)
 
         # Usage estimate
-        usage_est = 100 * (fga + 0.44 * fta + tov) / max(minutes, 1) * 2.0
+        usage_est = 100 * (fga + 0.44 * fta + tov) / (max(minutes, 1) * 2.0)
 
         # Assist rate proxy (ast * 3 as specified)
         ast_rate_proxy = ast * 3
