@@ -500,7 +500,9 @@ def get_alternative_tickets(leg_count: int, joseph_results: list,
         # Generate up to top_n alternative combos
         all_combos = []
         search_pool = candidates  # Use all candidates
-        max_combos = min(50, len(list(itertools.combinations(range(len(search_pool)), leg_count))) if len(search_pool) <= 15 else 50)
+        import math as _math
+        n_combos = _math.comb(len(search_pool), leg_count) if len(search_pool) >= leg_count else 0
+        max_combos = min(50, n_combos)
 
         combo_count = 0
         for combo_indices in itertools.combinations(range(len(search_pool)), leg_count):
