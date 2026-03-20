@@ -1070,7 +1070,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
     # IMPLEMENTATION: Phase 1B
     return {
         "verdict": "LEAN",
-        "verdict_emoji": VERDICT_EMOJIS.get("LEAN", "✅"),
+        "verdict_emoji": VERDICT_EMOJIS["LEAN"],
         "is_override": False,
         "edge": 0.0,
         "confidence": 50.0,
