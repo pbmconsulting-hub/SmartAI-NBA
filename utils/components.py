@@ -12,7 +12,7 @@ import base64
 
 @st.cache_data(show_spinner=False)
 def _load_hero_banner_b64() -> str:
-    """Load hero banner as base64-encoded PNG, cached per session."""
+    """Load hero banner as base64-encoded PNG, cached across reruns by Streamlit."""
     _this = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(_this, "..", "Joseph A Smith Hero Banner.png"),

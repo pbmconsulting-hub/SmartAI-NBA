@@ -616,8 +616,10 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
         inject_joseph_inline_commentary([{"player": "Jokic"}])
         # Commentary now goes through st.write_stream (typing effect)
         # or st.markdown (subsequent reruns). Check either path.
-        all_calls = str(_mock_st.markdown.call_args_list) + str(getattr(_mock_st, 'write_stream', lambda: None))
-        write_stream_called = _mock_st.write_stream.called if hasattr(_mock_st.write_stream, 'called') else False
+        if hasattr(_mock_st, "write_stream"):
+            write_stream_called = getattr(_mock_st.write_stream, "called", False)
+        else:
+            write_stream_called = False
         markdown_has_commentary = any("COMMENTARY" in str(c) for c in _mock_st.markdown.call_args_list)
         self.assertTrue(write_stream_called or markdown_has_commentary)
 
