@@ -24,9 +24,8 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html, get_premium_footer_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
-from utils.components import render_joseph_hero_banner, inject_joseph_floating
-render_joseph_hero_banner()
+# ── Joseph M. Smith Floating Widget ────────────────────────────
+from utils.components import inject_joseph_floating
 inject_joseph_floating()
 
 # ─── Premium Page Custom CSS ──────────────────────────────────

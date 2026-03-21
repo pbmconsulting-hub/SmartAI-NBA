@@ -314,7 +314,7 @@ _WIDGET_CSS = """<style>
     box-shadow:0 4px 32px rgba(0,0,0,0.6),0 0 28px rgba(255,94,0,0.2);
 }
 .joseph-floating-avatar{
-    width:72px;height:72px;border-radius:50%;flex-shrink:0;
+    width:96px;height:96px;border-radius:50%;flex-shrink:0;
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 12px rgba(255,94,0,0.45);
     animation:josephFloatingGlow 3s ease-in-out infinite;

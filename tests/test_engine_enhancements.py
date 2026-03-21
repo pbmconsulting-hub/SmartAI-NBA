@@ -1420,8 +1420,8 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         self.assertEqual(result[0]["stat_type"], "points")
         self.assertEqual(result[0]["line"], 24.5)
 
-    def test_platforms_are_grouped_separately(self):
-        """Same player/stat on different platforms are independent groups."""
+    def test_platforms_are_grouped_together(self):
+        """Same player/stat across platforms uses cross-platform median."""
         props = [
             self._make_prop("SGA", "points", 28.5, "PrizePicks"),
             self._make_prop("SGA", "points", 31.5, "PrizePicks"),
@@ -1429,14 +1429,16 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
             self._make_prop("SGA", "points", 30.0, "Underdog"),
         ]
         result = self.parse(props)
+        # Cross-platform median of [28.5, 30.0, 31.5, 34.5] = 30.75
+        # All lines are categorised relative to 30.75.
         pp = [p for p in result if p["platform"] == "PrizePicks"]
         ud = [p for p in result if p["platform"] == "Underdog"]
-        # Single Underdog line is the standard 50_50
-        self.assertEqual(ud[0]["line_category"], "50_50")
-        # PrizePicks: below=goblin, median=50_50, above=demon
+        # Underdog 30.0 < 30.75 → goblin
+        self.assertEqual(ud[0]["line_category"], "goblin")
+        # PrizePicks: 28.5 < 30.75 → goblin, 31.5 > 30.75 → demon, 34.5 > 30.75 → demon
         pp_cats = {p["line"]: p["line_category"] for p in pp}
         self.assertEqual(pp_cats[28.5], "goblin")
-        self.assertEqual(pp_cats[31.5], "50_50")
+        self.assertEqual(pp_cats[31.5], "demon")
         self.assertEqual(pp_cats[34.5], "demon")
 
     def test_empty_props_returns_empty(self):

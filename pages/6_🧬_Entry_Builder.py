@@ -58,7 +58,6 @@ from utils.components import render_global_settings, inject_joseph_floating, ren
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
-render_joseph_hero_banner()
 
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate
