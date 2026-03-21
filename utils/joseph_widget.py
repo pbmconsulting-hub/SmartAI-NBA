@@ -63,7 +63,7 @@ def _joseph_typing_generator(text: str):
     words = text.split(" ")
     for i, word in enumerate(words):
         yield word + (" " if i < len(words) - 1 else "")
-        _time.sleep(0.04)
+        _time.sleep(0.03)
 
 
 try:
@@ -642,7 +642,7 @@ def inject_joseph_inline_commentary(
             unsafe_allow_html=True,
         )
         # Stream the commentary word by word (typing effect)
-        _stream_key = f"_joseph_streamed_{hash(commentary)}"
+        _stream_key = f"_joseph_streamed_{context_type}_{hash(commentary)}"
         if not st.session_state.get(_stream_key, False):
             st.write_stream(_joseph_typing_generator(commentary))
             st.session_state[_stream_key] = True

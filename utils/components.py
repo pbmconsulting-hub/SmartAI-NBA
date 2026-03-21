@@ -7,7 +7,10 @@
 
 import os
 import base64
+import logging
 import streamlit as st
+
+_components_logger = logging.getLogger(__name__)
 
 
 # ── Cached Hero Banner Loader ─────────────────────────────────────────────
@@ -25,9 +28,11 @@ def _get_hero_banner_b64() -> str:
         if os.path.isfile(norm):
             try:
                 with open(norm, "rb") as fh:
+                    _components_logger.debug("Hero banner loaded from %s", norm)
                     return base64.b64encode(fh.read()).decode("utf-8")
             except Exception:
-                pass
+                _components_logger.warning("Failed reading hero banner at %s", norm)
+    _components_logger.warning("Joseph hero banner not found in any candidate path")
     return ""
 
 
