@@ -632,9 +632,8 @@ if run_analysis:
     except ImportError:
         _TEAM_FULL_MAP = {}
 
-    # Build reverse lookups: nickname → abbrev, city → abbrev
+    # Build reverse lookups: nickname → abbrev
     _TEAM_NICKNAME_MAP: dict = {}   # e.g. "LAKERS" → "LAL"
-    _TEAM_CITY_MAP: dict = {}       # e.g. "LOS ANGELES" → ["LAL", "LAC"]
     for _full_name, _abbr in _TEAM_FULL_MAP.items():
         parts = _full_name.rsplit(" ", 1)
         if len(parts) == 2:

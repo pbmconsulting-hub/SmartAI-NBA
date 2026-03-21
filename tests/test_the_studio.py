@@ -529,6 +529,9 @@ class TestGameAnalysisWithDictTeamsData(unittest.TestCase):
         # Should not contain raw dict representation
         self.assertNotIn("primary_scheme", scheme)
         self.assertNotIn("rim_protection", scheme)
+        # Should contain the extracted scheme name and both team names
+        self.assertIn("LAL", scheme)
+        self.assertIn("defense", scheme.lower())
 
     def test_game_analysis_empty_results_still_works(self):
         teams_data = {

@@ -900,8 +900,9 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         sim_mean = _safe_float(sim_result.get("simulated_mean", projected_avg))
 
         # --- Edge detection ---
-        implied_prob = 52.38  # standard -110 breakeven
-        edge = (prob_over * 100.0 if prob_over <= 1.0 else prob_over) - implied_prob
+        # Standard -110 vig breakeven: you need 52.38% win rate to break even
+        _STANDARD_VIG_BREAKEVEN = 52.38
+        edge = (prob_over * 100.0 if prob_over <= 1.0 else prob_over) - _STANDARD_VIG_BREAKEVEN
 
         # --- Confidence scoring ---
         try:
