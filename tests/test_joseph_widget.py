@@ -58,6 +58,10 @@ class TestModuleImports(unittest.TestCase):
         self.assertTrue(callable(render_joseph_sidebar_widget))
         self.assertTrue(callable(inject_joseph_inline_commentary))
 
+    def test_ask_popover_callable(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        self.assertTrue(callable(render_joseph_ask_popover))
+
 
 # ============================================================
 # SECTION 2: _WIDGET_CSS content validation
@@ -134,11 +138,124 @@ class TestWidgetCSS(unittest.TestCase):
     def test_orange_accent_color(self):
         self.assertIn("#ff5e00", self.css)
 
-    def test_border_radius_12(self):
-        self.assertIn("border-radius:12px", self.css)
+    def test_border_radius_14(self):
+        self.assertIn("border-radius:14px", self.css)
 
     def test_border_radius_10(self):
         self.assertIn("border-radius:10px", self.css)
+
+    # ── Premium typography ────────────────────────────────────
+
+    def test_orbitron_font(self):
+        self.assertIn("Orbitron", self.css)
+
+    def test_montserrat_font(self):
+        self.assertIn("Montserrat", self.css)
+
+    def test_jetbrains_mono_font(self):
+        self.assertIn("JetBrains Mono", self.css)
+
+    def test_tabular_nums(self):
+        self.assertIn("tabular-nums", self.css)
+
+    # ── Typing dots animation ─────────────────────────────────
+
+    def test_typing_indicator(self):
+        self.assertIn("joseph-widget-typing", self.css)
+
+    def test_typing_bounce_keyframes(self):
+        self.assertIn("josephWidgetBounce", self.css)
+
+    # ── Shimmer border animation ──────────────────────────────
+
+    def test_shimmer_animation(self):
+        self.assertIn("josephWidgetShimmer", self.css)
+
+    def test_shimmer_gradient(self):
+        self.assertIn("#ff9e00", self.css)
+
+    # ── Popover CSS classes ───────────────────────────────────
+
+    def test_popover_container(self):
+        self.assertIn("joseph-popover-container", self.css)
+
+    def test_popover_avatar_64px(self):
+        self.assertIn("joseph-popover-avatar", self.css)
+        self.assertIn("64px", self.css)
+
+    def test_popover_title_orbitron(self):
+        self.assertIn("joseph-popover-title", self.css)
+
+    def test_popover_body(self):
+        self.assertIn("joseph-popover-body", self.css)
+
+    def test_popover_glassmorphic(self):
+        self.assertIn("blur(16px)", self.css)
+
+    def test_sidebar_name_class(self):
+        self.assertIn("joseph-sidebar-name", self.css)
+
+    def test_track_record_class(self):
+        self.assertIn("joseph-track-record", self.css)
+
+    # ── Elite NBA ESPN AI theme enhancements ──────────────────
+
+    def test_sidebar_bottom_broadcast_bar(self):
+        """Sidebar container should have a bottom shimmer bar."""
+        self.assertIn("joseph-sidebar-container::after", self.css)
+
+    def test_sidebar_container_outer_glow(self):
+        """Sidebar container should have an outer glow."""
+        self.assertIn("box-shadow", self.css)
+
+    def test_sidebar_avatar_animated_glow(self):
+        """Sidebar avatar should have an animated glow."""
+        self.assertIn("josephSidebarGlow", self.css)
+
+    def test_live_badge_class(self):
+        """Should have an ESPN-style LIVE badge class."""
+        self.assertIn("joseph-live-badge", self.css)
+
+    def test_pulse_dot_glow(self):
+        """Pulse dot should have a box-shadow glow."""
+        self.assertIn("box-shadow:0 0 4px rgba(255,94,0,0.5)", self.css)
+
+    def test_inline_card_left_accent(self):
+        """Inline commentary card should have a left accent border."""
+        self.assertIn("border-left:3px solid rgba(255,94,0,0.5)", self.css)
+
+    def test_inline_card_hover(self):
+        """Inline card should have hover effect."""
+        self.assertIn("joseph-inline-card:hover", self.css)
+
+    def test_inline_avatar_glow(self):
+        """Inline avatar should have a glow shadow."""
+        self.assertIn("box-shadow:0 0 6px rgba(255,94,0,0.25)", self.css)
+
+    def test_inline_label_text_shadow(self):
+        """Inline label should have a text shadow."""
+        self.assertIn("text-shadow:0 0 6px rgba(255,94,0,0.12)", self.css)
+
+    def test_verdict_text_shadows(self):
+        """Verdict accents should have text-shadow glow."""
+        self.assertIn("text-shadow:0 0 6px rgba(255,68,68,0.2)", self.css)
+        self.assertIn("text-shadow:0 0 6px rgba(0,255,157,0.15)", self.css)
+
+    def test_popover_bottom_bar(self):
+        """Popover should have a bottom shimmer bar."""
+        self.assertIn("joseph-popover-container::after", self.css)
+
+    def test_popover_avatar_animated_glow(self):
+        """Popover avatar should have an animated glow ring."""
+        self.assertIn("josephPopoverGlow", self.css)
+
+    def test_popover_title_text_shadow(self):
+        """Popover title should have a text-shadow."""
+        self.assertIn("text-shadow:0 0 10px rgba(255,94,0,0.2)", self.css)
+
+    def test_sidebar_name_text_shadow(self):
+        """Sidebar name should have a text-shadow."""
+        self.assertIn("text-shadow:0 0 8px rgba(255,94,0,0.15)", self.css)
 
 
 # ============================================================
@@ -457,7 +574,135 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
 
 
 # ============================================================
-# SECTION 6: Availability flags
+# SECTION 6: render_joseph_ask_popover()
+# ============================================================
+
+class TestRenderJosephAskPopover(unittest.TestCase):
+    """Test the Ask Joseph popover rendering function."""
+
+    def setUp(self):
+        _mock_st.reset_mock()
+        _mock_st.session_state = {}
+
+    def _get_popover_html(self):
+        """Return the HTML string from the popover's st.markdown calls."""
+        for call in _mock_st.markdown.call_args_list:
+            if call[0] and '<div class="joseph-popover-container">' in call[0][0]:
+                return call[0][0]
+        return ""
+
+    def test_callable(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        self.assertTrue(callable(render_joseph_ask_popover))
+
+    def test_does_not_raise(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+
+    def test_calls_popover(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        _mock_st.popover.assert_called()
+
+    def test_popover_label(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        call_args = _mock_st.popover.call_args
+        self.assertIn("Ask Joseph", call_args[0][0])
+
+    def test_popover_emoji_in_label(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        call_args = _mock_st.popover.call_args
+        self.assertIn("🎙️", call_args[0][0])
+
+    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="POP_B64")
+    def test_popover_avatar_rendered(self, mock_avatar):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("joseph-popover-avatar", html)
+        self.assertIn("POP_B64", html)
+
+    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    def test_popover_emoji_fallback(self, mock_avatar):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("🎙️", html)
+
+    def test_popover_contains_name(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("Joseph M. Smith", html)
+
+    def test_popover_contains_title_class(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("joseph-popover-title", html)
+
+    def test_popover_contains_live_dot(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("joseph-pulse-dot", html)
+
+    @patch("utils.joseph_widget.joseph_commentary", return_value="HOT TAKE POP")
+    def test_popover_with_results(self, mock_comm):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover(results=[{"player": "Tatum"}])
+        html = self._get_popover_html()
+        self.assertIn("HOT TAKE POP", html)
+        mock_comm.assert_called_with([{"player": "Tatum"}], "analysis_results")
+
+    @patch("utils.joseph_widget.joseph_commentary", return_value="CUSTOM")
+    def test_popover_custom_context(self, mock_comm):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover(
+            results=[{"player": "AD"}], context_type="entry_built"
+        )
+        mock_comm.assert_called_with([{"player": "AD"}], "entry_built")
+
+    @patch("utils.joseph_widget.joseph_ambient_line", return_value="AMBIENT POP")
+    @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
+    def test_popover_ambient_when_no_results(self, mock_ctx, mock_line):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("AMBIENT POP", html)
+
+    @patch("utils.joseph_widget.joseph_ambient_line", return_value="")
+    @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
+    def test_popover_default_when_empty(self, mock_ctx, mock_line):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        html = self._get_popover_html()
+        self.assertIn("ready", html)
+
+    def test_popover_html_escaping(self):
+        with patch("utils.joseph_widget.joseph_ambient_line",
+                   return_value="<script>xss</script>"):
+            with patch("utils.joseph_widget.joseph_get_ambient_context",
+                       return_value=("idle", {})):
+                from utils.joseph_widget import render_joseph_ask_popover
+                render_joseph_ask_popover()
+                html = self._get_popover_html()
+                self.assertNotIn("<script>", html)
+                self.assertIn("&lt;script&gt;", html)
+
+    def test_popover_unsafe_allow_html(self):
+        from utils.joseph_widget import render_joseph_ask_popover
+        render_joseph_ask_popover()
+        # The markdown call inside the popover should use unsafe_allow_html
+        for call in _mock_st.markdown.call_args_list:
+            if call[0] and '<div class="joseph-popover-container">' in str(call[0][0]):
+                self.assertTrue(call[1].get("unsafe_allow_html", False))
+
+
+# ============================================================
+# SECTION 7: Availability flags
 # ============================================================
 
 class TestAvailabilityFlags(unittest.TestCase):

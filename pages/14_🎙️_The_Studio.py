@@ -172,12 +172,21 @@ _STUDIO_CSS = """<style>
     border-radius:18px;padding:32px 24px;
     text-align:center;margin-bottom:28px;
     position:relative;overflow:hidden;
+    box-shadow:0 0 60px rgba(255,94,0,0.08),inset 0 1px 0 rgba(255,158,0,0.1);
 }
+/* Top broadcast bar */
 .studio-hero::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
     background-size:200% 100%;
     animation:studioShimmer 3s linear infinite;
+}
+/* Bottom broadcast bar */
+.studio-hero::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    background-size:200% 100%;
+    animation:studioShimmer 3s linear infinite reverse;
 }
 @keyframes studioShimmer{
     0%{background-position:-200% 0}100%{background-position:200% 0}
@@ -186,50 +195,74 @@ _STUDIO_CSS = """<style>
     font-family:'Orbitron',sans-serif;font-size:1.8rem;
     color:#ff5e00;font-weight:700;margin:14px 0 6px;
     letter-spacing:1px;
+    text-shadow:0 0 20px rgba(255,94,0,0.3),0 0 40px rgba(255,94,0,0.1);
 }
 .studio-hero-subtitle{
     color:#94a3b8;font-size:0.95rem;
     font-family:'Montserrat',sans-serif;
+    letter-spacing:0.3px;
 }
 .studio-avatar-lg{
     width:120px;height:120px;border-radius:50%;
     border:3px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 24px rgba(255,94,0,0.3);
+    box-shadow:0 0 24px rgba(255,94,0,0.3),0 0 48px rgba(255,94,0,0.12);
     margin:0 auto;display:block;
+    animation:studioAvatarPulse 4s ease-in-out infinite;
+}
+@keyframes studioAvatarPulse{
+    0%,100%{box-shadow:0 0 24px rgba(255,94,0,0.3),0 0 48px rgba(255,94,0,0.12)}
+    50%{box-shadow:0 0 32px rgba(255,94,0,0.5),0 0 64px rgba(255,94,0,0.2)}
 }
 .studio-game-card{
     background:rgba(15,23,42,0.75);
     backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
     border:1px solid rgba(148,163,184,0.18);
+    border-left:3px solid rgba(255,94,0,0.4);
     border-radius:12px;padding:16px 20px;
-    cursor:pointer;transition:all 0.2s ease;
+    cursor:pointer;transition:all 0.25s ease;
     margin-bottom:10px;
 }
 .studio-game-card:hover{
     border-color:rgba(255,94,0,0.5);
-    box-shadow:0 0 12px rgba(255,94,0,0.15);
+    box-shadow:0 4px 24px rgba(255,94,0,0.12);
+    transform:translateY(-1px);
 }
 .studio-ticket-card{
     background:rgba(7,10,19,0.8);
     backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
     border:1px solid rgba(255,94,0,0.3);
     border-radius:14px;padding:22px 26px;
-    margin:16px 0;
+    margin:16px 0;position:relative;overflow:hidden;
+    box-shadow:0 0 30px rgba(255,94,0,0.06);
+}
+.studio-ticket-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,#ff5e00,transparent);
+    opacity:0.6;
 }
 .studio-ticket-header{
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:1.15rem;
     font-weight:700;margin-bottom:12px;
+    text-shadow:0 0 8px rgba(255,94,0,0.2);
 }
 .studio-ticket-leg{
     padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.08);
     color:#e2e8f0;font-size:0.9rem;
+    font-family:'Montserrat',sans-serif;
+    transition:background 0.15s ease;
 }
 .studio-ticket-leg:last-child{border-bottom:none}
+.studio-ticket-leg:hover{background:rgba(255,94,0,0.03);border-radius:4px}
 .studio-section-title{
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:1.2rem;font-weight:700;
     margin:28px 0 14px;letter-spacing:0.5px;
+    text-shadow:0 0 10px rgba(255,94,0,0.15);
+    padding-left:12px;
+    border-left:3px solid #ff5e00;
 }
 .studio-metric-row{
     display:flex;gap:14px;flex-wrap:wrap;margin:14px 0;
@@ -240,14 +273,29 @@ _STUDIO_CSS = """<style>
     border:1px solid rgba(255,94,0,0.2);
     border-radius:10px;padding:14px 18px;
     text-align:center;
+    transition:all 0.2s ease;
+    position:relative;overflow:hidden;
+}
+.studio-metric-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,#ff5e00,transparent);
+    opacity:0.4;
+}
+.studio-metric-card:hover{
+    border-color:rgba(255,94,0,0.4);
+    box-shadow:0 0 16px rgba(255,94,0,0.1);
+    transform:translateY(-1px);
 }
 .studio-metric-value{
     font-family:'JetBrains Mono',monospace;
+    font-variant-numeric:tabular-nums;
     font-size:1.4rem;color:#ff5e00;font-weight:700;
+    text-shadow:0 0 8px rgba(255,94,0,0.2);
 }
 .studio-metric-label{
     color:#94a3b8;font-size:0.78rem;
     margin-top:4px;font-family:'Montserrat',sans-serif;
+    text-transform:uppercase;letter-spacing:0.5px;
 }
 .studio-payout-table{
     width:100%;border-collapse:separate;border-spacing:0;
@@ -264,6 +312,8 @@ _STUDIO_CSS = """<style>
 .studio-payout-table td{
     padding:6px 12px;text-align:center;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.08);
+    font-family:'JetBrains Mono',monospace;
+    font-variant-numeric:tabular-nums;
 }
 .studio-payout-table td.highlight{color:#22c55e;font-weight:700}
 </style>"""

@@ -97,6 +97,56 @@ class TestRenderLiveDeskCss(unittest.TestCase):
     def test_border_color(self):
         self.assertIn("rgba(255,94,0,0.3)", self.css)
 
+    # ── Elite NBA ESPN AI theme enhancements ─────────────────
+
+    def test_bottom_broadcast_bar(self):
+        """Live desk should have a bottom shimmer bar like ESPN broadcast."""
+        self.assertIn("joseph-live-desk::after", self.css)
+
+    def test_container_outer_glow(self):
+        """Live desk container should have an outer glow shadow."""
+        self.assertIn("box-shadow", self.css)
+
+    def test_avatar_animated_glow(self):
+        """64px avatar should have an animated glow ring."""
+        self.assertIn("josephAvatarGlow", self.css)
+
+    def test_header_text_shadow(self):
+        """Header text should have a neon text-shadow."""
+        self.assertIn("text-shadow", self.css)
+
+    def test_segment_left_accent(self):
+        """Segment cards should have an ESPN-style left accent border."""
+        self.assertIn("border-left", self.css)
+
+    def test_segment_hover_lift(self):
+        """Segment cards should lift on hover (translateY)."""
+        self.assertIn("translateY", self.css)
+
+    def test_verdict_text_shadow(self):
+        """Verdict badges should have a text glow."""
+        self.assertIn("text-shadow:0 0 6px currentColor", self.css)
+
+    def test_verdict_hover_scale(self):
+        """Verdict badges should scale on hover."""
+        self.assertIn("joseph-verdict:hover", self.css)
+
+    def test_nerd_stats_tabular_nums(self):
+        """Nerd stats should use tabular-nums for scoreboard alignment."""
+        self.assertIn("tabular-nums", self.css)
+
+    def test_edge_value_class(self):
+        """Should have a scoreboard-style edge value class."""
+        self.assertIn("joseph-edge-value", self.css)
+
+    def test_live_dot_box_shadow(self):
+        """LIVE dot should have a red glow shadow."""
+        self.assertIn("box-shadow:0 0 6px rgba(255,32,32,0.6)", self.css)
+
+    def test_subtitle_montserrat(self):
+        """Subtitle should use Montserrat font."""
+        self.assertIn("Montserrat", self.css)
+
 
 class TestRenderBroadcastSegment(unittest.TestCase):
     """Test render_broadcast_segment returns valid HTML."""
