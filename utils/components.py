@@ -90,6 +90,17 @@ def render_global_settings():
 
         st.caption("Changes apply on next analysis run.")
 
+    # ═══ Joseph M. Smith — Always-On Sidebar Widget ═══
+    if st.session_state.get("joseph_enabled", True):
+        try:
+            from utils.joseph_widget import render_joseph_sidebar_widget
+            render_joseph_sidebar_widget()
+        except ImportError:
+            pass  # Joseph module not installed yet — silent degradation
+        except Exception as _joseph_widget_err:
+            import logging
+            logging.getLogger(__name__).debug(f"Joseph widget: {_joseph_widget_err}")
+
 
 # ── on_change callbacks ──────────────────────────────────────────
 # These propagate widget values into the canonical session-state keys

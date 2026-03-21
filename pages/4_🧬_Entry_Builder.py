@@ -706,6 +706,22 @@ if build_button:
 
             st.markdown("---")
 
+        # ════ JOSEPH REACTS TO ENTRY ════
+        if st.session_state.get("joseph_enabled", True):
+            try:
+                from utils.joseph_widget import render_joseph_inline_commentary
+                st.session_state["joseph_entry_just_built"] = True
+                _entry_results = [{"player_name": leg.get("player_name",""), "stat_type": leg.get("stat_type",""),
+                                   "line": leg.get("line",0), "direction": leg.get("direction",""),
+                                   "edge_percentage": leg.get("edge_percentage",0)}
+                                  for entry in (optimal_entries[:3] if 'optimal_entries' in dir() else [])
+                                  for leg in entry.get("legs", [])]
+                if _entry_results:
+                    render_joseph_inline_commentary(_entry_results, "entry_built")
+            except Exception:
+                pass
+        # ════ END JOSEPH ENTRY REACTION ════
+
     # Feature 5: Session risk summary
     try:
         if calculate_kelly_fraction is not None and get_session_risk_summary is not None and optimal_entries and bankroll_amount > 0:
