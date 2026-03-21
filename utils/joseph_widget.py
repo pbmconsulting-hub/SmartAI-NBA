@@ -267,6 +267,69 @@ _WIDGET_CSS = """<style>
     font-variant-numeric:tabular-nums;
     color:#00f0ff;font-size:0.82rem;
 }
+/* ── Floating Bottom-Right Widget ───────────────────────────── */
+.joseph-floating-widget{
+    position:fixed;bottom:24px;right:24px;z-index:999999;
+    display:flex;align-items:center;gap:12px;
+    background:rgba(7,10,19,0.94);
+    border:1px solid rgba(255,94,0,0.4);
+    border-radius:16px;
+    padding:10px 18px 10px 10px;
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    box-shadow:0 4px 24px rgba(0,0,0,0.5),0 0 20px rgba(255,94,0,0.1);
+    cursor:default;
+    transition:box-shadow 0.2s ease;
+    max-width:340px;
+    overflow:hidden;
+}
+.joseph-floating-widget::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite;
+}
+.joseph-floating-widget::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite reverse;
+}
+.joseph-floating-widget:hover{
+    box-shadow:0 4px 32px rgba(0,0,0,0.6),0 0 28px rgba(255,94,0,0.2);
+}
+.joseph-floating-avatar{
+    width:48px;height:48px;border-radius:50%;flex-shrink:0;
+    border:2px solid #ff5e00;object-fit:cover;
+    box-shadow:0 0 12px rgba(255,94,0,0.45);
+    animation:josephFloatingGlow 3s ease-in-out infinite;
+}
+@keyframes josephFloatingGlow{
+    0%,100%{box-shadow:0 0 12px rgba(255,94,0,0.45)}
+    50%{box-shadow:0 0 18px rgba(255,94,0,0.65)}
+}
+.joseph-floating-avatar:hover{
+    transform:scale(1.08);
+    box-shadow:0 0 20px rgba(255,94,0,0.65);
+    transition:transform 0.2s ease,box-shadow 0.2s ease;
+}
+.joseph-floating-info{
+    display:flex;flex-direction:column;gap:2px;
+    min-width:0;
+}
+.joseph-floating-name{
+    font-family:'Orbitron',sans-serif;
+    color:#ff5e00;font-size:0.72rem;font-weight:700;
+    letter-spacing:0.4px;white-space:nowrap;
+    text-shadow:0 0 8px rgba(255,94,0,0.15);
+}
+.joseph-floating-ambient{
+    color:#ff9d4d;font-size:0.68rem;font-style:italic;
+    font-family:'Montserrat',sans-serif;
+    line-height:1.3;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;text-overflow:ellipsis;
+}
 </style>"""
 
 
@@ -388,6 +451,86 @@ def render_joseph_sidebar_widget() -> None:
             )
     except Exception as exc:
         _logger.debug("render_joseph_sidebar_widget failed: %s", exc)
+
+
+# ════════════════════════════════════════════════════════════════
+# render_joseph_floating_widget — fixed bottom-right floating card
+# ════════════════════════════════════════════════════════════════
+
+def render_joseph_floating_widget() -> None:
+    """Render Joseph as a floating widget pinned to the bottom-right.
+
+    The widget uses ``position:fixed`` so it stays visible regardless
+    of scroll position.  It shows:
+
+    * Joseph's **48 px** avatar with animated glow ring
+    * A pulsing LIVE dot + his name
+    * A rotating ambient commentary line
+
+    Call this function once per page (typically from
+    :func:`utils.components.render_global_settings`) to give Joseph
+    persistent, always-visible presence.
+    """
+    if st is None:
+        return
+
+    try:
+        _inject_widget_css()
+    except Exception:
+        pass
+
+    try:
+        # ── Avatar image ──────────────────────────────────────
+        avatar_b64 = ""
+        try:
+            avatar_b64 = get_joseph_avatar_b64()
+        except Exception:
+            pass
+
+        if avatar_b64:
+            avatar_html = (
+                f'<img src="data:image/png;base64,{avatar_b64}" '
+                f'class="joseph-floating-avatar" '
+                f'alt="Joseph M. Smith" />'
+            )
+        else:
+            avatar_html = (
+                '<div class="joseph-floating-avatar" '
+                'style="display:flex;align-items:center;justify-content:center;'
+                'background:#1a1a2e;font-size:1.2rem;">🎙️</div>'
+            )
+
+        # ── Ambient commentary ────────────────────────────────
+        ambient_text = ""
+        try:
+            session_dict = dict(st.session_state) if hasattr(st, "session_state") else {}
+            context_key, ctx_kwargs = joseph_get_ambient_context(session_dict)
+            ambient_text = joseph_ambient_line(context_key, **ctx_kwargs)
+        except Exception as exc:
+            _logger.debug("Floating ambient line failed: %s", exc)
+
+        if not ambient_text:
+            ambient_text = "Joseph M. Smith is ALWAYS watching the board…"
+
+        escaped_ambient = _html.escape(ambient_text)
+
+        # ── Render floating HTML (main page, NOT sidebar) ─────
+        st.markdown(
+            f'<div class="joseph-floating-widget">'
+            f'{avatar_html}'
+            f'<div class="joseph-floating-info">'
+            f'<div class="joseph-floating-name">'
+            f'<span class="joseph-pulse-dot"></span> Joseph M. Smith'
+            f'</div>'
+            f'<div class="joseph-floating-ambient">'
+            f'{escaped_ambient}'
+            f'</div>'
+            f'</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    except Exception as exc:
+        _logger.debug("render_joseph_floating_widget failed: %s", exc)
 
 
 # ════════════════════════════════════════════════════════════════

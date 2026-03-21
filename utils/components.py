@@ -90,11 +90,18 @@ def render_global_settings():
 
         st.caption("Changes apply on next analysis run.")
 
-    # ═══ Joseph M. Smith — Always-On Sidebar Widget ═══
+
+def inject_joseph_floating():
+    """Render the Joseph M. Smith floating widget in the main content area.
+
+    Must be called **outside** ``with st.sidebar:`` so the
+    ``position: fixed`` CSS is not trapped by the sidebar's
+    transform-based containing block.
+    """
     if st.session_state.get("joseph_enabled", True):
         try:
-            from utils.joseph_widget import render_joseph_sidebar_widget
-            render_joseph_sidebar_widget()
+            from utils.joseph_widget import render_joseph_floating_widget
+            render_joseph_floating_widget()
         except ImportError:
             pass  # Joseph module not installed yet — silent degradation
         except Exception as _joseph_widget_err:
