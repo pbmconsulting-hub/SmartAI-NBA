@@ -18,7 +18,7 @@ _ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pic
 _ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
 _LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
 if os.path.exists(_LOGO_PATH):
-    st.logo(_LOGO_PATH, size="large")
+    st.logo(_LOGO_PATH, size="small")
 
 from styles.theme import get_global_css
 

@@ -37,23 +37,11 @@ def _get_hero_banner_b64() -> str:
 
 
 def render_joseph_hero_banner() -> None:
-    """Render the Joseph M. Smith 16×9 hero banner at the top of a page.
+    """No-op — the full-width hero banner has been removed from the UI.
 
-    Uses the ``Joseph A Smith Hero Banner.png`` image found in the repo root.
-    The banner spans the full width and stays compact vertically (16:9 ratio).
+    The function signature is preserved so existing callers do not break.
     """
-    b64 = _get_hero_banner_b64()
-    if not b64:
-        return
-    st.markdown(
-        f"""<div style="width:100%;margin-bottom:12px;border-radius:10px;overflow:hidden;
-            border:1px solid rgba(255,94,0,0.3);box-shadow:0 2px 16px rgba(255,94,0,0.1);">
-        <img src="data:image/png;base64,{b64}"
-             style="width:100%;height:auto;display:block;"
-             alt="Joseph M. Smith — SmartBetPro" />
-        </div>""",
-        unsafe_allow_html=True,
-    )
+    return
 
 
 def render_global_settings():
