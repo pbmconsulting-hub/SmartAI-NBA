@@ -5,7 +5,55 @@
 #          injected into any page's sidebar or header.
 # ============================================================
 
+import os
+import base64
+import logging
 import streamlit as st
+
+_components_logger = logging.getLogger(__name__)
+
+
+# ── Cached Hero Banner Loader ─────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def _get_hero_banner_b64() -> str:
+    """Load the Joseph A Smith Hero Banner and return base64-encoded string."""
+    _this = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_this, "..", "Joseph A Smith Hero Banner.png"),
+        os.path.join(os.getcwd(), "Joseph A Smith Hero Banner.png"),
+        os.path.join(_this, "..", "assets", "Joseph A Smith Hero Banner.png"),
+    ]
+    for path in candidates:
+        norm = os.path.normpath(path)
+        if os.path.isfile(norm):
+            try:
+                with open(norm, "rb") as fh:
+                    _components_logger.debug("Hero banner loaded from %s", norm)
+                    return base64.b64encode(fh.read()).decode("utf-8")
+            except Exception:
+                _components_logger.warning("Failed reading hero banner at %s", norm)
+    _components_logger.warning("Joseph hero banner not found in any candidate path")
+    return ""
+
+
+def render_joseph_hero_banner() -> None:
+    """Render the Joseph M. Smith 16×9 hero banner at the top of a page.
+
+    Uses the ``Joseph A Smith Hero Banner.png`` image found in the repo root.
+    The banner spans the full width and stays compact vertically (16:9 ratio).
+    """
+    b64 = _get_hero_banner_b64()
+    if not b64:
+        return
+    st.markdown(
+        f"""<div style="width:100%;margin-bottom:12px;border-radius:10px;overflow:hidden;
+            border:1px solid rgba(255,94,0,0.3);box-shadow:0 2px 16px rgba(255,94,0,0.1);">
+        <img src="data:image/png;base64,{b64}"
+             style="width:100%;height:auto;display:block;"
+             alt="Joseph M. Smith — SmartBetPro" />
+        </div>""",
+        unsafe_allow_html=True,
+    )
 
 
 def render_global_settings():

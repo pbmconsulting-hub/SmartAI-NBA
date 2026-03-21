@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/6_💎_Premium.py
+# FILE: pages/14_💎_Subscription_Level.py
 # PURPOSE: SmartBetPro NBA subscription management page.
 #          Shows pricing, feature comparison, and handles
 #          Stripe Checkout redirects for new subscribers.
@@ -23,6 +23,11 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html, get_premium_footer_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 # ─── Premium Page Custom CSS ──────────────────────────────────
 st.markdown("""
@@ -341,10 +346,10 @@ if sub_status["is_premium"]:
     st.subheader("🚀 Your Premium Features")
     feat_cols = st.columns(3)
     features = [
-        ("🧬", "Entry Builder",     "pages/4_🧬_Entry_Builder.py"),
-        ("🛡️", "Risk Shield",        "pages/5_🛡️_Risk_Shield.py"),
-        ("📋", "Game Report",        "pages/9_📋_Game_Report.py"),
-        ("🔮", "Player Simulator",  "pages/10_🔮_Player_Simulator.py"),
+        ("🧬", "Entry Builder",     "pages/6_🧬_Entry_Builder.py"),
+        ("🛡️", "Risk Shield",        "pages/8_🛡️_Risk_Shield.py"),
+        ("📋", "Game Report",        "pages/4_📋_Game_Report.py"),
+        ("🔮", "Player Simulator",  "pages/5_🔮_Player_Simulator.py"),
         ("📈", "Bet Tracker",        "pages/11_📈_Bet_Tracker.py"),
         ("🔬", "Full Prop Scanner",  "pages/2_🔬_Prop_Scanner.py"),
     ]

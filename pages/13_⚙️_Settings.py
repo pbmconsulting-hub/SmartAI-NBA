@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/7_⚙️_Settings.py
+# FILE: pages/13_⚙️_Settings.py
 # PURPOSE: Configure the SmartBetPro NBA engine settings:
 #          simulation depth, edge thresholds, platform selection,
 #          and entry fee defaults. All settings persist in session state.
@@ -22,6 +22,11 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 st.title("⚙️ Settings")
 st.markdown("Configure the SmartBetPro NBA prediction engine.")

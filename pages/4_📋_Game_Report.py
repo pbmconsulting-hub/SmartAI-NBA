@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/9_📋_Game_Report.py
+# FILE: pages/4_📋_Game_Report.py
 # PURPOSE: Generate a comprehensive QDS-styled game betting
 #          report using SmartBetPro's AI analysis results.
 # DESIGN:  Quantum Design System (QDS) — dark futuristic theme
@@ -41,6 +41,11 @@ st.set_page_config(
 
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate

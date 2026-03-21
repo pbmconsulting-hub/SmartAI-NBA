@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/8_🔄_Update_Data.py
+# FILE: pages/9_📡_Data_Feed.py
 # PURPOSE: Streamlit page that lets the user fetch live NBA data
 #          from the nba_api library. Updates player stats, team stats,
 #          and today's games with real, current data.
@@ -55,6 +55,11 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 # Page title and description
 st.title("📡 Data Feed")

@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/10_🔮_Player_Simulator.py
+# FILE: pages/5_🔮_Player_Simulator.py
 # PURPOSE: Player Simulator — run Quantum Matrix Engine 5.6 simulations for
 #          selected players to project their full stat line and
 #          surface "dark horse" upside picks for tonight's slate.
@@ -27,6 +27,11 @@ st.set_page_config(
 from styles.theme import get_global_css, get_qds_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate

@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/3_⚡_Neural_Analysis.py
+# FILE: pages/3_⚡_Quantum_Analysis_Matrix.py
 # PURPOSE: The main analysis page. Runs Quantum Matrix Engine 5.6 simulation
 #          for each prop and shows probability, edge, tier, and
 #          directional forces in the Quantum Design System (QDS) UI.
@@ -146,17 +146,18 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating
+from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
+render_joseph_hero_banner()
 
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
-    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
+    _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 _FREE_ANALYSIS_LIMIT = 3   # Free users can analyze up to 3 props
 _user_is_premium = _is_premium_user()
 if "selected_picks" not in st.session_state:
@@ -822,815 +823,862 @@ if run_analysis:
             text=f"Analyzing {prop.get('player_name', 'Player')}… ({prop_index + 1}/{total_props_count})"
         )
 
-        player_name = prop.get("player_name", "")
-        stat_type   = prop.get("stat_type", "points").lower()
-        prop_line   = float(prop.get("line", 0))
-        platform    = prop.get("platform", "PrizePicks")
+        try:
+            player_name = prop.get("player_name", "")
+            stat_type   = prop.get("stat_type", "points").lower()
+            prop_line   = float(prop.get("line", 0))
+            platform    = prop.get("platform", "PrizePicks")
 
-        # Phase 2: Use quarantined main line when available
-        _raw_target = prop.get("prop_target_line")
-        prop_target_line = None
-        if _raw_target is not None:
+            # Phase 2: Use quarantined main line when available
+            _raw_target = prop.get("prop_target_line")
+            prop_target_line = None
+            if _raw_target is not None:
+                try:
+                    _ptl = float(_raw_target)
+                    if _ptl > 0:
+                        prop_target_line = _ptl
+                except (ValueError, TypeError):
+                    pass
+
+            # ── Injury gate ───────────────────────────────────────────
+            injury_map        = st.session_state.get("injury_status_map", {})
+            player_status_info = get_player_status(player_name, injury_map)
+            player_status      = player_status_info.get("status", "Active")
+
+            if player_status in (
+                "Out", "Injured Reserve", "Out (No Recent Games)",
+                "Suspended", "Not With Team",
+                "G League - Two-Way", "G League - On Assignment", "G League",
+            ):
+                injury_note = player_status_info.get("injury_note", "Player is not active")
+                analysis_results_list.append({
+                    "player_name":   player_name,
+                    "team":          prop.get("team", ""),
+                    "player_team":   prop.get("team", ""),
+                    "player_position": "",
+                    "stat_type":     stat_type,
+                    "line":          prop_line,
+                    "platform":      platform,
+                    "season_pts_avg": 0, "season_reb_avg": 0, "season_ast_avg": 0,
+                    "points_avg": 0, "rebounds_avg": 0, "assists_avg": 0,
+                    "opponent":      "",
+                    "probability_over": 0.0, "probability_under": 1.0,
+                    "simulated_mean": 0.0, "simulated_std": 0.0,
+                    "percentile_10": 0.0, "percentile_50": 0.0, "percentile_90": 0.0,
+                    "adjusted_projection": 0.0, "overall_adjustment": 1.0,
+                    "recent_form_ratio": None, "games_played": None,
+                    "edge_percentage": -50.0, "confidence_score": 0,
+                    "tier": "Bronze", "tier_emoji": "🥉",
+                    "direction": "UNDER",
+                    "recommendation": f"SKIP — {player_name} is {player_status}",
+                    "forces": {"over_forces": [], "under_forces": []},
+                    "should_avoid": True,
+                    "avoid_reasons": [f"Player is {player_status}: {injury_note}"],
+                    "histogram": [], "score_breakdown": {},
+                    "line_vs_avg_pct": 0, "recent_form_results": [],
+                    "player_matched": False, "explanation": None,
+                    "line_sharpness_force": None, "line_sharpness_penalty": 0.0,
+                    "trap_line_result": {}, "trap_line_penalty": 0.0,
+                    "teammate_out_notes": [], "minutes_adjustment_factor": 1.0,
+                    "player_is_out": True,
+                    "player_status": player_status,
+                    "player_status_note": injury_note,
+                    "player_id": "",
+                })
+                continue
+
+            # ── Find player in database ───────────────────────────────
+            player_data    = find_player_by_name(players_data, player_name)
+            player_matched = player_data is not None
+
+            if player_data is None:
+                # Build a complete fallback using positional priors.
+                # Using only one stat's avg (the old approach) caused zero-projections for
+                # every other stat — which breaks combo stats, double_double, fantasy scores,
+                # and the directional forces analysis entirely.
+                #
+                # Strategy:
+                #  1. Fill all 7 stat avgs from the SF position prior (league-average for
+                #     an unknown player whose position we cannot determine).
+                #  2. For the specific stat being analyzed, anchor to prop_line (the most
+                #     reliable single data point we have) by scaling the prior components
+                #     proportionally so the expected total matches the prop line.
+                #  3. Set games_played=30 (above the Bayesian threshold of 25) so shrinkage
+                #     is NOT applied — the prop_line is already our best anchor and further
+                #     shrinkage toward league priors would move estimates away from it.
+                _pos   = "SF"  # default when position is unknown
+                _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
+                player_data = {
+                    "name":          player_name,
+                    "team":          prop.get("team", ""),
+                    "position":      _pos,
+                    "games_played":  30,   # above Bayesian threshold — trust prop_line anchor
+                    "minutes_avg":   28.0,
+                    # All seven stats seeded from position priors
+                    "points_avg":    str(_prior["points"]),
+                    "rebounds_avg":  str(_prior["rebounds"]),
+                    "assists_avg":   str(_prior["assists"]),
+                    "threes_avg":    str(_prior["threes"]),
+                    "steals_avg":    str(_prior["steals"]),
+                    "blocks_avg":    str(_prior["blocks"]),
+                    "turnovers_avg": str(_prior["turnovers"]),
+                }
+
+                if stat_type in COMBO_STAT_TYPES:
+                    # Scale prior components so they sum to the prop_line.
+                    # e.g. PRA line=50.5, SF prior P+R+A=25.0 → scale=2.02
+                    # → pts=32.3, reb=11.1, ast=7.1  (realistic split that totals 50.5)
+                    _components = COMBO_STATS.get(stat_type, [])
+                    _prior_sum = sum(_prior.get(s, 0.0) for s in _components)
+                    if _prior_sum > 0 and prop_line > 0:
+                        _scale = prop_line / _prior_sum
+                        for _c in _components:
+                            _est = round(_prior.get(_c, 0.0) * _scale, 1)
+                            player_data[f"{_c}_avg"] = str(_est)
+                            player_data[f"{_c}_std"] = str(round(max(0.5, _est * 0.35), 1))
+                    else:
+                        # Equal split fallback
+                        _split = round(prop_line / max(len(_components), 1), 1)
+                        for _c in _components:
+                            player_data[f"{_c}_avg"] = str(_split)
+                            player_data[f"{_c}_std"] = str(round(max(0.5, _split * 0.35), 1))
+
+                elif stat_type in FANTASY_STAT_TYPES:
+                    # Scale all stats so the weighted fantasy total matches prop_line.
+                    _formula = FANTASY_SCORING.get(stat_type, {})
+                    _prior_fantasy = sum(_prior.get(s, 0.0) * w for s, w in _formula.items())
+                    if _prior_fantasy > 0 and prop_line > 0:
+                        _scale = prop_line / _prior_fantasy
+                        for _fs in _formula:
+                            _est = round(_prior.get(_fs, 0.0) * _scale, 1)
+                            player_data[f"{_fs}_avg"] = str(_est)
+                            player_data[f"{_fs}_std"] = str(round(max(0.5, _est * 0.35), 1))
+
+                elif stat_type not in {"double_double", "triple_double"}:
+                    # Simple stat: prop_line is the best single-point estimate.
+                    player_data[f"{stat_type}_avg"] = str(prop_line)
+                    player_data[f"{stat_type}_std"] = str(round(prop_line * 0.35, 1))
+                # For double_double / triple_double, the position priors already seed
+                # all five required components — no further override needed.
+
+            player_team  = player_data.get("team", prop.get("team", ""))
+            game_context = find_game_context_for_player(player_team, todays_games)
+
+            recent_form_games  = prop.get("recent_form_results", [])
+
+            # ── Feature 6: Minutes Trend — compute using rotation_tracker ──
+            # If game logs contain minutes (MIN field), detect trend vs season avg.
+            _minutes_trend = None
+            _minutes_trend_indicator = "➡️"  # default: stable
+            if _rotation_tracker_available and recent_form_games:
+                try:
+                    _minutes_trend = track_minutes_trend(recent_form_games, window=5)
+                    _td = _minutes_trend.get("trend_direction", "stable")
+                    _minutes_trend_indicator = "🔺" if _td == "up" else ("🔻" if _td == "down" else "➡️")
+                except Exception:
+                    _minutes_trend = None
+
+            # ── C4: Teammate-Out Usage Adjustment ────────────────────
+            # Check if a high-usage teammate is OUT and boost this player's
+            # projection accordingly (+8% primary option, +5% secondary, cap +15%).
+            teammate_boost, teammate_boost_notes = calculate_teammate_out_boost(
+                player_data=player_data,
+                injury_status_map=injury_map,
+                teammates_data=players_data,
+            )
+
+            # ── Precise Minutes Projection (minutes_model.py) ─────────
+            # Use the dedicated minutes model to get a more accurate minutes estimate
+            # before running the full stat projection. The minutes projection
+            # accounts for blowout spread, back-to-back, teammate injuries, and pace.
+            _precise_minutes = None
+            if _minutes_model_available and project_player_minutes is not None:
+                try:
+                    _teammate_status = {
+                        k: v.get("status", "Active")
+                        for k, v in injury_map.items()
+                    } if injury_map else None
+                    _min_result = project_player_minutes(
+                        player_data=player_data,
+                        game_context={
+                            "opponent": game_context.get("opponent", ""),
+                            "is_home": game_context.get("is_home", True),
+                            "vegas_spread": game_context.get("vegas_spread", 0.0),
+                            "game_total": game_context.get("game_total", 220.0),
+                            "rest_days": game_context.get("rest_days", 2),
+                            "back_to_back": game_context.get("back_to_back", False),
+                        },
+                        teammate_status=_teammate_status,
+                        game_logs=recent_form_games if recent_form_games else None,
+                    )
+                    _precise_minutes = _min_result.get("projected_minutes")
+                except Exception:
+                    _precise_minutes = None
+
+            projection_result  = build_player_projection(
+                player_data=player_data,
+                opponent_team_abbreviation=game_context.get("opponent", ""),
+                is_home_game=game_context.get("is_home", True),
+                rest_days=game_context.get("rest_days", 2),
+                game_total=game_context.get("game_total", 220.0),
+                defensive_ratings_data=defensive_ratings_data,
+                teams_data=teams_data,
+                recent_form_games=recent_form_games if recent_form_games else None,
+                vegas_spread=game_context.get("vegas_spread", 0.0),
+                minutes_adjustment_factor=teammate_boost,
+                teammate_out_notes=teammate_boost_notes,
+            )
+
+            # ── Ensemble Model Override (3-model blend) ────────────────
+            # When game logs are available, run the full ensemble model (Model A:
+            # season avg + context, Model B: recent form, Model C: matchup history)
+            # and use the blended projection as the primary projected_stat.
+            # This is more accurate than a single model approach.
+            _ensemble_result = None
+            _ensemble_penalty = 0.0
+            if _ensemble_available and get_ensemble_projection is not None and stat_type not in (
+                "double_double", "triple_double"
+            ):
+                try:
+                    _ens_ctx = {
+                        "stat_type": stat_type,
+                        "opponent": game_context.get("opponent", ""),
+                        "is_home": game_context.get("is_home", True),
+                        "rest_factor": projection_result.get("rest_factor", 1.0),
+                        "pace_factor": projection_result.get("pace_factor", 1.0),
+                        "defense_factor": projection_result.get("defense_factor", 1.0),
+                    }
+                    _ensemble_result = get_ensemble_projection(
+                        player_data=player_data,
+                        game_context=_ens_ctx,
+                        game_logs=recent_form_games if len(recent_form_games or []) >= 3 else None,
+                    )
+                    _ensemble_penalty = _ensemble_result.get("confidence_adjustment", 0.0)
+                except Exception:
+                    _ensemble_result = None
+                    _ensemble_penalty = 0.0
+
+            stat_std      = get_stat_standard_deviation(player_data, stat_type)
+            projected_stat = projection_result.get(
+                f"projected_{stat_type}",
+                float(player_data.get(f"{stat_type}_avg", prop_line))
+            )
+
+            # ── Apply Ensemble Projection Override ───────────────────
+            # When the ensemble produced a blended projection, use it to
+            # override the single-model projected_stat. The ensemble blends
+            # season-avg, recent-form, and matchup-history models with
+            # inverse-variance weighting — consistently more accurate.
+            _ensemble_used = False
+            if (_ensemble_result is not None
+                    and stat_type not in ("double_double", "triple_double")
+                    and stat_type not in list(COMBO_STAT_TYPES) + list(FANTASY_STAT_TYPES)):
+                _ens_proj = _ensemble_result.get("ensemble_projection", 0)
+                _ens_std  = _ensemble_result.get("ensemble_std", 0)
+                if _ens_proj and _ens_proj > 0:
+                    projected_stat = _ens_proj
+                    _ensemble_used = True
+                    # Blend ensemble std with base std for richer variance estimate
+                    if _ens_std > 0:
+                        stat_std = (_ens_std + stat_std) / 2.0
+
+            # ── C8: Minutes-Stat Correlation — pass projected_minutes to sim ─
+            # ── C11: KDE from Game Logs — pass recent_game_logs to sim ──────
+            # Build stat-specific game log list from recent_form_games for KDE.
+            # Maps stat_type keys to the game-log column names.
+            _stat_log_key_map = {
+                "points": "pts", "rebounds": "reb", "assists": "ast",
+                "threes": "fg3m", "steals": "stl", "blocks": "blk",
+                "turnovers": "tov",
+            }
+            _log_key = _stat_log_key_map.get(stat_type, stat_type)
+            recent_game_log_values = []
+            for _g in (recent_form_games or []):
+                _v = _g.get(_log_key, _g.get(stat_type))
+                if _v is not None:
+                    try:
+                        recent_game_log_values.append(float(_v))
+                    except (TypeError, ValueError):
+                        pass
+
+            # ── Simulation dispatch: use specialist functions for combo/fantasy/yesno ──
+            # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
+            # Fantasy score stats use the platform-specific weighted-sum formula.
+            # Double/triple-double props use threshold-counting simulation.
+            # Simple stats fall back to the standard Quantum Matrix Engine 5.6 path.
+            _sim_kwargs = dict(
+                blowout_risk_factor=projection_result.get("blowout_risk", 0.15),
+                pace_adjustment_factor=projection_result.get("pace_factor", 1.0),
+                matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
+                home_away_adjustment=projection_result.get("home_away_factor", 0.0),
+                rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
+            )
+
+            if stat_type in COMBO_STAT_TYPES:
+                # Build component projections from the per-stat projection outputs
+                _combo_stat_components = COMBO_STATS.get(stat_type, [])
+                _comp_proj = {
+                    s: projection_result.get(
+                        f"projected_{s}",
+                        float(player_data.get(f"{s}_avg", 0) or 0),
+                    )
+                    for s in _combo_stat_components
+                }
+                _comp_std = {
+                    s: get_stat_standard_deviation(player_data, s)
+                    for s in _combo_stat_components
+                }
+                simulation_output = simulate_combo_stat(
+                    component_projections=_comp_proj,
+                    component_std_devs=_comp_std,
+                    prop_line=prop_line,
+                    number_of_simulations=simulation_depth,
+                    **_sim_kwargs,
+                )
+                # Update projected_stat to the adjusted combo sum for edge calc
+                projected_stat = simulation_output.get("adjusted_projection", sum(_comp_proj.values()))
+
+            elif stat_type in FANTASY_STAT_TYPES:
+                # Use the platform's weighted-sum fantasy formula
+                _formula = FANTASY_SCORING.get(stat_type, {})
+                _stat_proj = {
+                    s: projection_result.get(
+                        f"projected_{s}",
+                        float(player_data.get(f"{s}_avg", 0) or 0),
+                    )
+                    for s in _formula
+                }
+                _stat_std = {
+                    s: get_stat_standard_deviation(player_data, s)
+                    for s in _formula
+                }
+                simulation_output = simulate_fantasy_score(
+                    stat_projections=_stat_proj,
+                    stat_std_devs=_stat_std,
+                    fantasy_formula=_formula,
+                    prop_line=prop_line,
+                    number_of_simulations=simulation_depth,
+                    **_sim_kwargs,
+                )
+                projected_stat = simulation_output.get("adjusted_projection", projected_stat)
+
+            elif stat_type == "double_double":
+                _dd_stats = ["points", "rebounds", "assists", "blocks", "steals"]
+                _dd_proj = {
+                    s: projection_result.get(
+                        f"projected_{s}",
+                        float(player_data.get(f"{s}_avg", 0) or 0),
+                    )
+                    for s in _dd_stats
+                }
+                _dd_std = {s: get_stat_standard_deviation(player_data, s) for s in _dd_stats}
+                simulation_output = simulate_double_double(
+                    stat_projections=_dd_proj,
+                    stat_std_devs=_dd_std,
+                    number_of_simulations=simulation_depth,
+                    **_sim_kwargs,
+                )
+
+            elif stat_type == "triple_double":
+                _td_stats = ["points", "rebounds", "assists"]
+                _td_proj = {
+                    s: projection_result.get(
+                        f"projected_{s}",
+                        float(player_data.get(f"{s}_avg", 0) or 0),
+                    )
+                    for s in _td_stats
+                }
+                _td_std = {s: get_stat_standard_deviation(player_data, s) for s in _td_stats}
+                simulation_output = simulate_triple_double(
+                    stat_projections=_td_proj,
+                    stat_std_devs=_td_std,
+                    number_of_simulations=simulation_depth,
+                    **_sim_kwargs,
+                )
+
+            else:
+                # Simple stat: standard Quantum Matrix Engine 5.6 simulation (C5 skew-normal, C8 minutes, C11 KDE)
+                _flat_sim_minutes = _precise_minutes or projection_result.get("projected_minutes")
+                simulation_output = run_quantum_matrix_simulation(
+                    projected_stat_average=projected_stat,
+                    stat_standard_deviation=stat_std,
+                    prop_line=prop_line,
+                    number_of_simulations=simulation_depth,
+                    stat_type=stat_type,
+                    projected_minutes=_flat_sim_minutes,
+                    minutes_std=4.0,
+                    recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
+                    prop_target_line=prop_target_line,
+                    platform=platform,
+                    **_sim_kwargs,
+                )
+
+                # ── Game Script Blend (30% game-script + 70% flat) ────
+                # For simple stats, blend in the game-script simulation to
+                # capture within-game dynamics (blowout minutes cuts, close
+                # game OT boosts) that the flat model misses.
+                # IMPORTANT: We update the simulated_mean/std but keep all
+                # other keys (probability_over, percentiles, etc.) from the
+                # flat simulation since blend_with_flat_simulation only
+                # provides mean/std — no probability recalculation.
+                if _game_script_available and simulate_game_script is not None:
+                    try:
+                        _gs_proj_dict = {
+                            "projected_stat":    projected_stat,
+                            "projected_minutes": _flat_sim_minutes or 32.0,
+                            "stat_std":          stat_std,
+                        }
+                        _gs_ctx = {
+                            "vegas_spread": game_context.get("vegas_spread", 0.0),
+                            "game_total":   game_context.get("game_total", 220.0),
+                            "is_home":      game_context.get("is_home", True),
+                            "stat_type":    stat_type,
+                        }
+                        _gs_result = simulate_game_script(
+                            player_projection=_gs_proj_dict,
+                            game_context=_gs_ctx,
+                            num_simulations=min(500, simulation_depth),
+                        )
+                        # game_script returns 'simulated_values' not 'simulated_results'
+                        if _gs_result and _gs_result.get("simulated_values"):
+                            # blend_with_flat_simulation expects 'mean'/'std' keys,
+                            # but simulation.py returns 'simulated_mean'/'simulated_std'.
+                            # Build a normalized flat dict for the blend function.
+                            _flat_for_blend = {
+                                "mean": simulation_output.get(
+                                    "simulated_mean",
+                                    simulation_output.get("mean", 0.0)
+                                ),
+                                "std": simulation_output.get(
+                                    "simulated_std",
+                                    simulation_output.get("std", 0.0)
+                                ),
+                            }
+                            _blended = blend_with_flat_simulation(
+                                game_script_results=_gs_result,
+                                flat_simulation_results=_flat_for_blend,
+                            )
+                            if _blended and _blended.get("blended_mean", 0) > 0:
+                                # Merge blended mean/std back into simulation_output
+                                # without overwriting probability keys
+                                simulation_output = dict(simulation_output)
+                                simulation_output["simulated_mean"] = _blended["blended_mean"]
+                                simulation_output["simulated_std"]  = _blended["blended_std"]
+                                simulation_output["game_script_applied"] = True
+                    except Exception:
+                        pass  # Game script is additive — never block main flow
+
+            forces_result = analyze_directional_forces(
+                player_data=player_data,
+                prop_line=prop_line,
+                stat_type=stat_type,
+                projection_result=projection_result,
+                game_context=game_context,
+            )
+
+            season_avg_for_stat  = float(player_data.get(f"{stat_type}_avg", 0) or 0)
+            line_sharpness_force = detect_line_sharpness(
+                prop_line=prop_line,
+                season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
+                stat_type=stat_type,
+            )
+            line_sharpness_penalty = 0.0
+            if line_sharpness_force is not None:
+                line_sharpness_penalty = min(8.0, line_sharpness_force.get("strength", 0) * 2.5)
+
+            trap_line_result = detect_trap_line(
+                prop_line=prop_line,
+                season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
+                defense_factor=projection_result.get("defense_factor", 1.0),
+                rest_factor=projection_result.get("rest_factor", 1.0),
+                game_total=game_context.get("game_total", 220.0),
+                blowout_risk=projection_result.get("blowout_risk", 0.15),
+                stat_type=stat_type,
+            )
+            trap_line_penalty = trap_line_result.get("confidence_penalty", 0.0)
+
+            probability_over  = simulation_output.get("probability_over", 0.5)
+
+            # Use actual odds from the prop when available so the edge reflects the
+            # true implied probability for this platform/line, not a fixed -110 default.
+            # For PrizePicks / Underdog (no vig), we still default to 0.5238 (-110 equiv)
+            # since they use fixed-payout structures, not per-leg juice.
+            _prop_over_odds  = prop.get("over_odds", -110)
+            _prop_under_odds = prop.get("under_odds", -110)
+            _platform_for_odds = prop.get("platform", "")
+            # Platforms without per-leg vig: treat as standard -110 breakeven
+            _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
+            if _platform_for_odds in _NO_VIG_PLATFORMS:
+                # No vig — use the standard -110 breakeven (0.5238)
+                _implied_prob_for_edge = None  # let calculate_edge_percentage use default
+            else:
+                # DraftKings and other sportsbooks: use actual over odds for the implied prob
+                _implied_prob_for_edge = _odds_to_implied_prob(_prop_over_odds)
+
+            edge_pct = calculate_edge_percentage(probability_over, _implied_prob_for_edge)
+
+            # C10: Historical calibration — adjust confidence score based on
+            # how well-calibrated the model has been historically at this
+            # probability level.  Returns 0.0 on cold start (no history yet).
+            calibration_adj = get_calibration_adjustment(probability_over)
+
+            confidence_output = calculate_confidence_score(
+                probability_over=probability_over,
+                edge_percentage=edge_pct,
+                directional_forces=forces_result,
+                defense_factor=projection_result.get("defense_factor", 1.0),
+                stat_standard_deviation=stat_std,
+                stat_average=season_avg_for_stat,
+                simulation_results=simulation_output,
+                games_played=int(player_data.get("games_played", 0) or 0) or None,
+                recent_form_ratio=projection_result.get("recent_form_ratio"),
+                line_sharpness_penalty=line_sharpness_penalty,
+                trap_line_penalty=trap_line_penalty,
+                calibration_adjustment=calibration_adj,  # C10
+            )
+
+            # ── Apply ensemble model-disagreement penalty to confidence ─
+            if _ensemble_penalty > 0:
+                _cur_conf = confidence_output.get("confidence_score", 50)
+                confidence_output["confidence_score"] = max(0.0, _cur_conf - _ensemble_penalty)
+
+            # C12: Closing Line Value — record the model's opening projection and
+            # recommendation at analysis time.  Callers can later call
+            # engine.clv_tracker.update_closing_line() with the final closing line
+            # to compute CLV and validate the model's edge.
             try:
-                _ptl = float(_raw_target)
-                if _ptl > 0:
-                    prop_target_line = _ptl
-            except (ValueError, TypeError):
+                store_opening_line(
+                    player_name=player_name,
+                    stat_type=stat_type,
+                    opening_line=prop_line,
+                    model_projection=projected_stat,
+                    model_direction=confidence_output.get("direction", "OVER"),
+                    confidence_score=confidence_output.get("confidence_score", 0.0),
+                    tier=confidence_output.get("tier", "Bronze"),
+                    edge_percentage=edge_pct,
+                )
+            except Exception:
+                pass  # CLV recording is non-critical; never block analysis
+
+            # F9: Store initial line snapshot for market movement tracking
+            try:
+                _snap_key = f"{player_name}_{stat_type}"
+                if "line_snapshots" not in st.session_state:
+                    st.session_state["line_snapshots"] = {}
+                if _snap_key not in st.session_state["line_snapshots"]:
+                    st.session_state["line_snapshots"][_snap_key] = {
+                        "initial_line": prop_line,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                    }
+            except Exception:
                 pass
 
-        # ── Injury gate ───────────────────────────────────────────
-        injury_map        = st.session_state.get("injury_status_map", {})
-        player_status_info = get_player_status(player_name, injury_map)
-        player_status      = player_status_info.get("status", "Active")
+            should_avoid_flag, avoid_reasons = should_avoid_prop(
+                probability_over=probability_over,
+                directional_forces_result=forces_result,
+                edge_percentage=edge_pct,
+                stat_standard_deviation=stat_std,
+                stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
+                stat_type=stat_type,
+                platform=prop.get("platform", ""),
+                over_odds=prop.get("over_odds", -110),
+            )
 
-        if player_status in (
-            "Out", "Injured Reserve", "Out (No Recent Games)",
-            "Suspended", "Not With Team",
-            "G League - Two-Way", "G League - On Assignment", "G League",
-        ):
-            injury_note = player_status_info.get("injury_note", "Player is not active")
+            # Merge kill-switch flags from confidence engine (C2/C3) with
+            # should_avoid_prop() results so all sources are surfaced in the UI.
+            if confidence_output.get("should_avoid"):
+                should_avoid_flag = True
+            for extra_reason in confidence_output.get("avoid_reasons", []):
+                if extra_reason and extra_reason not in avoid_reasons:
+                    avoid_reasons.append(extra_reason)
+
+            histogram_data = build_histogram_from_results(
+                simulation_output.get("simulated_results", []),
+                prop_line,
+                number_of_buckets=15,
+            )
+
+            explanation = generate_pick_explanation(
+                player_data=player_data,
+                prop_line=prop_line,
+                stat_type=stat_type,
+                direction=confidence_output.get("direction", "OVER"),
+                projection_result=projection_result,
+                simulation_results=simulation_output,
+                forces=forces_result,
+                confidence_result=confidence_output,
+                game_context=game_context,
+                platform=platform,
+                recent_form_games=prop.get("recent_form_results", []),
+                should_avoid=should_avoid_flag,
+                avoid_reasons=avoid_reasons,
+                trap_line_result=trap_line_result,
+                line_sharpness_info=line_sharpness_force,
+                teammate_out_notes=projection_result.get("teammate_out_notes", []),
+            )
+
+            full_result = {
+                "player_name":      player_name,
+                "team":             player_team,
+                "player_team":      player_team,
+                "player_position":  player_data.get("position", ""),
+                "stat_type":        stat_type,
+                "line":             prop_line,
+                "platform":         platform,
+                "player_id":        player_data.get("player_id", ""),
+                "season_pts_avg":   float(player_data.get("points_avg",   0) or 0),
+                "season_reb_avg":   float(player_data.get("rebounds_avg", 0) or 0),
+                "season_ast_avg":   float(player_data.get("assists_avg",  0) or 0),
+                "points_avg":       float(player_data.get("points_avg",   0) or 0),
+                "rebounds_avg":     float(player_data.get("rebounds_avg", 0) or 0),
+                "assists_avg":      float(player_data.get("assists_avg",  0) or 0),
+                "opponent":         game_context.get("opponent", ""),
+                "probability_over": round(probability_over, 4),
+                "probability_under":round(1.0 - probability_over, 4),
+                "simulated_mean":   round(simulation_output.get("simulated_mean", 0), 1),
+                "simulated_std":    round(simulation_output.get("simulated_std",  0), 1),
+                "percentile_10":    round(simulation_output.get("percentile_10",  0), 1),
+                "percentile_50":    round(simulation_output.get("percentile_50",  0), 1),
+                "percentile_90":    round(simulation_output.get("percentile_90",  0), 1),
+                "adjusted_projection": round(projected_stat, 1),
+                "overall_adjustment":  round(projection_result.get("overall_adjustment", 1.0), 3),
+                "recent_form_ratio":   projection_result.get("recent_form_ratio"),
+                "games_played":        int(player_data.get("games_played", 0) or 0) or None,
+                "edge_percentage":     round(edge_pct, 1),
+                "confidence_score":    confidence_output.get("confidence_score", 50),
+                "tier":                confidence_output.get("tier", "Bronze"),
+                "tier_emoji":          confidence_output.get("tier_emoji", "🥉"),
+                "direction":           confidence_output.get("direction", "OVER"),
+                "recommendation":      confidence_output.get("recommendation", ""),
+                "forces":              forces_result,
+                "should_avoid":        should_avoid_flag,
+                "avoid_reasons":       avoid_reasons,
+                "histogram":           histogram_data,
+                "score_breakdown":     confidence_output.get("score_breakdown", {}),
+                "line_vs_avg_pct":     prop.get("line_vs_avg_pct", 0),
+                "recent_form_results": prop.get("recent_form_results", []),
+                "player_matched":      player_matched,
+                "explanation":         explanation,
+                "line_sharpness_force":   line_sharpness_force,
+                "line_sharpness_penalty": round(line_sharpness_penalty, 1),
+                "trap_line_result":       trap_line_result,
+                "trap_line_penalty":      round(trap_line_penalty, 1),
+                "teammate_out_notes":     projection_result.get("teammate_out_notes", []),
+                "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
+                "minutes_trend":           _minutes_trend,
+                "minutes_trend_indicator": _minutes_trend_indicator,
+                "projected_minutes":       round(_precise_minutes, 1) if _precise_minutes else None,
+                "player_is_out":    False,
+                "player_status":    player_status,
+                "player_status_note": player_status_info.get("injury_note", ""),
+                # Ensemble model metadata
+                "ensemble_used":       _ensemble_used,
+                "ensemble_models":     _ensemble_result.get("effective_models", 1) if _ensemble_result else 1,
+                "ensemble_disagreement": (
+                    _ensemble_result.get("disagreement", {}).get("description", "")
+                    if _ensemble_result else ""
+                ),
+                "ensemble_model_weights": (
+                    _ensemble_result.get("model_weights", {}) if _ensemble_result else {}
+                ),
+                # Simulation array for synthetic pricing / slider
+                "simulated_results": simulation_output.get("simulated_results", []),
+            }
+
+            # ── Phase 2: DFS Fixed-Payout Metrics ───────────────────────
+            # Stamp quarantined target line + DFS parlay EV metrics so the
+            # downstream UI can display breakeven thresholds per flex tier.
+            if simulation_output.get("prop_target_line"):
+                full_result["prop_target_line"] = simulation_output["prop_target_line"]
+                full_result["probability_over_target"] = simulation_output.get(
+                    "probability_over_target", probability_over
+                )
+            if simulation_output.get("dfs_breakevens"):
+                full_result["dfs_breakevens"] = simulation_output["dfs_breakevens"]
+            if simulation_output.get("dfs_parlay_ev"):
+                full_result["dfs_parlay_ev"] = simulation_output["dfs_parlay_ev"]
+            if simulation_output.get("dfs_platform"):
+                full_result["dfs_platform"] = simulation_output["dfs_platform"]
+
+            # ── Goblin / 50_50 / Demon Bet Classification ───────────────
+            # Primary classification is driven by line_category (from the
+            # ingestion layer).  Statistical Goblin overlay applies to
+            # standard-line picks.  Risk flags (conflicting forces, variance,
+            # fatigue, regression) are separate from bet_type and feed into
+            # the avoid-list system via is_uncertain.
+            try:
+                _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
+                # Determine the source of the prop line so the classifier can
+                # validate whether it is a real platform line or a synthetic one.
+                # Props with no platform or marked as estimated are treated as
+                # synthetic to prevent garbage-in/garbage-out Goblin awards.
+                _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
+                # Extract line-position category from the ingestion layer
+                _line_category = prop.get("line_category", None)
+                _standard_line = prop.get("standard_line", None)
+                # Pull user-configured thresholds from session state (set on Settings page)
+                _ss = st.session_state
+                _g_std  = _ss.get("goblin_min_std_devs")
+                _g_prob = (_ss.get("goblin_min_probability_pct", 80.0) / 100.0
+                           if _ss.get("goblin_min_probability_pct") is not None else None)
+                _g_edge = _ss.get("goblin_min_edge_pct")
+                _d_conf = _ss.get("demon_conflict_ratio")
+                _d_regr = _ss.get("demon_regression_pct")
+                _bet_classification = classify_bet_type(
+                    probability_over=probability_over,
+                    edge_percentage=edge_pct,
+                    stat_standard_deviation=stat_std,
+                    projected_stat=projected_stat,
+                    prop_line=prop_line,
+                    stat_type=stat_type,
+                    directional_forces_result=forces_result,
+                    rest_days=game_context.get("rest_days", 1),
+                    vegas_spread=game_context.get("vegas_spread", 0.0),
+                    recent_form_ratio=projection_result.get("recent_form_ratio"),
+                    season_average=_season_avg_for_classify,
+                    line_source=_line_source,
+                    goblin_min_std_devs=_g_std,
+                    goblin_min_probability=_g_prob,
+                    goblin_min_edge=_g_edge,
+                    demon_conflict_ratio=_d_conf,
+                    demon_regression_pct=_d_regr,
+                    line_category=_line_category,
+                    sim_percentile_10=simulation_output.get("percentile_10"),
+                    sim_percentile_90=simulation_output.get("percentile_90"),
+                )
+                full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
+                full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
+                full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Normal Bet")
+                full_result["bet_type_reasons"]= _bet_classification.get("reasons", [])
+                full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
+                full_result["line_verified"]   = _bet_classification.get("line_verified", True)
+                full_result["line_reliability_warning"] = _bet_classification.get("line_reliability_warning")
+                full_result["line_category"]   = _line_category
+                full_result["standard_line"]   = _standard_line
+                full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
+                full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
+                full_result["goblin_floor"]    = _bet_classification.get("goblin_floor")
+                full_result["demon_ceiling"]   = _bet_classification.get("demon_ceiling")
+                # Risk flags (conflicting forces, high-variance stat, etc.) are
+                # informational — they appear on the card UI as warnings but do NOT
+                # block the pick from being displayed or auto-logged.  The genuine
+                # should_avoid decision comes from should_avoid_prop() only.
+            except Exception:
+                full_result["bet_type"]         = "normal"
+                full_result["bet_type_emoji"]   = ""
+                full_result["bet_type_label"]   = "Normal Bet"
+                full_result["bet_type_reasons"] = []
+                full_result["std_devs_from_line"] = 0.0
+                full_result["line_verified"]    = True
+                full_result["line_reliability_warning"] = None
+                full_result["line_category"]    = None
+                full_result["standard_line"]    = None
+                full_result["risk_flags"]       = []
+                full_result["is_uncertain"]     = False
+                full_result["goblin_floor"]     = None
+                full_result["demon_ceiling"]    = None
+
+            # ── Capture odds from the original prop (for display) ────────
+            full_result["over_odds"]  = prop.get("over_odds",  -110)
+            full_result["under_odds"] = prop.get("under_odds", -110)
+
+            # ── Alt-Line Probability Generation (Goblin & Demon) ─────────
+            # Generate 3 Goblin lines (L-1, L-2, L-3) and 3 Demon lines
+            # (L+2, L+4, L+6) from the base prop line.  Probabilities are
+            # computed from the raw simulation distribution.
+            try:
+                _alt_lines = generate_alt_line_probabilities(simulation_output, prop_line)
+                full_result["alt_lines"] = _alt_lines
+                _best_alt = _alt_lines.get("best_alt", {})
+                full_result["prediction"] = _best_alt.get("prediction", "")
+                # Override: when the bet classification says this prop IS a
+                # goblin/demon, use the strict prediction string from the
+                # edge_detection formatter (anchored to the actual prop line)
+                # rather than the simulation-best line which may differ.
+                _bt = full_result.get("bet_type", "normal")
+                if _bt in ("goblin", "demon"):
+                    full_result["prediction"] = format_goblin_demon_prediction(_bt, prop_line)
+            except Exception:
+                full_result["alt_lines"] = {}
+                full_result["prediction"] = ""
+
+
+            try:
+                _clv_penalties = get_stat_type_clv_penalties(days=90)
+                _clv_stat_penalty = _clv_penalties.get(stat_type, 0.0)
+                if _clv_stat_penalty > 0:
+                    full_result["confidence_score"] = max(0.0, full_result["confidence_score"] - _clv_stat_penalty)
+                    full_result["clv_stat_penalty"] = _clv_stat_penalty
+            except Exception:
+                pass
+
+            # ── Feature 9: Market movement adjustment ────────────────────
+            try:
+                if detect_line_movement is not None:
+                    _opening_snap = st.session_state.get("line_snapshots", {}).get(
+                        f"{player_name}_{stat_type}", {}
+                    )
+                    if _opening_snap:
+                        _mv = detect_line_movement(
+                            player_name, stat_type,
+                            _opening_snap.get("initial_line", prop_line),
+                            prop_line,
+                            full_result.get("direction", "OVER"),
+                        )
+                        _mv_adj = _mv.get("confidence_adjustment", 0.0)
+                        if _mv_adj != 0.0:
+                            full_result["confidence_score"] = max(0.0, min(100.0, full_result["confidence_score"] + _mv_adj))
+                            full_result["market_movement"] = _mv
+            except Exception:
+                pass
+
+            analysis_results_list.append(full_result)
+        except Exception as _prop_loop_err:
+            _logger.warning(
+                "Prop #%d (%s/%s) analysis failed — skipped: %s",
+                prop_index,
+                prop.get('player_name', '?'),
+                prop.get('stat_type', '?'),
+                _prop_loop_err,
+            )
+            # Build a minimal error result so this prop is still visible
+            _err_name = prop.get('player_name', '')
+            _err_stat = prop.get('stat_type', 'points').lower()
+            _err_line = float(prop.get('line', 0))
             analysis_results_list.append({
-                "player_name":   player_name,
-                "team":          prop.get("team", ""),
-                "player_team":   prop.get("team", ""),
+                "player_name": _err_name,
+                "team": prop.get("team", ""),
+                "player_team": prop.get("team", ""),
                 "player_position": "",
-                "stat_type":     stat_type,
-                "line":          prop_line,
-                "platform":      platform,
+                "stat_type": _err_stat,
+                "line": _err_line,
+                "platform": prop.get("platform", "PrizePicks"),
                 "season_pts_avg": 0, "season_reb_avg": 0, "season_ast_avg": 0,
                 "points_avg": 0, "rebounds_avg": 0, "assists_avg": 0,
-                "opponent":      "",
-                "probability_over": 0.0, "probability_under": 1.0,
-                "simulated_mean": 0.0, "simulated_std": 0.0,
+                "opponent": "",
+                "probability_over": 0.5, "probability_under": 0.5,
+                "simulated_mean": _err_line, "simulated_std": 0.0,
                 "percentile_10": 0.0, "percentile_50": 0.0, "percentile_90": 0.0,
-                "adjusted_projection": 0.0, "overall_adjustment": 1.0,
+                "adjusted_projection": _err_line, "overall_adjustment": 1.0,
                 "recent_form_ratio": None, "games_played": None,
-                "edge_percentage": -50.0, "confidence_score": 0,
+                "edge_percentage": 0.0, "confidence_score": 0,
                 "tier": "Bronze", "tier_emoji": "🥉",
-                "direction": "UNDER",
-                "recommendation": f"SKIP — {player_name} is {player_status}",
+                "direction": "OVER",
+                "recommendation": f"⚠️ Analysis error for {_err_name} ({_err_stat})",
                 "forces": {"over_forces": [], "under_forces": []},
                 "should_avoid": True,
-                "avoid_reasons": [f"Player is {player_status}: {injury_note}"],
+                "avoid_reasons": [f"Analysis error: {_prop_loop_err}"],
                 "histogram": [], "score_breakdown": {},
                 "line_vs_avg_pct": 0, "recent_form_results": [],
                 "player_matched": False, "explanation": None,
                 "line_sharpness_force": None, "line_sharpness_penalty": 0.0,
                 "trap_line_result": {}, "trap_line_penalty": 0.0,
                 "teammate_out_notes": [], "minutes_adjustment_factor": 1.0,
-                "player_is_out": True,
-                "player_status": player_status,
-                "player_status_note": injury_note,
+                "player_is_out": False,
+                "player_status": "Analysis Error",
+                "player_status_note": str(_prop_loop_err),
                 "player_id": "",
             })
-            continue
-
-        # ── Find player in database ───────────────────────────────
-        player_data    = find_player_by_name(players_data, player_name)
-        player_matched = player_data is not None
-
-        if player_data is None:
-            # Build a complete fallback using positional priors.
-            # Using only one stat's avg (the old approach) caused zero-projections for
-            # every other stat — which breaks combo stats, double_double, fantasy scores,
-            # and the directional forces analysis entirely.
-            #
-            # Strategy:
-            #  1. Fill all 7 stat avgs from the SF position prior (league-average for
-            #     an unknown player whose position we cannot determine).
-            #  2. For the specific stat being analyzed, anchor to prop_line (the most
-            #     reliable single data point we have) by scaling the prior components
-            #     proportionally so the expected total matches the prop line.
-            #  3. Set games_played=30 (above the Bayesian threshold of 25) so shrinkage
-            #     is NOT applied — the prop_line is already our best anchor and further
-            #     shrinkage toward league priors would move estimates away from it.
-            _pos   = "SF"  # default when position is unknown
-            _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
-            player_data = {
-                "name":          player_name,
-                "team":          prop.get("team", ""),
-                "position":      _pos,
-                "games_played":  30,   # above Bayesian threshold — trust prop_line anchor
-                "minutes_avg":   28.0,
-                # All seven stats seeded from position priors
-                "points_avg":    str(_prior["points"]),
-                "rebounds_avg":  str(_prior["rebounds"]),
-                "assists_avg":   str(_prior["assists"]),
-                "threes_avg":    str(_prior["threes"]),
-                "steals_avg":    str(_prior["steals"]),
-                "blocks_avg":    str(_prior["blocks"]),
-                "turnovers_avg": str(_prior["turnovers"]),
-            }
-
-            if stat_type in COMBO_STAT_TYPES:
-                # Scale prior components so they sum to the prop_line.
-                # e.g. PRA line=50.5, SF prior P+R+A=25.0 → scale=2.02
-                # → pts=32.3, reb=11.1, ast=7.1  (realistic split that totals 50.5)
-                _components = COMBO_STATS.get(stat_type, [])
-                _prior_sum = sum(_prior.get(s, 0.0) for s in _components)
-                if _prior_sum > 0 and prop_line > 0:
-                    _scale = prop_line / _prior_sum
-                    for _c in _components:
-                        _est = round(_prior.get(_c, 0.0) * _scale, 1)
-                        player_data[f"{_c}_avg"] = str(_est)
-                        player_data[f"{_c}_std"] = str(round(max(0.5, _est * 0.35), 1))
-                else:
-                    # Equal split fallback
-                    _split = round(prop_line / max(len(_components), 1), 1)
-                    for _c in _components:
-                        player_data[f"{_c}_avg"] = str(_split)
-                        player_data[f"{_c}_std"] = str(round(max(0.5, _split * 0.35), 1))
-
-            elif stat_type in FANTASY_STAT_TYPES:
-                # Scale all stats so the weighted fantasy total matches prop_line.
-                _formula = FANTASY_SCORING.get(stat_type, {})
-                _prior_fantasy = sum(_prior.get(s, 0.0) * w for s, w in _formula.items())
-                if _prior_fantasy > 0 and prop_line > 0:
-                    _scale = prop_line / _prior_fantasy
-                    for _fs in _formula:
-                        _est = round(_prior.get(_fs, 0.0) * _scale, 1)
-                        player_data[f"{_fs}_avg"] = str(_est)
-                        player_data[f"{_fs}_std"] = str(round(max(0.5, _est * 0.35), 1))
-
-            elif stat_type not in {"double_double", "triple_double"}:
-                # Simple stat: prop_line is the best single-point estimate.
-                player_data[f"{stat_type}_avg"] = str(prop_line)
-                player_data[f"{stat_type}_std"] = str(round(prop_line * 0.35, 1))
-            # For double_double / triple_double, the position priors already seed
-            # all five required components — no further override needed.
-
-        player_team  = player_data.get("team", prop.get("team", ""))
-        game_context = find_game_context_for_player(player_team, todays_games)
-
-        recent_form_games  = prop.get("recent_form_results", [])
-
-        # ── Feature 6: Minutes Trend — compute using rotation_tracker ──
-        # If game logs contain minutes (MIN field), detect trend vs season avg.
-        _minutes_trend = None
-        _minutes_trend_indicator = "➡️"  # default: stable
-        if _rotation_tracker_available and recent_form_games:
-            try:
-                _minutes_trend = track_minutes_trend(recent_form_games, window=5)
-                _td = _minutes_trend.get("trend_direction", "stable")
-                _minutes_trend_indicator = "🔺" if _td == "up" else ("🔻" if _td == "down" else "➡️")
-            except Exception:
-                _minutes_trend = None
-
-        # ── C4: Teammate-Out Usage Adjustment ────────────────────
-        # Check if a high-usage teammate is OUT and boost this player's
-        # projection accordingly (+8% primary option, +5% secondary, cap +15%).
-        teammate_boost, teammate_boost_notes = calculate_teammate_out_boost(
-            player_data=player_data,
-            injury_status_map=injury_map,
-            teammates_data=players_data,
-        )
-
-        # ── Precise Minutes Projection (minutes_model.py) ─────────
-        # Use the dedicated minutes model to get a more accurate minutes estimate
-        # before running the full stat projection. The minutes projection
-        # accounts for blowout spread, back-to-back, teammate injuries, and pace.
-        _precise_minutes = None
-        if _minutes_model_available and project_player_minutes is not None:
-            try:
-                _teammate_status = {
-                    k: v.get("status", "Active")
-                    for k, v in injury_map.items()
-                } if injury_map else None
-                _min_result = project_player_minutes(
-                    player_data=player_data,
-                    game_context={
-                        "opponent": game_context.get("opponent", ""),
-                        "is_home": game_context.get("is_home", True),
-                        "vegas_spread": game_context.get("vegas_spread", 0.0),
-                        "game_total": game_context.get("game_total", 220.0),
-                        "rest_days": game_context.get("rest_days", 2),
-                        "back_to_back": game_context.get("back_to_back", False),
-                    },
-                    teammate_status=_teammate_status,
-                    game_logs=recent_form_games if recent_form_games else None,
-                )
-                _precise_minutes = _min_result.get("projected_minutes")
-            except Exception:
-                _precise_minutes = None
-
-        projection_result  = build_player_projection(
-            player_data=player_data,
-            opponent_team_abbreviation=game_context.get("opponent", ""),
-            is_home_game=game_context.get("is_home", True),
-            rest_days=game_context.get("rest_days", 2),
-            game_total=game_context.get("game_total", 220.0),
-            defensive_ratings_data=defensive_ratings_data,
-            teams_data=teams_data,
-            recent_form_games=recent_form_games if recent_form_games else None,
-            vegas_spread=game_context.get("vegas_spread", 0.0),
-            minutes_adjustment_factor=teammate_boost,
-            teammate_out_notes=teammate_boost_notes,
-        )
-
-        # ── Ensemble Model Override (3-model blend) ────────────────
-        # When game logs are available, run the full ensemble model (Model A:
-        # season avg + context, Model B: recent form, Model C: matchup history)
-        # and use the blended projection as the primary projected_stat.
-        # This is more accurate than a single model approach.
-        _ensemble_result = None
-        _ensemble_penalty = 0.0
-        if _ensemble_available and get_ensemble_projection is not None and stat_type not in (
-            "double_double", "triple_double"
-        ):
-            try:
-                _ens_ctx = {
-                    "stat_type": stat_type,
-                    "opponent": game_context.get("opponent", ""),
-                    "is_home": game_context.get("is_home", True),
-                    "rest_factor": projection_result.get("rest_factor", 1.0),
-                    "pace_factor": projection_result.get("pace_factor", 1.0),
-                    "defense_factor": projection_result.get("defense_factor", 1.0),
-                }
-                _ensemble_result = get_ensemble_projection(
-                    player_data=player_data,
-                    game_context=_ens_ctx,
-                    game_logs=recent_form_games if len(recent_form_games or []) >= 3 else None,
-                )
-                _ensemble_penalty = _ensemble_result.get("confidence_adjustment", 0.0)
-            except Exception:
-                _ensemble_result = None
-                _ensemble_penalty = 0.0
-
-        stat_std      = get_stat_standard_deviation(player_data, stat_type)
-        projected_stat = projection_result.get(
-            f"projected_{stat_type}",
-            float(player_data.get(f"{stat_type}_avg", prop_line))
-        )
-
-        # ── Apply Ensemble Projection Override ───────────────────
-        # When the ensemble produced a blended projection, use it to
-        # override the single-model projected_stat. The ensemble blends
-        # season-avg, recent-form, and matchup-history models with
-        # inverse-variance weighting — consistently more accurate.
-        _ensemble_used = False
-        if (_ensemble_result is not None
-                and stat_type not in ("double_double", "triple_double")
-                and stat_type not in list(COMBO_STAT_TYPES) + list(FANTASY_STAT_TYPES)):
-            _ens_proj = _ensemble_result.get("ensemble_projection", 0)
-            _ens_std  = _ensemble_result.get("ensemble_std", 0)
-            if _ens_proj and _ens_proj > 0:
-                projected_stat = _ens_proj
-                _ensemble_used = True
-                # Blend ensemble std with base std for richer variance estimate
-                if _ens_std > 0:
-                    stat_std = (_ens_std + stat_std) / 2.0
-
-        # ── C8: Minutes-Stat Correlation — pass projected_minutes to sim ─
-        # ── C11: KDE from Game Logs — pass recent_game_logs to sim ──────
-        # Build stat-specific game log list from recent_form_games for KDE.
-        # Maps stat_type keys to the game-log column names.
-        _stat_log_key_map = {
-            "points": "pts", "rebounds": "reb", "assists": "ast",
-            "threes": "fg3m", "steals": "stl", "blocks": "blk",
-            "turnovers": "tov",
-        }
-        _log_key = _stat_log_key_map.get(stat_type, stat_type)
-        recent_game_log_values = []
-        for _g in (recent_form_games or []):
-            _v = _g.get(_log_key, _g.get(stat_type))
-            if _v is not None:
-                try:
-                    recent_game_log_values.append(float(_v))
-                except (TypeError, ValueError):
-                    pass
-
-        # ── Simulation dispatch: use specialist functions for combo/fantasy/yesno ──
-        # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
-        # Fantasy score stats use the platform-specific weighted-sum formula.
-        # Double/triple-double props use threshold-counting simulation.
-        # Simple stats fall back to the standard Quantum Matrix Engine 5.6 path.
-        _sim_kwargs = dict(
-            blowout_risk_factor=projection_result.get("blowout_risk", 0.15),
-            pace_adjustment_factor=projection_result.get("pace_factor", 1.0),
-            matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
-            home_away_adjustment=projection_result.get("home_away_factor", 0.0),
-            rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
-        )
-
-        if stat_type in COMBO_STAT_TYPES:
-            # Build component projections from the per-stat projection outputs
-            _combo_stat_components = COMBO_STATS.get(stat_type, [])
-            _comp_proj = {
-                s: projection_result.get(
-                    f"projected_{s}",
-                    float(player_data.get(f"{s}_avg", 0) or 0),
-                )
-                for s in _combo_stat_components
-            }
-            _comp_std = {
-                s: get_stat_standard_deviation(player_data, s)
-                for s in _combo_stat_components
-            }
-            simulation_output = simulate_combo_stat(
-                component_projections=_comp_proj,
-                component_std_devs=_comp_std,
-                prop_line=prop_line,
-                number_of_simulations=simulation_depth,
-                **_sim_kwargs,
-            )
-            # Update projected_stat to the adjusted combo sum for edge calc
-            projected_stat = simulation_output.get("adjusted_projection", sum(_comp_proj.values()))
-
-        elif stat_type in FANTASY_STAT_TYPES:
-            # Use the platform's weighted-sum fantasy formula
-            _formula = FANTASY_SCORING.get(stat_type, {})
-            _stat_proj = {
-                s: projection_result.get(
-                    f"projected_{s}",
-                    float(player_data.get(f"{s}_avg", 0) or 0),
-                )
-                for s in _formula
-            }
-            _stat_std = {
-                s: get_stat_standard_deviation(player_data, s)
-                for s in _formula
-            }
-            simulation_output = simulate_fantasy_score(
-                stat_projections=_stat_proj,
-                stat_std_devs=_stat_std,
-                fantasy_formula=_formula,
-                prop_line=prop_line,
-                number_of_simulations=simulation_depth,
-                **_sim_kwargs,
-            )
-            projected_stat = simulation_output.get("adjusted_projection", projected_stat)
-
-        elif stat_type == "double_double":
-            _dd_stats = ["points", "rebounds", "assists", "blocks", "steals"]
-            _dd_proj = {
-                s: projection_result.get(
-                    f"projected_{s}",
-                    float(player_data.get(f"{s}_avg", 0) or 0),
-                )
-                for s in _dd_stats
-            }
-            _dd_std = {s: get_stat_standard_deviation(player_data, s) for s in _dd_stats}
-            simulation_output = simulate_double_double(
-                stat_projections=_dd_proj,
-                stat_std_devs=_dd_std,
-                number_of_simulations=simulation_depth,
-                **_sim_kwargs,
-            )
-
-        elif stat_type == "triple_double":
-            _td_stats = ["points", "rebounds", "assists"]
-            _td_proj = {
-                s: projection_result.get(
-                    f"projected_{s}",
-                    float(player_data.get(f"{s}_avg", 0) or 0),
-                )
-                for s in _td_stats
-            }
-            _td_std = {s: get_stat_standard_deviation(player_data, s) for s in _td_stats}
-            simulation_output = simulate_triple_double(
-                stat_projections=_td_proj,
-                stat_std_devs=_td_std,
-                number_of_simulations=simulation_depth,
-                **_sim_kwargs,
-            )
-
-        else:
-            # Simple stat: standard Quantum Matrix Engine 5.6 simulation (C5 skew-normal, C8 minutes, C11 KDE)
-            _flat_sim_minutes = _precise_minutes or projection_result.get("projected_minutes")
-            simulation_output = run_quantum_matrix_simulation(
-                projected_stat_average=projected_stat,
-                stat_standard_deviation=stat_std,
-                prop_line=prop_line,
-                number_of_simulations=simulation_depth,
-                stat_type=stat_type,
-                projected_minutes=_flat_sim_minutes,
-                minutes_std=4.0,
-                recent_game_logs=recent_game_log_values if len(recent_game_log_values) >= 15 else None,
-                prop_target_line=prop_target_line,
-                platform=platform,
-                **_sim_kwargs,
-            )
-
-            # ── Game Script Blend (30% game-script + 70% flat) ────
-            # For simple stats, blend in the game-script simulation to
-            # capture within-game dynamics (blowout minutes cuts, close
-            # game OT boosts) that the flat model misses.
-            # IMPORTANT: We update the simulated_mean/std but keep all
-            # other keys (probability_over, percentiles, etc.) from the
-            # flat simulation since blend_with_flat_simulation only
-            # provides mean/std — no probability recalculation.
-            if _game_script_available and simulate_game_script is not None:
-                try:
-                    _gs_proj_dict = {
-                        "projected_stat":    projected_stat,
-                        "projected_minutes": _flat_sim_minutes or 32.0,
-                        "stat_std":          stat_std,
-                    }
-                    _gs_ctx = {
-                        "vegas_spread": game_context.get("vegas_spread", 0.0),
-                        "game_total":   game_context.get("game_total", 220.0),
-                        "is_home":      game_context.get("is_home", True),
-                        "stat_type":    stat_type,
-                    }
-                    _gs_result = simulate_game_script(
-                        player_projection=_gs_proj_dict,
-                        game_context=_gs_ctx,
-                        num_simulations=min(500, simulation_depth),
-                    )
-                    # game_script returns 'simulated_values' not 'simulated_results'
-                    if _gs_result and _gs_result.get("simulated_values"):
-                        # blend_with_flat_simulation expects 'mean'/'std' keys,
-                        # but simulation.py returns 'simulated_mean'/'simulated_std'.
-                        # Build a normalized flat dict for the blend function.
-                        _flat_for_blend = {
-                            "mean": simulation_output.get(
-                                "simulated_mean",
-                                simulation_output.get("mean", 0.0)
-                            ),
-                            "std": simulation_output.get(
-                                "simulated_std",
-                                simulation_output.get("std", 0.0)
-                            ),
-                        }
-                        _blended = blend_with_flat_simulation(
-                            game_script_results=_gs_result,
-                            flat_simulation_results=_flat_for_blend,
-                        )
-                        if _blended and _blended.get("blended_mean", 0) > 0:
-                            # Merge blended mean/std back into simulation_output
-                            # without overwriting probability keys
-                            simulation_output = dict(simulation_output)
-                            simulation_output["simulated_mean"] = _blended["blended_mean"]
-                            simulation_output["simulated_std"]  = _blended["blended_std"]
-                            simulation_output["game_script_applied"] = True
-                except Exception:
-                    pass  # Game script is additive — never block main flow
-
-        forces_result = analyze_directional_forces(
-            player_data=player_data,
-            prop_line=prop_line,
-            stat_type=stat_type,
-            projection_result=projection_result,
-            game_context=game_context,
-        )
-
-        season_avg_for_stat  = float(player_data.get(f"{stat_type}_avg", 0) or 0)
-        line_sharpness_force = detect_line_sharpness(
-            prop_line=prop_line,
-            season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
-            stat_type=stat_type,
-        )
-        line_sharpness_penalty = 0.0
-        if line_sharpness_force is not None:
-            line_sharpness_penalty = min(8.0, line_sharpness_force.get("strength", 0) * 2.5)
-
-        trap_line_result = detect_trap_line(
-            prop_line=prop_line,
-            season_average=season_avg_for_stat if season_avg_for_stat > 0 else None,
-            defense_factor=projection_result.get("defense_factor", 1.0),
-            rest_factor=projection_result.get("rest_factor", 1.0),
-            game_total=game_context.get("game_total", 220.0),
-            blowout_risk=projection_result.get("blowout_risk", 0.15),
-            stat_type=stat_type,
-        )
-        trap_line_penalty = trap_line_result.get("confidence_penalty", 0.0)
-
-        probability_over  = simulation_output.get("probability_over", 0.5)
-
-        # Use actual odds from the prop when available so the edge reflects the
-        # true implied probability for this platform/line, not a fixed -110 default.
-        # For PrizePicks / Underdog (no vig), we still default to 0.5238 (-110 equiv)
-        # since they use fixed-payout structures, not per-leg juice.
-        _prop_over_odds  = prop.get("over_odds", -110)
-        _prop_under_odds = prop.get("under_odds", -110)
-        _platform_for_odds = prop.get("platform", "")
-        # Platforms without per-leg vig: treat as standard -110 breakeven
-        _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
-        if _platform_for_odds in _NO_VIG_PLATFORMS:
-            # No vig — use the standard -110 breakeven (0.5238)
-            _implied_prob_for_edge = None  # let calculate_edge_percentage use default
-        else:
-            # DraftKings and other sportsbooks: use actual over odds for the implied prob
-            _implied_prob_for_edge = _odds_to_implied_prob(_prop_over_odds)
-
-        edge_pct = calculate_edge_percentage(probability_over, _implied_prob_for_edge)
-
-        # C10: Historical calibration — adjust confidence score based on
-        # how well-calibrated the model has been historically at this
-        # probability level.  Returns 0.0 on cold start (no history yet).
-        calibration_adj = get_calibration_adjustment(probability_over)
-
-        confidence_output = calculate_confidence_score(
-            probability_over=probability_over,
-            edge_percentage=edge_pct,
-            directional_forces=forces_result,
-            defense_factor=projection_result.get("defense_factor", 1.0),
-            stat_standard_deviation=stat_std,
-            stat_average=season_avg_for_stat,
-            simulation_results=simulation_output,
-            games_played=int(player_data.get("games_played", 0) or 0) or None,
-            recent_form_ratio=projection_result.get("recent_form_ratio"),
-            line_sharpness_penalty=line_sharpness_penalty,
-            trap_line_penalty=trap_line_penalty,
-            calibration_adjustment=calibration_adj,  # C10
-        )
-
-        # ── Apply ensemble model-disagreement penalty to confidence ─
-        if _ensemble_penalty > 0:
-            _cur_conf = confidence_output.get("confidence_score", 50)
-            confidence_output["confidence_score"] = max(0.0, _cur_conf - _ensemble_penalty)
-
-        # C12: Closing Line Value — record the model's opening projection and
-        # recommendation at analysis time.  Callers can later call
-        # engine.clv_tracker.update_closing_line() with the final closing line
-        # to compute CLV and validate the model's edge.
-        try:
-            store_opening_line(
-                player_name=player_name,
-                stat_type=stat_type,
-                opening_line=prop_line,
-                model_projection=projected_stat,
-                model_direction=confidence_output.get("direction", "OVER"),
-                confidence_score=confidence_output.get("confidence_score", 0.0),
-                tier=confidence_output.get("tier", "Bronze"),
-                edge_percentage=edge_pct,
-            )
-        except Exception:
-            pass  # CLV recording is non-critical; never block analysis
-
-        # F9: Store initial line snapshot for market movement tracking
-        try:
-            _snap_key = f"{player_name}_{stat_type}"
-            if "line_snapshots" not in st.session_state:
-                st.session_state["line_snapshots"] = {}
-            if _snap_key not in st.session_state["line_snapshots"]:
-                st.session_state["line_snapshots"][_snap_key] = {
-                    "initial_line": prop_line,
-                    "timestamp": datetime.datetime.now().isoformat(),
-                }
-        except Exception:
-            pass
-
-        should_avoid_flag, avoid_reasons = should_avoid_prop(
-            probability_over=probability_over,
-            directional_forces_result=forces_result,
-            edge_percentage=edge_pct,
-            stat_standard_deviation=stat_std,
-            stat_average=float(player_data.get(f"{stat_type}_avg", prop_line)),
-            stat_type=stat_type,
-            platform=prop.get("platform", ""),
-            over_odds=prop.get("over_odds", -110),
-        )
-
-        # Merge kill-switch flags from confidence engine (C2/C3) with
-        # should_avoid_prop() results so all sources are surfaced in the UI.
-        if confidence_output.get("should_avoid"):
-            should_avoid_flag = True
-        for extra_reason in confidence_output.get("avoid_reasons", []):
-            if extra_reason and extra_reason not in avoid_reasons:
-                avoid_reasons.append(extra_reason)
-
-        histogram_data = build_histogram_from_results(
-            simulation_output.get("simulated_results", []),
-            prop_line,
-            number_of_buckets=15,
-        )
-
-        explanation = generate_pick_explanation(
-            player_data=player_data,
-            prop_line=prop_line,
-            stat_type=stat_type,
-            direction=confidence_output.get("direction", "OVER"),
-            projection_result=projection_result,
-            simulation_results=simulation_output,
-            forces=forces_result,
-            confidence_result=confidence_output,
-            game_context=game_context,
-            platform=platform,
-            recent_form_games=prop.get("recent_form_results", []),
-            should_avoid=should_avoid_flag,
-            avoid_reasons=avoid_reasons,
-            trap_line_result=trap_line_result,
-            line_sharpness_info=line_sharpness_force,
-            teammate_out_notes=projection_result.get("teammate_out_notes", []),
-        )
-
-        full_result = {
-            "player_name":      player_name,
-            "team":             player_team,
-            "player_team":      player_team,
-            "player_position":  player_data.get("position", ""),
-            "stat_type":        stat_type,
-            "line":             prop_line,
-            "platform":         platform,
-            "player_id":        player_data.get("player_id", ""),
-            "season_pts_avg":   float(player_data.get("points_avg",   0) or 0),
-            "season_reb_avg":   float(player_data.get("rebounds_avg", 0) or 0),
-            "season_ast_avg":   float(player_data.get("assists_avg",  0) or 0),
-            "points_avg":       float(player_data.get("points_avg",   0) or 0),
-            "rebounds_avg":     float(player_data.get("rebounds_avg", 0) or 0),
-            "assists_avg":      float(player_data.get("assists_avg",  0) or 0),
-            "opponent":         game_context.get("opponent", ""),
-            "probability_over": round(probability_over, 4),
-            "probability_under":round(1.0 - probability_over, 4),
-            "simulated_mean":   round(simulation_output.get("simulated_mean", 0), 1),
-            "simulated_std":    round(simulation_output.get("simulated_std",  0), 1),
-            "percentile_10":    round(simulation_output.get("percentile_10",  0), 1),
-            "percentile_50":    round(simulation_output.get("percentile_50",  0), 1),
-            "percentile_90":    round(simulation_output.get("percentile_90",  0), 1),
-            "adjusted_projection": round(projected_stat, 1),
-            "overall_adjustment":  round(projection_result.get("overall_adjustment", 1.0), 3),
-            "recent_form_ratio":   projection_result.get("recent_form_ratio"),
-            "games_played":        int(player_data.get("games_played", 0) or 0) or None,
-            "edge_percentage":     round(edge_pct, 1),
-            "confidence_score":    confidence_output.get("confidence_score", 50),
-            "tier":                confidence_output.get("tier", "Bronze"),
-            "tier_emoji":          confidence_output.get("tier_emoji", "🥉"),
-            "direction":           confidence_output.get("direction", "OVER"),
-            "recommendation":      confidence_output.get("recommendation", ""),
-            "forces":              forces_result,
-            "should_avoid":        should_avoid_flag,
-            "avoid_reasons":       avoid_reasons,
-            "histogram":           histogram_data,
-            "score_breakdown":     confidence_output.get("score_breakdown", {}),
-            "line_vs_avg_pct":     prop.get("line_vs_avg_pct", 0),
-            "recent_form_results": prop.get("recent_form_results", []),
-            "player_matched":      player_matched,
-            "explanation":         explanation,
-            "line_sharpness_force":   line_sharpness_force,
-            "line_sharpness_penalty": round(line_sharpness_penalty, 1),
-            "trap_line_result":       trap_line_result,
-            "trap_line_penalty":      round(trap_line_penalty, 1),
-            "teammate_out_notes":     projection_result.get("teammate_out_notes", []),
-            "minutes_adjustment_factor": round(projection_result.get("minutes_adjustment_factor", 1.0), 4),
-            "minutes_trend":           _minutes_trend,
-            "minutes_trend_indicator": _minutes_trend_indicator,
-            "projected_minutes":       round(_precise_minutes, 1) if _precise_minutes else None,
-            "player_is_out":    False,
-            "player_status":    player_status,
-            "player_status_note": player_status_info.get("injury_note", ""),
-            # Ensemble model metadata
-            "ensemble_used":       _ensemble_used,
-            "ensemble_models":     _ensemble_result.get("effective_models", 1) if _ensemble_result else 1,
-            "ensemble_disagreement": (
-                _ensemble_result.get("disagreement", {}).get("description", "")
-                if _ensemble_result else ""
-            ),
-            "ensemble_model_weights": (
-                _ensemble_result.get("model_weights", {}) if _ensemble_result else {}
-            ),
-            # Simulation array for synthetic pricing / slider
-            "simulated_results": simulation_output.get("simulated_results", []),
-        }
-
-        # ── Phase 2: DFS Fixed-Payout Metrics ───────────────────────
-        # Stamp quarantined target line + DFS parlay EV metrics so the
-        # downstream UI can display breakeven thresholds per flex tier.
-        if simulation_output.get("prop_target_line"):
-            full_result["prop_target_line"] = simulation_output["prop_target_line"]
-            full_result["probability_over_target"] = simulation_output.get(
-                "probability_over_target", probability_over
-            )
-        if simulation_output.get("dfs_breakevens"):
-            full_result["dfs_breakevens"] = simulation_output["dfs_breakevens"]
-        if simulation_output.get("dfs_parlay_ev"):
-            full_result["dfs_parlay_ev"] = simulation_output["dfs_parlay_ev"]
-        if simulation_output.get("dfs_platform"):
-            full_result["dfs_platform"] = simulation_output["dfs_platform"]
-
-        # ── Goblin / 50_50 / Demon Bet Classification ───────────────
-        # Primary classification is driven by line_category (from the
-        # ingestion layer).  Statistical Goblin overlay applies to
-        # standard-line picks.  Risk flags (conflicting forces, variance,
-        # fatigue, regression) are separate from bet_type and feed into
-        # the avoid-list system via is_uncertain.
-        try:
-            _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
-            # Determine the source of the prop line so the classifier can
-            # validate whether it is a real platform line or a synthetic one.
-            # Props with no platform or marked as estimated are treated as
-            # synthetic to prevent garbage-in/garbage-out Goblin awards.
-            _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
-            # Extract line-position category from the ingestion layer
-            _line_category = prop.get("line_category", None)
-            _standard_line = prop.get("standard_line", None)
-            # Pull user-configured thresholds from session state (set on Settings page)
-            _ss = st.session_state
-            _g_std  = _ss.get("goblin_min_std_devs")
-            _g_prob = (_ss.get("goblin_min_probability_pct", 80.0) / 100.0
-                       if _ss.get("goblin_min_probability_pct") is not None else None)
-            _g_edge = _ss.get("goblin_min_edge_pct")
-            _d_conf = _ss.get("demon_conflict_ratio")
-            _d_regr = _ss.get("demon_regression_pct")
-            _bet_classification = classify_bet_type(
-                probability_over=probability_over,
-                edge_percentage=edge_pct,
-                stat_standard_deviation=stat_std,
-                projected_stat=projected_stat,
-                prop_line=prop_line,
-                stat_type=stat_type,
-                directional_forces_result=forces_result,
-                rest_days=game_context.get("rest_days", 1),
-                vegas_spread=game_context.get("vegas_spread", 0.0),
-                recent_form_ratio=projection_result.get("recent_form_ratio"),
-                season_average=_season_avg_for_classify,
-                line_source=_line_source,
-                goblin_min_std_devs=_g_std,
-                goblin_min_probability=_g_prob,
-                goblin_min_edge=_g_edge,
-                demon_conflict_ratio=_d_conf,
-                demon_regression_pct=_d_regr,
-                line_category=_line_category,
-                sim_percentile_10=simulation_output.get("percentile_10"),
-                sim_percentile_90=simulation_output.get("percentile_90"),
-            )
-            full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
-            full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
-            full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Normal Bet")
-            full_result["bet_type_reasons"]= _bet_classification.get("reasons", [])
-            full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
-            full_result["line_verified"]   = _bet_classification.get("line_verified", True)
-            full_result["line_reliability_warning"] = _bet_classification.get("line_reliability_warning")
-            full_result["line_category"]   = _line_category
-            full_result["standard_line"]   = _standard_line
-            full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
-            full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
-            full_result["goblin_floor"]    = _bet_classification.get("goblin_floor")
-            full_result["demon_ceiling"]   = _bet_classification.get("demon_ceiling")
-            # Risk flags (conflicting forces, high-variance stat, etc.) are
-            # informational — they appear on the card UI as warnings but do NOT
-            # block the pick from being displayed or auto-logged.  The genuine
-            # should_avoid decision comes from should_avoid_prop() only.
-        except Exception:
-            full_result["bet_type"]         = "normal"
-            full_result["bet_type_emoji"]   = ""
-            full_result["bet_type_label"]   = "Normal Bet"
-            full_result["bet_type_reasons"] = []
-            full_result["std_devs_from_line"] = 0.0
-            full_result["line_verified"]    = True
-            full_result["line_reliability_warning"] = None
-            full_result["line_category"]    = None
-            full_result["standard_line"]    = None
-            full_result["risk_flags"]       = []
-            full_result["is_uncertain"]     = False
-            full_result["goblin_floor"]     = None
-            full_result["demon_ceiling"]    = None
-
-        # ── Capture odds from the original prop (for display) ────────
-        full_result["over_odds"]  = prop.get("over_odds",  -110)
-        full_result["under_odds"] = prop.get("under_odds", -110)
-
-        # ── Alt-Line Probability Generation (Goblin & Demon) ─────────
-        # Generate 3 Goblin lines (L-1, L-2, L-3) and 3 Demon lines
-        # (L+2, L+4, L+6) from the base prop line.  Probabilities are
-        # computed from the raw simulation distribution.
-        try:
-            _alt_lines = generate_alt_line_probabilities(simulation_output, prop_line)
-            full_result["alt_lines"] = _alt_lines
-            _best_alt = _alt_lines.get("best_alt", {})
-            full_result["prediction"] = _best_alt.get("prediction", "")
-            # Override: when the bet classification says this prop IS a
-            # goblin/demon, use the strict prediction string from the
-            # edge_detection formatter (anchored to the actual prop line)
-            # rather than the simulation-best line which may differ.
-            _bt = full_result.get("bet_type", "normal")
-            if _bt in ("goblin", "demon"):
-                full_result["prediction"] = format_goblin_demon_prediction(_bt, prop_line)
-        except Exception:
-            full_result["alt_lines"] = {}
-            full_result["prediction"] = ""
-
-
-        try:
-            _clv_penalties = get_stat_type_clv_penalties(days=90)
-            _clv_stat_penalty = _clv_penalties.get(stat_type, 0.0)
-            if _clv_stat_penalty > 0:
-                full_result["confidence_score"] = max(0.0, full_result["confidence_score"] - _clv_stat_penalty)
-                full_result["clv_stat_penalty"] = _clv_stat_penalty
-        except Exception:
-            pass
-
-        # ── Feature 9: Market movement adjustment ────────────────────
-        try:
-            if detect_line_movement is not None:
-                _opening_snap = st.session_state.get("line_snapshots", {}).get(
-                    f"{player_name}_{stat_type}", {}
-                )
-                if _opening_snap:
-                    _mv = detect_line_movement(
-                        player_name, stat_type,
-                        _opening_snap.get("initial_line", prop_line),
-                        prop_line,
-                        full_result.get("direction", "OVER"),
-                    )
-                    _mv_adj = _mv.get("confidence_adjustment", 0.0)
-                    if _mv_adj != 0.0:
-                        full_result["confidence_score"] = max(0.0, min(100.0, full_result["confidence_score"] + _mv_adj))
-                        full_result["market_movement"] = _mv
-        except Exception:
-            pass
-
-        analysis_results_list.append(full_result)
 
     # Detect correlated props
     correlation_warnings = detect_correlated_props(analysis_results_list)
@@ -1676,19 +1724,19 @@ if run_analysis:
             # Non-fatal — proceed with existing results
             _logger.warning(f"Smart Update error (non-fatal): {_su_err}")
 
-    # ── Select top _QME_MIN_OUTPUT_BETS bets from analyzed pool ──
-    # The engine analyzes ALL available props, then selects the best
-    # _QME_MIN_OUTPUT_BETS picks by confidence score.  Out players are
-    # kept at the end for transparency but do not count toward the quota.
+    # ── Sort all analyzed bets by confidence (keep every single pick) ──
+    # The engine analyzes ALL available props and returns ALL of them
+    # sorted by confidence score.  Out players are kept at the end for
+    # transparency.  No artificial truncation — every prop is shown.
     _total_analyzed = len(analysis_results_list)
     _out_results = [r for r in analysis_results_list if r.get("player_is_out", False)]
     _active_results = [r for r in analysis_results_list if not r.get("player_is_out", False)]
     _active_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
-    _selected_active = _active_results[:_QME_MIN_OUTPUT_BETS]
+    _selected_active = _active_results  # Keep ALL active results — no truncation
     analysis_results_list = _selected_active + _out_results
     _logger.info(
-        "QME 5.6 Output Selection: %d analyzed → %d eligible → %d selected (+ %d Out)",
-        _total_analyzed, len(_active_results), len(_selected_active), len(_out_results),
+        "QME 5.6 Output: %d analyzed → %d active + %d Out = %d total",
+        _total_analyzed, len(_selected_active), len(_out_results), len(analysis_results_list),
     )
 
     st.session_state["analysis_results"] = analysis_results_list
@@ -1707,9 +1755,8 @@ if run_analysis:
     progress_bar.empty()
     _analysis_elapsed = time.time() - _analysis_start_time
     st.success(
-        f"✅ Analysis complete! Analyzed **{_total_analyzed}** props → "
-        f"selected **{len(_selected_active)}** best picks "
-        f"in **{_analysis_elapsed:.1f}s**."
+        f"✅ Analysis complete! Analyzed and displaying **{len(_selected_active)}** picks "
+        f"(+ {len(_out_results)} out) in **{_analysis_elapsed:.1f}s**."
     )
 
     # ── Store ALL picks to all_analysis_picks table ──────────────
@@ -1754,7 +1801,27 @@ if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
     )
 
 # ════ JOSEPH M. SMITH LIVE BROADCAST DESK ════
+# Reduce Joseph's container size by 60% on this page per design requirements.
+_JOSEPH_DESK_SIZE_CSS = """<style>
+.joseph-live-desk{
+    padding:10px 12px !important;
+    margin:10px 0 !important;
+    font-size:0.85rem !important;
+    max-height:40vh;
+    overflow-y:auto;
+}
+.joseph-live-desk .joseph-desk-avatar{
+    width:40px !important;height:40px !important;
+}
+.joseph-live-desk h3,.joseph-live-desk h4{
+    font-size:0.85rem !important;margin:4px 0 !important;
+}
+.joseph-live-desk .joseph-desk-title{
+    font-size:0.9rem !important;
+}
+</style>"""
 if analysis_results and st.session_state.get("joseph_enabled", True):
+    st.markdown(_JOSEPH_DESK_SIZE_CSS, unsafe_allow_html=True)
     try:
         from pages.helpers.joseph_live_desk import render_joseph_live_desk
         from data.advanced_metrics import enrich_player_god_mode

@@ -226,7 +226,7 @@ try:
     _user_is_premium = _is_premium()
 except Exception:
     _user_is_premium = True  # Fail open — don't block the home page
-    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
+    _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 
 with st.sidebar:
     if _user_is_premium:
@@ -285,10 +285,11 @@ st.session_state.setdefault("joseph_last_commentary", "")
 st.session_state.setdefault("joseph_entry_just_built", False)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating
+from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
+render_joseph_hero_banner()
 
 # ============================================================
 # END SECTION: Initialize App on Startup

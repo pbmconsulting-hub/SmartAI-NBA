@@ -44,12 +44,17 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
+
 # ── Premium Status (partial gate — some features restricted) ──
 from utils.auth import is_premium_user as _is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
-    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
+    _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 _FREE_PROP_LIMIT = 5   # Free users can manually enter up to 5 props
 _user_is_premium = _is_premium_user()
 

@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/5_🚫_Avoid_List.py
+# FILE: pages/8_🛡️_Risk_Shield.py
 # PURPOSE: Display all props that should be avoided and explain
 #          WHY each one is a bad bet. Helps the user avoid traps.
 # CONNECTS TO: analysis results in session state
@@ -21,6 +21,11 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
+
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate

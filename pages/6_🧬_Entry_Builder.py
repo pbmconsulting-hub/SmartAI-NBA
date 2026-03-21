@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/4_🎰_Entry_Builder.py
+# FILE: pages/6_🧬_Entry_Builder.py
 # PURPOSE: Build optimal parlay entries for PrizePicks,
 #          Underdog, and DraftKings. Calculates EV for each.
 # CONNECTS TO: entry_optimizer.py, analysis results in session
@@ -54,10 +54,11 @@ from styles.theme import get_global_css, get_neural_header_html, get_education_b
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating
+from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
+render_joseph_hero_banner()
 
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate

@@ -55,7 +55,7 @@ APP_URL = APP_URL.rstrip("/")
 
 # Path to the Premium page (URL-encoded emoji in page name).
 # Used in redirect URLs passed to Stripe.
-_PREMIUM_PAGE_PATH = "/6_%F0%9F%92%8E_Premium"
+_PREMIUM_PAGE_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 
 # ── Configure Stripe SDK with our secret key ─────────────────
 # This must be done before any Stripe API calls.
@@ -84,7 +84,7 @@ def create_checkout_session(customer_email: str = "") -> dict:
 
     The user is redirected to Stripe's hosted checkout page,
     enters their payment details, and is then redirected back
-    to APP_URL/pages/6_💎_Premium?session_id=XXX on success.
+    to APP_URL/pages/14_💎_Subscription_Level?session_id=XXX on success.
 
     Args:
         customer_email (str): Pre-fill the checkout form with

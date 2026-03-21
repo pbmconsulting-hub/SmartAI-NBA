@@ -287,7 +287,7 @@ class TestEntryBuilderDfsBadges(unittest.TestCase):
     def setUp(self):
         self._eb_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "4_🧬_Entry_Builder.py",
+            "pages", "6_🧬_Entry_Builder.py",
         )
         with open(self._eb_path, "r") as f:
             self._content = f.read()
