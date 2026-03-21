@@ -1050,7 +1050,7 @@ if current_games:
     st.subheader(f"🏟️ Tonight's Slate — {len(current_games)} Game(s)")
     st.markdown("")
 
-    for _gi, game in enumerate(current_games):
+    for game in current_games:
         home = game.get("home_team", "")
         away = game.get("away_team", "")
         home_name = game.get("home_team_name", home)

@@ -2515,7 +2515,6 @@ if analysis_results:
             border-bottom-left-radius: 0 !important;
             border-bottom-right-radius: 0 !important;
             cursor: pointer;
-            pointer-events: none;
         }
         .card-btn-wrapper {
             position: relative;
