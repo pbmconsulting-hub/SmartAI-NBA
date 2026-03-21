@@ -1050,7 +1050,7 @@ if current_games:
     st.subheader(f"🏟️ Tonight's Slate — {len(current_games)} Game(s)")
     st.markdown("")
 
-    for game in current_games:
+    for _gi, game in enumerate(current_games):
         home = game.get("home_team", "")
         away = game.get("away_team", "")
         home_name = game.get("home_team_name", home)
@@ -1116,9 +1116,11 @@ if current_games:
         lines_parts.append(f"O/U: {total}")
         lines_line = " &nbsp;|&nbsp; ".join(lines_parts)
 
-        # Render card
-        card_html = f"""
-<div class="game-card">
+        # Render card — wrap in an expander so the whole card is clickable
+        _expander_label = f"🏀  {away} ({away_w}-{away_l}) @ {home} ({home_w}-{home_l})  •  {lines_line.replace('&nbsp;', ' ')}"
+        with st.expander(_expander_label, expanded=True):
+            card_html = f"""
+<div class="game-card" style="cursor:pointer;">
   <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <span class="team-badge away-badge">🚌 {away}</span>
     <span style="color:#a0aec0; font-size:1rem;">{away_name}</span>
@@ -1143,55 +1145,55 @@ if current_games:
   </div>
 </div>
 """
-        st.markdown(card_html, unsafe_allow_html=True)
+            st.markdown(card_html, unsafe_allow_html=True)
 
-        # ── Game Environment Card ──────────────────────────────────────
-        _pace_adj = "Fast 🚀" if total > 230 else ("Slow 🐢" if total < 210 else "Normal ⚖️")
-        _blowout_risk = abs(spread)
-        _blowout_lbl = "Low" if _blowout_risk < 5 else ("Medium" if _blowout_risk < 10 else "HIGH ⚠️")
-        _blowout_clr = "#00ff9d" if _blowout_risk < 5 else ("#ffcc00" if _blowout_risk < 10 else "#ff4444")
-        _o_u_lbl = "OVER-Friendly 📈" if total > 225 else ("UNDER-Friendly 📉" if total < 210 else "Neutral")
-        _o_u_clr = "#00ff9d" if total > 225 else ("#8b949e" if total < 210 else "#c0d0e8")
+            # ── Game Environment Card ──────────────────────────────────────
+            _pace_adj = "Fast 🚀" if total > 230 else ("Slow 🐢" if total < 210 else "Normal ⚖️")
+            _blowout_risk = abs(spread)
+            _blowout_lbl = "Low" if _blowout_risk < 5 else ("Medium" if _blowout_risk < 10 else "HIGH ⚠️")
+            _blowout_clr = "#00ff9d" if _blowout_risk < 5 else ("#ffcc00" if _blowout_risk < 10 else "#ff4444")
+            _o_u_lbl = "OVER-Friendly 📈" if total > 225 else ("UNDER-Friendly 📉" if total < 210 else "Neutral")
+            _o_u_clr = "#00ff9d" if total > 225 else ("#8b949e" if total < 210 else "#c0d0e8")
 
-        # Injury impact
-        _inj_map = st.session_state.get("injury_status_map", {})
-        _inj_statuses = {"Out", "Doubtful", "Injured Reserve"}
-        _home_out = [
-            p.get("name", "?")
-            for p in find_players_by_team(players_data, home)[:10]
-            if _inj_map.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses
-        ]
-        _away_out = [
-            p.get("name", "?")
-            for p in find_players_by_team(players_data, away)[:10]
-            if _inj_map.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses
-        ]
-        _inj_txt = ""
-        if _home_out:
-            _inj_txt += f'<span style="color:#ff6b6b;">🏥 {home}: {", ".join(_home_out[:3])}</span>&nbsp;&nbsp;'
-        if _away_out:
-            _inj_txt += f'<span style="color:#ff6b6b;">🏥 {away}: {", ".join(_away_out[:3])}</span>'
-        if not _inj_txt:
-            _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
+            # Injury impact
+            _inj_map = st.session_state.get("injury_status_map", {})
+            _inj_statuses = {"Out", "Doubtful", "Injured Reserve"}
+            _home_out = [
+                p.get("name", "?")
+                for p in find_players_by_team(players_data, home)[:10]
+                if _inj_map.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses
+            ]
+            _away_out = [
+                p.get("name", "?")
+                for p in find_players_by_team(players_data, away)[:10]
+                if _inj_map.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses
+            ]
+            _inj_txt = ""
+            if _home_out:
+                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {home}: {", ".join(_home_out[:3])}</span>&nbsp;&nbsp;'
+            if _away_out:
+                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {away}: {", ".join(_away_out[:3])}</span>'
+            if not _inj_txt:
+                _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
 
-        import html as _h
-        st.markdown(
-            f'<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:12px 16px;'
-            f'margin:-4px 0 16px 0;border:1px solid rgba(0,240,255,0.10);">'
-            f'<div style="font-size:0.78rem;color:#8a9bb8;font-weight:600;margin-bottom:8px;'
-            f'letter-spacing:0.5px;">⚙️ GAME ENVIRONMENT</div>'
-            f'<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.82rem;">'
-            f'<div><span style="color:#8a9bb8;">Pace:</span> '
-            f'<strong style="color:#c0d0e8;">{_pace_adj}</strong></div>'
-            f'<div><span style="color:#8a9bb8;">O/U {total}:</span> '
-            f'<strong style="color:{_o_u_clr};">{_o_u_lbl}</strong></div>'
-            f'<div><span style="color:#8a9bb8;">Blowout Risk:</span> '
-            f'<strong style="color:{_blowout_clr};">{_blowout_lbl} ({_blowout_risk:.0f} pts)</strong></div>'
-            f'</div>'
-            f'<div style="margin-top:8px;font-size:0.8rem;">🏥 <strong style="color:#8a9bb8;">Injury Impact:</strong> {_inj_txt}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
+            import html as _h
+            st.markdown(
+                f'<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:12px 16px;'
+                f'margin:-4px 0 16px 0;border:1px solid rgba(0,240,255,0.10);">'
+                f'<div style="font-size:0.78rem;color:#8a9bb8;font-weight:600;margin-bottom:8px;'
+                f'letter-spacing:0.5px;">⚙️ GAME ENVIRONMENT</div>'
+                f'<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.82rem;">'
+                f'<div><span style="color:#8a9bb8;">Pace:</span> '
+                f'<strong style="color:#c0d0e8;">{_pace_adj}</strong></div>'
+                f'<div><span style="color:#8a9bb8;">O/U {total}:</span> '
+                f'<strong style="color:{_o_u_clr};">{_o_u_lbl}</strong></div>'
+                f'<div><span style="color:#8a9bb8;">Blowout Risk:</span> '
+                f'<strong style="color:{_blowout_clr};">{_blowout_lbl} ({_blowout_risk:.0f} pts)</strong></div>'
+                f'</div>'
+                f'<div style="margin-top:8px;font-size:0.8rem;">🏥 <strong style="color:#8a9bb8;">Injury Impact:</strong> {_inj_txt}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
     with st.expander("✏️ Edit Spreads & Totals", expanded=False):
         st.markdown("Adjust Vegas lines for each game:")
         updated_games = []

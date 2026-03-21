@@ -2514,11 +2514,30 @@ if analysis_results:
             margin-bottom: 0 !important;
             border-bottom-left-radius: 0 !important;
             border-bottom-right-radius: 0 !important;
+            cursor: pointer;
+            pointer-events: none;
+        }
+        .card-btn-wrapper {
+            position: relative;
+        }
+        .card-btn-wrapper .stButton {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            z-index: 10;
+        }
+        .card-btn-wrapper .stButton button {
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            cursor: pointer !important;
         }
         </style>""", unsafe_allow_html=True)
 
-        # Render each player's trading card + clickable button together
-        # so the cards are visually paired with their click targets.
+        # Render each player's trading card as a clickable element.
+        # The card itself is the click target — no separate button below.
         _player_names = list(_grouped.keys())
         _cols_per_row = 5
         for _row_start in range(0, len(_player_names), _cols_per_row):
@@ -2540,7 +2559,7 @@ if analysis_results:
                     with st.container():
                         st.markdown('<div class="card-btn-wrapper">', unsafe_allow_html=True)
                         st.markdown(_card_html, unsafe_allow_html=True)
-                        if st.button(f"🔍 View {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
+                        if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
                             st.session_state["_spotlight_player"] = _cn
                         st.markdown('</div>', unsafe_allow_html=True)
 

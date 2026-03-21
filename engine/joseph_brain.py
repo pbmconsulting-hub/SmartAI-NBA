@@ -2072,16 +2072,40 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
         # Run full analysis on results that don't have verdicts
         analyzed = []
         for r in analysis_results:
-            if "verdict" in r and "joseph_edge" in r:
+            if "verdict" in r and ("joseph_edge" in r or "edge" in r):
+                analyzed.append(r)
+            elif "verdict" in r and "edge" not in r and "joseph_edge" not in r:
+                # Has verdict but no edge — still usable
                 analyzed.append(r)
             else:
                 try:
+                    # Try joseph_full_analysis first (needs analysis_result format)
                     player_data = r.get("player_data", r.get("player", {}))
                     game_data = r.get("game_data", r.get("game", {}))
-                    full = joseph_full_analysis(r, player_data, game_data, teams_data)
-                    full["player_name"] = r.get("player_name", r.get("name", ""))
-                    full["game_id"] = r.get("game_id", r.get("game", ""))
-                    analyzed.append(full)
+                    if player_data and game_data:
+                        full = joseph_full_analysis(r, player_data, game_data, teams_data)
+                        full["player_name"] = r.get("player_name", r.get("name", ""))
+                        full["game_id"] = r.get("game_id", r.get("game", ""))
+                        analyzed.append(full)
+                    else:
+                        # Fallback: use joseph_analyze_pick for raw platform props
+                        _pn = r.get("player_name", r.get("name", ""))
+                        _st = r.get("stat_type", r.get("stat", "points"))
+                        _ln = _safe_float(r.get("prop_line", r.get("line", 0)))
+                        _plat = r.get("platform", "PrizePicks")
+                        if _pn and _ln > 0:
+                            pick_result = joseph_analyze_pick(
+                                {"name": _pn, "player_name": _pn},
+                                _ln, _st, {},
+                                platform=_plat,
+                            )
+                            pick_result["game_id"] = r.get("game_id", r.get("game", ""))
+                            pick_result["prop_line"] = _ln
+                            pick_result["joseph_edge"] = pick_result.get("edge", 0.0)
+                            pick_result["joseph_probability"] = pick_result.get("probability_over", 50.0)
+                            analyzed.append(pick_result)
+                        else:
+                            analyzed.append(r)
                 except Exception:
                     analyzed.append(r)
 
@@ -2218,10 +2242,12 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             leg_summaries.append({
                 "player_name": l.get("player_name", l.get("name", "")),
                 "stat_type": l.get("stat_type", l.get("stat", "")),
-                "line": l.get("line", 0),
+                "line": l.get("prop_line", l.get("line", 0)),
+                "prop_line": l.get("prop_line", l.get("line", 0)),
                 "direction": l.get("direction", "OVER"),
                 "verdict": l.get("verdict", "LEAN"),
                 "joseph_edge": round(_safe_float(l.get("joseph_edge", l.get("edge", 0))), 1),
+                "one_liner": l.get("rant", l.get("one_liner", "")),
             })
 
         # Alternative tickets (next 3 best combos, simplified)

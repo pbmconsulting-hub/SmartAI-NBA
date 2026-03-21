@@ -2195,23 +2195,26 @@ def parse_alt_lines_from_platform_props(props):
     """
     import statistics as _statistics
 
-    # ── Step 1: Group all lines by (player_name, stat_type, platform) ────
-    # This lets us identify all available lines for each prop slot.
-    _groups = {}
+    # ── Step 1: Group all lines by (player_name, stat_type) ──────────────
+    # Group across ALL platforms so we find the true middle number for
+    # each player+stat combination.  This gives the most accurate
+    # More/Less (Over/Under) line by taking the median of all
+    # available lines regardless of which platform offered them.
+    _cross_groups: dict = {}
     for prop in props:
-        key = (
+        cross_key = (
             str(prop.get("player_name", "")).lower().strip(),
             str(prop.get("stat_type", "")).lower().strip(),
-            str(prop.get("platform", "")).lower().strip(),
         )
-        _groups.setdefault(key, []).append(prop)
+        _cross_groups.setdefault(cross_key, []).append(prop)
 
     # ── Step 2: Identify the Standard_Line for each group ────────────────
-    # The standard line is the MEDIAN of all lines in the group.
+    # The standard line is the MEDIAN of all lines across platforms.
     # For a single-entry group the only line IS the standard.
-    # For multi-entry groups the median represents the bookmaker's primary O/U.
-    _standard_lines = {}
-    for key, group_props in _groups.items():
+    # For multi-entry groups the median is the middle number — the true
+    # More/Less or Over/Under line.
+    _standard_lines: dict = {}
+    for cross_key, group_props in _cross_groups.items():
         valid_lines = []
         for p in group_props:
             try:
@@ -2221,19 +2224,18 @@ def parse_alt_lines_from_platform_props(props):
             except (ValueError, TypeError):
                 pass
         if valid_lines:
-            _standard_lines[key] = _statistics.median(valid_lines)
+            _standard_lines[cross_key] = _statistics.median(valid_lines)
         else:
-            _standard_lines[key] = None
+            _standard_lines[cross_key] = None
 
     # ── Step 3: Stamp each prop with standard_line and line_category ─────
     enriched = []
     for prop in props:
-        key = (
+        cross_key = (
             str(prop.get("player_name", "")).lower().strip(),
             str(prop.get("stat_type", "")).lower().strip(),
-            str(prop.get("platform", "")).lower().strip(),
         )
-        std_line = _standard_lines.get(key)
+        std_line = _standard_lines.get(cross_key)
 
         try:
             prop_line = float(prop.get("line", 0) or 0)
