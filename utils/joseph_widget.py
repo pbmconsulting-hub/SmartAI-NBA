@@ -51,6 +51,21 @@ except ImportError:
     def joseph_commentary(results, context_type):
         return ""
 
+import time as _time
+
+
+def _joseph_typing_generator(text: str):
+    """Yield words one at a time with a short delay to simulate typing.
+
+    Designed to be passed to ``st.write_stream()`` so Joseph's words
+    appear as if he is actively speaking in real-time.
+    """
+    words = text.split(" ")
+    for i, word in enumerate(words):
+        yield word + (" " if i < len(words) - 1 else "")
+        _time.sleep(0.04)
+
+
 try:
     from engine.joseph_bets import joseph_get_track_record
     _BETS_AVAILABLE = True
@@ -280,7 +295,7 @@ _WIDGET_CSS = """<style>
     box-shadow:0 4px 24px rgba(0,0,0,0.5),0 0 20px rgba(255,94,0,0.1);
     cursor:default;
     transition:box-shadow 0.2s ease;
-    max-width:340px;
+    max-width:380px;
     overflow:hidden;
 }
 .joseph-floating-widget::before{
@@ -299,7 +314,7 @@ _WIDGET_CSS = """<style>
     box-shadow:0 4px 32px rgba(0,0,0,0.6),0 0 28px rgba(255,94,0,0.2);
 }
 .joseph-floating-avatar{
-    width:48px;height:48px;border-radius:50%;flex-shrink:0;
+    width:72px;height:72px;border-radius:50%;flex-shrink:0;
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 12px rgba(255,94,0,0.45);
     animation:josephFloatingGlow 3s ease-in-out infinite;
@@ -329,6 +344,11 @@ _WIDGET_CSS = """<style>
     line-height:1.3;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;text-overflow:ellipsis;
+    animation:josephTypeIn 2s steps(50,end) both;
+}
+@keyframes josephTypeIn{
+    from{max-width:0;opacity:0.3}
+    to{max-width:300px;opacity:1}
 }
 </style>"""
 
@@ -608,19 +628,32 @@ def inject_joseph_inline_commentary(
         elif verdict in ("FADE", "STAY_AWAY"):
             verdict_class = " joseph-widget-verdict-fade"
 
-        # ── Render inline card ────────────────────────────────
+        # ── Render inline card with typing effect ─────────────
+        # Render the card header (avatar + name) as styled HTML,
+        # then use st.write_stream() with a word-by-word generator
+        # so Joseph's commentary feels like real-time speech.
         st.markdown(
             f'<div class="joseph-inline-card">'
             f'<div>'
             f'{inline_avatar}'
             f'<span class="joseph-inline-label">Joseph M. Smith</span>'
             f'</div>'
-            f'<div class="joseph-inline-text{verdict_class}">'
-            f'{escaped_commentary}'
-            f'</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
+        # Stream the commentary word by word (typing effect)
+        _stream_key = f"_joseph_streamed_{hash(commentary)}"
+        if not st.session_state.get(_stream_key, False):
+            st.write_stream(_joseph_typing_generator(commentary))
+            st.session_state[_stream_key] = True
+        else:
+            # Already streamed in this session — show instantly
+            st.markdown(
+                f'<div class="joseph-inline-text{verdict_class}">'
+                f'{escaped_commentary}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
     except Exception as exc:
         _logger.debug("inject_joseph_inline_commentary failed: %s", exc)
 

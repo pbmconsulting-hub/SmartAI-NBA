@@ -1801,7 +1801,27 @@ if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
     )
 
 # ════ JOSEPH M. SMITH LIVE BROADCAST DESK ════
+# Reduce Joseph's container size by 60% on this page per design requirements.
+_JOSEPH_DESK_SIZE_CSS = """<style>
+.joseph-live-desk{
+    padding:10px 12px !important;
+    margin:10px 0 !important;
+    font-size:0.85rem !important;
+    max-height:40vh;
+    overflow-y:auto;
+}
+.joseph-live-desk .joseph-desk-avatar{
+    width:40px !important;height:40px !important;
+}
+.joseph-live-desk h3,.joseph-live-desk h4{
+    font-size:0.85rem !important;margin:4px 0 !important;
+}
+.joseph-live-desk .joseph-desk-title{
+    font-size:0.9rem !important;
+}
+</style>"""
 if analysis_results and st.session_state.get("joseph_enabled", True):
+    st.markdown(_JOSEPH_DESK_SIZE_CSS, unsafe_allow_html=True)
     try:
         from pages.helpers.joseph_live_desk import render_joseph_live_desk
         from data.advanced_metrics import enrich_player_god_mode
