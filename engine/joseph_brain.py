@@ -1422,7 +1422,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         qme_prob = _safe_float(analysis_result.get("probability_over", 50.0))
         # Neural Analysis stores probability_over as 0-1 decimal (e.g. 0.63).
         # Joseph's internal math uses 0-100 percentage scale.
-        if 0.0 < qme_prob <= 1.0:
+        # Use < 1.5 threshold (simulations clamp to [0.01, 0.99]; a real
+        # percentage of 1.5% would be extremely rare and still benign).
+        if 0.0 < qme_prob < 1.5:
             qme_prob *= 100.0
         qme_edge = _safe_float(analysis_result.get("edge_percentage", 0.0))
         confidence_score = _safe_float(analysis_result.get("confidence_score", 50.0))
@@ -1504,7 +1506,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
 
         implied_line = _safe_float(analysis_result.get("implied_probability", 0.0))
         # implied_probability may be stored as 0-1 decimal — convert to percentage
-        if 0.0 < implied_line <= 1.0:
+        if 0.0 < implied_line < 1.5:
             implied_line *= 100.0
         # If implied_probability is missing or zero, derive from qme_prob and qme_edge
         if implied_line <= 0.0:

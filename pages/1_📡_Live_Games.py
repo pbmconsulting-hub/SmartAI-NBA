@@ -7,6 +7,7 @@
 
 import streamlit as st
 import datetime
+import os
 import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
@@ -30,11 +31,10 @@ st.set_page_config(
 )
 
 # ── App Logo ──────────────────────────────────────────────────
-import os as _os
-_ROOT_LOGO = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
-_ASSETS_LOGO = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
-_LOGO_PATH = _ROOT_LOGO if _os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
-if _os.path.exists(_LOGO_PATH):
+_ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
+_ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
+_LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
+if os.path.exists(_LOGO_PATH):
     st.logo(_LOGO_PATH, size="small")
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
