@@ -312,6 +312,10 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
     def test_noop_on_none_results(self):
         from utils.joseph_widget import inject_joseph_inline_commentary
         inject_joseph_inline_commentary(None)
+        # No inline card div should be rendered
+        calls = [c for c in _mock_st.markdown.call_args_list
+                 if c[0] and '<div class="joseph-inline-card">' in c[0][0]]
+        self.assertEqual(len(calls), 0)
 
     @patch("utils.joseph_widget.joseph_commentary", return_value="HOT TAKE")
     def test_renders_inline_card(self, mock_comm):
