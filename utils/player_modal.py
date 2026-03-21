@@ -101,9 +101,6 @@ def show_player_spotlight(player_name: str, grouped_entry: dict) -> None:
             edge = _safe_float(p.get("edge_percentage", 0))
             edge_class = "edge-pos" if edge >= 0 else "edge-neg"
             edge_display = f"+{edge:.1f}%" if edge >= 0 else f"{edge:.1f}%"
-            prob = _safe_float(p.get("probability_over", 50)) * 100
-            if prob > 100:
-                prob = _safe_float(p.get("probability_over", 50))
 
             cells_html += (
                 f'<div class="gm-market-cell">'
