@@ -647,28 +647,23 @@ if run_analysis:
         Handles: 3-letter codes, full names, nicknames, common aliases.
         Returns the uppercased team string unchanged if no mapping found.
         """
-        t = raw_team.upper().strip()
-        if not t:
+        team_upper = raw_team.upper().strip()
+        if not team_upper:
             return ""
         # Already a known abbreviation or alias?
-        if len(t) <= 4:
-            canon = ABBREV_ALIASES.get(t, t)
-            return canon
-        # Full name match? (e.g. "Los Angeles Lakers")
-        mapped = _TEAM_NICKNAME_MAP.get(t)
-        if mapped:
-            return mapped
-        # Nickname only? (e.g. "Lakers", "76ers")
-        mapped = _TEAM_NICKNAME_MAP.get(t)
+        if len(team_upper) <= 4:
+            return ABBREV_ALIASES.get(team_upper, team_upper)
+        # Full name or nickname match? (e.g. "Los Angeles Lakers", "Lakers")
+        mapped = _TEAM_NICKNAME_MAP.get(team_upper)
         if mapped:
             return mapped
         # Last word might be nickname (e.g. "LA Lakers" → "Lakers")
-        last_word = t.rsplit(" ", 1)[-1] if " " in t else ""
+        last_word = team_upper.rsplit(" ", 1)[-1] if " " in team_upper else ""
         if last_word:
             mapped = _TEAM_NICKNAME_MAP.get(last_word)
             if mapped:
                 return mapped
-        return t
+        return team_upper
 
     playing_teams_expanded: set = set()
     for _g in todays_games:

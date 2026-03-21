@@ -842,20 +842,20 @@ class TestTeamNormalizationLogic(unittest.TestCase):
             self._nickname_map[full_name.upper()] = abbr
 
         def _normalize(raw_team):
-            t = raw_team.upper().strip()
-            if not t:
+            team_upper = raw_team.upper().strip()
+            if not team_upper:
                 return ""
-            if len(t) <= 4:
-                return self.ABBREV_ALIASES.get(t, t)
-            mapped = self._nickname_map.get(t)
+            if len(team_upper) <= 4:
+                return self.ABBREV_ALIASES.get(team_upper, team_upper)
+            mapped = self._nickname_map.get(team_upper)
             if mapped:
                 return mapped
-            last_word = t.rsplit(" ", 1)[-1] if " " in t else ""
+            last_word = team_upper.rsplit(" ", 1)[-1] if " " in team_upper else ""
             if last_word:
                 mapped = self._nickname_map.get(last_word)
                 if mapped:
                     return mapped
-            return t
+            return team_upper
 
         self.normalize = _normalize
 
