@@ -308,5 +308,238 @@ class TestLiveDeskFileExists(unittest.TestCase):
         self.assertIsInstance(tree, ast.Module)
 
 
+class TestStudioPlatformPreference(unittest.TestCase):
+    """Tests for Joseph's platform preference selector in The Studio."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "14_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_platform_preference_state_key(self):
+        """Platform preference should use session state."""
+        self.assertIn("joseph_preferred_platform", self.source)
+
+    def test_platform_question_prompt(self):
+        """Joseph should ask what betting app the user uses."""
+        self.assertIn("What betting app are you using tonight", self.source)
+
+    def test_platform_options_all_three(self):
+        """All three platforms should be available."""
+        self.assertIn("PrizePicks", self.source)
+        self.assertIn("Underdog", self.source)
+        self.assertIn("DraftKings", self.source)
+
+    def test_platform_radio_key(self):
+        """Platform radio should have a unique key."""
+        self.assertIn("joseph_platform_radio", self.source)
+
+    def test_build_bets_uses_platform_preference(self):
+        """Build My Bets should use the Joseph platform preference."""
+        self.assertIn("joseph_platform", self.source)
+
+    def test_build_bets_no_hard_block(self):
+        """Build My Bets should not hard-block without analysis_results."""
+        # The old line that hard-blocked: 'if not analysis_results: st.info("Run Neural")'
+        # Should now have a fallback to platform_props
+        self.assertIn("platform_props", self.source)
+
+
+class TestFindTeamDataDictSupport(unittest.TestCase):
+    """Tests for _find_team_data accepting dict-keyed teams data."""
+
+    def setUp(self):
+        from engine.joseph_strategy import _find_team_data
+        self.find = _find_team_data
+        self.teams_dict = {
+            "LAL": {"abbreviation": "LAL", "pace": 100.5, "off_rating": 114.0},
+            "BOS": {"abbreviation": "BOS", "pace": 98.5, "off_rating": 116.0},
+        }
+        self.teams_list = list(self.teams_dict.values())
+
+    def test_dict_exact_key(self):
+        result = self.find("LAL", self.teams_dict)
+        self.assertEqual(result["pace"], 100.5)
+
+    def test_dict_case_insensitive(self):
+        result = self.find("lal", self.teams_dict)
+        self.assertEqual(result["pace"], 100.5)
+
+    def test_dict_not_found(self):
+        result = self.find("XXX", self.teams_dict)
+        self.assertEqual(result, {})
+
+    def test_list_still_works(self):
+        result = self.find("BOS", self.teams_list)
+        self.assertEqual(result["pace"], 98.5)
+
+    def test_empty_data(self):
+        self.assertEqual(self.find("LAL", {}), {})
+        self.assertEqual(self.find("LAL", []), {})
+        self.assertEqual(self.find("LAL", None), {})
+
+
+class TestJosephAnalyzePick(unittest.TestCase):
+    """Tests for the implemented joseph_analyze_pick function."""
+
+    def setUp(self):
+        from engine.joseph_brain import joseph_analyze_pick
+        self.analyze = joseph_analyze_pick
+        self.player = {
+            "name": "Test Player",
+            "points_avg": 20.0,
+            "rebounds_avg": 8.0,
+            "assists_avg": 5.0,
+            "games_played": 50,
+        }
+
+    def test_returns_dict(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIsInstance(result, dict)
+
+    def test_has_verdict(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIn(result["verdict"], ("SMASH", "LEAN", "FADE", "STAY_AWAY"))
+
+    def test_has_edge(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIsInstance(result["edge"], float)
+
+    def test_has_confidence(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIsInstance(result["confidence"], float)
+
+    def test_has_rant(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIsInstance(result["rant"], str)
+        # Rant should not be empty — it was a stub before
+        self.assertGreater(len(result["rant"]), 0)
+
+    def test_has_platform(self):
+        result = self.analyze(self.player, 18.5, "points", {}, platform="Underdog")
+        self.assertEqual(result["platform"], "Underdog")
+
+    def test_has_player_name(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertEqual(result["player_name"], "Test Player")
+
+    def test_has_verdict_emoji(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIn("verdict_emoji", result)
+
+    def test_has_projected_avg(self):
+        result = self.analyze(self.player, 18.5, "points", {})
+        self.assertIsInstance(result["projected_avg"], float)
+        self.assertGreater(result["projected_avg"], 0)
+
+    def test_graceful_empty_player(self):
+        result = self.analyze({}, 10.0, "points", {})
+        self.assertIn(result["verdict"], ("SMASH", "LEAN", "FADE", "STAY_AWAY"))
+
+    def test_different_stat_types(self):
+        for stat in ("points", "rebounds", "assists", "steals", "threes"):
+            result = self.analyze(self.player, 5.0, stat, {})
+            self.assertIn("verdict", result)
+
+
+class TestBuildRant(unittest.TestCase):
+    """Tests for the build_rant function (was an empty stub)."""
+
+    def setUp(self):
+        from engine.joseph_brain import build_rant
+        self.build_rant = build_rant
+
+    def test_returns_string(self):
+        result = self.build_rant("SMASH", player="Test", stat="points", line="24.5")
+        self.assertIsInstance(result, str)
+
+    def test_not_empty(self):
+        result = self.build_rant("SMASH", player="Test", stat="points", line="24.5")
+        self.assertGreater(len(result), 0)
+
+    def test_all_verdicts_produce_rant(self):
+        for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY"):
+            result = self.build_rant(v, player="Player", stat="assists")
+            self.assertGreater(len(result), 0, f"build_rant({v}) should produce text")
+
+
+class TestGameAnalysisWithDictTeamsData(unittest.TestCase):
+    """Test joseph_analyze_game works with dict-format teams_data."""
+
+    def setUp(self):
+        from engine.joseph_brain import joseph_analyze_game
+        self.analyze_game = joseph_analyze_game
+
+    def test_game_analysis_with_dict(self):
+        teams_data = {
+            "LAL": {"abbreviation": "LAL", "team": "LAL",
+                     "pace": 100.5, "off_rating": 114.0, "def_rating": 112.0},
+            "BOS": {"abbreviation": "BOS", "team": "BOS",
+                     "pace": 98.5, "off_rating": 116.0, "def_rating": 107.0},
+        }
+        game = {"home_team": "LAL", "away_team": "BOS",
+                "spread": -3.5, "total": 220.0}
+        result = self.analyze_game(game, teams_data, [])
+        self.assertTrue(result.get("game_narrative"), "Should produce narrative")
+        self.assertTrue(result.get("joseph_game_total_take"), "Should produce total take")
+
+    def test_game_analysis_uses_strategy_narrative(self):
+        teams_data = {
+            "LAL": {"abbreviation": "LAL", "team": "LAL",
+                     "pace": 100.5, "off_rating": 114.0, "def_rating": 112.0},
+            "BOS": {"abbreviation": "BOS", "team": "BOS",
+                     "pace": 98.5, "off_rating": 116.0, "def_rating": 107.0},
+        }
+        game = {"home_team": "LAL", "away_team": "BOS",
+                "spread": -3.5, "total": 220.0}
+        result = self.analyze_game(game, teams_data, [])
+        # Strategy narrative includes "visits" when teams are real
+        narrative = result.get("game_narrative", "")
+        self.assertIn("BOS", narrative)
+        self.assertIn("LAL", narrative)
+
+    def test_total_opinion_uses_model_projection(self):
+        teams_data = {
+            "LAL": {"abbreviation": "LAL", "team": "LAL",
+                     "pace": 100.5, "off_rating": 114.0, "def_rating": 112.0},
+            "BOS": {"abbreviation": "BOS", "team": "BOS",
+                     "pace": 98.5, "off_rating": 116.0, "def_rating": 107.0},
+        }
+        game = {"home_team": "LAL", "away_team": "BOS",
+                "spread": -3.5, "total": 220.0}
+        result = self.analyze_game(game, teams_data, [])
+        total_take = result.get("joseph_game_total_take", "")
+        # Should mention model projection when it differs from line
+        self.assertIn("model projects", total_take)
+
+    def test_scheme_not_raw_dict(self):
+        teams_data = {
+            "LAL": {"abbreviation": "LAL", "team": "LAL",
+                     "pace": 100.5, "off_rating": 114.0, "def_rating": 112.0},
+            "BOS": {"abbreviation": "BOS", "team": "BOS",
+                     "pace": 98.5, "off_rating": 116.0, "def_rating": 107.0},
+        }
+        game = {"home_team": "LAL", "away_team": "BOS",
+                "spread": -3.5, "total": 220.0}
+        result = self.analyze_game(game, teams_data, [])
+        scheme = result.get("scheme_analysis", "")
+        # Should not contain raw dict representation
+        self.assertNotIn("primary_scheme", scheme)
+        self.assertNotIn("rim_protection", scheme)
+
+    def test_game_analysis_empty_results_still_works(self):
+        teams_data = {
+            "LAL": {"abbreviation": "LAL", "team": "LAL",
+                     "pace": 100.5, "off_rating": 114.0, "def_rating": 112.0},
+        }
+        game = {"home_team": "LAL", "away_team": "UNK",
+                "spread": 0, "total": 220.0}
+        result = self.analyze_game(game, teams_data, [])
+        self.assertIsInstance(result, dict)
+
+
 if __name__ == "__main__":
     unittest.main()

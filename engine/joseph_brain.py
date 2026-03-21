@@ -819,7 +819,11 @@ def build_rant(verdict, player="", stat="", line="", edge="", prob=""):
     str
         The assembled rant string.
     """
-    return ""
+    prop = {"stat": stat, "line": line, "edge": edge, "prob": prob}
+    return build_joseph_rant(
+        player=player, prop=prop, verdict=verdict,
+        narrative_tags=[], mismatch=None, comp=None, energy="medium",
+    )
 
 
 def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
@@ -848,17 +852,155 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
     -------
     dict
         Analysis result with keys: ``verdict``, ``edge``, ``confidence``,
-        ``rant``, ``explanation``, ``grade``, ``strategy``.
+        ``rant``, ``explanation``, ``grade``, ``strategy``,
+        ``player_name``, ``stat_type``, ``line``, ``platform``.
     """
-    return {
-        "verdict": "LEAN",
-        "edge": 0.0,
-        "confidence": 50.0,
-        "rant": "",
-        "explanation": {},
-        "grade": {},
-        "strategy": {},
-    }
+    try:
+        player_name = player_data.get("name", player_data.get("player_name", "Player"))
+        prop_line = _safe_float(prop_line, 0.0)
+        game_context = game_context or {}
+
+        # --- Build projection ---
+        season_avg_key = {
+            "points": "points_avg", "rebounds": "rebounds_avg",
+            "assists": "assists_avg", "steals": "steals_avg",
+            "blocks": "blocks_avg", "threes": "fg3m_avg",
+            "fg3m": "fg3m_avg", "turnovers": "turnovers_avg",
+        }
+        avg_key = season_avg_key.get(stat_type.lower(), f"{stat_type.lower()}_avg")
+        projected_avg = _safe_float(player_data.get(avg_key, 0.0))
+        if projected_avg == 0.0:
+            projected_avg = _safe_float(player_data.get("points_avg", 15.0), 15.0)
+
+        # Rough std based on stat type
+        _STD_RATIOS = {
+            "points": 0.30, "rebounds": 0.35, "assists": 0.35,
+            "steals": 0.50, "blocks": 0.50, "threes": 0.45,
+            "fg3m": 0.45, "turnovers": 0.40,
+        }
+        std_ratio = _STD_RATIOS.get(stat_type.lower(), 0.30)
+        stat_std = max(projected_avg * std_ratio, 1.0)
+
+        # --- Run simulation ---
+        sim_result = run_quantum_matrix_simulation(
+            projected_stat_average=projected_avg,
+            stat_standard_deviation=stat_std,
+            prop_line=prop_line,
+            number_of_simulations=1000,
+            blowout_risk_factor=0.0,
+            pace_adjustment_factor=1.0,
+            matchup_adjustment_factor=1.0,
+            home_away_adjustment=0.0,
+            rest_adjustment_factor=1.0,
+            stat_type=stat_type,
+            platform=platform,
+        )
+
+        prob_over = _safe_float(sim_result.get("probability_over", 50.0))
+        sim_mean = _safe_float(sim_result.get("simulated_mean", projected_avg))
+
+        # --- Edge detection ---
+        implied_prob = 52.38  # standard -110 breakeven
+        edge = (prob_over * 100.0 if prob_over <= 1.0 else prob_over) - implied_prob
+
+        # --- Confidence scoring ---
+        try:
+            conf_result = calculate_confidence_score(
+                probability_over=prob_over,
+                edge_percentage=edge,
+                sample_size=_safe_float(player_data.get("games_played", 30)),
+            )
+            confidence = _safe_float(conf_result.get("confidence_score", 50.0))
+            tier = conf_result.get("tier", "Bronze")
+        except Exception:
+            confidence = 50.0
+            tier = "Bronze"
+
+        # --- Grading ---
+        try:
+            grade_result = joseph_grade_player(player_data, game_context)
+        except Exception:
+            grade_result = {"grade": "C", "archetype": "Unknown"}
+        grade = grade_result.get("grade", "C")
+        archetype = grade_result.get("archetype", "Unknown")
+
+        # --- Strategy ---
+        strategy = {}
+        try:
+            home_team = game_context.get("home_team", "")
+            away_team = game_context.get("away_team", "")
+            teams_data = game_context.get("teams_data", [])
+            if home_team and away_team:
+                strategy = analyze_game_strategy(home_team, away_team, game_context, teams_data)
+        except Exception:
+            strategy = {}
+
+        # --- Verdict ---
+        if edge >= 8.0:
+            verdict = "SMASH"
+        elif edge >= 5.0:
+            verdict = "LEAN"
+        elif edge >= 2.0:
+            verdict = "FADE"
+        else:
+            verdict = "STAY_AWAY"
+
+        # --- Rant ---
+        energy = "nuclear" if verdict == "SMASH" else "high" if verdict == "LEAN" else "medium"
+        rant = build_joseph_rant(
+            player=player_name,
+            prop={"stat": stat_type, "line": str(prop_line),
+                  "edge": str(round(edge, 1)), "prob": str(round(prob_over * 100.0 if prob_over <= 1 else prob_over, 1))},
+            verdict=verdict,
+            narrative_tags=[],
+            mismatch=None, comp=None, energy=energy,
+        )
+
+        # --- Explanation ---
+        try:
+            explanation = generate_pick_explanation(
+                player_data, prop_line, stat_type, game_context, sim_result
+            )
+        except Exception:
+            explanation = {"summary": f"Projected {round(sim_mean, 1)} vs line {prop_line}"}
+
+        return {
+            "player_name": player_name,
+            "stat_type": stat_type,
+            "line": prop_line,
+            "platform": platform,
+            "verdict": verdict,
+            "verdict_emoji": VERDICT_EMOJIS.get(verdict, ""),
+            "edge": round(edge, 2),
+            "confidence": round(confidence, 2),
+            "tier": tier,
+            "probability_over": round(prob_over * 100.0 if prob_over <= 1 else prob_over, 2),
+            "projected_avg": round(sim_mean, 2),
+            "rant": rant,
+            "explanation": explanation,
+            "grade": grade,
+            "archetype": archetype,
+            "strategy": strategy,
+        }
+    except Exception as exc:
+        logger.warning("joseph_analyze_pick failed: %s", exc)
+        return {
+            "player_name": player_data.get("name", "Player") if isinstance(player_data, dict) else "Player",
+            "stat_type": stat_type,
+            "line": prop_line,
+            "platform": platform,
+            "verdict": "LEAN",
+            "verdict_emoji": VERDICT_EMOJIS.get("LEAN", ""),
+            "edge": 0.0,
+            "confidence": 50.0,
+            "tier": "Bronze",
+            "probability_over": 50.0,
+            "projected_avg": 0.0,
+            "rant": "",
+            "explanation": {},
+            "grade": {},
+            "strategy": {},
+        }
 
 
 def joseph_rank_picks(picks, game_contexts=None):
@@ -1485,8 +1627,18 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             strategy = {"scheme": "unknown", "strategy": "unknown",
                         "scheme_match": 0.0, "mismatch_tags": []}
 
-        scheme = strategy.get("scheme", "unknown")
+        scheme = strategy.get("home_scheme", strategy.get("scheme", "unknown"))
+        if isinstance(scheme, dict):
+            scheme = scheme.get("primary_scheme", scheme.get("scheme_name", "unknown"))
+        away_scheme = strategy.get("away_scheme", "unknown")
+        if isinstance(away_scheme, dict):
+            away_scheme = away_scheme.get("primary_scheme", away_scheme.get("scheme_name", "unknown"))
+        # Use strategy pace projection when game-level pace_delta isn't available
+        pace_proj = _safe_float(strategy.get("pace_projection", 0.0))
         pace = _safe_float(game.get("pace_delta", 0.0))
+        if pace == 0.0 and pace_proj > 0:
+            # Derive delta from league average (~100)
+            pace = pace_proj - 100.0
 
         # Filter results for this game
         game_props = []
@@ -1509,7 +1661,8 @@ def joseph_analyze_game(game: dict, teams_data: dict,
                     pass
 
         # Generate narratives
-        game_narrative = (
+        strategy_narrative = strategy.get("game_narrative", "")
+        game_narrative = strategy_narrative if strategy_narrative else (
             f"{away} at {home} is a game I've been watching CLOSELY. "
             f"The scheme profile says '{scheme}' and the matchups are INTRIGUING. "
             f"I see {len(game_props)} props on the board and the edges are REAL."
@@ -1522,8 +1675,14 @@ def joseph_analyze_game(game: dict, teams_data: dict,
         else:
             pace_take = "Pace is NEUTRAL here. No significant advantage or disadvantage from tempo."
 
-        scheme_analysis = f"The defensive scheme is '{scheme}'. "
-        if strategy.get("mismatch_tags"):
+        scheme_analysis = f"{home} runs a '{scheme}' defense"
+        if away_scheme and away_scheme != "unknown":
+            scheme_analysis += f" while {away} runs '{away_scheme}'"
+        scheme_analysis += ". "
+        scheme_matchups = strategy.get("scheme_matchups", [])
+        if scheme_matchups:
+            scheme_analysis += f"I see matchup edges in {', '.join(str(m) for m in scheme_matchups[:2])}. That's where the VALUE is."
+        elif strategy.get("mismatch_tags"):
             scheme_analysis += f"I see mismatches in {', '.join(strategy['mismatch_tags'][:2])}. That's where the VALUE is."
         else:
             scheme_analysis += "No glaring mismatches but the matchup data tells a story."
@@ -1539,21 +1698,39 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             blowout_risk_text = f"The spread of {spread} suggests a competitive but lopsided game. Monitor minute projections."
 
         # Betting angle and game total
-        betting_angle = "Focus on the BEST individual matchups rather than game-level bets tonight."
+        strategy_angle = strategy.get("betting_angle", "")
+        betting_angle = strategy_angle if strategy_angle else (
+            "Focus on the BEST individual matchups rather than game-level bets tonight."
+        )
         if best_props:
             top = best_props[0]
             pname = top.get("player_name", top.get("name", "top pick"))
             betting_angle = f"My best angle for this game is {pname}. The edge profile is the STRONGEST here."
 
         game_total = _safe_float(game.get("total", game.get("over_under", 220.0)))
+        strategy_total_est = _safe_float(strategy.get("game_total_est", 0.0))
         joseph_game_total_take = f"The total is set at {game_total}. "
-        if pace > 2.0:
+        if strategy_total_est > 0 and abs(strategy_total_est - game_total) > 3:
+            if strategy_total_est > game_total:
+                joseph_game_total_take += (
+                    f"My model projects {round(strategy_total_est, 1)} — that's "
+                    f"{round(strategy_total_est - game_total, 1)} points ABOVE the line. "
+                    f"I LEAN towards the OVER."
+                )
+            else:
+                joseph_game_total_take += (
+                    f"My model projects {round(strategy_total_est, 1)} — that's "
+                    f"{round(game_total - strategy_total_est, 1)} points BELOW the line. "
+                    f"I LEAN towards the UNDER."
+                )
+        elif pace > 2.0:
             joseph_game_total_take += "With the pace profile, I LEAN towards the over."
         elif pace < -2.0:
             joseph_game_total_take += "Slower pace tells me the under has VALUE."
         else:
             joseph_game_total_take += "I don't have a strong lean on the total tonight."
 
+        strategy_spread_est = _safe_float(strategy.get("spread_est", 0.0))
         joseph_spread_take = f"{home} at {spread} — "
         if abs(spread) < 3:
             joseph_spread_take += "this is a COIN FLIP game and I love the drama."

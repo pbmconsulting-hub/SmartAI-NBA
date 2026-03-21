@@ -349,6 +349,17 @@ st.markdown(
 )
 
 
+# Helper for small inline avatar (defined early so all modes can use it)
+def _avatar_inline(size=48):
+    if avatar_b64:
+        return (
+            f'<img src="data:image/png;base64,{avatar_b64}" '
+            f'class="joseph-avatar-sm" style="width:{size}px;height:{size}px" '
+            f'alt="Joseph">'
+        )
+    return f'<span style="font-size:{size // 2}px">🎙️</span>'
+
+
 # ═════════════════════════════════════════════════════════════
 # THREE INTERACTIVE MODES
 # ═════════════════════════════════════════════════════════════
@@ -359,6 +370,35 @@ mode = st.radio(
     horizontal=True,
     label_visibility="collapsed",
 )
+
+# ── Joseph's Platform Preference ──────────────────────────────
+# Joseph asks what betting platform the user is using.
+# Persists in session state so it's remembered across interactions.
+_PLATFORM_OPTIONS = ["PrizePicks", "Underdog", "DraftKings"]
+if "joseph_preferred_platform" not in st.session_state:
+    st.session_state["joseph_preferred_platform"] = "PrizePicks"
+
+_platform_fallback_icon = '<span style="font-size:16px">🎙️</span>'
+_platform_avatar = _avatar_inline(32) if avatar_b64 else _platform_fallback_icon
+st.markdown(
+    f'<div style="display:flex;align-items:center;gap:10px;'
+    f'margin:8px 0 16px 0;padding:10px 16px;'
+    f'background:rgba(255,94,0,0.06);border-left:3px solid #ff5e00;'
+    f'border-radius:6px">'
+    f'{_platform_avatar}'
+    f'<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
+    f'What betting app are you using tonight?</span></div>',
+    unsafe_allow_html=True,
+)
+joseph_platform = st.radio(
+    "Your betting platform",
+    _PLATFORM_OPTIONS,
+    index=_PLATFORM_OPTIONS.index(st.session_state["joseph_preferred_platform"]),
+    horizontal=True,
+    label_visibility="collapsed",
+    key="joseph_platform_radio",
+)
+st.session_state["joseph_preferred_platform"] = joseph_platform
 
 # Shared data
 analysis_results = st.session_state.get("analysis_results", [])
@@ -381,17 +421,6 @@ elif isinstance(teams_data_list, dict):
     teams_data = teams_data_list
 else:
     teams_data = {}
-
-
-# Helper for small inline avatar
-def _avatar_inline(size=48):
-    if avatar_b64:
-        return (
-            f'<img src="data:image/png;base64,{avatar_b64}" '
-            f'class="joseph-avatar-sm" style="width:{size}px;height:{size}px" '
-            f'alt="Joseph">'
-        )
-    return f'<span style="font-size:{size // 2}px">🎙️</span>'
 
 
 # ─────────────────────────────────────────────────────────────
@@ -793,278 +822,296 @@ elif mode == "👤 SCOUT A PLAYER":
 # MODE 3: BUILD MY BETS
 # ─────────────────────────────────────────────────────────────
 elif mode == "🎰 BUILD MY BETS":
-    if not analysis_results:
-        st.info("Run **⚡ Neural Analysis** first to populate data for bet building!")
-    elif not _BRAIN_AVAILABLE:
+    if not _BRAIN_AVAILABLE:
         st.warning("Joseph's brain module is not available.")
     else:
-        st.markdown(
-            '<div class="studio-section-title">Choose Your Entry Size</div>',
-            unsafe_allow_html=True,
-        )
-
-        # 5 large columns with leg-count buttons
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            btn2 = st.button("2️⃣ POWER PLAY", use_container_width=True)
-        with col2:
-            btn3 = st.button("3️⃣ TRIPLE THREAT", use_container_width=True)
-        with col3:
-            btn4 = st.button("4️⃣ THE QUAD", use_container_width=True)
-        with col4:
-            btn5 = st.button("5️⃣ HIGH FIVE", use_container_width=True)
-        with col5:
-            btn6 = st.button("6️⃣ THE FULL SEND", use_container_width=True)
-
-        # Platform selector
-        platform = st.radio(
-            "Platform",
-            ["PrizePicks", "Underdog", "DraftKings"],
-            horizontal=True,
-        )
-
-        # Determine which button was pressed
-        selected_legs = None
-        if btn2:
-            selected_legs = 2
-        elif btn3:
-            selected_legs = 3
-        elif btn4:
-            selected_legs = 4
-        elif btn5:
-            selected_legs = 5
-        elif btn6:
-            selected_legs = 6
-
-        # Regenerate key
-        if "studio_regen_seed" not in st.session_state:
-            st.session_state["studio_regen_seed"] = 0
-
-        if selected_legs:
-            # Set random seed for regeneration variety
-            random.seed(st.session_state["studio_regen_seed"] + (selected_legs * 1000))
-
-            with st.spinner(
-                f"Joseph is building your {TICKET_NAMES.get(selected_legs, '')}..."
-            ):
-                try:
-                    ticket_result = joseph_generate_best_bets(
-                        selected_legs, analysis_results, teams_data
-                    )
-                except Exception as exc:
-                    _logger.warning("joseph_generate_best_bets failed: %s", exc)
-                    ticket_result = {}
-
-            if ticket_result and ticket_result.get("legs"):
-                # Inline reaction
-                try:
-                    reaction = joseph_commentary([ticket_result], "ticket_generated")
-                except Exception:
-                    reaction = ""
-
-                if reaction:
-                    st.markdown(
-                        f'<div style="display:flex;align-items:flex-start;gap:12px;'
-                        f'margin:14px 0">'
-                        f'{_avatar_inline(40)}'
-                        f'<div style="color:#e2e8f0;font-size:0.9rem;'
-                        f'line-height:1.5;font-style:italic">'
-                        f'{_html.escape(reaction)}</div></div>',
-                        unsafe_allow_html=True,
-                    )
-
-                # Ticket card
-                ticket_name = ticket_result.get(
-                    "ticket_name", TICKET_NAMES.get(selected_legs, "TICKET")
+        # Use analysis_results if available, otherwise try platform props
+        _bets_data = analysis_results
+        if not _bets_data:
+            # Fallback: use platform props from session state
+            _platform_props = st.session_state.get("platform_props", [])
+            if _platform_props:
+                _bets_data = _platform_props
+                st.info(
+                    f"📡 Using **{len(_platform_props)}** live props from "
+                    f"betting platforms. For full analysis, run **⚡ Neural Analysis** first."
                 )
-                pitch = ticket_result.get("rant", ticket_result.get("pitch", ""))
-
-                legs_html = ""
-                for leg in ticket_result.get("legs", []):
-                    l_player = _html.escape(str(leg.get("player", "")))
-                    l_dir = _html.escape(str(leg.get("direction", "")))
-                    l_line = leg.get("line", leg.get("prop_line", ""))
-                    l_stat = _html.escape(
-                        str(leg.get("stat_type", leg.get("prop", "")))
-                    )
-                    l_verdict = leg.get("verdict", "LEAN")
-                    l_emoji = VERDICT_EMOJIS.get(
-                        l_verdict.upper().replace(" ", "_"), "✅"
-                    )
-                    l_oneliner = _html.escape(
-                        str(leg.get("one_liner", leg.get("rant", "")[:80]))
-                    )
-
-                    legs_html += (
-                        f'<div class="studio-ticket-leg">'
-                        f'{_html.escape(l_emoji)} '
-                        f'<strong>{l_player}</strong> '
-                        f'{l_stat} {l_dir} {_html.escape(str(l_line))} '
-                        f'<span style="color:#94a3b8;font-size:0.82rem">'
-                        f'— {l_oneliner}</span>'
-                        f'</div>'
-                    )
-
-                # Combined stats
-                combined_prob = ticket_result.get("combined_probability",
-                                                  ticket_result.get("total_ev", 0))
-                ev = ticket_result.get("expected_value",
-                                       ticket_result.get("total_ev", 0))
-                synergy = ticket_result.get("synergy_score",
-                                            ticket_result.get("correlation_score", 0))
-
-                st.markdown(
-                    f'<div class="studio-ticket-card">'
-                    f'<div class="studio-ticket-header">'
-                    f'🎫 {_html.escape(str(ticket_name))}</div>'
-                    f'<div style="color:#94a3b8;font-size:0.88rem;margin-bottom:14px">'
-                    f'{_html.escape(str(pitch))}</div>'
-                    f'{legs_html}'
-                    f'<div style="display:flex;gap:20px;margin-top:14px;'
-                    f'padding-top:12px;border-top:1px solid rgba(148,163,184,0.12)">'
-                    f'<div><span style="color:#94a3b8;font-size:0.78rem">'
-                    f'Combined Prob</span><br>'
-                    f'<span style="color:#22c55e;font-family:\'JetBrains Mono\','
-                    f'monospace;font-weight:600">'
-                    f'{combined_prob:.1%}</span></div>'
-                    f'<div><span style="color:#94a3b8;font-size:0.78rem">EV</span><br>'
-                    f'<span style="color:#ff5e00;font-family:\'JetBrains Mono\','
-                    f'monospace;font-weight:600">'
-                    f'{ev:+.2f}</span></div>'
-                    f'<div><span style="color:#94a3b8;font-size:0.78rem">'
-                    f'Synergy</span><br>'
-                    f'<span style="color:#00f0ff;font-family:\'JetBrains Mono\','
-                    f'monospace;font-weight:600">'
-                    f'{synergy:.2f}</span></div>'
-                    f'</div></div>',
-                    unsafe_allow_html=True,
+            else:
+                st.info(
+                    "📡 Load games on **📡 Live Games** and fetch props, "
+                    "or run **⚡ Neural Analysis** to populate data for bet building!"
                 )
 
-                # "Why These Connect:" narrative
-                why = ticket_result.get("why_these_legs",
-                                        ticket_result.get("why_these_connect", ""))
-                if why:
-                    st.markdown(
-                        render_broadcast_segment({
-                            "title": "🔗 Why These Connect",
-                            "body": _html.escape(str(why)),
-                        }),
-                        unsafe_allow_html=True,
-                    )
+        if _bets_data:
+            st.markdown(
+                '<div class="studio-section-title">Choose Your Entry Size</div>',
+                unsafe_allow_html=True,
+            )
 
-                # Risk disclaimer
-                disclaimer = ticket_result.get(
-                    "risk_disclaimer",
-                    "All picks carry risk. Bet responsibly. Past performance does not guarantee future results.",
-                )
-                st.markdown(
-                    f'<div style="color:#94a3b8;font-size:0.78rem;'
-                    f'margin:10px 0;font-style:italic">'
-                    f'⚠️ {_html.escape(str(disclaimer))}</div>',
-                    unsafe_allow_html=True,
-                )
+            # 5 large columns with leg-count buttons
+            col1, col2, col3, col4, col5 = st.columns(5)
+            with col1:
+                btn2 = st.button("2️⃣ POWER PLAY", use_container_width=True)
+            with col2:
+                btn3 = st.button("3️⃣ TRIPLE THREAT", use_container_width=True)
+            with col3:
+                btn4 = st.button("4️⃣ THE QUAD", use_container_width=True)
+            with col4:
+                btn5 = st.button("5️⃣ HIGH FIVE", use_container_width=True)
+            with col5:
+                btn6 = st.button("6️⃣ THE FULL SEND", use_container_width=True)
 
-                # Nerd Stats expander
-                nerd = ticket_result.get("nerd_stats", {})
-                with st.expander("📊 Nerd Stats"):
-                    if isinstance(nerd, dict) and nerd:
-                        for nk, nv in nerd.items():
-                            st.markdown(
-                                f"**{_html.escape(str(nk))}:** "
-                                f"{_html.escape(str(nv)[:500])}"
-                            )
-                    else:
-                        for key in ("combined_probability", "expected_value",
-                                    "synergy_score", "correlation_score",
-                                    "total_ev", "joseph_confidence"):
-                            val = ticket_result.get(key)
-                            if val is not None:
-                                st.markdown(
-                                    f"**{key}:** {_html.escape(str(val))}"
-                                )
+            # Use Joseph's platform preference (from top selector)
+            platform = joseph_platform
 
-                # Regenerate button
-                if st.button("🔄 Regenerate", key="studio_regen"):
-                    st.session_state["studio_regen_seed"] += 1
-                    st.rerun()
+            st.markdown(
+                f'<div style="color:#94a3b8;font-size:0.82rem;margin:4px 0 8px 0">'
+                f'Building bets for <strong style="color:#ff5e00">{platform}</strong></div>',
+                unsafe_allow_html=True,
+            )
 
-                # View All Options expander
-                if _TICKETS_AVAILABLE:
-                    with st.expander("📋 View All Options — Top 3 Alternatives"):
-                        joseph_results = st.session_state.get("joseph_results", [])
-                        try:
-                            alts = get_alternative_tickets(
-                                selected_legs, joseph_results, top_n=3
-                            )
-                        except Exception as exc:
-                            _logger.warning("get_alternative_tickets failed: %s", exc)
-                            alts = []
+            # Determine which button was pressed
+            selected_legs = None
+            if btn2:
+                selected_legs = 2
+            elif btn3:
+                selected_legs = 3
+            elif btn4:
+                selected_legs = 4
+            elif btn5:
+                selected_legs = 5
+            elif btn6:
+                selected_legs = 6
 
-                        if alts:
-                            for a_idx, alt in enumerate(alts, 1):
-                                alt_name = alt.get("ticket_name", f"Alt #{a_idx}")
-                                alt_pitch = alt.get("pitch", "")
-                                alt_edge = alt.get("total_edge", 0)
-                                st.markdown(
-                                    f"**{a_idx}. {_html.escape(str(alt_name))}** "
-                                    f"(Edge: {alt_edge:+.1f}%)"
-                                )
-                                if alt_pitch:
-                                    st.markdown(
-                                        f'<div style="color:#94a3b8;font-size:0.85rem;'
-                                        f'margin-bottom:8px">'
-                                        f'{_html.escape(str(alt_pitch))}</div>',
-                                        unsafe_allow_html=True,
-                                    )
-                                alt_legs = alt.get("legs", [])
-                                for al in alt_legs:
-                                    al_name = _html.escape(
-                                        str(al.get("player", ""))
-                                    )
-                                    al_stat = _html.escape(
-                                        str(al.get("stat_type", al.get("prop", "")))
-                                    )
-                                    al_dir = _html.escape(
-                                        str(al.get("direction", ""))
-                                    )
-                                    st.markdown(
-                                        f"  • {al_name} {al_stat} {al_dir}"
-                                    )
-                        else:
-                            st.info("No alternative tickets available.")
+            # Regenerate key
+            if "studio_regen_seed" not in st.session_state:
+                st.session_state["studio_regen_seed"] = 0
 
-                # Payout table
-                if _FLEX_TABLES_AVAILABLE and platform in PLATFORM_FLEX_TABLES:
-                    payout_table = PLATFORM_FLEX_TABLES[platform]
-                    leg_payouts = payout_table.get(selected_legs, {})
-                    if leg_payouts:
-                        header_cells = "".join(
-                            f"<th>{k} Correct</th>"
-                            for k in sorted(leg_payouts.keys(), reverse=True)
+            if selected_legs:
+                # Set random seed for regeneration variety
+                random.seed(st.session_state["studio_regen_seed"] + (selected_legs * 1000))
+
+                with st.spinner(
+                    f"Joseph is building your {TICKET_NAMES.get(selected_legs, '')}..."
+                ):
+                    try:
+                        ticket_result = joseph_generate_best_bets(
+                            selected_legs, _bets_data, teams_data
                         )
-                        data_cells = "".join(
-                            f'<td class="{"highlight" if v > 0 else ""}">'
-                            f'{v:.1f}x</td>'
-                            for k, v in sorted(
-                                leg_payouts.items(), reverse=True
-                            )
-                        )
+                    except Exception as exc:
+                        _logger.warning("joseph_generate_best_bets failed: %s", exc)
+                        ticket_result = {}
+
+                if ticket_result and ticket_result.get("legs"):
+                    # Inline reaction
+                    try:
+                        reaction = joseph_commentary([ticket_result], "ticket_generated")
+                    except Exception:
+                        reaction = ""
+
+                    if reaction:
                         st.markdown(
-                            f'<div style="margin-top:16px">'
-                            f'<div style="color:#ff5e00;font-size:0.85rem;'
-                            f'font-family:\'Orbitron\',sans-serif;margin-bottom:6px">'
-                            f'{_html.escape(platform)} Payouts — '
-                            f'{selected_legs}-Leg Entry</div>'
-                            f'<table class="studio-payout-table">'
-                            f'<thead><tr>{header_cells}</tr></thead>'
-                            f'<tbody><tr>{data_cells}</tr></tbody>'
-                            f'</table></div>',
+                            f'<div style="display:flex;align-items:flex-start;gap:12px;'
+                            f'margin:14px 0">'
+                            f'{_avatar_inline(40)}'
+                            f'<div style="color:#e2e8f0;font-size:0.9rem;'
+                            f'line-height:1.5;font-style:italic">'
+                            f'{_html.escape(reaction)}</div></div>',
                             unsafe_allow_html=True,
                         )
-            else:
-                st.warning(
-                    "Joseph couldn't build a ticket — not enough qualifying picks."
-                )
+
+                    # Ticket card
+                    ticket_name = ticket_result.get(
+                        "ticket_name", TICKET_NAMES.get(selected_legs, "TICKET")
+                    )
+                    pitch = ticket_result.get("rant", ticket_result.get("pitch", ""))
+
+                    legs_html = ""
+                    for leg in ticket_result.get("legs", []):
+                        l_player = _html.escape(str(leg.get("player", "")))
+                        l_dir = _html.escape(str(leg.get("direction", "")))
+                        l_line = leg.get("line", leg.get("prop_line", ""))
+                        l_stat = _html.escape(
+                            str(leg.get("stat_type", leg.get("prop", "")))
+                        )
+                        l_verdict = leg.get("verdict", "LEAN")
+                        l_emoji = VERDICT_EMOJIS.get(
+                            l_verdict.upper().replace(" ", "_"), "✅"
+                        )
+                        l_oneliner = _html.escape(
+                            str(leg.get("one_liner", leg.get("rant", "")[:80]))
+                        )
+
+                        legs_html += (
+                            f'<div class="studio-ticket-leg">'
+                            f'{_html.escape(l_emoji)} '
+                            f'<strong>{l_player}</strong> '
+                            f'{l_stat} {l_dir} {_html.escape(str(l_line))} '
+                            f'<span style="color:#94a3b8;font-size:0.82rem">'
+                            f'— {l_oneliner}</span>'
+                            f'</div>'
+                        )
+
+                    # Combined stats
+                    combined_prob = ticket_result.get("combined_probability",
+                                                      ticket_result.get("total_ev", 0))
+                    ev = ticket_result.get("expected_value",
+                                           ticket_result.get("total_ev", 0))
+                    synergy = ticket_result.get("synergy_score",
+                                                ticket_result.get("correlation_score", 0))
+
+                    st.markdown(
+                        f'<div class="studio-ticket-card">'
+                        f'<div class="studio-ticket-header">'
+                        f'🎫 {_html.escape(str(ticket_name))}</div>'
+                        f'<div style="color:#94a3b8;font-size:0.88rem;margin-bottom:14px">'
+                        f'{_html.escape(str(pitch))}</div>'
+                        f'{legs_html}'
+                        f'<div style="display:flex;gap:20px;margin-top:14px;'
+                        f'padding-top:12px;border-top:1px solid rgba(148,163,184,0.12)">'
+                        f'<div><span style="color:#94a3b8;font-size:0.78rem">'
+                        f'Combined Prob</span><br>'
+                        f'<span style="color:#22c55e;font-family:\'JetBrains Mono\','
+                        f'monospace;font-weight:600">'
+                        f'{combined_prob:.1%}</span></div>'
+                        f'<div><span style="color:#94a3b8;font-size:0.78rem">EV</span><br>'
+                        f'<span style="color:#ff5e00;font-family:\'JetBrains Mono\','
+                        f'monospace;font-weight:600">'
+                        f'{ev:+.2f}</span></div>'
+                        f'<div><span style="color:#94a3b8;font-size:0.78rem">'
+                        f'Synergy</span><br>'
+                        f'<span style="color:#00f0ff;font-family:\'JetBrains Mono\','
+                        f'monospace;font-weight:600">'
+                        f'{synergy:.2f}</span></div>'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    # "Why These Connect:" narrative
+                    why = ticket_result.get("why_these_legs",
+                                            ticket_result.get("why_these_connect", ""))
+                    if why:
+                        st.markdown(
+                            render_broadcast_segment({
+                                "title": "🔗 Why These Connect",
+                                "body": _html.escape(str(why)),
+                            }),
+                            unsafe_allow_html=True,
+                        )
+
+                    # Risk disclaimer
+                    disclaimer = ticket_result.get(
+                        "risk_disclaimer",
+                        "All picks carry risk. Bet responsibly. Past performance does not guarantee future results.",
+                    )
+                    st.markdown(
+                        f'<div style="color:#94a3b8;font-size:0.78rem;'
+                        f'margin:10px 0;font-style:italic">'
+                        f'⚠️ {_html.escape(str(disclaimer))}</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                    # Nerd Stats expander
+                    nerd = ticket_result.get("nerd_stats", {})
+                    with st.expander("📊 Nerd Stats"):
+                        if isinstance(nerd, dict) and nerd:
+                            for nk, nv in nerd.items():
+                                st.markdown(
+                                    f"**{_html.escape(str(nk))}:** "
+                                    f"{_html.escape(str(nv)[:500])}"
+                                )
+                        else:
+                            for key in ("combined_probability", "expected_value",
+                                        "synergy_score", "correlation_score",
+                                        "total_ev", "joseph_confidence"):
+                                val = ticket_result.get(key)
+                                if val is not None:
+                                    st.markdown(
+                                        f"**{key}:** {_html.escape(str(val))}"
+                                    )
+
+                    # Regenerate button
+                    if st.button("🔄 Regenerate", key="studio_regen"):
+                        st.session_state["studio_regen_seed"] += 1
+                        st.rerun()
+
+                    # View All Options expander
+                    if _TICKETS_AVAILABLE:
+                        with st.expander("📋 View All Options — Top 3 Alternatives"):
+                            joseph_results = st.session_state.get("joseph_results", [])
+                            try:
+                                alts = get_alternative_tickets(
+                                    selected_legs, joseph_results, top_n=3
+                                )
+                            except Exception as exc:
+                                _logger.warning("get_alternative_tickets failed: %s", exc)
+                                alts = []
+
+                            if alts:
+                                for a_idx, alt in enumerate(alts, 1):
+                                    alt_name = alt.get("ticket_name", f"Alt #{a_idx}")
+                                    alt_pitch = alt.get("pitch", "")
+                                    alt_edge = alt.get("total_edge", 0)
+                                    st.markdown(
+                                        f"**{a_idx}. {_html.escape(str(alt_name))}** "
+                                        f"(Edge: {alt_edge:+.1f}%)"
+                                    )
+                                    if alt_pitch:
+                                        st.markdown(
+                                            f'<div style="color:#94a3b8;font-size:0.85rem;'
+                                            f'margin-bottom:8px">'
+                                            f'{_html.escape(str(alt_pitch))}</div>',
+                                            unsafe_allow_html=True,
+                                        )
+                                    alt_legs = alt.get("legs", [])
+                                    for al in alt_legs:
+                                        al_name = _html.escape(
+                                            str(al.get("player", ""))
+                                        )
+                                        al_stat = _html.escape(
+                                            str(al.get("stat_type", al.get("prop", "")))
+                                        )
+                                        al_dir = _html.escape(
+                                            str(al.get("direction", ""))
+                                        )
+                                        st.markdown(
+                                            f"  • {al_name} {al_stat} {al_dir}"
+                                        )
+                            else:
+                                st.info("No alternative tickets available.")
+
+                    # Payout table
+                    if _FLEX_TABLES_AVAILABLE and platform in PLATFORM_FLEX_TABLES:
+                        payout_table = PLATFORM_FLEX_TABLES[platform]
+                        leg_payouts = payout_table.get(selected_legs, {})
+                        if leg_payouts:
+                            header_cells = "".join(
+                                f"<th>{k} Correct</th>"
+                                for k in sorted(leg_payouts.keys(), reverse=True)
+                            )
+                            data_cells = "".join(
+                                f'<td class="{"highlight" if v > 0 else ""}">'
+                                f'{v:.1f}x</td>'
+                                for k, v in sorted(
+                                    leg_payouts.items(), reverse=True
+                                )
+                            )
+                            st.markdown(
+                                f'<div style="margin-top:16px">'
+                                f'<div style="color:#ff5e00;font-size:0.85rem;'
+                                f'font-family:\'Orbitron\',sans-serif;margin-bottom:6px">'
+                                f'{_html.escape(platform)} Payouts — '
+                                f'{selected_legs}-Leg Entry</div>'
+                                f'<table class="studio-payout-table">'
+                                f'<thead><tr>{header_cells}</tr></thead>'
+                                f'<tbody><tr>{data_cells}</tr></tbody>'
+                                f'</table></div>',
+                                unsafe_allow_html=True,
+                            )
+                else:
+                    st.warning(
+                        "Joseph couldn't build a ticket — not enough qualifying picks."
+                    )
 
 
 # ═════════════════════════════════════════════════════════════
