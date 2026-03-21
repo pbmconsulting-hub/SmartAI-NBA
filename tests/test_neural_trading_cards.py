@@ -677,5 +677,227 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
         self.assertEqual(len(selected), 500)
 
 
+# ============================================================
+# Test: Neural Analysis team normalization and fallback logic
+# ============================================================
+
+class TestNeuralAnalysisTeamNormalization(unittest.TestCase):
+    """Verify the Neural Analysis page has comprehensive team-name
+    normalization so props with full names or alternate abbreviations
+    are not silently filtered out."""
+
+    def _read_source(self):
+        import pathlib
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        return na_path.read_text(encoding="utf-8")
+
+    def test_has_team_name_to_abbreviation_import(self):
+        """Page imports TEAM_NAME_TO_ABBREVIATION for full-name resolution."""
+        source = self._read_source()
+        self.assertIn("TEAM_NAME_TO_ABBREVIATION", source)
+
+    def test_has_normalize_team_function(self):
+        """Page defines _normalize_team_to_abbrev helper."""
+        source = self._read_source()
+        self.assertIn("def _normalize_team_to_abbrev", source)
+
+    def test_normalize_used_in_team_filter(self):
+        """Team filter uses _normalize_team_to_abbrev on each prop."""
+        source = self._read_source()
+        self.assertIn('_normalize_team_to_abbrev(p.get("team", ""))', source)
+
+    def test_fallback_when_all_props_filtered(self):
+        """If ALL props are filtered out, page falls back to analyze all."""
+        source = self._read_source()
+        self.assertIn("len(props_to_analyze) == 0 and len(final_props) > 0", source)
+
+    def test_fallback_warning_message(self):
+        """Fallback shows a user-visible warning before proceeding."""
+        source = self._read_source()
+        self.assertIn("Proceeding with all", source)
+
+    def test_no_dead_code_in_filter(self):
+        """The old dead-code condition 'not playing_teams_expanded' is removed."""
+        source = self._read_source()
+        # The old filter had: 'not playing_teams_expanded  # if no games loaded'
+        # This was always False inside the 'if playing_teams_expanded:' block.
+        self.assertNotIn("not playing_teams_expanded  # if no games loaded", source)
+
+    def test_nickname_map_built(self):
+        """Page builds _TEAM_NICKNAME_MAP for nickname resolution."""
+        source = self._read_source()
+        self.assertIn("_TEAM_NICKNAME_MAP", source)
+
+
+# ============================================================
+# Test: joseph_analyze_game function signature fix
+# ============================================================
+
+class TestJosephAnalyzeGameSignature(unittest.TestCase):
+    """Verify joseph_analyze_game passes correct args to analyze_game_strategy."""
+
+    def _read_brain_source(self):
+        import pathlib
+        brain = pathlib.Path(__file__).parent.parent / "engine" / "joseph_brain.py"
+        return brain.read_text(encoding="utf-8")
+
+    def test_analyze_game_strategy_correct_args(self):
+        """analyze_game_strategy must be called with (home, away, game, teams_data)."""
+        source = self._read_brain_source()
+        self.assertIn("analyze_game_strategy(home, away, game, teams_data)", source)
+
+    def test_no_two_arg_call(self):
+        """The old 2-arg call analyze_game_strategy(game, teams_data) must be gone."""
+        source = self._read_brain_source()
+        self.assertNotIn("analyze_game_strategy(game, teams_data)", source)
+
+    def test_grade_player_correct_args(self):
+        """joseph_grade_player must be called with (player, game_context) — 2 args."""
+        source = self._read_brain_source()
+        # Should NOT have 3-arg call with teams_data
+        self.assertNotIn("joseph_grade_player(player, tonight_game, teams_data)", source)
+        self.assertNotIn("joseph_grade_player(player, game, teams_data)", source)
+
+    def test_joseph_analyze_game_returns_spread_take(self):
+        """joseph_analyze_game must return joseph_spread_take key."""
+        source = self._read_brain_source()
+        self.assertIn('"joseph_spread_take"', source)
+
+    def test_joseph_analyze_game_returns_total_take(self):
+        """joseph_analyze_game must return joseph_game_total_take key."""
+        source = self._read_brain_source()
+        self.assertIn('"joseph_game_total_take"', source)
+
+
+# ============================================================
+# Test: The Studio reads joseph keys correctly
+# ============================================================
+
+class TestStudioKeyAlignment(unittest.TestCase):
+    """Verify The Studio reads both old and new key names for
+    game total/spread opinions from joseph_analyze_game results."""
+
+    def _read_studio_source(self):
+        import pathlib
+        studio = pathlib.Path(__file__).parent.parent / "pages" / "14_🎙️_The_Studio.py"
+        return studio.read_text(encoding="utf-8")
+
+    def test_total_opinion_falls_back_to_joseph_key(self):
+        """Studio reads total_opinion with fallback to joseph_game_total_take."""
+        source = self._read_studio_source()
+        self.assertIn("joseph_game_total_take", source)
+
+    def test_spread_opinion_falls_back_to_joseph_key(self):
+        """Studio reads spread_opinion with fallback to joseph_spread_take."""
+        source = self._read_studio_source()
+        self.assertIn("joseph_spread_take", source)
+
+    def test_nerd_stats_includes_betting_angle(self):
+        """Studio Nerd Stats section includes betting_angle."""
+        source = self._read_studio_source()
+        self.assertIn('"betting_angle"', source)
+
+    def test_nerd_stats_includes_risk_warning(self):
+        """Studio Nerd Stats section includes risk_warning."""
+        source = self._read_studio_source()
+        self.assertIn('"risk_warning"', source)
+
+
+# ============================================================
+# Test: Team normalization logic (pure function test)
+# ============================================================
+
+class TestTeamNormalizationLogic(unittest.TestCase):
+    """Test the team-name normalization algorithm used by Neural Analysis."""
+
+    def setUp(self):
+        """Replicate the normalization logic from the Neural Analysis page."""
+        try:
+            from data.live_data_fetcher import TEAM_NAME_TO_ABBREVIATION
+        except ImportError:
+            TEAM_NAME_TO_ABBREVIATION = {
+                "Los Angeles Lakers": "LAL",
+                "Boston Celtics": "BOS",
+                "Golden State Warriors": "GSW",
+            }
+
+        self.ABBREV_ALIASES = {
+            "GS": "GSW", "GSW": "GS",
+            "NY": "NYK", "NYK": "NY",
+            "NO": "NOP", "NOP": "NO",
+            "SA": "SAS", "SAS": "SA",
+            "UTAH": "UTA", "UTA": "UTAH",
+            "WSH": "WAS", "WAS": "WSH",
+            "BKN": "BRK", "BRK": "BKN",
+            "PHX": "PHO", "PHO": "PHX",
+            "CHA": "CHO", "CHO": "CHA",
+            "NJ": "BKN",
+        }
+
+        self._nickname_map = {}
+        for full_name, abbr in TEAM_NAME_TO_ABBREVIATION.items():
+            parts = full_name.rsplit(" ", 1)
+            if len(parts) == 2:
+                self._nickname_map[parts[1].upper()] = abbr
+            self._nickname_map[full_name.upper()] = abbr
+
+        def _normalize(raw_team):
+            team_upper = raw_team.upper().strip()
+            if not team_upper:
+                return ""
+            if len(team_upper) <= 4:
+                return self.ABBREV_ALIASES.get(team_upper, team_upper)
+            mapped = self._nickname_map.get(team_upper)
+            if mapped:
+                return mapped
+            last_word = team_upper.rsplit(" ", 1)[-1] if " " in team_upper else ""
+            if last_word:
+                mapped = self._nickname_map.get(last_word)
+                if mapped:
+                    return mapped
+            return team_upper
+
+        self.normalize = _normalize
+
+    def test_standard_abbreviation(self):
+        self.assertEqual(self.normalize("LAL"), "LAL")
+
+    def test_alias_abbreviation(self):
+        self.assertEqual(self.normalize("GS"), "GSW")
+
+    def test_full_team_name(self):
+        self.assertEqual(self.normalize("Los Angeles Lakers"), "LAL")
+
+    def test_full_team_name_case_insensitive(self):
+        self.assertEqual(self.normalize("los angeles lakers"), "LAL")
+
+    def test_nickname_only(self):
+        self.assertEqual(self.normalize("Lakers"), "LAL")
+
+    def test_nickname_only_case_insensitive(self):
+        self.assertEqual(self.normalize("CELTICS"), "BOS")
+
+    def test_empty_returns_empty(self):
+        self.assertEqual(self.normalize(""), "")
+
+    def test_whitespace_returns_empty(self):
+        self.assertEqual(self.normalize("   "), "")
+
+    def test_unknown_team_passthrough(self):
+        """Unknown teams are passed through unchanged (uppercased)."""
+        result = self.normalize("MYSTERY TEAM")
+        self.assertEqual(result, "MYSTERY TEAM")
+
+    def test_partial_name_with_nickname(self):
+        """e.g. 'LA Lakers' should resolve via last-word nickname."""
+        self.assertEqual(self.normalize("LA Lakers"), "LAL")
+
+    def test_short_alias_ny(self):
+        self.assertEqual(self.normalize("NY"), "NYK")
+
+    def test_short_alias_sa(self):
+        self.assertEqual(self.normalize("SA"), "SAS")
+
+
 if __name__ == "__main__":
     unittest.main()

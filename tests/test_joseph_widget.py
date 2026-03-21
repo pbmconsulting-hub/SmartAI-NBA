@@ -62,6 +62,10 @@ class TestModuleImports(unittest.TestCase):
         from utils.joseph_widget import render_joseph_ask_popover
         self.assertTrue(callable(render_joseph_ask_popover))
 
+    def test_floating_widget_callable(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        self.assertTrue(callable(render_joseph_floating_widget))
+
 
 # ============================================================
 # SECTION 2: _WIDGET_CSS content validation
@@ -257,6 +261,51 @@ class TestWidgetCSS(unittest.TestCase):
         """Sidebar name should have a text-shadow."""
         self.assertIn("text-shadow:0 0 8px rgba(255,94,0,0.15)", self.css)
 
+    # ── Floating widget CSS ───────────────────────────────────
+
+    def test_floating_widget_class(self):
+        """CSS should include the floating widget container."""
+        self.assertIn("joseph-floating-widget", self.css)
+
+    def test_floating_widget_position_fixed(self):
+        """Floating widget must use position:fixed."""
+        self.assertIn("position:fixed", self.css)
+
+    def test_floating_widget_bottom_right(self):
+        """Floating widget must be pinned to bottom-right."""
+        self.assertIn("bottom:24px", self.css)
+        self.assertIn("right:24px", self.css)
+
+    def test_floating_widget_z_index(self):
+        """Floating widget must have a high z-index."""
+        self.assertIn("z-index:999999", self.css)
+
+    def test_floating_avatar_class(self):
+        """CSS should include the floating avatar class."""
+        self.assertIn("joseph-floating-avatar", self.css)
+        self.assertIn("48px", self.css)
+
+    def test_floating_avatar_glow_keyframes(self):
+        """Floating avatar should have an animated glow."""
+        self.assertIn("josephFloatingGlow", self.css)
+
+    def test_floating_name_class(self):
+        """CSS should include the floating name class."""
+        self.assertIn("joseph-floating-name", self.css)
+
+    def test_floating_ambient_class(self):
+        """CSS should include the floating ambient text class."""
+        self.assertIn("joseph-floating-ambient", self.css)
+
+    def test_floating_info_class(self):
+        """CSS should include the floating info container."""
+        self.assertIn("joseph-floating-info", self.css)
+
+    def test_floating_widget_shimmer_bars(self):
+        """Floating widget should have shimmer bars."""
+        self.assertIn("joseph-floating-widget::before", self.css)
+        self.assertIn("joseph-floating-widget::after", self.css)
+
 
 # ============================================================
 # SECTION 3: _inject_widget_css()
@@ -404,6 +453,117 @@ class TestRenderJosephSidebarWidget(unittest.TestCase):
                 html = self._get_sidebar_html()
                 self.assertNotIn("<script>", html)
                 self.assertIn("&lt;script&gt;", html)
+
+
+# ============================================================
+# SECTION 4B: render_joseph_floating_widget()
+# ============================================================
+
+class TestRenderJosephFloatingWidget(unittest.TestCase):
+    """Test the floating bottom-right widget rendering function."""
+
+    def setUp(self):
+        _mock_st.reset_mock()
+        _mock_st.session_state = {}
+
+    def _get_floating_html(self):
+        """Return the HTML string of the floating card from st.markdown calls."""
+        for call in _mock_st.markdown.call_args_list:
+            if call[0] and '<div class="joseph-floating-widget">' in call[0][0]:
+                return call[0][0]
+        return ""
+
+    def test_callable(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        self.assertTrue(callable(render_joseph_floating_widget))
+
+    def test_does_not_raise(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+
+    def test_calls_markdown(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertTrue(len(self._get_floating_html()) > 0)
+
+    def test_floating_html_contains_container(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("joseph-floating-widget", self._get_floating_html())
+
+    def test_floating_html_contains_name(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("Joseph M. Smith", self._get_floating_html())
+
+    def test_floating_html_contains_pulse_dot(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("joseph-pulse-dot", self._get_floating_html())
+
+    def test_floating_html_contains_ambient_text(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("joseph-floating-ambient", self._get_floating_html())
+
+    def test_not_rendered_in_sidebar(self):
+        """Floating widget must NOT use st.sidebar."""
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        # The floating div should be in a direct st.markdown call, not sidebar
+        html = self._get_floating_html()
+        self.assertTrue(len(html) > 0)
+        # Verify it is NOT inside st.sidebar context
+        sidebar_calls = [c for c in _mock_st.sidebar.markdown.call_args_list
+                         if c[0] and "joseph-floating-widget" in c[0][0]]
+        self.assertEqual(len(sidebar_calls), 0)
+
+    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="FLOAT_B64")
+    def test_avatar_image_rendered(self, mock_avatar):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        html = self._get_floating_html()
+        self.assertIn("joseph-floating-avatar", html)
+        self.assertIn("FLOAT_B64", html)
+
+    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    def test_fallback_emoji_when_no_avatar(self, mock_avatar):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("🎙️", self._get_floating_html())
+
+    @patch("utils.joseph_widget.joseph_ambient_line", return_value="FLOAT LINE")
+    @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
+    def test_ambient_line_rendered(self, mock_ctx, mock_line):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("FLOAT LINE", self._get_floating_html())
+
+    @patch("utils.joseph_widget.joseph_ambient_line", return_value="")
+    @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
+    def test_default_ambient_when_empty(self, mock_ctx, mock_line):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        self.assertIn("ALWAYS watching", self._get_floating_html())
+
+    def test_html_escaping_ambient(self):
+        """Ambient text must be HTML-escaped to prevent injection."""
+        with patch("utils.joseph_widget.joseph_ambient_line",
+                   return_value="<script>alert(1)</script>"):
+            with patch("utils.joseph_widget.joseph_get_ambient_context",
+                       return_value=("idle", {})):
+                from utils.joseph_widget import render_joseph_floating_widget
+                render_joseph_floating_widget()
+                html = self._get_floating_html()
+                self.assertNotIn("<script>", html)
+                self.assertIn("&lt;script&gt;", html)
+
+    def test_unsafe_allow_html(self):
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+        for call in _mock_st.markdown.call_args_list:
+            if call[0] and '<div class="joseph-floating-widget">' in str(call[0][0]):
+                self.assertTrue(call[1].get("unsafe_allow_html", False))
 
 
 # ============================================================

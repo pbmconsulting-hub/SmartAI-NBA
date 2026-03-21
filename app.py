@@ -285,9 +285,10 @@ st.session_state.setdefault("joseph_last_commentary", "")
 st.session_state.setdefault("joseph_entry_just_built", False)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings
+from utils.components import render_global_settings, inject_joseph_floating
 with st.sidebar:
     render_global_settings()
+inject_joseph_floating()
 
 # ============================================================
 # END SECTION: Initialize App on Startup

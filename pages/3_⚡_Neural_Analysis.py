@@ -146,9 +146,10 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings
+from utils.components import render_global_settings, inject_joseph_floating
 with st.sidebar:
     render_global_settings()
+inject_joseph_floating()
 
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user
@@ -624,6 +625,45 @@ if run_analysis:
         "NJ": "BKN",
     }
 
+    # Full team name → abbreviation mapping for platform props that use
+    # full names or nicknames instead of standard 3-letter codes.
+    try:
+        from data.live_data_fetcher import TEAM_NAME_TO_ABBREVIATION as _TEAM_FULL_MAP
+    except ImportError:
+        _TEAM_FULL_MAP = {}
+
+    # Build reverse lookups: nickname → abbrev
+    _TEAM_NICKNAME_MAP: dict = {}   # e.g. "LAKERS" → "LAL"
+    for _full_name, _abbr in _TEAM_FULL_MAP.items():
+        parts = _full_name.rsplit(" ", 1)
+        if len(parts) == 2:
+            _TEAM_NICKNAME_MAP[parts[1].upper()] = _abbr
+        _TEAM_NICKNAME_MAP[_full_name.upper()] = _abbr
+
+    def _normalize_team_to_abbrev(raw_team: str) -> str:
+        """Convert any team representation to a standard abbreviation.
+
+        Handles: 3-letter codes, full names, nicknames, common aliases.
+        Returns the uppercased team string unchanged if no mapping found.
+        """
+        team_upper = raw_team.upper().strip()
+        if not team_upper:
+            return ""
+        # Already a known abbreviation or alias?
+        if len(team_upper) <= 4:
+            return ABBREV_ALIASES.get(team_upper, team_upper)
+        # Full name or nickname match? (e.g. "Los Angeles Lakers", "Lakers")
+        mapped = _TEAM_NICKNAME_MAP.get(team_upper)
+        if mapped:
+            return mapped
+        # Last word might be nickname (e.g. "LA Lakers" → "Lakers")
+        last_word = team_upper.rsplit(" ", 1)[-1] if " " in team_upper else ""
+        if last_word:
+            mapped = _TEAM_NICKNAME_MAP.get(last_word)
+            if mapped:
+                return mapped
+        return team_upper
+
     playing_teams_expanded: set = set()
     for _g in todays_games:
         for _abbrev in (
@@ -643,8 +683,7 @@ if run_analysis:
         props_to_analyze = [
             p for p in final_props
             if (
-                not playing_teams_expanded  # if no games loaded, include all
-                or p.get("team", "").upper().strip() in playing_teams_expanded
+                _normalize_team_to_abbrev(p.get("team", "")) in playing_teams_expanded
                 or not p.get("team", "").strip()  # include props with no team set
             )
         ]
@@ -654,6 +693,17 @@ if run_analysis:
                 f"ℹ️ Skipping **{skipped_count}** prop(s) for teams not playing tonight. "
                 f"Analyzing **{len(props_to_analyze)}** prop(s) for tonight's {len(todays_games)} game(s)."
             )
+
+        # ── Fallback: if ALL props were filtered out, analyze them all ──
+        # This prevents a dead-end where a team-name format mismatch
+        # between platforms and the games list silently drops every prop.
+        if len(props_to_analyze) == 0 and len(final_props) > 0:
+            st.warning(
+                f"⚠️ All **{len(final_props)}** props were filtered out by tonight's team list. "
+                f"This usually means the team names in your props don't match the loaded games. "
+                f"**Proceeding with all {len(final_props)} props** so your analysis isn't blocked."
+            )
+            props_to_analyze = list(final_props)
     else:
         props_to_analyze = list(final_props)  # Fallback: no games loaded
 

@@ -599,12 +599,15 @@ def analyze_game_strategy(
 
 # ── Private Helpers ─────────────────────────────────────────
 
-def _find_team_data(abbreviation: str, teams_data: list) -> dict:
-    """Look up a team dictionary by abbreviation from the teams list.
+def _find_team_data(abbreviation: str, teams_data) -> dict:
+    """Look up a team dictionary by abbreviation from the teams data.
 
     Args:
         abbreviation: Team abbreviation string (e.g. ``"LAL"``).
-        teams_data: List of team dictionaries.
+        teams_data: A list of team dicts **or** a dict keyed by
+            abbreviation.  Both formats are accepted so callers
+            (e.g. The Studio, which converts to a dict) work
+            without conversion.
 
     Returns:
         The matching team dictionary, or an empty dict if not found.
@@ -612,9 +615,26 @@ def _find_team_data(abbreviation: str, teams_data: list) -> dict:
     try:
         if not teams_data:
             return {}
+        abbr_upper = abbreviation.upper()
+
+        # ── Dict path: keyed by abbreviation ────────────────
+        if isinstance(teams_data, dict):
+            # Try exact key first, then case-insensitive scan
+            if abbreviation in teams_data:
+                return teams_data[abbreviation]
+            for key, val in teams_data.items():
+                if key.upper() == abbr_upper:
+                    return val
+            _logger.warning(
+                "[JosephStrategy] Team '%s' not found in teams_data dict",
+                abbreviation,
+            )
+            return {}
+
+        # ── List path: original iteration ───────────────────
         for team in teams_data:
             team_abbr = team.get("abbreviation", team.get("team", ""))
-            if team_abbr.upper() == abbreviation.upper():
+            if team_abbr.upper() == abbr_upper:
                 return team
         _logger.warning(
             "[JosephStrategy] Team '%s' not found in teams_data", abbreviation
