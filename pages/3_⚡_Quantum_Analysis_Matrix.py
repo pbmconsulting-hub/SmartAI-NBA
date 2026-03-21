@@ -140,6 +140,13 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── App Logo ──────────────────────────────────────────────────
+_ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
+_ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
+_NA_LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
+if os.path.exists(_NA_LOGO_PATH):
+    st.logo(_NA_LOGO_PATH, size="small")
+
 # Inject global CSS + QDS CSS
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
@@ -2484,9 +2491,38 @@ if analysis_results:
             '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
             'margin-bottom:8px;">🃏 Player Spotlight Cards</h3>'
             '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
-            'Click any player button to open the full Player Spotlight analysis.</p>',
+            'Click any card to open the full Player Spotlight analysis.</p>',
             unsafe_allow_html=True,
         )
+
+        # CSS to make the button visually merge with the card above it,
+        # creating a single clickable card unit.
+        st.markdown("""<style>
+        .card-btn-wrapper .stButton button {
+            margin-top: -12px !important;
+            border-top-left-radius: 0 !important;
+            border-top-right-radius: 0 !important;
+            border-bottom-left-radius: 12px !important;
+            border-bottom-right-radius: 12px !important;
+            background: var(--gm-bg-card, rgba(10,15,30,0.85)) !important;
+            border: 1px solid var(--gm-border, rgba(0,198,255,0.12)) !important;
+            border-top: none !important;
+            color: #00C6FF !important;
+            font-weight: 600 !important;
+            padding: 10px 8px !important;
+            font-size: 0.82rem !important;
+        }
+        .card-btn-wrapper .stButton button:hover {
+            border-color: var(--gm-accent-blue, #00C6FF) !important;
+            box-shadow: 0 0 18px rgba(0, 198, 255, 0.25) !important;
+            background: rgba(0,198,255,0.08) !important;
+        }
+        .card-btn-wrapper .gm-player-card {
+            margin-bottom: 0 !important;
+            border-bottom-left-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+        }
+        </style>""", unsafe_allow_html=True)
 
         # Render each player's trading card + clickable button together
         # so the cards are visually paired with their click targets.
@@ -2508,9 +2544,12 @@ if analysis_results:
                         season_stats=_v.get("season_stats"),
                         prop_count=len(_pdata.get("props", [])),
                     )
-                    st.markdown(_card_html, unsafe_allow_html=True)
-                    if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
-                        st.session_state["_spotlight_player"] = _cn
+                    with st.container():
+                        st.markdown('<div class="card-btn-wrapper">', unsafe_allow_html=True)
+                        st.markdown(_card_html, unsafe_allow_html=True)
+                        if st.button(f"🔍 View {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
+                            st.session_state["_spotlight_player"] = _cn
+                        st.markdown('</div>', unsafe_allow_html=True)
 
         # Open the spotlight modal if a player was selected
         _spot_player = st.session_state.get("_spotlight_player")

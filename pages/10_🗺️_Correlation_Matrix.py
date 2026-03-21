@@ -13,12 +13,7 @@ import streamlit as st
 import os
 import html as _html
 
-# ── App Logo ──────────────────────────────────────────────────
-_ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
-_ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
-_LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
-if os.path.exists(_LOGO_PATH):
-    st.logo(_LOGO_PATH, size="small")
+# ── App Logo (removed — only shown on key pages) ─────────────
 
 from styles.theme import get_global_css
 

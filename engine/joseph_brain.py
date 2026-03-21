@@ -1420,6 +1420,10 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
     try:
         # Step 1 — OBSERVE
         qme_prob = _safe_float(analysis_result.get("probability_over", 50.0))
+        # Neural Analysis stores probability_over as 0-1 decimal (e.g. 0.63).
+        # Joseph's internal math uses 0-100 percentage scale.
+        if 0.0 < qme_prob <= 1.0:
+            qme_prob *= 100.0
         qme_edge = _safe_float(analysis_result.get("edge_percentage", 0.0))
         confidence_score = _safe_float(analysis_result.get("confidence_score", 50.0))
         tier = str(analysis_result.get("tier", "Bronze"))
@@ -1498,7 +1502,16 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening
         joseph_prob = max(1.0, min(99.0, joseph_prob))
 
-        implied_line = _safe_float(analysis_result.get("implied_probability", 50.0))
+        implied_line = _safe_float(analysis_result.get("implied_probability", 0.0))
+        # implied_probability may be stored as 0-1 decimal — convert to percentage
+        if 0.0 < implied_line <= 1.0:
+            implied_line *= 100.0
+        # If implied_probability is missing or zero, derive from qme_prob and qme_edge
+        if implied_line <= 0.0:
+            if abs(qme_edge) > 0.001:
+                implied_line = qme_prob - qme_edge
+            else:
+                implied_line = 50.0
         joseph_edge = joseph_prob - implied_line
 
         # Step 5 — ADJUST

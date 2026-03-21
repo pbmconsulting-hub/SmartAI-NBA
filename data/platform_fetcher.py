@@ -392,14 +392,14 @@ def fetch_prizepicks_props(league="NBA"):
         stat_type = normalize_stat_type(raw_stat, "PrizePicks")
 
         # Extract the sportsbook's true Over/Under projection line.
-        # PrizePicks stores it under "line_score"; fall back to
-        # "stat_projection" or "points" if present.
+        # PrizePicks stores the actual betting line under "line_score".
+        # Do NOT fall back to "stat_projection" or "points" — those are
+        # projected stat values (often the highest number), not the line
+        # you actually bet on.
         try:
-            _raw_line = attrs.get("line_score",
-                                  attrs.get("stat_projection",
-                                            attrs.get("points")))
+            _raw_line = attrs.get("line_score")
             if _raw_line is None:
-                continue  # No projection line available — silently discard
+                continue  # No betting line available — silently discard
             true_line = float(_raw_line)
         except (ValueError, TypeError, KeyError):
             continue  # Skip if line is not a valid number
@@ -1037,11 +1037,9 @@ async def _async_fetch_prizepicks(session, semaphore):
                 continue
             raw_stat = attrs.get("stat_type", "")
             stat_type = normalize_stat_type(raw_stat, "PrizePicks")
-            # TRUE LINE KILL SWITCH: extract line_score → fallback chain
+            # TRUE LINE: extract only line_score (the actual betting line)
             try:
-                _raw_line = attrs.get("line_score",
-                                      attrs.get("stat_projection",
-                                                attrs.get("points")))
+                _raw_line = attrs.get("line_score")
                 if _raw_line is None:
                     continue  # KILL SWITCH: no line → discard
                 true_line = float(_raw_line)
