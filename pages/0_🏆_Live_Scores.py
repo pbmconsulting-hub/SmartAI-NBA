@@ -31,6 +31,13 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+try:
+    from utils.components import inject_joseph_floating
+    inject_joseph_floating()
+except Exception:
+    pass  # Non-critical — never block page load
+
+
 st.title("🏆 Live Scores & Stats Leaders")
 st.markdown(
     f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Real-time NBA scores and leaderboards."
