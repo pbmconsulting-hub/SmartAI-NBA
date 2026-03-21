@@ -156,6 +156,10 @@ if "selected_picks" not in st.session_state:
 if "injury_status_map" not in st.session_state:
     st.session_state["injury_status_map"] = load_injury_status()
 
+st.session_state.setdefault("joseph_enabled", True)
+st.session_state.setdefault("joseph_used_fragments", set())
+st.session_state.setdefault("joseph_bets_logged", False)
+
 # ── Analysis Session Persistence — Rehydrate from DB if session empty ──────
 # If the user's session state has no analysis results (e.g. after inactivity
 # or a page refresh), reload the most recently saved session from SQLite so
@@ -1675,6 +1679,51 @@ if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
         f"💾 **Analysis restored from saved session** (last run: {_reloaded_ts}). "
         "Results are preserved from your last analysis run — click **🚀 Run Analysis** above to refresh."
     )
+
+# ════ JOSEPH M. SMITH LIVE BROADCAST DESK ════
+if analysis_results and st.session_state.get("joseph_enabled", True):
+    try:
+        from pages.helpers.joseph_live_desk import render_joseph_live_desk
+        from data.advanced_metrics import enrich_player_god_mode
+        from data.data_manager import load_players_data, load_teams_data
+        from engine.joseph_bets import joseph_auto_log_bets
+        from utils.joseph_widget import render_joseph_inline_commentary
+
+        _players = load_players_data()
+        _teams = {t.get("abbreviation", "").upper(): t for t in load_teams_data()}
+        _games = st.session_state.get("todays_games", [])
+
+        _enriched = []
+        for _p in _players:
+            try:
+                _enriched.append(enrich_player_god_mode(_p, _games, _teams))
+            except Exception:
+                _enriched.append(_p)
+        _enriched_lookup = {str(p.get("name", "")).lower().strip(): p for p in _enriched}
+
+        with st.container():
+            render_joseph_live_desk(
+                analysis_results=analysis_results,
+                enriched_players=_enriched_lookup,
+                teams_data=_teams,
+                todays_games=_games,
+            )
+
+        render_joseph_inline_commentary(analysis_results, "analysis_results")
+
+        if not st.session_state.get("joseph_bets_logged", False):
+            _joseph_results = st.session_state.get("joseph_results", [])
+            if _joseph_results:
+                _logged_count, _logged_msg = joseph_auto_log_bets(_joseph_results)
+                if _logged_count > 0:
+                    st.toast(f"🎙️ {_logged_msg}")
+                st.session_state["joseph_bets_logged"] = True
+
+        st.divider()
+    except Exception as _joseph_err:
+        import logging
+        logging.getLogger(__name__).warning(f"Joseph Live Desk error: {_joseph_err}")
+# ════ END JOSEPH LIVE DESK ════
 
 if analysis_results:
     st.divider()

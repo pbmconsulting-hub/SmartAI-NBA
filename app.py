@@ -271,6 +271,19 @@ if "session_props" not in st.session_state:
 if "fetched_live_picks" not in st.session_state:
     st.session_state["fetched_live_picks"] = []
 
+# ═══ Joseph M. Smith Session State ═══
+st.session_state.setdefault("joseph_enabled", True)
+st.session_state.setdefault("joseph_used_fragments", set())
+st.session_state.setdefault("joseph_bets_logged", False)
+st.session_state.setdefault("joseph_results", [])
+st.session_state.setdefault("joseph_widget_mode", None)
+st.session_state.setdefault("joseph_widget_selection", None)
+st.session_state.setdefault("joseph_widget_response", None)
+st.session_state.setdefault("joseph_ambient_line", "")
+st.session_state.setdefault("joseph_ambient_context", "idle")
+st.session_state.setdefault("joseph_last_commentary", "")
+st.session_state.setdefault("joseph_entry_just_built", False)
+
 # ── Global Settings Popover (accessible from sidebar) ─────────
 from utils.components import render_global_settings
 with st.sidebar:
