@@ -77,6 +77,45 @@ for _map in (PRIZEPICKS_STAT_MAP, DRAFTKINGS_STAT_MAP, UNDERDOG_STAT_MAP):
     for _k, _v in _map.items():
         ALL_PLATFORM_STAT_NAMES[_k.lower()] = _v
 
+
+# ── Hard-Typed Stat Mapping ──────────────────────────────────────────────────
+# Different APIs return stat names in wildly inconsistent casing and
+# abbreviation styles.  This catch-all map converts every known variant
+# to the single canonical internal key used by the engine.
+# Add new aliases here as they are discovered in API responses.
+HARD_STAT_MAP = {
+    # --- points ---
+    "points": "points", "pts": "points", "PTS": "points",
+    "Points": "points", "point": "points", "POINTS": "points",
+    # --- rebounds ---
+    "rebounds": "rebounds", "rebs": "rebounds", "reb": "rebounds",
+    "Rebounds": "rebounds", "REB": "rebounds", "REBOUNDS": "rebounds",
+    # --- assists ---
+    "assists": "assists", "asts": "assists", "ast": "assists",
+    "Assists": "assists", "AST": "assists", "ASSISTS": "assists",
+    # --- threes ---
+    "threes": "threes", "3pm": "threes", "3PM": "threes",
+    "three_pointers_made": "threes", "3-pointers made": "threes",
+    "3-point made": "threes", "three pointers made": "threes",
+    "Threes": "threes", "THREES": "threes",
+    # --- steals ---
+    "steals": "steals", "stl": "steals", "STL": "steals",
+    "Steals": "steals", "STEALS": "steals",
+    # --- blocks ---
+    "blocks": "blocks", "blk": "blocks", "BLK": "blocks",
+    "Blocks": "blocks", "BLOCKS": "blocks",
+    # --- turnovers ---
+    "turnovers": "turnovers", "to": "turnovers", "TO": "turnovers",
+    "tov": "turnovers", "TOV": "turnovers",
+    "Turnovers": "turnovers", "TURNOVERS": "turnovers",
+    # --- combo stats ---
+    "points_rebounds": "points_rebounds",
+    "points_assists": "points_assists",
+    "rebounds_assists": "rebounds_assists",
+    "points_rebounds_assists": "points_rebounds_assists",
+    "blocks_steals": "blocks_steals",
+}
+
 # ============================================================
 # END SECTION: Platform Stat Name Mappings
 # ============================================================
@@ -156,12 +195,41 @@ _PLATFORM_MAPS = {
 }
 
 
+def hard_normalize_stat_type(raw_stat_name):
+    """
+    Strict hard-typed stat normalization.
+
+    Converts any known variant of a stat name ('points', 'pts', 'PTS',
+    'Points', etc.) to the single canonical internal key.  Returns the
+    mapped key if found, otherwise ``None`` (unlike ``normalize_stat_type``
+    which falls back to the lowered raw name).
+
+    Args:
+        raw_stat_name (str): Raw stat string from any API.
+
+    Returns:
+        str or None: Canonical internal key, or None if no mapping exists.
+
+    Example:
+        hard_normalize_stat_type("PTS")   → "points"
+        hard_normalize_stat_type("xyz")   → None
+    """
+    if not raw_stat_name:
+        return None
+    # Try exact match first (fastest path)
+    canonical = HARD_STAT_MAP.get(raw_stat_name)
+    if canonical:
+        return canonical
+    # Try stripped lower-case match
+    return HARD_STAT_MAP.get(raw_stat_name.strip().lower())
+
+
 def normalize_stat_type(raw_stat_name, platform=None):
     """
     Convert a platform-native stat name to our internal stat key.
 
-    Tries platform-specific map first, then falls back to the
-    combined lookup across all platforms.
+    Tries platform-specific map first, then the hard-typed catch-all
+    map, then the combined lookup across all platforms.
 
     Args:
         raw_stat_name (str): Stat name as it appears on the platform,
@@ -186,6 +254,13 @@ def normalize_stat_type(raw_stat_name, platform=None):
         plat_map = _PLATFORM_MAPS.get(plat_key, {})
         if raw_stat_name in plat_map:
             return plat_map[raw_stat_name]
+
+    # Try hard-typed catch-all map (handles 'pts', 'PTS', 'Pts', etc.)
+    hard_hit = HARD_STAT_MAP.get(raw_stat_name) or HARD_STAT_MAP.get(
+        raw_stat_name.strip().lower()
+    )
+    if hard_hit:
+        return hard_hit
 
     # Try combined lookup (case-insensitive)
     lower_name = raw_stat_name.strip().lower()
