@@ -7,6 +7,7 @@
 
 import streamlit as st
 import datetime
+import os
 import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
@@ -29,11 +30,18 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── App Logo ──────────────────────────────────────────────────
+_ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
+_ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
+_LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
+if os.path.exists(_LOGO_PATH):
+    st.logo(_LOGO_PATH, size="small")
+
 # ─── Inject Global CSS Theme ──────────────────────────────────
 from styles.theme import get_global_css, get_education_box_html, get_logo_img_tag, GOLD_LOGO_PATH
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+# ── Joseph M. Smith Floating Widget ───────────────────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
 render_joseph_hero_banner()
 inject_joseph_floating()
@@ -270,6 +278,27 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
             key="smart_filter_stat_types",
             help="Only analyze these stat types. Deselect to include all.",
         )
+
+# ── Platform Preference ──────────────────────────────────────
+with st.expander("⚙️ Platform Settings", expanded=False):
+    _PLATFORM_OPTIONS = ["PrizePicks", "Underdog", "DraftKings"]
+    if "joseph_preferred_platform" not in st.session_state:
+        st.session_state["joseph_preferred_platform"] = "PrizePicks"
+
+    st.markdown(
+        '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
+        'What betting app are you using tonight?</span>',
+        unsafe_allow_html=True,
+    )
+    _lg_platform = st.radio(
+        "Preferred betting platform",
+        _PLATFORM_OPTIONS,
+        index=_PLATFORM_OPTIONS.index(st.session_state["joseph_preferred_platform"]),
+        horizontal=True,
+        label_visibility="collapsed",
+        key="lg_platform_radio",
+    )
+    st.session_state["joseph_preferred_platform"] = _lg_platform
 
 with _fetch_btn_col:
     _any_platform_selected = _include_pp or _include_ud or _include_dk

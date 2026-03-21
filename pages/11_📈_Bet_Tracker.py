@@ -18,6 +18,7 @@
 import datetime
 import json
 import logging
+import os
 
 import streamlit as st
 
@@ -74,11 +75,18 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── App Logo ──────────────────────────────────────────────────
+_ROOT_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Pick_Pro_Logo.png")
+_ASSETS_LOGO = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "Smart_Pick_Pro_Logo.png")
+_LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
+if os.path.exists(_LOGO_PATH):
+    st.logo(_LOGO_PATH, size="small")
+
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 
-# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+# ── Joseph M. Smith Floating Widget ───────────────────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
 render_joseph_hero_banner()
 inject_joseph_floating()
