@@ -5438,3 +5438,320 @@ def get_quantum_card_matrix_css():
 # ============================================================
 # END SECTION: Quantum Card Matrix CSS
 # ============================================================
+
+
+# ============================================================
+# SECTION: Glassmorphic Dark Theme — Trading Card & Modal CSS
+# PURPOSE: Obsidian/Deep Space backgrounds, neon accents,
+#          Inter + JetBrains Mono typography, and glassmorphic
+#          card/modal styles for the Player Spotlight system.
+# ============================================================
+
+GLASSMORPHIC_CARD_CSS = """
+/* ── Glassmorphic Dark-Theme Variables ───────────────────── */
+:root {
+  --gm-bg-deep: #070A13;
+  --gm-bg-card: rgba(15, 23, 42, 0.6);
+  --gm-border: rgba(255, 255, 255, 0.1);
+  --gm-accent-blue: #00C6FF;
+  --gm-accent-red: #FF0055;
+  --gm-text-primary: #E2E8F0;
+  --gm-text-muted: #94A3B8;
+  --gm-font-body: 'Inter', sans-serif;
+  --gm-font-mono: 'JetBrains Mono', monospace;
+}
+
+/* ── Google-Font import for Inter ────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+/* ── Trading-Card Grid ───────────────────────────────────── */
+.gm-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+  padding: 12px 0;
+}
+
+/* ── Individual Trading Card ─────────────────────────────── */
+.gm-player-card {
+  background: var(--gm-bg-card);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--gm-border);
+  border-radius: 12px;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+.gm-player-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 18px rgba(0, 198, 255, 0.25);
+  border-color: var(--gm-accent-blue);
+}
+
+/* ── Card headshot ───────────────────────────────────────── */
+.gm-card-headshot {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--gm-accent-blue);
+  object-fit: cover;
+  margin: 0 auto 10px;
+  display: block;
+}
+
+/* ── Card player name ────────────────────────────────────── */
+.gm-card-name {
+  font-family: var(--gm-font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--gm-text-primary);
+  text-align: center;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Card subtitle (Position · Team · Opponent) ──────────── */
+.gm-card-sub {
+  font-family: var(--gm-font-mono);
+  font-size: 0.72rem;
+  color: var(--gm-text-muted);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* ── Mini stat pills row ─────────────────────────────────── */
+.gm-card-stats {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gm-stat-pill {
+  font-family: var(--gm-font-mono);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--gm-accent-blue);
+  background: rgba(0, 198, 255, 0.08);
+  border: 1px solid rgba(0, 198, 255, 0.18);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+/* ── Prop count badge ────────────────────────────────────── */
+.gm-card-prop-count {
+  font-family: var(--gm-font-mono);
+  font-size: 0.68rem;
+  color: var(--gm-text-muted);
+  text-align: center;
+}
+
+/* ── Modal / Dialog overrides ────────────────────────────── */
+div[data-testid="stDialog"] > div {
+  background: rgba(15, 23, 42, 0.92) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+}
+
+/* ── Modal Vitals Row ────────────────────────────────────── */
+.gm-modal-vitals {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.gm-modal-headshot {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 3px solid var(--gm-accent-blue);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.gm-modal-info h2 {
+  font-family: var(--gm-font-body);
+  color: var(--gm-text-primary);
+  margin: 0 0 4px;
+}
+.gm-modal-info p {
+  font-family: var(--gm-font-mono);
+  color: var(--gm-text-muted);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* ── Season-Stats Metric Bar ─────────────────────────────── */
+.gm-season-bar {
+  display: flex;
+  gap: 14px;
+  margin: 14px 0 20px;
+  flex-wrap: wrap;
+}
+.gm-season-metric {
+  text-align: center;
+  min-width: 64px;
+}
+.gm-season-metric .val {
+  font-family: var(--gm-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gm-accent-blue);
+}
+.gm-season-metric .lbl {
+  font-family: var(--gm-font-body);
+  font-size: 0.68rem;
+  color: var(--gm-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Market Grid (bet rows) ──────────────────────────────── */
+.gm-market-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.gm-market-cell {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--gm-font-mono);
+  font-size: 0.78rem;
+  color: var(--gm-text-primary);
+}
+.gm-market-cell .stat-label {
+  font-weight: 700;
+  color: var(--gm-accent-blue);
+  margin-bottom: 4px;
+}
+.gm-market-cell .edge-pos {
+  color: #4ADE80;
+}
+.gm-market-cell .edge-neg {
+  color: var(--gm-accent-red);
+}
+
+/* ── Ask Joseph CTA button ───────────────────────────────── */
+.gm-ask-joseph-btn button {
+  width: 100%;
+  background: linear-gradient(135deg, #FF5E00 0%, #FF0055 100%) !important;
+  color: #fff !important;
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 12px 0 !important;
+  box-shadow: 0 0 20px rgba(255, 94, 0, 0.35);
+  transition: box-shadow 0.2s ease;
+}
+.gm-ask-joseph-btn button:hover {
+  box-shadow: 0 0 28px rgba(255, 0, 85, 0.55);
+}
+
+/* ── Joseph Broadcast Container ──────────────────────────── */
+.gm-joseph-response {
+  background: rgba(255, 94, 0, 0.06);
+  border: 1px solid rgba(255, 94, 0, 0.30);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 14px;
+}
+.gm-joseph-response .gm-joseph-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #FF5E00;
+  object-fit: cover;
+  float: left;
+  margin-right: 12px;
+}
+.gm-joseph-response .gm-joseph-lock {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #FF5E00;
+  margin-bottom: 6px;
+}
+.gm-joseph-response .gm-joseph-rant {
+  font-family: var(--gm-font-body);
+  font-size: 0.85rem;
+  color: var(--gm-text-primary);
+  line-height: 1.6;
+}
+"""
+
+
+def get_glassmorphic_card_css():
+    """Return the Glassmorphic Trading-Card CSS for injection."""
+    return f"<style>{GLASSMORPHIC_CARD_CSS}</style>"
+
+
+def get_player_trading_card_html(
+    player_name: str,
+    headshot_url: str = "",
+    position: str = "N/A",
+    team: str = "N/A",
+    opponent: str = "TBD",
+    season_stats: dict | None = None,
+    prop_count: int = 0,
+) -> str:
+    """Build an HTML Trading Card for one player.
+
+    Parameters
+    ----------
+    player_name : str
+        Display name.
+    headshot_url : str
+        URL to headshot image.
+    position, team, opponent : str
+        Player metadata.
+    season_stats : dict | None
+        ``{"ppg": float, "rpg": float, "apg": float, "avg_minutes": float}``
+    prop_count : int
+        Number of available props for badge.
+
+    Returns
+    -------
+    str
+        HTML string for one trading card.
+    """
+    stats = season_stats or {}
+    safe_name = _html.escape(str(player_name))
+    safe_pos = _html.escape(str(position))
+    safe_team = _html.escape(str(team))
+    safe_opp = _html.escape(str(opponent))
+    safe_url = _html.escape(str(headshot_url))
+
+    ppg = stats.get("ppg", 0.0)
+    rpg = stats.get("rpg", 0.0)
+    apg = stats.get("apg", 0.0)
+
+    return (
+        f'<div class="gm-player-card">'
+        f'<img class="gm-card-headshot" src="{safe_url}" alt="{safe_name}" '
+        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png\'">'
+        f'<div class="gm-card-name">{safe_name}</div>'
+        f'<div class="gm-card-sub">{safe_pos} · {safe_team} vs {safe_opp}</div>'
+        f'<div class="gm-card-stats">'
+        f'<span class="gm-stat-pill">{ppg} PPG</span>'
+        f'<span class="gm-stat-pill">{rpg} RPG</span>'
+        f'<span class="gm-stat-pill">{apg} APG</span>'
+        f'</div>'
+        f'<div class="gm-card-prop-count">{prop_count} prop{"s" if prop_count != 1 else ""} available</div>'
+        f'</div>'
+    )
+
+
+# ============================================================
+# END SECTION: Glassmorphic Dark Theme
+# ============================================================

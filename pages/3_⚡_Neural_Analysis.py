@@ -120,6 +120,12 @@ from data.platform_fetcher import smart_filter_props as _smart_filter_props
 from utils.renderers import compile_card_matrix as _compile_card_matrix
 from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
+# ── Glassmorphic Trading-Card imports ────────────────────────────────────────
+from styles.theme import get_glassmorphic_card_css as _get_gm_css
+from styles.theme import get_player_trading_card_html as _get_trading_card_html
+from utils.data_grouper import group_props_by_player as _group_props
+from utils.player_modal import show_player_spotlight as _show_spotlight
+
 # ── Section logo paths ────────────────────────────────────────────────────────
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
 _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
@@ -137,6 +143,7 @@ st.set_page_config(
 # Inject global CSS + QDS CSS
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
+st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
 from utils.components import render_global_settings
@@ -2329,6 +2336,63 @@ if analysis_results:
                         ),
                         unsafe_allow_html=True,
                     )
+
+    st.divider()
+
+    # ── Player Trading-Card Grid ─────────────────────────────────
+    # Group analysis results by player and render a clickable
+    # "Trading Card" for each player.  Clicking opens the Jumbo
+    # Card Player Spotlight modal.
+    _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
+    _grouped = _group_props(_active_results, players_data, todays_games)
+
+    if _grouped:
+        st.markdown(
+            '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
+            'margin-bottom:8px;">🃏 Player Spotlight Cards</h3>'
+            '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
+            'Click any card to open the full Player Spotlight analysis.</p>',
+            unsafe_allow_html=True,
+        )
+
+        # Build the Trading-Card grid HTML
+        _tc_cards = ""
+        for _pname, _pdata in _grouped.items():
+            _v = _pdata.get("vitals", {})
+            _tc_cards += _get_trading_card_html(
+                player_name=_pname,
+                headshot_url=_v.get("headshot_url", ""),
+                position=_v.get("position", "N/A"),
+                team=_v.get("team", "N/A"),
+                opponent=_v.get("next_opponent", "TBD"),
+                season_stats=_v.get("season_stats"),
+                prop_count=len(_pdata.get("props", [])),
+            )
+        st.markdown(
+            f'<div class="gm-card-grid">{_tc_cards}</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Render clickable Streamlit buttons per player to trigger modals
+        _player_names = list(_grouped.keys())
+        _cols_per_row = 5
+        for _row_start in range(0, len(_player_names), _cols_per_row):
+            _row_names = _player_names[_row_start:_row_start + _cols_per_row]
+            _btn_cols = st.columns(len(_row_names))
+            for _ci, _cn in enumerate(_row_names):
+                with _btn_cols[_ci]:
+                    if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}"):
+                        st.session_state["_spotlight_player"] = _cn
+
+        # Open the spotlight modal if a player was selected
+        _spot_player = st.session_state.get("_spotlight_player")
+        if _spot_player and _spot_player in _grouped:
+            @st.dialog("Player Spotlight", width="large")
+            def _open_spotlight():
+                _show_spotlight(_spot_player, _grouped[_spot_player])
+
+            _open_spotlight()
+            st.session_state["_spotlight_player"] = None
 
     st.divider()
 
