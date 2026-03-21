@@ -448,10 +448,17 @@ def _fetch_team_records():
         time.sleep(API_DELAY_SECONDS)
 
         for row in standings_data:
-            abbrev = row.get("TeamSlug", "").upper()
-            # nba_api standings use TeamAbbreviation
-            abbrev = row.get("TeamAbbreviation", abbrev)
-            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
+            # LeagueStandingsV3 does NOT return TeamAbbreviation.
+            # Derive the abbreviation from TeamCity + TeamName using the
+            # existing TEAM_NAME_TO_ABBREVIATION mapping.
+            team_city = str(row.get("TeamCity", "") or "").strip()
+            team_name = str(row.get("TeamName", "") or "").strip()
+            full_name = f"{team_city} {team_name}".strip()
+            abbrev = TEAM_NAME_TO_ABBREVIATION.get(full_name, "")
+            if not abbrev:
+                # Fallback: try TeamSlug through NBA_API_ABBREV_TO_OURS
+                slug = str(row.get("TeamSlug", "") or "").upper()
+                abbrev = NBA_API_ABBREV_TO_OURS.get(slug, slug)
             if not abbrev:
                 continue
 
