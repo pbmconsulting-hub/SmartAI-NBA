@@ -525,7 +525,7 @@ if mode == "🏀 GAMES TONIGHT":
                                 )
 
                         # Game total and spread opinions
-                        total_opinion = result.get("total_opinion", "")
+                        total_opinion = result.get("total_opinion", result.get("joseph_game_total_take", ""))
                         if total_opinion:
                             st.markdown(
                                 render_broadcast_segment({
@@ -535,7 +535,7 @@ if mode == "🏀 GAMES TONIGHT":
                                 unsafe_allow_html=True,
                             )
 
-                        spread_opinion = result.get("spread_opinion", "")
+                        spread_opinion = result.get("spread_opinion", result.get("joseph_spread_take", ""))
                         if spread_opinion:
                             st.markdown(
                                 render_broadcast_segment({
@@ -564,7 +564,9 @@ if mode == "🏀 GAMES TONIGHT":
                         with st.expander("📊 Nerd Stats"):
                             nerd_keys = [
                                 "pace_take", "scheme_analysis", "blowout_risk",
-                                "game_narrative", "total_opinion", "spread_opinion",
+                                "game_narrative", "total_opinion", "joseph_game_total_take",
+                                "spread_opinion", "joseph_spread_take",
+                                "betting_angle", "risk_warning",
                             ]
                             for nk in nerd_keys:
                                 nv = result.get(nk)

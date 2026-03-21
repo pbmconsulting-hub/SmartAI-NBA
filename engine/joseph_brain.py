@@ -1234,7 +1234,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
 
         # Step 3 — RETRIEVE
         try:
-            player_grade = joseph_grade_player(player, game, teams_data)
+            player_grade = joseph_grade_player(player, game)
         except Exception:
             player_grade = {"grade": "C", "archetype": "Unknown", "score": 50.0,
                             "gravity": 50.0, "switchability": 50.0}
@@ -1253,8 +1253,10 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 comp = random.choice(JOSEPH_COMPS_DATABASE)
 
         # Step 4 — MODEL
+        _home_team = str(game.get("home_team", game.get("home", ""))).upper().strip()
+        _away_team = str(game.get("away_team", game.get("away", ""))).upper().strip()
         try:
-            game_strategy = analyze_game_strategy(game, teams_data)
+            game_strategy = analyze_game_strategy(_home_team, _away_team, game, teams_data)
         except Exception:
             game_strategy = {"scheme": "unknown", "strategy": "unknown",
                              "scheme_match": 0.0, "mismatch_tags": [],
@@ -1478,7 +1480,7 @@ def joseph_analyze_game(game: dict, teams_data: dict,
 
         # Run game strategy
         try:
-            strategy = analyze_game_strategy(game, teams_data)
+            strategy = analyze_game_strategy(home, away, game, teams_data)
         except Exception:
             strategy = {"scheme": "unknown", "strategy": "unknown",
                         "scheme_match": 0.0, "mismatch_tags": []}
@@ -1626,7 +1628,7 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         # Grade the player
         tonight_game = games[0] if games else {}
         try:
-            grade_result = joseph_grade_player(player, tonight_game, teams_data)
+            grade_result = joseph_grade_player(player, tonight_game)
         except Exception:
             grade_result = {"grade": "C", "archetype": "Unknown", "score": 50.0,
                             "gravity": 50.0, "switchability": 50.0}
