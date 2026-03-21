@@ -38,7 +38,7 @@ _ROOT_LOGO_PATH   = os.path.join(os.path.dirname(__file__), "Smart_Pick_Pro_Logo
 _ASSETS_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
 _LOGO_PATH = _ROOT_LOGO_PATH if os.path.exists(_ROOT_LOGO_PATH) else _ASSETS_LOGO_PATH
 if os.path.exists(_LOGO_PATH):
-    st.logo(_LOGO_PATH, size="large")
+    st.logo(_LOGO_PATH, size="small")
 
 
 @st.cache_data(show_spinner=False)
@@ -110,7 +110,7 @@ st.markdown("""
     letter-spacing: 0.03em;
 }
 .spp-hero-logo {
-    width: 250px !important;
+    width: 88px !important;
     max-width: 100%;
     height: auto;
     object-fit: contain;
@@ -121,7 +121,7 @@ st.markdown("""
 /* Responsive: stack on mobile */
 @media (max-width: 640px) {
     .hero-hud { flex-direction: column; text-align: center; padding: 24px 20px; }
-    .spp-hero-logo { width: 250px !important; max-width: 100%; }
+    .spp-hero-logo { width: 88px !important; max-width: 100%; }
 }
 /* Status card — dark glass panel */
 .status-card {

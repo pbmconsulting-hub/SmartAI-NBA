@@ -137,11 +137,11 @@ class TestCSSLogoOverrides(unittest.TestCase):
     """Verify CSS overrides for hero banner and sidebar logos."""
 
     def test_hero_logo_width_250px(self):
-        """Hero banner logo should have width: 250px !important."""
+        """Hero banner logo should have width: 88px !important (65% smaller than original 250px)."""
         src = pathlib.Path(__file__).parent.parent / "app.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("width: 250px !important", content,
-                       "Hero logo should have strict 250px width")
+        self.assertIn("width: 88px !important", content,
+                       "Hero logo should have strict 88px width (65% reduction)")
 
     def test_hero_logo_object_fit(self):
         """Hero banner logo should use object-fit: contain."""
@@ -181,12 +181,12 @@ class TestCSSLogoOverrides(unittest.TestCase):
                        "CSS should target stLogo for sidebar logo")
 
     def test_hero_logo_responsive_keeps_250px(self):
-        """Mobile responsive CSS should maintain 250px width for hero logo."""
+        """Mobile responsive CSS should maintain 88px width for hero logo."""
         src = pathlib.Path(__file__).parent.parent / "app.py"
         content = src.read_text(encoding="utf-8")
-        # Check that the responsive media query also uses 250px
-        self.assertIn(".spp-hero-logo { width: 250px !important", content,
-                       "Responsive hero logo should maintain 250px width")
+        # Check that the responsive media query also uses 88px
+        self.assertIn(".spp-hero-logo { width: 88px !important", content,
+                       "Responsive hero logo should maintain 88px width")
 
 
 if __name__ == "__main__":

@@ -1358,17 +1358,17 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
     # ── Single-entry group (no alternates) ────────────────────────
 
     def test_single_line_is_standard(self):
-        """When only one line exists for a player/stat/platform, it is standard."""
+        """When only one line exists for a player/stat/platform, it is 50_50 (the standard O/U line)."""
         props = [self._make_prop("SGA", "points", 31.5)]
         result = self.parse(props)
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["line_category"], "standard")
+        self.assertEqual(result[0]["line_category"], "50_50")
         self.assertAlmostEqual(result[0]["standard_line"], 31.5)
 
     # ── Multi-entry group: alt line categorization ────────────────
 
     def test_below_median_is_goblin(self):
-        """All line_category values are now 'standard'."""
+        """A line below the median should be categorized as 'goblin'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1376,10 +1376,10 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[28.5], "standard")
+        self.assertEqual(cats[28.5], "goblin")
 
     def test_above_median_is_demon(self):
-        """All line_category values are now 'standard'."""
+        """A line above the median should be categorized as 'demon'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1387,10 +1387,10 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[34.5], "standard")
+        self.assertEqual(cats[34.5], "demon")
 
     def test_median_line_is_standard(self):
-        """All line_category values are now 'standard'."""
+        """The median (middle) line should be categorized as '50_50'."""
         props = [
             self._make_prop("SGA", "points", 28.5),
             self._make_prop("SGA", "points", 31.5),
@@ -1398,7 +1398,7 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         ]
         result = self.parse(props)
         cats = {p["line"]: p["line_category"] for p in result}
-        self.assertEqual(cats[31.5], "standard")
+        self.assertEqual(cats[31.5], "50_50")
 
     # ── Enrichment & structure ────────────────────────────────────
 
@@ -1431,12 +1431,13 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
         result = self.parse(props)
         pp = [p for p in result if p["platform"] == "PrizePicks"]
         ud = [p for p in result if p["platform"] == "Underdog"]
-        # All line_category values are now "standard"
-        self.assertEqual(ud[0]["line_category"], "standard")
+        # Single Underdog line is the standard 50_50
+        self.assertEqual(ud[0]["line_category"], "50_50")
+        # PrizePicks: below=goblin, median=50_50, above=demon
         pp_cats = {p["line"]: p["line_category"] for p in pp}
-        self.assertEqual(pp_cats[28.5], "standard")
-        self.assertEqual(pp_cats[31.5], "standard")
-        self.assertEqual(pp_cats[34.5], "standard")
+        self.assertEqual(pp_cats[28.5], "goblin")
+        self.assertEqual(pp_cats[31.5], "50_50")
+        self.assertEqual(pp_cats[34.5], "demon")
 
     def test_empty_props_returns_empty(self):
         """Empty input should return an empty list."""

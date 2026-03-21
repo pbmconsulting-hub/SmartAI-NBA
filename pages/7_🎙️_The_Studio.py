@@ -22,7 +22,7 @@ _ASSETS_LOGO = os.path.join(
 )
 _LOGO_PATH = _ROOT_LOGO if os.path.exists(_ROOT_LOGO) else _ASSETS_LOGO
 if os.path.exists(_LOGO_PATH):
-    st.logo(_LOGO_PATH, size="large")
+    st.logo(_LOGO_PATH, size="small")
 
 # ── Styles ───────────────────────────────────────────────────
 try:
@@ -160,6 +160,18 @@ except ImportError:
 
     def render_override_report(_r):
         st.info("Override report unavailable.")
+
+    def render_broadcast_segment(seg_dict):
+        """Fallback when joseph_live_desk is not available."""
+        title = seg_dict.get("title", "")
+        body = seg_dict.get("body", "")
+        return (
+            f'<div style="border-left:3px solid #ff5e00;padding:10px 14px;'
+            f'margin:8px 0;background:rgba(255,94,0,0.04);border-radius:4px">'
+            f'<div style="color:#ff5e00;font-weight:600;font-size:0.92rem">{title}</div>'
+            f'<div style="color:#e2e8f0;font-size:0.88rem;margin-top:4px">{body}</div>'
+            f'</div>'
+        )
 
 
 # ── Inject desk CSS ──────────────────────────────────────────
@@ -543,7 +555,7 @@ if mode == "🏀 GAMES TONIGHT":
                                 emoji = VERDICT_EMOJIS.get(
                                     v.upper().replace(" ", "_"), "✅"
                                 )
-                                bp_name = _html.escape(str(bp.get("player", "")))
+                                bp_name = _html.escape(str(bp.get("player_name", bp.get("player", ""))))
                                 bp_rant = _html.escape(str(bp.get("rant", "")))
                                 st.markdown(
                                     render_broadcast_segment({
@@ -616,7 +628,7 @@ elif mode == "👤 SCOUT A PLAYER":
     player_options = []
     _seen = set()
     for ar in analysis_results:
-        name = ar.get("player", ar.get("name", ""))
+        name = ar.get("player_name", ar.get("player", ar.get("name", "")))
         team = ar.get("team", "")
         label = f"{name} ({team})" if team else name
         if label and label not in _seen:
@@ -744,7 +756,17 @@ elif mode == "👤 SCOUT A PLAYER":
                         )
                         for ap in alt_props[:3]:
                             if isinstance(ap, dict):
-                                ap_text = ap.get("summary", ap.get("rant", str(ap)))
+                                ap_text = ap.get("summary", ap.get("rant", ""))
+                                if not ap_text:
+                                    # Format key fields instead of dumping the raw dict
+                                    _ap_player = ap.get("player_name", ap.get("player", ""))
+                                    _ap_stat = ap.get("stat_type", ap.get("stat", ""))
+                                    _ap_dir = ap.get("direction", "")
+                                    _ap_line = ap.get("prop_line", ap.get("line", ""))
+                                    _ap_verdict = ap.get("verdict", "")
+                                    ap_text = " ".join(
+                                        p for p in [_ap_player, _ap_stat, _ap_dir, str(_ap_line), _ap_verdict] if p
+                                    ) or "Alternative prop"
                             else:
                                 ap_text = str(ap)
                             st.markdown(
@@ -929,9 +951,9 @@ elif mode == "🎰 BUILD MY BETS":
 
                     legs_html = ""
                     for leg in ticket_result.get("legs", []):
-                        l_player = _html.escape(str(leg.get("player", "")))
+                        l_player = _html.escape(str(leg.get("player_name", leg.get("player", ""))))
                         l_dir = _html.escape(str(leg.get("direction", "")))
-                        l_line = leg.get("line", leg.get("prop_line", ""))
+                        l_line = leg.get("prop_line", leg.get("line", ""))
                         l_stat = _html.escape(
                             str(leg.get("stat_type", leg.get("prop", "")))
                         )
@@ -1066,18 +1088,24 @@ elif mode == "🎰 BUILD MY BETS":
                                         )
                                     alt_legs = alt.get("legs", [])
                                     for al in alt_legs:
-                                        al_name = _html.escape(
-                                            str(al.get("player", ""))
-                                        )
-                                        al_stat = _html.escape(
-                                            str(al.get("stat_type", al.get("prop", "")))
-                                        )
-                                        al_dir = _html.escape(
-                                            str(al.get("direction", ""))
-                                        )
-                                        st.markdown(
-                                            f"  • {al_name} {al_stat} {al_dir}"
-                                        )
+                                        if isinstance(al, dict):
+                                            al_name = _html.escape(
+                                                str(al.get("player_name", al.get("player", "")))
+                                            )
+                                            al_stat = _html.escape(
+                                                str(al.get("stat_type", al.get("prop", "")))
+                                            )
+                                            al_dir = _html.escape(
+                                                str(al.get("direction", ""))
+                                            )
+                                            st.markdown(
+                                                f"  • {al_name} {al_stat} {al_dir}"
+                                            )
+                                        else:
+                                            # Alternative legs may be plain strings
+                                            st.markdown(
+                                                f"  • {_html.escape(str(al))}"
+                                            )
                             else:
                                 st.info("No alternative tickets available.")
 

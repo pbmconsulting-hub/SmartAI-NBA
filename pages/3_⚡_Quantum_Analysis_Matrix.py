@@ -2484,29 +2484,12 @@ if analysis_results:
             '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
             'margin-bottom:8px;">🃏 Player Spotlight Cards</h3>'
             '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
-            'Click any card to open the full Player Spotlight analysis.</p>',
+            'Click any player button to open the full Player Spotlight analysis.</p>',
             unsafe_allow_html=True,
         )
 
-        # Build the Trading-Card grid HTML
-        _tc_cards = ""
-        for _pname, _pdata in _grouped.items():
-            _v = _pdata.get("vitals", {})
-            _tc_cards += _get_trading_card_html(
-                player_name=_pname,
-                headshot_url=_v.get("headshot_url", ""),
-                position=_v.get("position", "N/A"),
-                team=_v.get("team", "N/A"),
-                opponent=_v.get("next_opponent", "TBD"),
-                season_stats=_v.get("season_stats"),
-                prop_count=len(_pdata.get("props", [])),
-            )
-        st.markdown(
-            f'<div class="gm-card-grid">{_tc_cards}</div>',
-            unsafe_allow_html=True,
-        )
-
-        # Render clickable Streamlit buttons per player to trigger modals
+        # Render each player's trading card + clickable button together
+        # so the cards are visually paired with their click targets.
         _player_names = list(_grouped.keys())
         _cols_per_row = 5
         for _row_start in range(0, len(_player_names), _cols_per_row):
@@ -2514,7 +2497,19 @@ if analysis_results:
             _btn_cols = st.columns(len(_row_names))
             for _ci, _cn in enumerate(_row_names):
                 with _btn_cols[_ci]:
-                    if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}"):
+                    _pdata = _grouped[_cn]
+                    _v = _pdata.get("vitals", {})
+                    _card_html = _get_trading_card_html(
+                        player_name=_cn,
+                        headshot_url=_v.get("headshot_url", ""),
+                        position=_v.get("position", "N/A"),
+                        team=_v.get("team", "N/A"),
+                        opponent=_v.get("next_opponent", "TBD"),
+                        season_stats=_v.get("season_stats"),
+                        prop_count=len(_pdata.get("props", [])),
+                    )
+                    st.markdown(_card_html, unsafe_allow_html=True)
+                    if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
                         st.session_state["_spotlight_player"] = _cn
 
         # Open the spotlight modal if a player was selected

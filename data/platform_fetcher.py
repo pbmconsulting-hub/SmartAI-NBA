@@ -2245,10 +2245,40 @@ def parse_alt_lines_from_platform_props(props):
         enriched_prop = dict(prop)
         enriched_prop["standard_line"] = std_line
 
-        # Tier classification removed — all props are treated as
-        # "standard" regardless of their relationship to the standard
-        # O/U line.  The True More/Less Line remains the primary anchor.
-        enriched_prop["line_category"] = "standard"
+        # Classify each prop relative to the standard O/U line.
+        # The standard_line (median / middle number) is the primary
+        # More/Less or Over/Under line that platforms advertise.
+        if std_line is None or prop_line <= 0:
+            enriched_prop["line_category"] = "standard"
+        elif abs(prop_line - std_line) < 0.01:
+            # This IS the standard O/U line (the main More/Less line)
+            enriched_prop["line_category"] = "50_50"
+        elif prop_line < std_line:
+            # Below the standard — safer bet (goblin)
+            enriched_prop["line_category"] = "goblin"
+        else:
+            # Above the standard — riskier bet (demon)
+            enriched_prop["line_category"] = "demon"
+
+        # Ensure every prop carries a ``prop_line`` field set to the
+        # standard (middle) line so downstream consumers always know
+        # the primary More/Less threshold.
+        if std_line is not None:
+            enriched_prop["prop_line"] = std_line
+
+        # Ensure a ``direction`` field exists so downstream bet cards
+        # always display the More/Less (Over/Under) side.  For the
+        # standard line use OVER as default; for goblin lines the
+        # player is likely to clear (OVER); for demon lines the bar
+        # is higher (UNDER is the safer play).
+        if "direction" not in enriched_prop:
+            cat = enriched_prop.get("line_category", "standard")
+            if cat == "goblin":
+                enriched_prop["direction"] = "OVER"
+            elif cat == "demon":
+                enriched_prop["direction"] = "UNDER"
+            else:
+                enriched_prop["direction"] = "OVER"
 
         enriched.append(enriched_prop)
 
