@@ -568,8 +568,8 @@ class TestThemeFileIntegrity(unittest.TestCase):
 # ============================================================
 
 class TestNeuralAnalysisOutputSelection(unittest.TestCase):
-    """Verify the Neural Analysis page selects the top _QME_MIN_OUTPUT_BETS
-    picks from all analyzed results, rather than dumping every result."""
+    """Verify the Neural Analysis page sorts all analyzed results by
+    confidence and returns ALL of them (no artificial truncation)."""
 
     def _read_source(self):
         import pathlib
@@ -577,7 +577,7 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
         return na_path.read_text(encoding="utf-8")
 
     def test_output_quota_constant_is_500(self):
-        """_QME_MIN_OUTPUT_BETS must be defined as 500."""
+        """_QME_MIN_OUTPUT_BETS must still be defined (kept for reference)."""
         source = self._read_source()
         self.assertIn("_QME_MIN_OUTPUT_BETS = 500", source)
 
@@ -597,34 +597,31 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
             source,
         )
 
-    def test_selection_slices_to_quota(self):
-        """Active results must be sliced to _QME_MIN_OUTPUT_BETS."""
+    def test_selection_keeps_all_active(self):
+        """Active results must NOT be truncated — all picks are kept."""
         source = self._read_source()
-        self.assertIn("_active_results[:_QME_MIN_OUTPUT_BETS]", source)
+        self.assertIn("_selected_active = _active_results", source)
 
     def test_selected_plus_out_forms_final_list(self):
         """Final analysis_results_list must be selected + out players."""
         source = self._read_source()
         self.assertIn("analysis_results_list = _selected_active + _out_results", source)
 
-    def test_success_message_shows_selection_count(self):
-        """Success toast must report both total analyzed and selected count."""
+    def test_success_message_shows_counts(self):
+        """Success toast must report the number of displayed picks."""
         source = self._read_source()
-        self.assertIn("_total_analyzed", source)
         self.assertIn("_selected_active", source)
-        # The success message references both counts
-        self.assertIn("Analyzed **{_total_analyzed}**", source)
-        self.assertIn("selected **{len(_selected_active)}**", source)
+        self.assertIn("_out_results", source)
 
-    def test_logger_reports_selection(self):
-        """Logger must record the selection funnel numbers."""
+    def test_logger_reports_output(self):
+        """Logger must record the output numbers."""
         source = self._read_source()
-        self.assertIn("QME 5.6 Output Selection", source)
+        self.assertIn("QME 5.6 Output:", source)
 
     # ── Pure-logic simulation of the selection algorithm ─────────
 
-    def test_selection_logic_caps_at_500(self):
-        """Given 2000 active results, only the top 500 by confidence are kept."""
+    def test_selection_logic_keeps_all(self):
+        """Given 2000 active results, ALL are kept (no truncation)."""
         results = [
             {"confidence_score": i, "player_is_out": False}
             for i in range(2000)
@@ -632,19 +629,18 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
         out = [{"confidence_score": 0, "player_is_out": True}]
         all_results = results + out
 
-        # Replicate the selection logic from the page
-        _QME_MIN_OUTPUT_BETS = 500
+        # Replicate the new selection logic from the page (no truncation)
         _out = [r for r in all_results if r.get("player_is_out", False)]
         _active = [r for r in all_results if not r.get("player_is_out", False)]
         _active.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
-        selected = _active[:_QME_MIN_OUTPUT_BETS] + _out
+        selected = _active + _out  # ALL active + out
 
-        # 500 active + 1 out = 501 total
-        self.assertEqual(len(selected), 501)
+        # 2000 active + 1 out = 2001 total
+        self.assertEqual(len(selected), 2001)
         # Top pick should be the one with confidence 1999
         self.assertEqual(selected[0]["confidence_score"], 1999)
-        # 500th active pick should be confidence 1500
-        self.assertEqual(selected[499]["confidence_score"], 1500)
+        # Last active pick should be confidence 0
+        self.assertEqual(selected[1999]["confidence_score"], 0)
         # Last entry is the out player
         self.assertTrue(selected[-1]["player_is_out"])
 
@@ -654,11 +650,10 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
             {"confidence_score": i, "player_is_out": False}
             for i in range(100)
         ]
-        _QME_MIN_OUTPUT_BETS = 500
         _out = [r for r in results if r.get("player_is_out", False)]
         _active = [r for r in results if not r.get("player_is_out", False)]
         _active.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
-        selected = _active[:_QME_MIN_OUTPUT_BETS] + _out
+        selected = _active + _out
         self.assertEqual(len(selected), 100)
 
     def test_selection_preserves_order_by_confidence(self):
@@ -668,13 +663,12 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
             {"confidence_score": random.uniform(0, 100), "player_is_out": False}
             for _ in range(800)
         ]
-        _QME_MIN_OUTPUT_BETS = 500
         _active = list(results)
         _active.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
-        selected = _active[:_QME_MIN_OUTPUT_BETS]
+        selected = _active  # No truncation
         scores = [r["confidence_score"] for r in selected]
         self.assertEqual(scores, sorted(scores, reverse=True))
-        self.assertEqual(len(selected), 500)
+        self.assertEqual(len(selected), 800)
 
 
 # ============================================================
