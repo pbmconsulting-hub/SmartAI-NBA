@@ -2264,3 +2264,144 @@ def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
         return (0, "Joseph bets module not installed yet")
     except Exception as exc:
         return (0, f"Joseph auto-log error: {exc}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# PLATINUM LOCK — Multi-Prop Conflict Resolution with Stat Validation
+# ═══════════════════════════════════════════════════════════════
+
+def joseph_platinum_lock(props: list, season_stats: dict) -> dict:
+    """Select ONE Platinum Lock from a player's multiple props.
+
+    When a player has multiple lines, Joseph compares each prop's
+    True Line against the player's actual ``season_stats`` and
+    chooses the single highest-edge prop as the Platinum Lock.
+    He then explicitly tears down the remaining bets using the
+    real stats as justification.
+
+    Parameters
+    ----------
+    props : list[dict]
+        All prop dicts for one player.  Each must contain at least
+        ``stat_type``, ``line``/``prop_line``, ``edge_percentage``,
+        ``direction``, and ``probability_over``.
+    season_stats : dict
+        ``{"ppg": float, "rpg": float, "apg": float, "avg_minutes": float}``
+
+    Returns
+    -------
+    dict
+        ``{"platinum_lock_stat": str, "rant": str}``
+    """
+    if not props:
+        return {
+            "platinum_lock_stat": "N/A",
+            "rant": "No props available for analysis.",
+        }
+
+    # ── Map stat types to season averages ────────────────────
+    stat_avg_map = {
+        "points": season_stats.get("ppg", 0),
+        "rebounds": season_stats.get("rpg", 0),
+        "assists": season_stats.get("apg", 0),
+        "pts": season_stats.get("ppg", 0),
+        "reb": season_stats.get("rpg", 0),
+        "ast": season_stats.get("apg", 0),
+        "minutes": season_stats.get("avg_minutes", 0),
+    }
+
+    # ── Score each prop: edge + stat alignment ───────────────
+    scored = []
+    for p in props:
+        stat = str(p.get("stat_type", "")).lower().strip()
+        edge = _safe_float(p.get("edge_percentage", 0))
+        line = _safe_float(p.get("prop_line", p.get("line", 0)))
+        direction = str(p.get("direction", "OVER")).upper()
+        avg = stat_avg_map.get(stat, 0)
+
+        # Stat alignment bonus: if OVER and avg > line → aligned
+        alignment = 0.0
+        if avg > 0 and line > 0:
+            if direction == "OVER" and avg > line:
+                alignment = min((avg - line) / max(line, 0.1) * 100.0, 25.0)
+            elif direction == "UNDER" and avg < line:
+                alignment = min((line - avg) / max(line, 0.1) * 100.0, 25.0)
+
+        total_score = edge + alignment
+        scored.append({
+            "prop": p,
+            "stat": stat,
+            "edge": edge,
+            "line": line,
+            "direction": direction,
+            "avg": avg,
+            "alignment": alignment,
+            "total_score": total_score,
+        })
+
+    # ── Sort by total score → best is the lock ───────────────
+    scored.sort(key=lambda x: x["total_score"], reverse=True)
+    lock = scored[0]
+    others = scored[1:]
+
+    lock_stat = lock["stat"].title() if lock["stat"] else "Points"
+    lock_line = lock["line"]
+    lock_dir = lock["direction"]
+    lock_edge = lock["edge"]
+    lock_avg = lock["avg"]
+
+    # ── Build the rant ───────────────────────────────────────
+    try:
+        opener = _select_fragment(OPENER_POOL, _used_fragments.setdefault("rant", set()))
+        opener_text = opener.get("text", "I've been waiting ALL DAY to say this.")
+    except Exception:
+        opener_text = "I've been waiting ALL DAY to say this."
+
+    # Lock justification
+    lock_just = (
+        f"The PLATINUM LOCK is {lock_stat} {lock_dir} {lock_line:g}. "
+    )
+    if lock_avg > 0:
+        lock_just += (
+            f"This player averages {lock_avg:g} per game in this category — "
+        )
+        if lock_dir == "OVER" and lock_avg > lock_line:
+            lock_just += f"that's {lock_avg - lock_line:.1f} ABOVE the line. The math doesn't LIE. "
+        elif lock_dir == "UNDER" and lock_avg < lock_line:
+            lock_just += f"that's {lock_line - lock_avg:.1f} BELOW the line. We're FADING this one. "
+        else:
+            lock_just += f"the edge at {lock_edge:+.1f}% is enough. Trust the model. "
+    else:
+        lock_just += f"The edge is {lock_edge:+.1f}% and the numbers SCREAM it. "
+
+    # Tear down other props
+    teardowns = []
+    for o in others:
+        o_stat = o["stat"].title() if o["stat"] else "Unknown"
+        o_line = o["line"]
+        o_avg = o["avg"]
+        o_edge = o["edge"]
+        if o_avg > 0:
+            teardowns.append(
+                f"{o_stat} at {o_line:g}? The season average is {o_avg:g} — "
+                f"that's only a {o_edge:+.1f}% edge. NOT enough for me."
+            )
+        else:
+            teardowns.append(
+                f"{o_stat} at {o_line:g}? Edge is {o_edge:+.1f}%. I'm passing."
+            )
+
+    teardown_text = " ".join(teardowns) if teardowns else ""
+
+    try:
+        closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+        closer_text = closer.get("text", "And I say that with GREAT conviction!")
+    except Exception:
+        closer_text = "And I say that with GREAT conviction!"
+
+    full_rant = f"{opener_text} {lock_just}{teardown_text} {closer_text}"
+
+    return {
+        "platinum_lock_stat": lock_stat,
+        "rant": full_rant.strip(),
+    }
