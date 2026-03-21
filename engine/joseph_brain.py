@@ -177,6 +177,77 @@ except ImportError:
         return out_min + (clamped - min_val) / (max_val - min_val) * (out_max - out_min)
 
 # ═══════════════════════════════════════════════════════════════
+# GOD MODE ANALYTICAL MODULES (Layer 10)
+# ═══════════════════════════════════════════════════════════════
+
+try:
+    from engine.impact_metrics import (
+        calculate_true_shooting_pct,
+        calculate_effective_fg_pct,
+        estimate_epm,
+        estimate_raptor,
+        calculate_player_efficiency_profile,
+        calculate_offensive_load,
+        estimate_defensive_impact,
+        calculate_war as impact_calculate_war,
+    )
+    _IMPACT_METRICS_AVAILABLE = True
+except ImportError:
+    _IMPACT_METRICS_AVAILABLE = False
+
+try:
+    from engine.lineup_analysis import (
+        estimate_lineup_net_rating,
+        calculate_synergy_score,
+        find_optimal_rotation,
+        find_closing_lineup,
+        analyze_lineup_combination,
+        detect_lineup_weaknesses,
+    )
+    _LINEUP_ANALYSIS_AVAILABLE = True
+except ImportError:
+    _LINEUP_ANALYSIS_AVAILABLE = False
+
+try:
+    from engine.regime_detection import (
+        detect_regime_change,
+        bayesian_update_probability,
+        detect_player_structural_shift,
+        detect_team_regime_change,
+        calculate_adaptive_weight,
+        run_bayesian_player_update,
+    )
+    _REGIME_DETECTION_AVAILABLE = True
+except ImportError:
+    _REGIME_DETECTION_AVAILABLE = False
+
+try:
+    from engine.trade_evaluator import (
+        calculate_player_war,
+        evaluate_player_contract_value,
+        evaluate_trade,
+        score_roster_fit,
+        project_cap_sheet,
+        build_trade_package,
+    )
+    _TRADE_EVALUATOR_AVAILABLE = True
+except ImportError:
+    _TRADE_EVALUATOR_AVAILABLE = False
+
+try:
+    from engine.draft_prospect import (
+        translate_college_stats,
+        score_physical_profile,
+        find_historical_comparisons,
+        predict_career_outcome,
+        build_prospect_scouting_report,
+        rank_draft_class,
+    )
+    _DRAFT_PROSPECT_AVAILABLE = True
+except ImportError:
+    _DRAFT_PROSPECT_AVAILABLE = False
+
+# ═══════════════════════════════════════════════════════════════
 # MODULE-LEVEL LOGGER
 # ═══════════════════════════════════════════════════════════════
 logger = logging.getLogger(__name__)
@@ -2585,3 +2656,250 @@ def joseph_platinum_lock(props: list, season_stats: dict) -> dict:
         "platinum_lock_stat": lock_stat,
         "rant": full_rant.strip(),
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# GOD MODE — MASTER ANALYSIS ORCHESTRATOR
+# ═══════════════════════════════════════════════════════════════
+
+# Availability flags for God Mode modules — exported for UI checks
+GOD_MODE_MODULES = {
+    "impact_metrics": _IMPACT_METRICS_AVAILABLE,
+    "lineup_analysis": _LINEUP_ANALYSIS_AVAILABLE,
+    "regime_detection": _REGIME_DETECTION_AVAILABLE,
+    "trade_evaluator": _TRADE_EVALUATOR_AVAILABLE,
+    "draft_prospect": _DRAFT_PROSPECT_AVAILABLE,
+}
+
+
+def joseph_god_mode_player(player_data: dict, game_context: dict = None,
+                           recent_games: list = None) -> dict:
+    """Run ALL God Mode analytical modules on a single player.
+
+    This is the master orchestration function that combines every
+    analytical layer Joseph has access to:
+
+    - Impact metrics (EPM, RAPTOR, WAR, True Shooting%)
+    - Regime detection (structural shifts, Bayesian updates)
+    - Defensive impact estimates
+    - Offensive load analysis
+    - Full efficiency profile
+
+    Parameters
+    ----------
+    player_data : dict
+        Player data with season stats.
+    game_context : dict, optional
+        Tonight's game context.
+    recent_games : list[dict], optional
+        Recent game logs for trend/regime analysis.
+
+    Returns
+    -------
+    dict
+        Comprehensive God Mode analysis with all available modules.
+    """
+    result = {
+        "player_name": "",
+        "modules_used": [],
+        "impact_metrics": {},
+        "efficiency_profile": {},
+        "offensive_load": {},
+        "defensive_impact": {},
+        "war": 0.0,
+        "regime_analysis": {},
+        "bayesian_update": {},
+        "joseph_god_mode_take": "",
+    }
+    try:
+        player_name = player_data.get("name", player_data.get("player_name", "Player"))
+        result["player_name"] = player_name
+        game_context = game_context or {}
+        recent_games = recent_games or []
+
+        # ── Impact Metrics ────────────────────────────────
+        if _IMPACT_METRICS_AVAILABLE:
+            try:
+                result["efficiency_profile"] = calculate_player_efficiency_profile(player_data)
+                result["offensive_load"] = calculate_offensive_load(player_data)
+                result["defensive_impact"] = estimate_defensive_impact(player_data)
+                result["war"] = impact_calculate_war(player_data)
+                result["impact_metrics"] = {
+                    "epm": estimate_epm(player_data),
+                    "raptor": estimate_raptor(player_data),
+                }
+                result["modules_used"].append("impact_metrics")
+            except Exception as exc:
+                logger.debug("God Mode impact_metrics error: %s", exc)
+
+        # ── Regime Detection ──────────────────────────────
+        if _REGIME_DETECTION_AVAILABLE and recent_games:
+            try:
+                result["regime_analysis"] = detect_player_structural_shift(
+                    player_data, recent_games
+                )
+                result["modules_used"].append("regime_detection")
+            except Exception as exc:
+                logger.debug("God Mode regime_detection error: %s", exc)
+
+        # ── Bayesian Update ───────────────────────────────
+        if _REGIME_DETECTION_AVAILABLE and recent_games:
+            try:
+                prop_line = _safe_float(game_context.get("prop_line", 0))
+                stat_type = game_context.get("stat_type", "points")
+                if prop_line > 0:
+                    result["bayesian_update"] = run_bayesian_player_update(
+                        player_data, recent_games, prop_line, stat_type
+                    )
+                    result["modules_used"].append("bayesian_update")
+            except Exception as exc:
+                logger.debug("God Mode bayesian_update error: %s", exc)
+
+        # ── Trade Value (always available if module loaded) ─
+        if _TRADE_EVALUATOR_AVAILABLE:
+            try:
+                result["trade_value"] = calculate_player_war(player_data)
+                result["modules_used"].append("trade_evaluator")
+            except Exception as exc:
+                logger.debug("God Mode trade_evaluator error: %s", exc)
+
+        # ── God Mode Joseph Take ──────────────────────────
+        take_parts = [f"GOD MODE analysis on {player_name}:"]
+        eff = result.get("efficiency_profile", {})
+        if eff.get("efficiency_tier"):
+            take_parts.append(f"Efficiency tier is {eff['efficiency_tier']}.")
+        war = result.get("war", 0.0)
+        if war:
+            take_parts.append(f"WAR estimate: {round(war, 1)}.")
+        regime = result.get("regime_analysis", {})
+        if regime.get("has_structural_shift"):
+            take_parts.append(
+                f"REGIME CHANGE detected: {regime.get('description', 'unknown shift')}."
+            )
+        elif regime:
+            take_parts.append("No structural shifts detected — steady as she goes.")
+        bayes = result.get("bayesian_update", {})
+        if bayes.get("explanation"):
+            take_parts.append(bayes["explanation"])
+
+        result["joseph_god_mode_take"] = " ".join(take_parts)
+
+    except Exception as exc:
+        logger.warning("joseph_god_mode_player failed: %s", exc)
+        result["joseph_god_mode_take"] = "God Mode analysis encountered an error."
+
+    return result
+
+
+def joseph_god_mode_lineup(players: list, game_context: dict = None) -> dict:
+    """Run God Mode lineup analysis on a group of players.
+
+    Parameters
+    ----------
+    players : list[dict]
+        List of 2-5 player data dicts.
+    game_context : dict, optional
+        Game context for closing lineup optimization.
+
+    Returns
+    -------
+    dict
+        Lineup analysis with synergy, weaknesses, closing lineup recommendation.
+    """
+    result = {
+        "lineup_analysis": {},
+        "weaknesses": [],
+        "closing_lineup": {},
+        "modules_used": [],
+        "joseph_take": "",
+    }
+    try:
+        game_context = game_context or {}
+
+        if _LINEUP_ANALYSIS_AVAILABLE and players:
+            try:
+                result["lineup_analysis"] = analyze_lineup_combination(players)
+                result["weaknesses"] = detect_lineup_weaknesses(players)
+                result["modules_used"].append("lineup_analysis")
+            except Exception as exc:
+                logger.debug("God Mode lineup_analysis error: %s", exc)
+
+            try:
+                result["closing_lineup"] = find_closing_lineup(players, game_context)
+                result["modules_used"].append("closing_lineup")
+            except Exception as exc:
+                logger.debug("God Mode closing_lineup error: %s", exc)
+
+        # Joseph take
+        analysis = result.get("lineup_analysis", {})
+        weaknesses = result.get("weaknesses", [])
+        take = analysis.get("joseph_take", "")
+        if weaknesses:
+            take += f" Weaknesses: {'; '.join(weaknesses[:3])}."
+        result["joseph_take"] = take or "Lineup analysis unavailable."
+
+    except Exception as exc:
+        logger.warning("joseph_god_mode_lineup failed: %s", exc)
+
+    return result
+
+
+def joseph_god_mode_trade(outgoing: list, incoming: list,
+                          team_needs: list = None) -> dict:
+    """Run God Mode trade evaluation.
+
+    Parameters
+    ----------
+    outgoing : list[dict]
+        Players being sent out.
+    incoming : list[dict]
+        Players being received.
+    team_needs : list[str], optional
+        List of team needs (e.g., ["rim_protector", "3pt_shooting"]).
+
+    Returns
+    -------
+    dict
+        Trade evaluation with grade, WAR change, Joseph's take.
+    """
+    result = {"trade_evaluation": {}, "modules_used": [], "joseph_take": ""}
+    try:
+        if _TRADE_EVALUATOR_AVAILABLE:
+            result["trade_evaluation"] = evaluate_trade(
+                outgoing, incoming, team_needs
+            )
+            result["modules_used"].append("trade_evaluator")
+            result["joseph_take"] = result["trade_evaluation"].get(
+                "joseph_take", "Trade analysis unavailable."
+            )
+    except Exception as exc:
+        logger.warning("joseph_god_mode_trade failed: %s", exc)
+        result["joseph_take"] = "Trade analysis encountered an error."
+    return result
+
+
+def joseph_god_mode_prospect(prospect: dict) -> dict:
+    """Run God Mode draft prospect evaluation.
+
+    Parameters
+    ----------
+    prospect : dict
+        Prospect data with college stats and physical measurements.
+
+    Returns
+    -------
+    dict
+        Full scouting report with projections, comps, career prediction.
+    """
+    result = {"scouting_report": {}, "modules_used": [], "joseph_take": ""}
+    try:
+        if _DRAFT_PROSPECT_AVAILABLE:
+            result["scouting_report"] = build_prospect_scouting_report(prospect)
+            result["modules_used"].append("draft_prospect")
+            result["joseph_take"] = result["scouting_report"].get(
+                "joseph_take", "Prospect analysis unavailable."
+            )
+    except Exception as exc:
+        logger.warning("joseph_god_mode_prospect failed: %s", exc)
+        result["joseph_take"] = "Prospect analysis encountered an error."
+    return result
