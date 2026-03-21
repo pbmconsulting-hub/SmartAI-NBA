@@ -28,6 +28,11 @@ from styles.theme import get_global_css, get_qds_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
+
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate
 if not premium_gate("Player Simulator"):

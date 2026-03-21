@@ -31,6 +31,11 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
+
 st.title("🏆 Live Scores & Stats Leaders")
 st.markdown(
     f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Real-time NBA scores and leaderboards."

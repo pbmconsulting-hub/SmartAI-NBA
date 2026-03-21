@@ -146,10 +146,11 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating
+from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
+render_joseph_hero_banner()
 
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user

@@ -13,6 +13,11 @@ st.set_page_config(
 from styles.theme import get_global_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
+
 from utils.premium_gate import premium_gate
 if not premium_gate("Backtester"):
     st.stop()

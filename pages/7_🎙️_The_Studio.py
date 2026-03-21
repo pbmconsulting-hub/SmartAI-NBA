@@ -56,10 +56,11 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ── Sidebar global settings ──────────────────────────────────
 try:
-    from utils.components import render_global_settings, inject_joseph_floating
+    from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
     with st.sidebar:
         render_global_settings()
     inject_joseph_floating()
+    render_joseph_hero_banner()
 except ImportError:
     pass
 

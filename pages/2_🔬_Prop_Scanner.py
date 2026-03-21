@@ -44,6 +44,11 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+# ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
+from utils.components import render_joseph_hero_banner, inject_joseph_floating
+render_joseph_hero_banner()
+inject_joseph_floating()
+
 # ── Premium Status (partial gate — some features restricted) ──
 from utils.auth import is_premium_user as _is_premium_user
 try:
