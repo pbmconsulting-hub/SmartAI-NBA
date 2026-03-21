@@ -1626,6 +1626,21 @@ if run_analysis:
             # Non-fatal — proceed with existing results
             _logger.warning(f"Smart Update error (non-fatal): {_su_err}")
 
+    # ── Select top _QME_MIN_OUTPUT_BETS bets from analyzed pool ──
+    # The engine analyzes ALL available props, then selects the best
+    # _QME_MIN_OUTPUT_BETS picks by confidence score.  Out players are
+    # kept at the end for transparency but do not count toward the quota.
+    _total_analyzed = len(analysis_results_list)
+    _out_results = [r for r in analysis_results_list if r.get("player_is_out", False)]
+    _active_results = [r for r in analysis_results_list if not r.get("player_is_out", False)]
+    _active_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
+    _selected_active = _active_results[:_QME_MIN_OUTPUT_BETS]
+    analysis_results_list = _selected_active + _out_results
+    _logger.info(
+        "QME 5.6 Output Selection: %d analyzed → %d eligible → %d selected (+ %d Out)",
+        _total_analyzed, len(_active_results), len(_selected_active), len(_out_results),
+    )
+
     st.session_state["analysis_results"] = analysis_results_list
     st.session_state["analysis_timestamp"] = datetime.datetime.now()
 
@@ -1642,7 +1657,8 @@ if run_analysis:
     progress_bar.empty()
     _analysis_elapsed = time.time() - _analysis_start_time
     st.success(
-        f"✅ Analysis complete! **{len(analysis_results_list)}** props analyzed "
+        f"✅ Analysis complete! Analyzed **{_total_analyzed}** props → "
+        f"selected **{len(_selected_active)}** best picks "
         f"in **{_analysis_elapsed:.1f}s**."
     )
 
