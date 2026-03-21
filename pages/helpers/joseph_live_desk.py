@@ -240,7 +240,9 @@ def render_broadcast_segment(segment_data: dict) -> str:
     Parameters
     ----------
     segment_data : dict
-        Keys: title (str), body (str), verdict (str|None),
+        Keys: title (str), body (str — may contain pre-built HTML;
+        callers are responsible for escaping user-facing strings via
+        html.escape before embedding them), verdict (str|None),
         player (str|None), prop_line (str|None).
     """
     title = _html.escape(str(segment_data.get("title", "")))
