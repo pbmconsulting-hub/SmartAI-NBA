@@ -82,11 +82,22 @@ _WIDGET_CSS = """<style>
 .joseph-sidebar-container{
     background:rgba(7,10,19,0.90);
     border:1px solid rgba(255,94,0,0.35);
-    border-radius:12px;
-    padding:12px;
+    border-radius:14px;
+    padding:14px;
     margin-top:12px;
     text-align:center;
     backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    position:relative;overflow:hidden;
+}
+.joseph-sidebar-container::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite;
+}
+@keyframes josephWidgetShimmer{
+    0%{background-position:-200% 0}100%{background-position:200% 0}
 }
 /* ── Joseph Sidebar Avatar ──────────────────────────────────── */
 .joseph-sidebar-avatar{
@@ -99,10 +110,23 @@ _WIDGET_CSS = """<style>
     transform:scale(1.1);
     box-shadow:0 0 22px rgba(255,94,0,0.65);
 }
+/* ── Sidebar Name Label ─────────────────────────────────────── */
+.joseph-sidebar-name{
+    font-family:'Orbitron',sans-serif;
+    color:#ff5e00;font-size:0.78rem;font-weight:700;
+    margin-top:6px;letter-spacing:0.4px;
+}
 /* ── Ambient Text ───────────────────────────────────────────── */
 .joseph-ambient-text{
     color:#ff9d4d;font-size:0.76rem;font-style:italic;
+    font-family:'Montserrat',sans-serif;
     margin-top:6px;line-height:1.35;min-height:2.5em;
+}
+/* ── Track Record Numbers ───────────────────────────────────── */
+.joseph-track-record{
+    font-family:'JetBrains Mono',monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:0.7rem;color:#94a3b8;margin-top:8px;
 }
 /* ── Pulse Dot ──────────────────────────────────────────────── */
 .joseph-pulse-dot{
@@ -115,6 +139,19 @@ _WIDGET_CSS = """<style>
     0%,100%{opacity:0.4;transform:scale(0.8);}
     50%{opacity:1;transform:scale(1.2);}
 }
+/* ── Typing Indicator — 3 bouncing dots ─────────────────────── */
+.joseph-widget-typing{display:inline-flex;gap:4px;align-items:center;padding:4px 0}
+.joseph-widget-typing span{
+    display:inline-block;width:5px;height:5px;
+    background:#ff5e00;border-radius:50%;
+    animation:josephWidgetBounce 1.2s ease-in-out infinite;
+}
+.joseph-widget-typing span:nth-child(2){animation-delay:0.15s}
+.joseph-widget-typing span:nth-child(3){animation-delay:0.3s}
+@keyframes josephWidgetBounce{
+    0%,80%,100%{transform:translateY(0)}
+    40%{transform:translateY(-6px)}
+}
 /* ── Inline Commentary Card ─────────────────────────────────── */
 .joseph-inline-card{
     background:rgba(7,10,19,0.90);
@@ -122,6 +159,7 @@ _WIDGET_CSS = """<style>
     border-radius:10px;
     padding:14px 16px;margin:12px 0;
     backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
 }
 .joseph-inline-avatar{
     width:36px;height:36px;border-radius:50%;
@@ -130,14 +168,61 @@ _WIDGET_CSS = """<style>
 }
 .joseph-inline-label{
     color:#ff5e00;font-weight:700;font-size:0.85rem;
+    font-family:'Orbitron',sans-serif;
 }
 .joseph-inline-text{
     color:#c0d0e8;font-size:0.84rem;margin-top:8px;line-height:1.5;
+    font-family:'Montserrat',sans-serif;
 }
 /* ── Verdict Accents ────────────────────────────────────────── */
 .joseph-widget-verdict-smash{color:#ff4444;font-weight:700;}
 .joseph-widget-verdict-lean{color:#00ff9d;font-weight:700;}
 .joseph-widget-verdict-fade{color:#ffc800;font-weight:700;}
+/* ── Ask Joseph Popover ─────────────────────────────────────── */
+.joseph-popover-container{
+    background:rgba(7,10,19,0.92);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,94,0,0.3);
+    border-radius:14px;
+    padding:20px;position:relative;overflow:hidden;
+}
+.joseph-popover-container::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite;
+}
+.joseph-popover-avatar{
+    width:64px;height:64px;border-radius:50%;
+    border:2px solid #ff5e00;object-fit:cover;
+    box-shadow:0 0 14px rgba(255,94,0,0.4);
+    transition:transform 0.2s ease,box-shadow 0.2s ease;
+}
+.joseph-popover-avatar:hover{
+    transform:scale(1.08);
+    box-shadow:0 0 22px rgba(255,94,0,0.6);
+}
+.joseph-popover-title{
+    font-family:'Orbitron',sans-serif;
+    color:#ff5e00;font-size:1.05rem;font-weight:700;
+    letter-spacing:0.5px;
+}
+.joseph-popover-subtitle{
+    color:#94a3b8;font-size:0.82rem;
+    font-family:'Montserrat',sans-serif;
+}
+.joseph-popover-body{
+    color:#e2e8f0;font-size:0.88rem;line-height:1.6;
+    font-family:'Montserrat',sans-serif;
+    margin-top:12px;
+}
+.joseph-popover-body strong{color:#ff9e00}
+.joseph-popover-stat{
+    font-family:'JetBrains Mono',monospace;
+    font-variant-numeric:tabular-nums;
+    color:#00f0ff;font-size:0.82rem;
+}
 </style>"""
 
 
@@ -236,7 +321,7 @@ def render_joseph_sidebar_widget() -> None:
                 roi = record.get("roi_estimate", 0.0)
                 roi_sign = "+" if roi >= 0 else ""
                 track_html = (
-                    f'<div style="margin-top:8px;font-size:0.7rem;color:#94a3b8;">'
+                    f'<div class="joseph-track-record">'
                     f'📊 {wins}W-{losses}L '
                     f'<span style="color:#00ff9d;">{roi_sign}{roi:.1f}% ROI</span>'
                     f'</div>'
@@ -351,3 +436,101 @@ def inject_joseph_inline_commentary(
         )
     except Exception as exc:
         _logger.debug("inject_joseph_inline_commentary failed: %s", exc)
+
+
+# ════════════════════════════════════════════════════════════════
+# render_joseph_ask_popover — Ask Joseph popover with 64px avatar
+# ════════════════════════════════════════════════════════════════
+
+def render_joseph_ask_popover(
+    results: list | None = None,
+    context_type: str = "analysis_results",
+) -> None:
+    """Render an *Ask Joseph* popover button with a 64 px avatar header.
+
+    The popover shows:
+
+    * Joseph's **64 px** avatar with orange glow ring (or 🎙️ fallback)
+    * A broadcast-style header with his name
+    * A reactive commentary line based on ``results`` (or an ambient
+      line when no results are supplied)
+
+    Call from any page to give users a quick-access Joseph surface
+    beyond the sidebar widget.
+
+    Parameters
+    ----------
+    results : list[dict] | None
+        Optional analysis results for Joseph to react to.
+    context_type : str
+        Context type key passed to :func:`engine.joseph_brain.joseph_commentary`.
+    """
+    if st is None:
+        return
+
+    try:
+        _inject_widget_css()
+    except Exception:
+        pass
+
+    try:
+        # ── Avatar image ──────────────────────────────────────
+        avatar_b64 = ""
+        try:
+            avatar_b64 = get_joseph_avatar_b64()
+        except Exception:
+            pass
+
+        if avatar_b64:
+            avatar_html = (
+                f'<img src="data:image/png;base64,{avatar_b64}" '
+                f'class="joseph-popover-avatar" '
+                f'alt="Joseph M. Smith" />'
+            )
+        else:
+            avatar_html = (
+                '<div class="joseph-popover-avatar" '
+                'style="display:flex;align-items:center;justify-content:center;'
+                'background:#1a1a2e;font-size:1.6rem;">🎙️</div>'
+            )
+
+        # ── Commentary / ambient text ─────────────────────────
+        commentary = ""
+        try:
+            if results:
+                commentary = joseph_commentary(results, context_type)
+            else:
+                session_dict = (
+                    dict(st.session_state)
+                    if hasattr(st, "session_state")
+                    else {}
+                )
+                ctx_key, ctx_kwargs = joseph_get_ambient_context(session_dict)
+                commentary = joseph_ambient_line(ctx_key, **ctx_kwargs)
+        except Exception as exc:
+            _logger.debug("Popover commentary failed: %s", exc)
+
+        if not commentary:
+            commentary = "Joseph M. Smith is ready. What's on the board tonight?"
+
+        escaped_commentary = _html.escape(commentary)
+
+        # ── Render popover ────────────────────────────────────
+        with st.popover("🎙️ Ask Joseph"):
+            st.markdown(
+                f'<div class="joseph-popover-container">'
+                f'<div style="display:flex;align-items:center;gap:14px;'
+                f'margin-bottom:12px;">'
+                f'{avatar_html}'
+                f'<div>'
+                f'<div class="joseph-popover-title">Joseph M. Smith</div>'
+                f'<div class="joseph-popover-subtitle">'
+                f'<span class="joseph-pulse-dot"></span> LIVE — NBA Analyst'
+                f'</div>'
+                f'</div></div>'
+                f'<div class="joseph-popover-body">{escaped_commentary}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    except Exception as exc:
+        _logger.debug("render_joseph_ask_popover failed: %s", exc)
