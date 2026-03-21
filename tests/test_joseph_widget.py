@@ -198,6 +198,65 @@ class TestWidgetCSS(unittest.TestCase):
     def test_track_record_class(self):
         self.assertIn("joseph-track-record", self.css)
 
+    # ── Elite NBA ESPN AI theme enhancements ──────────────────
+
+    def test_sidebar_bottom_broadcast_bar(self):
+        """Sidebar container should have a bottom shimmer bar."""
+        self.assertIn("joseph-sidebar-container::after", self.css)
+
+    def test_sidebar_container_outer_glow(self):
+        """Sidebar container should have an outer glow."""
+        self.assertIn("box-shadow", self.css)
+
+    def test_sidebar_avatar_animated_glow(self):
+        """Sidebar avatar should have an animated glow."""
+        self.assertIn("josephSidebarGlow", self.css)
+
+    def test_live_badge_class(self):
+        """Should have an ESPN-style LIVE badge class."""
+        self.assertIn("joseph-live-badge", self.css)
+
+    def test_pulse_dot_glow(self):
+        """Pulse dot should have a box-shadow glow."""
+        self.assertIn("box-shadow:0 0 4px rgba(255,94,0,0.5)", self.css)
+
+    def test_inline_card_left_accent(self):
+        """Inline commentary card should have a left accent border."""
+        self.assertIn("border-left:3px solid rgba(255,94,0,0.5)", self.css)
+
+    def test_inline_card_hover(self):
+        """Inline card should have hover effect."""
+        self.assertIn("joseph-inline-card:hover", self.css)
+
+    def test_inline_avatar_glow(self):
+        """Inline avatar should have a glow shadow."""
+        self.assertIn("box-shadow:0 0 6px rgba(255,94,0,0.25)", self.css)
+
+    def test_inline_label_text_shadow(self):
+        """Inline label should have a text shadow."""
+        self.assertIn("text-shadow:0 0 6px rgba(255,94,0,0.12)", self.css)
+
+    def test_verdict_text_shadows(self):
+        """Verdict accents should have text-shadow glow."""
+        self.assertIn("text-shadow:0 0 6px rgba(255,68,68,0.2)", self.css)
+        self.assertIn("text-shadow:0 0 6px rgba(0,255,157,0.15)", self.css)
+
+    def test_popover_bottom_bar(self):
+        """Popover should have a bottom shimmer bar."""
+        self.assertIn("joseph-popover-container::after", self.css)
+
+    def test_popover_avatar_animated_glow(self):
+        """Popover avatar should have an animated glow ring."""
+        self.assertIn("josephPopoverGlow", self.css)
+
+    def test_popover_title_text_shadow(self):
+        """Popover title should have a text-shadow."""
+        self.assertIn("text-shadow:0 0 10px rgba(255,94,0,0.2)", self.css)
+
+    def test_sidebar_name_text_shadow(self):
+        """Sidebar name should have a text-shadow."""
+        self.assertIn("text-shadow:0 0 8px rgba(255,94,0,0.15)", self.css)
+
 
 # ============================================================
 # SECTION 3: _inject_widget_css()

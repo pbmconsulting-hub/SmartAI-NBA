@@ -95,11 +95,21 @@ def render_live_desk_css() -> str:
     margin:24px 0;
     position:relative;
     overflow:hidden;
+    box-shadow:0 0 40px rgba(255,94,0,0.08),inset 0 1px 0 rgba(255,158,0,0.1);
 }
+/* Top broadcast bar */
 .joseph-live-desk::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
+    background-size:200% 100%;
     animation:josephShimmer 3s linear infinite;
+}
+/* Bottom broadcast bar */
+.joseph-live-desk::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    background-size:200% 100%;
+    animation:josephShimmer 3s linear infinite reverse;
 }
 @keyframes josephShimmer{
     0%{background-position:-200% 0}
@@ -112,10 +122,11 @@ def render_live_desk_css() -> str:
     background:#ff2020;border-radius:50%;
     margin-right:8px;vertical-align:middle;
     animation:josephLivePulse 1.4s ease-in-out infinite;
+    box-shadow:0 0 6px rgba(255,32,32,0.6);
 }
 @keyframes josephLivePulse{
-    0%,100%{opacity:1;transform:scale(1)}
-    50%{opacity:0.4;transform:scale(0.85)}
+    0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 6px rgba(255,32,32,0.6)}
+    50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 2px rgba(255,32,32,0.3)}
 }
 
 /* ── Typing Indicator — 3 bouncing dots ───────────────────── */
@@ -136,8 +147,13 @@ def render_live_desk_css() -> str:
 .joseph-avatar{
     width:64px;height:64px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 12px rgba(255,94,0,0.35);
+    box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15);
     flex-shrink:0;
+    animation:josephAvatarGlow 3s ease-in-out infinite;
+}
+@keyframes josephAvatarGlow{
+    0%,100%{box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15)}
+    50%{box-shadow:0 0 18px rgba(255,94,0,0.55),0 0 36px rgba(255,94,0,0.2)}
 }
 .joseph-avatar-sm{width:48px;height:48px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
@@ -148,24 +164,35 @@ def render_live_desk_css() -> str:
 .joseph-header-text{
     font-family:'Orbitron',sans-serif;font-size:1.25rem;
     color:#ff5e00;font-weight:700;letter-spacing:0.5px;
+    text-shadow:0 0 12px rgba(255,94,0,0.3);
 }
-.joseph-subtitle{color:#94a3b8;font-size:0.85rem;margin-top:2px}
+.joseph-subtitle{
+    color:#94a3b8;font-size:0.85rem;margin-top:2px;
+    font-family:'Montserrat',sans-serif;letter-spacing:0.3px;
+}
 
 /* ── Broadcast Segment Cards ──────────────────────────────── */
 .joseph-segment{
     background:rgba(15,23,42,0.7);
     backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
     border:1px solid rgba(255,94,0,0.15);
+    border-left:3px solid rgba(255,94,0,0.5);
     border-radius:12px;padding:18px 22px;
     margin-bottom:14px;
-    transition:border-color 0.2s ease;
+    transition:all 0.25s ease;
 }
-.joseph-segment:hover{border-color:rgba(255,94,0,0.45)}
+.joseph-segment:hover{
+    border-color:rgba(255,94,0,0.45);
+    transform:translateY(-1px);
+    box-shadow:0 4px 20px rgba(255,94,0,0.1);
+}
 
 .joseph-segment-title{
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:1rem;font-weight:600;
-    margin-bottom:10px;
+    margin-bottom:10px;letter-spacing:0.5px;
+    text-shadow:0 0 8px rgba(255,94,0,0.15);
 }
 .joseph-segment-body{
     color:#e2e8f0;font-size:0.92rem;
@@ -179,10 +206,13 @@ def render_live_desk_css() -> str:
     font-family:'Orbitron',sans-serif;font-size:0.75rem;
     font-weight:700;letter-spacing:0.8px;margin-right:8px;
     vertical-align:middle;
+    text-shadow:0 0 6px currentColor;
+    transition:transform 0.15s ease;
 }
-.joseph-verdict-smash{background:rgba(239,68,68,0.25);color:#ff4444;border:1px solid rgba(239,68,68,0.4)}
-.joseph-verdict-lean{background:rgba(34,197,94,0.2);color:#22c55e;border:1px solid rgba(34,197,94,0.35)}
-.joseph-verdict-fade{background:rgba(234,179,8,0.2);color:#eab308;border:1px solid rgba(234,179,8,0.35)}
+.joseph-verdict:hover{transform:scale(1.05)}
+.joseph-verdict-smash{background:rgba(239,68,68,0.25);color:#ff4444;border:1px solid rgba(239,68,68,0.4);box-shadow:0 0 8px rgba(239,68,68,0.15)}
+.joseph-verdict-lean{background:rgba(34,197,94,0.2);color:#22c55e;border:1px solid rgba(34,197,94,0.35);box-shadow:0 0 8px rgba(34,197,94,0.12)}
+.joseph-verdict-fade{background:rgba(234,179,8,0.2);color:#eab308;border:1px solid rgba(234,179,8,0.35);box-shadow:0 0 8px rgba(234,179,8,0.12)}
 .joseph-verdict-stay_away{background:rgba(107,114,128,0.25);color:#9ca3af;border:1px solid rgba(107,114,128,0.35)}
 
 /* ── Dawg Board Table ─────────────────────────────────────── */
@@ -199,6 +229,7 @@ def render_live_desk_css() -> str:
 .joseph-dawg-table td{
     padding:8px 14px;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.1);
+    transition:background 0.15s ease;
 }
 .joseph-dawg-table tr:hover td{background:rgba(255,94,0,0.06)}
 
@@ -216,6 +247,7 @@ def render_live_desk_css() -> str:
 .joseph-override-table td{
     padding:8px 14px;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.1);
+    transition:background 0.15s ease;
 }
 .joseph-override-table tr:hover td{background:rgba(0,240,255,0.04)}
 
@@ -225,8 +257,16 @@ def render_live_desk_css() -> str:
     border-radius:8px;padding:14px 18px;margin-top:10px;
     font-family:'JetBrains Mono',monospace;font-size:0.78rem;
     color:#94a3b8;line-height:1.6;
+    font-variant-numeric:tabular-nums;
 }
 .joseph-nerd-stats strong{color:#00f0ff}
+
+/* ── Edge Scoreboard Numbers ──────────────────────────────── */
+.joseph-edge-value{
+    font-family:'JetBrains Mono',monospace;
+    font-variant-numeric:tabular-nums;
+    font-weight:700;color:#ff5e00;
+}
 </style>"""
 
 

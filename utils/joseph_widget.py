@@ -89,12 +89,21 @@ _WIDGET_CSS = """<style>
     backdrop-filter:blur(12px);
     -webkit-backdrop-filter:blur(12px);
     position:relative;overflow:hidden;
+    box-shadow:0 0 24px rgba(255,94,0,0.06);
 }
+/* Top broadcast bar */
 .joseph-sidebar-container::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
     background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
     background-size:200% 100%;
     animation:josephWidgetShimmer 3s linear infinite;
+}
+/* Bottom broadcast bar */
+.joseph-sidebar-container::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite reverse;
 }
 @keyframes josephWidgetShimmer{
     0%{background-position:-200% 0}100%{background-position:200% 0}
@@ -105,6 +114,11 @@ _WIDGET_CSS = """<style>
     border:2px solid #ff5e00;
     box-shadow:0 0 14px rgba(255,94,0,0.45);
     transition:transform 0.2s ease,box-shadow 0.2s ease;
+    animation:josephSidebarGlow 3s ease-in-out infinite;
+}
+@keyframes josephSidebarGlow{
+    0%,100%{box-shadow:0 0 14px rgba(255,94,0,0.45)}
+    50%{box-shadow:0 0 20px rgba(255,94,0,0.65)}
 }
 .joseph-sidebar-avatar:hover{
     transform:scale(1.1);
@@ -115,6 +129,14 @@ _WIDGET_CSS = """<style>
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:0.78rem;font-weight:700;
     margin-top:6px;letter-spacing:0.4px;
+    text-shadow:0 0 8px rgba(255,94,0,0.15);
+}
+/* ── LIVE Analysis Badge ────────────────────────────────────── */
+.joseph-live-badge{
+    display:inline-flex;align-items:center;gap:4px;
+    font-family:'Orbitron',sans-serif;font-size:0.6rem;
+    color:#ff2020;font-weight:700;letter-spacing:0.8px;
+    margin-top:4px;
 }
 /* ── Ambient Text ───────────────────────────────────────────── */
 .joseph-ambient-text{
@@ -134,6 +156,7 @@ _WIDGET_CSS = """<style>
     border-radius:50%;background:#ff5e00;
     animation:josephPulse 1.5s ease-in-out infinite;
     margin-right:4px;vertical-align:middle;
+    box-shadow:0 0 4px rgba(255,94,0,0.5);
 }
 @keyframes josephPulse{
     0%,100%{opacity:0.4;transform:scale(0.8);}
@@ -156,28 +179,36 @@ _WIDGET_CSS = """<style>
 .joseph-inline-card{
     background:rgba(7,10,19,0.90);
     border:1px solid rgba(255,94,0,0.25);
+    border-left:3px solid rgba(255,94,0,0.5);
     border-radius:10px;
     padding:14px 16px;margin:12px 0;
     backdrop-filter:blur(12px);
     -webkit-backdrop-filter:blur(12px);
+    transition:all 0.2s ease;
+}
+.joseph-inline-card:hover{
+    border-color:rgba(255,94,0,0.4);
+    box-shadow:0 2px 16px rgba(255,94,0,0.08);
 }
 .joseph-inline-avatar{
     width:36px;height:36px;border-radius:50%;
     border:2px solid #ff5e00;
     vertical-align:middle;margin-right:8px;
+    box-shadow:0 0 6px rgba(255,94,0,0.25);
 }
 .joseph-inline-label{
     color:#ff5e00;font-weight:700;font-size:0.85rem;
     font-family:'Orbitron',sans-serif;
+    text-shadow:0 0 6px rgba(255,94,0,0.12);
 }
 .joseph-inline-text{
     color:#c0d0e8;font-size:0.84rem;margin-top:8px;line-height:1.5;
     font-family:'Montserrat',sans-serif;
 }
 /* ── Verdict Accents ────────────────────────────────────────── */
-.joseph-widget-verdict-smash{color:#ff4444;font-weight:700;}
-.joseph-widget-verdict-lean{color:#00ff9d;font-weight:700;}
-.joseph-widget-verdict-fade{color:#ffc800;font-weight:700;}
+.joseph-widget-verdict-smash{color:#ff4444;font-weight:700;text-shadow:0 0 6px rgba(255,68,68,0.2);}
+.joseph-widget-verdict-lean{color:#00ff9d;font-weight:700;text-shadow:0 0 6px rgba(0,255,157,0.15);}
+.joseph-widget-verdict-fade{color:#ffc800;font-weight:700;text-shadow:0 0 6px rgba(255,200,0,0.15);}
 /* ── Ask Joseph Popover ─────────────────────────────────────── */
 .joseph-popover-container{
     background:rgba(7,10,19,0.92);
@@ -186,6 +217,7 @@ _WIDGET_CSS = """<style>
     border:1px solid rgba(255,94,0,0.3);
     border-radius:14px;
     padding:20px;position:relative;overflow:hidden;
+    box-shadow:0 0 30px rgba(255,94,0,0.08);
 }
 .joseph-popover-container::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
@@ -193,11 +225,22 @@ _WIDGET_CSS = """<style>
     background-size:200% 100%;
     animation:josephWidgetShimmer 3s linear infinite;
 }
+.joseph-popover-container::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    background-size:200% 100%;
+    animation:josephWidgetShimmer 3s linear infinite reverse;
+}
 .joseph-popover-avatar{
     width:64px;height:64px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 14px rgba(255,94,0,0.4);
+    box-shadow:0 0 14px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.15);
     transition:transform 0.2s ease,box-shadow 0.2s ease;
+    animation:josephPopoverGlow 3s ease-in-out infinite;
+}
+@keyframes josephPopoverGlow{
+    0%,100%{box-shadow:0 0 14px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.15)}
+    50%{box-shadow:0 0 20px rgba(255,94,0,0.6),0 0 36px rgba(255,94,0,0.2)}
 }
 .joseph-popover-avatar:hover{
     transform:scale(1.08);
@@ -207,6 +250,7 @@ _WIDGET_CSS = """<style>
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:1.05rem;font-weight:700;
     letter-spacing:0.5px;
+    text-shadow:0 0 10px rgba(255,94,0,0.2);
 }
 .joseph-popover-subtitle{
     color:#94a3b8;font-size:0.82rem;

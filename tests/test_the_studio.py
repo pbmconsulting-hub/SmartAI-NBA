@@ -185,6 +185,62 @@ class TestStudioCSS(unittest.TestCase):
     def test_orbitron_font(self):
         self.assertIn("Orbitron", self.source)
 
+    # ── Elite NBA ESPN AI theme enhancements ─────────────────
+
+    def test_hero_bottom_broadcast_bar(self):
+        """Hero should have a bottom shimmer bar like ESPN broadcast."""
+        self.assertIn("studio-hero::after", self.source)
+
+    def test_hero_outer_glow(self):
+        """Hero should have an outer glow box-shadow."""
+        self.assertIn("box-shadow", self.source)
+
+    def test_hero_title_text_shadow(self):
+        """Hero title should have a neon text-shadow."""
+        self.assertIn("text-shadow", self.source)
+
+    def test_avatar_animated_pulse(self):
+        """120px avatar should have an animated pulse glow ring."""
+        self.assertIn("studioAvatarPulse", self.source)
+
+    def test_game_card_left_accent(self):
+        """Game cards should have ESPN-style left accent border."""
+        self.assertIn("border-left", self.source)
+
+    def test_game_card_hover_lift(self):
+        """Game cards should lift on hover."""
+        self.assertIn("translateY", self.source)
+
+    def test_ticket_card_top_accent(self):
+        """Ticket cards should have a top accent gradient line."""
+        self.assertIn("studio-ticket-card::before", self.source)
+
+    def test_metric_value_tabular_nums(self):
+        """Metric values should use tabular-nums for scoreboard alignment."""
+        self.assertIn("tabular-nums", self.source)
+
+    def test_metric_label_uppercase(self):
+        """Metric labels should be uppercase."""
+        self.assertIn("text-transform:uppercase", self.source)
+
+    def test_metric_card_hover(self):
+        """Metric cards should have hover effects."""
+        self.assertIn("studio-metric-card:hover", self.source)
+
+    def test_section_title_left_border(self):
+        """Section titles should have ESPN-style left accent border."""
+        self.assertIn("border-left:3px solid #ff5e00", self.source)
+
+    def test_montserrat_font(self):
+        self.assertIn("Montserrat", self.source)
+
+    def test_jetbrains_mono_font(self):
+        self.assertIn("JetBrains Mono", self.source)
+
+    def test_payout_table_tabular_nums(self):
+        """Payout table should use tabular-nums for scoreboard numbers."""
+        self.assertIn("tabular-nums", self.source)
+
 
 class TestStudioImports(unittest.TestCase):
     """Verify the Studio page imports all required modules."""
