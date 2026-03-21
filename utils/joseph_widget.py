@@ -10,6 +10,7 @@
 
 import html as _html
 import logging
+import time
 
 try:
     import streamlit as st
@@ -110,19 +111,19 @@ _WIDGET_CSS = """<style>
 }
 /* ── Joseph Sidebar Avatar ──────────────────────────────────── */
 .joseph-sidebar-avatar{
-    width:56px;height:56px;border-radius:50%;
-    border:2px solid #ff5e00;
-    box-shadow:0 0 14px rgba(255,94,0,0.45);
+    width:80px;height:80px;border-radius:50%;
+    border:3px solid #ff5e00;
+    box-shadow:0 0 18px rgba(255,94,0,0.5);
     transition:transform 0.2s ease,box-shadow 0.2s ease;
     animation:josephSidebarGlow 3s ease-in-out infinite;
 }
 @keyframes josephSidebarGlow{
-    0%,100%{box-shadow:0 0 14px rgba(255,94,0,0.45)}
-    50%{box-shadow:0 0 20px rgba(255,94,0,0.65)}
+    0%,100%{box-shadow:0 0 18px rgba(255,94,0,0.5)}
+    50%{box-shadow:0 0 26px rgba(255,94,0,0.7)}
 }
 .joseph-sidebar-avatar:hover{
-    transform:scale(1.1);
-    box-shadow:0 0 22px rgba(255,94,0,0.65);
+    transform:scale(1.12);
+    box-shadow:0 0 28px rgba(255,94,0,0.7);
 }
 /* ── Sidebar Name Label ─────────────────────────────────────── */
 .joseph-sidebar-name{
@@ -137,12 +138,6 @@ _WIDGET_CSS = """<style>
     font-family:'Orbitron',sans-serif;font-size:0.6rem;
     color:#ff2020;font-weight:700;letter-spacing:0.8px;
     margin-top:4px;
-}
-/* ── Ambient Text ───────────────────────────────────────────── */
-.joseph-ambient-text{
-    color:#ff9d4d;font-size:0.76rem;font-style:italic;
-    font-family:'Montserrat',sans-serif;
-    margin-top:6px;line-height:1.35;min-height:2.5em;
 }
 /* ── Track Record Numbers ───────────────────────────────────── */
 .joseph-track-record{
@@ -191,10 +186,10 @@ _WIDGET_CSS = """<style>
     box-shadow:0 2px 16px rgba(255,94,0,0.08);
 }
 .joseph-inline-avatar{
-    width:36px;height:36px;border-radius:50%;
+    width:52px;height:52px;border-radius:50%;
     border:2px solid #ff5e00;
-    vertical-align:middle;margin-right:8px;
-    box-shadow:0 0 6px rgba(255,94,0,0.25);
+    vertical-align:middle;margin-right:10px;
+    box-shadow:0 0 10px rgba(255,94,0,0.35);
 }
 .joseph-inline-label{
     color:#ff5e00;font-weight:700;font-size:0.85rem;
@@ -232,15 +227,15 @@ _WIDGET_CSS = """<style>
     animation:josephWidgetShimmer 3s linear infinite reverse;
 }
 .joseph-popover-avatar{
-    width:64px;height:64px;border-radius:50%;
-    border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 14px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.15);
+    width:80px;height:80px;border-radius:50%;
+    border:3px solid #ff5e00;object-fit:cover;
+    box-shadow:0 0 18px rgba(255,94,0,0.5),0 0 32px rgba(255,94,0,0.18);
     transition:transform 0.2s ease,box-shadow 0.2s ease;
     animation:josephPopoverGlow 3s ease-in-out infinite;
 }
 @keyframes josephPopoverGlow{
-    0%,100%{box-shadow:0 0 14px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.15)}
-    50%{box-shadow:0 0 20px rgba(255,94,0,0.6),0 0 36px rgba(255,94,0,0.2)}
+    0%,100%{box-shadow:0 0 18px rgba(255,94,0,0.5),0 0 32px rgba(255,94,0,0.18)}
+    50%{box-shadow:0 0 24px rgba(255,94,0,0.65),0 0 40px rgba(255,94,0,0.25)}
 }
 .joseph-popover-avatar:hover{
     transform:scale(1.08);
@@ -299,18 +294,18 @@ _WIDGET_CSS = """<style>
     box-shadow:0 4px 32px rgba(0,0,0,0.6),0 0 28px rgba(255,94,0,0.2);
 }
 .joseph-floating-avatar{
-    width:48px;height:48px;border-radius:50%;flex-shrink:0;
-    border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 12px rgba(255,94,0,0.45);
+    width:72px;height:72px;border-radius:50%;flex-shrink:0;
+    border:3px solid #ff5e00;object-fit:cover;
+    box-shadow:0 0 16px rgba(255,94,0,0.5);
     animation:josephFloatingGlow 3s ease-in-out infinite;
 }
 @keyframes josephFloatingGlow{
-    0%,100%{box-shadow:0 0 12px rgba(255,94,0,0.45)}
-    50%{box-shadow:0 0 18px rgba(255,94,0,0.65)}
+    0%,100%{box-shadow:0 0 16px rgba(255,94,0,0.5)}
+    50%{box-shadow:0 0 24px rgba(255,94,0,0.7)}
 }
 .joseph-floating-avatar:hover{
-    transform:scale(1.08);
-    box-shadow:0 0 20px rgba(255,94,0,0.65);
+    transform:scale(1.1);
+    box-shadow:0 0 24px rgba(255,94,0,0.7);
     transition:transform 0.2s ease,box-shadow 0.2s ease;
 }
 .joseph-floating-info{
@@ -329,6 +324,18 @@ _WIDGET_CSS = """<style>
     line-height:1.3;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;text-overflow:ellipsis;
+}
+/* ── Joseph Typing / Text Reveal Animation ──────────────────── */
+.joseph-ambient-text{
+    color:#ff9d4d;font-size:0.76rem;font-style:italic;
+    font-family:'Montserrat',sans-serif;
+    margin-top:6px;line-height:1.35;min-height:2.5em;
+    animation:josephTextReveal 2s ease-out forwards;
+    overflow:hidden;
+}
+@keyframes josephTextReveal{
+    from{clip-path:inset(0 100% 0 0);opacity:0.3}
+    to{clip-path:inset(0 0% 0 0);opacity:1}
 }
 </style>"""
 
@@ -364,7 +371,7 @@ def render_joseph_sidebar_widget() -> None:
 
     The widget shows:
 
-    * Joseph's 56 px avatar with hover glow
+    * Joseph's 80 px avatar with hover glow
     * A pulsing "LIVE" dot
     * A rotating ambient commentary line from
       :func:`engine.joseph_brain.joseph_ambient_line`
@@ -463,7 +470,7 @@ def render_joseph_floating_widget() -> None:
     The widget uses ``position:fixed`` so it stays visible regardless
     of scroll position.  It shows:
 
-    * Joseph's **48 px** avatar with animated glow ring
+    * Joseph's **72 px** avatar with animated glow ring
     * A pulsing LIVE dot + his name
     * A rotating ambient commentary line
 
@@ -531,6 +538,18 @@ def render_joseph_floating_widget() -> None:
         )
     except Exception as exc:
         _logger.debug("render_joseph_floating_widget failed: %s", exc)
+
+
+# ════════════════════════════════════════════════════════════════
+# _joseph_word_generator — yields words with a typing delay
+# ════════════════════════════════════════════════════════════════
+
+def _joseph_word_generator(text: str):
+    """Yield words one at a time with a small delay to simulate typing."""
+    words = text.split()
+    for i, word in enumerate(words):
+        yield word + (" " if i < len(words) - 1 else "")
+        time.sleep(0.04)
 
 
 # ════════════════════════════════════════════════════════════════
@@ -609,24 +628,37 @@ def inject_joseph_inline_commentary(
             verdict_class = " joseph-widget-verdict-fade"
 
         # ── Render inline card ────────────────────────────────
+        # Card header (avatar + label) rendered as styled HTML.
         st.markdown(
             f'<div class="joseph-inline-card">'
             f'<div>'
             f'{inline_avatar}'
             f'<span class="joseph-inline-label">Joseph M. Smith</span>'
             f'</div>'
-            f'<div class="joseph-inline-text{verdict_class}">'
-            f'{escaped_commentary}'
-            f'</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
+
+        # ── Typing effect: use st.write_stream() the first time, then
+        #    display static text on subsequent reruns so the user doesn't
+        #    re-watch the animation every time the page refreshes. ──
+        _stream_key = f"_joseph_streamed_{context_type}"
+        if not st.session_state.get(_stream_key):
+            st.write_stream(_joseph_word_generator(commentary))
+            st.session_state[_stream_key] = True
+        else:
+            st.markdown(
+                f'<div class="joseph-inline-text{verdict_class}">'
+                f'{escaped_commentary}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
     except Exception as exc:
         _logger.debug("inject_joseph_inline_commentary failed: %s", exc)
 
 
 # ════════════════════════════════════════════════════════════════
-# render_joseph_ask_popover — Ask Joseph popover with 64px avatar
+# render_joseph_ask_popover — Ask Joseph popover with 80px avatar
 # ════════════════════════════════════════════════════════════════
 
 def render_joseph_ask_popover(
@@ -637,7 +669,7 @@ def render_joseph_ask_popover(
 
     The popover shows:
 
-    * Joseph's **64 px** avatar with orange glow ring (or 🎙️ fallback)
+    * Joseph's **80 px** avatar with orange glow ring (or 🎙️ fallback)
     * A broadcast-style header with his name
     * A reactive commentary line based on ``results`` (or an ambient
       line when no results are supplied)
@@ -721,3 +753,9 @@ def render_joseph_ask_popover(
             )
     except Exception as exc:
         _logger.debug("render_joseph_ask_popover failed: %s", exc)
+
+
+# ════════════════════════════════════════════════════════════════
+# Alias — pages import this name; keep both for compatibility
+# ════════════════════════════════════════════════════════════════
+render_joseph_inline_commentary = inject_joseph_inline_commentary

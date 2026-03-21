@@ -33,6 +33,12 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html, get_logo_img_tag, GOLD_LOGO_PATH
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+try:
+    from utils.components import inject_joseph_floating
+    inject_joseph_floating()
+except Exception:
+    pass  # Non-critical — never block page load
+
 # ─── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -819,6 +825,7 @@ if platform_props_clicked:
             st.success("✅ Props fetched and merged! Go to ⚡ Neural Analysis to run analysis on all loaded props.")
             from styles.theme import get_bet_card_css, get_bet_card_html, get_summary_cards_html
             st.markdown(get_bet_card_css(), unsafe_allow_html=True)
+
 
             # Summary
             total_picks = len(analyzed_props)

@@ -28,6 +28,13 @@ from styles.theme import get_global_css, get_qds_css
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+try:
+    from utils.components import inject_joseph_floating
+    inject_joseph_floating()
+except Exception:
+    pass  # Non-critical — never block page load
+
+
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate
 if not premium_gate("Player Simulator"):

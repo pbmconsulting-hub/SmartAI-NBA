@@ -24,6 +24,13 @@ st.set_page_config(
 from styles.theme import get_global_css, get_education_box_html, get_premium_footer_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+try:
+    from utils.components import inject_joseph_floating
+    inject_joseph_floating()
+except Exception:
+    pass  # Non-critical — never block page load
+
+
 # ─── Premium Page Custom CSS ──────────────────────────────────
 st.markdown("""
 <style>

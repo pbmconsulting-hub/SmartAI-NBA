@@ -30,6 +30,13 @@ st.set_page_config(
 
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
+try:
+    from utils.components import inject_joseph_floating
+    inject_joseph_floating()
+except Exception:
+    pass  # Non-critical — never block page load
+
+
 # ── Premium gate (graceful if module unavailable) ─────────────
 try:
     from utils.premium_gate import premium_gate

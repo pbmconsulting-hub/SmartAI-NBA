@@ -84,18 +84,18 @@ def get_joseph_avatar_b64() -> str:
 def render_live_desk_css() -> str:
     """Return complete CSS string for Joseph's Live Broadcast Desk."""
     return """<style>
-/* ── Joseph Live Desk — Glassmorphic Container ─────────────── */
+/* ── Joseph Live Desk — Glassmorphic Container (compact) ───── */
 .joseph-live-desk{
     background:rgba(7,10,19,0.85);
     backdrop-filter:blur(16px);
     -webkit-backdrop-filter:blur(16px);
     border:1px solid rgba(255,94,0,0.3);
-    border-radius:16px;
-    padding:24px 28px;
-    margin:24px 0;
+    border-radius:12px;
+    padding:10px 14px;
+    margin:10px 0;
     position:relative;
     overflow:hidden;
-    box-shadow:0 0 40px rgba(255,94,0,0.08),inset 0 1px 0 rgba(255,158,0,0.1);
+    box-shadow:0 0 24px rgba(255,94,0,0.06),inset 0 1px 0 rgba(255,158,0,0.1);
 }
 /* Top broadcast bar */
 .joseph-live-desk::before{
@@ -145,29 +145,29 @@ def render_live_desk_css() -> str:
 
 /* ── Joseph Avatar Circle ─────────────────────────────────── */
 .joseph-avatar{
-    width:64px;height:64px;border-radius:50%;
-    border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15);
+    width:80px;height:80px;border-radius:50%;
+    border:3px solid #ff5e00;object-fit:cover;
+    box-shadow:0 0 16px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.18);
     flex-shrink:0;
     animation:josephAvatarGlow 3s ease-in-out infinite;
 }
 @keyframes josephAvatarGlow{
-    0%,100%{box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15)}
-    50%{box-shadow:0 0 18px rgba(255,94,0,0.55),0 0 36px rgba(255,94,0,0.2)}
+    0%,100%{box-shadow:0 0 16px rgba(255,94,0,0.4),0 0 28px rgba(255,94,0,0.18)}
+    50%{box-shadow:0 0 22px rgba(255,94,0,0.6),0 0 40px rgba(255,94,0,0.25)}
 }
 .joseph-avatar-sm{width:48px;height:48px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 8px rgba(255,94,0,0.25);flex-shrink:0}
 
 /* ── Broadcast Header Row ─────────────────────────────────── */
-.joseph-header{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.joseph-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
 .joseph-header-text{
-    font-family:'Orbitron',sans-serif;font-size:1.25rem;
+    font-family:'Orbitron',sans-serif;font-size:1rem;
     color:#ff5e00;font-weight:700;letter-spacing:0.5px;
-    text-shadow:0 0 12px rgba(255,94,0,0.3);
+    text-shadow:0 0 10px rgba(255,94,0,0.25);
 }
 .joseph-subtitle{
-    color:#94a3b8;font-size:0.85rem;margin-top:2px;
+    color:#94a3b8;font-size:0.78rem;margin-top:2px;
     font-family:'Montserrat',sans-serif;letter-spacing:0.3px;
 }
 
@@ -178,8 +178,8 @@ def render_live_desk_css() -> str:
     -webkit-backdrop-filter:blur(8px);
     border:1px solid rgba(255,94,0,0.15);
     border-left:3px solid rgba(255,94,0,0.5);
-    border-radius:12px;padding:18px 22px;
-    margin-bottom:14px;
+    border-radius:10px;padding:10px 14px;
+    margin-bottom:8px;
     transition:all 0.25s ease;
 }
 .joseph-segment:hover{
@@ -190,13 +190,13 @@ def render_live_desk_css() -> str:
 
 .joseph-segment-title{
     font-family:'Orbitron',sans-serif;
-    color:#ff5e00;font-size:1rem;font-weight:600;
-    margin-bottom:10px;letter-spacing:0.5px;
-    text-shadow:0 0 8px rgba(255,94,0,0.15);
+    color:#ff5e00;font-size:0.85rem;font-weight:600;
+    margin-bottom:6px;letter-spacing:0.5px;
+    text-shadow:0 0 6px rgba(255,94,0,0.12);
 }
 .joseph-segment-body{
-    color:#e2e8f0;font-size:0.92rem;
-    line-height:1.65;font-family:'Montserrat',sans-serif;
+    color:#e2e8f0;font-size:0.82rem;
+    line-height:1.5;font-family:'Montserrat',sans-serif;
 }
 .joseph-segment-body strong{color:#ff9e00}
 
@@ -218,16 +218,16 @@ def render_live_desk_css() -> str:
 /* ── Dawg Board Table ─────────────────────────────────────── */
 .joseph-dawg-table{
     width:100%;border-collapse:separate;border-spacing:0;
-    font-family:'Montserrat',sans-serif;font-size:0.85rem;
+    font-family:'Montserrat',sans-serif;font-size:0.78rem;
 }
 .joseph-dawg-table th{
     background:rgba(255,94,0,0.12);color:#ff5e00;
-    padding:10px 14px;text-align:left;
-    font-family:'Orbitron',sans-serif;font-size:0.75rem;
+    padding:6px 10px;text-align:left;
+    font-family:'Orbitron',sans-serif;font-size:0.68rem;
     letter-spacing:0.5px;border-bottom:1px solid rgba(255,94,0,0.25);
 }
 .joseph-dawg-table td{
-    padding:8px 14px;color:#e2e8f0;
+    padding:5px 10px;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.1);
     transition:background 0.15s ease;
 }
@@ -236,16 +236,16 @@ def render_live_desk_css() -> str:
 /* ── Override Report Table ────────────────────────────────── */
 .joseph-override-table{
     width:100%;border-collapse:separate;border-spacing:0;
-    font-family:'Montserrat',sans-serif;font-size:0.85rem;
+    font-family:'Montserrat',sans-serif;font-size:0.78rem;
 }
 .joseph-override-table th{
     background:rgba(0,240,255,0.08);color:#00f0ff;
-    padding:10px 14px;text-align:left;
-    font-family:'Orbitron',sans-serif;font-size:0.75rem;
+    padding:6px 10px;text-align:left;
+    font-family:'Orbitron',sans-serif;font-size:0.68rem;
     letter-spacing:0.5px;border-bottom:1px solid rgba(0,240,255,0.2);
 }
 .joseph-override-table td{
-    padding:8px 14px;color:#e2e8f0;
+    padding:5px 10px;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.1);
     transition:background 0.15s ease;
 }
@@ -254,9 +254,9 @@ def render_live_desk_css() -> str:
 /* ── Nerd Stats Toggle ────────────────────────────────────── */
 .joseph-nerd-stats{
     background:rgba(7,10,19,0.6);border:1px solid rgba(148,163,184,0.15);
-    border-radius:8px;padding:14px 18px;margin-top:10px;
-    font-family:'JetBrains Mono',monospace;font-size:0.78rem;
-    color:#94a3b8;line-height:1.6;
+    border-radius:6px;padding:8px 12px;margin-top:6px;
+    font-family:'JetBrains Mono',monospace;font-size:0.7rem;
+    color:#94a3b8;line-height:1.45;
     font-variant-numeric:tabular-nums;
 }
 .joseph-nerd-stats strong{color:#00f0ff}
