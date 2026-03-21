@@ -37,11 +37,22 @@ def _get_hero_banner_b64() -> str:
 
 
 def render_joseph_hero_banner() -> None:
-    """No-op — the full-width hero banner has been removed from the UI.
+    """Render the Joseph A Smith Hero Banner at the top of the page.
 
-    The function signature is preserved so existing callers do not break.
+    Displays a full-width 16:9 banner image when the banner file
+    is found.  Falls back to a no-op when the image is missing.
     """
-    return
+    b64 = _get_hero_banner_b64()
+    if not b64:
+        return
+    st.markdown(
+        f'<div style="width:100%;margin-bottom:16px;">'
+        f'<img src="data:image/png;base64,{b64}" '
+        f'style="width:100%;border-radius:12px;display:block;" '
+        f'alt="Joseph A Smith Hero Banner" />'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_global_settings():

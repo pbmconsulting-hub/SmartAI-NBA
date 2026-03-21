@@ -287,7 +287,6 @@ from utils.components import render_global_settings, inject_joseph_floating, ren
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
-render_joseph_hero_banner()
 
 # ============================================================
 # END SECTION: Initialize App on Startup

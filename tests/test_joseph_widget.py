@@ -283,7 +283,7 @@ class TestWidgetCSS(unittest.TestCase):
     def test_floating_avatar_class(self):
         """CSS should include the floating avatar class."""
         self.assertIn("joseph-floating-avatar", self.css)
-        self.assertIn("72px", self.css)
+        self.assertIn("96px", self.css)
 
     def test_floating_avatar_glow_keyframes(self):
         """Floating avatar should have an animated glow."""
