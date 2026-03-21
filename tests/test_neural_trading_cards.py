@@ -503,7 +503,7 @@ class TestNeuralAnalysisPageIntegration(unittest.TestCase):
     def setUp(self):
         self.page_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Neural_Analysis.py",
+            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
         )
         with open(self.page_path, "r") as f:
             self.source = f.read()
@@ -573,7 +573,7 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
 
     def _read_source(self):
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         return na_path.read_text(encoding="utf-8")
 
     def test_output_quota_constant_is_500(self):
@@ -688,7 +688,7 @@ class TestNeuralAnalysisTeamNormalization(unittest.TestCase):
 
     def _read_source(self):
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         return na_path.read_text(encoding="utf-8")
 
     def test_has_team_name_to_abbreviation_import(self):
@@ -779,7 +779,7 @@ class TestStudioKeyAlignment(unittest.TestCase):
 
     def _read_studio_source(self):
         import pathlib
-        studio = pathlib.Path(__file__).parent.parent / "pages" / "14_🎙️_The_Studio.py"
+        studio = pathlib.Path(__file__).parent.parent / "pages" / "7_🎙️_The_Studio.py"
         return studio.read_text(encoding="utf-8")
 
     def test_total_opinion_falls_back_to_joseph_key(self):

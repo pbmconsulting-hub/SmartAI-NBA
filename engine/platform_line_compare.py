@@ -8,7 +8,7 @@
 #          shopping — a free source of EV with zero model risk.
 #
 # CONNECTS TO: engine/entry_optimizer.py (EV calculation),
-#              pages/4_🧬_Entry_Builder.py (display annotations)
+#              pages/6_🧬_Entry_Builder.py (display annotations)
 # CONCEPTS COVERED: Line shopping, market inefficiency, EV from
 #                   line differences, cross-platform arbitrage
 # ============================================================

@@ -34,9 +34,9 @@ class TestEngineRebrand(unittest.TestCase):
         self.assertNotIn("JM5", content, "Found residual 'JM5' reference in styles/theme.py")
 
     def test_no_jm5_in_neural_analysis(self):
-        """pages/3_⚡_Neural_Analysis.py should contain no 'JM5' references."""
+        """pages/3_⚡_Quantum_Analysis_Matrix.py should contain no 'JM5' references."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         content = na_path.read_text(encoding="utf-8")
         self.assertNotIn("JM5", content, "Found residual 'JM5' reference in Neural Analysis page")
 
@@ -48,9 +48,9 @@ class TestEngineRebrand(unittest.TestCase):
         self.assertIn("Quantum Matrix Engine 5.6", content)
 
     def test_quantum_matrix_in_neural_analysis(self):
-        """pages/3_⚡_Neural_Analysis.py should mention 'Quantum Matrix Engine 5.6'."""
+        """pages/3_⚡_Quantum_Analysis_Matrix.py should mention 'Quantum Matrix Engine 5.6'."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         content = na_path.read_text(encoding="utf-8")
         self.assertIn("Quantum Matrix Engine 5.6", content)
 
@@ -94,7 +94,7 @@ class TestGlobalSettingsComponent(unittest.TestCase):
     def test_settings_injected_in_neural_analysis(self):
         """Neural Analysis page should import and call render_global_settings."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("from utils.components import render_global_settings", source)
         self.assertIn("render_global_settings()", source)
@@ -102,7 +102,7 @@ class TestGlobalSettingsComponent(unittest.TestCase):
     def test_settings_injected_in_entry_builder(self):
         """Entry Builder page should import and call render_global_settings."""
         import pathlib
-        eb_path = pathlib.Path(__file__).parent.parent / "pages" / "4_🧬_Entry_Builder.py"
+        eb_path = pathlib.Path(__file__).parent.parent / "pages" / "6_🧬_Entry_Builder.py"
         source = eb_path.read_text(encoding="utf-8")
         self.assertIn("from utils.components import render_global_settings", source)
         self.assertIn("render_global_settings()", source)
@@ -118,14 +118,14 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     def test_funnel_expander_exists(self):
         """Neural Analysis page should have a Market Filters expander."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn('Market Filters', source)
 
     def test_funnel_stat_multiselect(self):
         """Neural Analysis page should have a stat type multiselect widget."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("Stat Types", source)
         self.assertIn("_STAT_TYPE_OPTIONS", source)
@@ -133,7 +133,7 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     def test_funnel_max_per_player_removed(self):
         """Neural Analysis page should NOT have a user-facing max-props-per-player control."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertNotIn("Max Props per Player", source)
         self.assertNotIn("funnel_max_per_player", source)
@@ -141,7 +141,7 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     def test_funnel_absolute_max_removed(self):
         """Neural Analysis page should NOT have an absolute-max-props control."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertNotIn("Absolute Max Props", source)
         self.assertNotIn("funnel_absolute_max", source)
@@ -149,21 +149,21 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     def test_output_quota_constant(self):
         """Neural Analysis page should define an output quota via _QME_MIN_OUTPUT_BETS."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("_QME_MIN_OUTPUT_BETS = 500", source)
 
     def test_funnel_dynamic_metric(self):
         """Neural Analysis page should show a dynamic metric for the output target."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("Output Target", source)
 
     def test_smart_filter_wired_in_runner(self):
         """The analysis runner should call smart_filter_props with funnel settings."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("smart_filter_props", source)
         self.assertIn("_funnel_stat_keys_run", source)
@@ -172,7 +172,7 @@ class TestPreAnalysisFunnel(unittest.TestCase):
     def test_no_per_player_cap_in_neural_analysis(self):
         """Neural Analysis should pass max_props_per_player=None (no per-player cap)."""
         import pathlib
-        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Neural_Analysis.py"
+        na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("max_props_per_player=None", source)
 

@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/4_🎰_Entry_Builder.py
+# FILE: pages/6_🧬_Entry_Builder.py
 # PURPOSE: Build optimal parlay entries for PrizePicks,
 #          Underdog, and DraftKings. Calculates EV for each.
 # CONNECTS TO: entry_optimizer.py, analysis results in session

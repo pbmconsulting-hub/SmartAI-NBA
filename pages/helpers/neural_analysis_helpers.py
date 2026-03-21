@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: pages/helpers/neural_analysis_helpers.py
 # PURPOSE: Helper functions for the Neural Analysis page.
-#          Extracted from pages/3_⚡_Neural_Analysis.py to reduce page size.
+#          Extracted from pages/3_⚡_Quantum_Analysis_Matrix.py to reduce page size.
 # ============================================================
 import streamlit as st
 import streamlit.components.v1 as _components

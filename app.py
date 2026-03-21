@@ -226,7 +226,7 @@ try:
     _user_is_premium = _is_premium()
 except Exception:
     _user_is_premium = True  # Fail open — don't block the home page
-    _PREM_PATH = "/6_%F0%9F%92%8E_Premium"
+    _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 
 with st.sidebar:
     if _user_is_premium:

@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/0_🏆_Live_Scores.py
+# FILE: pages/0_🏆_Live_Scores_&_Props.py
 # PURPOSE: Live NBA scoreboard, tonight's stats leaders, and
 #          season leaders — the first page in the sidebar.
 # DESIGN:  Quantum Design System (QDS) — dark futuristic theme

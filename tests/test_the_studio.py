@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: tests/test_the_studio.py
-# PURPOSE: Tests for pages/14_🎙️_The_Studio.py
+# PURPOSE: Tests for pages/7_🎙️_The_Studio.py
 #          (Joseph's dedicated interactive page — Layer 7)
 # ============================================================
 import sys, os, unittest, ast
@@ -16,7 +16,7 @@ class TestStudioFileSyntax(unittest.TestCase):
     def setUp(self):
         self.filepath = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "14_🎙️_The_Studio.py",
+            "pages", "7_🎙️_The_Studio.py",
         )
 
     def test_file_exists(self):
@@ -41,7 +41,7 @@ class TestStudioFileStructure(unittest.TestCase):
     def setUp(self):
         self.filepath = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "14_🎙️_The_Studio.py",
+            "pages", "7_🎙️_The_Studio.py",
         )
         with open(self.filepath, "r") as fh:
             self.source = fh.read()
@@ -152,7 +152,7 @@ class TestStudioCSS(unittest.TestCase):
     def setUp(self):
         self.filepath = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "14_🎙️_The_Studio.py",
+            "pages", "7_🎙️_The_Studio.py",
         )
         with open(self.filepath, "r") as fh:
             self.source = fh.read()
@@ -248,7 +248,7 @@ class TestStudioImports(unittest.TestCase):
     def setUp(self):
         self.filepath = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "14_🎙️_The_Studio.py",
+            "pages", "7_🎙️_The_Studio.py",
         )
         with open(self.filepath, "r") as fh:
             self.source = fh.read()
@@ -314,7 +314,7 @@ class TestStudioPlatformPreference(unittest.TestCase):
     def setUp(self):
         self.filepath = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "14_🎙️_The_Studio.py",
+            "pages", "7_🎙️_The_Studio.py",
         )
         with open(self.filepath, "r") as fh:
             self.source = fh.read()

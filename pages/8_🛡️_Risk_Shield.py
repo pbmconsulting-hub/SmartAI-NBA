@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/5_🚫_Avoid_List.py
+# FILE: pages/8_🛡️_Risk_Shield.py
 # PURPOSE: Display all props that should be avoided and explain
 #          WHY each one is a bad bet. Helps the user avoid traps.
 # CONNECTS TO: analysis results in session state
