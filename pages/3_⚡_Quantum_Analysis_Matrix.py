@@ -135,7 +135,7 @@ _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
 st.set_page_config(
-    page_title="Neural Analysis — SmartBetPro NBA",
+    page_title="Quantum Analysis Matrix — SmartBetPro NBA",
     page_icon="⚡",
     layout="wide",
 )
@@ -150,6 +150,12 @@ from utils.components import render_global_settings, inject_joseph_floating
 with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
+
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
 
 # ── Premium Status (partial gate — free users capped at 3 props) ──
 from utils.auth import is_premium_user as _is_premium_user

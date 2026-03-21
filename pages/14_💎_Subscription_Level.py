@@ -15,7 +15,7 @@ import datetime
 # ============================================================
 
 st.set_page_config(
-    page_title="Premium — SmartBetPro NBA",
+    page_title="Subscription Level — SmartBetPro NBA",
     page_icon="💎",
     layout="wide",
 )
@@ -29,6 +29,12 @@ try:
     inject_joseph_floating()
 except Exception:
     pass  # Non-critical — never block page load
+
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
 
 
 # ─── Premium Page Custom CSS ──────────────────────────────────

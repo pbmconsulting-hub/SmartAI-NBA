@@ -63,6 +63,12 @@ try:
 except ImportError:
     pass
 
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
+
 # ── Premium gate ─────────────────────────────────────────────
 try:
     from utils.premium_gate import premium_gate

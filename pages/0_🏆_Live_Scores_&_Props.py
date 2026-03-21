@@ -23,7 +23,7 @@ except ImportError:
 # ============================================================
 
 st.set_page_config(
-    page_title="Live Scores — SmartBetPro NBA",
+    page_title="Live Scores & Props — SmartBetPro NBA",
     page_icon="🏆",
     layout="wide",
 )
@@ -37,8 +37,14 @@ try:
 except Exception:
     pass  # Non-critical — never block page load
 
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
 
-st.title("🏆 Live Scores & Stats Leaders")
+
+st.title("🏆 Live Scores & Props")
 st.markdown(
     f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Real-time NBA scores and leaderboards."
 )

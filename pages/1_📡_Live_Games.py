@@ -39,6 +39,12 @@ try:
 except Exception:
     pass  # Non-critical — never block page load
 
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
+
 # ─── Custom CSS ────────────────────────────────────────────
 st.markdown("""
 <style>

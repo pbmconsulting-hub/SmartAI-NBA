@@ -59,6 +59,12 @@ with st.sidebar:
     render_global_settings()
 inject_joseph_floating()
 
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
+
 # ── Premium Gate ───────────────────────────────────────────────
 from utils.premium_gate import premium_gate
 if not premium_gate("Entry Builder"):

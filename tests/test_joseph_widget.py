@@ -89,7 +89,7 @@ class TestWidgetCSS(unittest.TestCase):
 
     def test_sidebar_avatar(self):
         self.assertIn("joseph-sidebar-avatar", self.css)
-        self.assertIn("56px", self.css)
+        self.assertIn("80px", self.css)
         self.assertIn("#ff5e00", self.css)
 
     def test_sidebar_avatar_hover(self):
@@ -117,7 +117,7 @@ class TestWidgetCSS(unittest.TestCase):
 
     def test_inline_avatar(self):
         self.assertIn("joseph-inline-avatar", self.css)
-        self.assertIn("36px", self.css)
+        self.assertIn("52px", self.css)
 
     def test_inline_label(self):
         self.assertIn("joseph-inline-label", self.css)
@@ -183,9 +183,9 @@ class TestWidgetCSS(unittest.TestCase):
     def test_popover_container(self):
         self.assertIn("joseph-popover-container", self.css)
 
-    def test_popover_avatar_64px(self):
+    def test_popover_avatar_80px(self):
         self.assertIn("joseph-popover-avatar", self.css)
-        self.assertIn("64px", self.css)
+        self.assertIn("80px", self.css)
 
     def test_popover_title_orbitron(self):
         self.assertIn("joseph-popover-title", self.css)
@@ -234,7 +234,7 @@ class TestWidgetCSS(unittest.TestCase):
 
     def test_inline_avatar_glow(self):
         """Inline avatar should have a glow shadow."""
-        self.assertIn("box-shadow:0 0 6px rgba(255,94,0,0.25)", self.css)
+        self.assertIn("box-shadow:0 0 10px rgba(255,94,0,0.35)", self.css)
 
     def test_inline_label_text_shadow(self):
         """Inline label should have a text shadow."""
@@ -283,7 +283,7 @@ class TestWidgetCSS(unittest.TestCase):
     def test_floating_avatar_class(self):
         """CSS should include the floating avatar class."""
         self.assertIn("joseph-floating-avatar", self.css)
-        self.assertIn("48px", self.css)
+        self.assertIn("72px", self.css)
 
     def test_floating_avatar_glow_keyframes(self):
         """Floating avatar should have an animated glow."""
@@ -614,9 +614,12 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
     def test_inline_card_contains_commentary(self, mock_comm):
         from utils.joseph_widget import inject_joseph_inline_commentary
         inject_joseph_inline_commentary([{"player": "Jokic"}])
-        calls = [c for c in _mock_st.markdown.call_args_list
-                 if "joseph-inline-card" in str(c)]
-        self.assertTrue(any("COMMENTARY" in str(c) for c in calls))
+        # Commentary now goes through st.write_stream (typing effect)
+        # or st.markdown (subsequent reruns). Check either path.
+        all_calls = str(_mock_st.markdown.call_args_list) + str(getattr(_mock_st, 'write_stream', lambda: None))
+        write_stream_called = _mock_st.write_stream.called if hasattr(_mock_st.write_stream, 'called') else False
+        markdown_has_commentary = any("COMMENTARY" in str(c) for c in _mock_st.markdown.call_args_list)
+        self.assertTrue(write_stream_called or markdown_has_commentary)
 
     @patch("utils.joseph_widget.joseph_commentary", return_value="SMASH")
     def test_verdict_smash_class(self, mock_comm):

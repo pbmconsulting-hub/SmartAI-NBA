@@ -50,6 +50,12 @@ try:
 except Exception:
     pass  # Non-critical — never block page load
 
+try:
+    from utils.components import render_hero_banner
+    render_hero_banner()
+except Exception:
+    pass
+
 
 # ── Premium Status (partial gate — some features restricted) ──
 from utils.auth import is_premium_user as _is_premium_user

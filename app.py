@@ -298,22 +298,16 @@ inject_joseph_floating()
 # SECTION: Hero Banner
 # ============================================================
 
+from utils.components import render_hero_banner
+render_hero_banner()
+
 today_str = datetime.date.today().strftime("%A, %B %d, %Y")
 todays_games = st.session_state.get("todays_games", [])
 game_count = len(todays_games)
 game_count_text = f"{game_count} game{'s' if game_count != 1 else ''} loaded" if game_count else "No games loaded yet"
 
-# Embed logo using cached base64 load — root-level high-res version
-_logo_b64 = _load_logo_b64(_LOGO_PATH) if os.path.exists(_LOGO_PATH) else ""
-
-_logo_img_tag = (
-    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" alt="Smart Pick Pro logo" />'
-    if _logo_b64 else ""
-)
-
 st.markdown(f"""
 <div class="hero-hud ss-fade-in-up">
-  {_logo_img_tag}
   <div class="hero-hud-text">
     <div class="hero-tagline">Quantum-Powered Prop Analytics</div>
     <div class="hero-subtext">1,000 Quantum Matrix Engine Simulations &bull; Institutional Edge Detection</div>

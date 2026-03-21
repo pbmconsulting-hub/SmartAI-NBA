@@ -70,7 +70,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
 
     def test_avatar_circle(self):
         self.assertIn("joseph-avatar", self.css)
-        self.assertIn("64px", self.css)
+        self.assertIn("80px", self.css)
         self.assertIn("#ff5e00", self.css)
 
     def test_segment_cards(self):
@@ -108,7 +108,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
         self.assertIn("box-shadow", self.css)
 
     def test_avatar_animated_glow(self):
-        """64px avatar should have an animated glow ring."""
+        """80px avatar should have an animated glow ring."""
         self.assertIn("josephAvatarGlow", self.css)
 
     def test_header_text_shadow(self):

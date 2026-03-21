@@ -6,6 +6,47 @@
 # ============================================================
 
 import streamlit as st
+import os
+import base64
+
+
+@st.cache_data(show_spinner=False)
+def _load_hero_banner_b64() -> str:
+    """Load hero banner as base64-encoded PNG, cached per session."""
+    _this = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_this, "..", "Joseph A Smith Hero Banner.png"),
+        os.path.join(os.getcwd(), "Joseph A Smith Hero Banner.png"),
+        os.path.join(_this, "..", "assets", "Joseph A Smith Hero Banner.png"),
+    ]
+    for path in candidates:
+        norm = os.path.normpath(path)
+        if os.path.isfile(norm):
+            try:
+                with open(norm, "rb") as fh:
+                    return base64.b64encode(fh.read()).decode("utf-8")
+            except Exception:
+                pass
+    return ""
+
+
+def render_hero_banner() -> None:
+    """Render the Joseph M. Smith hero banner at the top of a page.
+
+    The banner is 16:9 aspect ratio and spans the full page width.
+    Uses the ``Joseph A Smith Hero Banner.png`` image from the repo root.
+    """
+    b64 = _load_hero_banner_b64()
+    if b64:
+        st.markdown(
+            f'<div style="width:100%;margin:0 0 16px 0;border-radius:10px;overflow:hidden;'
+            f'box-shadow:0 0 20px rgba(255,94,0,0.1);">'
+            f'<img src="data:image/png;base64,{b64}" '
+            f'style="width:100%;height:auto;display:block;" '
+            f'alt="Joseph M. Smith — SmartPick Pro" />'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_global_settings():
