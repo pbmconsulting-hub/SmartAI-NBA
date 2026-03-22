@@ -376,6 +376,13 @@ with st.expander("📖 How to Use Vegas Vault", expanded=False):
 
         **How to act:** Focus on God Mode Locks — these are the strongest finds and close fast.
         """)
+    st.markdown("""
+    💡 **Pro Tips:**
+    - God Mode Locks close fast — act within hours of finding one
+    - Higher convergence scores mean more books agree on the pricing discrepancy
+    - Use the Kelly Fraction column to size your bets proportionally to your bankroll
+    - Combine Vegas Vault finds with Neural Analysis confidence for the strongest picks
+    """)
 
 
 # ============================================================
