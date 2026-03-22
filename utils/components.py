@@ -131,10 +131,14 @@ def render_global_settings():
 def inject_joseph_floating():
     """Render the Joseph M. Smith floating widget in the main content area.
 
-    Currently disabled — the Joseph image/widget has been removed from
-    all pages.
+    Delegates to :func:`utils.joseph_widget.render_joseph_floating_widget`
+    so the widget appears on every page that calls this helper.
     """
-    return
+    try:
+        from utils.joseph_widget import render_joseph_floating_widget
+        render_joseph_floating_widget()
+    except Exception as exc:
+        _components_logger.debug("inject_joseph_floating failed: %s", exc)
 
 
 # ── on_change callbacks ──────────────────────────────────────────

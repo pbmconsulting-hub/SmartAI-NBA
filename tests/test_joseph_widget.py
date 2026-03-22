@@ -887,5 +887,30 @@ class TestAvailabilityFlags(unittest.TestCase):
         self.assertIsInstance(w._AUTH_AVAILABLE, bool)
 
 
+# ============================================================
+# SECTION: inject_joseph_floating (utils/components.py wrapper)
+# ============================================================
+
+class TestInjectJosephFloating(unittest.TestCase):
+    """Verify inject_joseph_floating delegates to render_joseph_floating_widget."""
+
+    def test_inject_joseph_floating_calls_render(self):
+        """inject_joseph_floating must call render_joseph_floating_widget."""
+        with patch("utils.joseph_widget.render_joseph_floating_widget") as mock_render:
+            from utils.components import inject_joseph_floating
+            inject_joseph_floating()
+            mock_render.assert_called_once()
+
+    def test_inject_joseph_floating_no_crash_on_import_error(self):
+        """inject_joseph_floating must not crash if the widget import fails."""
+        from utils.components import inject_joseph_floating
+        with patch(
+            "utils.joseph_widget.render_joseph_floating_widget",
+            side_effect=Exception("boom"),
+        ):
+            # Should silently catch the exception — no raise
+            inject_joseph_floating()
+
+
 if __name__ == "__main__":
     unittest.main()
