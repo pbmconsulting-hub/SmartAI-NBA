@@ -16,6 +16,7 @@ except ImportError:
 # ── Constants ─────────────────────────────────────────────────
 REGULATION_MINUTES = 48
 HALF_MINUTES = 24
+MINUTES_PER_QUARTER = 12.0
 BLOWOUT_THRESHOLD = 20
 FOUL_TROUBLE_THRESHOLD = 3
 BLOWOUT_PACE_SLASH = 0.70  # multiply projected pace by 70% in blowouts
@@ -130,7 +131,7 @@ def calculate_live_pace(
         # Estimate the player's total minutes allocation based on current
         # minutes-per-quarter pace, but cap at total game minutes.
         mins_per_period = minutes_played / max(1, period_num) if period_num > 0 else minutes_played
-        est_total_minutes = min(total_game_minutes, mins_per_period * (total_game_minutes / 12.0))
+        est_total_minutes = min(total_game_minutes, mins_per_period * (total_game_minutes / MINUTES_PER_QUARTER))
         est_total_minutes = max(est_total_minutes, minutes_played)  # never below what's played
     else:
         est_total_minutes = TYPICAL_STARTER_MINUTES
