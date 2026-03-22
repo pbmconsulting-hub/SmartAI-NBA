@@ -45,6 +45,7 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
+st.session_state["joseph_page_context"] = "page_game_report"
 inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────

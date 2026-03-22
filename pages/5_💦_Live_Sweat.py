@@ -39,6 +39,7 @@ st.markdown(get_live_sweat_css(), unsafe_allow_html=True)
 
 try:
     from utils.components import inject_joseph_floating
+    st.session_state["joseph_page_context"] = "page_live_sweat"
     inject_joseph_floating()
 except ImportError:
     pass

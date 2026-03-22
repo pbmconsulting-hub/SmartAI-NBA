@@ -82,6 +82,7 @@ st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 # ── Joseph M. Smith Floating Widget ───────────────────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
 render_joseph_hero_banner()
+st.session_state["joseph_page_context"] = "page_bet_tracker"
 inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────

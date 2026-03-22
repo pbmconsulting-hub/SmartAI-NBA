@@ -314,7 +314,7 @@ _WIDGET_CSS = """<style>
     box-shadow:0 4px 32px rgba(0,0,0,0.6),0 0 28px rgba(255,94,0,0.2);
 }
 .joseph-floating-avatar{
-    width:96px;height:96px;border-radius:50%;flex-shrink:0;
+    width:115px;height:115px;border-radius:50%;flex-shrink:0;
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 12px rgba(255,94,0,0.45);
     animation:josephFloatingGlow 3s ease-in-out infinite;
@@ -344,11 +344,7 @@ _WIDGET_CSS = """<style>
     line-height:1.3;
     display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
     overflow:hidden;text-overflow:ellipsis;
-    animation:josephTypeIn 2s steps(50,end) both;
-}
-@keyframes josephTypeIn{
-    from{max-width:0;opacity:0.3}
-    to{max-width:300px;opacity:1}
+    transition:opacity 0.6s ease;
 }
 </style>"""
 
@@ -520,19 +516,55 @@ def render_joseph_floating_widget() -> None:
                 'background:#1a1a2e;font-size:1.2rem;">🎙️</div>'
             )
 
-        # ── Ambient commentary ────────────────────────────────
-        ambient_text = ""
+        # ── Ambient commentary (multiple for 60-second rotation) ─
+        _ROTATION_COUNT = 10
+        ambient_lines: list[str] = []
         try:
             session_dict = dict(st.session_state) if hasattr(st, "session_state") else {}
             context_key, ctx_kwargs = joseph_get_ambient_context(session_dict)
-            ambient_text = joseph_ambient_line(context_key, **ctx_kwargs)
+            seen: set[str] = set()
+            # Try up to 3× the target count to handle duplicates from
+            # the anti-repetition logic in joseph_ambient_line.
+            for _ in range(_ROTATION_COUNT * 3):
+                line = joseph_ambient_line(context_key, **ctx_kwargs)
+                if line and line not in seen:
+                    seen.add(line)
+                    ambient_lines.append(line)
+                if len(ambient_lines) >= _ROTATION_COUNT:
+                    break
         except Exception as exc:
             _logger.debug("Floating ambient line failed: %s", exc)
 
-        if not ambient_text:
-            ambient_text = "Joseph M. Smith is ALWAYS watching the board…"
+        if not ambient_lines:
+            ambient_lines = [
+                "Joseph M. Smith is ALWAYS watching the board…",
+            ]
 
-        escaped_ambient = _html.escape(ambient_text)
+        import json as _json
+        first_msg = _html.escape(ambient_lines[0])
+        # JSON-encode the array for safe embedding in a <script> tag
+        msgs_json = _json.dumps(ambient_lines)
+
+        rotation_js = ""
+        if len(ambient_lines) > 1:
+            rotation_js = (
+                "<script>"
+                "(function(){"
+                "var el=document.getElementById('joseph-floating-ambient-text');"
+                "if(!el)return;"
+                f"var msgs={msgs_json};"
+                "var idx=0;"
+                "setInterval(function(){"
+                "el.style.opacity='0';"
+                "setTimeout(function(){"
+                "idx=(idx+1)%msgs.length;"
+                "el.textContent=msgs[idx];"
+                "el.style.opacity='1';"
+                "},600);"
+                "},60000);"
+                "})();"
+                "</script>"
+            )
 
         # ── Render floating HTML (main page, NOT sidebar) ─────
         st.markdown(
@@ -542,11 +574,13 @@ def render_joseph_floating_widget() -> None:
             f'<div class="joseph-floating-name">'
             f'<span class="joseph-pulse-dot"></span> Joseph M. Smith'
             f'</div>'
-            f'<div class="joseph-floating-ambient">'
-            f'{escaped_ambient}'
+            f'<div class="joseph-floating-ambient" '
+            f'id="joseph-floating-ambient-text">'
+            f'{first_msg}'
             f'</div>'
             f'</div>'
-            f'</div>',
+            f'</div>'
+            f'{rotation_js}',
             unsafe_allow_html=True,
         )
     except Exception as exc:

@@ -283,7 +283,7 @@ class TestWidgetCSS(unittest.TestCase):
     def test_floating_avatar_class(self):
         """CSS should include the floating avatar class."""
         self.assertIn("joseph-floating-avatar", self.css)
-        self.assertIn("96px", self.css)
+        self.assertIn("115px", self.css)
 
     def test_floating_avatar_glow_keyframes(self):
         """Floating avatar should have an animated glow."""
@@ -885,6 +885,81 @@ class TestAvailabilityFlags(unittest.TestCase):
     def test_auth_available_flag(self):
         import utils.joseph_widget as w
         self.assertIsInstance(w._AUTH_AVAILABLE, bool)
+
+
+# ============================================================
+# SECTION: inject_joseph_floating (utils/components.py wrapper)
+# ============================================================
+
+class TestInjectJosephFloating(unittest.TestCase):
+    """Verify inject_joseph_floating delegates to render_joseph_floating_widget."""
+
+    def test_inject_joseph_floating_calls_render(self):
+        """inject_joseph_floating must call render_joseph_floating_widget."""
+        with patch("utils.joseph_widget.render_joseph_floating_widget") as mock_render:
+            from utils.components import inject_joseph_floating
+            inject_joseph_floating()
+            mock_render.assert_called_once()
+
+    def test_inject_joseph_floating_no_crash_on_import_error(self):
+        """inject_joseph_floating must not crash if the widget import fails."""
+        from utils.components import inject_joseph_floating
+        with patch(
+            "utils.joseph_widget.render_joseph_floating_widget",
+            side_effect=Exception("boom"),
+        ):
+            # Should silently catch the exception — no raise
+            inject_joseph_floating()
+
+
+# ============================================================
+# SECTION: Floating widget avatar size & message rotation
+# ============================================================
+
+class TestFloatingWidgetAvatarSize(unittest.TestCase):
+    """Verify the floating avatar is 115 px (20% larger than original 96 px)."""
+
+    def test_floating_avatar_css_115px(self):
+        from utils.joseph_widget import _WIDGET_CSS
+        self.assertIn("width:115px", _WIDGET_CSS)
+        self.assertIn("height:115px", _WIDGET_CSS)
+
+
+class TestFloatingWidgetMessageRotation(unittest.TestCase):
+    """Verify the floating widget embeds multiple messages and a 60-second rotation script."""
+
+    def test_css_has_opacity_transition(self):
+        """Ambient text needs opacity transition for smooth rotation fade."""
+        from utils.joseph_widget import _WIDGET_CSS
+        self.assertIn("transition:opacity", _WIDGET_CSS)
+
+    def test_render_embeds_json_msgs(self):
+        """render_joseph_floating_widget must embed JSON-encoded messages in script."""
+        from utils.joseph_widget import render_joseph_floating_widget
+        _mock_st.markdown.reset_mock()
+        render_joseph_floating_widget()
+        if _mock_st.markdown.called:
+            html_out = _mock_st.markdown.call_args[0][0]
+            self.assertIn("var msgs=", html_out)
+
+    def test_render_embeds_rotation_script(self):
+        """render_joseph_floating_widget must embed 60-second setInterval."""
+        from utils.joseph_widget import render_joseph_floating_widget
+        _mock_st.markdown.reset_mock()
+        render_joseph_floating_widget()
+        if _mock_st.markdown.called:
+            html_out = _mock_st.markdown.call_args[0][0]
+            self.assertIn("setInterval", html_out)
+            self.assertIn("60000", html_out)
+
+    def test_render_embeds_ambient_id(self):
+        """The ambient div must have an id for the JS rotator to target."""
+        from utils.joseph_widget import render_joseph_floating_widget
+        _mock_st.markdown.reset_mock()
+        render_joseph_floating_widget()
+        if _mock_st.markdown.called:
+            html_out = _mock_st.markdown.call_args[0][0]
+            self.assertIn('id="joseph-floating-ambient-text"', html_out)
 
 
 if __name__ == "__main__":

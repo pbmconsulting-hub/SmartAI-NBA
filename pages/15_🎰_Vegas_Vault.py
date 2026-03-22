@@ -34,6 +34,7 @@ except ImportError:
     pass
 
 # ─── Joseph Hero Banner ──────────────────────────────────────
+st.session_state["joseph_page_context"] = "page_vegas_vault"
 try:
     from utils.components import render_joseph_hero_banner, inject_joseph_floating
     render_joseph_hero_banner()

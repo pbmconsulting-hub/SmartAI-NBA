@@ -57,6 +57,7 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
+st.session_state["joseph_page_context"] = "page_entry_builder"
 inject_joseph_floating()
 
 # ── Premium Gate ───────────────────────────────────────────────
