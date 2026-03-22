@@ -2974,3 +2974,129 @@ def joseph_god_mode_prospect(prospect: dict) -> dict:
         logger.warning("joseph_god_mode_prospect failed: %s", exc)
         result["joseph_take"] = "Prospect analysis encountered an error."
     return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# VEGAS VAULT — AI Reaction to Arbitrage Discrepancies
+# ═══════════════════════════════════════════════════════════════
+
+# Fragment pools for vault rant assembly (follows build_joseph_rant pattern).
+_VAULT_JOSEPH_OPENERS = [
+    {"id": "vj1", "text": "STOP what you're doing and LOOK at this board."},
+    {"id": "vj2", "text": "Vegas is SLEEPING and we just caught them with their hand in the cookie jar."},
+    {"id": "vj3", "text": "I've been watching lines ALL DAY and the sharp money just revealed itself."},
+    {"id": "vj4", "text": "The DFS apps are SLEEPING on this — but Joseph M. Smith NEVER sleeps."},
+    {"id": "vj5", "text": "Ladies and gentlemen, the window is OPEN and it's closing FAST."},
+]
+
+_VAULT_JOSEPH_BODIES = [
+    {"id": "vb1", "text": "We found {count} EV discrepancies across the board — that's SHARP MONEY talking."},
+    {"id": "vb2", "text": "{count} props just lit up like a Christmas tree — Vegas is MISPRICING these lines."},
+    {"id": "vb3", "text": "The books are fighting each other and we're catching {count} edges in the crossfire."},
+]
+
+_VAULT_JOSEPH_GOD_MODE = [
+    {"id": "vg1", "text": "AND WE HAVE GOD MODE LOCKS — implied probability over 60%! THIS IS NOT A DRILL!"},
+    {"id": "vg2", "text": "GOD MODE ACTIVATED — the math doesn't lie, these locks are SCREAMING value!"},
+    {"id": "vg3", "text": "We've got GOD MODE LOCKS on the board — Vegas is giving away FREE MONEY!"},
+]
+
+_VAULT_JOSEPH_CLOSERS = [
+    {"id": "vc1", "text": "The window is CLOSING — move NOW or watch the edge disappear."},
+    {"id": "vc2", "text": "Sharp money moves FAST. Don't be the last one to the counter."},
+    {"id": "vc3", "text": "This is what separates the SHARKS from the fish. ACT."},
+]
+
+_VAULT_PROF_OPENERS = [
+    {"id": "vp1", "text": "The current pricing landscape reveals a statistically significant market inefficiency."},
+    {"id": "vp2", "text": "Cross-book analysis has identified actionable expected-value opportunities."},
+    {"id": "vp3", "text": "The mathematics are unambiguous — there is a measurable edge available."},
+]
+
+_VAULT_PROF_BODIES = [
+    {"id": "vpb1", "text": "The top finding shows an implied probability of {prob:.1f}%, yielding an EV edge of {edge:.1f} percentage points above a fair market."},
+    {"id": "vpb2", "text": "At {prob:.1f}% implied probability, the expected value exceeds the break-even threshold by {edge:.1f} points — a clear market inefficiency."},
+]
+
+_VAULT_PROF_CLOSERS = [
+    {"id": "vpc1", "text": "These inefficiencies tend to correct within hours as market makers re-calibrate."},
+    {"id": "vpc2", "text": "The expected value calculation is straightforward: the edge is real and quantifiable."},
+]
+
+
+def joseph_vault_reaction(discrepancies: list, mode: str = "joseph") -> str:
+    """Generate an AI reaction to Vegas Vault arbitrage finds.
+
+    Parameters
+    ----------
+    discrepancies : list[dict]
+        Output of ``find_ev_discrepancies()``.  Each entry has keys
+        ``ev_edge``, ``is_god_mode_lock``, ``best_over_implied_prob``,
+        ``best_under_implied_prob``, etc.
+    mode : str
+        ``"joseph"`` → aggressive sharp-money rant (Joseph M. Smith persona).
+        ``"professor"`` → calm EV-math academic breakdown (The Professor persona).
+
+    Returns
+    -------
+    str
+        Multi-sentence reaction string.
+    """
+    try:
+        if not discrepancies:
+            if mode == "professor":
+                return ("No statistically significant pricing discrepancies were "
+                        "detected across the current sportsbook landscape. "
+                        "The market appears to be efficiently priced at this time.")
+            return ("The board is CLEAN right now — no edges worth taking. "
+                    "Vegas has its lines locked up tight. "
+                    "But Joseph M. Smith is ALWAYS watching. The second they slip, we STRIKE.")
+
+        count = len(discrepancies)
+        top = discrepancies[0]
+        top_edge = top.get("ev_edge", 0)
+        top_prob = max(top.get("best_over_implied_prob", 0),
+                       top.get("best_under_implied_prob", 0))
+        has_god_mode = any(d.get("is_god_mode_lock", False) for d in discrepancies)
+
+        used_set = _used_fragments.setdefault("vault", set())
+
+        if mode == "professor":
+            opener = _select_fragment(_VAULT_PROF_OPENERS, used_set)
+            body = _select_fragment(_VAULT_PROF_BODIES, used_set)
+            closer = _select_fragment(_VAULT_PROF_CLOSERS, used_set)
+
+            opener_text = opener.get("text", _VAULT_PROF_OPENERS[0]["text"])
+            try:
+                body_text = body.get("text", "").format(prob=top_prob, edge=top_edge)
+            except (KeyError, IndexError):
+                body_text = body.get("text", "")
+            closer_text = closer.get("text", _VAULT_PROF_CLOSERS[0]["text"])
+
+            return f"{opener_text} {body_text} {closer_text}"
+
+        # Joseph mode — aggressive sharp-money rant
+        opener = _select_fragment(_VAULT_JOSEPH_OPENERS, used_set)
+        body = _select_fragment(_VAULT_JOSEPH_BODIES, used_set)
+        closer = _select_fragment(_VAULT_JOSEPH_CLOSERS, used_set)
+
+        opener_text = opener.get("text", _VAULT_JOSEPH_OPENERS[0]["text"])
+        try:
+            body_text = body.get("text", "").format(count=count)
+        except (KeyError, IndexError):
+            body_text = body.get("text", "")
+        closer_text = closer.get("text", _VAULT_JOSEPH_CLOSERS[0]["text"])
+
+        parts = [opener_text, body_text]
+        if has_god_mode:
+            god = _select_fragment(_VAULT_JOSEPH_GOD_MODE, used_set)
+            parts.append(god.get("text", _VAULT_JOSEPH_GOD_MODE[0]["text"]))
+        parts.append(closer_text)
+
+        return " ".join(parts)
+
+    except Exception as exc:
+        logger.debug("joseph_vault_reaction error: %s", exc)
+        if mode == "professor":
+            return "Unable to generate analysis at this time."
+        return "The Vault is loading... Joseph M. Smith will have his take SHORTLY."

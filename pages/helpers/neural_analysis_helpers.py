@@ -1136,6 +1136,22 @@ def display_prop_analysis_card_qds(result):
         _season_avg_show = float(result.get(_stat_avg_key_map.get(stat, ""), 0) or 0)
 
     _meta_badges = []
+    # ── Win Score badge ──────────────────────────────────────────
+    _cws = result.get("composite_win_score", 0)
+    _cws_grade = result.get("win_score_grade", "")
+    _cws_label = result.get("win_score_label", "")
+    if _cws > 0 and _cws_grade:
+        _cws_color_map = {
+            "A+": "#00e676", "A": "#69f0ae", "B+": "#29b6f6",
+            "B": "#4fc3f7", "C": "#ffa726", "D": "#ff7043", "F": "#ef5350",
+        }
+        _cws_color = _cws_color_map.get(_cws_grade, "#90a4ae")
+        _cws_bg = f"rgba({','.join(str(int(_cws_color.lstrip('#')[i:i+2], 16)) for i in (0,2,4))},0.12)"
+        _meta_badges.append(
+            f'<span style="background:{_cws_bg};color:{_cws_color};padding:2px 7px;'
+            f'border-radius:4px;font-size:0.72rem;font-weight:700;border:1px solid {_cws_color}40;">'
+            f'🎯 Win Score: {_cws:.0f} ({_cws_grade})</span>'
+        )
     if _ensemble_used and _ensemble_models >= 2:
         _meta_badges.append(
             f'<span style="background:rgba(0,168,255,0.15);color:#29b6f6;padding:2px 7px;'
