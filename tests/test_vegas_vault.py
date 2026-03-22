@@ -661,6 +661,21 @@ class TestDevigEnhancedFields(unittest.TestCase):
         d = result[0]
         # Over odds are more aggressive => recommended_side should be OVER
         self.assertEqual(d["recommended_side"], "OVER")
+        self.assertGreater(d["fair_probability"], 50.0)
+
+    def test_recommended_side_under(self):
+        """When under odds are more aggressive, recommended_side should be UNDER."""
+        props = [
+            {"player_name": "Underdog", "stat_type": "rebounds", "line": 9.5,
+             "platform": "DK", "over_odds": +120, "under_odds": -200},
+            {"player_name": "Underdog", "stat_type": "rebounds", "line": 9.5,
+             "platform": "FD", "over_odds": +130, "under_odds": -180},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertEqual(d["recommended_side"], "UNDER")
+        self.assertGreater(d["fair_probability"], 50.0)
 
     def test_backward_compatibility(self):
         """New fields must not remove any existing required fields."""

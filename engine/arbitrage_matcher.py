@@ -33,6 +33,7 @@ try:
     _DEVIG_AVAILABLE = True
 except ImportError:
     _DEVIG_AVAILABLE = False
+    _logger.warning("devig_probabilities not available; fair probability fields will use fallbacks.")
     def devig_probabilities(over_odds, under_odds):
         return (0.5, 0.5)
     def get_vig_percentage(odds_side1, odds_side2=None):
@@ -305,7 +306,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
         comp_odds = best_under_odds if rec_side == "OVER" else best_over_odds
         try:
             vig = round(get_vig_percentage(rec_odds, comp_odds) * 100.0, 2) if rec_odds else 0.0
-        except Exception:
+        except (TypeError, ValueError, ZeroDivisionError):
             vig = 0.0
 
         display_name = canonical_names.get(norm_name, norm_name)
