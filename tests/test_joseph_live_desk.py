@@ -30,15 +30,10 @@ class TestGetJosephAvatarB64(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_returns_nonempty_when_file_exists(self):
-        """If Joseph M Smith.png exists at repo root, it should return b64."""
+        """Avatar loader is disabled — always returns empty string."""
         from pages.helpers.joseph_live_desk import get_joseph_avatar_b64
         result = get_joseph_avatar_b64()
-        # The file exists in the repo, so we expect a non-empty base64 string
-        img_path = os.path.join(os.path.dirname(__file__), "..", "Joseph M Smith.png")
-        if os.path.isfile(img_path):
-            self.assertTrue(len(result) > 100)
-        else:
-            self.assertEqual(result, "")
+        self.assertEqual(result, "")
 
 
 class TestRenderLiveDeskCss(unittest.TestCase):

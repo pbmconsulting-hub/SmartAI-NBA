@@ -47,12 +47,7 @@ except ImportError:
 except Exception:
     pass
 
-# ─── Joseph sidebar widget ───────────────────────────────────
-try:
-    from utils.joseph_widget import render_joseph_sidebar_widget
-    render_joseph_sidebar_widget()
-except ImportError:
-    pass
+# ─── Joseph sidebar widget (disabled — image removed) ────────
 
 # ─── Engine / data imports ────────────────────────────────────
 try:

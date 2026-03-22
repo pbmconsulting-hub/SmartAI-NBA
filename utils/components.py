@@ -39,20 +39,10 @@ def _get_hero_banner_b64() -> str:
 def render_joseph_hero_banner() -> None:
     """Render the Joseph A Smith Hero Banner at the top of the page.
 
-    Displays a full-width 16:9 banner image when the banner file
-    is found.  Falls back to a no-op when the image is missing.
+    Currently disabled — the hero banner image has been removed from
+    all pages.
     """
-    b64 = _get_hero_banner_b64()
-    if not b64:
-        return
-    st.markdown(
-        f'<div style="width:100%;margin-bottom:16px;">'
-        f'<img src="data:image/png;base64,{b64}" '
-        f'style="width:100%;border-radius:12px;display:block;" '
-        f'alt="Joseph A Smith Hero Banner" />'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
+    return
 
 
 def render_global_settings():
@@ -141,19 +131,10 @@ def render_global_settings():
 def inject_joseph_floating():
     """Render the Joseph M. Smith floating widget in the main content area.
 
-    Must be called **outside** ``with st.sidebar:`` so the
-    ``position: fixed`` CSS is not trapped by the sidebar's
-    transform-based containing block.
+    Currently disabled — the Joseph image/widget has been removed from
+    all pages.
     """
-    if st.session_state.get("joseph_enabled", True):
-        try:
-            from utils.joseph_widget import render_joseph_floating_widget
-            render_joseph_floating_widget()
-        except ImportError:
-            pass  # Joseph module not installed yet — silent degradation
-        except Exception as _joseph_widget_err:
-            import logging
-            logging.getLogger(__name__).debug(f"Joseph widget: {_joseph_widget_err}")
+    return
 
 
 # ── on_change callbacks ──────────────────────────────────────────

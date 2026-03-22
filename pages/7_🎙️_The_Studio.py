@@ -327,22 +327,8 @@ st.markdown(_STUDIO_CSS, unsafe_allow_html=True)
 # HERO BANNER
 # ═════════════════════════════════════════════════════════════
 
-avatar_b64 = get_joseph_avatar_b64()
-if avatar_b64:
-    avatar_hero = (
-        f'<img src="data:image/png;base64,{avatar_b64}" '
-        f'class="studio-avatar-lg" alt="Joseph M. Smith">'
-    )
-else:
-    avatar_hero = (
-        '<div class="studio-avatar-lg" style="background:#1e293b;'
-        'display:flex;align-items:center;justify-content:center;'
-        'font-size:2.5rem">🎙️</div>'
-    )
-
 st.markdown(
     f'<div class="studio-hero">'
-    f'{avatar_hero}'
     f'<div class="studio-hero-title">🎙️ THE STUDIO — Joseph M. Smith</div>'
     f'<div class="studio-hero-subtitle">'
     f'God-Mode Analyst • Live Commentator • Your Betting Edge'
@@ -353,12 +339,6 @@ st.markdown(
 
 # Helper for small inline avatar (defined early so all modes can use it)
 def _avatar_inline(size=48):
-    if avatar_b64:
-        return (
-            f'<img src="data:image/png;base64,{avatar_b64}" '
-            f'class="joseph-avatar-sm" style="width:{size}px;height:{size}px" '
-            f'alt="Joseph">'
-        )
     return f'<span style="font-size:{size // 2}px">🎙️</span>'
 
 
