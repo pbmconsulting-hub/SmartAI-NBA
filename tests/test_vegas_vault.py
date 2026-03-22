@@ -927,11 +927,11 @@ class TestFindEvDiscrepanciesNewFields(unittest.TestCase):
         """Create props guaranteed to produce a discrepancy."""
         return [
             {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
-             "platform": "DraftKings", "over_odds": -200, "under_odds": 120},
+             "platform": "DraftKings", "over_odds": -200, "under_odds": +120},
             {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
-             "platform": "FanDuel", "over_odds": -190, "under_odds": 130},
+             "platform": "FanDuel", "over_odds": -190, "under_odds": +130},
             {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
-             "platform": "BetMGM", "over_odds": -180, "under_odds": 140},
+             "platform": "BetMGM", "over_odds": -180, "under_odds": +140},
         ]
 
     def test_kelly_fraction_present(self):
@@ -965,13 +965,13 @@ class TestFindEvDiscrepanciesNewFields(unittest.TestCase):
         """3-book props should have higher convergence than 2-book."""
         two_book = [
             {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
-             "platform": "DraftKings", "over_odds": -190, "under_odds": 130},
+             "platform": "DraftKings", "over_odds": -190, "under_odds": +130},
             {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
-             "platform": "FanDuel", "over_odds": -185, "under_odds": 135},
+             "platform": "FanDuel", "over_odds": -185, "under_odds": +135},
         ]
         three_book = two_book + [
             {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
-             "platform": "BetMGM", "over_odds": -195, "under_odds": 125},
+             "platform": "BetMGM", "over_odds": -195, "under_odds": +125},
         ]
         r2 = self.find(two_book)
         r3 = self.find(three_book)
