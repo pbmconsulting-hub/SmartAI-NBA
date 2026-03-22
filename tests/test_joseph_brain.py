@@ -387,9 +387,25 @@ class TestAmbientPools(unittest.TestCase):
         self.assertIsInstance(self.pool, dict)
 
     def test_has_all_six_contexts(self):
-        expected = {"idle", "games_loaded", "analysis_complete",
-                    "entry_built", "premium_pitch", "commentary_on_results"}
-        self.assertEqual(set(self.pool.keys()), expected)
+        expected_original = {"idle", "games_loaded", "analysis_complete",
+                            "entry_built", "premium_pitch", "commentary_on_results"}
+        self.assertTrue(expected_original.issubset(set(self.pool.keys())))
+
+    def test_has_all_page_contexts(self):
+        """Each page should have a dedicated ambient pool."""
+        page_keys = {
+            "page_home", "page_live_scores", "page_live_games",
+            "page_prop_scanner", "page_analysis", "page_game_report",
+            "page_live_sweat", "page_simulator", "page_entry_builder",
+            "page_studio", "page_risk_shield", "page_data_feed",
+            "page_correlation", "page_bet_tracker", "page_backtester",
+            "page_settings", "page_premium", "page_vegas_vault",
+        }
+        self.assertTrue(page_keys.issubset(set(self.pool.keys())))
+
+    def test_total_pool_count(self):
+        """AMBIENT_POOLS should have 24 pools (6 original + 18 page)."""
+        self.assertEqual(len(self.pool), 24)
 
     def test_each_context_has_15_lines(self):
         for key, lines in self.pool.items():
@@ -426,6 +442,14 @@ class TestAmbientPools(unittest.TestCase):
         """At least some commentary_on_results lines use {player}."""
         p_lines = [l for l in self.pool["commentary_on_results"] if "{player}" in l]
         self.assertGreater(len(p_lines), 0)
+
+    def test_page_pools_no_format_placeholders(self):
+        """Page-specific pools should be static (no format placeholders)."""
+        page_keys = [k for k in self.pool if k.startswith("page_")]
+        for key in page_keys:
+            for line in self.pool[key]:
+                self.assertNotIn("{", line,
+                                 f"Unexpected placeholder in {key}: {line}")
 
 
 # ── Section C new: COMMENTARY_OPENER_POOL ───────────────────
@@ -869,6 +893,39 @@ class TestJosephGetAmbientContextImplementation(unittest.TestCase):
         ctx, kwargs = joseph_get_ambient_context(state)
         self.assertEqual(ctx, "entry_built")
         self.assertEqual(kwargs["n"], 3)
+
+    def test_page_context_overrides_generic(self):
+        """Page context should override generic analysis_complete/games_loaded."""
+        from engine.joseph_brain import joseph_get_ambient_context
+        state = {
+            "joseph_page_context": "page_live_sweat",
+            "analysis_results": [{"verdict": "SMASH", "tier": "Gold", "is_override": False}],
+        }
+        ctx, kwargs = joseph_get_ambient_context(state)
+        self.assertEqual(ctx, "page_live_sweat")
+        self.assertEqual(kwargs, {})
+
+    def test_page_context_all_pages(self):
+        """All 18 page context keys should be recognized."""
+        from engine.joseph_brain import joseph_get_ambient_context
+        page_keys = [
+            "page_home", "page_live_scores", "page_live_games",
+            "page_prop_scanner", "page_analysis", "page_game_report",
+            "page_live_sweat", "page_simulator", "page_entry_builder",
+            "page_studio", "page_risk_shield", "page_data_feed",
+            "page_correlation", "page_bet_tracker", "page_backtester",
+            "page_settings", "page_premium", "page_vegas_vault",
+        ]
+        for key in page_keys:
+            ctx, kwargs = joseph_get_ambient_context({"joseph_page_context": key})
+            self.assertEqual(ctx, key, f"Expected {key}, got {ctx}")
+
+    def test_invalid_page_context_falls_through(self):
+        """An unknown page context should fall through to generic checks."""
+        from engine.joseph_brain import joseph_get_ambient_context
+        state = {"joseph_page_context": "page_nonexistent"}
+        ctx, kwargs = joseph_get_ambient_context(state)
+        self.assertEqual(ctx, "idle")
 
 
 class TestJosephAmbientLineImplementation(unittest.TestCase):

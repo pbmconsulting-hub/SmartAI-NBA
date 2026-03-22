@@ -523,6 +523,8 @@ def render_joseph_floating_widget() -> None:
             session_dict = dict(st.session_state) if hasattr(st, "session_state") else {}
             context_key, ctx_kwargs = joseph_get_ambient_context(session_dict)
             seen: set[str] = set()
+            # Try up to 3× the target count to handle duplicates from
+            # the anti-repetition logic in joseph_ambient_line.
             for _ in range(_ROTATION_COUNT * 3):
                 line = joseph_ambient_line(context_key, **ctx_kwargs)
                 if line and line not in seen:

@@ -2711,8 +2711,13 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
 def joseph_get_ambient_context(session_state: dict) -> tuple:
     """Determine ambient context from session state.
 
-    Inspects the session state to decide which ambient context is active
-    (idle, games_loaded, analysis_complete, entry_built, premium_pitch).
+    Inspects the session state to decide which ambient context is active.
+    Priority order:
+
+    1. Premium pitch (30 % chance for free-tier users)
+    2. Transient ``joseph_entry_just_built`` flag → ``"entry_built"``
+    3. Page-specific context via ``joseph_page_context`` key
+    4. Generic fallbacks: ``analysis_complete`` → ``games_loaded`` → ``idle``
 
     Parameters
     ----------
@@ -2737,11 +2742,17 @@ def joseph_get_ambient_context(session_state: dict) -> tuple:
         except Exception:
             pass
 
-        # Entry just built
+        # Entry just built (transient — consumes the flag)
         if session_state.get("joseph_entry_just_built"):
             n = session_state.pop("joseph_entry_just_built", 0)
             return ("entry_built", {"n": n})
 
+        # ── Page-specific context ────────────────────────────
+        page_ctx = session_state.get("joseph_page_context", "")
+        if page_ctx and page_ctx in AMBIENT_POOLS:
+            return (page_ctx, {})
+
+        # ── Generic session-state fallbacks ───────────────────
         # Analysis complete
         analysis_results = session_state.get("analysis_results", [])
         if analysis_results:
