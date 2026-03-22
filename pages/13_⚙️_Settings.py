@@ -548,6 +548,86 @@ with st.expander("🔑 Configure ClearSports API Key (Games, Stats, Injuries, Ro
             st.info("ClearSports API key cleared.")
             st.rerun()
 
+# ── API Connection Status & Quota ──────────────────────────────────────────
+# Shows live connection status for both APIs and remaining Odds API quota.
+with st.expander("📊 API Connection Status & Usage", expanded=False):
+    _status_col_a, _status_col_b = st.columns(2)
+
+    # ── Odds API Status ──
+    with _status_col_a:
+        st.markdown("**The Odds API**")
+        _odds_key = st.session_state.get("odds_api_key", "")
+        if _odds_key:
+            try:
+                from data.odds_api_client import get_odds_api_usage
+                _usage = get_odds_api_usage()
+                _remaining = _usage.get("requests_remaining")
+                _used = _usage.get("requests_used")
+                _updated = _usage.get("updated_at")
+                if _remaining is not None:
+                    _pct_used = round(_used / max(_used + _remaining, 1) * 100) if _used is not None else 0
+                    _bar_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
+                    st.markdown(
+                        f'<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                        f'border:1px solid rgba(0,240,255,0.15);">'
+                        f'<div style="font-weight:700;color:#c0d0e8;margin-bottom:4px;">✅ Connected</div>'
+                        f'<div style="color:{_bar_color};font-size:1.1rem;font-weight:700;">'
+                        f'{_remaining:,} requests remaining</div>'
+                        f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
+                        f'<div style="height:6px;width:{100-_pct_used}%;background:{_bar_color};'
+                        f'border-radius:3px;"></div></div>'
+                        f'<div style="color:#8b949e;font-size:0.75rem;">'
+                        f'{_used if _used is not None else "?"} used · '
+                        f'Updated: {_updated[:16] if _updated else "pending first request"}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                        'border:1px solid rgba(0,240,255,0.15);">'
+                        '<div style="font-weight:700;color:#ffd700;">🔑 Key set — quota loads after first API call</div>'
+                        '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                        'Run a data fetch or load tonight\'s games to check quota.</div></div>',
+                        unsafe_allow_html=True,
+                    )
+            except ImportError:
+                st.info("Odds API client not available.")
+        else:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(255,107,107,0.3);">'
+                '<div style="font-weight:700;color:#ff6b6b;">❌ Not configured</div>'
+                '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                'Set your Odds API key above to enable player props and market data.</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── ClearSports API Status ──
+    with _status_col_b:
+        st.markdown("**ClearSports API**")
+        _cs_key = st.session_state.get("clearsports_api_key", "")
+        if _cs_key:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(0,240,255,0.15);">'
+                '<div style="font-weight:700;color:#c0d0e8;">✅ Connected</div>'
+                '<div style="color:#9ae6b4;font-size:0.85rem;margin-top:4px;">'
+                'Games · Players · Teams · Injuries · Scores · Standings · News</div>'
+                '<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">'
+                'All ClearSports endpoints active</div></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(255,107,107,0.3);">'
+                '<div style="font-weight:700;color:#ff6b6b;">❌ Not configured</div>'
+                '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                'Set your ClearSports API key above to enable game data, stats, and injuries.</div></div>',
+                unsafe_allow_html=True,
+            )
+
 st.divider()
 
 # ============================================================
