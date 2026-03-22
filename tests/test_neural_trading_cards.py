@@ -590,10 +590,10 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
         self.assertIn("_active_results", source)
 
     def test_selection_sorts_by_confidence(self):
-        """Active results must be sorted by confidence_score descending."""
+        """Active results must be sorted by composite_win_score descending."""
         source = self._read_source()
         self.assertIn(
-            '_active_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)',
+            '_active_results.sort(key=lambda r: r.get("composite_win_score", 0), reverse=True)',
             source,
         )
 

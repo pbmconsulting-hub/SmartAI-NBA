@@ -1702,3 +1702,185 @@ def _reconcile_line_signals(
                 f">= sharpness confidence ({sharp_conf:.2f}) — treating as trap (conservative)."
             ),
         }
+
+
+# ============================================================
+# SECTION: Composite Win Score
+# A single 0-100 score combining the strongest win-rate signals
+# into one number. Higher score = higher expected historical win
+# rate.  Designed as a quick sort key for "what should I bet on?"
+#
+# Weight allocation reflects empirical NBA prop hit-rate drivers:
+#   - Probability in-direction (40%): Strongest single predictor
+#   - Confidence score (25%): Aggregates edge, matchup, forces
+#   - Edge percentage (15%): Raw model edge vs line
+#   - Force alignment (10%): How unanimous the directional forces are
+#   - Streak/form bonus (5%): Hot hand / cold adjustment
+#   - Risk penalty (5%): De-rate risky picks
+# ============================================================
+
+# Weights — must sum to 1.0
+_CWS_W_PROBABILITY = 0.40
+_CWS_W_CONFIDENCE  = 0.25
+_CWS_W_EDGE        = 0.15
+_CWS_W_FORCES      = 0.10
+_CWS_W_STREAK      = 0.05
+_CWS_W_RISK        = 0.05
+
+# Edge % is uncapped in theory; we cap at this value for scoring purposes.
+# 20% edge is exceptional for NBA props — anything above is near-certain.
+_CWS_MAX_EDGE_PCT = 20.0
+
+# Probability ceiling for normalization.  Most NBA props are 50-75%;
+# ≥80% is rare and represents extreme value.  Using 80% as ceiling
+# ensures a 70% probability scores ~67/100, not ~40/100.
+_CWS_PROB_CEILING = 0.80
+
+
+def calculate_composite_win_score(
+    probability_in_direction,
+    confidence_score,
+    edge_percentage,
+    directional_forces_result=None,
+    streak_multiplier=1.0,
+    risk_score=5.0,
+    is_coin_flip=False,
+    should_avoid=False,
+):
+    """
+    Calculate a composite 0-100 score predicting how likely a pick is to win.
+
+    Combines the model's strongest signals — probability, confidence, edge,
+    force alignment, streak momentum, and risk — into one number so picks
+    can be ranked by expected win rate.
+
+    Higher score = stronger expected historical hit rate.
+
+    Args:
+        probability_in_direction (float): Simulation probability in the
+            recommended direction (0.0-1.0). This is the single strongest
+            predictor of hit rate.
+        confidence_score (float): SAFE score (0-100) from
+            calculate_confidence_score(). Captures edge quality, matchup,
+            and multi-factor agreement.
+        edge_percentage (float): Raw model edge vs line (e.g. 12.5 for
+            12.5%). Captures how far the projection is from the line.
+        directional_forces_result (dict or None): Output of
+            analyze_directional_forces(). Used to compute force alignment
+            (how one-sided the signals are).
+        streak_multiplier (float): 1.05 for hot, 0.95 for cold, 1.0 for
+            neutral. From detect_streak().
+        risk_score (float): 1-10 risk rating from calculate_risk_score().
+            Lower = safer. Inverted for scoring.
+        is_coin_flip (bool): True if detect_coin_flip() flagged this prop.
+            If True, the score is capped at 25.
+        should_avoid (bool): True if the avoid-list flagged this prop.
+            If True, the score is capped at 15.
+
+    Returns:
+        dict: {
+            'composite_win_score': float (0-100),
+            'grade': str ('A+', 'A', 'B+', 'B', 'C', 'D', 'F'),
+            'grade_label': str (e.g. 'Strong Play', 'Solid Play'),
+            'components': dict of individual sub-scores,
+        }
+
+    Example:
+        probability=0.68, confidence=78, edge=12.5, hot streak
+        → composite_win_score ≈ 74 (grade B+)
+    """
+    # ── Normalize each component to 0-100 ─────────────────────────
+
+    # 1. Probability sub-score (40%): 0.50 → 0, _CWS_PROB_CEILING → 100
+    prob_val = max(0.0, min(1.0, float(probability_in_direction)))
+    prob_range = _CWS_PROB_CEILING - 0.50
+    prob_score = min(100.0, max(0.0, (prob_val - 0.50) / prob_range) * 100.0)
+
+    # 2. Confidence sub-score (25%): pass-through (already 0-100)
+    conf_score = max(0.0, min(100.0, float(confidence_score)))
+
+    # 3. Edge sub-score (15%): 0% → 0, _CWS_MAX_EDGE_PCT% → 100
+    abs_edge = min(abs(float(edge_percentage)), _CWS_MAX_EDGE_PCT)
+    edge_score = (abs_edge / _CWS_MAX_EDGE_PCT) * 100.0
+
+    # 4. Force alignment sub-score (10%): measures unanimity of forces
+    force_score = 50.0  # default neutral
+    if directional_forces_result:
+        over_count  = len(directional_forces_result.get("over_forces", []))
+        under_count = len(directional_forces_result.get("under_forces", []))
+        total = over_count + under_count
+        if total > 0:
+            dominant = max(over_count, under_count)
+            # Alignment ratio: 1.0 = all forces agree, 0.5 = equal split
+            alignment = dominant / total
+            # Scale: 0.5 → 0, 1.0 → 100
+            force_score = max(0.0, (alignment - 0.5) / 0.5) * 100.0
+            # Bonus: more total forces = more evidence
+            evidence_bonus = min(20.0, total * 2.0)
+            force_score = min(100.0, force_score + evidence_bonus)
+
+    # 5. Streak sub-score (5%): hot=80, neutral=50, cold=20
+    streak_val = float(streak_multiplier)
+    if streak_val >= 1.03:
+        streak_score = 80.0
+    elif streak_val <= 0.97:
+        streak_score = 20.0
+    else:
+        streak_score = 50.0
+
+    # 6. Risk sub-score (5%): risk_score 1→100, 10→0 (inverted)
+    risk_val = max(1.0, min(10.0, float(risk_score)))
+    risk_sub_score = ((10.0 - risk_val) / 9.0) * 100.0
+
+    # ── Weighted combination ──────────────────────────────────────
+    raw_score = (
+        prob_score   * _CWS_W_PROBABILITY
+        + conf_score * _CWS_W_CONFIDENCE
+        + edge_score * _CWS_W_EDGE
+        + force_score * _CWS_W_FORCES
+        + streak_score * _CWS_W_STREAK
+        + risk_sub_score * _CWS_W_RISK
+    )
+
+    # ── Hard caps for problematic picks ───────────────────────────
+    if should_avoid:
+        raw_score = min(raw_score, 15.0)
+    elif is_coin_flip:
+        raw_score = min(raw_score, 25.0)
+
+    composite = _safe_float(round(max(0.0, min(100.0, raw_score)), 1), 0.0)
+
+    # ── Letter grade ──────────────────────────────────────────────
+    if composite >= 85:
+        grade, label = "A+", "Elite Play"
+    elif composite >= 75:
+        grade, label = "A", "Strong Play"
+    elif composite >= 65:
+        grade, label = "B+", "Solid Play"
+    elif composite >= 55:
+        grade, label = "B", "Decent Play"
+    elif composite >= 45:
+        grade, label = "C", "Marginal"
+    elif composite >= 30:
+        grade, label = "D", "Weak"
+    else:
+        grade, label = "F", "Avoid"
+
+    return {
+        "composite_win_score": composite,
+        "grade": grade,
+        "grade_label": label,
+        "components": {
+            "probability_score": _safe_float(round(prob_score, 1), 0.0),
+            "confidence_score": _safe_float(round(conf_score, 1), 0.0),
+            "edge_score": _safe_float(round(edge_score, 1), 0.0),
+            "force_alignment_score": _safe_float(round(force_score, 1), 0.0),
+            "streak_score": _safe_float(round(streak_score, 1), 0.0),
+            "risk_score": _safe_float(round(risk_sub_score, 1), 0.0),
+        },
+    }
+
+
+# ============================================================
+# END SECTION: Composite Win Score
+# ============================================================

@@ -34,7 +34,7 @@ from engine.simulation import (
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, format_goblin_demon_prediction
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, format_goblin_demon_prediction, calculate_composite_win_score
 
 try:
     from engine.rotation_tracker import track_minutes_trend
@@ -1632,6 +1632,34 @@ if run_analysis:
             except Exception:
                 pass
 
+            # ── Composite Win Score ───────────────────────────────────────
+            # Single 0-100 score combining all signals for quick sorting.
+            try:
+                _dir = full_result.get("direction", "OVER")
+                _prob_in_dir = (
+                    full_result.get("probability_over", 0.5)
+                    if _dir == "OVER"
+                    else full_result.get("probability_under", 0.5)
+                )
+                _streak_mult = projection_result.get("streak_multiplier", 1.0)
+                _cws_result = calculate_composite_win_score(
+                    probability_in_direction=_prob_in_dir,
+                    confidence_score=full_result.get("confidence_score", 50),
+                    edge_percentage=full_result.get("edge_percentage", 0),
+                    directional_forces_result=full_result.get("forces"),
+                    streak_multiplier=_streak_mult,
+                    risk_score=5.0,
+                    is_coin_flip=full_result.get("is_coin_flip", False),
+                    should_avoid=full_result.get("should_avoid", False),
+                )
+                full_result["composite_win_score"] = _cws_result["composite_win_score"]
+                full_result["win_score_grade"] = _cws_result["grade"]
+                full_result["win_score_label"] = _cws_result["grade_label"]
+            except Exception:
+                full_result["composite_win_score"] = 0.0
+                full_result["win_score_grade"] = "F"
+                full_result["win_score_label"] = "Error"
+
             analysis_results_list.append(full_result)
         except Exception as _prop_loop_err:
             _logger.warning(
@@ -1678,6 +1706,9 @@ if run_analysis:
                 "player_status": "Analysis Error",
                 "player_status_note": str(_prop_loop_err),
                 "player_id": "",
+                "composite_win_score": 0.0,
+                "win_score_grade": "F",
+                "win_score_label": "Error",
             })
 
     # Detect correlated props
@@ -1724,14 +1755,15 @@ if run_analysis:
             # Non-fatal — proceed with existing results
             _logger.warning(f"Smart Update error (non-fatal): {_su_err}")
 
-    # ── Sort all analyzed bets by confidence (keep every single pick) ──
+    # ── Sort all analyzed bets by composite win score (keep every single pick) ──
     # The engine analyzes ALL available props and returns ALL of them
-    # sorted by confidence score.  Out players are kept at the end for
+    # sorted by composite win score (multi-factor: probability + confidence +
+    # edge + forces + streak + risk).  Out players are kept at the end for
     # transparency.  No artificial truncation — every prop is shown.
     _total_analyzed = len(analysis_results_list)
     _out_results = [r for r in analysis_results_list if r.get("player_is_out", False)]
     _active_results = [r for r in analysis_results_list if not r.get("player_is_out", False)]
-    _active_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
+    _active_results.sort(key=lambda r: r.get("composite_win_score", 0), reverse=True)
     _selected_active = _active_results  # Keep ALL active results — no truncation
     analysis_results_list = _selected_active + _out_results
     _logger.info(
