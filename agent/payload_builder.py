@@ -317,7 +317,7 @@ def build_live_vibe_payload(
         "current":              current,
         "needed":               round(needed, 1),
         "clock":                clock_display,
-        "score_diff":           str(score_diff) if score_diff >= 0 else str(score_diff),
+        "score_diff":           str(score_diff),
         "opponent":             opponent,
         "shooting":             shooting,
         "free_throws":          free_throws,
