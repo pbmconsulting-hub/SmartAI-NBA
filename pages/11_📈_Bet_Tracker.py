@@ -131,6 +131,18 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
                     )
             except Exception:
                 pass  # Not available or API error — silently skip
+
+            # Auto-update CLV closing lines using Odds API prop lines
+            try:
+                from engine.clv_tracker import auto_update_closing_lines as _auto_clv
+                _clv_result = _auto_clv(days_back=1)
+                if _clv_result.get("updated", 0) > 0:
+                    st.toast(
+                        f"📈 CLV updated: {_clv_result['updated']} record(s) closed "
+                        f"with live closing lines."
+                    )
+            except Exception:
+                pass  # Optional — never block page load
         except Exception:
             pass  # Best-effort — never block page load
 

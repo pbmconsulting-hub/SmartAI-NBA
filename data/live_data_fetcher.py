@@ -604,6 +604,72 @@ def _enrich_games_with_odds_api(games: list) -> list:
     return games
 
 
+def _enrich_games_with_standings(games: list) -> list:
+    """
+    Enrich game dicts with ClearSports standings data (W-L, streak, rank).
+
+    Populates ``home_wins``, ``home_losses``, ``home_streak``,
+    ``away_wins``, ``away_losses``, ``away_streak`` on every game dict
+    when data is available from ClearSports standings.  Existing non-zero
+    values are never overwritten (ClearSports game data takes priority).
+
+    Falls back gracefully — returns the original list unchanged if the
+    API key is missing or the fetch fails.
+
+    Args:
+        games: List of game dicts.
+
+    Returns:
+        list: Same games, enriched in-place with standings fields.
+    """
+    if not games:
+        return games
+
+    try:
+        from data.clearsports_client import fetch_standings as _cs_st
+        standings_list = _cs_st() or []
+    except Exception as exc:
+        _logger.debug("_enrich_games_with_standings: standings unavailable — %s", exc)
+        return games
+
+    if not standings_list:
+        return games
+
+    # Build abbrev → standings entry lookup
+    standings_map: dict = {
+        str(s.get("team_abbreviation", "")).upper(): s
+        for s in standings_list
+    }
+
+    enriched = 0
+    for game in games:
+        for side in ("home", "away"):
+            abbrev = str(game.get(f"{side}_team", "")).upper().strip()
+            entry  = standings_map.get(abbrev)
+            if not entry:
+                continue
+            # Only fill in if the current value is absent / zero (ClearSports game data wins)
+            if not game.get(f"{side}_wins"):
+                game[f"{side}_wins"]   = entry.get("wins", 0)
+            if not game.get(f"{side}_losses"):
+                game[f"{side}_losses"] = entry.get("losses", 0)
+            if not game.get(f"{side}_streak"):
+                game[f"{side}_streak"] = entry.get("streak", "")
+            # Always add extended standings fields for Game Report and other pages
+            game[f"{side}_conference_rank"] = entry.get("conference_rank", 0)
+            game[f"{side}_conference"]      = entry.get("conference", "")
+            game[f"{side}_win_pct"]         = entry.get("win_pct", 0.0)
+            game[f"{side}_last_10"]         = (
+                f"{entry.get('last_10_wins', 0)}-{entry.get('last_10_losses', 0)}"
+            )
+        enriched += 1
+
+    _logger.info(
+        "_enrich_games_with_standings: enriched %d game(s) with standings.", enriched
+    )
+    return games
+
+
 def fetch_todays_games():
     """
     Fetch tonight's NBA games via ClearSports API, then enrich with
@@ -626,6 +692,9 @@ def fetch_todays_games():
 
     # Enrich every game with Odds API consensus lines (moneyline + spread + total)
     games = _enrich_games_with_odds_api(games)
+
+    # Enrich with ClearSports standings (W-L, streak, conference rank)
+    games = _enrich_games_with_standings(games)
 
     if not games:
         _logger.warning("No games available from any source.")
@@ -1303,6 +1372,35 @@ def fetch_all_todays_data(progress_callback=None):
         refresh_historical_data_for_tonight(games=results["games"])
     except Exception as _hist_exc:
         _logger.debug("fetch_all_todays_data: historical refresh skipped — %s", _hist_exc)
+
+    # --------------------------------------------------------
+    # Bonus: Pre-load standings and news into session state
+    # so Game Report and other pages can display them immediately
+    # without a separate user action.
+    # --------------------------------------------------------
+    try:
+        _standings = fetch_standings()
+        if _standings:
+            results["standings"] = _standings
+            try:
+                import streamlit as _st_snap
+                _st_snap.session_state["league_standings"] = _standings
+            except Exception:
+                pass
+    except Exception as _std_exc:
+        _logger.debug("fetch_all_todays_data: standings pre-load skipped — %s", _std_exc)
+
+    try:
+        _news = fetch_player_news(limit=30)
+        if _news:
+            results["news"] = _news
+            try:
+                import streamlit as _st_news
+                _st_news.session_state["player_news"] = _news
+            except Exception:
+                pass
+    except Exception as _news_exc:
+        _logger.debug("fetch_all_todays_data: news pre-load skipped — %s", _news_exc)
 
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]

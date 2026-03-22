@@ -1792,6 +1792,14 @@ if run_analysis:
 
 analysis_results = st.session_state.get("analysis_results", [])
 
+# Build a player → news lookup from ClearSports news in session state.
+# This is used to show injury/trade/performance alerts on prop cards.
+_player_news_lookup: dict = {}  # {player_name_lower: [news_item, ...]}
+for _ni in st.session_state.get("player_news", []):
+    _ni_player = _ni.get("player_name", "").strip().lower()
+    if _ni_player:
+        _player_news_lookup.setdefault(_ni_player, []).append(_ni)
+
 # Show a notice if results were reloaded from the saved session
 if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
     _reloaded_ts = st.session_state["_analysis_session_reloaded_at"]
@@ -2113,6 +2121,66 @@ if analysis_results:
             "📭 **No picks match the current filters.** All analyzed props were filtered out. "
             "Try switching to **All picks** above, or loosen the Tier / Bet Classification filters."
         )
+
+    # ============================================================
+    # SECTION: Player News Alerts (ClearSports)
+    # Show injury/trade/performance news for players in today's slate.
+    # ============================================================
+    _slate_players = {
+        str(r.get("player_name", "")).strip().lower()
+        for r in displayed_results
+        if r.get("player_name")
+    }
+    _slate_news: list = []
+    for _pname_lower in _slate_players:
+        for _news_item in _player_news_lookup.get(_pname_lower, []):
+            _slate_news.append(_news_item)
+    # Sort by impact (high > medium > low) then by published date
+    _imp_order = {"high": 0, "medium": 1, "low": 2}
+    _slate_news.sort(key=lambda x: (_imp_order.get(x.get("impact", "low"), 3), x.get("published_at", "")))
+
+    if _slate_news:
+        _imp_colors = {"high": "#ff4444", "medium": "#ffd700", "low": "#8b949e"}
+        _cat_emoji  = {
+            "injury": "🏥", "trade": "🔄", "performance": "📈",
+            "suspension": "🚫", "contract": "💰", "roster": "📋",
+        }
+        with st.expander(
+            f"📰 Player News Alerts — {len(_slate_news)} item(s) for tonight's slate",
+            expanded=any(n.get("impact") == "high" for n in _slate_news),
+        ):
+            for _na in _slate_news[:15]:
+                _na_title  = _na.get("title", "")
+                _na_player = _na.get("player_name", "")
+                _na_body   = _na.get("body", "")
+                _na_cat    = _na.get("category", "")
+                _na_imp    = _na.get("impact", "").lower()
+                _na_pub    = _na.get("published_at", "")[:10]
+                if not _na_title:
+                    continue
+                _na_c = _imp_colors.get(_na_imp, "#555")
+                _na_em = _cat_emoji.get(_na_cat, "📰")
+                st.markdown(
+                    f'<div style="background:#0d1117;border-left:4px solid {_na_c};'
+                    f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="color:#e0e7ef;font-weight:700;">{_na_em} {_html.escape(_na_title[:80])}</span>'
+                    f'<span style="background:{_na_c};color:#000;border-radius:4px;'
+                    f'padding:1px 6px;font-size:0.72rem;font-weight:700;">'
+                    f'{_na_imp.upper() if _na_imp else "NEWS"}</span>'
+                    f'</div>'
+                    f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                    f'<strong style="color:#c0d0e8;">{_html.escape(_na_player)}</strong>'
+                    + (f' · {_html.escape(_na_pub)}' if _na_pub else "")
+                    + f'</div>'
+                    + (f'<div style="color:#a0b4d0;font-size:0.82rem;margin-top:6px;">'
+                       f'{_html.escape(_na_body[:200])}'
+                       + ("…" if len(_na_body) > 200 else "")
+                       + f'</div>' if _na_body else "")
+                    + f'</div>',
+                    unsafe_allow_html=True,
+                )
+        st.divider()
 
     # ============================================================
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)

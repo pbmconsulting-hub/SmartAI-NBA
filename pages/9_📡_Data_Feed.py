@@ -328,6 +328,39 @@ with injury_btn_col2:
             "Run `pip install nba_api` to enable this feature."
         )
 
+st.markdown("---")
+
+# ─── Standings & News Section ────────────────────────────────
+st.markdown("""
+<div style="background:linear-gradient(135deg,#0a1628,#0f2040); border:1px solid #00c9ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
+  <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">📊 NBA Standings & Player News</div>
+  <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
+    Fetches current NBA standings and recent player/team news from the
+    <strong>ClearSports API</strong> — conference ranks, W-L records,
+    streaks, injury news, and trade updates.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+sn_col1, sn_col2 = st.columns([1, 3])
+with sn_col1:
+    if st.button(
+        "📊 Refresh Standings & News",
+        use_container_width=True,
+        help="Fetch NBA standings and recent news from ClearSports API",
+    ):
+        st.session_state["update_action"] = "standings_news"
+
+with sn_col2:
+    _last_sn = st.session_state.get("standings_news_last_fetched")
+    if _last_sn:
+        st.caption(f"Last fetched: {_last_sn}")
+    else:
+        st.caption(
+            "Fetches conference standings (rank, W-L, home/away splits, last-10, streak) "
+            "and recent player/team news. Requires your ClearSports API key."
+        )
+
 # ============================================================
 # END SECTION: Update Action Buttons
 # ============================================================
@@ -841,6 +874,46 @@ if current_action:
                     "Existing nba_api injury data is preserved."
                 )
 
+    # --------------------------------------------------------
+    # Action: Refresh Standings & News (ClearSports)
+    # --------------------------------------------------------
+    elif current_action == "standings_news":
+        st.subheader("📊 Refreshing Standings & News…")
+        st.session_state["update_action"] = None
+
+        import datetime as _dt_sn
+
+        with st.spinner("Fetching NBA standings from ClearSports…"):
+            try:
+                from data.live_data_fetcher import fetch_standings as _fetch_standings_ldf
+                _standings_data = _fetch_standings_ldf()
+                st.session_state["league_standings"] = _standings_data
+            except Exception as _sn_err:
+                _standings_data = []
+                st.warning(f"Standings fetch failed: {_sn_err}")
+
+        with st.spinner("Fetching recent NBA news from ClearSports…"):
+            try:
+                from data.live_data_fetcher import fetch_player_news as _fetch_news_ldf
+                _news_data = _fetch_news_ldf(limit=30)
+                st.session_state["player_news"] = _news_data
+            except Exception as _news_err:
+                _news_data = []
+                st.warning(f"News fetch failed: {_news_err}")
+
+        _now_sn = _dt_sn.datetime.now().strftime("%Y-%m-%d %H:%M")
+        st.session_state["standings_news_last_fetched"] = _now_sn
+
+        if _standings_data:
+            st.success(
+                f"✅ Standings loaded: **{len(_standings_data)} teams** · "
+                f"News: **{len(_news_data)} items**"
+            )
+        elif not _standings_data:
+            st.warning(
+                "No standings returned. Confirm your ClearSports API key is set on ⚙️ Settings."
+            )
+
 # ============================================================
 # END SECTION: Execute the Selected Action
 # ============================================================
@@ -1173,6 +1246,114 @@ if _PLATFORM_FETCHER_AVAILABLE:
 
 
 # ============================================================
+# SECTION: Standings & News Display
+# Shows current NBA standings and recent news from ClearSports.
+# ============================================================
+
+_standings_display = st.session_state.get("league_standings", [])
+_news_display      = st.session_state.get("player_news", [])
+
+if _standings_display or _news_display:
+    st.divider()
+    st.subheader("📊 NBA Standings & News")
+
+    _sn_tab1, _sn_tab2 = st.tabs(["🏆 Standings", "📰 Player & Team News"])
+
+    with _sn_tab1:
+        if _standings_display:
+            # Split into East/West
+            _east = [t for t in _standings_display if "east" in str(t.get("conference", "")).lower()]
+            _west = [t for t in _standings_display if "west" in str(t.get("conference", "")).lower()]
+            _other = [t for t in _standings_display if t not in _east and t not in _west]
+            if _other:
+                _east += _other  # fallback: dump into East if conference missing
+
+            def _standings_table(teams, title):
+                if not teams:
+                    return
+                st.markdown(f"**{title}**")
+                rows = []
+                for t in sorted(teams, key=lambda x: x.get("conference_rank", 99)):
+                    w = t.get("wins", 0)
+                    l = t.get("losses", 0)
+                    hw = t.get("home_wins", 0)
+                    hl = t.get("home_losses", 0)
+                    aw = t.get("away_wins", 0)
+                    al = t.get("away_losses", 0)
+                    l10w = t.get("last_10_wins", 0)
+                    l10l = t.get("last_10_losses", 0)
+                    streak = t.get("streak", "")
+                    gb = t.get("games_back", 0.0)
+                    rows.append({
+                        "Rank": t.get("conference_rank", "—"),
+                        "Team": t.get("team_abbreviation", ""),
+                        "W": w,
+                        "L": l,
+                        "W%": f"{t.get('win_pct', 0):.3f}",
+                        "GB": f"{gb:.1f}" if gb else "—",
+                        "Home": f"{hw}-{hl}",
+                        "Away": f"{aw}-{al}",
+                        "L10": f"{l10w}-{l10l}",
+                        "Streak": streak,
+                    })
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+
+            _c_east, _c_west = st.columns(2)
+            with _c_east:
+                _standings_table(_east, "🏀 Eastern Conference")
+            with _c_west:
+                _standings_table(_west, "🏀 Western Conference")
+        else:
+            st.info(
+                "No standings loaded yet. Click **📊 Refresh Standings & News** above. "
+                "Requires your ClearSports API key (⚙️ Settings)."
+            )
+
+    with _sn_tab2:
+        if _news_display:
+            _imp_colors = {"high": "#ff4444", "medium": "#ffd700", "low": "#00ff9d"}
+            _cat_emoji  = {
+                "injury": "🏥", "trade": "🔄", "performance": "📈",
+                "suspension": "🚫", "contract": "💰", "roster": "📋",
+            }
+            for _item in _news_display[:25]:
+                _title = _item.get("title", "")
+                _body  = _item.get("body", "")
+                _player = _item.get("player_name", "")
+                _team  = _item.get("team_abbreviation", "")
+                _cat   = _item.get("category", "")
+                _imp   = _item.get("impact", "").lower()
+                _pub   = _item.get("published_at", "")[:10]
+                if not _title:
+                    continue
+                _imp_badge = (
+                    f'<span style="background:{_imp_colors.get(_imp,"#555")};'
+                    f'color:#000;border-radius:4px;padding:1px 6px;font-size:0.72rem;'
+                    f'font-weight:700;">{_imp.upper()}</span>'
+                    if _imp else ""
+                )
+                _cat_label = _cat_emoji.get(_cat, "📰") + " " + _cat.title() if _cat else "📰 News"
+                _who = f"**{_player}**" if _player else f"*{_team}*" if _team else ""
+                with st.expander(
+                    f"{_cat_emoji.get(_cat, '📰')} {_title[:80]}"
+                    + (f"  ·  {_pub}" if _pub else ""),
+                    expanded=False,
+                ):
+                    if _who:
+                        st.markdown(f"{_who} · {_cat_label} {_imp_badge}", unsafe_allow_html=True)
+                    if _body:
+                        st.markdown(_body)
+        else:
+            st.info(
+                "No news loaded yet. Click **📊 Refresh Standings & News** above."
+            )
+
+# ============================================================
+# END SECTION: Standings & News Display
+# ============================================================
+
+
+# ============================================================
 # SECTION: Help and Tips
 # ============================================================
 
@@ -1202,14 +1383,15 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: What happens if the update fails?**
     A: Nothing breaks! The app just keeps using the existing CSV data.
-    Try again in a few minutes — the NBA API is occasionally slow or down.
+    Try again in a few minutes — the API may be temporarily slow or down.
 
     ---
 
     **Q: Where does the data come from?**
-    A: The `nba_api` library fetches data from **stats.nba.com** — the NBA's
-    official statistics website. It's the same data ESPN and basketball-reference
-    use! No account or API key needed.
+    A: Player stats, team stats, rosters, injuries, standings, and live scores
+    all come from the **ClearSports API** (configure your key on ⚙️ Settings).
+    Prop lines for DraftKings come from **The Odds API** (also on ⚙️ Settings).
+    PrizePicks and Underdog Fantasy have free public APIs — no key required.
 
     ---
 
@@ -1221,13 +1403,21 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: I see 'no data yet' even after updating. Why?**
     A: The players.csv file gets written when you click Update. If you still see "no data"
-    in the status, try refreshing the page or running the update again.
+    in the status, try refreshing the page or running the update again. Also confirm
+    your **ClearSports API key** is set on the ⚙️ Settings page.
 
     ---
 
     **Q: How do I get DraftKings props?**
     A: Get a free API key from [the-odds-api.com](https://the-odds-api.com),
     add it on the ⚙️ Settings page, then click "Fetch DraftKings" or "Refresh All Props".
+
+    ---
+
+    **Q: How do I get NBA Standings and News?**
+    A: Click **📊 Refresh Standings & News** (above). This fetches current conference
+    standings and recent player/team news from ClearSports. Standings are also
+    auto-loaded whenever you run **One-Click Full Setup** or **🏀 Auto-Load Tonight's Games**.
     """)
 
 # ============================================================

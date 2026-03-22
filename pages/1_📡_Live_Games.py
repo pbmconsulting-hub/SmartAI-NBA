@@ -7,6 +7,7 @@
 
 import streamlit as st
 import datetime
+import html as _h
 import os
 import time
 
@@ -1078,6 +1079,20 @@ if current_games:
 
         home_streak = game.get("home_streak", "")
         away_streak = game.get("away_streak", "")
+
+        # Extended standings fields (populated by _enrich_games_with_standings)
+        home_rank   = game.get("home_conference_rank", 0)
+        home_conf   = game.get("home_conference", "")[:1].upper()
+        home_l10    = game.get("home_last_10", "")
+        away_rank   = game.get("away_conference_rank", 0)
+        away_conf   = game.get("away_conference", "")[:1].upper()
+        away_l10    = game.get("away_last_10", "")
+
+        def _conf_badge(rank, conf):
+            if rank and conf:
+                return f'<span style="color:#8a9bb8;font-size:0.75rem;">#{rank} {conf}</span>'
+            return ""
+
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
         spread = game.get("vegas_spread", 0.0)
@@ -1167,14 +1182,18 @@ if current_games:
     <span class="team-badge away-badge">🚌 {away}</span>
     <span style="color:#a0aec0; font-size:1rem;">{away_name}</span>
     <span style="color:#718096; font-size:0.9rem;">({away_w}-{away_l})</span>
+    {_conf_badge(away_rank, away_conf)}
     {streak_html(away_streak)}
+    {f'<span style="color:#718096;font-size:0.75rem;">L10: {away_l10}</span>' if away_l10 else ''}
   </div>
   <div class="vs-divider" style="margin:8px 0;">VS</div>
   <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <span class="team-badge home-badge">🏠 {home}</span>
     <span style="color:#a0aec0; font-size:1rem;">{home_name}</span>
     <span style="color:#718096; font-size:0.9rem;">({home_w}-{home_l})</span>
+    {_conf_badge(home_rank, home_conf)}
     {streak_html(home_streak)}
+    {f'<span style="color:#718096;font-size:0.75rem;">L10: {home_l10}</span>' if home_l10 else ''}
   </div>
   {f'<div class="game-meta">{meta_line}</div>' if meta_line else ''}
   <div class="game-meta" style="margin-top:6px;">📊 {lines_line}</div>
@@ -1219,7 +1238,6 @@ if current_games:
             if not _inj_txt:
                 _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
 
-            import html as _h
 
             # Bookmaker consensus row (only shown when Odds API data available)
             _bk_count = game.get("bookmaker_count", 0)
