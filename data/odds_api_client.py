@@ -394,6 +394,9 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
             params = {
                 "apiKey":     resolved_key,
                 "markets":    markets_param,
+                # "us2" is intentional: The Odds API uses it for the secondary US
+                # region (BetMGM, Caesars, PointsBet, etc.) which carries most
+                # player-prop markets.  "us" covers DraftKings / FanDuel only.
                 "regions":    "us2",
                 "oddsFormat": "american",
                 "dateFormat": "iso",
