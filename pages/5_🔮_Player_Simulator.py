@@ -230,8 +230,8 @@ if _fetch_logs_btn and selected_names:
                         _gl_pdata["recent_form_games"] = _form.get("game_results", [])
                         _gl_pdata["recent_trend"] = _form.get("trend", "neutral")
                         _gl_pdata["recent_trend_emoji"] = _form.get("trend_emoji", "➡️")
-                except Exception:
-                    pass
+                except Exception as _form_exc:
+                    _logger.warning("Recent form fetch failed for %s: %s", _gl_pname, _form_exc)
             except Exception as _gl_exc:
                 _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
                 _gl_errors += 1
