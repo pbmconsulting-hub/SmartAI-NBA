@@ -42,6 +42,28 @@ st.title("🏆 Live Scores & Stats Leaders")
 st.markdown(
     f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Real-time NBA scores and leaderboards."
 )
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Live Scores & Stats Leaders
+    
+    This page shows **real-time NBA scores** and **statistical leaderboards** for the current season.
+    
+    **Live Scores**
+    - Automatically refreshed from the NBA API
+    - Shows current score, quarter, and time remaining for active games
+    - Completed games show final scores
+    
+    **Season Leaders**
+    - View top performers across key stats (points, rebounds, assists, etc.)
+    - Updated automatically when you refresh player data on the Data Feed page
+    
+    💡 **Pro Tips:**
+    - Use this page to quickly scout which players are hot before placing bets
+    - Check if a player's recent performance matches their season averages
+    - Compare leaders across stat categories for correlation insights
+    """)
+
 st.divider()
 
 # ============================================================

@@ -27,6 +27,36 @@ st.markdown(
     "Validate the model against real game logs. "
     "See win rates, ROI, and tier-by-tier performance metrics."
 )
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Historical Backtester — Validate Before You Bet
+    
+    The Backtester runs the prediction model against **real historical game logs** to measure accuracy.
+    
+    **How to Run a Backtest**
+    1. Select players (or use all cached players)
+    2. Choose the stat types to backtest (points, rebounds, assists, etc.)
+    3. Set the number of historical games per player (more games = more reliable results)
+    4. Click "Run Backtest" and wait for the analysis to complete
+    
+    **Understanding Results**
+    - **Win Rate**: Percentage of picks that would have been correct
+    - **ROI**: Return on investment assuming flat $10 bets
+    - **Tier Breakdown**: How each confidence tier (Platinum/Gold/Silver/Bronze) performed
+    - **By Stat Type**: Which stat categories the model predicts best
+    
+    **What Good Results Look Like**
+    - Overall win rate above 55% is strong
+    - Platinum/Gold tiers should have the highest win rates
+    - If Bronze tier beats Platinum, the confidence model needs recalibration
+    
+    💡 **Pro Tips:**
+    - Run "Refresh Game Logs" on the Data Feed page first to load historical data
+    - Backtest with at least 10 games per player for statistically meaningful results
+    - Focus on stat types where the model shows consistent edge (>55% win rate)
+    """)
+
 st.divider()
 
 # ── Imports ──────────────────────────────────────────────────

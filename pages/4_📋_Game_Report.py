@@ -165,6 +165,30 @@ st.markdown(
     "AI-powered prop betting report with **SAFE Score™** analysis — "
     "collapsible sections, confidence bars, and entry strategy matrix."
 )
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Game Report — AI-Powered Analysis
+    
+    The Game Report provides a **comprehensive breakdown** of any selected game using the SAFE Score™ system.
+    
+    **How to Generate a Report**
+    1. Run analysis on the **⚡ Quantum Analysis Matrix** page first
+    2. Select a game from the dropdown to view its full report
+    3. Expand sections to see detailed player-by-player breakdowns
+    
+    **What You'll See**
+    - **SAFE Score™**: Our composite confidence metric (0-100) combining probability, edge, and risk
+    - **Confidence Bars**: Visual indicator of how confident the model is in each pick
+    - **Entry Strategy Matrix**: Suggested parlay combinations ranked by expected value
+    - **Force Analysis**: Directional factors pushing a prop OVER or UNDER
+    
+    💡 **Pro Tips:**
+    - Focus on picks with SAFE Scores above 65 (Gold tier and above)
+    - The Entry Strategy Matrix suggests which picks combine well in parlays
+    - Use the force analysis to understand WHY the model likes a pick, not just that it does
+    """)
+
 st.divider()
 
 # ============================================================

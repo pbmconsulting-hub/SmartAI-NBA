@@ -38,6 +38,31 @@ st.markdown(
     "These props have been flagged as **high-risk or low-edge** by the model. "
     "Understand WHY to make better decisions."
 )
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Risk Shield — Protecting Your Bankroll
+    
+    The Risk Shield automatically flags props that **failed the model's quality checks**. These are picks you should avoid.
+    
+    **How It Works**
+    1. Run analysis on the **⚡ Quantum Analysis Matrix** page
+    2. The Risk Shield automatically collects all flagged props
+    3. Each flagged pick shows WHY it was flagged (low edge, trap line, high variance, etc.)
+    
+    **Understanding Red Flags**
+    - 🚩 **Low Edge**: Model probability is near 50/50 — essentially a coin flip
+    - 🚩 **Trap Line**: Vegas set this line to bait bettors to the wrong side
+    - 🚩 **Sharp Line**: The line matches the player's exact average — no value
+    - 🚩 **High Variance**: The player's game-to-game stats are too unpredictable
+    - 🚩 **Low Confidence**: Contradictory signals — the model isn't sure
+    
+    💡 **Pro Tips:**
+    - If a pick appears here, skip it — even if the potential payout looks attractive
+    - Check the "What would make this playable?" section for each flagged pick
+    - Use this alongside the Entry Builder to avoid putting risky picks in parlays
+    """)
+
 st.divider()
 
 st.markdown(get_education_box_html(

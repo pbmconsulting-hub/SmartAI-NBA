@@ -279,6 +279,33 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+with st.expander("📖 How Subscriptions Work", expanded=False):
+    st.markdown("""
+    ### SmartBetPro Premium — What You Get
+    
+    **Free Tier**
+    - View live scores and basic game information
+    - Access the Data Feed for stat updates
+    - Limited analysis features
+    
+    **Premium Tier**
+    - ⚡ Full Quantum Analysis Matrix with unlimited simulations
+    - 🧬 Entry Builder for optimal parlay construction
+    - 📋 AI Game Reports with SAFE Score™ breakdowns
+    - 🔮 Player Simulator for scenario modeling
+    - 📈 Bet Tracker with model health monitoring
+    - 📊 Historical Backtester for strategy validation
+    - 🎰 Vegas Vault for cross-book edge detection
+    - 🎙️ Full Studio access with Joseph M. Smith AI analysis
+    
+    **How Payment Works**
+    - Secure checkout through Stripe (industry-standard payment processor)
+    - Cancel anytime — no long-term commitment
+    - Your subscription status is verified automatically on each visit
+    
+    💡 **Already subscribed?** Your status appears at the top of this page. Use "Manage Subscription" to update billing or cancel.
+    """)
+
 # ============================================================
 # SECTION: Subscriber View (already premium)
 # ============================================================
