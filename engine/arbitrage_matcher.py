@@ -305,7 +305,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
         rec_odds = best_over_odds if rec_side == "OVER" else best_under_odds
         comp_odds = best_under_odds if rec_side == "OVER" else best_over_odds
         try:
-            vig = round(get_vig_percentage(rec_odds, comp_odds) * 100.0, 2) if rec_odds else 0.0
+            vig = round(get_vig_percentage(rec_odds, comp_odds) * 100.0, 2) if (rec_odds and comp_odds) else 0.0
         except (TypeError, ValueError, ZeroDivisionError):
             vig = 0.0
 
@@ -341,3 +341,4 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
 
     _logger.info("find_ev_discrepancies: %d props passed filter.", len(discrepancies))
     return discrepancies
+
