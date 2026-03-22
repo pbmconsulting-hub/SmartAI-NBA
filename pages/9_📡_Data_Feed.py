@@ -485,7 +485,7 @@ if current_action:
         # Show a spinner while we fetch
         # BEGINNER NOTE: st.spinner() shows a loading animation
         # while the code inside the "with" block runs
-        with st.spinner("Connecting to NBA API..."):
+        with st.spinner("Connecting to ClearSports API…"):
             # Call the fetcher function
             todays_games = fetch_todays_games()
 
@@ -498,8 +498,8 @@ if current_action:
             # Show success message
             st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
             st.info(
-                "💡 Vegas lines (spread and total) were set to defaults. "
-                "Edit them on the **🏀 Today's Games** page."
+                "💡 Vegas lines and totals are fetched from The Odds API consensus. "
+                "You can also edit them on the **🏀 Today's Games** page."
             )
 
             # Show the games in a table
@@ -512,10 +512,11 @@ if current_action:
                     "Away Team": game.get("away_team", ""),
                     "Home Team": game.get("home_team", ""),
                     "Game Date": game.get("game_date", ""),
+                    "Total (O/U)": game.get("consensus_total") or game.get("game_total", ""),
+                    "Spread": game.get("consensus_spread") or game.get("vegas_spread", ""),
                 })
 
             # Display as a clean table
-            # BEGINNER NOTE: st.dataframe() creates a scrollable, sortable table
             st.dataframe(games_display, width="stretch", hide_index=True)
 
         else:
@@ -526,7 +527,7 @@ if current_action:
                 "⚠️ No games found for tonight, or there was an API error. "
                 "\n\nPossible reasons:\n"
                 "- No NBA games are scheduled today\n"
-                "- The NBA API is temporarily unavailable\n"
+                "- ClearSports API key not configured (⚙️ Settings)\n"
                 "- Check your internet connection\n\n"
                 "You can still enter games manually on the **🏀 Today's Games** page."
             )
@@ -599,7 +600,7 @@ if current_action:
                 "❌ **Failed to update player stats.**\n\n"
                 "Possible reasons:\n"
                 "- No internet connection\n"
-                "- The NBA API is temporarily down\n"
+                "- ClearSports API key not configured (⚙️ Settings)\n"
                 "- Try again in a few minutes\n\n"
                 "The app will continue to use the existing data until a successful update."
             )

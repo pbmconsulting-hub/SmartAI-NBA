@@ -163,7 +163,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     
     **Auto-Resolve:**
     - Click "Check Results Now" to automatically resolve today's bets
-    - The system fetches actual game stats from NBA API and marks bets as Won/Lost
+    - The system fetches actual game stats from ClearSports API and marks bets as Won/Lost
     - Player name matching uses fuzzy logic to handle name variations
     
     **Reading Stats:**
@@ -1415,13 +1415,13 @@ with tab_all_picks:
 with tab_auto_resolve:
     st.subheader("🤖 Auto-Resolve — Fetch Actual Stats & Mark Results")
     st.markdown(
-        "Automatically fetch actual player stats from the NBA API and mark pending bets "
+        "Automatically fetch actual player stats from ClearSports API and mark pending bets "
         "as WIN / LOSS / PUSH. Use **⚡ Resolve Now** to resolve today's completed games instantly."
     )
 
     # ── Resolve Now (today's bets) ────────────────────────────────────
     st.markdown("### ⚡ Resolve Today's Bets")
-    st.caption("Checks live NBA scoreboard for Final games and resolves today's pending bets immediately.")
+    st.caption("Checks ClearSports live scores for Final games and resolves today's pending bets immediately.")
 
     resolve_today_btn = st.button(
         "⚡ Resolve Now",
@@ -1558,7 +1558,7 @@ with tab_auto_resolve:
         )
 
     if resolve_btn:
-        with st.spinner("Fetching actual stats from NBA API…"):
+        with st.spinner("Fetching actual stats from ClearSports API…"):
             resolved, errors = auto_resolve_bet_results(date_str=resolve_date.isoformat())
 
         if resolved > 0:
