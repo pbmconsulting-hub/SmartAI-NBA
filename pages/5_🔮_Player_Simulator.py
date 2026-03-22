@@ -8,6 +8,13 @@
 
 import streamlit as st
 import html as _html
+import logging as _logging
+
+try:
+    from utils.logger import get_logger as _get_logger
+    _logger = _get_logger(__name__)
+except ImportError:
+    _logger = _logging.getLogger(__name__)
 
 from data.data_manager import (
     load_players_data,
@@ -177,12 +184,60 @@ if _scenario_mode and selected_names:
             f"Rest {_sce_rest}d | Def {_sce_def_adj:+d}%"
         )
 
-run_sim = st.button(
-    "🚀 Run Simulation",
-    type="primary",
-    width="content",
-    disabled=not selected_names,
-)
+_sim_btn_col1, _sim_btn_col2 = st.columns([2, 3])
+with _sim_btn_col1:
+    run_sim = st.button(
+        "🚀 Run Simulation",
+        type="primary",
+        use_container_width=True,
+        disabled=not selected_names,
+    )
+with _sim_btn_col2:
+    _fetch_logs_btn = st.button(
+        "🔄 Fetch Game Logs from ClearSports",
+        use_container_width=True,
+        help="Load the last 20 games per player from ClearSports API for more accurate simulation",
+        disabled=not selected_names,
+    )
+
+# ── On-demand ClearSports game log fetch ──────────────────────
+if _fetch_logs_btn and selected_names:
+    _gl_progress = st.progress(0, text="Fetching game logs from ClearSports…")
+    _gl_fetched = 0
+    _gl_errors  = 0
+    for _gl_idx, _gl_pname in enumerate(selected_names):
+        _gl_pdata = next(
+            (p for p in tonight_players if p.get("name") == _gl_pname), None
+        )
+        _gl_player_id = _gl_pdata.get("player_id", "") if _gl_pdata else ""
+        _gl_progress.progress(
+            (_gl_idx + 1) / len(selected_names),
+            text=f"Fetching logs for {_gl_pname}…",
+        )
+        if _gl_player_id:
+            try:
+                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                from data.game_log_cache import save_game_logs_to_cache as _gl_save
+                _logs = _ldf_gl(_gl_player_id, last_n_games=20)
+                if _logs:
+                    _gl_save(_gl_pname, _logs)
+                    _gl_fetched += 1
+            except Exception as _gl_exc:
+                _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
+                _gl_errors += 1
+        else:
+            _gl_errors += 1
+    _gl_progress.empty()
+    if _gl_fetched:
+        st.success(
+            f"✅ Game logs fetched for **{_gl_fetched}** player(s). "
+            "Re-run simulation to use the fresh data."
+        )
+    if _gl_errors:
+        st.warning(
+            f"⚠️ Could not fetch logs for {_gl_errors} player(s) — "
+            "player IDs may be missing. Run a Smart Update on the Data Feed page first."
+        )
 
 st.divider()
 

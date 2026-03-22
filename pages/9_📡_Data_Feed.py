@@ -1,13 +1,14 @@
 # ============================================================
 # FILE: pages/9_📡_Data_Feed.py
 # PURPOSE: Streamlit page that lets the user fetch live NBA data
-#          from the nba_api library. Updates player stats, team stats,
-#          and today's games with real, current data.
+#          from the ClearSports API and The Odds API. Updates player
+#          stats, team stats, standings, and today's games with real,
+#          current data.
 # CONNECTS TO: data/live_data_fetcher.py, data/data_manager.py
 # CONCEPTS COVERED: Progress bars, API calls, session state, error handling
 #
 # BEGINNER NOTE: This page is your "data refresh" control panel.
-# Click a button to pull live stats from the NBA's official website.
+# Click a button to pull live stats from ClearSports and The Odds API.
 # After updating, all the other pages in the app will use the fresh data!
 # ============================================================
 
@@ -25,9 +26,8 @@ from data.data_manager import (
 )
 
 # Import our live data fetcher functions
-# BEGINNER NOTE: We import these here, but the actual nba_api calls
-# happen inside these functions. If nba_api is not installed, the
-# functions will show a friendly error message instead of crashing.
+# These functions call ClearSports API for roster/stats/injury data
+# and The Odds API for sportsbook lines.
 from data.live_data_fetcher import (
     fetch_todays_games,          # Fetch tonight's NBA games
     fetch_player_stats,          # Fetch all player season averages
@@ -38,8 +38,8 @@ from data.live_data_fetcher import (
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
-# RosterEngine is the single source for injury data (replaces web_scraper/web_scrapers).
-# It is available whenever nba_api is installed — set after the nba_api availability check below.
+# RosterEngine is the single source for injury data.
+# It uses ClearSports API as the primary source, with NBA CDN feed as fallback.
 
 # ============================================================
 # SECTION: Page Setup
@@ -297,7 +297,8 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#1a0a2e,#0f1a2e); border:1px solid #c800ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches live injury designations from the <strong>official NBA API</strong> —
+    Fetches live injury designations from the <strong>ClearSports API</strong> (primary) 
+    with NBA CDN feed as fallback —
     real-time GTD/Out/Doubtful status, specific injury details, and expected return dates.
   </div>
 </div>
@@ -309,7 +310,7 @@ with injury_btn_col1:
     if st.button(
         "🔄 Refresh Injury Report",
         width="stretch",
-        help="Fetch live GTD/Out/injury data from the official NBA API (requires nba_api)",
+        help="Fetch live GTD/Out/injury data from ClearSports API (primary) with NBA CDN as fallback",
         disabled=_injury_btn_disabled,
     ):
         st.session_state["update_action"] = "injury_report"
@@ -321,11 +322,11 @@ with injury_btn_col2:
         if _last_scraped:
             st.caption(f"Last fetched: {_last_scraped}")
         else:
-            st.caption("Click to pull real-time injury designations from the NBA API.")
+            st.caption("Click to pull real-time injury designations from ClearSports API.")
     else:
         st.caption(
-            "⚠️ `nba_api` is required. "
-            "Run `pip install nba_api` to enable this feature."
+            "⚠️ RosterEngine unavailable. "
+            "Check that data/roster_engine.py is present."
         )
 
 st.markdown("---")
@@ -742,20 +743,21 @@ if current_action:
             st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
 
     # --------------------------------------------------------
-    # Action: Refresh Injury Report (nba_api)
+    # Action: Refresh Injury Report (ClearSports + NBA CDN fallback)
     # --------------------------------------------------------
     elif current_action == "injury_report":
         st.subheader("🏥 Refreshing Injury Report…")
 
         st.info(
-            "Fetching real-time injury data from **NBA API** (official source). "
+            "Fetching real-time injury data from **ClearSports API** (primary source) "
+            "with NBA CDN feed as fallback. "
             "This typically takes 5–15 seconds."
         )
 
         # Clear the action flag immediately so a page reload doesn't re-run it
         st.session_state["update_action"] = None
 
-        with st.spinner("Fetching injury data from NBA API…"):
+        with st.spinner("Fetching injury data from ClearSports…"):
             try:
                 from data.roster_engine import RosterEngine as _RE
                 _re = _RE()
@@ -782,8 +784,8 @@ if current_action:
             if total_count == 0:
                 st.warning(
                     "⚠️ **0 injuries found** — all data sources returned empty results. "
-                    "The NBA CDN feed and stats.nba.com may be temporarily unavailable. "
-                    "Try again in a few minutes."
+                    "ClearSports API or NBA CDN feed may be temporarily unavailable. "
+                    "Confirm your ClearSports API key is set on ⚙️ Settings, then try again."
                 )
             else:
                 st.success(
@@ -793,9 +795,9 @@ if current_action:
                 )
 
             # Show a summary table
-            st.markdown("### 📋 NBA API Injury Data")
+            st.markdown("### 📋 Injury Data (ClearSports + NBA CDN)")
             st.caption(
-                "Showing players with a non-Active designation from the NBA API. "
+                "Showing players with a non-Active designation from ClearSports / NBA CDN. "
                 "Run a Smart Update or Full Setup to apply these to the "
                 "full injury_status.json."
             )
@@ -870,8 +872,8 @@ if current_action:
             if scraped_data is not None and not scraped_data:
                 st.warning(
                     "⚠️ **No injury data was returned.** "
-                    "The external sites may be unreachable or have changed their HTML structure. "
-                    "Existing nba_api injury data is preserved."
+                    "ClearSports API may be unavailable or the API key is not configured. "
+                    "Check your ClearSports API key on the ⚙️ Settings page."
                 )
 
     # --------------------------------------------------------

@@ -130,9 +130,9 @@ with st.expander("📖 How to Use This Page", expanded=False):
 # SECTION: Action Buttons — Two Independent Workflows
 # ─────────────────────────────────────────────────────────────
 # BUTTON 1 — Auto-Load Tonight's Games:
-#   Fetches the schedule, rosters, player/team stats from NBA API,
-#   then auto-generates SYNTHETIC props from season averages.
-#   Use this as a first step or to refresh data.
+#   Fetches the schedule, rosters, player/team stats from ClearSports API,
+#   enriches with Odds API consensus lines, then auto-generates SYNTHETIC
+#   props from season averages. Use this as a first step or to refresh data.
 #
 # BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
 #   Fetches REAL live prop lines from PrizePicks, Underdog, and
@@ -321,7 +321,7 @@ if auto_load_clicked:
             status_text.empty()
             st.warning(
                 "⚠️ Could not auto-load games. Possible reasons:\n"
-                "- `nba_api` is not installed (run: `pip install nba_api`)\n"
+                "- ClearSports API key is not configured (⚙️ Settings)\n"
                 "- No games scheduled tonight\n"
                 "- No internet connection\n\n"
                 "Please enter games manually using the form below."
@@ -1467,7 +1467,8 @@ with st.expander("💡 Tips for Best Results"):
 
     - **Total (O/U):** The Vegas over/under for the game (usually 210–235).
 
-    - **Auto-Load**: Fetches live game data + team records (W-L, streaks) from the NBA API.
+    - **Auto-Load**: Fetches live game data + team records (W-L, streaks, standings) from
+      ClearSports API, then enriches with consensus lines from The Odds API.
 
     - **Key Players**: Loaded from your player database. Go to **Update Data** to
       refresh with today's team rosters.

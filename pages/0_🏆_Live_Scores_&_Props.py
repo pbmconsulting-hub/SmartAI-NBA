@@ -257,9 +257,9 @@ else:
     st.info(
         "📡 No live scores available right now.\n\n"
         "This may be because:\n"
-        "- `nba_api` is not installed (`pip install nba_api`)\n"
         "- No games are currently scheduled or in progress\n"
-        "- The NBA API is temporarily unavailable\n\n"
+        "- The ClearSports API key is not configured (⚙️ Settings)\n"
+        "- The ClearSports API is temporarily unavailable\n\n"
         "Check back when games are live!"
     )
 
