@@ -36,10 +36,26 @@ except ImportError:
     _BACKTESTER_AVAILABLE = False
 
 try:
-    from data.game_log_cache import get_all_cached_players, load_game_logs_from_cache
+    from data.game_log_cache import (
+        get_all_cached_players,
+        load_game_logs_from_cache,
+        save_game_logs_to_cache,
+    )
     _CACHE_AVAILABLE = True
 except ImportError:
     _CACHE_AVAILABLE = False
+
+try:
+    from data.live_data_fetcher import refresh_historical_data_for_tonight as _refresh_hist
+    _HIST_REFRESH_AVAILABLE = True
+except ImportError:
+    _HIST_REFRESH_AVAILABLE = False
+
+try:
+    from engine.clv_tracker import get_clv_summary, validate_model_edge
+    _CLV_AVAILABLE = True
+except ImportError:
+    _CLV_AVAILABLE = False
 
 # ── Sidebar Controls ─────────────────────────────────────────
 with st.sidebar:
@@ -65,20 +81,71 @@ with st.sidebar:
 
     run_btn = st.button("▶ Run Backtest", type="primary", use_container_width=True)
 
+    st.divider()
+
+    # ── Historical data refresh ───────────────────────────────
+    st.subheader("📡 Historical Data")
+    st.caption(
+        "Auto-fetch game logs for tonight's players via ClearSports API "
+        "and update CLV closing lines from The Odds API."
+    )
+    refresh_hist_btn = st.button(
+        "🔄 Refresh Historical Data",
+        use_container_width=True,
+        disabled=not _HIST_REFRESH_AVAILABLE,
+        help="Fetches the last 30 games per player for all teams playing tonight.",
+    )
+
 # ── Info if backtester not available ─────────────────────────
 if not _BACKTESTER_AVAILABLE:
     st.error("⚠️ Backtester engine not available. Check engine/backtester.py.")
     st.stop()
 
+# ── Historical Data Refresh Handler ──────────────────────────
+if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
+    _prog = st.progress(0, text="Fetching historical game logs…")
+    def _prog_cb(current, total, msg):
+        _prog.progress(min(current / max(total, 1), 1.0), text=msg)
+
+    with st.spinner("Fetching historical game logs from ClearSports…"):
+        todays_games = st.session_state.get("todays_games", [])
+        hist_result = _refresh_hist(games=todays_games, last_n_games=30, progress_callback=_prog_cb)
+
+    _prog.empty()
+    refreshed  = hist_result.get("players_refreshed", 0)
+    clv_closed = hist_result.get("clv_updated", 0)
+    errs       = hist_result.get("errors", 0)
+
+    if refreshed > 0:
+        st.success(
+            f"✅ Historical data refreshed: **{refreshed} player(s)** cached"
+            + (f", **{clv_closed} CLV record(s)** updated" if clv_closed else "")
+            + (f", {errs} error(s)" if errs else "")
+        )
+    elif not todays_games:
+        st.warning(
+            "⚠️ No tonight's games loaded. Go to **📡 Live Games** and click "
+            "**Auto-Load Tonight's Games** first, then refresh historical data."
+        )
+    else:
+        st.info(
+            "ℹ️ No game logs fetched. This typically means the ClearSports API key "
+            "isn't configured, or players don't have IDs in the loaded data. "
+            "Configure your API key on the **⚙️ Settings** page."
+        )
+
 # ── Load cached game logs ─────────────────────────────────────
 game_logs_by_player = {}
+stale_count = 0
 if _CACHE_AVAILABLE:
     cached_players = get_all_cached_players()
     if cached_players:
         for pname in cached_players:
             logs, is_stale = load_game_logs_from_cache(pname)
-            if logs and not is_stale:
+            if logs:
                 game_logs_by_player[pname] = logs
+                if is_stale:
+                    stale_count += 1
 
 # Also check session state (set by Player Simulator page)
 session_logs = st.session_state.get("game_logs_by_player", {})
@@ -87,17 +154,76 @@ for pname, logs in session_logs.items():
         game_logs_by_player[pname] = logs
 
 # ── Status ────────────────────────────────────────────────────
-st.info(
-    f"📁 **{len(game_logs_by_player)} player(s)** with cached game logs available. "
-    "Fetch player game logs on the 🔮 Player Simulator page first, "
-    "then return here to backtest."
-)
-
-if not game_logs_by_player:
+_fresh = len(game_logs_by_player) - stale_count
+if game_logs_by_player:
+    st.info(
+        f"📁 **{len(game_logs_by_player)} player(s)** with cached game logs available "
+        f"({_fresh} fresh · {stale_count} stale). "
+        f"Use **🔄 Refresh Historical Data** in the sidebar to update all logs at once."
+    )
+else:
     st.warning(
-        "No game log data found. Go to **🔮 Player Simulator**, search for players, "
+        "No game log data found. Click **🔄 Refresh Historical Data** in the sidebar "
+        "(requires tonight's games to be loaded on **📡 Live Games** first). "
+        "Or go to **🔮 Player Simulator**, search for players, "
         "and their logs will be cached for backtesting."
     )
+    if not _HIST_REFRESH_AVAILABLE:
+        st.stop()
+
+# ── CLV Model Validation Panel ────────────────────────────────
+if _CLV_AVAILABLE:
+    clv_summary = get_clv_summary(days=90)
+    clv_records_count = clv_summary.get("total_records", 0)
+    if clv_records_count > 0:
+        with st.expander(
+            f"🎯 CLV Model Validation — {clv_records_count} records (last 90 days)",
+            expanded=False,
+        ):
+            avg_clv = clv_summary.get("avg_clv", 0.0)
+            pos_rate = clv_summary.get("positive_clv_rate", 0.0)
+            clv_c1, clv_c2, clv_c3 = st.columns(3)
+            clv_c1.metric(
+                "Avg CLV",
+                f"{avg_clv:+.2f}",
+                help="Positive = model consistently beat the closing line (real edge). "
+                     "Negative = market moved away from model (no edge).",
+            )
+            clv_c2.metric(
+                "Positive CLV Rate",
+                f"{pos_rate*100:.1f}%",
+                delta="✅ Sharp" if pos_rate > 0.55 else "⚠️ Below sharp threshold",
+                delta_color="off",
+                help="% of picks where the market moved in our direction (beat close).",
+            )
+            clv_c3.metric(
+                "Total Records",
+                clv_records_count,
+                help="Number of picks with both opening and closing lines recorded.",
+            )
+
+            # Per-stat breakdown
+            edge_data = validate_model_edge(days=90)
+            clv_by_stat = edge_data.get("clv_by_stat", {})
+            if clv_by_stat:
+                st.markdown("**CLV by Stat Type:**")
+                _clv_rows = []
+                for stat, info in sorted(clv_by_stat.items()):
+                    cnt = info.get("count", 0)
+                    if cnt >= 3:
+                        _clv_rows.append({
+                            "Stat": stat.capitalize(),
+                            "Picks": cnt,
+                            "Avg CLV": f"{info.get('avg_clv', 0):+.2f}",
+                            "Positive Rate": f"{info.get('positive_clv_rate', 0)*100:.1f}%",
+                            "Signal": "✅ Edge" if info.get("avg_clv", 0) > 0 else "❌ No Edge",
+                        })
+                if _clv_rows:
+                    st.dataframe(_clv_rows, hide_index=True, use_container_width=True)
+
+        st.divider()
+
+if not game_logs_by_player:
     st.stop()
 
 # ── Run Backtest ──────────────────────────────────────────────

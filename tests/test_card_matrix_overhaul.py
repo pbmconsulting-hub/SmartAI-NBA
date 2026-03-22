@@ -291,31 +291,26 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
         self.assertIsInstance(AIOHTTP_AVAILABLE, bool)
 
     def test_true_line_kill_switch_prizepicks(self):
-        """PrizePicks fetcher must discard props with no valid line."""
-        import inspect
-        from data.platform_fetcher import fetch_prizepicks_props
-        source = inspect.getsource(fetch_prizepicks_props)
-        # Must continue (skip) when line is None or invalid
+        """Odds API client (replacing PrizePicks) must discard props with no valid line."""
+        import pathlib
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
-        self.assertIn("true_line", source)
-        self.assertIn("line_score", source)
 
     def test_true_line_kill_switch_underdog(self):
-        """Underdog fetcher must discard props with no valid line."""
-        import inspect
-        from data.platform_fetcher import fetch_underdog_props
-        source = inspect.getsource(fetch_underdog_props)
+        """Odds API client (replacing Underdog) must discard props with no valid line."""
+        import pathlib
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
-        self.assertIn("true_line", source)
-        self.assertIn("stat_value", source)
+        self.assertTrue("point" in source or "line" in source)
 
     def test_true_line_kill_switch_draftkings(self):
-        """DraftKings fetcher must discard props with no valid line."""
-        import inspect
-        from data.platform_fetcher import fetch_draftkings_props
-        source = inspect.getsource(fetch_draftkings_props)
+        """Odds API client (replacing DraftKings fetcher) must discard invalid props."""
+        import pathlib
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
-        self.assertIn("true_line", source)
         self.assertIn("point", source)
 
 

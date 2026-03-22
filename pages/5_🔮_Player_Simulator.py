@@ -8,6 +8,13 @@
 
 import streamlit as st
 import html as _html
+import logging as _logging
+
+try:
+    from utils.logger import get_logger as _get_logger
+    _logger = _get_logger(__name__)
+except ImportError:
+    _logger = _logging.getLogger(__name__)
 
 from data.data_manager import (
     load_players_data,
@@ -177,12 +184,60 @@ if _scenario_mode and selected_names:
             f"Rest {_sce_rest}d | Def {_sce_def_adj:+d}%"
         )
 
-run_sim = st.button(
-    "🚀 Run Simulation",
-    type="primary",
-    width="content",
-    disabled=not selected_names,
-)
+_sim_btn_col1, _sim_btn_col2 = st.columns([2, 3])
+with _sim_btn_col1:
+    run_sim = st.button(
+        "🚀 Run Simulation",
+        type="primary",
+        use_container_width=True,
+        disabled=not selected_names,
+    )
+with _sim_btn_col2:
+    _fetch_logs_btn = st.button(
+        "🔄 Fetch Game Logs from ClearSports",
+        use_container_width=True,
+        help="Load the last 20 games per player from ClearSports API for more accurate simulation",
+        disabled=not selected_names,
+    )
+
+# ── On-demand ClearSports game log fetch ──────────────────────
+if _fetch_logs_btn and selected_names:
+    _gl_progress = st.progress(0, text="Fetching game logs from ClearSports…")
+    _gl_fetched = 0
+    _gl_errors  = 0
+    for _gl_idx, _gl_pname in enumerate(selected_names):
+        _gl_pdata = next(
+            (p for p in tonight_players if p.get("name") == _gl_pname), None
+        )
+        _gl_player_id = _gl_pdata.get("player_id", "") if _gl_pdata else ""
+        _gl_progress.progress(
+            (_gl_idx + 1) / len(selected_names),
+            text=f"Fetching logs for {_gl_pname}…",
+        )
+        if _gl_player_id:
+            try:
+                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                from data.game_log_cache import save_game_logs_to_cache as _gl_save
+                _logs = _ldf_gl(_gl_player_id, last_n_games=20)
+                if _logs:
+                    _gl_save(_gl_pname, _logs)
+                    _gl_fetched += 1
+            except Exception as _gl_exc:
+                _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
+                _gl_errors += 1
+        else:
+            _gl_errors += 1
+    _gl_progress.empty()
+    if _gl_fetched:
+        st.success(
+            f"✅ Game logs fetched for **{_gl_fetched}** player(s). "
+            "Re-run simulation to use the fresh data."
+        )
+    if _gl_errors:
+        st.warning(
+            f"⚠️ Could not fetch logs for {_gl_errors} player(s) — "
+            "player IDs may be missing. Run a Smart Update on the Data Feed page first."
+        )
 
 st.divider()
 
@@ -561,10 +616,24 @@ if run_sim and selected_names:
             _pdata = sim_result["player"]
             _pname_log = _pdata.get("name", "")
             _recent_games = _pdata.get("recent_form_games", [])
-            if _recent_games:
-                with st.expander(f"📅 {_pname_log} — Last {len(_recent_games)} Game Log", expanded=False):
+
+            # Also check game log cache (populated by historical data refresh)
+            _cached_logs = []
+            try:
+                from data.game_log_cache import load_game_logs_from_cache as _load_cache
+                _cached_logs, _cache_stale = _load_cache(_pname_log)
+            except Exception:
+                _cached_logs, _cache_stale = [], True
+
+            _game_logs_for_display = _recent_games or _cached_logs
+
+            if _game_logs_for_display:
+                with st.expander(
+                    f"📅 {_pname_log} — Last {len(_game_logs_for_display)} Game Log",
+                    expanded=False,
+                ):
                     _log_rows = []
-                    for _gi, _g in enumerate(_recent_games[:10], start=1):
+                    for _gi, _g in enumerate(_game_logs_for_display[:15], start=1):
                         def _to_float(val):
                             try:
                                 return float(val)
@@ -572,14 +641,84 @@ if run_sim and selected_names:
                                 return None
                         _log_rows.append({
                             "Game": f"G-{_gi}",
+                            "Date": _g.get("game_date", ""),
+                            "Opp": _g.get("matchup", _g.get("opp", "")),
                             "PTS": _to_float(_g.get("pts")),
                             "REB": _to_float(_g.get("reb")),
                             "AST": _to_float(_g.get("ast")),
                             "3PM": _to_float(_g.get("fg3m")),
                             "STL": _to_float(_g.get("stl")),
                             "BLK": _to_float(_g.get("blk")),
+                            "TOV": _to_float(_g.get("tov")),
                         })
                     st.dataframe(_log_rows, width="stretch", hide_index=True)
+
+                # ── Matchup History vs Tonight's Opponent ─────────────────
+                _tonight_ctx = sim_result.get("context", {})
+                _opponent = _tonight_ctx.get("opponent", "")
+                if _opponent and _game_logs_for_display:
+                    try:
+                        from engine.matchup_history import (
+                            get_player_vs_team_history,
+                            get_matchup_force_signal,
+                        )
+                        # Normalise game log keys to what matchup_history expects
+                        _norm_logs = []
+                        for _gl in _game_logs_for_display:
+                            _norm_logs.append({
+                                "opp": _gl.get("matchup", _gl.get("opp", "")),
+                                "opponent": _gl.get("matchup", _gl.get("opp", "")),
+                                "pts": _gl.get("pts", 0),
+                                "reb": _gl.get("reb", 0),
+                                "ast": _gl.get("ast", 0),
+                                "fg3m": _gl.get("fg3m", 0),
+                                "stl": _gl.get("stl", 0),
+                                "blk": _gl.get("blk", 0),
+                                "tov": _gl.get("tov", 0),
+                            })
+
+                        _mh_rows = []
+                        for _mh_stat in ["points", "rebounds", "assists", "threes"]:
+                            _season_avg = float(
+                                _pdata.get(
+                                    {"points": "points_avg", "rebounds": "rebounds_avg",
+                                     "assists": "assists_avg", "threes": "threes_avg"}[_mh_stat],
+                                    0,
+                                ) or 0
+                            )
+                            if _season_avg < 0.5:
+                                continue
+                            _mh = get_player_vs_team_history(
+                                _pname_log, _opponent, _mh_stat, _norm_logs,
+                                season_average=_season_avg,
+                            )
+                            if _mh.get("games_found", 0) < 1:
+                                continue
+                            _avg_vs = _mh.get("avg_vs_team")
+                            _sig = get_matchup_force_signal(
+                                (_avg_vs / _season_avg) if _avg_vs and _season_avg else 1.0
+                            )
+                            _mh_rows.append({
+                                "Stat": _mh_stat.title(),
+                                "Games vs Opp": _mh["games_found"],
+                                "Avg vs Opp": f"{_avg_vs:.1f}" if _avg_vs is not None else "—",
+                                "Season Avg": f"{_season_avg:.1f}",
+                                "Δ vs Avg": (
+                                    f"{(_avg_vs - _season_avg):+.1f}"
+                                    if _avg_vs is not None else "—"
+                                ),
+                                "Signal": _sig.get("label", ""),
+                            })
+
+                        if _mh_rows:
+                            st.markdown(
+                                f"**📊 Matchup History vs {_opponent}:**"
+                            )
+                            st.dataframe(_mh_rows, hide_index=True, use_container_width=True)
+
+                    except Exception as _mh_exc:
+                        pass  # Matchup history is optional — never break the page
+
             elif _scenario_mode:
                 st.caption(
                     f"ℹ️ No recent game log stored for {_pname_log}. "

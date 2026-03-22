@@ -7,6 +7,7 @@
 
 import streamlit as st
 import datetime
+import html as _h
 import os
 import time
 
@@ -129,9 +130,9 @@ with st.expander("📖 How to Use This Page", expanded=False):
 # SECTION: Action Buttons — Two Independent Workflows
 # ─────────────────────────────────────────────────────────────
 # BUTTON 1 — Auto-Load Tonight's Games:
-#   Fetches the schedule, rosters, player/team stats from NBA API,
-#   then auto-generates SYNTHETIC props from season averages.
-#   Use this as a first step or to refresh data.
+#   Fetches the schedule, rosters, player/team stats from ClearSports API,
+#   enriches with Odds API consensus lines, then auto-generates SYNTHETIC
+#   props from season averages. Use this as a first step or to refresh data.
 #
 # BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
 #   Fetches REAL live prop lines from PrizePicks, Underdog, and
@@ -320,7 +321,7 @@ if auto_load_clicked:
             status_text.empty()
             st.warning(
                 "⚠️ Could not auto-load games. Possible reasons:\n"
-                "- `nba_api` is not installed (run: `pip install nba_api`)\n"
+                "- ClearSports API key is not configured (⚙️ Settings)\n"
                 "- No games scheduled tonight\n"
                 "- No internet connection\n\n"
                 "Please enter games manually using the form below."
@@ -630,6 +631,11 @@ if platform_props_clicked:
                     "game_total": 220.0,
                     "is_home": True,
                     "rest_days": 2,
+                    "moneyline_home": None,
+                    "moneyline_away": None,
+                    "consensus_spread": None,
+                    "consensus_total": None,
+                    "bookmaker_count": 0,
                 }
                 for g in games_context:
                     home_team = g.get("home_team", "")
@@ -638,10 +644,20 @@ if platform_props_clicked:
                         is_home = player_team == home_team
                         game_ctx = {
                             "opponent": away_team if is_home else home_team,
+                            "home_team": home_team,
+                            "away_team": away_team,
                             "vegas_spread": float(g.get("vegas_spread", 0) or 0),
                             "game_total": float(g.get("game_total", 220) or 220),
                             "is_home": is_home,
                             "rest_days": 2,
+                            # Odds API consensus fields (may be None if key not configured)
+                            "moneyline_home": g.get("moneyline_home"),
+                            "moneyline_away": g.get("moneyline_away"),
+                            "consensus_spread": g.get("consensus_spread"),
+                            "consensus_total": g.get("consensus_total"),
+                            "bookmaker_count": g.get("bookmaker_count", 0),
+                            "spread_range": g.get("spread_range", (None, None)),
+                            "total_range": g.get("total_range", (None, None)),
                         }
                         break
 
@@ -1063,6 +1079,20 @@ if current_games:
 
         home_streak = game.get("home_streak", "")
         away_streak = game.get("away_streak", "")
+
+        # Extended standings fields (populated by _enrich_games_with_standings)
+        home_rank   = game.get("home_conference_rank", 0)
+        home_conf   = game.get("home_conference", "")[:1].upper()
+        home_l10    = game.get("home_last_10", "")
+        away_rank   = game.get("away_conference_rank", 0)
+        away_conf   = game.get("away_conference", "")[:1].upper()
+        away_l10    = game.get("away_last_10", "")
+
+        def _conf_badge(rank, conf):
+            if rank and conf:
+                return f'<span style="color:#8a9bb8;font-size:0.75rem;">#{rank} {conf}</span>'
+            return ""
+
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
         spread = game.get("vegas_spread", 0.0)
@@ -1101,6 +1131,22 @@ if current_games:
         else:
             spread_text = "Pick'em"
 
+        # Moneyline / consensus display from Odds API
+        ml_home_raw = game.get("moneyline_home")
+        ml_away_raw = game.get("moneyline_away")
+        bk_count     = game.get("bookmaker_count", 0)
+        cons_spread  = game.get("consensus_spread")
+
+        def _fmt_ml(ml):
+            if ml is None:
+                return "—"
+            ml_val = round(float(ml))
+            return f"+{ml_val}" if ml_val > 0 else str(ml_val)
+
+        ml_home_str = _fmt_ml(ml_home_raw)
+        ml_away_str = _fmt_ml(ml_away_raw)
+        has_odds_data = bk_count > 0
+
         # Build game meta line
         meta_parts = []
         if game_time:
@@ -1116,6 +1162,17 @@ if current_games:
         lines_parts.append(f"O/U: {total}")
         lines_line = " &nbsp;|&nbsp; ".join(lines_parts)
 
+        # Moneyline info (only shown when Odds API has data)
+        ml_line = ""
+        if has_odds_data:
+            bk_note = f" <span style='color:#718096;font-size:0.75rem;'>({bk_count} books)</span>"
+            ml_line = (
+                f'<div class="game-meta" style="margin-top:4px;">'
+                f'💰 ML: <strong>{away} {ml_away_str}</strong> &nbsp;|&nbsp; '
+                f'<strong>{home} {ml_home_str}</strong>'
+                f'{bk_note}</div>'
+            )
+
         # Render card — wrap in an expander so the whole card is clickable
         _expander_label = f"🏀  {away} ({away_w}-{away_l}) @ {home} ({home_w}-{home_l})  •  {lines_line.replace('&nbsp;', ' ')}"
         with st.expander(_expander_label, expanded=True):
@@ -1125,17 +1182,22 @@ if current_games:
     <span class="team-badge away-badge">🚌 {away}</span>
     <span style="color:#a0aec0; font-size:1rem;">{away_name}</span>
     <span style="color:#718096; font-size:0.9rem;">({away_w}-{away_l})</span>
+    {_conf_badge(away_rank, away_conf)}
     {streak_html(away_streak)}
+    {f'<span style="color:#718096;font-size:0.75rem;">L10: {away_l10}</span>' if away_l10 else ''}
   </div>
   <div class="vs-divider" style="margin:8px 0;">VS</div>
   <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <span class="team-badge home-badge">🏠 {home}</span>
     <span style="color:#a0aec0; font-size:1rem;">{home_name}</span>
     <span style="color:#718096; font-size:0.9rem;">({home_w}-{home_l})</span>
+    {_conf_badge(home_rank, home_conf)}
     {streak_html(home_streak)}
+    {f'<span style="color:#718096;font-size:0.75rem;">L10: {home_l10}</span>' if home_l10 else ''}
   </div>
   {f'<div class="game-meta">{meta_line}</div>' if meta_line else ''}
   <div class="game-meta" style="margin-top:6px;">📊 {lines_line}</div>
+  {ml_line}
   <div class="key-players">
     <div class="key-players-title">Key Players</div>
     <div style="margin-top:6px; display:flex; gap:20px; flex-wrap:wrap;">
@@ -1176,7 +1238,32 @@ if current_games:
             if not _inj_txt:
                 _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
 
-            import html as _h
+
+            # Bookmaker consensus row (only shown when Odds API data available)
+            _bk_count = game.get("bookmaker_count", 0)
+            _consensus_html = ""
+            if _bk_count > 0:
+                _cons_spread = game.get("consensus_spread")
+                _cons_total  = game.get("consensus_total")
+                _sr = game.get("spread_range", (None, None)) or (None, None)
+                _tr = game.get("total_range", (None, None)) or (None, None)
+                _cs_txt = f"{_cons_spread:+.1f}" if _cons_spread is not None else "—"
+                _ct_txt = f"{_cons_total:.1f}" if _cons_total is not None else "—"
+                _spread_rng_txt = (
+                    f" ({_sr[0]:+.1f} to {_sr[1]:+.1f})" if _sr[0] is not None else ""
+                )
+                _total_rng_txt = (
+                    f" ({_tr[0]:.1f} to {_tr[1]:.1f})" if _tr[0] is not None else ""
+                )
+                _consensus_html = (
+                    f'<div style="margin-top:6px;font-size:0.8rem;">'
+                    f'📚 <strong style="color:#8a9bb8;">Consensus ({_bk_count} books):</strong> '
+                    f'Spread <strong style="color:#63b3ed;">{_cs_txt}{_spread_rng_txt}</strong>'
+                    f' &nbsp;|&nbsp; '
+                    f'O/U <strong style="color:#63b3ed;">{_ct_txt}{_total_rng_txt}</strong>'
+                    f'</div>'
+                )
+
             st.markdown(
                 f'<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:12px 16px;'
                 f'margin:-4px 0 16px 0;border:1px solid rgba(0,240,255,0.10);">'
@@ -1190,6 +1277,7 @@ if current_games:
                 f'<div><span style="color:#8a9bb8;">Blowout Risk:</span> '
                 f'<strong style="color:{_blowout_clr};">{_blowout_lbl} ({_blowout_risk:.0f} pts)</strong></div>'
                 f'</div>'
+                f'{_consensus_html}'
                 f'<div style="margin-top:8px;font-size:0.8rem;">🏥 <strong style="color:#8a9bb8;">Injury Impact:</strong> {_inj_txt}</div>'
                 f'</div>',
                 unsafe_allow_html=True,
@@ -1379,7 +1467,8 @@ with st.expander("💡 Tips for Best Results"):
 
     - **Total (O/U):** The Vegas over/under for the game (usually 210–235).
 
-    - **Auto-Load**: Fetches live game data + team records (W-L, streaks) from the NBA API.
+    - **Auto-Load**: Fetches live game data + team records (W-L, streaks, standings) from
+      ClearSports API, then enriches with consensus lines from The Odds API.
 
     - **Key Players**: Loaded from your player database. Go to **Update Data** to
       refresh with today's team rosters.

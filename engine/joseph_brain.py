@@ -755,6 +755,14 @@ TICKET_NAMES = {
     6: "THE FULL SEND",
 }
 
+# ── Market Total Thresholds (from Odds API consensus) ──────────────────────────
+# NBA historical average is ~225 points per game.
+# When 5+ bookmakers agree on a total significantly above/below average,
+# Joseph applies a ±1.5% probability adjustment to scoring props.
+MARKET_HIGH_TOTAL_THRESHOLD = 228.0  # Games projected to be high-scoring
+MARKET_LOW_TOTAL_THRESHOLD  = 212.0  # Games projected to be defensive slugfests
+MARKET_CONSENSUS_MIN_BOOKS  = 5      # Minimum bookmakers required for consensus signal
+
 
 # ═══════════════════════════════════════════════════════════════
 # IMPLEMENTED FUNCTIONS — Fragment pickers + verdict + rant + analysis stubs
@@ -1501,7 +1509,29 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         if games_played < 10:
             sample_dampening = -1.0 * (10 - games_played) / 10
 
-        joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening
+        # ── Market context boost/fade from Odds API consensus ──────
+        # When The Odds API provides consensus lines from 5+ bookmakers,
+        # use the multi-book total to calibrate the game-pace assumption.
+        # High-total games (consensus > 228) get a +1.5 boost for scoring
+        # props; low-total games (consensus < 212) get -1.5.
+        market_adj = 0.0
+        _consensus_total = game.get("consensus_total")
+        _bk_count = int(game.get("bookmaker_count", 0) or 0)
+        if _consensus_total is not None and _bk_count >= MARKET_CONSENSUS_MIN_BOOKS:
+            try:
+                ct = float(_consensus_total)
+                if ct > MARKET_HIGH_TOTAL_THRESHOLD:
+                    market_adj = 1.5
+                    if "market_high_total" not in narrative_tags:
+                        narrative_tags.append("market_high_total")
+                elif ct < MARKET_LOW_TOTAL_THRESHOLD:
+                    market_adj = -1.5
+                    if "market_low_total" not in narrative_tags:
+                        narrative_tags.append("market_low_total")
+            except (TypeError, ValueError):
+                pass
+
+        joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening + market_adj
         joseph_prob = max(1.0, min(99.0, joseph_prob))
 
         implied_line = _safe_float(analysis_result.get("implied_probability", 0.0))
@@ -1596,7 +1626,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             {"step": 1, "name": "OBSERVE", "detail": f"QME: {round(qme_prob, 1)}% prob, {round(qme_edge, 1)}% edge, tier={tier}"},
             {"step": 2, "name": "FRAME", "detail": f"Tags: {narrative_tags}"},
             {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}"},
-            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}"},
+            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}, Market={round(market_adj, 1)}"},
             {"step": 5, "name": "ADJUST", "detail": f"Joseph edge={round(joseph_edge, 1)}%, Override={is_override}"},
             {"step": 6, "name": "CONCLUDE", "detail": f"Verdict={verdict}, Risks={risk_factors}"},
             {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}"},

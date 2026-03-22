@@ -92,43 +92,44 @@ def _nba_today_et():
 # ============================================================
 # SECTION: Unified Stat Column Mapping
 # Maps ALL known internal stat keys AND platform-native aliases
-# to nba_api PlayerGameLog column names.
+# to ClearSports game log field names (lowercase).
 # ============================================================
 
+# ClearSports game log uses lowercase keys: pts, reb, ast, stl, blk, tov, fg3m, minutes
 _STAT_COL = {
     # ── Internal canonical keys ────────────────────────────────
-    "points":           "PTS",
-    "rebounds":         "REB",
-    "assists":          "AST",
-    "threes":           "FG3M",
-    "steals":           "STL",
-    "blocks":           "BLK",
-    "turnovers":        "TOV",
-    "three_pointers":   "FG3M",
-    "minutes":          "MIN",
+    "points":           "pts",
+    "rebounds":         "reb",
+    "assists":          "ast",
+    "threes":           "fg3m",
+    "steals":           "stl",
+    "blocks":           "blk",
+    "turnovers":        "tov",
+    "three_pointers":   "fg3m",
+    "minutes":          "minutes",
     # ── PrizePicks aliases ─────────────────────────────────────
-    "pts":              "PTS",
-    "rebs":             "REB",
-    "asts":             "AST",
-    "blks":             "BLK",
-    "stls":             "STL",
-    "tovs":             "TOV",
-    "3-pt made":        "FG3M",
-    "3pm":              "FG3M",
-    "blocked shots":    "BLK",
-    "free throws made": "FTM",
-    "ftm":              "FTM",
+    "pts":              "pts",
+    "rebs":             "reb",
+    "asts":             "ast",
+    "blks":             "blk",
+    "stls":             "stl",
+    "tovs":             "tov",
+    "3-pt made":        "fg3m",
+    "3pm":              "fg3m",
+    "blocked shots":    "blk",
+    "free throws made": "ftm",
+    "ftm":              "ftm",
     # ── DraftKings / Underdog aliases ──────────────────────────
-    "three pointers":   "FG3M",
-    "3-pointers":       "FG3M",
-    "three_point":      "FG3M",
-    "fg3m":             "FG3M",
-    "tov":              "TOV",
-    "stl":              "STL",
-    "blk":              "BLK",
-    "reb":              "REB",
-    "ast":              "AST",
-    "min":              "MIN",
+    "three pointers":   "fg3m",
+    "3-pointers":       "fg3m",
+    "three_point":      "fg3m",
+    "fg3m":             "fg3m",
+    "tov":              "tov",
+    "stl":              "stl",
+    "blk":              "blk",
+    "reb":              "reb",
+    "ast":              "ast",
+    "min":              "minutes",
 }
 
 # Game-segment prop patterns that CANNOT be resolved from PlayerGameLog
@@ -580,10 +581,11 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
 def auto_resolve_bet_results(date_str=None):
     """
     For all pending bets on date_str (default: yesterday), fetch actual
-    player stats from nba_api and automatically mark WIN/LOSS/PUSH.
+    player stats from ClearSports API and automatically mark WIN/LOSS/PUSH.
 
-    Uses nba_api.stats.endpoints.PlayerGameLog to get actual stat values.
-    Compares actual value vs prop_line + direction → WIN/LOSS/PUSH.
+    Uses data.live_data_fetcher.fetch_player_game_log() to get actual stat
+    values from ClearSports. Falls back to game_log_cache if the API is
+    unavailable. Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
 
     Args:
         date_str (str|None): ISO date string "YYYY-MM-DD".
@@ -596,8 +598,6 @@ def auto_resolve_bet_results(date_str=None):
 
     if date_str is None:
         # Anchor to US/Eastern — NBA game dates are defined in ET.
-        # Using UTC or the server's local tz could mismatch by a day
-        # when games end after midnight UTC (most East Coast tip-offs).
         _today_et = _nba_today_et()
         date_str = (_today_et - _dt.timedelta(days=1)).isoformat()
 
@@ -614,14 +614,6 @@ def auto_resolve_bet_results(date_str=None):
     if not pending_bets:
         return 0, [f"No pending bets found for {date_str}"]
 
-    # Try to import nba_api
-    try:
-        from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import players as nba_players_static
-        import time as _time
-    except ImportError:
-        return 0, ["nba_api not available — cannot auto-resolve bets"]
-
     # Import combo/fantasy stat definitions and name normalizer
     try:
         from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
@@ -635,64 +627,18 @@ def auto_resolve_bet_results(date_str=None):
         def _normalize_name(n):
             return n.lower().strip()
 
-    _all_nba_players = nba_players_static.get_players()
-    _name_to_id = {
-        p["full_name"].lower(): p["id"]
-        for p in _all_nba_players
-    }
-    # Also build a normalized-name → id map (handles unicode, suffixes)
-    _norm_to_id = {
-        _normalize_name(p["full_name"]): p["id"]
-        for p in _all_nba_players
-    }
-
-    # Season string for PlayerGameLog (current season).
-    # Use ET-anchored date for season calculation to stay consistent.
-    _today_et = _nba_today_et()
-    current_year = _today_et.year
-    current_month = _today_et.month
-    season_year = current_year if current_month >= 10 else current_year - 1
-    season_str = f"{season_year}-{str(season_year + 1)[-2:]}"
+    # Player ID lookup: ClearSports API → nba_api static list (local, no network)
+    try:
+        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+    except ImportError:
+        _lookup_pid = None
 
     # Target date as a date object (for robust date comparison)
     target_date = _dt.datetime.strptime(date_str, "%Y-%m-%d").date()
 
-    # Pre-build month abbreviation map once for efficient date parsing
-    import calendar as _cal
-    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
-
-    def _parse_game_date(date_val):
-        """Parse a GAME_DATE value from nba_api into a date object.
-
-        nba_api may return dates in several formats:
-          - "MAR 05, 2026" or "Mar 05, 2026"  (month-abbrev, zero-padded)
-          - "MAR 5, 2026"  or "Mar 5, 2026"   (month-abbrev, non-padded)
-          - "2026-03-05"                        (ISO format)
-        Returns None if parsing fails.
-        """
-        s = str(date_val).strip()
-        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
-            try:
-                return _dt.datetime.strptime(s, fmt).date()
-            except ValueError:
-                pass
-        # Handle uppercase month abbreviation with non-zero-padded day
-        # e.g. "MAR 5, 2026" — strptime %b is case-sensitive on some platforms
-        try:
-            parts = s.replace(",", "").split()
-            if len(parts) == 3:
-                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
-                if month_num:
-                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
-        return None
-
-    # ── Pre-fetch all unique player game logs in parallel ───────
-    # Collect unique (player_id, player_name) pairs that need API calls
-    _fetch_tasks = []  # list of (bet, player_id, stat_type_info)
-    _player_ids_to_fetch = set()
-    _bet_prep = []  # (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    # ── Pre-validate bets and collect unique player names ─────
+    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    _names_to_fetch: set = set()
 
     for bet in pending_bets:
         bet_id      = bet.get("bet_id")
@@ -711,7 +657,7 @@ def auto_resolve_bet_results(date_str=None):
             normalized = _norm_stat_type(stat_type)
             stat_col = _STAT_COL.get(normalized)
             if stat_col:
-                stat_type = normalized  # use the normalized key downstream
+                stat_type = normalized
 
         if not stat_col and not is_combo and not is_fantasy:
             if _is_segment_prop(stat_type):
@@ -723,110 +669,113 @@ def auto_resolve_bet_results(date_str=None):
             errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
             continue
 
-        # --- Player lookup: exact → normalized → partial ---
-        player_id = _name_to_id.get(player_name.lower())
-        if not player_id:
-            # Try normalized match (handles unicode, Jr./III suffixes)
-            player_id = _norm_to_id.get(_normalize_name(player_name))
-        if not player_id:
-            # Try partial match on normalized names (first + last name)
-            norm_search = _normalize_name(player_name)
-            parts = norm_search.split()
-            if len(parts) >= 2:
-                player_id = next(
-                    (
-                        pid
-                        for norm_name, pid in _norm_to_id.items()
-                        if parts[0] in norm_name and parts[-1] in norm_name
-                    ),
-                    None,
-                )
-        if not player_id:
-            errors_list.append(f"#{bet_id} {player_name}: player not found in nba_api")
-            continue
+        _names_to_fetch.add(player_name)
+        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
 
-        _player_ids_to_fetch.add(player_id)
-        _bet_prep.append((bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+    if not _bet_prep:
+        return resolved_count, errors_list
 
-    # ── Parallel game-log fetch using ThreadPoolExecutor ──────
+    # ── Resolve player names → ClearSports player IDs ────────
+    # lookup_player_id() checks: cache → ClearSports API → nba_api static (local)
+    _name_to_pid: dict = {}
+    for pname in _names_to_fetch:
+        if _lookup_pid is not None:
+            pid = _lookup_pid(pname)
+            # Also try normalized form (handles unicode/suffix differences)
+            if not pid:
+                pid = _lookup_pid(_normalize_name(pname))
+        else:
+            pid = None
+        _name_to_pid[pname] = pid
+
+    # ── Fetch game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    import time as _time
 
-    _game_log_cache = {}  # player_id → DataFrame (or None on error)
+    # Group: player_name → player_id (or None)
+    _ids_to_fetch = {
+        pid for pid in _name_to_pid.values() if pid
+    }
+    _game_log_cache: dict = {}  # player_id → list[dict] of ClearSports game log rows
 
     def _fetch_player_log(pid):
-        """Fetch a single player's game log with retry + backoff."""
+        """Fetch a single player's ClearSports game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
                     _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                game_log = playergamelog.PlayerGameLog(
-                    player_id=pid,
-                    season=season_str,
-                    season_type_all_star="Regular Season",
-                    timeout=NBA_API_TIMEOUT,
-                )
-                return pid, game_log.get_data_frames()[0]
+                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                logs = _ldf_gl(pid, last_n_games=5)
+                return pid, logs
             except Exception:
                 if _attempt == RESOLVE_MAX_RETRIES - 1:
-                    return pid, None
-        return pid, None
+                    return pid, []
+        return pid, []
 
-    _unique_ids = list(_player_ids_to_fetch)
+    _unique_ids = list(_ids_to_fetch)
     with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids) or 1)) as executor:
         futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
         for future in as_completed(futures):
             pid = futures[future]
             try:
-                _, df_result = future.result()
-                _game_log_cache[pid] = df_result
+                _, logs_result = future.result()
+                _game_log_cache[pid] = logs_result or []
             except Exception:
-                _game_log_cache[pid] = None
+                _game_log_cache[pid] = []
 
     # ── Resolve bets from cached game logs ────────────────────
-    for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
-        bet_id      = bet.get("bet_id")
-        player_name = bet.get("player_name", "")
+    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+        bet_id = bet.get("bet_id")
 
         try:
-            df = _game_log_cache.get(player_id)
-            if df is None or df.empty:
+            player_id = _name_to_pid.get(player_name)
+            if not player_id:
+                errors_list.append(f"#{bet_id} {player_name}: player ID not found")
+                continue
+
+            logs = _game_log_cache.get(player_id, [])
+            if not logs:
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
-            # Find the game on target date — parse each GAME_DATE to a date object
-            # so we're not sensitive to format differences (MAR vs Mar, padded vs not)
-            df["_parsed_date"] = df["GAME_DATE"].apply(_parse_game_date)
-            matching = df[df["_parsed_date"] == target_date]
-            if matching.empty:
-                last_game = df["GAME_DATE"].iloc[0] if not df.empty else "N/A"
+            # Find the game on target date (ClearSports returns "YYYY-MM-DD")
+            matching_log = None
+            for log_row in logs:
+                raw_date = log_row.get("game_date", "")
+                try:
+                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
+                    if log_date == target_date:
+                        matching_log = log_row
+                        break
+                except (ValueError, TypeError):
+                    continue
+
+            if matching_log is None:
+                last_date = logs[0].get("game_date", "N/A") if logs else "N/A"
                 errors_list.append(
                     f"#{bet_id} {player_name}: no game found on {date_str} "
-                    f"(last game: {last_game})"
+                    f"(last game: {last_date})"
                 )
                 continue
 
-            row = matching.iloc[0]
-
             # Compute actual_value based on stat type
             if is_combo:
-                # Sum the component columns (e.g. points_rebounds = PTS + REB)
                 components = COMBO_STATS[stat_type]
                 actual_value = sum(
-                    float(row.get(_STAT_COL[comp], 0) or 0)
+                    float(matching_log.get(_STAT_COL.get(comp, comp), 0) or 0)
                     for comp in components
                     if comp in _STAT_COL
                 )
             elif is_fantasy:
-                # Weighted sum of individual stats using platform formula
                 formula = FANTASY_SCORING[stat_type]
                 actual_value = sum(
-                    weight * float(row.get(_STAT_COL[comp], 0) or 0)
+                    weight * float(matching_log.get(_STAT_COL.get(comp, comp), 0) or 0)
                     for comp, weight in formula.items()
                     if comp in _STAT_COL
                 )
                 actual_value = round(actual_value, 2)
             else:
-                actual_value = float(row.get(stat_col, 0) or 0)
+                actual_value = float(matching_log.get(stat_col, 0) or 0)
 
             # Determine WIN / LOSS / PUSH
             if actual_value == prop_line:
@@ -857,12 +806,12 @@ PUSH_THRESHOLD_EPSILON = 0.01
 
 def resolve_todays_bets():
     """
-    Resolve today's pending bets by checking live game status via nba_api.
+    Resolve today's pending bets by checking live game status via ClearSports API.
 
+    Uses ClearSports fetch_live_scores() to detect finished games,
+    then fetches player game logs via data.live_data_fetcher.fetch_player_game_log().
+    Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
     Only resolves bets where the game has a FINAL status.
-    Uses comprehensive player matching (exact → normalized → fuzzy) and
-    handles combo stats, fantasy scoring, and platform name mismatches —
-    ported from ``auto_resolve_bet_results()``.
 
     Returns:
         dict: {
@@ -897,15 +846,6 @@ def resolve_todays_bets():
     if not todays_pending:
         return summary
 
-    # Try to use nba_api; bail early if unavailable
-    try:
-        from nba_api.stats.endpoints import PlayerGameLog
-        from nba_api.stats.static import players as nba_players_static
-    except ImportError:
-        summary["errors"].append("nba_api not available — cannot resolve bets")
-        summary["pending"] = len(todays_pending)
-        return summary
-
     # Import combo/fantasy stat definitions
     try:
         from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
@@ -921,86 +861,41 @@ def resolve_todays_bets():
         def _normalize_name(n):
             return str(n).lower().strip()
 
-    # Build name → player_id maps once (exact and normalized)
-    _all_nba_players = nba_players_static.get_players()
-    _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_nba_players}
-    _norm_to_id = {_normalize_name(p["full_name"]): p["id"] for p in _all_nba_players}
-
-    # Try to use nba_api live scoreboard to find final games
-    final_game_ids: set = set()
-    _scoreboard_available = False
+    # Player ID lookup via ClearSports → nba_api static list (local)
     try:
-        from nba_api.live.nba.endpoints.scoreboard import ScoreBoard
-        sb = ScoreBoard()
-        games_data = sb.get_dict().get("scoreboard", {}).get("games", [])
-        _scoreboard_available = True
-        for g in games_data:
-            status = g.get("gameStatus", 0)
-            if status == 3 or str(g.get("gameStatusText", "")).strip().lower() == "final":
-                gid = str(g.get("gameId", ""))
-                if gid:
-                    final_game_ids.add(gid)
-    except Exception as exc:
-        summary["errors"].append(f"Live scoreboard unavailable: {exc}")
+        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+    except ImportError:
+        _lookup_pid = None
 
-    # Fall back to ScoreboardV2 if live endpoint failed
-    if not final_game_ids:
-        try:
-            from nba_api.stats.endpoints import ScoreboardV2
-            sb2 = ScoreboardV2(game_date=today_str)
+    # ── Check ClearSports live scores for finished games ──────
+    _scoreboard_available = False
+    has_final_games = False
+    try:
+        from data.clearsports_client import fetch_live_scores as _cs_live
+        live_scores = _cs_live()
+        if live_scores:
             _scoreboard_available = True
-            for row in sb2.get_normalized_dict().get("GameHeader", []):
-                if str(row.get("GAME_STATUS_TEXT", "")).strip().lower() in ("final", "final/ot"):
-                    gid = str(row.get("GAME_ID", ""))
-                    if gid:
-                        final_game_ids.add(gid)
-        except Exception as exc2:
-            summary["errors"].append(f"ScoreboardV2 unavailable: {exc2}")
+            has_final_games = any(
+                "final" in str(g.get("status", "")).lower()
+                for g in live_scores
+            )
+    except Exception as exc:
+        summary["errors"].append(f"ClearSports live scores unavailable: {exc}")
 
     # Short-circuit: if the scoreboard responded but no games are Final yet,
     # skip the expensive per-player API calls and tell the user clearly.
-    if _scoreboard_available and not final_game_ids:
+    if _scoreboard_available and not has_final_games:
         summary["pending"] = len(todays_pending)
         summary["errors"].append(
             "No games are Final yet today — try again after today's games finish."
         )
         return summary
 
-    # Current NBA season string (e.g. "2024-25")
-    _now = _dt.date.today()
-    _year = _now.year
-    season_str = (
-        f"{_year - 1}-{str(_year)[2:]}"
-        if _now.month < 10
-        else f"{_year}-{str(_year + 1)[2:]}"
-    )
-
-    # Pre-build month abbreviation map once for date parsing
-    import calendar as _cal
-    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
-
-    def _parse_game_date(date_val):
-        s = str(date_val).strip()
-        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
-            try:
-                return _dt.datetime.strptime(s, fmt).date()
-            except ValueError:
-                pass
-        try:
-            parts = s.replace(",", "").split()
-            if len(parts) == 3:
-                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
-                if month_num:
-                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
-        return None
-
     target_date = _dt.datetime.strptime(today_str, "%Y-%m-%d").date()
 
-    # ── Pre-validate bets and collect unique player IDs for batch fetch ──
-    _bet_prep = []  # (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
-    _player_ids_to_fetch = set()
+    # ── Pre-validate bets and collect unique player names ─────
+    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    _names_to_fetch: set = set()
 
     for bet in todays_pending:
         bet_id      = bet.get("id") or bet.get("bet_id")
@@ -1018,7 +913,7 @@ def resolve_todays_bets():
             normalized = _norm_stat_type(stat_type)
             stat_col = _STAT_COL.get(normalized)
             if stat_col:
-                stat_type = normalized  # use the normalized key downstream
+                stat_type = normalized
 
         if not stat_col and not is_combo and not is_fantasy:
             if _is_segment_prop(stat_type):
@@ -1031,58 +926,47 @@ def resolve_todays_bets():
             summary["pending"] += 1
             continue
 
-        # ── Comprehensive player lookup: exact → normalized → fuzzy ──
-        player_id = _name_to_id.get(player_name.lower())
-        if not player_id:
-            player_id = _norm_to_id.get(_normalize_name(player_name))
-        if not player_id:
-            norm_search = _normalize_name(player_name)
-            parts = norm_search.split()
-            if len(parts) >= 2:
-                player_id = next(
-                    (
-                        pid
-                        for norm_name, pid in _norm_to_id.items()
-                        if parts[0] in norm_name and parts[-1] in norm_name
-                    ),
-                    None,
-                )
-        if not player_id:
-            summary["errors"].append(f"#{bet_id} {player_name}: player not found in nba_api")
-            summary["pending"] += 1
-            continue
+        _names_to_fetch.add(player_name)
+        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
 
-        _player_ids_to_fetch.add(player_id)
-        _bet_prep.append((bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+    if not _bet_prep:
+        return summary
 
-    # ── Parallel game-log fetch using ThreadPoolExecutor ──────
+    # ── Resolve player names → player IDs ────────────────────
+    _name_to_pid: dict = {}
+    for pname in _names_to_fetch:
+        pid = None
+        if _lookup_pid is not None:
+            pid = _lookup_pid(pname)
+            if not pid:
+                pid = _lookup_pid(_normalize_name(pname))
+        _name_to_pid[pname] = pid
+
+    # ── Fetch game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    _game_log_cache = {}  # player_id → list[dict] (normalized game log rows)
+    _ids_to_fetch = {pid for pid in _name_to_pid.values() if pid}
+    _game_log_cache: dict = {}  # player_id → list[dict] of ClearSports game log rows
 
     def _fetch_player_log(pid):
-        """Fetch a single player's game log with retry + backoff."""
+        """Fetch a single player's ClearSports game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
                     time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                gl = PlayerGameLog(
-                    player_id=pid,
-                    season=season_str,
-                    season_type_all_star="Regular Season",
-                    timeout=NBA_API_TIMEOUT,
-                )
-                return pid, gl.get_normalized_dict().get("PlayerGameLog", [])
+                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                logs = _ldf_gl(pid, last_n_games=5)
+                return pid, logs
             except Exception as _retry_exc:
                 _logger.warning(
                     f"  resolve_todays_bets: attempt {_attempt+1}/{RESOLVE_MAX_RETRIES} "
                     f"failed for player_id={pid}: {_retry_exc}"
                 )
                 if _attempt == RESOLVE_MAX_RETRIES - 1:
-                    return pid, None
-        return pid, None
+                    return pid, []
+        return pid, []
 
-    _unique_ids = list(_player_ids_to_fetch)
+    _unique_ids = list(_ids_to_fetch)
     if _unique_ids:
         with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids))) as executor:
             futures = {executor.submit(_fetch_player_log, pid): pid for pid in _unique_ids}
@@ -1090,28 +974,37 @@ def resolve_todays_bets():
                 pid = futures[future]
                 try:
                     _, log_data = future.result()
-                    _game_log_cache[pid] = log_data
+                    _game_log_cache[pid] = log_data or []
                 except Exception:
-                    _game_log_cache[pid] = None
+                    _game_log_cache[pid] = []
 
     # ── Resolve bets from cached game logs ────────────────────
-    for (bet, player_id, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
-        bet_id      = bet.get("id") or bet.get("bet_id")
-        player_name = bet.get("player_name", "")
+    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+        bet_id = bet.get("id") or bet.get("bet_id")
 
         try:
-            logs = _game_log_cache.get(player_id)
+            player_id = _name_to_pid.get(player_name)
+            if not player_id:
+                summary["errors"].append(f"#{bet_id} {player_name}: player ID not found")
+                summary["pending"] += 1
+                continue
+
+            logs = _game_log_cache.get(player_id, [])
             if not logs:
                 summary["pending"] += 1
                 continue
 
-            # Find the game log entry for today
+            # Find the game log entry for today (ClearSports returns "YYYY-MM-DD")
             latest = None
             for log_row in logs:
-                log_date = _parse_game_date(log_row.get("GAME_DATE", ""))
-                if log_date == target_date:
-                    latest = log_row
-                    break
+                raw_date = log_row.get("game_date", "")
+                try:
+                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
+                    if log_date == target_date:
+                        latest = log_row
+                        break
+                except (ValueError, TypeError):
+                    continue
 
             if latest is None:
                 summary["pending"] += 1
@@ -1119,18 +1012,18 @@ def resolve_todays_bets():
 
             # ── Compute actual value ─────────────────────────────────
             if is_combo:
-                # COMBO_STATS maps stat_type → list of component stat keys
                 component_keys = COMBO_STATS.get(stat_type, [])
                 actual_value = sum(
-                    float(latest.get(_STAT_COL.get(k, k.upper()), 0) or 0)
+                    float(latest.get(_STAT_COL.get(k, k), 0) or 0)
                     for k in component_keys
+                    if _STAT_COL.get(k)
                 )
             elif is_fantasy:
-                # FANTASY_SCORING maps stat_type → {col: multiplier}
                 scoring_weights = FANTASY_SCORING.get(stat_type, {})
                 actual_value = sum(
-                    float(latest.get(_STAT_COL.get(col, col.upper()), 0) or 0) * mult
+                    float(latest.get(_STAT_COL.get(col, col), 0) or 0) * mult
                     for col, mult in scoring_weights.items()
+                    if _STAT_COL.get(col)
                 )
             else:
                 actual_value = float(latest.get(stat_col, 0) or 0)
@@ -1181,7 +1074,7 @@ def resolve_all_pending_bets():
     Resolve ALL pending bets regardless of date — manual bets, AI picks, any platform.
 
     Queries every bet with no ``result`` set, groups them by date for efficient
-    API calls, and resolves WIN/LOSS/PUSH for each using PlayerGameLog stats.
+    API calls, and resolves WIN/LOSS/PUSH for each using ClearSports game logs.
     Has rate limiting (1 second between API calls per player).
 
     Returns:
@@ -1205,11 +1098,9 @@ def resolve_all_pending_bets():
 
     # Try importing required modules
     try:
-        from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import players as nba_players_static
+        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
     except ImportError:
-        summary["errors"].append("nba_api not available — cannot resolve bets")
-        return summary
+        _lookup_pid = None
 
     try:
         from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
@@ -1224,31 +1115,6 @@ def resolve_all_pending_bets():
         def _normalize_name(n):
             return n.lower().strip()
 
-    # Build player lookup maps once
-    _all_players = nba_players_static.get_players()
-    _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_players}
-    _norm_to_id = {_normalize_name(p["full_name"]): p["id"] for p in _all_players}
-
-    import calendar as _cal
-    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
-
-    def _parse_date(date_val):
-        s = str(date_val).strip()
-        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
-            try:
-                return _dt.datetime.strptime(s, fmt).date()
-            except ValueError:
-                pass
-        try:
-            parts = s.replace(",", "").split()
-            if len(parts) == 3:
-                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
-                if month_num:
-                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
-        return None
-
     # Load all pending bets (no result set) regardless of date
     try:
         all_bets = load_all_bets(limit=2000)
@@ -1260,14 +1126,14 @@ def resolve_all_pending_bets():
     if not pending_bets:
         return summary
 
-    # Group by date for efficient season-string calculation
+    # Group by date for efficient caching
     from collections import defaultdict as _defaultdict
     by_date = _defaultdict(list)
     for bet in pending_bets:
         d = bet.get("bet_date") or bet.get("game_date") or ""
         by_date[d].append(bet)
 
-    # Player game log cache: (player_id, season_str) → DataFrame
+    # Player game log cache: player_id → list[dict]
     _log_cache: dict = {}
 
     for date_str, bets in sorted(by_date.items()):
@@ -1280,13 +1146,6 @@ def resolve_all_pending_bets():
         except ValueError:
             summary["pending"] += len(bets)
             continue
-
-        _year = target_date.year
-        season_str = (
-            f"{_year - 1}-{str(_year)[2:]}"
-            if target_date.month < 10
-            else f"{_year}-{str(_year + 1)[2:]}"
-        )
 
         date_resolved = 0
         for bet in bets:
@@ -1305,7 +1164,7 @@ def resolve_all_pending_bets():
                 normalized = _norm_stat_type(stat_type)
                 stat_col = _STAT_COL.get(normalized)
                 if stat_col:
-                    stat_type = normalized  # use the normalized key downstream
+                    stat_type = normalized
 
             if not stat_col and not is_combo and not is_fantasy:
                 if _is_segment_prop(stat_type):
@@ -1318,73 +1177,73 @@ def resolve_all_pending_bets():
                 summary["pending"] += 1
                 continue
 
-            # Player lookup: exact → normalized → fuzzy
-            player_id = _name_to_id.get(player_name.lower())
+            # Player ID lookup: ClearSports → nba_api static (local)
+            player_id = None
+            if _lookup_pid is not None:
+                player_id = _lookup_pid(player_name)
+                if not player_id:
+                    player_id = _lookup_pid(_normalize_name(player_name))
             if not player_id:
-                player_id = _norm_to_id.get(_normalize_name(player_name))
-            if not player_id:
-                parts = _normalize_name(player_name).split()
-                if len(parts) >= 2:
-                    player_id = next(
-                        (pid for nk, pid in _norm_to_id.items()
-                         if parts[0] in nk and parts[-1] in nk),
-                        None,
-                    )
-            if not player_id:
-                summary["errors"].append(f"#{bet_id} {player_name}: not found in nba_api")
+                summary["errors"].append(f"#{bet_id} {player_name}: player ID not found")
                 summary["pending"] += 1
                 continue
 
-            cache_key = (player_id, season_str)
-            if cache_key not in _log_cache:
+            if player_id not in _log_cache:
                 _api_exc = None
                 for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        gl = playergamelog.PlayerGameLog(
-                            player_id=player_id,
-                            season=season_str,
-                            season_type_all_star="Regular Season",
-                            timeout=NBA_API_TIMEOUT,
-                        )
-                        _log_cache[cache_key] = gl.get_data_frames()[0]
+                        from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                        logs = _ldf_gl(player_id, last_n_games=10)
+                        _log_cache[player_id] = logs or []
                         _api_exc = None
-                        break  # success
+                        break
                     except Exception as exc:
                         _api_exc = exc
-                        continue  # retry
+                        continue
                 if _api_exc is not None:
                     summary["errors"].append(f"#{bet_id} {player_name}: API error — {_api_exc}")
                     summary["pending"] += 1
                     continue
 
-            df = _log_cache[cache_key]
-            if df.empty:
-                summary["errors"].append(f"#{bet_id} {player_name}: no game log for {season_str}")
+            logs = _log_cache.get(player_id, [])
+            if not logs:
+                summary["errors"].append(f"#{bet_id} {player_name}: no game log available")
                 summary["pending"] += 1
                 continue
 
-            df["_parsed_date"] = df["GAME_DATE"].apply(_parse_date)
-            matching = df[df["_parsed_date"] == target_date]
-            if matching.empty:
+            # Find the game on target date (ClearSports returns "YYYY-MM-DD")
+            matching_log = None
+            for log_row in logs:
+                raw_date = log_row.get("game_date", "")
+                try:
+                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
+                    if log_date == target_date:
+                        matching_log = log_row
+                        break
+                except (ValueError, TypeError):
+                    continue
+
+            if matching_log is None:
                 summary["pending"] += 1
                 continue
 
-            row = matching.iloc[0]
             try:
                 if is_combo:
                     actual_value = sum(
-                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0)
+                        float(matching_log.get(_STAT_COL.get(c, c), 0) or 0)
                         for c in COMBO_STATS[stat_type]
+                        if _STAT_COL.get(c)
                     )
                 elif is_fantasy:
                     actual_value = round(sum(
-                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0) * w
+                        float(matching_log.get(_STAT_COL.get(c, c), 0) or 0) * w
                         for c, w in FANTASY_SCORING[stat_type].items()
+                        if _STAT_COL.get(c)
                     ), 2)
                 else:
-                    actual_value = float(row.get(stat_col, 0) or 0)
+                    actual_value = float(matching_log.get(stat_col, 0) or 0)
 
                 if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                     result = "PUSH"
@@ -1430,7 +1289,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
     (not the ``bets`` table).  Without this function the "Resolve All
     Picks" button would never actually update what the user sees.
 
-    Uses the same NBA API + PlayerGameLog approach as
+    Uses the same ClearSports game log approach as
     ``resolve_all_pending_bets()``:
       - Loads every row in ``all_analysis_picks`` where result is NULL
       - Groups by date, fetches game logs per player per season
@@ -1469,11 +1328,9 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
     # ── Import dependencies ────────────────────────────────────────────
     try:
-        from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import players as nba_players_static
+        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
     except ImportError:
-        summary["errors"].append("nba_api not available — cannot resolve picks")
-        return summary
+        _lookup_pid = None
 
     try:
         from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
@@ -1493,35 +1350,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
         update_analysis_pick_result,
     )
 
-    # ── Build player lookup maps (once) ───────────────────────────────
-    _all_players = nba_players_static.get_players()
-    _name_to_id  = {p["full_name"].lower(): p["id"] for p in _all_players}
-    _norm_to_id  = {_normalize_name(p["full_name"]): p["id"] for p in _all_players}
-
-    import calendar as _cal
-    _MONTH_ABBREVS = {m[:3].upper(): i for i, m in enumerate(_cal.month_abbr) if m}
-
-    def _parse_date(date_val):
-        s = str(date_val).strip()
-        for fmt in ("%b %d, %Y", "%Y-%m-%d"):
-            try:
-                return _dt.datetime.strptime(s, fmt).date()
-            except ValueError:
-                pass
-        try:
-            parts = s.replace(",", "").split()
-            if len(parts) == 3:
-                month_num = _MONTH_ABBREVS.get(parts[0].upper()[:3])
-                if month_num:
-                    return _dt.date(int(parts[2]), month_num, int(parts[1]))
-        except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
-        return None
-
     # ── Load picks from all_analysis_picks ────────────────────────────
-    # When a specific date is requested we load ALL picks for that date
-    # (including already-resolved ones) so the user can re-verify them.
-    # When no date is given we only load pending picks to avoid redundant work.
     try:
         if date_str:
             from tracking.database import load_analysis_picks_for_date
@@ -1535,14 +1364,14 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
     if not pending_picks:
         return summary
 
-    # ── Group by date for efficient season-string reuse ───────────────
+    # ── Group by date ─────────────────────────────────────────────────
     from collections import defaultdict as _defaultdict
     by_date = _defaultdict(list)
     for pick in pending_picks:
         d = pick.get("pick_date") or ""
         by_date[d].append(pick)
 
-    # Player game log cache: (player_id, season_str) → DataFrame
+    # Player game log cache: player_id → list[dict]
     _log_cache: dict = {}
 
     for _loop_date, picks in sorted(by_date.items()):
@@ -1565,13 +1394,6 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
             summary["pending"] += len(picks)
             continue
 
-        _year = target_date.year
-        season_str = (
-            f"{_year - 1}-{str(_year)[2:]}"
-            if target_date.month < 10
-            else f"{_year}-{str(_year + 1)[2:]}"
-        )
-
         date_resolved = 0
         for pick in picks:
             pick_id     = pick.get("pick_id")
@@ -1589,7 +1411,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 normalized = _norm_stat_type(stat_type)
                 stat_col = _STAT_COL.get(normalized)
                 if stat_col:
-                    stat_type = normalized  # use the normalized key downstream
+                    stat_type = normalized
 
             if not stat_col and not is_combo and not is_fantasy:
                 if _is_segment_prop(stat_type):
@@ -1604,45 +1426,34 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
-            # ── Player lookup: exact → normalized → partial ────────────
-            player_id = _name_to_id.get(player_name.lower())
-            if not player_id:
-                player_id = _norm_to_id.get(_normalize_name(player_name))
-            if not player_id:
-                parts = _normalize_name(player_name).split()
-                if len(parts) >= 2:
-                    player_id = next(
-                        (pid for nk, pid in _norm_to_id.items()
-                         if parts[0] in nk and parts[-1] in nk),
-                        None,
-                    )
+            # ── Player ID lookup: ClearSports → nba_api static (local) ──
+            player_id = None
+            if _lookup_pid is not None:
+                player_id = _lookup_pid(player_name)
+                if not player_id:
+                    player_id = _lookup_pid(_normalize_name(player_name))
             if not player_id:
                 summary["errors"].append(
-                    f"#{pick_id} {player_name}: not found in nba_api"
+                    f"#{pick_id} {player_name}: player ID not found"
                 )
                 summary["pending"] += 1
                 continue
 
-            # ── Fetch game log (cached per player+season) ─────────────
-            cache_key = (player_id, season_str)
-            if cache_key not in _log_cache:
+            # ── Fetch game log (cached per player) ────────────────────
+            if player_id not in _log_cache:
                 _api_exc = None
                 for _attempt in range(RESOLVE_MAX_RETRIES):
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        gl = playergamelog.PlayerGameLog(
-                            player_id=player_id,
-                            season=season_str,
-                            season_type_all_star="Regular Season",
-                            timeout=NBA_API_TIMEOUT,
-                        )
-                        _log_cache[cache_key] = gl.get_data_frames()[0]
+                        from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                        logs = _ldf_gl(player_id, last_n_games=10)
+                        _log_cache[player_id] = logs or []
                         _api_exc = None
-                        break  # success
+                        break
                     except Exception as exc:
                         _api_exc = exc
-                        continue  # retry
+                        continue
                 if _api_exc is not None:
                     summary["errors"].append(
                         f"#{pick_id} {player_name}: API error — {_api_exc}"
@@ -1650,37 +1461,46 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                     summary["pending"] += 1
                     continue
 
-            df = _log_cache[cache_key]
-            if df.empty:
+            logs = _log_cache.get(player_id, [])
+            if not logs:
                 summary["errors"].append(
-                    f"#{pick_id} {player_name}: no game log for {season_str}"
+                    f"#{pick_id} {player_name}: no game log available"
                 )
                 summary["pending"] += 1
                 continue
 
-            # ── Match game by date ─────────────────────────────────────
-            df["_parsed_date"] = df["GAME_DATE"].apply(_parse_date)
-            matching = df[df["_parsed_date"] == target_date]
-            if matching.empty:
+            # ── Match game by date (ClearSports: "YYYY-MM-DD") ────────
+            matching_log = None
+            for log_row in logs:
+                raw_date = log_row.get("game_date", "")
+                try:
+                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
+                    if log_date == target_date:
+                        matching_log = log_row
+                        break
+                except (ValueError, TypeError):
+                    continue
+
+            if matching_log is None:
                 summary["pending"] += 1
                 continue
-
-            row = matching.iloc[0]
 
             # ── Compute actual stat value ──────────────────────────────
             try:
                 if is_combo:
                     actual_value = sum(
-                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0)
+                        float(matching_log.get(_STAT_COL.get(c, c), 0) or 0)
                         for c in COMBO_STATS[stat_type]
+                        if _STAT_COL.get(c)
                     )
                 elif is_fantasy:
                     actual_value = round(sum(
-                        float(row.get(_STAT_COL.get(c, c.upper()), 0) or 0) * w
+                        float(matching_log.get(_STAT_COL.get(c, c), 0) or 0) * w
                         for c, w in FANTASY_SCORING[stat_type].items()
+                        if _STAT_COL.get(c)
                     ), 2)
                 else:
-                    actual_value = float(row.get(stat_col, 0) or 0)
+                    actual_value = float(matching_log.get(stat_col, 0) or 0)
 
                 # ── Determine WIN / LOSS / PUSH ────────────────────────
                 if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
@@ -1719,7 +1539,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
 def get_live_bet_status(bets_list):
     """
-    Check live box scores for today's pending bets.
+    Check live box scores for today's pending bets via ClearSports live scores.
 
     Args:
         bets_list (list[dict]): Today's pending bets from the database.
@@ -1732,57 +1552,39 @@ def get_live_bet_status(bets_list):
     """
     augmented = []
 
-    # Build player_id cache
-    player_id_cache: dict = {}
-    try:
-        from nba_api.stats.static import players as nba_players_static
-        _static_players = nba_players_static.get_active_players()
-        for p in _static_players:
-            player_id_cache[p["full_name"].lower()] = p["id"]
-    except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
-
-    # Fetch live box scores
+    # Fetch live box scores from ClearSports
     live_box: dict = {}  # player_name_lower → current stat totals
     try:
-        from nba_api.live.nba.endpoints.scoreboard import ScoreBoard
-        sb = ScoreBoard()
-        games = sb.get_dict().get("scoreboard", {}).get("games", [])
-        for g in games:
-            game_status = g.get("gameStatus", 1)
-            status_text = str(g.get("gameStatusText", "")).strip()
-            is_final = game_status == 3 or status_text.lower() == "final"
-            is_live = game_status == 2
+        from data.clearsports_client import fetch_live_scores as _cs_live
+        live_scores = _cs_live()
+        for g in (live_scores or []):
+            status_text = str(g.get("status", "")).lower()
+            is_final = "final" in status_text
+            is_live  = "in progress" in status_text or "live" in status_text or "q" in status_text
 
             if not (is_final or is_live):
                 continue
 
-            gid = g.get("gameId", "")
-            try:
-                from nba_api.live.nba.endpoints.boxscore import BoxScore
-                bs = BoxScore(game_id=gid)
-                bs_data = bs.get_dict().get("game", {})
-                for team_side in ("homeTeam", "awayTeam"):
-                    team_data = bs_data.get(team_side, {})
-                    for player in team_data.get("players", []):
-                        stats = player.get("statistics", {})
-                        pname = player.get("name", "").lower()
-                        live_box[pname] = {
-                            "pts": float(stats.get("points", 0)),
-                            "reb": float(stats.get("reboundsTotal", 0)),
-                            "ast": float(stats.get("assists", 0)),
-                            "stl": float(stats.get("steals", 0)),
-                            "blk": float(stats.get("blocks", 0)),
-                            "tov": float(stats.get("turnovers", 0)),
-                            "fg3m": float(stats.get("threePointersMade", 0)),
-                            "min": str(stats.get("minutesCalculated", "PT0M")),
-                            "is_final": is_final,
-                            "is_live": is_live,
-                        }
-            except Exception as _exc:
-                logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
+            # ClearSports may include player stats in the game object
+            for team_key in ("home_players", "away_players", "players"):
+                for player in g.get(team_key, []):
+                    stats = player.get("statistics", player)
+                    pname = str(player.get("name", player.get("player_name", ""))).lower()
+                    if not pname:
+                        continue
+                    live_box[pname] = {
+                        "pts": float(stats.get("pts", stats.get("points", 0))),
+                        "reb": float(stats.get("reb", stats.get("rebounds", 0))),
+                        "ast": float(stats.get("ast", stats.get("assists", 0))),
+                        "stl": float(stats.get("stl", stats.get("steals", 0))),
+                        "blk": float(stats.get("blk", stats.get("blocks", 0))),
+                        "tov": float(stats.get("tov", stats.get("turnovers", 0))),
+                        "fg3m": float(stats.get("fg3m", stats.get("threes_made", 0))),
+                        "is_final": is_final,
+                        "is_live": is_live,
+                    }
     except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[BetTracker] Unexpected error: {_exc}")
+        logging.getLogger(__name__).warning(f"[BetTracker] Live box score fetch failed: {_exc}")
 
     STAT_TO_BOX = {
         "points": "pts",

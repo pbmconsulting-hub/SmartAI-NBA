@@ -220,7 +220,7 @@ class RosterEngine:
     def __init__(self):
         # {normalized_player_name → {status, injury, team, return_date, source}}
         self._injury_map: dict = {}
-        # {team_abbrev → [player_name, ...]}  — all names from nba_api roster
+        # {team_abbrev → [player_name, ...]}  — all names from ClearSports roster
         self._full_rosters: dict = {}
         # {team_abbrev → [player_name, ...]}  — filtered active-only
         self._active_rosters: dict = {}
@@ -292,30 +292,30 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from nba_api — the single authoritative source.
+        Fetch fresh data from ClearSports API — the single authoritative source.
 
         Sources used (in order):
-            1. nba_api live Injuries endpoint — daily injury designations
-            2. nba_api CommonTeamRoster       — official roster + two-way status
+            1. ClearSports injury report endpoint — daily injury designations
+            2. ClearSports rosters endpoint       — official roster per team
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-        _logger.info("RosterEngine.refresh() — starting data pull (nba_api sources only)")
+        _logger.info("RosterEngine.refresh() — starting data pull (ClearSports)")
         merged: dict = {}
 
-        # ── Source 1: nba_api live Injuries endpoint ──────────────
-        src1 = self._fetch_nba_api_injuries()
+        # ── Source 1: ClearSports injury report ──────────────────
+        src1 = self._fetch_clearsports_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        _logger.info(f"  Source 1 (nba_api live injuries): {len(src1)} players")
+        _logger.info(f"  Source 1 (ClearSports injuries): {len(src1)} players")
 
         self._injury_map = merged
 
-        # ── Source 2: nba_api CommonTeamRoster (primary roster) ───
+        # ── Source 2: ClearSports rosters ────────────────────────
         if team_abbrevs:
-            self._fetch_nba_api_rosters(team_abbrevs)
+            self._fetch_clearsports_rosters(team_abbrevs)
 
         # Invalidate active-roster cache
         self._active_rosters = {}
@@ -327,177 +327,99 @@ class RosterEngine:
         )
 
     # ----------------------------------------------------------
-    # Source 1: nba_api live Injuries endpoint
+    # Source 1: ClearSports injury report
     # ----------------------------------------------------------
 
-    def _fetch_nba_api_injuries(self) -> dict:
+    def _fetch_clearsports_injuries(self) -> dict:
         """
-        Fetch today's injury report via multiple sources with fallback.
+        Fetch today's injury report from ClearSports API.
 
-        Sources tried in order:
-          1. NBA CDN public injury JSON feed
-          2. stats.nba.com leagueinjuries endpoint with NBA headers
-          3. nba_api Injuries endpoint (if available)
-
-        Falls back to an empty dict if all sources fail.
+        Falls back to NBA CDN public injury JSON feed if ClearSports fails.
+        Returns an empty dict if all sources fail.
         """
-        import requests as _requests  # local import to avoid top-level dep for optional feature
+        try:
+            from data.clearsports_client import fetch_injury_report as _cs_injuries
+            raw_injuries = _cs_injuries()
+            if raw_injuries:
+                result = {}
+                for player_name_lower, info in raw_injuries.items():
+                    norm_key = _normalize_name(player_name_lower)
+                    raw_status = info.get("status", "Out")
+                    status = _normalize_status(raw_status)
+                    result[norm_key] = {
+                        "status": status,
+                        "injury": info.get("injury_note", ""),
+                        "team": "",
+                        "return_date": info.get("return_date", ""),
+                        "source": "ClearSports",
+                    }
+                return result
+        except Exception as err:
+            _logger.warning(f"ClearSports injury fetch failed: {err}")
 
-        # User-Agent kept generic enough to work across NBA endpoints;
-        # update the Chrome version string if NBA API starts rejecting requests.
+        # Fallback: NBA CDN public injury JSON
+        return self._fetch_nba_cdn_injuries()
+
+    def _fetch_nba_cdn_injuries(self) -> dict:
+        """
+        Fallback: fetch injury data from NBA's public CDN JSON feed.
+        """
+        import requests as _requests
+
         _NBA_HEADERS = {
-            "Host": "stats.nba.com",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "x-nba-stats-origin": "stats",
-            "x-nba-stats-token": "true",
-            "Connection": "keep-alive",
-            "Referer": "https://www.nba.com/",
-            "Origin": "https://www.nba.com",
+            "Accept": "application/json",
         }
 
-        # ── Source 1: NBA CDN ──────────────────────────────────
+        result = {}
         try:
-            resp = _requests.get(
-                "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
-                timeout=10,
-            )
+            cdn_url = "https://cdn.nba.com/static/json/staticData/injuries.json"
+            resp = _requests.get(cdn_url, headers=_NBA_HEADERS, timeout=10)
             resp.raise_for_status()
             data = resp.json()
-            injured_list = (
-                data.get("league", {}).get("standard", [])
-                or data.get("injuries", {}).get("injuredPlayers", [])
-                or data.get("injuredPlayers", [])
-                or data.get("players", [])
-            )
-            result = _parse_injured_list(injured_list, "nba-cdn-injuries")
-            if result:
-                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CDN source returned {len(result)} players")
-                return result
-            _logger.info("  RosterEngine._fetch_nba_api_injuries: CDN returned 0 players, trying fallback")
-        except Exception as exc:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries CDN: {exc}")
 
-        # ── Source 2: stats.nba.com leagueinjuries ────────────
-        try:
-            _current_season = _current_nba_season()
-            _url = f"https://stats.nba.com/stats/leagueinjuries?LeagueID=00&Season={_current_season}"
-            resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
-            resp2.raise_for_status()
-            data2 = resp2.json()
-            # Try common response structures
-            injured_list2 = (
-                data2.get("resultSets", [{}])[0].get("rowSet", [])
-                if data2.get("resultSets")
-                else data2.get("players", [])
-            )
-            # If rowSet format, parse columns
-            if data2.get("resultSets") and data2["resultSets"][0].get("headers"):
-                headers = data2["resultSets"][0]["headers"]
-                rows    = data2["resultSets"][0].get("rowSet", [])
-                injured_list2 = [dict(zip(headers, row)) for row in rows]
-            result2 = _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
-            if result2:
-                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: stats.nba.com source returned {len(result2)} players")
-                return result2
-            _logger.info("  RosterEngine._fetch_nba_api_injuries: stats.nba.com returned 0 players, trying nba_api")
-        except Exception as exc2:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries stats.nba.com: {exc2}")
+            for player in (data.get("data", {}).get("PlayerInjuries", []) or []):
+                player_name = str(player.get("playerName", "") or "").strip()
+                status_raw = str(player.get("injuryStatus", "") or "").strip()
+                injury_note = str(player.get("injuryText", "") or "").strip()
+                team = str(player.get("teamTricode", "") or "").strip().upper()
 
-        # ── Source 3: nba_api Injuries endpoint ───────────────
-        try:
-            from nba_api.stats.endpoints import injuries as _injuries_ep
-            inj = _injuries_ep.Injuries(timeout=12)
-            inj_df = inj.get_data_frames()[0] if inj.get_data_frames() else None
-            if inj_df is not None and not inj_df.empty:
-                result3: dict = {}
-                for _, row in inj_df.iterrows():
-                    name   = str(row.get("Player_Name", row.get("PLAYER_NAME", "")) or "")
-                    status = _normalize_status(str(row.get("Status", row.get("STATUS", "")) or ""))
-                    injury = str(row.get("Injury", row.get("INJURY", row.get("Comment", "")) or "") or "")
-                    team   = str(row.get("Team", row.get("TEAM", "") or "") or "")
-                    if not name:
-                        continue
-                    key = _normalize_name(name)
-                    result3[key] = {
-                        "status":      status,
-                        "injury":      injury,
-                        "team":        team,
-                        "return_date": "",
-                        "source":      "nba_api-injuries",
-                    }
-                if result3:
-                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: nba_api source returned {len(result3)} players")
-                    return result3
-        except Exception as exc3:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries nba_api: {exc3}")
+                if not player_name:
+                    continue
 
-        _logger.info("  RosterEngine._fetch_nba_api_injuries: all sources returned 0 players")
-        return {}
+                norm_key = _normalize_name(player_name)
+                status = _normalize_status(status_raw)
+
+                result[norm_key] = {
+                    "status": status,
+                    "injury": injury_note,
+                    "team": team,
+                    "return_date": "",
+                    "source": "NBA CDN",
+                }
+
+            _logger.info(f"  NBA CDN injuries: {len(result)} players")
+        except Exception as cdn_err:
+            _logger.warning(f"NBA CDN injury fallback failed: {cdn_err}")
+
+        return result
 
     # ----------------------------------------------------------
-    # Source 2: nba_api CommonTeamRoster (primary roster source)
+    # Source 2: ClearSports rosters endpoint
     # ----------------------------------------------------------
 
-    def _fetch_nba_api_rosters(self, team_abbrevs: list):
+    def _fetch_clearsports_rosters(self, team_abbrevs: list):
         """
-        Fetch full rosters from nba_api, store them in _full_rosters,
-        and update the injury map for G-League / two-way contract players.
-
-        CommonTeamRoster is the authoritative source for who is currently
-        on an NBA roster (reflects all trades and signings).  Players
-        on two-way contracts who are on G-League assignment are flagged
-        as inactive so they are excluded from tonight's active roster.
+        Fetch full rosters from ClearSports API, store in _full_rosters.
         """
         try:
-            from nba_api.stats.endpoints import CommonTeamRoster
-            from nba_api.stats.static import teams as nba_static_teams
-        except ImportError:
-            _logger.warning("RosterEngine._fetch_nba_api_rosters: nba_api not available")
-            return
-
-        all_teams = {t["abbreviation"]: t["id"] for t in nba_static_teams.get_teams()}
-
-        for abbrev in (team_abbrevs or []):
-            team_id = all_teams.get(abbrev.upper())
-            if not team_id:
-                _logger.info(f"  RosterEngine: no team_id for {abbrev}")
-                continue
-            try:
-                time.sleep(0.4)
-                resp = CommonTeamRoster(team_id=team_id)
-                df = resp.get_data_frames()[0]
-
-                all_players = []
-                for _, row in df.iterrows():
-                    player_name = row.get("PLAYER", "")
-                    if not player_name:
-                        continue
-
-                    all_players.append(player_name)
-
-                    # Flag two-way / G-League players as inactive
-                    player_type  = str(row.get("PLAYER_TYPE",  "") or "").lower()
-                    how_acquired = str(row.get("HOW_ACQUIRED", "") or "").lower()
-                    if "two-way" in player_type or "two-way" in how_acquired:
-                        key = _normalize_name(player_name)
-                        existing = self._injury_map.get(key, {})
-                        if _severity(existing.get("status", "Active")) < _severity("G League - Two-Way"):
-                            self._injury_map[key] = {
-                                "status":      "G League - Two-Way",
-                                "injury":      "Two-way contract",
-                                "team":        abbrev.upper(),
-                                "return_date": "",
-                                "source":      "nba_api",
-                            }
-                        _logger.info(f"  Flagged two-way player: {player_name} ({abbrev})")
-
-                self._full_rosters[abbrev.upper()] = all_players
-                _logger.info(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
-            except Exception as exc:
-                _logger.warning(f"  RosterEngine nba_api error for {abbrev}: {exc}")
+            from data.clearsports_client import fetch_rosters as _cs_rosters
+            rosters = _cs_rosters(list(team_abbrevs))
+            for abbrev, players in rosters.items():
+                self._full_rosters[abbrev.upper()] = players
+                _logger.info(f"  RosterEngine ClearSports: {abbrev} → {len(players)} players")
+        except Exception as err:
+            _logger.warning(f"ClearSports roster fetch failed: {err}")
 
 # ============================================================
 # END SECTION: RosterEngine class

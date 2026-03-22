@@ -16,12 +16,15 @@ import logging as _logging
 
 _logger = _logging.getLogger(__name__)
 
-# ── NBA CDN helpers ─────────────────────────────────────────
-# The official NBA CDN serves headshots at a predictable URL
-# keyed by a numeric player ID.  We maintain a lightweight
-# lookup of marquee player IDs so the UI never needs a live
-# API call for the image.
+# ── Player ID lookup cache ───────────────────────────────────
+# Maps player_name.lower() → NBA player ID (int).
+# Populated on first call to get_headshot_url() / lookup_player_id(),
+# and pre-seeded with marquee players for test compatibility and performance.
+_PLAYER_ID_CACHE: dict = {}
 
+# Pre-seeded player IDs for the most common NBA players.
+# This ensures headshots work immediately without any API call,
+# and provides backward compatibility for tests that import _KNOWN_PLAYER_IDS.
 _KNOWN_PLAYER_IDS: dict[str, int] = {
     "lebron james": 2544,
     "stephen curry": 201939,
@@ -53,138 +56,136 @@ _KNOWN_PLAYER_IDS: dict[str, int] = {
     "domantas sabonis": 1627734,
     "pascal siakam": 1627783,
     "lauri markkanen": 1628374,
-    "desmond bane": 1630217,
-    "tyler herro": 1629639,
+    "tyrese maxey": 1630178,
+    "jaylen brown": 1627759,
+    "jalen williams": 1631114,
+    "alperen sengun": 1630578,
     "cade cunningham": 1630595,
     "franz wagner": 1630532,
     "scottie barnes": 1630567,
     "mikal bridges": 1628969,
-    "jalen williams": 1631114,
-    "alperen sengun": 1630578,
-    # ── Extended roster — covers most active starters & key role players ──
+    "desmond bane": 1630217,
+    "tyler herro": 1629639,
     "james harden": 201935,
     "paul george": 202331,
     "kawhi leonard": 202695,
-    "russell westbrook": 201566,
-    "chris paul": 101108,
     "kyrie irving": 202681,
-    "bradley beal": 203078,
-    "deandre ayton": 1629028,
-    "brandon ingram": 1627742,
-    "dejounte murray": 1627749,
-    "darius garland": 1629636,
-    "evan mobley": 1630596,
-    "jarrett allen": 1628386,
-    "fred vanvleet": 1627832,
-    "julius randle": 203944,
-    "og anunoby": 1628384,
-    "immanuel quickley": 1630193,
-    "jrue holiday": 201950,
-    "khris middleton": 203114,
-    "brook lopez": 201572,
-    "nikola vucevic": 202696,
-    "coby white": 1629632,
-    "alex caruso": 1627936,
-    "derrick white": 1628401,
-    "jaylen brown": 1627759,
-    "al horford": 201143,
-    "marcus smart": 203935,
-    "jaren jackson jr.": 1628991,
-    "austin reaves": 1630559,
-    "rui hachimura": 1629060,
-    "d'angelo russell": 1626156,
-    "malik monk": 1628370,
-    "jamal murray": 1627750,
-    "michael porter jr.": 1629008,
-    "aaron gordon": 203932,
-    "klay thompson": 202691,
-    "andrew wiggins": 203952,
-    "draymond green": 203110,
-    "jordan poole": 1629673,
-    "anfernee simons": 1629014,
-    "jerami grant": 203924,
-    "jabari smith jr.": 1631095,
-    "cam thomas": 1630560,
-    "spencer dinwiddie": 203915,
-    "nic claxton": 1629651,
-    "myles turner": 1626167,
-    "buddy hield": 1627741,
-    "terry rozier": 1626179,
-    "mark williams": 1631109,
-    "josh hart": 1628404,
-    "miles bridges": 1628970,
-    "tre jones": 1630200,
-    "keldon johnson": 1629640,
-    "herb jones": 1630539,
-    "cj mccollum": 203468,
-    "jonas valanciunas": 202685,
-    "jalen green": 1630224,
-    "kevin porter jr.": 1629645,
-    "rick fox": 376,
-    "derrick rose": 201565,
-    "demar derozan": 201942,
-    "norman powell": 1626181,
-    "ivica zubac": 1627826,
     "josh giddey": 1630581,
+    "jalen green": 1630224,
+    "cam thomas": 1630560,
     "dyson daniels": 1631097,
     "keegan murray": 1631099,
-    "bennedict mathurin": 1631100,
-    "tyrese maxey": 1630178,
-    "tobias harris": 202699,
-    "cameron johnson": 1629661,
-    "bruce brown": 1628971,
-    "p.j. washington": 1629023,
-    "isaiah hartenstein": 1628392,
-    "bobby portis": 1626171,
-    "malik beasley": 1627736,
-    "kyle kuzma": 1628398,
-    "jordan clarkson": 1626149,
-    "collin sexton": 1629012,
-    "john collins": 1628381,
-    "clint capela": 203991,
-    "harrison barnes": 203084,
-    "rudy gobert": 203497,
-    "mike conley": 201144,
-    "walker kessler": 1631107,
-    "naz reid": 1629675,
-    "ayo dosunmu": 1630245,
-    "patrick williams": 1630172,
-    "jaden ivey": 1631093,
-    "daniel gafford": 1629655,
-    "dennis schroder": 203471,
-    "bogdan bogdanovic": 203992,
-    "herbert jones": 1630539,
-    "trey murphy iii": 1630530,
-    "obi toppin": 1630167,
-    "onyeka okongwu": 1630168,
-    "john wall": 202322,
-    "lonzo ball": 1628366,
-    "markelle fultz": 1628365,
-    "wendell carter jr.": 1628976,
-    "mo bamba": 1628964,
-    "deni avdija": 1630166,
-    "jonathan kuminga": 1630228,
-    "corey kispert": 1630235,
-    "davion mitchell": 1630558,
-    "ziaire williams": 1630533,
-    "jalen suggs": 1630229,
-    "evan fournier": 203095,
-    "gary trent jr.": 1629018,
-    "precious achiuwa": 1630173,
-    "kelly oubre jr.": 1626162,
-    "grant williams": 1629684,
-    "tre mann": 1630544,
-    "brandon clarke": 1629634,
-    "saddiq bey": 1630180,
-    "isaiah stewart": 1630191,
-    "talen horton-tucker": 1629659,
-    "luguentz dort": 1629652,
-    "max strus": 1629622,
-    "gabe vincent": 1629216,
-    "caleb martin": 1628997,
-    "duncan robinson": 1629130,
-    "kel'el ware": 1642269,
 }
+
+# Pre-seed the lookup cache with the known IDs
+_PLAYER_ID_CACHE.update(_KNOWN_PLAYER_IDS)
+
+# ── NBA CDN helpers ─────────────────────────────────────────
+# The official NBA CDN serves headshots at a predictable URL
+# keyed by a numeric player ID.
+
+
+def _build_nba_static_lookup() -> dict:
+    """
+    Build a name→id lookup from nba_api's local static players list.
+
+    This is a LOCAL file read — no network call — so it always works
+    even when stats.nba.com is rate-limited or blocked.  It covers
+    every player who has ever played in the NBA (4000+ entries).
+
+    Returns:
+        dict: {player_name.lower(): player_id (int)}  or {} on failure.
+    """
+    try:
+        from nba_api.stats.static import players as _nba_players_static
+        all_players = _nba_players_static.get_players()
+        return {p["full_name"].lower(): int(p["id"]) for p in all_players}
+    except Exception:
+        return {}
+
+
+def lookup_player_id(player_name: str) -> int | None:
+    """
+    Return the NBA player ID (int) for headshot URL construction.
+
+    Lookup order:
+    1. Module-level cache (instant, no I/O)
+    2. ClearSports API (if configured)
+    3. nba_api local static player list (always fast, covers all players)
+
+    The result is cached so subsequent calls for the same player are free.
+
+    Parameters
+    ----------
+    player_name : str
+        Full player name (case-insensitive).
+
+    Returns
+    -------
+    int or None
+        NBA CDN player ID, or None if not found.
+    """
+    key = str(player_name).lower().strip()
+
+    # 1. Cache hit
+    if key in _PLAYER_ID_CACHE:
+        return _PLAYER_ID_CACHE[key]
+
+    pid = None
+
+    # 2. ClearSports API
+    try:
+        from data.clearsports_client import lookup_player_id as _cs_lookup
+        pid = _cs_lookup(player_name)
+    except Exception:
+        pass
+
+    # 3. nba_api local static list (no network call)
+    if not pid:
+        try:
+            static_lookup = _build_nba_static_lookup()
+            pid = static_lookup.get(key)
+            if not pid:
+                # Try partial match: first + last name
+                parts = key.split()
+                if len(parts) >= 2:
+                    pid = next(
+                        (v for k, v in static_lookup.items()
+                         if parts[0] in k and parts[-1] in k),
+                        None,
+                    )
+        except Exception:
+            pass
+
+    # Cache result (even None) to avoid repeated lookups
+    _PLAYER_ID_CACHE[key] = pid
+    return pid
+
+
+def get_headshot_url(player_name: str) -> str:
+    """Return the NBA CDN headshot URL for a player.
+
+    Uses dynamic player ID lookup — covers ALL NBA players, not just
+    a hardcoded list. Falls back to a generic silhouette if the player
+    ID cannot be found.
+
+    Parameters
+    ----------
+    player_name : str
+        Full player name (case-insensitive).
+
+    Returns
+    -------
+    str
+        URL string pointing to a player headshot image.
+    """
+    pid = lookup_player_id(player_name)
+    if pid:
+        return (
+            f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
+        )
+    return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
+
 
 # ── Team logo CDN ───────────────────────────────────────────
 _NBA_TEAM_LOGO_TMPL = (
@@ -203,30 +204,6 @@ _TEAM_ABBREV_TO_ID: dict[str, int] = {
     "POR": 1610612757, "SAC": 1610612758, "SAS": 1610612759,
     "TOR": 1610612761, "UTA": 1610612762, "WAS": 1610612764,
 }
-
-
-def get_headshot_url(player_name: str) -> str:
-    """Return the NBA CDN headshot URL for a player.
-
-    Falls back to a generic silhouette if the player ID is unknown.
-
-    Parameters
-    ----------
-    player_name : str
-        Full player name (case-insensitive).
-
-    Returns
-    -------
-    str
-        URL string pointing to a player headshot image.
-    """
-    key = str(player_name).lower().strip()
-    pid = _KNOWN_PLAYER_IDS.get(key)
-    if pid:
-        return (
-            f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
-        )
-    return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
 
 
 def get_team_logo_url(team_abbrev: str) -> str:
@@ -302,21 +279,25 @@ def _extract_season_stats(player_data: dict) -> dict:
     ppg = _f(
         player_data.get("ppg")
         or player_data.get("pts_per_game")
+        or player_data.get("points_avg")
         or player_data.get("points", 0)
     )
     rpg = _f(
         player_data.get("rpg")
         or player_data.get("reb_per_game")
+        or player_data.get("rebounds_avg")
         or player_data.get("rebounds", 0)
     )
     apg = _f(
         player_data.get("apg")
         or player_data.get("ast_per_game")
+        or player_data.get("assists_avg")
         or player_data.get("assists", 0)
     )
     avg_min = _f(
         player_data.get("avg_minutes")
         or player_data.get("min_per_game")
+        or player_data.get("minutes_avg")
         or player_data.get("minutes", 0)
     )
     return {"ppg": ppg, "rpg": rpg, "apg": apg, "avg_minutes": avg_min}
@@ -359,6 +340,14 @@ def enrich_player_data(
 
     team = str(player_row.get("team", player_row.get("team_abbrev", ""))).upper().strip()
     position = str(player_row.get("position", player_row.get("pos", ""))).strip()
+
+    # If player_id is in the CSV row, cache it for future headshot lookups
+    csv_pid = player_row.get("player_id")
+    if csv_pid and not _PLAYER_ID_CACHE.get(key):
+        try:
+            _PLAYER_ID_CACHE[key] = int(csv_pid)
+        except (ValueError, TypeError):
+            pass
 
     return {
         "player_name": safe_name,

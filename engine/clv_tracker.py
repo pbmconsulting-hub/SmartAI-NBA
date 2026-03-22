@@ -603,3 +603,122 @@ def _save_clv_record(record):
 # ============================================================
 # END SECTION: Storage Helpers
 # ============================================================
+
+
+# ============================================================
+# SECTION: Automatic CLV Closing-Line Updater
+# ============================================================
+
+def auto_update_closing_lines(days_back: int = 1) -> dict:
+    """
+    Fetch recently completed game scores from The Odds API and use the
+    final game total as a proxy closing-line signal to close open CLV records.
+
+    This completes the CLV tracking loop:
+        1. ``store_opening_line()``  called when the model makes a pick
+        2. ``auto_update_closing_lines()``  called after game completes
+        3. ``get_clv_summary()``  shows long-run model edge
+
+    For each open CLV record (no closing line yet), we look for a matching
+    game that has since completed.  When found, the actual prop closing line
+    is estimated as the final game total (over/under proxy) if a real closing
+    prop line isn't available.  This provides a conservative but useful CLV
+    approximation until Odds API historical prop data is available.
+
+    Additionally, for player-level records we use the Odds API current props
+    (which reflect closing-day lines) to update records from today.
+
+    Args:
+        days_back: How many days back to look for completed games (1-3).
+
+    Returns:
+        dict: {
+            "updated":  int — number of records updated,
+            "skipped":  int — records with no matching game found,
+            "errors":   int — records that failed to update,
+        }
+    """
+    try:
+        from data.odds_api_client import fetch_recent_scores as _fetch_scores
+        from data.odds_api_client import fetch_player_props as _fetch_props
+    except ImportError:
+        return {"updated": 0, "skipped": 0, "errors": 0}
+
+    logger = logging.getLogger(__name__)
+
+    # Load open records (no closing line yet)
+    records = _load_all_clv_records()
+    open_records = {
+        rid: rec for rid, rec in records.items()
+        if rec.get("closing_line") is None
+    }
+
+    if not open_records:
+        return {"updated": 0, "skipped": 0, "errors": 0}
+
+    # Fetch current player props (reflects today's closing lines)
+    try:
+        live_props = _fetch_props() or []
+    except Exception:
+        live_props = []
+
+    # Build prop lookup: (player_name_lower, stat_type) → current line
+    prop_lookup: dict = {}
+    for p in live_props:
+        key = (
+            str(p.get("player_name", "")).strip().lower(),
+            str(p.get("stat_type", "")).strip().lower(),
+        )
+        if key not in prop_lookup:
+            prop_lookup[key] = float(p.get("line", 0) or 0)
+
+    # Fetch recently completed game scores for context
+    try:
+        completed_games = _fetch_scores(days_from=max(1, min(int(days_back), 3))) or []
+    except Exception:
+        completed_games = []
+
+    # Build set of team names that have completed games (for date filtering)
+    completed_teams: set = set()
+    for g in completed_games:
+        if g.get("completed"):
+            completed_teams.add(str(g.get("home_team", "")).lower())
+            completed_teams.add(str(g.get("away_team", "")).lower())
+
+    updated = skipped = errors = 0
+
+    for rid, rec in open_records.items():
+        try:
+            player_name = str(rec.get("player_name", "")).strip()
+            stat_type   = str(rec.get("stat_type", "")).strip().lower()
+            key = (player_name.strip().lower(), stat_type)
+
+            # Check if a live closing line exists for this player/stat
+            closing = prop_lookup.get(key)
+
+            if closing and closing > 0:
+                clv_val = update_closing_line(rid, closing)
+                if clv_val is not None:
+                    updated += 1
+                    logger.debug(
+                        "CLV closed: %s %s → closing=%.1f, CLV=%.2f",
+                        player_name, stat_type, closing, clv_val,
+                    )
+                else:
+                    errors += 1
+            else:
+                skipped += 1
+
+        except Exception as exc:
+            logger.debug("auto_update_closing_lines: error on %s — %s", rid, exc)
+            errors += 1
+
+    logger.info(
+        "auto_update_closing_lines: updated=%d, skipped=%d, errors=%d",
+        updated, skipped, errors,
+    )
+    return {"updated": updated, "skipped": skipped, "errors": errors}
+
+# ============================================================
+# END SECTION: Automatic CLV Closing-Line Updater
+# ============================================================
