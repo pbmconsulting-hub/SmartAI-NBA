@@ -266,7 +266,7 @@ if scan_btn:
 
 # ── Display results from session state ────────────────────────
 discrepancies = st.session_state.get("vault_discrepancies", [])
-persona = st.session_state.get("vault_mode", persona_mode if 'persona_mode' in dir() else "joseph")
+persona = st.session_state.get("vault_mode", "joseph")
 scan_time = st.session_state.get("vault_scan_time", "")
 total_props = st.session_state.get("vault_total_props", 0)
 
