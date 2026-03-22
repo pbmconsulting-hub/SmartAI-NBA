@@ -172,6 +172,8 @@ _NICKNAME_MAP: dict[str, str] = {
     "luka":   "Luka Doncic",
 }
 
+# 85% similarity — high enough to avoid false positives, but low enough
+# to tolerate minor spelling variations & missing suffixes (e.g. "Jr.").
 _FUZZY_THRESHOLD = 85
 
 

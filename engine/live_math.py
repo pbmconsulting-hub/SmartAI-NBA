@@ -18,7 +18,7 @@ REGULATION_MINUTES = 48
 HALF_MINUTES = 24
 BLOWOUT_THRESHOLD = 20
 FOUL_TROUBLE_THRESHOLD = 3
-BLOWOUT_PACE_SLASH = 0.70  # reduce projected pace by 30% in blowouts
+BLOWOUT_PACE_SLASH = 0.70  # multiply projected pace by 70% in blowouts
 
 
 def calculate_live_pace(
