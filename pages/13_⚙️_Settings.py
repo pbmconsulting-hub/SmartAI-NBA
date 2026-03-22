@@ -25,6 +25,7 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Floating Widget ────────────────────────────
 from utils.components import inject_joseph_floating
+st.session_state["joseph_page_context"] = "page_settings"
 inject_joseph_floating()
 
 st.title("⚙️ Settings")

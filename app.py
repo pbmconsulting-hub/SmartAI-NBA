@@ -286,6 +286,7 @@ st.session_state.setdefault("joseph_entry_just_built", False)
 from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
+st.session_state["joseph_page_context"] = "page_home"
 inject_joseph_floating()
 
 # ============================================================
