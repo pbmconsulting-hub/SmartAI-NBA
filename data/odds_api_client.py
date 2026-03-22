@@ -108,6 +108,17 @@ _PROP_MARKETS: list[str] = list(_ODDS_API_STAT_MAP.keys())
 _API_CACHE: dict = {}
 _API_CACHE_TTL: int = int(os.environ.get("API_CACHE_TTL_SECONDS", "300"))
 
+# ── Odds API usage / quota tracking ───────────────────────────────────────────
+# The Odds API returns x-requests-remaining and x-requests-used headers.
+# We capture them on every successful response so the Settings page can display
+# remaining quota to the user.
+
+_last_quota: dict = {
+    "requests_remaining": None,
+    "requests_used": None,
+    "updated_at": None,
+}
+
 
 def _cache_get(url: str):
     """Return cached payload for *url* if still within TTL, else None."""
@@ -194,6 +205,10 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 return None
 
             resp.raise_for_status()
+
+            # ── Capture API quota from response headers ──────────────
+            _update_quota_from_headers(resp.headers)
+
             data = resp.json()
             _cache_set(url, data)
             return data
@@ -210,6 +225,35 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 _logger.error("All retries exhausted for %s: %s", url, exc)
 
     return None
+
+
+def _update_quota_from_headers(headers) -> None:
+    """Extract x-requests-remaining / x-requests-used from Odds API response headers."""
+    try:
+        remaining = headers.get("x-requests-remaining")
+        used = headers.get("x-requests-used")
+        if remaining is not None:
+            _last_quota["requests_remaining"] = int(remaining)
+        if used is not None:
+            _last_quota["requests_used"] = int(used)
+        if remaining is not None or used is not None:
+            _last_quota["updated_at"] = datetime.datetime.now().isoformat()
+    except (ValueError, TypeError):
+        pass
+
+
+def get_odds_api_usage() -> dict:
+    """
+    Return the most recent Odds API quota snapshot.
+
+    Returns:
+        dict: {
+            "requests_remaining": int or None,
+            "requests_used":     int or None,
+            "updated_at":        ISO datetime string or None,
+        }
+    """
+    return dict(_last_quota)
 
 
 # ── Private helpers ───────────────────────────────────────────────────────────

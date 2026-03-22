@@ -174,6 +174,77 @@ for _ci, (_label, _ts, _warn_h, _desc) in enumerate(_data_sources):
             unsafe_allow_html=True,
         )
 
+# ── Staleness warning ──────────────────────────────────────────
+try:
+    from data.live_data_fetcher import get_teams_staleness_warning
+    _stale_warning = get_teams_staleness_warning()
+    if _stale_warning:
+        st.warning(f"⏰ {_stale_warning}")
+except Exception:
+    pass
+
+# ── API quota status row ───────────────────────────────────────
+_api_q_col1, _api_q_col2 = st.columns(2)
+with _api_q_col1:
+    _odds_key = st.session_state.get("odds_api_key", "")
+    if _odds_key:
+        try:
+            from data.odds_api_client import get_odds_api_usage
+            _usage = get_odds_api_usage()
+            _remaining = _usage.get("requests_remaining")
+            if _remaining is not None:
+                _used = _usage.get("requests_used") or 0
+                _pct_remaining = round(_remaining / max(_used + _remaining, 1) * 100)
+                _bar_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
+                st.markdown(
+                    f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+                    f'border:1px solid rgba(0,240,255,0.15);">'
+                    f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
+                    f'📡 Odds API Quota</div>'
+                    f'<span style="background:{"#276749" if _remaining > 100 else ("#744210" if _remaining > 20 else "#742a2a")};'
+                    f'color:{"#9ae6b4" if _remaining > 100 else ("#fbd38d" if _remaining > 20 else "#feb2b2")};'
+                    f'padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">'
+                    f'{_remaining:,} remaining</span>'
+                    f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
+                    f'<div style="height:6px;width:{_pct_remaining}%;background:{_bar_color};'
+                    f'border-radius:3px;"></div></div>'
+                    f'<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">'
+                    f'{_used:,} used this month</div></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+                    'border:1px solid rgba(0,240,255,0.15);">'
+                    '<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
+                    '📡 Odds API Quota</div>'
+                    '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;'
+                    'font-size:0.75rem;font-weight:700;">PENDING</span>'
+                    '<div style="color:#8b949e;font-size:0.75rem;margin-top:8px;">'
+                    'Quota loads after first API call</div></div>',
+                    unsafe_allow_html=True,
+                )
+        except ImportError:
+            pass
+with _api_q_col2:
+    _cs_key = st.session_state.get("clearsports_api_key", "")
+    _cs_status = "✅ Active" if _cs_key else "❌ Not set"
+    _cs_badge_bg = "#276749" if _cs_key else "#742a2a"
+    _cs_badge_fg = "#9ae6b4" if _cs_key else "#feb2b2"
+    st.markdown(
+        f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+        f'border:1px solid rgba(0,240,255,0.15);">'
+        f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
+        f'🔬 ClearSports API</div>'
+        f'<span style="background:{_cs_badge_bg};color:{_cs_badge_fg};'
+        f'padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">'
+        f'{_cs_status}</span>'
+        f'<div style="color:#8b949e;font-size:0.75rem;margin-top:8px;">'
+        f'{"Games · Players · Teams · Injuries · Standings · News" if _cs_key else "Set API key in ⚙️ Settings"}'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+
 st.divider()
 
 # ============================================================
@@ -414,6 +485,28 @@ if current_action:
                 f"**{len(updated_players)} players** fetched | "
                 f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
             )
+
+            # Show bonus data enrichment status (standings, news, historical data)
+            _bonus_parts = []
+            if result.get("standings"):
+                _bonus_parts.append(f"📊 Standings loaded ({len(result['standings'])} teams)")
+            if result.get("news"):
+                _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
+            if _bonus_parts:
+                st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
+
+            # Show Odds API quota if available
+            try:
+                from data.odds_api_client import get_odds_api_usage
+                _usage = get_odds_api_usage()
+                _remaining = _usage.get("requests_remaining")
+                if _remaining is not None:
+                    _q_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
+                    st.caption(
+                        f"📡 Odds API quota: **{_remaining:,}** requests remaining"
+                    )
+            except Exception:
+                pass
         else:
             st.warning(
                 "⚠️ Could not fetch tonight's games (no games tonight, or API error). "
