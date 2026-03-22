@@ -69,6 +69,8 @@ the market line.
 ### Step-by-Step Workflow
 1. **Load Tonight's Games** — visit **📡 Live Games** first and click
    *Auto-Load Tonight's Games* so the simulator knows which players are active.
+   If you skip this step, all players in the database will appear — but
+   projections will be less accurate without tonight's game context.
 2. **Select a Player** — use the sidebar dropdown to pick a player from
    tonight's slate.
 3. **Review Context** — the simulator auto-detects the opponent, home/away

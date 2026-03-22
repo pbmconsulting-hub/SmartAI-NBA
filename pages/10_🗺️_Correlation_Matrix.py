@@ -94,6 +94,9 @@ while pairing uncorrelated props reduces overall variance.
   your combo probability up or down compared to naïve multiplication.
 - 💡 Run **⚡ Quantum Analysis Matrix** first — this page needs simulation arrays
   to compute correlations.
+- 💡 Pearson correlation measures **linear** relationships. Non-linear dependencies
+  (e.g. blowout effects) won't appear as high values, so always pair this with
+  your game-script knowledge.
 """)
 
 # ============================================================
