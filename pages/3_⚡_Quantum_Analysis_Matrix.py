@@ -2183,6 +2183,47 @@ if analysis_results:
         st.divider()
 
     # ============================================================
+    # SECTION: Market Movement Alerts (Odds API line snapshots)
+    # Shows sharp-money / line-movement signals detected during analysis.
+    # ============================================================
+    _mm_results = [
+        r for r in displayed_results
+        if r.get("market_movement") and not r.get("player_is_out", False)
+    ]
+    if _mm_results:
+        with st.expander(
+            f"📉 Market Movement Alerts — {len(_mm_results)} line shift(s) detected",
+            expanded=False,
+        ):
+            for _mm_r in _mm_results:
+                _mm = _mm_r["market_movement"]
+                _mm_player = _mm_r.get("player_name", "")
+                _mm_stat = _mm_r.get("stat_type", "")
+                _mm_dir = _mm.get("direction", "")
+                _mm_shift = _mm.get("line_shift", 0)
+                _mm_signal = _mm.get("signal", "neutral")
+                _mm_adj = _mm.get("confidence_adjustment", 0)
+                _sig_colors = {"sharp_buy": "#00ff9d", "sharp_fade": "#ff6b6b", "neutral": "#8b949e"}
+                _sig_c = _sig_colors.get(_mm_signal, "#8b949e")
+                _sig_labels = {"sharp_buy": "🟢 SHARP BUY", "sharp_fade": "🔴 SHARP FADE", "neutral": "⚪ NEUTRAL"}
+                _sig_lbl = _sig_labels.get(_mm_signal, "⚪ NEUTRAL")
+                st.markdown(
+                    f'<div style="background:#0d1117;border-left:4px solid {_sig_c};'
+                    f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<span style="color:#e0e7ef;font-weight:700;">'
+                    f'{_html.escape(_mm_player)} — {_html.escape(_mm_stat.title())} {_html.escape(_mm_dir)}</span>'
+                    f'<span style="color:{_sig_c};font-weight:700;font-size:0.85rem;">{_sig_lbl}</span>'
+                    f'</div>'
+                    f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                    f'Line shift: <strong style="color:#c0d0e8;">{_mm_shift:+.1f}</strong>'
+                    + (f' · Confidence adj: <strong style="color:{_sig_c};">{_mm_adj:+.1f}</strong>' if _mm_adj else '')
+                    + f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+        st.divider()
+
+    # ============================================================
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
     # ============================================================
     _uncertain_picks = [

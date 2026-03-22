@@ -217,11 +217,21 @@ if _fetch_logs_btn and selected_names:
         if _gl_player_id:
             try:
                 from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                from data.live_data_fetcher import fetch_player_recent_form as _ldf_form
                 from data.game_log_cache import save_game_logs_to_cache as _gl_save
                 _logs = _ldf_gl(_gl_player_id, last_n_games=20)
                 if _logs:
                     _gl_save(_gl_pname, _logs)
                     _gl_fetched += 1
+                # Also fetch recent form trend for the player
+                try:
+                    _form = _ldf_form(_gl_player_id, last_n_games=10)
+                    if _form and _gl_pdata:
+                        _gl_pdata["recent_form_games"] = _form.get("game_results", [])
+                        _gl_pdata["recent_trend"] = _form.get("trend", "neutral")
+                        _gl_pdata["recent_trend_emoji"] = _form.get("trend_emoji", "➡️")
+                except Exception:
+                    pass
             except Exception as _gl_exc:
                 _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
                 _gl_errors += 1
@@ -616,6 +626,23 @@ if run_sim and selected_names:
             _pdata = sim_result["player"]
             _pname_log = _pdata.get("name", "")
             _recent_games = _pdata.get("recent_form_games", [])
+
+            # ── Recent Form Trend Badge ────────────────────────────────
+            _trend = _pdata.get("recent_trend", "")
+            _trend_emoji = _pdata.get("recent_trend_emoji", "")
+            if _trend and _trend != "neutral":
+                _trend_colors = {"hot": "#00ff9d", "cold": "#ff6b6b"}
+                _tc = _trend_colors.get(_trend, "#8b949e")
+                st.markdown(
+                    f'<div style="display:inline-block;background:rgba(0,0,0,0.3);'
+                    f'border:1px solid {_tc};border-radius:6px;padding:4px 12px;'
+                    f'font-size:0.82rem;margin-bottom:8px;">'
+                    f'{_trend_emoji} <strong style="color:{_tc};">'
+                    f'{_pname_log} is {_trend.upper()}</strong>'
+                    f' — Recent form trend based on last 10 games'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
 
             # Also check game log cache (populated by historical data refresh)
             _cached_logs = []

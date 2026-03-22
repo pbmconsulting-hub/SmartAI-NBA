@@ -632,6 +632,48 @@ with tab_model_health:
         except Exception as _exc:
             logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
 
+        # CLV Summary — aggregate closing-line-value performance
+        try:
+            if get_clv_summary is not None:
+                st.subheader("📈 Closing Line Value (CLV) Summary")
+                _clv_data = get_clv_summary()
+                if _clv_data and _clv_data.get("has_data"):
+                    _clv_c1, _clv_c2, _clv_c3 = st.columns(3)
+                    _clv_c1.metric("Total CLV Records", _clv_data.get("total_records", 0))
+                    _avg_clv = _clv_data.get("avg_clv", 0)
+                    _clv_c2.metric(
+                        "Average CLV",
+                        f"{_avg_clv:+.3f}",
+                        delta="Beating the market" if _avg_clv > 0 else "Behind the market",
+                        delta_color="normal" if _avg_clv > 0 else "inverse",
+                    )
+                    _pos_rate = _clv_data.get("positive_clv_rate", 0)
+                    _clv_c3.metric("Positive CLV Rate", f"{_pos_rate * 100:.1f}%")
+
+                    _clv_by_tier = _clv_data.get("clv_by_tier", {})
+                    if _clv_by_tier:
+                        st.markdown("**CLV by Tier:**")
+                        for _tier_name, _tier_clv in _clv_by_tier.items():
+                            _t_avg = _tier_clv.get("avg_clv", 0)
+                            _t_pos = _tier_clv.get("positive_clv_rate", 0)
+                            _t_n = _tier_clv.get("count", 0)
+                            _t_icon = "🟢" if _t_avg > 0 else "🔴"
+                            st.markdown(
+                                f"{_t_icon} **{_tier_name}**: avg CLV {_t_avg:+.3f} · "
+                                f"positive rate {_t_pos * 100:.1f}% · {_t_n} record(s)"
+                            )
+
+                    _interpretation = _clv_data.get("interpretation", "")
+                    if _interpretation:
+                        st.info(f"💡 {_interpretation}")
+                else:
+                    st.info(
+                        "📈 CLV summary will appear after recording bets and tracking closing lines. "
+                        "Run **⚡ Neural Analysis** and allow auto-CLV updates to build your CLV history."
+                    )
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[BetTrackerPage] CLV summary error: {_exc}")
+
 # ============================================================
 # END SECTION: Model Health Tab
 # ============================================================
