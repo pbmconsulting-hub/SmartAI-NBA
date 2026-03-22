@@ -65,6 +65,15 @@ from engine.live_math import calculate_live_pace, pace_color_tier
 from styles.live_theme import render_sweat_card, render_waiting_card
 from agent.live_persona import get_joseph_live_reaction, stream_joseph_text
 
+# ── Pillar 4 Panic Room imports ──────────────────────────────
+
+from agent.payload_builder import build_live_vibe_payload, get_grudge_buffer
+from agent.response_parser import parse_vibe_response, generate_vibe_css_class, get_vibe_emoji
+from styles.live_theme import get_panic_room_css, render_panic_room_card
+
+# Inject Panic Room CSS
+st.markdown(get_panic_room_css(), unsafe_allow_html=True)
+
 # ============================================================
 # SECTION: Header
 # ============================================================
@@ -333,13 +342,80 @@ if waiting_html:
     )
 
 # ============================================================
-# SECTION: Joseph's Live Vibe Checks
+# SECTION: Joseph's Live Vibe Checks (Pillar 4 Panic Room)
 # ============================================================
 
 if vibe_checks:
     st.divider()
-    st.subheader("🎙️ Joseph's Live Vibe Check")
+    st.subheader("🎙️ Joseph's Live Panic Room")
 
+    grudge = get_grudge_buffer()
+
+    panic_cards_html = ""
+    for player_name, pace in vibe_checks:
+        # Fast-path fragment reaction (always available offline)
+        reaction = get_joseph_live_reaction(pace)
+
+        # Build the Pillar 4 structured payload for this bet
+        bet_for_payload = next(
+            (b for b in active_bets
+             if b.get("player_name", "") == player_name),
+            {"player_name": player_name, "stat_type": "",
+             "line": pace.get("target_stat", 0),
+             "direction": pace.get("direction", "OVER")},
+        )
+        game = get_game_for_player(player_name, live_games)
+        matched = match_live_player(player_name, all_live_players)
+
+        payload = build_live_vibe_payload(
+            ticket=bet_for_payload,
+            live_stats=matched or {},
+            game_context=game or {},
+            grudge_buffer=grudge,
+            pace_result=pace,
+        )
+
+        game_state = payload.get("game_state", "")
+
+        # Map game state to a vibe status for the card glow
+        from agent.response_parser import _STATE_TO_DEFAULT_VIBE
+        vibe_status = _STATE_TO_DEFAULT_VIBE.get(game_state, "Sweating")
+
+        # Generate ticker-tape headline from the game state
+        _STATE_HEADLINES = {
+            "THE_HOOK":             "DYING ON THE HOOK!",
+            "FREE_THROW_MERCHANT":  "FREE THROW MERCHANT!",
+            "BENCH_SWEAT":          "BENCH SWEAT ALERT!",
+            "USAGE_FREEZE_OUT":     "GIVE HIM THE BALL!",
+            "GARBAGE_TIME_MIRACLE": "GARBAGE TIME MIRACLE!",
+            "LOCKER_ROOM_TRAGEDY":  "INJURY SCARE!",
+            "THE_REF_SHOW":         "BLAME THE REFS!",
+            "THE_CLEAN_CASH":       "CASHED IT!",
+        }
+        headline = _STATE_HEADLINES.get(game_state, "JOSEPH IS SWEATING!")
+
+        # Render the panic room card
+        panic_cards_html += render_panic_room_card(
+            vibe_status=vibe_status,
+            ticker_headline=headline,
+            joseph_rant=reaction,
+            player_name=player_name,
+            game_state=game_state,
+        )
+
+        # Push reaction into grudge buffer for anti-repetition
+        grudge.add(reaction)
+
+    # Render all panic room cards
+    if panic_cards_html:
+        st.markdown(panic_cards_html, unsafe_allow_html=True)
+
+    # Still offer the streaming text in expanders for detail
+    st.markdown(
+        '<div class="sweat-stat-label" style="margin-top:12px;margin-bottom:4px;">'
+        '📜 Detailed Reactions</div>',
+        unsafe_allow_html=True,
+    )
     for player_name, pace in vibe_checks:
         reaction = get_joseph_live_reaction(pace)
         with st.expander(f"🎙️ {player_name}", expanded=pace.get("cashed", False)):

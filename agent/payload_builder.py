@@ -211,6 +211,7 @@ def build_live_vibe_payload(
     game_context: dict | None = None,
     chat_history: list[str] | None = None,
     grudge_buffer: GrudgeBuffer | None = None,
+    pace_result: dict | None = None,
 ) -> dict:
     """
     Build the structured JSON payload that feeds the Joseph persona prompt.
@@ -232,6 +233,10 @@ def build_live_vibe_payload(
         module-level grudge buffer.
     grudge_buffer : GrudgeBuffer or None
         Custom grudge buffer.  If ``None``, uses the module-level default.
+    pace_result : dict or None
+        Pre-computed output from ``calculate_live_pace()``.  When provided
+        the classifier uses this directly instead of building a synthetic
+        pace_result.
 
     Returns
     -------
@@ -287,26 +292,41 @@ def build_live_vibe_payload(
     foul_count = int(live_stats.get("fouls", live_stats.get("pf", 0)) or 0)
     injury_status = str(live_stats.get("injury_status", "Active"))
 
-    # ── Build pace result for classifier ──────────────────────
-    # We build a mini pace_result dict for the classifier.
-    # In production, the caller passes the real pace_result.
+    # ── Build or reuse pace result for classifier ─────────────
     minutes_played = float(live_stats.get("minutes", 0) or 0)
-    pace_result_for_classify = {
-        "cashed": (direction == "OVER" and current >= line),
-        "distance": needed,
-        "blowout_risk": abs(score_diff) >= 20 and period in ("3", "4", "Q3", "Q4"),
-        "foul_trouble": foul_count >= 3 and minutes_played <= 24,
-        "minutes_played": minutes_played,
-        "pct_of_target": (current / max(0.01, line)) * 100,
-    }
+    if pace_result is not None and isinstance(pace_result, dict):
+        pace_for_classify = pace_result
+    else:
+        # UNDER cashing: the game must be over (Q4 with very little time
+        # or the period string hints at final) and current < line.
+        _is_late_game = period in ("4", "Q4", "OT", "OT1", "Final")
+        if direction == "UNDER":
+            _under_cashed = current < line and _is_late_game and clock in ("", "0:00", "Final")
+        else:
+            _under_cashed = False
+
+        pace_for_classify = {
+            "cashed": (direction == "OVER" and current >= line) or _under_cashed,
+            "distance": needed,
+            "blowout_risk": abs(score_diff) >= 20 and period in ("3", "4", "Q3", "Q4"),
+            "foul_trouble": foul_count >= 3 and minutes_played <= 24,
+            "minutes_played": minutes_played,
+            "pct_of_target": (current / max(0.01, line)) * 100,
+            "direction": direction,
+        }
 
     game_state = classify_game_state(
-        pace_result=pace_result_for_classify,
+        pace_result=pace_for_classify,
         shooting_line=shooting,
         free_throw_line=free_throws,
         injury_status=injury_status,
         score_diff=score_diff,
     )
+
+    # ── Minutes remaining (from pace or estimated) ────────────
+    minutes_remaining = 0.0
+    if pace_result and isinstance(pace_result, dict):
+        minutes_remaining = float(pace_result.get("minutes_remaining", 0) or 0)
 
     # ── Assemble the payload ──────────────────────────────────
     payload = {
@@ -323,6 +343,7 @@ def build_live_vibe_payload(
         "free_throws":          free_throws,
         "foul_count":           foul_count,
         "injury_status":        injury_status,
+        "minutes_remaining":    round(minutes_remaining, 1),
         "game_state":           game_state,
         "recent_rants_history": list(chat_history),
     }

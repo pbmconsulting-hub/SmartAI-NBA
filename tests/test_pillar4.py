@@ -279,9 +279,42 @@ class TestBuildLiveVibePayload(unittest.TestCase):
             "player_name", "ticket_type", "stat", "line", "current",
             "needed", "clock", "score_diff", "opponent", "shooting",
             "free_throws", "foul_count", "injury_status", "game_state",
-            "recent_rants_history",
+            "recent_rants_history", "minutes_remaining",
         }
         self.assertEqual(set(payload.keys()), expected_keys)
+
+    def test_pace_result_pass_through(self):
+        """When pace_result is provided, classifier uses it directly."""
+        ticket = {"player_name": "X", "stat_type": "points",
+                  "line": 20, "direction": "OVER"}
+        pace = {
+            "cashed": True, "distance": 0, "blowout_risk": False,
+            "foul_trouble": False, "minutes_played": 35,
+            "pct_of_target": 120, "minutes_remaining": 5.2,
+        }
+        payload = self.build(ticket, pace_result=pace)
+        self.assertEqual(payload["game_state"], "THE_CLEAN_CASH")
+        self.assertEqual(payload["minutes_remaining"], 5.2)
+
+    def test_under_cashing_at_final(self):
+        """UNDER bet should classify as CLEAN_CASH when game is over and stat < line."""
+        ticket = {"player_name": "X", "stat_type": "points",
+                  "line": 25, "direction": "UNDER"}
+        live = {"pts": 18, "minutes": 36}
+        game = {"home_score": 100, "away_score": 95,
+                "period": "4", "game_clock": "0:00"}
+        payload = self.build(ticket, live_stats=live, game_context=game)
+        self.assertEqual(payload["game_state"], "THE_CLEAN_CASH")
+
+    def test_under_not_cashed_mid_game(self):
+        """UNDER bet mid-game should NOT classify as cashed."""
+        ticket = {"player_name": "X", "stat_type": "points",
+                  "line": 25, "direction": "UNDER"}
+        live = {"pts": 10, "minutes": 20}
+        game = {"home_score": 55, "away_score": 50,
+                "period": "2", "game_clock": "4:00"}
+        payload = self.build(ticket, live_stats=live, game_context=game)
+        self.assertNotEqual(payload["game_state"], "THE_CLEAN_CASH")
 
 
 class TestModuleLevelGrudge(unittest.TestCase):
@@ -674,6 +707,162 @@ class TestStateToDefaultVibe(unittest.TestCase):
         for state in ALL_GAME_STATES:
             self.assertIn(state, _STATE_TO_DEFAULT_VIBE)
             self.assertIn(_STATE_TO_DEFAULT_VIBE[state], VALID_VIBE_STATUSES)
+
+
+class TestGenerateVibeCssClass(unittest.TestCase):
+    """Tests for generate_vibe_css_class()."""
+
+    def setUp(self):
+        from agent.response_parser import generate_vibe_css_class
+        self.css_class = generate_vibe_css_class
+
+    def test_panic(self):
+        self.assertEqual(self.css_class("Panic"), "panic-glow")
+
+    def test_hype(self):
+        self.assertEqual(self.css_class("Hype"), "hype-glow")
+
+    def test_disgust(self):
+        self.assertEqual(self.css_class("Disgust"), "disgust-glow")
+
+    def test_victory(self):
+        self.assertEqual(self.css_class("Victory"), "victory-glow")
+
+    def test_sweating(self):
+        self.assertEqual(self.css_class("Sweating"), "sweating-glow")
+
+    def test_unknown_defaults(self):
+        self.assertEqual(self.css_class("Unknown"), "sweating-glow")
+
+    def test_all_valid_statuses_have_class(self):
+        from agent.response_parser import VALID_VIBE_STATUSES
+        for status in VALID_VIBE_STATUSES:
+            cls = self.css_class(status)
+            self.assertTrue(cls.endswith("-glow"), f"{status} → {cls}")
+            self.assertGreater(len(cls), 0)
+
+
+class TestGetVibeEmoji(unittest.TestCase):
+    """Tests for get_vibe_emoji()."""
+
+    def setUp(self):
+        from agent.response_parser import get_vibe_emoji
+        self.emoji = get_vibe_emoji
+
+    def test_panic(self):
+        self.assertEqual(self.emoji("Panic"), "🚨")
+
+    def test_hype(self):
+        self.assertEqual(self.emoji("Hype"), "🔥")
+
+    def test_victory(self):
+        self.assertEqual(self.emoji("Victory"), "🏆")
+
+    def test_sweating(self):
+        self.assertEqual(self.emoji("Sweating"), "😰")
+
+    def test_disgust(self):
+        self.assertEqual(self.emoji("Disgust"), "🤢")
+
+    def test_unknown_defaults(self):
+        self.assertEqual(self.emoji("Unknown"), "😰")
+
+    def test_all_valid_statuses_have_emoji(self):
+        from agent.response_parser import VALID_VIBE_STATUSES
+        for status in VALID_VIBE_STATUSES:
+            e = self.emoji(status)
+            self.assertIsInstance(e, str)
+            self.assertGreater(len(e), 0)
+
+
+class TestPanicRoomCss(unittest.TestCase):
+    """Tests for get_panic_room_css()."""
+
+    def setUp(self):
+        from styles.live_theme import get_panic_room_css
+        self.css = get_panic_room_css()
+
+    def test_returns_style_block(self):
+        self.assertIn("<style>", self.css)
+        self.assertIn("</style>", self.css)
+
+    def test_panic_glow_class(self):
+        self.assertIn("panic-glow", self.css)
+
+    def test_hype_glow_class(self):
+        self.assertIn("hype-glow", self.css)
+
+    def test_disgust_glow_class(self):
+        self.assertIn("disgust-glow", self.css)
+
+    def test_victory_glow_class(self):
+        self.assertIn("victory-glow", self.css)
+
+    def test_sweating_glow_class(self):
+        self.assertIn("sweating-glow", self.css)
+
+    def test_panic_pulse_animation(self):
+        self.assertIn("panicPulse", self.css)
+
+    def test_victory_shimmer_animation(self):
+        self.assertIn("victoryShimmer", self.css)
+
+    def test_headline_class(self):
+        self.assertIn("panic-room-headline", self.css)
+
+    def test_rant_class(self):
+        self.assertIn("panic-room-rant", self.css)
+
+    def test_vibe_badge_class(self):
+        self.assertIn("panic-room-vibe-badge", self.css)
+
+
+class TestRenderPanicRoomCard(unittest.TestCase):
+    """Tests for render_panic_room_card()."""
+
+    def setUp(self):
+        from styles.live_theme import render_panic_room_card
+        self.render = render_panic_room_card
+
+    def test_returns_html_string(self):
+        html = self.render("Panic", "DYING ON THE HOOK!", "He needs ONE MORE!")
+        self.assertIsInstance(html, str)
+        self.assertIn("panic-room-card", html)
+
+    def test_glow_class_applied(self):
+        html = self.render("Panic", "TEST!", "Rant text")
+        self.assertIn("panic-glow", html)
+
+    def test_victory_glow(self):
+        html = self.render("Victory", "CASHED IT!", "We won!")
+        self.assertIn("victory-glow", html)
+
+    def test_headline_rendered(self):
+        html = self.render("Hype", "LET'S GO!", "Hype rant")
+        self.assertIn("LET&#x27;S GO!", html)
+
+    def test_rant_rendered(self):
+        html = self.render("Sweating", "SWEAT!", "Some dramatic text here")
+        self.assertIn("Some dramatic text here", html)
+
+    def test_player_name_shown(self):
+        html = self.render("Panic", "TEST!", "Rant", player_name="LeBron James")
+        self.assertIn("LeBron James", html)
+
+    def test_game_state_badge(self):
+        html = self.render("Panic", "TEST!", "Rant", game_state="THE_HOOK")
+        self.assertIn("The Hook", html)
+
+    def test_emoji_in_badge(self):
+        html = self.render("Victory", "WIN!", "Rant")
+        self.assertIn("🏆", html)
+
+    def test_xss_safe(self):
+        """Ensure HTML entities are escaped."""
+        html = self.render("Panic", "<script>alert(1)</script>",
+                          "He needs <b>one</b>")
+        self.assertNotIn("<script>", html)
+        self.assertNotIn("<b>", html)
 
 
 # ============================================================

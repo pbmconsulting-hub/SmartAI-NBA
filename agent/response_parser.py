@@ -243,3 +243,59 @@ def build_openai_response_format() -> dict:
             "schema": VIBE_RESPONSE_SCHEMA,
         },
     }
+
+
+# ============================================================
+# SECTION: UI Helpers — CSS Glow Classes & Emojis
+# ============================================================
+
+# Vibe → CSS class suffix for the glowing card container
+_VIBE_CSS_CLASSES: dict[str, str] = {
+    "Panic":    "panic-glow",
+    "Hype":     "hype-glow",
+    "Disgust":  "disgust-glow",
+    "Victory":  "victory-glow",
+    "Sweating": "sweating-glow",
+}
+
+# Vibe → emoji for UI badges
+_VIBE_EMOJIS: dict[str, str] = {
+    "Panic":    "🚨",
+    "Hype":     "🔥",
+    "Disgust":  "🤢",
+    "Victory":  "🏆",
+    "Sweating": "😰",
+}
+
+
+def generate_vibe_css_class(vibe_status: str) -> str:
+    """
+    Map a ``vibe_status`` value to its CSS class suffix for the
+    Streamlit container glow.
+
+    Parameters
+    ----------
+    vibe_status : str
+        One of ``VALID_VIBE_STATUSES``.
+
+    Returns
+    -------
+    str — CSS class name like ``"panic-glow"``, ``"victory-glow"``, etc.
+    """
+    return _VIBE_CSS_CLASSES.get(vibe_status, "sweating-glow")
+
+
+def get_vibe_emoji(vibe_status: str) -> str:
+    """
+    Return the emoji associated with a ``vibe_status``.
+
+    Parameters
+    ----------
+    vibe_status : str
+        One of ``VALID_VIBE_STATUSES``.
+
+    Returns
+    -------
+    str — Single emoji character/string.
+    """
+    return _VIBE_EMOJIS.get(vibe_status, "😰")
