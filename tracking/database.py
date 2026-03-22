@@ -690,6 +690,57 @@ def insert_prediction(prediction_data):
     return cursor.lastrowid if cursor else None
 
 
+def load_recent_predictions(days=90):
+    """
+    Load recent prediction records from the prediction_history table.
+
+    Used by the calibration engine to build calibration curves and
+    compute self-correction adjustments.
+
+    Args:
+        days (int): Number of past days to include. Default 90.
+
+    Returns:
+        list of dict: Prediction records with keys including
+            ``probability_over`` (aliased from probability_predicted),
+            ``result`` (aliased from was_correct), ``stat_type``,
+            ``date`` (aliased from prediction_date), and ``created_at``.
+        Empty list on cold start or database errors.
+    """
+    initialize_database()
+    cutoff = (
+        datetime.datetime.now() - datetime.timedelta(days=days)
+    ).strftime("%Y-%m-%d")
+    query_sql = """
+    SELECT
+        prediction_id,
+        prediction_date  AS date,
+        player_name,
+        stat_type,
+        prop_line,
+        direction,
+        confidence_score,
+        probability_predicted AS probability_over,
+        was_correct           AS result,
+        actual_value,
+        notes,
+        created_at
+    FROM prediction_history
+    WHERE prediction_date >= ?
+    ORDER BY prediction_date DESC
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute(query_sql, (cutoff,))
+            rows = cursor.fetchall()
+            return [dict(r) for r in rows]
+    except sqlite3.Error as exc:
+        _logger.error("[database] load_recent_predictions error: %s", exc)
+        return []
+
+
 def update_prediction_outcome(prediction_id, was_correct, actual_value):
     """
     Record the actual outcome for a prediction. (W7)

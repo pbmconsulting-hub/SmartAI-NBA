@@ -61,6 +61,41 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.expander("📖 How to Use the Correlation Matrix", expanded=False):
+    st.markdown("""
+### What This Page Does
+The Correlation Matrix shows how the simulated stat outcomes of different
+players **move together** (or apart).  This is critical for building
+**parlays and DFS stacks** — combining correlated props amplifies upside,
+while pairing uncorrelated props reduces overall variance.
+
+### Understanding Correlation Values
+| Value Range | Colour | Meaning |
+|-------------|--------|---------|
+| **+0.7 to +1.0** | 🟥 Strong red | Outcomes move tightly together (great for stacking) |
+| **+0.3 to +0.7** | 🟧 Moderate | Moderate positive relationship |
+| **−0.3 to +0.3** | ⬜ Neutral | Little-to-no relationship |
+| **−0.7 to −0.3** | 🟦 Moderate blue | Outcomes tend to move in opposite directions |
+| **−1.0 to −0.7** | 🟦 Strong blue | Strongly inversely related (good for hedging) |
+
+### How to Read the Heatmap
+- Each **cell** represents the Pearson correlation between two player-prop
+  simulation distributions (from the Quantum Matrix Engine).
+- **Diagonal cells** are always +1.0 (a prop is perfectly correlated with itself).
+- Hover over a cell to see the exact correlation value.
+
+### Practical Tips
+- 💡 **Stacking teammates** (e.g. PG assists + SG points) often shows +0.4 to +0.7 —
+  ideal for same-game parlays.
+- 💡 **Opposite sides of the ball** (e.g. scorer vs. opposing defender) may show
+  negative correlation — useful for hedging.
+- 💡 Use the **🏀 Filter by Game** selector above to zoom into one matchup.
+- 💡 The **Parlay Impact** panel below the heatmap shows how correlation adjusts
+  your combo probability up or down compared to naïve multiplication.
+- 💡 Run **⚡ Quantum Analysis Matrix** first — this page needs simulation arrays
+  to compute correlations.
+""")
+
 # ============================================================
 # SECTION: Pull analyzed results from session state
 # ============================================================

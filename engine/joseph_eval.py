@@ -38,6 +38,28 @@ except ImportError:
 
 
 # ------------------------------------------------------------------
+# Archetype profiles — exported so other modules (e.g. joseph_brain)
+# can access archetype metadata without re-defining it.
+# ------------------------------------------------------------------
+
+ARCHETYPE_PROFILES: dict = {
+    "Stretch Big":          {"role": "spacing big",       "key_stats": ["threes", "rebounds"]},
+    "3-and-D Wing":         {"role": "two-way wing",      "key_stats": ["threes", "steals"]},
+    "Shot Creator":         {"role": "primary scorer",    "key_stats": ["points", "assists"]},
+    "Primary Ball Handler": {"role": "lead guard",        "key_stats": ["assists", "points"]},
+    "Rim Runner":           {"role": "athletic big",      "key_stats": ["rebounds", "blocks"]},
+    "Floor General":        {"role": "pass-first guard",  "key_stats": ["assists", "steals"]},
+    "Two-Way Wing":         {"role": "versatile wing",    "key_stats": ["steals", "rebounds"]},
+    "Defensive Anchor":     {"role": "rim protector",     "key_stats": ["blocks", "rebounds"]},
+    "Sharpshooter":         {"role": "catch-and-shoot",   "key_stats": ["threes", "points"]},
+    "Slasher":              {"role": "driving scorer",    "key_stats": ["points", "assists"]},
+    "Post Scorer":          {"role": "interior scorer",   "key_stats": ["points", "rebounds"]},
+    "Combo Guard":          {"role": "hybrid guard",      "key_stats": ["points", "assists"]},
+    "Role Player":          {"role": "utility",           "key_stats": ["rebounds", "assists"]},
+}
+
+
+# ------------------------------------------------------------------
 # Letter-grade mapping
 # ------------------------------------------------------------------
 
