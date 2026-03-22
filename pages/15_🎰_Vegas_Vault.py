@@ -538,6 +538,19 @@ if discrepancies or scan_time:
     m4.metric("Top Edge", f"+{top_edge}%")
     m5.metric("Avg Edge", f"+{avg_edge}%")
 
+    # ── Win-rate enhancement metrics ─────────────────────────────
+    a_plus_count = sum(1 for d in discrepancies if d.get("edge_grade") in ("A+", "A"))
+    avg_conv = (
+        round(sum(d.get("convergence_score", 0) for d in discrepancies) / len(discrepancies))
+        if discrepancies else 0
+    )
+    max_kelly = max((d.get("kelly_fraction", 0) for d in discrepancies), default=0)
+
+    m6, m7, m8 = st.columns(3)
+    m6.metric("Premium Grades (A+/A)", f"{a_plus_count}")
+    m7.metric("Avg Convergence", f"{avg_conv}/100")
+    m8.metric("Max Kelly Sizing", f"{max_kelly:.2%}" if max_kelly > 0 else "—")
+
     if scan_time:
         st.caption(f"Last scan: {scan_time}")
 
@@ -581,11 +594,27 @@ if discrepancies or scan_time:
             # Probability bar color
             bar_color = "#c800ff" if max_prob >= 65 else "#00ff9d"
 
+            kelly = d.get("kelly_fraction", 0)
+            conv = d.get("convergence_score", 0)
+            grade = d.get("edge_grade", "?")
+            grade_label = d.get("edge_grade_label", "")
+
+            # Grade badge color
+            _grade_colors = {
+                "A+": "#c800ff", "A": "#00ff9d", "B+": "#00d4ff",
+                "B": "#4da6ff", "C": "#ffc107", "D": "#ff6b35", "F": "#ff4444",
+            }
+            grade_color = _grade_colors.get(grade, "#888")
+
             st.markdown(f"""
             <div class="god-mode-card">
                 <span class="badge-god">🔒 GOD MODE LOCK</span>
                 <span class="badge-edge">+{d['ev_edge']}% Edge</span>
                 <span class="badge-rec">▶ {side}</span>
+                <span style="background:{grade_color};color:#000;font-weight:700;padding:2px 8px;
+                       border-radius:4px;font-size:0.75rem;margin-left:6px;">
+                    {grade} — {grade_label}
+                </span>
                 <h3 style="margin:0.6rem 0 0.3rem 0; color:#fff;">
                     {player_esc} — {stat_esc} {d['true_line']}
                 </h3>
@@ -599,6 +628,10 @@ if discrepancies or scan_time:
                     (true edge +{true_edge}%)
                     &bull; {d['book_count']} books
                     {f'&bull; <span class="vig-tag">{vig:.1f}% vig</span>' if vig > 0 else ''}
+                </p>
+                <p style="margin:4px 0 0 0; color:#a0b4d0; font-size:0.82rem;">
+                    💰 Kelly: <strong>{kelly:.2%}</strong> of bankroll
+                    &bull; 📊 Convergence: <strong>{conv}/100</strong>
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -686,6 +719,9 @@ if discrepancies or scan_time:
                     "Vig%": d.get("vig_pct", 0),
                     "God Mode": "🔒" if d.get("is_god_mode_lock") else "",
                     "Books": d["book_count"],
+                    "Grade": d.get("edge_grade", "?"),
+                    "Kelly%": f"{d.get('kelly_fraction', 0):.2%}",
+                    "Conv.": d.get("convergence_score", 0),
                 })
             df_table = pd.DataFrame(table_data)
             st.dataframe(
@@ -726,11 +762,25 @@ if discrepancies or scan_time:
                 under_prob = d.get("best_under_implied_prob", 0)
                 _fp = d.get("fair_probability", 0)
                 _te = d.get("true_ev_edge", d["ev_edge"])
+                _grade = d.get("edge_grade", "?")
+                _grade_label = d.get("edge_grade_label", "")
+                _kelly = d.get("kelly_fraction", 0)
+                _conv = d.get("convergence_score", 0)
+
+                _grade_colors = {
+                    "A+": "#c800ff", "A": "#00ff9d", "B+": "#00d4ff",
+                    "B": "#4da6ff", "C": "#ffc107", "D": "#ff6b35", "F": "#ff4444",
+                }
+                _gc = _grade_colors.get(_grade, "#888")
 
                 st.markdown(f"""
                 <div class="{card_class}">
                     {badge}<span class="badge-edge">+{d['ev_edge']}% EV Edge</span>
                     {_rec_badge}
+                    <span style="background:{_gc};color:#000;font-weight:700;padding:2px 8px;
+                           border-radius:4px;font-size:0.72rem;margin-left:4px;">
+                        {_grade}
+                    </span>
                     <h4 style="margin:0.5rem 0 0.3rem 0; color:#fff;">
                         {player_esc} — {stat_esc} {d['true_line']}
                     </h4>
@@ -743,6 +793,11 @@ if discrepancies or scan_time:
                         &nbsp;&nbsp;|&nbsp;&nbsp;
                         📚 {d['book_count']} books
                         {f'&nbsp;&nbsp;|&nbsp;&nbsp; <span class="fair-prob-tag">{_fp:.1f}% fair</span>' if _fp > 0 else ''}
+                    </p>
+                    <p style="margin:4px 0 0 0; color:#8aa0c0; font-size:0.82rem;">
+                        💰 Kelly: <strong>{_kelly:.2%}</strong>
+                        &nbsp;|&nbsp; 📊 Conv: <strong>{_conv}/100</strong>
+                        &nbsp;|&nbsp; 🏆 {_grade_label}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)

@@ -706,6 +706,280 @@ class TestDevigEnhancedFields(unittest.TestCase):
                 "vig_pct",
             }
             self.assertTrue(new_keys.issubset(d.keys()))
+            # Win-rate enhancement keys must also be present
+            win_rate_keys = {
+                "kelly_fraction", "convergence_score",
+                "edge_grade", "edge_grade_label",
+            }
+            self.assertTrue(win_rate_keys.issubset(d.keys()))
+
+
+# ============================================================
+# 6. Kelly Criterion Bet Sizing tests
+# ============================================================
+
+class TestKellyFractionForEdge(unittest.TestCase):
+    """Tests for calculate_kelly_fraction_for_edge."""
+
+    def setUp(self):
+        from engine.arbitrage_matcher import calculate_kelly_fraction_for_edge
+        self.kelly = calculate_kelly_fraction_for_edge
+
+    def test_positive_edge_returns_positive(self):
+        """A 62.5% fair prob at -145 should yield a positive Kelly fraction."""
+        result = self.kelly(62.5, -145)
+        self.assertGreater(result, 0.0)
+        self.assertLessEqual(result, 0.05)
+
+    def test_no_edge_returns_zero(self):
+        """50% fair prob at -110 should yield 0 (no edge)."""
+        result = self.kelly(50.0, -110)
+        self.assertEqual(result, 0.0)
+
+    def test_none_inputs_return_zero(self):
+        """None inputs should gracefully return 0."""
+        self.assertEqual(self.kelly(None, -110), 0.0)
+        self.assertEqual(self.kelly(62.5, None), 0.0)
+        self.assertEqual(self.kelly(None, None), 0.0)
+
+    def test_positive_odds(self):
+        """Test with underdog odds (+130)."""
+        result = self.kelly(60.0, 130)
+        self.assertGreater(result, 0.0)
+        self.assertLessEqual(result, 0.05)
+
+    def test_capped_at_five_percent(self):
+        """Even extreme edges should be capped at 5% of bankroll."""
+        result = self.kelly(90.0, -110)
+        self.assertLessEqual(result, 0.05)
+
+    def test_zero_odds_returns_zero(self):
+        """Zero odds = invalid, should return 0."""
+        self.assertEqual(self.kelly(60.0, 0), 0.0)
+
+    def test_boundary_probability_100(self):
+        """100% fair prob = invalid, should return 0."""
+        self.assertEqual(self.kelly(100.0, -110), 0.0)
+
+    def test_boundary_probability_0(self):
+        """0% fair prob should return 0."""
+        self.assertEqual(self.kelly(0.0, -110), 0.0)
+
+    def test_higher_edge_yields_larger_kelly(self):
+        """Higher fair probability should yield larger Kelly fraction."""
+        low = self.kelly(57.0, -130)
+        high = self.kelly(65.0, -130)
+        self.assertGreater(high, low)
+
+    def test_return_type_is_float(self):
+        """Kelly fraction should always be a float."""
+        result = self.kelly(62.5, -145)
+        self.assertIsInstance(result, float)
+
+
+# ============================================================
+# 7. Convergence Score tests
+# ============================================================
+
+class TestConvergenceScore(unittest.TestCase):
+    """Tests for calculate_convergence_score."""
+
+    def setUp(self):
+        from engine.arbitrage_matcher import calculate_convergence_score
+        self.conv = calculate_convergence_score
+
+    def test_single_book_low_score(self):
+        """1 book with no devig should score low."""
+        result = self.conv(1, 0, 5.0)
+        self.assertLess(result, 30)
+
+    def test_many_books_high_score(self):
+        """5 books, 4 devig pairs, low vig should score high."""
+        result = self.conv(5, 4, 1.0)
+        self.assertGreater(result, 80)
+
+    def test_medium_scenario(self):
+        """3 books, 2 devig pairs, 3% vig should be medium."""
+        result = self.conv(3, 2, 3.0)
+        self.assertGreater(result, 40)
+        self.assertLess(result, 90)
+
+    def test_range_0_to_100(self):
+        """Score should always be 0-100."""
+        for books in range(1, 8):
+            for devig in range(0, books + 1):
+                for vig in [0, 2, 5, 10]:
+                    score = self.conv(books, devig, vig)
+                    self.assertGreaterEqual(score, 0)
+                    self.assertLessEqual(score, 100)
+
+    def test_more_books_increases_score(self):
+        """More books should generally increase score."""
+        low = self.conv(1, 1, 3.0)
+        high = self.conv(5, 1, 3.0)
+        self.assertGreater(high, low)
+
+    def test_more_devig_increases_score(self):
+        """More deviggable pairs should increase score."""
+        low = self.conv(3, 0, 3.0)
+        high = self.conv(3, 3, 3.0)
+        self.assertGreater(high, low)
+
+    def test_lower_vig_increases_score(self):
+        """Lower vig should increase score."""
+        low = self.conv(3, 2, 10.0)
+        high = self.conv(3, 2, 1.0)
+        self.assertGreater(high, low)
+
+    def test_return_type_is_int(self):
+        """Convergence score should be an integer."""
+        result = self.conv(3, 2, 3.0)
+        self.assertIsInstance(result, int)
+
+
+# ============================================================
+# 8. Edge Quality Grade tests
+# ============================================================
+
+class TestEdgeQualityGrade(unittest.TestCase):
+    """Tests for grade_edge_quality."""
+
+    def setUp(self):
+        from engine.arbitrage_matcher import grade_edge_quality
+        self.grade = grade_edge_quality
+
+    def test_returns_dict_with_required_keys(self):
+        """Grade output must have grade, label, score keys."""
+        result = self.grade(10.0, 8.0, 3, False, 0.01, 3.0)
+        self.assertIn("grade", result)
+        self.assertIn("label", result)
+        self.assertIn("score", result)
+
+    def test_high_edge_gets_premium_grade(self):
+        """Strong edge with god mode should get A or A+."""
+        result = self.grade(15.0, 12.0, 4, True, 0.02, 3.0)
+        self.assertIn(result["grade"], ("A+", "A"))
+
+    def test_moderate_edge_gets_C(self):
+        """Moderate edge should get around C."""
+        result = self.grade(8.0, 6.0, 2, False, 0.005, 5.0)
+        self.assertIn(result["grade"], ("C", "D"))
+
+    def test_perfect_edge_gets_A_plus(self):
+        """Maximum signals should get A+."""
+        result = self.grade(20.0, 18.0, 5, True, 0.04, 2.0)
+        self.assertEqual(result["grade"], "A+")
+
+    def test_marginal_edge_gets_D_or_F(self):
+        """Minimal edge with 1 book and high vig should be D or F."""
+        result = self.grade(7.0, 5.0, 1, False, 0.0, 8.0)
+        self.assertIn(result["grade"], ("D", "F"))
+
+    def test_god_mode_boosts_grade(self):
+        """God Mode should boost the grade vs identical non-God-Mode."""
+        no_god = self.grade(10.0, 8.0, 3, False, 0.01, 3.0)
+        with_god = self.grade(10.0, 8.0, 3, True, 0.01, 3.0)
+        self.assertGreaterEqual(with_god["score"], no_god["score"])
+
+    def test_score_range_0_to_100(self):
+        """Score should always be 0-100."""
+        for ev in [7, 10, 15, 20, 25]:
+            for true_ev in [5, 8, 12, 15]:
+                for books in [1, 2, 3, 5]:
+                    result = self.grade(ev, true_ev, books, False, 0.01, 3.0)
+                    self.assertGreaterEqual(result["score"], 0)
+                    self.assertLessEqual(result["score"], 100)
+
+    def test_grade_label_matches_grade(self):
+        """Grade and label should be consistent."""
+        grade_to_label = {
+            "A+": "Elite Edge",
+            "A": "Premium Edge",
+            "B+": "Strong Edge",
+            "B": "Solid Edge",
+            "C": "Moderate Edge",
+            "D": "Marginal Edge",
+            "F": "Weak Edge",
+        }
+        result = self.grade(15.0, 12.0, 4, True, 0.02, 3.0)
+        expected_label = grade_to_label.get(result["grade"])
+        if expected_label:
+            self.assertEqual(result["label"], expected_label)
+
+    def test_invalid_inputs_return_unknown(self):
+        """Invalid inputs should return ? grade gracefully."""
+        result = self.grade("invalid", "bad", "x", False, 0.0, 0.0)
+        self.assertEqual(result["grade"], "?")
+
+
+# ============================================================
+# 9. Integration: new fields in find_ev_discrepancies output
+# ============================================================
+
+class TestFindEvDiscrepanciesNewFields(unittest.TestCase):
+    """Verify the new win-rate enhancement fields in discrepancy output."""
+
+    def setUp(self):
+        from engine.arbitrage_matcher import find_ev_discrepancies
+        self.find = find_ev_discrepancies
+
+    def _make_strong_props(self):
+        """Create props guaranteed to produce a discrepancy."""
+        return [
+            {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
+             "platform": "DraftKings", "over_odds": -200, "under_odds": 120},
+            {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
+             "platform": "FanDuel", "over_odds": -190, "under_odds": 130},
+            {"player_name": "Big Star", "stat_type": "points", "line": 25.5,
+             "platform": "BetMGM", "over_odds": -180, "under_odds": 140},
+        ]
+
+    def test_kelly_fraction_present(self):
+        """Discrepancies must contain kelly_fraction field."""
+        result = self.find(self._make_strong_props())
+        if result:
+            self.assertIn("kelly_fraction", result[0])
+            self.assertIsInstance(result[0]["kelly_fraction"], float)
+            self.assertGreaterEqual(result[0]["kelly_fraction"], 0.0)
+            self.assertLessEqual(result[0]["kelly_fraction"], 0.05)
+
+    def test_convergence_score_present(self):
+        """Discrepancies must contain convergence_score field."""
+        result = self.find(self._make_strong_props())
+        if result:
+            self.assertIn("convergence_score", result[0])
+            self.assertIsInstance(result[0]["convergence_score"], int)
+            self.assertGreaterEqual(result[0]["convergence_score"], 0)
+            self.assertLessEqual(result[0]["convergence_score"], 100)
+
+    def test_edge_grade_present(self):
+        """Discrepancies must contain edge_grade and edge_grade_label fields."""
+        result = self.find(self._make_strong_props())
+        if result:
+            self.assertIn("edge_grade", result[0])
+            self.assertIn("edge_grade_label", result[0])
+            self.assertIn(result[0]["edge_grade"],
+                          ("A+", "A", "B+", "B", "C", "D", "F", "?"))
+
+    def test_multi_book_convergence_higher(self):
+        """3-book props should have higher convergence than 2-book."""
+        two_book = [
+            {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
+             "platform": "DraftKings", "over_odds": -190, "under_odds": 130},
+            {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
+             "platform": "FanDuel", "over_odds": -185, "under_odds": 135},
+        ]
+        three_book = two_book + [
+            {"player_name": "Player X", "stat_type": "rebounds", "line": 8.5,
+             "platform": "BetMGM", "over_odds": -195, "under_odds": 125},
+        ]
+        r2 = self.find(two_book)
+        r3 = self.find(three_book)
+        if r2 and r3:
+            self.assertGreaterEqual(
+                r3[0]["convergence_score"],
+                r2[0]["convergence_score"],
+            )
 
 
 if __name__ == "__main__":

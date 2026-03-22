@@ -311,6 +311,19 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
 
         display_name = canonical_names.get(norm_name, norm_name)
 
+        # ── 6c. Kelly fraction — optimal bet sizing ───────────────────
+        # Quarter-Kelly is the standard for retail bettors. This tells
+        # users *how much* to bet on each edge, not just *what* to bet.
+        kelly = calculate_kelly_fraction_for_edge(fair_prob, rec_odds)
+
+        # ── 6d. Convergence score — multi-book agreement strength ─────
+        conv = calculate_convergence_score(len(book_set), devig_count, vig)
+
+        # ── 6e. Edge quality grade ────────────────────────────────────
+        grade_info = grade_edge_quality(
+            ev_edge, true_ev_edge, len(book_set), is_god_mode, kelly, vig,
+        )
+
         discrepancies.append({
             "player_name": display_name,
             "stat_type": stat,
@@ -324,7 +337,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
             "ev_edge": ev_edge,
             "is_god_mode_lock": is_god_mode,
             "book_count": len(book_set),
-            # ── New devig-enhanced fields ─────────────────────────────
+            # ── Devig-enhanced fields ─────────────────────────────────
             "recommended_side": rec_side,
             "recommended_book": rec_book,
             "fair_probability": round(fair_prob, 2),
@@ -334,6 +347,11 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
             "consensus_fair_over": consensus_fair_over,
             "consensus_fair_under": consensus_fair_under,
             "vig_pct": vig,
+            # ── Win-rate enhancement fields ───────────────────────────
+            "kelly_fraction": kelly,
+            "convergence_score": conv,
+            "edge_grade": grade_info["grade"],
+            "edge_grade_label": grade_info["label"],
         })
 
     # ── 7. Sort by ev_edge descending ─────────────────────────────────
@@ -341,4 +359,199 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
 
     _logger.info("find_ev_discrepancies: %d props passed filter.", len(discrepancies))
     return discrepancies
+
+
+# ============================================================
+# SECTION: Kelly Criterion Bet Sizing for Vegas Vault
+# ============================================================
+
+def calculate_kelly_fraction_for_edge(fair_probability_pct, american_odds):
+    """Compute Quarter-Kelly fraction for a Vegas Vault discrepancy.
+
+    Uses the standard Kelly Criterion formula:
+        Full Kelly f = (p * b - q) / b
+    where p = win probability, q = 1 - p, b = net payout ratio.
+    Quarter-Kelly is f / 4 (recommended for retail bettors).
+
+    Parameters
+    ----------
+    fair_probability_pct : float
+        Devigged fair win probability (0-100 scale, e.g. 62.5).
+    american_odds : int or float or None
+        American odds on the recommended side (e.g. -145, +130).
+
+    Returns
+    -------
+    float
+        Quarter-Kelly fraction of bankroll to wager (0.0 to 0.05).
+        Capped at 5% max to prevent over-betting.
+        Returns 0.0 if inputs are invalid or edge is negative.
+    """
+    try:
+        if american_odds is None or fair_probability_pct is None:
+            return 0.0
+        p = float(fair_probability_pct) / 100.0
+        if p <= 0 or p >= 1:
+            return 0.0
+        odds = float(american_odds)
+        # Net payout ratio: how much you win per $1 wagered
+        if odds > 0:
+            b = odds / 100.0
+        elif odds < 0:
+            b = 100.0 / abs(odds)
+        else:
+            return 0.0
+        q = 1.0 - p
+        # Full Kelly
+        full_kelly = (p * b - q) / b if b > 0 else 0.0
+        if full_kelly <= 0:
+            return 0.0
+        # Quarter Kelly (conservative)
+        quarter_kelly = full_kelly / 4.0
+        # Cap at 5% of bankroll
+        return round(min(quarter_kelly, 0.05), 4)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return 0.0
+
+
+# ============================================================
+# END SECTION: Kelly Criterion Bet Sizing for Vegas Vault
+# ============================================================
+
+
+# ============================================================
+# SECTION: Convergence Score — Multi-Book Agreement
+# ============================================================
+
+def calculate_convergence_score(book_count, devig_count, vig_pct):
+    """Score how well multiple books converge on confirming this edge.
+
+    A higher convergence score means the edge is more likely real
+    (not a mispricing by one stale book).
+
+    Components:
+        - Book breadth (0-40): More books = more confirmation
+        - Devig depth (0-30): More deviggable pairs = better fair-prob estimate
+        - Vig tightness (0-30): Lower vig = sharper line = stronger signal
+
+    Parameters
+    ----------
+    book_count : int
+        Number of distinct sportsbooks pricing this prop.
+    devig_count : int
+        Number of books with both over/under odds (deviggable pairs).
+    vig_pct : float
+        Vig percentage on the recommended side (0-20 typical).
+
+    Returns
+    -------
+    int
+        Convergence score 0-100. Higher = more reliable edge.
+    """
+    try:
+        # Book breadth: 1 book = 0, 2 = 13, 3 = 27, 4 = 33, 5+ = 40
+        breadth = min(40, int(max(0, book_count - 1)) * 13)
+
+        # Devig depth: 0 deviggable = 0, 1 = 10, 2 = 20, 3+ = 30
+        depth = min(30, int(max(0, devig_count)) * 10)
+
+        # Vig tightness: 0% vig = 30, 5% = 15, 10%+ = 0
+        vig_val = max(0.0, float(vig_pct))
+        tightness = max(0, int(30 - vig_val * 3))
+
+        return min(100, breadth + depth + tightness)
+    except (TypeError, ValueError):
+        return 0
+
+
+# ============================================================
+# END SECTION: Convergence Score
+# ============================================================
+
+
+# ============================================================
+# SECTION: Edge Quality Grade
+# ============================================================
+
+# Grade thresholds — determines the A/B/C/D/F grade.
+_GRADE_THRESHOLDS = [
+    (85, "A+", "Elite Edge"),
+    (70, "A",  "Premium Edge"),
+    (55, "B+", "Strong Edge"),
+    (40, "B",  "Solid Edge"),
+    (25, "C",  "Moderate Edge"),
+    (10, "D",  "Marginal Edge"),
+    (0,  "F",  "Weak Edge"),
+]
+
+
+def grade_edge_quality(ev_edge, true_ev_edge, book_count, is_god_mode,
+                       kelly_fraction, vig_pct):
+    """Assign an A-F quality grade to a Vegas Vault discrepancy.
+
+    Combines multiple signals into a 0-100 quality score and maps it
+    to a letter grade for quick visual decision-making.
+
+    Score components (0-100):
+        - EV edge magnitude (0-30): Larger raw edge = better
+        - True edge magnitude (0-25): Devigged edge = real signal
+        - Book confirmation (0-15): More books = more reliable
+        - God Mode bonus (0-10): High-probability lock
+        - Kelly sizing (0-10): Positive Kelly = real +EV
+        - Vig penalty (0 to -10): High vig = noisy signal
+
+    Parameters
+    ----------
+    ev_edge : float
+        Raw EV edge percentage (7.0+).
+    true_ev_edge : float
+        Devigged true edge percentage.
+    book_count : int
+        Number of sportsbooks pricing this prop.
+    is_god_mode : bool
+        Whether any side has >= 60% implied probability.
+    kelly_fraction : float
+        Quarter-Kelly fraction (0.0 to 0.05).
+    vig_pct : float
+        Vig percentage on the recommended line.
+
+    Returns
+    -------
+    dict
+        {'grade': str, 'label': str, 'score': int}
+    """
+    try:
+        # EV edge: 7% → 9, 10% → 15, 15% → 25, 20%+ → 30
+        ev_score = min(30, max(0, int((float(ev_edge) - 5.0) * 2.0 + 5)))
+
+        # True edge: 5% → 6, 8% → 15, 12% → 25
+        true_score = min(25, max(0, int((float(true_ev_edge) - 3.0) * 3.0)))
+
+        # Book confirmation: 1 → 5, 2 → 10, 3+ → 15
+        book_score = min(15, max(0, int(book_count) * 5))
+
+        # God Mode bonus
+        god_bonus = 10 if is_god_mode else 0
+
+        # Kelly sizing: 0 = 0, 0.01 → 4, 0.02 → 8, 0.025+ → 10
+        kelly_score = min(10, int(float(kelly_fraction) * 400))
+
+        # Vig penalty: 0% = 0, 5% = -5, 10%+ = -10
+        vig_penalty = min(10, max(0, int(float(vig_pct))))
+
+        total = ev_score + true_score + book_score + god_bonus + kelly_score - vig_penalty
+        total = max(0, min(100, total))
+
+        for threshold, grade, label in _GRADE_THRESHOLDS:
+            if total >= threshold:
+                return {"grade": grade, "label": label, "score": total}
+
+        return {"grade": "F", "label": "Weak Edge", "score": 0}
+    except (TypeError, ValueError):
+        return {"grade": "?", "label": "Unknown", "score": 0}
+
+
+# ============================================================
+# END SECTION: Edge Quality Grade
+# ============================================================
 
