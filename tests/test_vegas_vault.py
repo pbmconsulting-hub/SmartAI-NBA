@@ -6,6 +6,7 @@ Tests for the Vegas Vault feature:
   - find_ev_discrepancies (engine/arbitrage_matcher)
   - joseph_vault_reaction (appended to joseph_brain)
   - pages/15_🎰_Vegas_Vault.py (file structure)
+  - implied_probability_to_american_odds (reverse converter)
 """
 
 import unittest
@@ -53,6 +54,16 @@ class TestCalculateImpliedProbability(unittest.TestCase):
         # -150 => 60%
         result = self.calc(-150)
         self.assertAlmostEqual(result, 60.0, delta=0.1)
+
+    def test_minus_300_is_75(self):
+        # -300 => 75%
+        result = self.calc(-300)
+        self.assertAlmostEqual(result, 75.0, delta=0.1)
+
+    def test_plus_200_is_33(self):
+        # +200 => 33.33%
+        result = self.calc(+200)
+        self.assertAlmostEqual(result, 33.33, delta=0.1)
 
 
 # ============================================================
@@ -184,6 +195,35 @@ class TestFindEvDiscrepancies(unittest.TestCase):
         if result:
             self.assertEqual(result[0]["book_count"], 3)
 
+    def test_missing_fields_skipped(self):
+        """Props with missing required fields should be silently skipped."""
+        props = [
+            {"player_name": "", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +100},
+            {"stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -200, "under_odds": +100},
+            {"player_name": "Test", "stat_type": "", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +100},
+        ]
+        # Should not crash, just skip invalid props
+        result = self.find(props)
+        self.assertIsInstance(result, list)
+
+    def test_ev_edge_value(self):
+        """Verify ev_edge is computed as max(implied_probs) - 50."""
+        props = [
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        if result:
+            d = result[0]
+            max_prob = max(d["best_over_implied_prob"], d["best_under_implied_prob"])
+            expected_edge = round(max_prob - 50.0, 2)
+            self.assertAlmostEqual(d["ev_edge"], expected_edge, places=1)
+
 
 # ============================================================
 # 3. joseph_vault_reaction tests
@@ -238,9 +278,87 @@ class TestJosephVaultReaction(unittest.TestCase):
         result = self.react([], mode="joseph")
         self.assertIsInstance(result, str)
 
+    def test_joseph_no_god_mode_still_works(self):
+        """Joseph mode without any god mode locks should still produce a rant."""
+        mock = [
+            {"ev_edge": 8.0, "is_god_mode_lock": False,
+             "best_over_implied_prob": 58.0, "best_under_implied_prob": 47.0},
+        ]
+        result = self.react(mock, mode="joseph")
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 20)
+        # Should NOT mention GOD MODE since none present
+        self.assertNotIn("GOD MODE", result)
+
+    def test_professor_references_top_edge(self):
+        """Professor mode should reference the top finding's probability."""
+        mock = [
+            {"ev_edge": 11.5, "is_god_mode_lock": True,
+             "best_over_implied_prob": 61.5, "best_under_implied_prob": 47.6},
+        ]
+        result = self.react(mock, mode="professor")
+        # Should mention the top probability or edge
+        self.assertTrue(
+            "61.5" in result or "11.5" in result,
+            f"Professor should reference specific numbers: {result}",
+        )
+
+    def test_multiple_discrepancies_count(self):
+        """Joseph mode should reference the count of discrepancies."""
+        mock = [
+            {"ev_edge": 11.0, "is_god_mode_lock": True,
+             "best_over_implied_prob": 61.0, "best_under_implied_prob": 47.0},
+            {"ev_edge": 9.0, "is_god_mode_lock": False,
+             "best_over_implied_prob": 59.0, "best_under_implied_prob": 46.0},
+            {"ev_edge": 8.0, "is_god_mode_lock": False,
+             "best_over_implied_prob": 58.0, "best_under_implied_prob": 45.0},
+        ]
+        result = self.react(mock, mode="joseph")
+        self.assertIn("3", result, f"Should mention count of 3: {result}")
+
 
 # ============================================================
-# 4. Vegas Vault page file structure tests
+# 4. Reverse odds converter tests
+# ============================================================
+
+class TestImpliedProbToAmericanOdds(unittest.TestCase):
+    """Tests for implied_probability_to_american_odds in odds_engine.py."""
+
+    def setUp(self):
+        from engine.odds_engine import implied_probability_to_american_odds
+        self.convert = implied_probability_to_american_odds
+
+    def test_favourite_60_pct(self):
+        # 60% => -150
+        result = self.convert(0.60)
+        self.assertAlmostEqual(result, -150.0, delta=1.0)
+
+    def test_underdog_40_pct(self):
+        # 40% => +150
+        result = self.convert(0.40)
+        self.assertAlmostEqual(result, 150.0, delta=1.0)
+
+    def test_even_50_pct(self):
+        # 50% should be around -100 or +100
+        result = self.convert(0.50)
+        self.assertAlmostEqual(abs(result), 100.0, delta=1.0)
+
+    def test_heavy_favourite(self):
+        # 75% => -300
+        result = self.convert(0.75)
+        self.assertAlmostEqual(result, -300.0, delta=1.0)
+
+    def test_roundtrip(self):
+        """Converting probability back to odds should be inverse of odds→prob."""
+        from data.odds_api_client import calculate_implied_probability
+        original_odds = -145
+        prob = calculate_implied_probability(original_odds) / 100.0
+        recovered_odds = self.convert(prob)
+        self.assertAlmostEqual(recovered_odds, float(original_odds), delta=1.0)
+
+
+# ============================================================
+# 5. Vegas Vault page file structure tests
 # ============================================================
 
 class TestVegasVaultPageFile(unittest.TestCase):
@@ -280,9 +398,99 @@ class TestVegasVaultPageFile(unittest.TestCase):
         self.assertIn("joseph_vault_reaction", source)
         self.assertIn("calculate_implied_probability", source)
 
+    def test_has_section_0_css(self):
+        """Page must have Section 0 with custom CSS."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("SECTION 0", source)
+        self.assertIn("<style>", source)
+        self.assertIn("god-mode-card", source)
+        self.assertIn("ev-card", source)
+
+    def test_has_section_1_header(self):
+        """Page must have Section 1 header."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("SECTION 1", source)
+        self.assertIn("vault-header", source)
+
+    def test_has_section_2_controls(self):
+        """Page must have Section 2 with sidebar controls."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("SECTION 2", source)
+        self.assertIn("st.sidebar", source)
+        self.assertIn("st.slider", source)
+
+    def test_has_section_3_results(self):
+        """Page must have Section 3 with scan logic and results."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("SECTION 3", source)
+        self.assertIn("find_ev_discrepancies", source)
+        self.assertIn("God Mode Locks", source)
+
+    def test_has_section_4_tools(self):
+        """Page must have Section 4 with implied probability calculator."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("SECTION 4", source)
+        self.assertIn("Calculator", source)
+        self.assertIn("st.tabs", source)
+
+    def test_has_premium_gate(self):
+        """Page must have premium gate."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("premium", source.lower())
+
+    def test_has_education_section(self):
+        """Page must have education/how-to section."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("How to Use", source)
+
+    def test_has_sidebar_filters(self):
+        """Page must have sidebar filter controls."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("Min EV Edge", source)
+        self.assertIn("Stat Type Filter", source)
+        self.assertIn("God Mode Locks Only", source)
+
+    def test_has_download_export(self):
+        """Page must have data export capability."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("download_button", source)
+
+    def test_has_data_table(self):
+        """Page must have tabular data display."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("st.dataframe", source)
+
+    def test_has_joseph_hero_banner(self):
+        """Page must render Joseph hero banner."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("render_joseph_hero_banner", source)
+
+    def test_has_reverse_odds_converter(self):
+        """Page must import the reverse odds converter."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("implied_probability_to_american_odds", source)
+
+    def test_has_ev_formula_reference(self):
+        """Page must have EV formula reference section."""
+        with open(self._PAGE_PATH, "r") as f:
+            source = f.read()
+        self.assertIn("EV Formula", source)
+
 
 # ============================================================
-# 5. arbitrage_matcher file structure tests
+# 6. arbitrage_matcher file structure tests
 # ============================================================
 
 class TestArbitrageMatcherFileStructure(unittest.TestCase):
@@ -298,6 +506,29 @@ class TestArbitrageMatcherFileStructure(unittest.TestCase):
             "engine", "arbitrage_matcher.py",
         )
         self.assertTrue(os.path.isfile(path))
+
+    def test_name_helpers_exist(self):
+        """Internal name normalization helpers should exist."""
+        from engine.arbitrage_matcher import _normalise_name, _names_match
+        self.assertTrue(callable(_normalise_name))
+        self.assertTrue(callable(_names_match))
+
+    def test_normalise_name(self):
+        from engine.arbitrage_matcher import _normalise_name
+        self.assertEqual(_normalise_name("LeBron James"), "lebron james")
+        self.assertEqual(_normalise_name("  L. James  "), "l james")
+
+    def test_names_match_exact(self):
+        from engine.arbitrage_matcher import _names_match
+        self.assertTrue(_names_match("LeBron James", "lebron james"))
+
+    def test_names_match_abbreviated(self):
+        from engine.arbitrage_matcher import _names_match
+        self.assertTrue(_names_match("LeBron James", "L. James"))
+
+    def test_names_no_match(self):
+        from engine.arbitrage_matcher import _names_match
+        self.assertFalse(_names_match("LeBron James", "Stephen Curry"))
 
 
 if __name__ == "__main__":
