@@ -565,8 +565,18 @@ class TestValidateVibeResponse(unittest.TestCase):
             "joseph_rant": "Test rant",
         }
         result = self.validate(data)
-        # Should be truncated to 5 words
+        # Headlines > 8 words get truncated to 5 words
         self.assertLessEqual(len(result["ticker_tape_headline"].split()), 5)
+
+    def test_headline_moderate_length_kept(self):
+        """Headlines with 6-8 words are allowed (flexibility zone)."""
+        data = {
+            "vibe_status": "Sweating",
+            "ticker_tape_headline": "one two three four five six",
+            "joseph_rant": "Test rant",
+        }
+        result = self.validate(data)
+        self.assertEqual(len(result["ticker_tape_headline"].split()), 6)
 
     def test_invalid_vibe_status(self):
         data = {

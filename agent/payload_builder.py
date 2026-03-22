@@ -297,11 +297,14 @@ def build_live_vibe_payload(
     if pace_result is not None and isinstance(pace_result, dict):
         pace_for_classify = pace_result
     else:
-        # UNDER cashing: the game must be over (Q4 with very little time
-        # or the period string hints at final) and current < line.
-        _is_late_game = period in ("4", "Q4", "OT", "OT1", "Final")
+        # UNDER cashing: the game must be over and current < line.
+        # Accept Q4/OT/OTn/Final with clock at "0:00", "", "00:00", or "Final".
+        _period_lower = str(period).strip().lower()
+        _is_late_game = _period_lower in ("4", "q4", "final") or _period_lower.startswith("ot")
+        _clock_stripped = str(clock).strip().lower()
+        _clock_done = _clock_stripped in ("", "0:00", "00:00", "0.0", "final")
         if direction == "UNDER":
-            _under_cashed = current < line and _is_late_game and clock in ("", "0:00", "Final")
+            _under_cashed = current < line and _is_late_game and _clock_done
         else:
             _under_cashed = False
 
