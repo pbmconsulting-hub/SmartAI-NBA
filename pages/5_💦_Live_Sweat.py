@@ -62,7 +62,7 @@ from data.live_tracker import (
     match_live_player,
 )
 from engine.live_math import calculate_live_pace, pace_color_tier
-from styles.live_theme import render_sweat_card
+from styles.live_theme import render_sweat_card, render_waiting_card
 from agent.live_persona import get_joseph_live_reaction, stream_joseph_text
 
 # ============================================================
@@ -108,6 +108,7 @@ _COMBO_STATS = {
     "points_assists":           ("pts", "ast"),
     "rebounds_assists":         ("reb", "ast"),
     "points_rebounds_assists":  ("pts", "reb", "ast"),
+    "blocks_steals":            ("blk", "stl"),
 }
 
 
@@ -194,6 +195,16 @@ if not active_bets:
 live_games = fetch_live_boxscores()
 all_live_players = get_all_live_players(live_games)
 
+# ── Last Refresh Timestamp ────────────────────────────────────
+
+_now = datetime.datetime.now()
+_refresh_col, _btn_col, _ = st.columns([2, 1, 3])
+with _refresh_col:
+    st.caption(f"🕐 Last refreshed: **{_now.strftime('%I:%M:%S %p')}**")
+with _btn_col:
+    if st.button("🔄 Refresh Now", key="manual_refresh"):
+        st.rerun()
+
 if not live_games:
     st.warning(
         "📡 No live games in progress right now.  "
@@ -205,14 +216,17 @@ if not live_games:
 cashed_count = 0
 tracking_count = 0
 risk_count = 0
+waiting_count = 0
 
 cards_html = ""
+waiting_html = ""
 vibe_checks: list[tuple[str, dict]] = []  # (player_name, pace_result)
 
 for bet in active_bets:
     player_name = bet.get("player_name", "")
     stat_type = bet.get("stat_type", "")
     target = float(bet.get("line", 0) or 0)
+    direction = str(bet.get("direction", "OVER")).upper()
 
     if not player_name or target <= 0:
         continue
@@ -220,6 +234,14 @@ for bet in active_bets:
     # Fuzzy-match the player in the live box score
     matched = match_live_player(player_name, all_live_players)
     if matched is None:
+        # Player not found in live data — show awaiting card
+        waiting_count += 1
+        waiting_html += render_waiting_card(
+            player_name=player_name,
+            stat_type=stat_type,
+            target_stat=target,
+            direction=direction,
+        )
         continue
 
     tracking_count += 1
@@ -244,9 +266,10 @@ for bet in active_bets:
         live_score_diff=score_diff,
         current_fouls=matched.get("fouls", 0),
         period=period,
+        direction=direction,
     )
 
-    color = pace_color_tier(pace["pct_of_target"])
+    color = pace_color_tier(pace["pct_of_target"], direction)
 
     if pace["cashed"]:
         cashed_count += 1
@@ -266,17 +289,21 @@ for bet in active_bets:
         foul_trouble=pace["foul_trouble"],
         cashed=pace["cashed"],
         minutes_played=pace["minutes_played"],
+        direction=direction,
+        minutes_remaining=pace["minutes_remaining"],
+        is_overtime=pace["is_overtime"],
     )
 
     vibe_checks.append((player_name, pace))
 
 # ── Top-Level Metrics ─────────────────────────────────────────
 
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("🎯 Active Bets", len(active_bets))
 c2.metric("📡 Tracking Live", tracking_count)
 c3.metric("✅ Cashed", cashed_count)
 c4.metric("🚨 At Risk", risk_count)
+c5.metric("🕐 Awaiting", waiting_count)
 
 st.divider()
 
@@ -293,6 +320,16 @@ elif live_games:
     st.info(
         "📊 No matching box-score data found for your active bets yet. "
         "Stats appear once games tip off and players check in."
+    )
+
+# ── Render awaiting tip-off cards ─────────────────────────────
+
+if waiting_html:
+    st.markdown(
+        '<div style="margin-top:8px;">'
+        '<div class="sweat-stat-label" style="margin-bottom:6px;">🕐 Awaiting Tip-Off</div>'
+        f'{waiting_html}</div>',
+        unsafe_allow_html=True,
     )
 
 # ============================================================

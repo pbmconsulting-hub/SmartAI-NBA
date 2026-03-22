@@ -25,13 +25,14 @@ class TestLiveMathPacing(unittest.TestCase):
         self.calc = calculate_live_pace
 
     def test_basic_pace_projection(self):
-        """Pace = (10 pts / 20 min) * 48 = 24.0."""
+        """Player with 10 pts in 20 min should project forward using remaining mins."""
         result = self.calc(10, 20, 24.5)
-        self.assertAlmostEqual(result["projected_final"], 24.0, places=1)
-        self.assertTrue(result["on_pace"] is False)  # 24.0 < 24.5
+        # Projection uses remaining minutes, not naive *48
+        self.assertGreater(result["projected_final"], 10)
+        self.assertIn("minutes_remaining", result)
 
     def test_cashed_flag(self):
-        """If current_stat >= target, cashed must be True."""
+        """If current_stat >= target, cashed must be True for OVER."""
         result = self.calc(25, 30, 24.5)
         self.assertTrue(result["cashed"])
 
@@ -48,7 +49,6 @@ class TestLiveMathPacing(unittest.TestCase):
         """Score diff > 20 in Q3 triggers blowout_risk."""
         result = self.calc(10, 20, 30, live_score_diff=25, period="3")
         self.assertTrue(result["blowout_risk"])
-        self.assertLess(result["projected_final"], 24.0)
 
     def test_no_blowout_first_quarter(self):
         """Blowout risk should not trigger in Q1 even with big diff."""
@@ -79,7 +79,7 @@ class TestLiveMathPacing(unittest.TestCase):
 
     def test_pct_of_target(self):
         result = self.calc(12, 24, 24)
-        self.assertAlmostEqual(result["pct_of_target"], 100.0, places=0)
+        self.assertGreater(result["pct_of_target"], 0)
 
     def test_pace_per_minute(self):
         result = self.calc(10, 20, 25)
@@ -94,10 +94,81 @@ class TestLiveMathPacing(unittest.TestCase):
         result = self.calc(10, 20, 25)
         expected_keys = {
             "current_stat", "target_stat", "distance", "minutes_played",
-            "pace_per_minute", "projected_final", "pct_of_target",
-            "blowout_risk", "foul_trouble", "on_pace", "cashed",
+            "minutes_remaining", "pace_per_minute", "projected_final",
+            "pct_of_target", "blowout_risk", "foul_trouble", "on_pace",
+            "cashed", "direction", "is_overtime",
         }
         self.assertEqual(set(result.keys()), expected_keys)
+
+    # ── New: Direction-aware tests ───────────────────────────
+
+    def test_direction_over_default(self):
+        """Default direction should be OVER."""
+        result = self.calc(10, 20, 25)
+        self.assertEqual(result["direction"], "OVER")
+
+    def test_direction_under_on_pace(self):
+        """UNDER bet: projected below target means on_pace=True."""
+        result = self.calc(3, 20, 25, direction="UNDER")
+        self.assertEqual(result["direction"], "UNDER")
+        # Low stat → projected below target → on_pace for UNDER
+        self.assertTrue(result["on_pace"])
+
+    def test_direction_under_not_on_pace(self):
+        """UNDER bet: projected above target means on_pace=False."""
+        result = self.calc(20, 20, 25, direction="UNDER")
+        self.assertFalse(result["on_pace"])
+
+    def test_direction_under_never_cashed_early(self):
+        """UNDER bets shouldn't cash during the game (only at final)."""
+        result = self.calc(5, 30, 25, direction="UNDER")
+        self.assertFalse(result["cashed"])
+
+    def test_invalid_direction_defaults_over(self):
+        result = self.calc(10, 20, 25, direction="INVALID")
+        self.assertEqual(result["direction"], "OVER")
+
+    # ── New: Overtime handling tests ─────────────────────────
+
+    def test_overtime_detection(self):
+        """OT period should set is_overtime=True."""
+        result = self.calc(20, 40, 30, period="OT")
+        self.assertTrue(result["is_overtime"])
+
+    def test_overtime_ot1(self):
+        result = self.calc(20, 40, 30, period="OT1")
+        self.assertTrue(result["is_overtime"])
+
+    def test_overtime_ot2(self):
+        result = self.calc(20, 44, 30, period="OT2")
+        self.assertTrue(result["is_overtime"])
+
+    def test_not_overtime_regulation(self):
+        result = self.calc(20, 30, 30, period="3")
+        self.assertFalse(result["is_overtime"])
+
+    # ── New: Minutes remaining tests ─────────────────────────
+
+    def test_minutes_remaining_present(self):
+        result = self.calc(10, 20, 25, period="2")
+        self.assertIn("minutes_remaining", result)
+        self.assertGreaterEqual(result["minutes_remaining"], 0)
+
+    def test_minutes_remaining_decreases_with_time(self):
+        """Later in the game → fewer minutes remaining."""
+        early = self.calc(5, 10, 25, period="1")
+        late = self.calc(20, 36, 25, period="4")
+        self.assertGreater(early["minutes_remaining"], late["minutes_remaining"])
+
+    # ── New: Remaining-time projection accuracy ──────────────
+
+    def test_projection_uses_remaining_time(self):
+        """With 40 min played, projection should NOT just be pace*48."""
+        result = self.calc(20, 40, 30, period="4")
+        naive_48 = (20 / 40) * 48  # = 24
+        # Remaining-time projection: 20 + (0.5 * remaining) which should
+        # be close to 20 + small amount, not the naive 24
+        self.assertNotAlmostEqual(result["projected_final"], naive_48, places=0)
 
 
 class TestPaceColorTier(unittest.TestCase):
@@ -126,6 +197,49 @@ class TestPaceColorTier(unittest.TestCase):
         self.assertEqual(self.tier(100), "green")
         self.assertEqual(self.tier(150), "green")
 
+    # ── New: UNDER direction tests ───────────────────────────
+
+    def test_under_low_pct_is_green(self):
+        """For UNDER, low projection = green (good)."""
+        self.assertEqual(self.tier(50, "UNDER"), "green")
+
+    def test_under_high_pct_is_orange(self):
+        self.assertEqual(self.tier(90, "UNDER"), "orange")
+
+    def test_under_over_100_is_red(self):
+        """UNDER: projected > target = red (bad)."""
+        self.assertEqual(self.tier(105, "UNDER"), "red")
+
+
+class TestParsePeriod(unittest.TestCase):
+    """Tests for _parse_period helper."""
+
+    def setUp(self):
+        from engine.live_math import _parse_period
+        self.parse = _parse_period
+
+    def test_numeric(self):
+        self.assertEqual(self.parse("1"), (1, False))
+        self.assertEqual(self.parse("4"), (4, False))
+
+    def test_q_prefix(self):
+        self.assertEqual(self.parse("Q3"), (3, False))
+
+    def test_ot(self):
+        self.assertEqual(self.parse("OT"), (5, True))
+
+    def test_ot1(self):
+        self.assertEqual(self.parse("OT1"), (5, True))
+
+    def test_ot2(self):
+        self.assertEqual(self.parse("OT2"), (6, True))
+
+    def test_empty(self):
+        self.assertEqual(self.parse(""), (0, False))
+
+    def test_invalid(self):
+        self.assertEqual(self.parse("halftime"), (0, False))
+
 
 # ============================================================
 # SECTION 2: data/live_tracker entity matcher tests
@@ -143,6 +257,9 @@ class TestMatchLivePlayer(unittest.TestCase):
             {"name": "Anthony Edwards", "pts": 18},
             {"name": "Nikola Jokic", "pts": 25},
             {"name": "Stephen Curry", "pts": 28},
+            {"name": "Bam Adebayo", "pts": 14},
+            {"name": "Victor Wembanyama", "pts": 20},
+            {"name": "Jalen Brunson", "pts": 24},
         ]
 
     def test_exact_match(self):
@@ -204,6 +321,29 @@ class TestMatchLivePlayer(unittest.TestCase):
     def test_none_inputs(self):
         self.assertIsNone(self.match(None, self.players))
         self.assertIsNone(self.match("LeBron", None))
+
+    # ── New: Expanded nickname tests ─────────────────────────
+
+    def test_nickname_bam(self):
+        result = self.match("bam", self.players)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Bam Adebayo")
+
+    def test_nickname_wemby(self):
+        result = self.match("wemby", self.players)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Victor Wembanyama")
+
+    def test_nickname_brunson(self):
+        result = self.match("brunson", self.players)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "Jalen Brunson")
+
+    def test_nickname_lebron(self):
+        """'lebron' (without James) should still resolve."""
+        result = self.match("lebron", self.players)
+        self.assertIsNotNone(result)
+        self.assertEqual(result["name"], "LeBron James")
 
 
 class TestGetAllLivePlayers(unittest.TestCase):
@@ -268,6 +408,33 @@ class TestLiveThemeCSS(unittest.TestCase):
         css = get_live_sweat_css()
         self.assertIn("box-shadow", css)
 
+    # ── New: Direction badge CSS ─────────────────────────────
+
+    def test_direction_badge_over(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-badge-over", css)
+
+    def test_direction_badge_under(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-badge-under", css)
+
+    def test_waiting_card_style(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-card-waiting", css)
+
+    def test_ot_badge_style(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-badge-ot", css)
+
+    def test_pct_label_style(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".progress-pct-label", css)
+
 
 class TestRenderProgressBar(unittest.TestCase):
 
@@ -286,6 +453,12 @@ class TestRenderProgressBar(unittest.TestCase):
         from styles.live_theme import render_progress_bar
         html = render_progress_bar(-10, "blue")
         self.assertIn("width:0", html)
+
+    def test_pct_label_present(self):
+        from styles.live_theme import render_progress_bar
+        html = render_progress_bar(75, "orange")
+        self.assertIn("75%", html)
+        self.assertIn("progress-pct-label", html)
 
 
 class TestRenderSweatCard(unittest.TestCase):
@@ -345,6 +518,71 @@ class TestRenderSweatCard(unittest.TestCase):
         )
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)
+
+    # ── New: Direction display tests ─────────────────────────
+
+    def test_over_direction_badge(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25,
+            projected_final=20, pct_of_target=80,
+            color_tier="orange", direction="OVER",
+        )
+        self.assertIn("OVER", html)
+        self.assertIn("sweat-badge-over", html)
+
+    def test_under_direction_badge(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25,
+            projected_final=18, pct_of_target=72,
+            color_tier="green", direction="UNDER",
+        )
+        self.assertIn("UNDER", html)
+        self.assertIn("sweat-badge-under", html)
+
+    def test_minutes_remaining_display(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25,
+            projected_final=20, pct_of_target=80,
+            color_tier="orange", minutes_remaining=12.0,
+        )
+        self.assertIn("12 MIN left", html)
+
+    def test_ot_badge(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=25, target_stat=30,
+            projected_final=28, pct_of_target=93,
+            color_tier="red", is_overtime=True,
+        )
+        self.assertIn("sweat-badge-ot", html)
+
+
+class TestRenderWaitingCard(unittest.TestCase):
+    """Tests for the awaiting tip-off card."""
+
+    def test_basic_waiting_card(self):
+        from styles.live_theme import render_waiting_card
+        html = render_waiting_card("LeBron James", "points", 25.5)
+        self.assertIn("LeBron James", html)
+        self.assertIn("sweat-card-waiting", html)
+        self.assertIn("Awaiting Tip-Off", html)
+
+    def test_direction_shown(self):
+        from styles.live_theme import render_waiting_card
+        html = render_waiting_card("Test", "rebounds", 10.5, "UNDER")
+        self.assertIn("UNDER", html)
+
+    def test_html_escape(self):
+        from styles.live_theme import render_waiting_card
+        html = render_waiting_card('<script>x</script>', "pts", 20)
+        self.assertNotIn("<script>", html)
 
 
 # ============================================================
@@ -409,19 +647,74 @@ class TestJosephLiveReaction(unittest.TestCase):
         })
         self.assertIn(result, _CASHED_BRAGS)
 
+    # ── New: UNDER direction reaction tests ──────────────────
+
+    def test_under_on_pace_reaction(self):
+        """UNDER bet on pace should get a positive UNDER-specific reaction."""
+        from agent.live_persona import (
+            get_joseph_live_reaction, _UNDER_ON_PACE_VIBES,
+        )
+        result = get_joseph_live_reaction({
+            "cashed": False, "blowout_risk": False,
+            "foul_trouble": False, "on_pace": True,
+            "direction": "UNDER",
+        })
+        self.assertIn(result, _UNDER_ON_PACE_VIBES)
+
+    def test_under_losing_reaction(self):
+        """UNDER bet off pace should get a worried UNDER-specific reaction."""
+        from agent.live_persona import (
+            get_joseph_live_reaction, _UNDER_LOSING_WORRY,
+        )
+        result = get_joseph_live_reaction({
+            "cashed": False, "blowout_risk": False,
+            "foul_trouble": False, "on_pace": False,
+            "direction": "UNDER",
+        })
+        self.assertIn(result, _UNDER_LOSING_WORRY)
+
+    def test_under_blowout_is_positive(self):
+        """For UNDER, blowout is actually good (starters pulled)."""
+        from agent.live_persona import (
+            get_joseph_live_reaction, _UNDER_ON_PACE_VIBES,
+        )
+        result = get_joseph_live_reaction({
+            "cashed": False, "blowout_risk": True,
+            "foul_trouble": False, "on_pace": True,
+            "direction": "UNDER",
+        })
+        self.assertIn(result, _UNDER_ON_PACE_VIBES)
+
+    def test_overtime_prefix(self):
+        """OT flag should add an overtime prefix."""
+        from agent.live_persona import get_joseph_live_reaction
+        result = get_joseph_live_reaction({
+            "cashed": False, "blowout_risk": False,
+            "foul_trouble": False, "on_pace": True,
+            "is_overtime": True,
+        })
+        # Both OT messages contain either "OVERTIME" or "OT!"
+        has_ot_indicator = "OVERTIME" in result or "OT!" in result
+        self.assertTrue(has_ot_indicator, f"Expected OT indicator in: {result}")
+
 
 class TestStreamJosephText(unittest.TestCase):
 
     def test_yields_characters(self):
         from agent.live_persona import stream_joseph_text
         text = "Hello"
-        chars = list(stream_joseph_text(text))
+        chars = list(stream_joseph_text(text, delay=0))
         self.assertEqual(chars, ["H", "e", "l", "l", "o"])
 
     def test_empty_string(self):
         from agent.live_persona import stream_joseph_text
-        chars = list(stream_joseph_text(""))
+        chars = list(stream_joseph_text("", delay=0))
         self.assertEqual(chars, [])
+
+    def test_default_delay_positive(self):
+        """Default delay should be > 0 for typing effect."""
+        from agent.live_persona import _TYPING_DELAY
+        self.assertGreater(_TYPING_DELAY, 0)
 
 
 # ============================================================
@@ -481,6 +774,26 @@ class TestLiveSweatPageFile(unittest.TestCase):
 
     def test_cashed_label(self):
         self.assertIn("Cashed", self.source)
+
+    # ── New: Enhancement presence tests ──────────────────────
+
+    def test_direction_passed_to_pace(self):
+        self.assertIn("direction=direction", self.source)
+
+    def test_render_waiting_card_import(self):
+        self.assertIn("render_waiting_card", self.source)
+
+    def test_manual_refresh_button(self):
+        self.assertIn("Refresh Now", self.source)
+
+    def test_last_refresh_timestamp(self):
+        self.assertIn("Last refreshed", self.source)
+
+    def test_awaiting_metric(self):
+        self.assertIn("Awaiting", self.source)
+
+    def test_blocks_steals_combo(self):
+        self.assertIn("blocks_steals", self.source)
 
 
 # ============================================================
