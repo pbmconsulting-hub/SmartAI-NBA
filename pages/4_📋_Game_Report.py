@@ -575,6 +575,37 @@ with _tab_report:
                 st.markdown("#### 📊 Team Stats & Game Prediction")
                 _render_game_team_stats(game, game_pred)
 
+                # ── Show Odds API consensus lines if available ─────────
+                _bk_count = game.get("bookmaker_count", 0)
+                if _bk_count > 0:
+                    _cons_spread = game.get("consensus_spread")
+                    _cons_total  = game.get("consensus_total")
+                    _ml_home     = game.get("moneyline_home")
+                    _ml_away     = game.get("moneyline_away")
+                    _sr          = game.get("spread_range", (None, None)) or (None, None)
+                    _tr          = game.get("total_range", (None, None)) or (None, None)
+
+                    def _fmt_ml_gr(ml):
+                        if ml is None:
+                            return "—"
+                        v = round(float(ml))
+                        return f"+{v}" if v > 0 else str(v)
+
+                    _oc1, _oc2, _oc3, _oc4 = st.columns(4)
+                    _oc1.metric(
+                        "Consensus Spread",
+                        f"{_cons_spread:+.1f}" if _cons_spread is not None else "—",
+                        help=f"Range across {_bk_count} books: {_sr[0]:+.1f} to {_sr[1]:+.1f}" if (_sr[0] is not None and _sr[1] is not None) else f"From {_bk_count} books",
+                    )
+                    _oc2.metric(
+                        "Consensus O/U",
+                        f"{_cons_total:.1f}" if _cons_total is not None else "—",
+                        help=f"Range: {_tr[0]:.1f} to {_tr[1]:.1f}" if (_tr[0] is not None and _tr[1] is not None) else f"From {_bk_count} books",
+                    )
+                    _oc3.metric(f"{home} Moneyline", _fmt_ml_gr(_ml_home), help="Consensus across all bookmakers")
+                    _oc4.metric(f"{away} Moneyline", _fmt_ml_gr(_ml_away), help="Consensus across all bookmakers")
+                    st.caption(f"📚 Consensus from {_bk_count} bookmakers via The Odds API")
+
                 if game_pred:
                     # Rich multi-metric caption if engine provided full output
                     _home_wp  = game_pred.get("home_win_probability")

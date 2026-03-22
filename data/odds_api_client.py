@@ -494,3 +494,122 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
     except Exception as exc:
         _logger.warning("fetch_player_props failed: %s", exc)
         return []
+
+
+# ── Consensus odds helpers ────────────────────────────────────────────────────
+
+def _median(values: list) -> float | None:
+    """Return median of a numeric list, or None for empty/invalid input."""
+    clean = [v for v in values if v is not None]
+    if not clean:
+        return None
+    s = sorted(clean)
+    mid = len(s) // 2
+    if len(s) % 2 == 0:
+        return (s[mid - 1] + s[mid]) / 2.0
+    return float(s[mid])
+
+
+def get_consensus_odds(games_odds: list[dict] | None = None,
+                       api_key: str | None = None) -> dict:
+    """
+    Compute consensus Vegas lines from raw Odds API bookmaker data.
+
+    Uses the median across all bookmakers offering each market. Returns a
+    dict keyed by a normalised "(away_team) @ (home_team)" matchup string
+    *and* by each team abbreviation for easy lookup.
+
+    Args:
+        games_odds: Output of fetch_game_odds(). If None, calls
+                    fetch_game_odds() internally.
+        api_key:    Passed through to fetch_game_odds() if called internally.
+
+    Returns:
+        dict: Keyed by ``"HOME_TEAM"`` or ``"AWAY_TEAM"`` abbreviation
+              (upper-case, ClearSports-style) with sub-dicts:
+
+            {
+                "home_team": str,
+                "away_team": str,
+                "consensus_spread": float | None,   # home spread, e.g. -3.5
+                "consensus_total":  float | None,   # over/under
+                "moneyline_home":   float | None,   # american odds
+                "moneyline_away":   float | None,
+                "bookmaker_count":  int,             # how many books offered
+                "spread_range":     tuple,           # (min, max) spread across books
+                "total_range":      tuple,           # (min, max) total across books
+            }
+    """
+    if games_odds is None:
+        games_odds = fetch_game_odds(api_key=api_key)
+
+    if not games_odds:
+        return {}
+
+    result: dict = {}
+
+    for game in games_odds:
+        home_full = str(game.get("home_team", "")).strip()
+        away_full = str(game.get("away_team", "")).strip()
+        bookmakers = game.get("bookmakers", [])
+
+        if not bookmakers:
+            continue
+
+        spreads_home: list[float] = []
+        totals: list[float] = []
+        ml_home: list[float] = []
+        ml_away: list[float] = []
+
+        for bm in bookmakers:
+            mkts = bm.get("markets", {})
+
+            # Spread: Odds API uses home team name as key
+            sp = mkts.get("spreads", {})
+            if sp and home_full in sp:
+                try:
+                    spreads_home.append(float(sp[home_full]))
+                except (TypeError, ValueError):
+                    pass
+
+            # Totals: sum (over) is the relevant market
+            tot = mkts.get("totals", {})
+            for val in tot.values():
+                try:
+                    totals.append(float(val))
+                    break  # One "Over" value per book is enough
+                except (TypeError, ValueError):
+                    pass
+
+            # Moneyline
+            h2h = mkts.get("h2h", {})
+            if home_full in h2h:
+                try:
+                    ml_home.append(float(h2h[home_full]))
+                except (TypeError, ValueError):
+                    pass
+            if away_full in h2h:
+                try:
+                    ml_away.append(float(h2h[away_full]))
+                except (TypeError, ValueError):
+                    pass
+
+        consensus = {
+            "home_team":        home_full,
+            "away_team":        away_full,
+            "consensus_spread": _median(spreads_home),
+            "consensus_total":  _median(totals),
+            "moneyline_home":   _median(ml_home),
+            "moneyline_away":   _median(ml_away),
+            "bookmaker_count":  len(bookmakers),
+            "spread_range":     (min(spreads_home), max(spreads_home)) if spreads_home else (None, None),
+            "total_range":      (min(totals), max(totals)) if totals else (None, None),
+        }
+
+        # Index by both team name components so callers can look up by team abbrev
+        # The full team names from Odds API (e.g. "Los Angeles Lakers") will be
+        # normalised to abbreviations by the caller using NBA_TEAM_NAME_TO_ABBREV.
+        result[home_full] = consensus
+        result[away_full] = consensus
+
+    return result

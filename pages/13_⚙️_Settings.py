@@ -461,10 +461,12 @@ st.markdown(get_education_box_html(
     "📖 API Keys for Live Data",
     """
     <strong>The Odds API</strong> provides player props from all major US sportsbooks 
-    (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one unified call.
+    (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one unified call. Also provides 
+    game-level moneylines, spreads, and totals from 15+ bookmakers — used for consensus 
+    Vegas line calculation and market movement tracking.
     <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">Free tier: 500 req/month</a>.<br><br>
     <strong>ClearSports API</strong> provides NBA games, player stats, team stats, injuries, 
-    and rosters. 
+    rosters, live scores, standings, and player news.
     <a href="https://clearsportsapi.com" target="_blank" style="color:#00f0ff;">Free tier: 1,000 req/month</a>.<br><br>
     Keys are stored only in this browser session and never saved to disk.
     """

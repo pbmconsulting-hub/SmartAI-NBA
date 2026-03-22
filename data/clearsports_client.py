@@ -584,3 +584,170 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
     except Exception as exc:
         _logger.warning("fetch_player_game_log failed for player_id=%s: %s", player_id, exc)
         return []
+
+
+def fetch_standings() -> list[dict]:
+    """
+    Fetch current NBA standings from ClearSports API.
+
+    Returns a list of team standing entries including conference rank,
+    win-loss record, home/away splits, last-10 record, and streak.
+    Falls back to an empty list if the API is unavailable.
+
+    Returns:
+        list[dict]: Each entry has (at minimum):
+            {
+                "team_abbreviation": str,
+                "conference": "East"|"West",
+                "conference_rank": int,
+                "wins": int,
+                "losses": int,
+                "win_pct": float,
+                "home_wins": int, "home_losses": int,
+                "away_wins": int, "away_losses": int,
+                "last_10_wins": int, "last_10_losses": int,
+                "streak": str,          # e.g. "W3" or "L1"
+                "games_back": float,
+            }
+    """
+    api_key = _resolve_api_key()
+    if not api_key:
+        _logger.debug("fetch_standings: no ClearSports API key — returning []")
+        return []
+
+    url = f"{_BASE_URL}/nba/standings"
+    params = {"apiKey": api_key}
+    cache_key = f"{url}?season=current"
+
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        data = _fetch_with_retry(url, params=params)
+        if not data:
+            return []
+
+        rows_raw = (
+            data if isinstance(data, list)
+            else data.get("standings", data.get("data", []))
+        )
+
+        standings = []
+        for row in rows_raw:
+            abbrev = _safe_str(
+                row.get("teamAbbreviation", row.get("team_abbreviation",
+                row.get("abbreviation", row.get("team", ""))))
+            ).upper().strip()
+
+            if not abbrev:
+                continue
+
+            def _wl(field, default=0):
+                raw = row.get(field, default)
+                try:
+                    return int(float(str(raw))) if raw is not None else default
+                except (ValueError, TypeError):
+                    return default
+
+            w  = _wl("wins",  _wl("W", 0))
+            l  = _wl("losses", _wl("L", 0))
+            hw = _wl("homeWins",  _wl("home_wins", 0))
+            hl = _wl("homeLosses", _wl("home_losses", 0))
+            aw = _wl("awayWins",  _wl("away_wins", 0))
+            al = _wl("awayLosses", _wl("away_losses", 0))
+            l10w = _wl("last10Wins",   _wl("last_10_wins", 0))
+            l10l = _wl("last10Losses", _wl("last_10_losses", 0))
+            total = w + l
+            win_pct = round(w / total, 3) if total else 0.0
+
+            standings.append({
+                "team_abbreviation": abbrev,
+                "conference": _safe_str(row.get("conference", row.get("conf", ""))),
+                "conference_rank": _wl("conferenceRank", _wl("rank", 0)),
+                "wins": w,
+                "losses": l,
+                "win_pct": win_pct,
+                "home_wins": hw,
+                "home_losses": hl,
+                "away_wins": aw,
+                "away_losses": al,
+                "last_10_wins": l10w,
+                "last_10_losses": l10l,
+                "streak": _safe_str(row.get("streak", "")),
+                "games_back": _safe_float(row.get("gamesBack", row.get("games_back", 0.0))),
+            })
+
+        _cache_set(cache_key, standings)
+        _logger.info("fetch_standings: %d teams returned.", len(standings))
+        return standings
+
+    except Exception as exc:
+        _logger.warning("fetch_standings failed: %s", exc)
+        return []
+
+
+def fetch_news(limit: int = 20) -> list[dict]:
+    """
+    Fetch recent NBA player/team news from ClearSports API.
+
+    Useful for Joseph M. Smith's contextual commentary and for
+    surfacing injury updates, trade news, and performance notes.
+
+    Args:
+        limit: Maximum number of news items to return (default: 20).
+
+    Returns:
+        list[dict]: News items, each with (at minimum):
+            {
+                "title": str,
+                "body": str,
+                "player_name": str,     # Empty if team-level news
+                "team_abbreviation": str,
+                "published_at": str,    # ISO datetime
+                "category": str,        # "injury", "trade", "performance", etc.
+                "impact": str,          # "high", "medium", "low" or empty
+            }
+    """
+    api_key = _resolve_api_key()
+    if not api_key:
+        _logger.debug("fetch_news: no ClearSports API key — returning []")
+        return []
+
+    url = f"{_BASE_URL}/nba/news"
+    params = {"apiKey": api_key, "limit": limit}
+    cache_key = f"{url}?limit={limit}"
+
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        data = _fetch_with_retry(url, params=params)
+        if not data:
+            return []
+
+        items_raw = (
+            data if isinstance(data, list)
+            else data.get("news", data.get("articles", data.get("data", [])))
+        )
+
+        news = []
+        for item in items_raw[:limit]:
+            news.append({
+                "title":            _safe_str(item.get("title", item.get("headline", ""))),
+                "body":             _safe_str(item.get("body", item.get("description", item.get("content", "")))),
+                "player_name":      _safe_str(item.get("playerName", item.get("player_name", item.get("player", "")))),
+                "team_abbreviation":_safe_str(item.get("teamAbbreviation", item.get("team", ""))).upper(),
+                "published_at":     _safe_str(item.get("publishedAt", item.get("published_at", item.get("date", "")))),
+                "category":         _safe_str(item.get("category", item.get("type", ""))).lower(),
+                "impact":           _safe_str(item.get("impact", item.get("severity", ""))).lower(),
+            })
+
+        _cache_set(cache_key, news)
+        _logger.info("fetch_news: %d items returned.", len(news))
+        return news
+
+    except Exception as exc:
+        _logger.warning("fetch_news failed: %s", exc)
+        return []

@@ -254,6 +254,12 @@ TEAM_CONFERENCE = {
 # END SECTION: NBA Team Abbreviation Mapping
 # ============================================================
 
+# Pre-built lowercase reverse lookup: "los angeles lakers" → "LAL"
+# Built once at module load time to avoid O(n²) lookups in _enrich_games_with_odds_api.
+_TEAM_NAME_LOWER_TO_ABBREV: dict = {
+    name.lower(): abbr for name, abbr in TEAM_NAME_TO_ABBREVIATION.items()
+}
+
 
 # ============================================================
 # SECTION: Timestamp Functions
@@ -510,26 +516,121 @@ def _deduplicate_games(games: list) -> list:
     return unique
 
 
+def _enrich_games_with_odds_api(games: list) -> list:
+    """
+    Enrich a list of game dicts with consensus Vegas lines from The Odds API.
+
+    For each game, computes the median spread/total/moneyline across all
+    bookmakers (DraftKings, FanDuel, BetMGM, Caesars, etc.) and:
+      - Fills in ``vegas_spread`` when ClearSports returned 0 or None
+      - Fills in ``game_total`` when ClearSports returned 0 or 220 (default)
+      - Adds ``moneyline_home``, ``moneyline_away``, ``consensus_spread``,
+        ``consensus_total``, ``bookmaker_count`` to every game dict
+
+    Falls back gracefully — if The Odds API key is missing or the call
+    fails, the original games list is returned unchanged.
+
+    Args:
+        games: List of game dicts from ClearSports (or anywhere).
+
+    Returns:
+        list: Same games, enriched in-place with consensus odds fields.
+    """
+    if not games:
+        return games
+
+    try:
+        from data.odds_api_client import get_consensus_odds as _get_consensus
+        consensus_map = _get_consensus()  # uses session state / env key
+    except Exception as exc:
+        _logger.debug("_enrich_games_with_odds_api: Odds API unavailable — %s", exc)
+        return games
+
+    if not consensus_map:
+        return games
+
+    # Build abbrev → consensus entry using pre-built lowercase reverse lookup.
+    # The Odds API uses full team names (e.g. "Los Angeles Lakers"),
+    # so we normalise them through _TEAM_NAME_LOWER_TO_ABBREV (built once at
+    # module load time for O(1) lookups).
+    abbrev_consensus: dict = {}
+    for full_name, entry in consensus_map.items():
+        name_lower = full_name.lower().strip()
+        abbrev = (_TEAM_NAME_LOWER_TO_ABBREV.get(name_lower) or "").upper().strip()
+        if abbrev:
+            abbrev_consensus[abbrev] = entry
+        else:
+            # Try partial-match fallback (rare: Odds API name slightly different)
+            for tm_lower, tm_abbr in _TEAM_NAME_LOWER_TO_ABBREV.items():
+                if name_lower in tm_lower or tm_lower in name_lower:
+                    abbrev_consensus[tm_abbr] = entry
+                    break
+
+    for game in games:
+        home = str(game.get("home_team", "")).upper().strip()
+        entry = abbrev_consensus.get(home)
+        if entry is None:
+            away = str(game.get("away_team", "")).upper().strip()
+            entry = abbrev_consensus.get(away)
+        if entry is None:
+            continue
+
+        cs = entry.get("consensus_spread")
+        ct = entry.get("consensus_total")
+
+        # Always add the consensus/moneyline fields for downstream use
+        game["consensus_spread"]  = cs
+        game["consensus_total"]   = ct
+        game["moneyline_home"]    = entry.get("moneyline_home")
+        game["moneyline_away"]    = entry.get("moneyline_away")
+        game["bookmaker_count"]   = entry.get("bookmaker_count", 0)
+        game["spread_range"]      = entry.get("spread_range", (None, None))
+        game["total_range"]       = entry.get("total_range", (None, None))
+
+        # Override ClearSports spread/total when it's missing (0 or default 220)
+        current_spread = float(game.get("vegas_spread") or 0)
+        current_total  = float(game.get("game_total")  or 0)
+
+        if cs is not None and current_spread == 0.0:
+            game["vegas_spread"] = round(float(cs), 1)
+
+        if ct is not None and (current_total == 0.0 or current_total == 220.0):
+            game["game_total"] = round(float(ct), 1)
+
+    _logger.info(
+        "_enrich_games_with_odds_api: enriched %d game(s) with Odds API consensus.",
+        sum(1 for g in games if g.get("bookmaker_count", 0) > 0),
+    )
+    return games
+
+
 def fetch_todays_games():
     """
-    Fetch tonight's NBA games via ClearSports API.
+    Fetch tonight's NBA games via ClearSports API, then enrich with
+    consensus Vegas lines from The Odds API (spread, total, moneyline).
 
     Returns:
         list of dict: Tonight's games, each with home_team, away_team,
-                      team records, and default Vegas lines.
-                      Returns empty list if the fetch fails.
+                      team records, and Vegas lines from Odds API consensus.
+                      Returns empty list if all fetches fail.
     """
+    games = []
     try:
         from data.clearsports_client import fetch_games_today as _cs_games
-        games = _cs_games()
+        games = _cs_games() or []
         if games:
             _logger.info(f"ClearSports: {len(games)} game(s) found.")
-            return _deduplicate_games(games)
+            games = _deduplicate_games(games)
     except Exception as err:
         _logger.warning(f"ClearSports games fetch failed: {err}")
 
-    _logger.warning("ClearSports game fetch failed. No games available.")
-    return []
+    # Enrich every game with Odds API consensus lines (moneyline + spread + total)
+    games = _enrich_games_with_odds_api(games)
+
+    if not games:
+        _logger.warning("No games available from any source.")
+
+    return games
 
 # ============================================================
 # END SECTION: Today's Games Fetcher
@@ -1187,6 +1288,13 @@ def fetch_all_todays_data(progress_callback=None):
     if progress_callback:
         progress_callback(40, 40, "✅ All done! Games, players, team stats, and injury status loaded.")
 
+    # --------------------------------------------------------
+    # Bonus: Record market movement snapshots from Odds API
+    # This runs silently after the main data fetch — it's optional
+    # and won't block or fail the main results.
+    # --------------------------------------------------------
+    _record_odds_api_snapshots(results["games"])
+
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]
     games_count = len(results["games"])
@@ -1277,4 +1385,132 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 
 # ============================================================
 # END SECTION: Dynamic CV Estimation Helper
+# ============================================================
+
+
+# ============================================================
+# SECTION: Odds API Market Movement Snapshot Recorder
+# Records prop line snapshots for market movement tracking.
+# Called automatically by fetch_all_todays_data() each time
+# the data is refreshed, building a historical trail for line
+# movement analysis.
+# ============================================================
+
+def _record_odds_api_snapshots(games: list | None = None) -> None:
+    """
+    Record prop line snapshots from The Odds API for market movement tracking.
+
+    Fetches current player props from all bookmakers and stores them via
+    engine.market_movement.track_line_snapshot(). These snapshots build
+    the historical trail used by engine.market_movement.detect_line_movement()
+    to identify sharp money, steam moves, and line drift.
+
+    This function is non-blocking: all errors are caught and logged. It
+    will silently skip if no Odds API key is configured.
+
+    Args:
+        games: Optional list of game dicts (for logging context only).
+    """
+    try:
+        from data.odds_api_client import fetch_player_props as _fetch_props
+        from engine.market_movement import track_line_snapshot as _snapshot
+    except ImportError:
+        return  # Engine or client not available — skip silently
+
+    try:
+        props = _fetch_props()
+        if not props:
+            return
+
+        recorded = 0
+        for prop in props:
+            player_name = prop.get("player_name", "")
+            stat_type   = prop.get("stat_type", "")
+            platform    = prop.get("platform", "")
+            line        = prop.get("line")
+
+            if not (player_name and stat_type and line is not None):
+                continue
+
+            try:
+                line_val = float(line)
+                _snapshot(
+                    player_name=player_name,
+                    stat_type=stat_type,
+                    platform=platform,
+                    line_value=line_val,
+                )
+                recorded += 1
+            except Exception:
+                continue
+
+        _logger.info(
+            "_record_odds_api_snapshots: recorded %d prop line snapshots.", recorded
+        )
+    except Exception as exc:
+        _logger.debug("_record_odds_api_snapshots: skipped — %s", exc)
+
+
+def fetch_standings(progress_callback=None) -> list[dict]:
+    """
+    Fetch current NBA standings from ClearSports API.
+
+    Returns a list of team standing entries including conference rank,
+    win-loss record, home/away splits, last-10 record, and streak.
+    Falls back to an empty list if the API is unavailable.
+
+    Args:
+        progress_callback: Optional callable(current, total, message).
+
+    Returns:
+        list[dict]: Each entry has team_abbreviation, conference,
+                    conference_rank, wins, losses, win_pct, streak, etc.
+    """
+    if progress_callback:
+        progress_callback(0, 10, "Fetching NBA standings from ClearSports...")
+
+    try:
+        from data.clearsports_client import fetch_standings as _cs_standings
+        standings = _cs_standings()
+        if progress_callback:
+            progress_callback(10, 10, f"Standings loaded ({len(standings)} teams).")
+        return standings
+    except Exception as exc:
+        _logger.warning("fetch_standings failed: %s", exc)
+        return []
+
+
+def fetch_player_news(player_name: str | None = None, limit: int = 20) -> list[dict]:
+    """
+    Fetch recent NBA news from ClearSports API, optionally filtered to
+    a specific player.
+
+    Useful for enriching Joseph M. Smith's contextual commentary with
+    the latest injury updates, trade news, and performance notes.
+
+    Args:
+        player_name: Optional player name to filter results.
+        limit:       Maximum number of news items to return.
+
+    Returns:
+        list[dict]: News items with title, body, player_name, team_abbreviation,
+                    published_at, category, impact.
+    """
+    try:
+        from data.clearsports_client import fetch_news as _cs_news
+        all_news = _cs_news(limit=limit)
+        if player_name:
+            target = player_name.lower().strip()
+            all_news = [
+                item for item in all_news
+                if target in item.get("player_name", "").lower()
+                or target in item.get("title", "").lower()
+            ]
+        return all_news
+    except Exception as exc:
+        _logger.warning("fetch_player_news failed: %s", exc)
+        return []
+
+# ============================================================
+# END SECTION: Odds API Market Movement Snapshot Recorder
 # ============================================================
