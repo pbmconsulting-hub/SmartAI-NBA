@@ -541,12 +541,12 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
                       pts, reb, ast, stl, blk, tov, fg3m, ft_pct.
                       Returns empty list if the fetch fails.
     """
-    api_key = _get_api_key()
+    api_key = _resolve_api_key()
     if not api_key:
         _logger.warning("ClearSports API key not configured — cannot fetch player game log.")
         return []
 
-    url = f"{CLEARSPORTS_BASE_URL}/nba/players/{player_id}/game_log"
+    url = f"{_BASE_URL}/nba/players/{player_id}/game_log"
     params = {"apiKey": api_key, "last_n": last_n_games}
     cache_key = f"{url}?player_id={player_id}&last_n={last_n_games}"
 
