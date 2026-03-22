@@ -501,7 +501,6 @@ if current_action:
                 _usage = get_odds_api_usage()
                 _remaining = _usage.get("requests_remaining")
                 if _remaining is not None:
-                    _q_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
                     st.caption(
                         f"📡 Odds API quota: **{_remaining:,}** requests remaining"
                     )
