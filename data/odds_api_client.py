@@ -759,3 +759,14 @@ def fetch_recent_scores(days_from: int = 1,
     except Exception as exc:
         _logger.warning("fetch_recent_scores failed: %s", exc)
         return []
+
+
+# ── Vegas Vault helper ────────────────────────────────────────────────────────
+
+def calculate_implied_probability(american_odds: float) -> float:
+    """
+    Convert American odds to implied probability percentage.
+    Delegates to the existing engine/odds_engine implementation.
+    Returns a float between 0.0 and 100.0.
+    """
+    return american_odds_to_implied_probability(american_odds) * 100
