@@ -21,7 +21,8 @@ except ImportError:
 try:
     from data.odds_api_client import calculate_implied_probability
 except ImportError:
-    def calculate_implied_probability(american_odds: float) -> float:  # noqa: D103
+    def calculate_implied_probability(american_odds: float) -> float:
+        """Fallback: convert American odds to implied probability percentage."""
         odds = float(american_odds)
         if odds < 0:
             return abs(odds) / (abs(odds) + 100.0) * 100
@@ -168,23 +169,37 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
             over = p.get("over_odds")
             under = p.get("under_odds")
 
-            # Best Over = highest payout = least negative or most positive.
+            # Best Over = highest implied probability = most aggressive pricing
+            # (most negative odds for favourites, or lowest positive odds).
+            # We compare implied probabilities to select the strongest signal.
             if over is not None:
                 try:
                     over_int = int(over)
-                    if best_over_odds is None or over_int > best_over_odds:
+                    if best_over_odds is None:
                         best_over_odds = over_int
                         best_over_book = platform
+                    else:
+                        over_ip = calculate_implied_probability(over_int)
+                        best_ip = calculate_implied_probability(best_over_odds)
+                        if over_ip > best_ip:
+                            best_over_odds = over_int
+                            best_over_book = platform
                 except (TypeError, ValueError):
                     pass
 
-            # Best Under = highest payout = least negative or most positive.
+            # Best Under = highest implied probability = most aggressive pricing.
             if under is not None:
                 try:
                     under_int = int(under)
-                    if best_under_odds is None or under_int > best_under_odds:
+                    if best_under_odds is None:
                         best_under_odds = under_int
                         best_under_book = platform
+                    else:
+                        under_ip = calculate_implied_probability(under_int)
+                        best_uip = calculate_implied_probability(best_under_odds)
+                        if under_ip > best_uip:
+                            best_under_odds = under_int
+                            best_under_book = platform
                 except (TypeError, ValueError):
                     pass
 
