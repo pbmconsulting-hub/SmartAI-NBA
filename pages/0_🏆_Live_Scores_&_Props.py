@@ -510,6 +510,68 @@ else:
 
 
 # ============================================================
+# SECTION: Recent Game Results (from Odds API)
+# Shows scores for completed NBA games from the past 1-3 days.
+# ============================================================
+
+with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
+    st.caption("Completed NBA scores via The Odds API · data refreshes every 5 minutes")
+    try:
+        from data.odds_api_client import fetch_recent_scores as _fetch_scores
+        _recent_scores = []
+        for _days_back in (1, 2, 3):
+            _scores = _fetch_scores(days_from=_days_back)
+            for _g in _scores:
+                if _g.get("completed") and _g not in _recent_scores:
+                    _recent_scores.append(_g)
+
+        # De-duplicate by game_id
+        _seen_ids: set = set()
+        _deduped = []
+        for _g in _recent_scores:
+            gid = _g.get("game_id", "")
+            if gid and gid not in _seen_ids:
+                _seen_ids.add(gid)
+                _deduped.append(_g)
+            elif not gid:
+                _deduped.append(_g)
+
+        if _deduped:
+            _score_rows = []
+            for _g in sorted(_deduped, key=lambda x: x.get("commence_time", ""), reverse=True):
+                _home = _g.get("home_team", "")
+                _away = _g.get("away_team", "")
+                _hs   = _g.get("home_score")
+                _as   = _g.get("away_score")
+                if _hs is not None and _as is not None:
+                    _winner = _home if _hs > _as else _away
+                    _margin = abs(_hs - _as)
+                    _score_rows.append({
+                        "Date": _g.get("commence_time", "")[:10],
+                        "Matchup": f"{_away} @ {_home}",
+                        "Score": f"{_away} {_as} — {_home} {_hs}",
+                        "Winner": f"✅ {_winner} (+{_margin})",
+                        "Total": _hs + _as,
+                    })
+            if _score_rows:
+                st.dataframe(_score_rows, hide_index=True, use_container_width=True)
+            else:
+                st.info("No completed scores available yet. Data appears once games finish.")
+        else:
+            st.info(
+                "No recent completed scores found. "
+                "Either no games completed in the last 3 days, "
+                "or the Odds API key isn't configured (set on ⚙️ Settings)."
+            )
+    except Exception as _scores_exc:
+        st.info("Recent scores unavailable — configure your Odds API key on ⚙️ Settings.")
+
+# ============================================================
+# END SECTION: Recent Game Results
+# ============================================================
+
+
+# ============================================================
 # SECTION: Auto-Refresh Handler
 # ============================================================
 

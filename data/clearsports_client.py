@@ -751,3 +751,54 @@ def fetch_news(limit: int = 20) -> list[dict]:
     except Exception as exc:
         _logger.warning("fetch_news failed: %s", exc)
         return []
+
+
+def fetch_season_game_logs_batch(
+    player_ids: list,
+    last_n_games: int = 30,
+) -> dict:
+    """
+    Batch-fetch game logs for multiple players from ClearSports API.
+
+    Fetches each player's game log sequentially with a short pause to
+    respect rate limits, then returns a name-keyed dict suitable for
+    direct use by the Backtester and the matchup history engine.
+
+    Args:
+        player_ids: List of ``(player_name, player_id)`` tuples.
+                    ``player_id`` may be an int or string; ``player_name``
+                    is used as the dict key in the result.
+        last_n_games: How many recent games to fetch per player (default 30).
+
+    Returns:
+        dict: ``{player_name: [game_log_dict, ...]}``
+              Empty inner list when a player's fetch fails.
+              Returns ``{}`` when the API key is not configured.
+    """
+    api_key = _resolve_api_key()
+    if not api_key:
+        _logger.debug("fetch_season_game_logs_batch: no API key — returning {}")
+        return {}
+
+    result: dict = {}
+    for player_name, player_id in (player_ids or []):
+        if not player_id:
+            result[player_name] = []
+            continue
+        try:
+            logs = fetch_player_game_log(player_id, last_n_games=last_n_games)
+            result[player_name] = logs
+            # Small pause to respect rate limits (same as odds_api_client pattern)
+            time.sleep(0.15)
+        except Exception as exc:
+            _logger.debug(
+                "fetch_season_game_logs_batch: failed for %s (id=%s): %s",
+                player_name, player_id, exc,
+            )
+            result[player_name] = []
+
+    _logger.info(
+        "fetch_season_game_logs_batch: fetched logs for %d player(s).",
+        sum(1 for v in result.values() if v),
+    )
+    return result

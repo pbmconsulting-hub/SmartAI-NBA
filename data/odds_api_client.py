@@ -613,3 +613,105 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
         result[away_full] = consensus
 
     return result
+
+
+# ── Historical scores ─────────────────────────────────────────────────────────
+
+def fetch_recent_scores(days_from: int = 1,
+                        api_key: str | None = None) -> list[dict]:
+    """
+    Fetch recently completed NBA game scores from The Odds API.
+
+    The Odds API ``/scores`` endpoint returns the results of games that
+    finished within the last *days_from* calendar days (1–3 days max on
+    the free tier).  These scores are used to:
+
+    * Auto-update CLV records after games complete (closing-line validation)
+    * Validate projection accuracy against actual game outcomes
+    * Cross-reference injury / rest-day impact on final scores
+
+    Args:
+        days_from: How many days back to fetch (1 = yesterday, 2 = 2 days
+                   ago, up to 3 on the free tier).
+        api_key:   Optional explicit key; falls back to session state / env.
+
+    Returns:
+        list[dict]: Each entry has:
+            {
+                "game_id":      str,
+                "home_team":    str,
+                "away_team":    str,
+                "commence_time": str,   # ISO datetime
+                "completed":    bool,
+                "home_score":   int | None,
+                "away_score":   int | None,
+            }
+        Returns [] on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.debug("fetch_recent_scores: no Odds API key — returning []")
+        return []
+
+    days_from = max(1, min(int(days_from), 3))  # clamp to free-tier range
+    url = f"{_BASE_URL}/sports/{_SPORT}/scores"
+    params = {
+        "apiKey":    resolved_key,
+        "daysFrom":  days_from,
+        "dateFormat": "iso",
+    }
+    cache_key = f"{url}?daysFrom={days_from}"
+
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        raw = _fetch_with_retry(url, params=params)
+        if not isinstance(raw, list):
+            _logger.warning("fetch_recent_scores: unexpected response shape")
+            return []
+
+        scores: list[dict] = []
+        for ev in raw:
+            if not isinstance(ev, dict):
+                continue
+
+            scores_raw = ev.get("scores") or []
+            home_team  = ev.get("home_team", "")
+            away_team  = ev.get("away_team", "")
+            home_score = None
+            away_score = None
+
+            for sc in scores_raw:
+                if not isinstance(sc, dict):
+                    continue
+                name = sc.get("name", "")
+                val  = sc.get("score")
+                try:
+                    val_int = int(val) if val is not None else None
+                except (TypeError, ValueError):
+                    val_int = None
+                if name == home_team:
+                    home_score = val_int
+                elif name == away_team:
+                    away_score = val_int
+
+            scores.append({
+                "game_id":       ev.get("id", ""),
+                "home_team":     home_team,
+                "away_team":     away_team,
+                "commence_time": ev.get("commence_time", ""),
+                "completed":     bool(ev.get("completed", False)),
+                "home_score":    home_score,
+                "away_score":    away_score,
+            })
+
+        # Cache for 5 minutes (scores don't change once posted)
+        _cache_set(cache_key, scores)
+        _logger.info("fetch_recent_scores: %d game(s) returned.", len(scores))
+        return scores
+
+    except Exception as exc:
+        _logger.warning("fetch_recent_scores failed: %s", exc)
+        return []

@@ -1295,6 +1295,15 @@ def fetch_all_todays_data(progress_callback=None):
     # --------------------------------------------------------
     _record_odds_api_snapshots(results["games"])
 
+    # --------------------------------------------------------
+    # Bonus: Refresh historical game logs + CLV closing lines
+    # Runs silently — will skip gracefully if API key is missing.
+    # --------------------------------------------------------
+    try:
+        refresh_historical_data_for_tonight(games=results["games"])
+    except Exception as _hist_exc:
+        _logger.debug("fetch_all_todays_data: historical refresh skipped — %s", _hist_exc)
+
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]
     games_count = len(results["games"])
@@ -1513,4 +1522,137 @@ def fetch_player_news(player_name: str | None = None, limit: int = 20) -> list[d
 
 # ============================================================
 # END SECTION: Odds API Market Movement Snapshot Recorder
+# ============================================================
+
+
+# ============================================================
+# SECTION: Historical Data Refresher
+# Auto-populates game log cache and updates CLV closing lines
+# using ClearSports player game logs + Odds API completed scores.
+# ============================================================
+
+def refresh_historical_data_for_tonight(
+    games: list | None = None,
+    last_n_games: int = 30,
+    progress_callback=None,
+) -> dict:
+    """
+    Auto-fetch historical game logs for all players in tonight's lineup
+    and update CLV closing lines from recently completed games.
+
+    This function is the "historical data refresh" entry point. It:
+
+    1. Resolves tonight's playing teams from ``games`` (or session state)
+    2. Fetches each player's recent game log from ClearSports API
+    3. Saves results to ``data/game_log_cache.py`` for the Backtester
+    4. Calls ``engine/clv_tracker.auto_update_closing_lines()`` to close
+       open CLV records using today's Odds API prop lines (closing lines)
+
+    Args:
+        games:             List of tonight's game dicts.  If None, tries
+                           ``st.session_state["todays_games"]``.
+        last_n_games:      How many recent games to fetch per player (30).
+        progress_callback: Optional callable(current, total, message).
+
+    Returns:
+        dict: {
+            "players_refreshed": int,
+            "clv_updated":       int,
+            "errors":            int,
+        }
+    """
+    results = {"players_refreshed": 0, "clv_updated": 0, "errors": 0}
+
+    # Resolve tonight's games
+    if games is None:
+        try:
+            import streamlit as _st
+            games = _st.session_state.get("todays_games", [])
+        except Exception:
+            games = []
+
+    if not games:
+        _logger.debug("refresh_historical_data_for_tonight: no games — skipping")
+        return results
+
+    # Collect all players from tonight's teams
+    playing_teams: set = set()
+    for g in games:
+        for key in ("home_team", "away_team"):
+            t = str(g.get(key, "")).upper().strip()
+            if t:
+                playing_teams.add(t)
+
+    if not playing_teams:
+        return results
+
+    # Load player data (from CSV) to get player_ids
+    try:
+        from data.data_manager import load_players_data as _load_players
+        all_players = _load_players()
+    except Exception as exc:
+        _logger.warning("refresh_historical_data_for_tonight: could not load players — %s", exc)
+        return results
+
+    tonight_players = [
+        p for p in all_players
+        if str(p.get("team", "")).upper().strip() in playing_teams
+        and p.get("player_id")
+    ]
+
+    if not tonight_players:
+        _logger.debug("refresh_historical_data_for_tonight: no players with IDs found")
+        return results
+
+    total = len(tonight_players)
+    if progress_callback:
+        progress_callback(0, total, f"Fetching historical logs for {total} player(s)…")
+
+    # Batch-fetch game logs from ClearSports
+    try:
+        from data.clearsports_client import fetch_season_game_logs_batch as _batch
+        from data.game_log_cache import save_game_logs_to_cache as _save_cache
+
+        player_id_pairs = [
+            (p.get("name", ""), p.get("player_id"))
+            for p in tonight_players
+            if p.get("player_id")
+        ]
+
+        logs_map = _batch(player_id_pairs, last_n_games=last_n_games)
+
+        for idx, (player_name, logs) in enumerate(logs_map.items()):
+            if logs:
+                try:
+                    _save_cache(player_name, logs)
+                    results["players_refreshed"] += 1
+                except Exception as save_exc:
+                    _logger.debug(
+                        "refresh_historical_data_for_tonight: cache save failed for %s — %s",
+                        player_name, save_exc,
+                    )
+                    results["errors"] += 1
+            if progress_callback:
+                progress_callback(idx + 1, total, f"Cached logs for {player_name}")
+
+    except Exception as exc:
+        _logger.warning("refresh_historical_data_for_tonight: batch fetch failed — %s", exc)
+        results["errors"] += 1
+
+    # Auto-update CLV closing lines from Odds API
+    try:
+        from engine.clv_tracker import auto_update_closing_lines as _clv_update
+        clv_result = _clv_update(days_back=1)
+        results["clv_updated"] = clv_result.get("updated", 0)
+    except Exception as exc:
+        _logger.debug("refresh_historical_data_for_tonight: CLV update skipped — %s", exc)
+
+    _logger.info(
+        "refresh_historical_data_for_tonight: players_refreshed=%d, clv_updated=%d, errors=%d",
+        results["players_refreshed"], results["clv_updated"], results["errors"],
+    )
+    return results
+
+# ============================================================
+# END SECTION: Historical Data Refresher
 # ============================================================
