@@ -531,5 +531,167 @@ class TestArbitrageMatcherFileStructure(unittest.TestCase):
         self.assertFalse(_names_match("LeBron James", "Stephen Curry"))
 
 
+# ============================================================
+# 6. Devig-Enhanced Fields tests
+# ============================================================
+
+class TestDevigEnhancedFields(unittest.TestCase):
+    """Tests for devig-enhanced fields: recommended_side, fair_probability, etc."""
+
+    def setUp(self):
+        from engine.arbitrage_matcher import find_ev_discrepancies
+        self.find = find_ev_discrepancies
+
+    def test_recommended_side_present(self):
+        """Discrepancies should include recommended_side."""
+        props = [
+            {"player_name": "Star Player", "stat_type": "points", "line": 25.5,
+             "platform": "DraftKings", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star Player", "stat_type": "points", "line": 25.5,
+             "platform": "FanDuel", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertIn("recommended_side", d)
+        self.assertIn(d["recommended_side"], ("OVER", "UNDER"))
+
+    def test_recommended_book_present(self):
+        """Discrepancies should include recommended_book."""
+        props = [
+            {"player_name": "Star", "stat_type": "rebounds", "line": 10.5,
+             "platform": "DraftKings", "over_odds": -170, "under_odds": +100},
+            {"player_name": "Star", "stat_type": "rebounds", "line": 10.5,
+             "platform": "FanDuel", "over_odds": -160, "under_odds": +110},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertIn("recommended_book", d)
+        self.assertIsInstance(d["recommended_book"], str)
+        self.assertGreater(len(d["recommended_book"]), 0)
+
+    def test_fair_probability_present(self):
+        """Discrepancies should include fair_probability (devigged)."""
+        props = [
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertIn("fair_probability", d)
+        self.assertGreater(d["fair_probability"], 0.0)
+        self.assertLessEqual(d["fair_probability"], 100.0)
+
+    def test_true_ev_edge_present(self):
+        """Discrepancies should include true_ev_edge (devig-adjusted)."""
+        props = [
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star", "stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertIn("true_ev_edge", d)
+        # true_ev_edge should be <= ev_edge (devig removes vig inflation)
+        self.assertLessEqual(d["true_ev_edge"], d["ev_edge"] + 0.1)
+
+    def test_fair_over_under_probs_present(self):
+        """Discrepancies should include fair_over_prob and fair_under_prob."""
+        props = [
+            {"player_name": "Star", "stat_type": "assists", "line": 8.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star", "stat_type": "assists", "line": 8.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        self.assertIn("fair_over_prob", d)
+        self.assertIn("fair_under_prob", d)
+        self.assertGreater(d["fair_over_prob"], 0.0)
+        self.assertGreater(d["fair_under_prob"], 0.0)
+        # Fair probs should sum closer to 100 than vigged probs
+        fair_sum = d["fair_over_prob"] + d["fair_under_prob"]
+        self.assertAlmostEqual(fair_sum, 100.0, delta=5.0)
+
+    def test_consensus_fair_probs_present(self):
+        """Discrepancies should include consensus fair probabilities."""
+        props = [
+            {"player_name": "P", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "P", "stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        if result:
+            d = result[0]
+            self.assertIn("consensus_fair_over", d)
+            self.assertIn("consensus_fair_under", d)
+
+    def test_vig_pct_present(self):
+        """Discrepancies should include vig_pct."""
+        props = [
+            {"player_name": "P", "stat_type": "points", "line": 20.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "P", "stat_type": "points", "line": 20.5,
+             "platform": "FD", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        if result:
+            d = result[0]
+            self.assertIn("vig_pct", d)
+            self.assertGreaterEqual(d["vig_pct"], 0.0)
+
+    def test_recommended_side_matches_highest_fair_prob(self):
+        """Recommended side should match the side with higher fair probability."""
+        props = [
+            {"player_name": "Test", "stat_type": "points", "line": 24.5,
+             "platform": "DK", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Test", "stat_type": "points", "line": 24.5,
+             "platform": "FD", "over_odds": -180, "under_odds": +130},
+        ]
+        result = self.find(props)
+        self.assertGreaterEqual(len(result), 1)
+        d = result[0]
+        # Over odds are more aggressive => recommended_side should be OVER
+        self.assertEqual(d["recommended_side"], "OVER")
+
+    def test_backward_compatibility(self):
+        """New fields must not remove any existing required fields."""
+        props = [
+            {"player_name": "Star Player", "stat_type": "points", "line": 25.5,
+             "platform": "DraftKings", "over_odds": -200, "under_odds": +120},
+            {"player_name": "Star Player", "stat_type": "points", "line": 25.5,
+             "platform": "FanDuel", "over_odds": -190, "under_odds": +130},
+        ]
+        result = self.find(props)
+        if result:
+            d = result[0]
+            # All original keys must still be present
+            original_keys = {
+                "player_name", "stat_type", "true_line",
+                "best_over_odds", "best_over_book",
+                "best_under_odds", "best_under_book",
+                "best_over_implied_prob", "best_under_implied_prob",
+                "ev_edge", "is_god_mode_lock", "book_count",
+            }
+            self.assertTrue(original_keys.issubset(d.keys()))
+            # New keys must also be present
+            new_keys = {
+                "recommended_side", "recommended_book",
+                "fair_probability", "true_ev_edge",
+                "fair_over_prob", "fair_under_prob",
+                "consensus_fair_over", "consensus_fair_under",
+                "vig_pct",
+            }
+            self.assertTrue(new_keys.issubset(d.keys()))
+
+
 if __name__ == "__main__":
     unittest.main()

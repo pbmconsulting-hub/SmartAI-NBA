@@ -28,6 +28,16 @@ except ImportError:
             return abs(odds) / (abs(odds) + 100.0) * 100
         return 100.0 / (odds + 100.0) * 100
 
+try:
+    from engine.odds_engine import devig_probabilities, get_vig_percentage
+    _DEVIG_AVAILABLE = True
+except ImportError:
+    _DEVIG_AVAILABLE = False
+    def devig_probabilities(over_odds, under_odds):
+        return (0.5, 0.5)
+    def get_vig_percentage(odds_side1, odds_side2=None):
+        return 0.0476
+
 
 # ── Name-normalisation helpers ────────────────────────────────────────────────
 
@@ -214,6 +224,46 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
         if best_under_odds is not None:
             under_prob = calculate_implied_probability(best_under_odds)
 
+        # ── 3b. Devig: compute fair (vig-free) probabilities ─────────
+        # For each book in the group, devig its over/under pair and
+        # track the highest fair probability per side.  This removes
+        # bookmaker juice and gives a truer picture of the edge.
+        best_fair_over = 0.0
+        best_fair_under = 0.0
+        best_fair_over_book = ""
+        best_fair_under_book = ""
+        consensus_fair_over_sum = 0.0
+        consensus_fair_under_sum = 0.0
+        devig_count = 0
+
+        if _DEVIG_AVAILABLE:
+            for p in props:
+                p_over = p.get("over_odds")
+                p_under = p.get("under_odds")
+                if p_over is None or p_under is None:
+                    continue
+                try:
+                    fair_o, fair_u = devig_probabilities(int(p_over), int(p_under))
+                    fair_o_pct = round(fair_o * 100.0, 2)
+                    fair_u_pct = round(fair_u * 100.0, 2)
+                    platform = p.get("platform", "Unknown")
+                    if fair_o_pct > best_fair_over:
+                        best_fair_over = fair_o_pct
+                        best_fair_over_book = platform
+                    if fair_u_pct > best_fair_under:
+                        best_fair_under = fair_u_pct
+                        best_fair_under_book = platform
+                    consensus_fair_over_sum += fair_o_pct
+                    consensus_fair_under_sum += fair_u_pct
+                    devig_count += 1
+                except (TypeError, ValueError):
+                    pass
+
+        # Consensus fair probability: average devigged prob across all books.
+        # This is the market's best estimate of the true probability.
+        consensus_fair_over = round(consensus_fair_over_sum / max(1, devig_count), 2)
+        consensus_fair_under = round(consensus_fair_under_sum / max(1, devig_count), 2)
+
         # ── 4. EV edge = max implied prob - 50 ───────────────────────
         max_prob = max(over_prob, under_prob)
         ev_edge = round(max_prob - 50.0, 2)
@@ -224,6 +274,39 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
 
         # ── 6. God Mode Lock: any side >= 60% implied ────────────────
         is_god_mode = over_prob >= 60.0 or under_prob >= 60.0
+
+        # ── 6b. Recommended side and fair edge ────────────────────────
+        # Recommend the side with the higher fair (devigged) probability.
+        # Fall back to raw implied if devig not available.
+        if best_fair_over > 0 or best_fair_under > 0:
+            if best_fair_over >= best_fair_under:
+                rec_side = "OVER"
+                rec_book = best_fair_over_book or best_over_book
+                fair_prob = best_fair_over
+            else:
+                rec_side = "UNDER"
+                rec_book = best_fair_under_book or best_under_book
+                fair_prob = best_fair_under
+        else:
+            if over_prob >= under_prob:
+                rec_side = "OVER"
+                rec_book = best_over_book
+                fair_prob = over_prob
+            else:
+                rec_side = "UNDER"
+                rec_book = best_under_book
+                fair_prob = under_prob
+
+        # True edge after vig removal — the real signal.
+        true_ev_edge = round(fair_prob - 50.0, 2) if fair_prob > 0 else ev_edge
+
+        # Vig % on the recommended side's best odds.
+        rec_odds = best_over_odds if rec_side == "OVER" else best_under_odds
+        comp_odds = best_under_odds if rec_side == "OVER" else best_over_odds
+        try:
+            vig = round(get_vig_percentage(rec_odds, comp_odds) * 100.0, 2) if rec_odds else 0.0
+        except Exception:
+            vig = 0.0
 
         display_name = canonical_names.get(norm_name, norm_name)
 
@@ -240,6 +323,16 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
             "ev_edge": ev_edge,
             "is_god_mode_lock": is_god_mode,
             "book_count": len(book_set),
+            # ── New devig-enhanced fields ─────────────────────────────
+            "recommended_side": rec_side,
+            "recommended_book": rec_book,
+            "fair_probability": round(fair_prob, 2),
+            "true_ev_edge": true_ev_edge,
+            "fair_over_prob": round(best_fair_over, 2),
+            "fair_under_prob": round(best_fair_under, 2),
+            "consensus_fair_over": consensus_fair_over,
+            "consensus_fair_under": consensus_fair_under,
+            "vig_pct": vig,
         })
 
     # ── 7. Sort by ev_edge descending ─────────────────────────────────

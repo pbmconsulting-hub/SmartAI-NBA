@@ -291,6 +291,30 @@ st.markdown("""
     border-radius: 6px;
     transition: width 0.5s ease;
 }
+
+/* Recommended side badge */
+.badge-rec {
+    background: linear-gradient(90deg, #00c6ff, #0072ff);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-left: 6px;
+}
+/* Fair probability highlight */
+.fair-prob-tag {
+    color: #ffb347;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+/* Vig indicator */
+.vig-tag {
+    color: #ff5e5e;
+    font-size: 0.78rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -540,9 +564,13 @@ if discrepancies or scan_time:
             over_prob = d.get("best_over_implied_prob", 0)
             under_prob = d.get("best_under_implied_prob", 0)
             max_prob = max(over_prob, under_prob)
-            side = "OVER" if over_prob >= under_prob else "UNDER"
-            best_book = d["best_over_book"] if side == "OVER" else d["best_under_book"]
+            side = d.get("recommended_side", "OVER" if over_prob >= under_prob else "UNDER")
+            rec_book = d.get("recommended_book", "")
+            best_book = rec_book or (d["best_over_book"] if side == "OVER" else d["best_under_book"])
             best_odds = d["best_over_odds"] if side == "OVER" else d["best_under_odds"]
+            fair_prob = d.get("fair_probability", max_prob)
+            true_edge = d.get("true_ev_edge", d["ev_edge"])
+            vig = d.get("vig_pct", 0)
 
             player_esc = _html.escape(str(d["player_name"]))
             stat_esc = _html.escape(
@@ -557,6 +585,7 @@ if discrepancies or scan_time:
             <div class="god-mode-card">
                 <span class="badge-god">🔒 GOD MODE LOCK</span>
                 <span class="badge-edge">+{d['ev_edge']}% Edge</span>
+                <span class="badge-rec">▶ {side}</span>
                 <h3 style="margin:0.6rem 0 0.3rem 0; color:#fff;">
                     {player_esc} — {stat_esc} {d['true_line']}
                 </h3>
@@ -564,9 +593,12 @@ if discrepancies or scan_time:
                     <div class="prob-bar-fill" style="width:{min(max_prob, 100):.0f}%; background:{bar_color};"></div>
                 </div>
                 <p style="margin:0; color:#c0d0e8;">
-                    Best {side}: <span class="badge-book">{book_esc}</span>
-                    at <strong>{best_odds}</strong>
-                    ({max_prob:.1f}% implied) &bull; {d['book_count']} books pricing
+                    Play <strong>{side}</strong> at <span class="badge-book">{book_esc}</span>
+                    ({best_odds}) &bull;
+                    <span class="fair-prob-tag">{fair_prob:.1f}% fair</span>
+                    (true edge +{true_edge}%)
+                    &bull; {d['book_count']} books
+                    {f'&bull; <span class="vig-tag">{vig:.1f}% vig</span>' if vig > 0 else ''}
                 </p>
             </div>
             """, unsafe_allow_html=True)
@@ -579,6 +611,7 @@ if discrepancies or scan_time:
                 bc1, bc2 = st.columns(2)
                 with bc1:
                     st.markdown("**📈 OVER Side**")
+                    _fo_prob = d.get("fair_over_prob", 0)
                     st.markdown(f"""
                     <div class="detail-row"><span class="detail-label">Book</span>
                     <span class="detail-value">{_html.escape(str(d['best_over_book']))}</span></div>
@@ -586,9 +619,12 @@ if discrepancies or scan_time:
                     <span class="detail-value">{d['best_over_odds']}</span></div>
                     <div class="detail-row"><span class="detail-label">Implied Prob</span>
                     <span class="detail-value">{d['best_over_implied_prob']:.1f}%</span></div>
+                    <div class="detail-row"><span class="detail-label">Fair Prob (no vig)</span>
+                    <span class="detail-value fair-prob-tag">{_fo_prob:.1f}%</span></div>
                     """, unsafe_allow_html=True)
                 with bc2:
                     st.markdown("**📉 UNDER Side**")
+                    _fu_prob = d.get("fair_under_prob", 0)
                     st.markdown(f"""
                     <div class="detail-row"><span class="detail-label">Book</span>
                     <span class="detail-value">{_html.escape(str(d['best_under_book']))}</span></div>
@@ -596,6 +632,8 @@ if discrepancies or scan_time:
                     <span class="detail-value">{d['best_under_odds']}</span></div>
                     <div class="detail-row"><span class="detail-label">Implied Prob</span>
                     <span class="detail-value">{d['best_under_implied_prob']:.1f}%</span></div>
+                    <div class="detail-row"><span class="detail-label">Fair Prob (no vig)</span>
+                    <span class="detail-value fair-prob-tag">{_fu_prob:.1f}%</span></div>
                     """, unsafe_allow_html=True)
                 st.markdown(f"""
                 <div class="detail-row"><span class="detail-label">True Line</span>
@@ -604,8 +642,13 @@ if discrepancies or scan_time:
                 <span class="detail-value">{stat_esc}</span></div>
                 <div class="detail-row"><span class="detail-label">Books Pricing</span>
                 <span class="detail-value">{d['book_count']}</span></div>
-                <div class="detail-row"><span class="detail-label">EV Edge</span>
+                <div class="detail-row"><span class="detail-label">EV Edge (vigged)</span>
                 <span class="detail-value" style="color:#00ff9d;">+{d['ev_edge']}%</span></div>
+                <div class="detail-row"><span class="detail-label">True Edge (devigged)</span>
+                <span class="detail-value fair-prob-tag">+{true_edge}%</span></div>
+                <div class="detail-row"><span class="detail-label">Recommended</span>
+                <span class="detail-value" style="color:#00c6ff;">▶ {side} at {book_esc}</span></div>
+                {f'<div class="detail-row"><span class="detail-label">Vig</span><span class="detail-value vig-tag">{vig:.1f}%</span></div>' if vig > 0 else ''}
                 """, unsafe_allow_html=True)
 
     # ── Section 3d: All EV Discrepancies Table ────────────────
@@ -621,24 +664,26 @@ if discrepancies or scan_time:
         if _PANDAS_AVAILABLE:
             table_data = []
             for d in discrepancies:
-                side = (
+                rec_side = d.get("recommended_side", (
                     "OVER"
                     if d.get("best_over_implied_prob", 0)
                     >= d.get("best_under_implied_prob", 0)
                     else "UNDER"
-                )
+                ))
                 table_data.append({
                     "Player": d["player_name"],
                     "Stat": str(d["stat_type"]).replace("_", " ").title(),
                     "Line": d["true_line"],
-                    "Best Side": side,
+                    "▶ Play": rec_side,
+                    "▶ Book": d.get("recommended_book", ""),
+                    "Fair Prob%": d.get("fair_probability", 0),
+                    "True Edge%": d.get("true_ev_edge", d["ev_edge"]),
                     "Over Odds": d["best_over_odds"],
                     "Over Book": d["best_over_book"],
-                    "Over Prob%": round(d["best_over_implied_prob"], 1),
                     "Under Odds": d["best_under_odds"],
                     "Under Book": d["best_under_book"],
-                    "Under Prob%": round(d["best_under_implied_prob"], 1),
                     "EV Edge%": d["ev_edge"],
+                    "Vig%": d.get("vig_pct", 0),
                     "God Mode": "🔒" if d.get("is_god_mode_lock") else "",
                     "Books": d["book_count"],
                 })
@@ -668,6 +713,9 @@ if discrepancies or scan_time:
                     card_class = "ev-card"
                     badge = ""
 
+                _rec = d.get("recommended_side", "")
+                _rec_badge = f'<span class="badge-rec">▶ {_rec}</span>' if _rec else ""
+
                 player_esc = _html.escape(str(d["player_name"]))
                 stat_esc = _html.escape(
                     str(d["stat_type"]).replace("_", " ").title()
@@ -676,10 +724,13 @@ if discrepancies or scan_time:
                 under_book_esc = _html.escape(str(d["best_under_book"]))
                 over_prob = d.get("best_over_implied_prob", 0)
                 under_prob = d.get("best_under_implied_prob", 0)
+                _fp = d.get("fair_probability", 0)
+                _te = d.get("true_ev_edge", d["ev_edge"])
 
                 st.markdown(f"""
                 <div class="{card_class}">
                     {badge}<span class="badge-edge">+{d['ev_edge']}% EV Edge</span>
+                    {_rec_badge}
                     <h4 style="margin:0.5rem 0 0.3rem 0; color:#fff;">
                         {player_esc} — {stat_esc} {d['true_line']}
                     </h4>
@@ -691,6 +742,7 @@ if discrepancies or scan_time:
                         {d['best_under_odds']} ({under_prob:.1f}%)
                         &nbsp;&nbsp;|&nbsp;&nbsp;
                         📚 {d['book_count']} books
+                        {f'&nbsp;&nbsp;|&nbsp;&nbsp; <span class="fair-prob-tag">{_fp:.1f}% fair</span>' if _fp > 0 else ''}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
