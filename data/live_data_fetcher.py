@@ -421,77 +421,38 @@ def _utc_to_et_display(game_time_utc):
 
 
 # ============================================================
+# ============================================================
 # SECTION: Today's Games Fetcher
-# Fetches which NBA games are being played today using a
-# 3-layer fallback system for maximum reliability.
+# Fetches which NBA games are being played today via ClearSports API.
 # ============================================================
 
 def _fetch_team_records():
     """
-    Fetch team records (W-L, streak, home/away splits) from the NBA standings.
-
-    Shared helper used by all three game-fetching layers so standings are
-    only pulled once regardless of which layer succeeds.
+    Fetch team records (W-L) from ClearSports API team stats.
 
     Returns:
-        dict: Maps team abbreviation → {wins, losses, streak,
-              home_record, away_record, conf_rank}.
-              Returns empty dict if the standings API fails.
+        dict: Maps team abbreviation → {wins, losses, streak, ...}.
+              Returns empty dict if the fetch fails.
     """
-    team_records = {}
     try:
-        from nba_api.stats.endpoints import leaguestandingsv3
-        standings_endpoint = leaguestandingsv3.LeagueStandingsV3(
-            season_type="Regular Season",
-        )
-        standings_data = standings_endpoint.get_data_frames()[0].to_dict("records")
-        time.sleep(API_DELAY_SECONDS)
-
-        for row in standings_data:
-            # LeagueStandingsV3 does NOT return TeamAbbreviation.
-            # Derive the abbreviation from TeamCity + TeamName using the
-            # existing TEAM_NAME_TO_ABBREVIATION mapping.
-            team_city = str(row.get("TeamCity", "") or "").strip()
-            team_name = str(row.get("TeamName", "") or "").strip()
-            full_name = f"{team_city} {team_name}".strip()
-            abbrev = TEAM_NAME_TO_ABBREVIATION.get(full_name, "")
-            if not abbrev:
-                # Fallback: try TeamSlug through NBA_API_ABBREV_TO_OURS
-                slug = str(row.get("TeamSlug", "") or "").upper()
-                abbrev = NBA_API_ABBREV_TO_OURS.get(slug, slug)
-            if not abbrev:
-                continue
-
-            wins = int(row.get("WINS", 0) or 0)
-            losses = int(row.get("LOSSES", 0) or 0)
-
-            # Parse streak: e.g. "W 3" or "L 2"
-            streak_raw = str(row.get("strCurrentStreak", "") or "")
-            if streak_raw and len(streak_raw) >= 2:
-                streak_dir = streak_raw[0]   # "W" or "L"
-                streak_num = streak_raw[1:].strip()
-                streak_display = f"{streak_dir}{streak_num}"
-            else:
-                streak_display = ""
-
-            # Home and away records — use helper to avoid duplicated parsing
-            home_wins_s, home_losses_s = _parse_win_loss_record(row.get("HOME", "0-0"))
-            away_wins_s, away_losses_s = _parse_win_loss_record(row.get("ROAD", "0-0"))
-
-            conf_rank = int(row.get("PlayoffRank", 0) or 0)
-
-            team_records[abbrev] = {
-                "wins": wins,
-                "losses": losses,
-                "streak": streak_display,
-                "home_record": f"{home_wins_s}-{home_losses_s}",
-                "away_record": f"{away_wins_s}-{away_losses_s}",
-                "conf_rank": conf_rank,
-            }
-    except Exception as standings_error:
-        _logger.warning(f"Could not fetch standings (non-fatal): {standings_error}")
-
-    return team_records
+        from data.clearsports_client import fetch_team_stats as _cs_teams
+        teams = _cs_teams()
+        records = {}
+        for t in teams:
+            abbrev = str(t.get("team_abbreviation", "")).upper().strip()
+            if abbrev:
+                records[abbrev] = {
+                    "wins": int(t.get("wins", 0) or 0),
+                    "losses": int(t.get("losses", 0) or 0),
+                    "streak": "",
+                    "home_record": "0-0",
+                    "away_record": "0-0",
+                    "conf_rank": 0,
+                }
+        return records
+    except Exception as err:
+        _logger.warning(f"Could not fetch team records (non-fatal): {err}")
+        return {}
 
 
 def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_name,
@@ -500,679 +461,199 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
     Build the standardised game dict used throughout the app.
 
     Args:
-        home_abbrev (str): Home team abbreviation (our format).
-        away_abbrev (str): Away team abbreviation (our format).
-        home_team_name (str): Full display name for the home team.
-        away_team_name (str): Full display name for the away team.
-        game_time_et (str): Game time in Eastern Time, e.g. "7:30 PM ET".
-        arena_display (str): Arena name and city string.
-        team_records (dict): Standings data from _fetch_team_records().
+        home_abbrev (str): Home team abbreviation.
+        away_abbrev (str): Away team abbreviation.
+        home_team_name (str): Full home team name.
+        away_team_name (str): Full away team name.
+        game_time_et (str): Game time display string (ET).
+        arena_display (str): Arena name.
+        team_records (dict): Lookup dict from _fetch_team_records().
 
     Returns:
-        dict: Standardised game record.
+        dict: Standardised game dict.
     """
     home_rec = team_records.get(home_abbrev, {})
     away_rec = team_records.get(away_abbrev, {})
 
     return {
-        "game_id": f"{home_abbrev}_vs_{away_abbrev}",
-        "home_team": home_abbrev,
-        "away_team": away_abbrev,
-        "home_team_full": f"{home_abbrev} — {home_team_name}",
-        "away_team_full": f"{away_abbrev} — {away_team_name}",
+        "home_team":     home_abbrev,
+        "away_team":     away_abbrev,
         "home_team_name": home_team_name,
         "away_team_name": away_team_name,
-        "vegas_spread": DEFAULT_VEGAS_SPREAD,
-        "game_total": DEFAULT_GAME_TOTAL,
-        "game_date": _nba_today_et().isoformat(),
-        "game_time_et": game_time_et,
-        "arena": arena_display,
-        # Team records
-        "home_wins": home_rec.get("wins", 0),
-        "home_losses": home_rec.get("losses", 0),
-        "home_streak": home_rec.get("streak", ""),
-        "home_home_record": home_rec.get("home_record", ""),
+        "game_time_et":  game_time_et,
+        "arena":         arena_display,
+        "home_wins":     home_rec.get("wins", 0),
+        "home_losses":   home_rec.get("losses", 0),
+        "away_wins":     away_rec.get("wins", 0),
+        "away_losses":   away_rec.get("losses", 0),
+        "home_streak":   home_rec.get("streak", ""),
+        "away_streak":   away_rec.get("streak", ""),
+        "home_record":   home_rec.get("home_record", "0-0"),
+        "away_record":   away_rec.get("away_record", "0-0"),
         "home_conf_rank": home_rec.get("conf_rank", 0),
-        "away_wins": away_rec.get("wins", 0),
-        "away_losses": away_rec.get("losses", 0),
-        "away_streak": away_rec.get("streak", ""),
-        "away_away_record": away_rec.get("away_record", ""),
         "away_conf_rank": away_rec.get("conf_rank", 0),
+        "game_id":       "",
+        "vegas_spread":  0,
+        "game_total":    220,
     }
 
 
-def _fetch_games_layer1_scoreboard_v2(team_records):
-    """
-    Layer 1: Fetch today's games via the NBA Stats ScoreboardV2 endpoint.
-
-    ScoreboardV2 is the most reliable source — it uses the same NBA Stats
-    API as the rest of nba_api and returns a clean GameHeader data frame.
-
-    Args:
-        team_records (dict): Pre-fetched standings data from _fetch_team_records().
-
-    Returns:
-        list of dict: Formatted game records, or empty list on failure.
-    """
-    try:
-        from nba_api.stats.endpoints import scoreboardv2
-        from nba_api.stats.static import teams as nba_teams_static
-
-        # Build team_id → abbreviation and name mapping
-        all_nba_teams = nba_teams_static.get_teams()
-        team_id_to_abbrev = {}
-        team_id_to_info = {}
-        for t in all_nba_teams:
-            abbrev = t.get("abbreviation", "")
-            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
-            tid = t.get("id")
-            team_id_to_abbrev[tid] = abbrev
-            team_id_to_info[tid] = {
-                "city": t.get("city", ""),
-                "name": t.get("nickname", ""),
-            }
-
-        today_str = _nba_today_et().strftime("%m/%d/%Y")
-        sb = scoreboardv2.ScoreboardV2(game_date=today_str, day_offset=0)
-        dfs = sb.get_data_frames()
-        time.sleep(API_DELAY_SECONDS)
-
-        if not dfs:
-            return []
-
-        game_header_df = dfs[0]  # First frame is GameHeader
-        if game_header_df.empty:
-            return []
-
-        formatted_games = []
-        for row in game_header_df.to_dict("records"):
-            home_team_id = row.get("HOME_TEAM_ID")
-            away_team_id = row.get("VISITOR_TEAM_ID")
-
-            home_abbrev = team_id_to_abbrev.get(home_team_id, "")
-            away_abbrev = team_id_to_abbrev.get(away_team_id, "")
-
-            if not home_abbrev or not away_abbrev:
-                continue
-
-            # GAME_STATUS_TEXT shows "7:30 pm ET" for scheduled games
-            game_time_et = str(row.get("GAME_STATUS_TEXT", "") or "").strip()
-
-            home_info = team_id_to_info.get(home_team_id, {})
-            away_info = team_id_to_info.get(away_team_id, {})
-            home_team_name = f"{home_info.get('city', '')} {home_info.get('name', '')}".strip()
-            away_team_name = f"{away_info.get('city', '')} {away_info.get('name', '')}".strip()
-
-            formatted_games.append(_build_formatted_game(
-                home_abbrev, away_abbrev,
-                home_team_name, away_team_name,
-                game_time_et, "",
-                team_records,
-            ))
-
-        return formatted_games
-
-    except Exception as error:
-        _logger.warning(f"Layer 1 (ScoreboardV2) failed: {error}")
-        return []
-
-
-def _fetch_games_layer2_espn(team_records):
-    """
-    Layer 2: Fetch today's games via the ESPN public scoreboard API.
-
-    ESPN provides a free, unauthenticated JSON endpoint that returns the
-    current day's NBA schedule.  No API key required.
-
-    Args:
-        team_records (dict): Pre-fetched standings data from _fetch_team_records().
-
-    Returns:
-        list of dict: Formatted game records, or empty list on failure.
-    """
-    try:
-        import requests
-
-        url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        resp = requests.get(url, timeout=ESPN_API_TIMEOUT_SECONDS)
-        resp.raise_for_status()
-        data = resp.json()
-
-        events = data.get("events", [])
-        if not events:
-            return []
-
-        formatted_games = []
-        for event in events:
-            competitions = event.get("competitions", [])
-            if not competitions:
-                continue
-            comp = competitions[0]
-
-            competitors = comp.get("competitors", [])
-            home_comp = next((c for c in competitors if c.get("homeAway") == "home"), None)
-            away_comp = next((c for c in competitors if c.get("homeAway") == "away"), None)
-
-            if not home_comp or not away_comp:
-                continue
-
-            home_team = home_comp.get("team", {})
-            away_team = away_comp.get("team", {})
-
-            home_abbrev = home_team.get("abbreviation", "")
-            away_abbrev = away_team.get("abbreviation", "")
-
-            # Normalise ESPN abbreviations to our internal codes
-            home_abbrev = NBA_API_ABBREV_TO_OURS.get(home_abbrev, home_abbrev)
-            away_abbrev = NBA_API_ABBREV_TO_OURS.get(away_abbrev, away_abbrev)
-
-            if not home_abbrev or not away_abbrev:
-                continue
-
-            # Game time — ESPN uses ISO 8601 UTC in startDate
-            start_date = comp.get("startDate", event.get("date", ""))
-            game_time_et = _utc_to_et_display(start_date)
-
-            # Venue
-            venue = comp.get("venue", {})
-            arena_name = venue.get("fullName", "")
-            arena_city = venue.get("address", {}).get("city", "")
-            arena_display = f"{arena_name}, {arena_city}".strip(", ") if arena_name else ""
-
-            home_team_name = home_team.get("displayName", "")
-            away_team_name = away_team.get("displayName", "")
-
-            formatted_games.append(_build_formatted_game(
-                home_abbrev, away_abbrev,
-                home_team_name, away_team_name,
-                game_time_et, arena_display,
-                team_records,
-            ))
-
-        return formatted_games
-
-    except Exception as error:
-        _logger.warning(f"Layer 2 (ESPN API) failed: {error}")
-        return []
-
-
-def _fetch_games_layer3_live_scoreboard(team_records):
-    """
-    Layer 3: Fetch today's games via the nba_api live ScoreBoard endpoint.
-
-    This is the original single-source implementation, retained as the
-    final fallback when both ScoreboardV2 and the ESPN API are unavailable.
-
-    Args:
-        team_records (dict): Pre-fetched standings data from _fetch_team_records().
-
-    Returns:
-        list of dict: Formatted game records, or empty list on failure.
-    """
-    try:
-        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
-
-        board = live_scoreboard.ScoreBoard()
-        games_data = board.games.get_dict()
-
-        formatted_games = []
-
-        for game in games_data:
-            home_team_info = game.get("homeTeam", {})
-            away_team_info = game.get("awayTeam", {})
-
-            home_abbrev = home_team_info.get("teamTricode", "")
-            away_abbrev = away_team_info.get("teamTricode", "")
-
-            home_abbrev = NBA_API_ABBREV_TO_OURS.get(home_abbrev, home_abbrev)
-            away_abbrev = NBA_API_ABBREV_TO_OURS.get(away_abbrev, away_abbrev)
-
-            if not home_abbrev or not away_abbrev:
-                continue
-
-            game_time_et = _utc_to_et_display(game.get("gameTimeUTC", ""))
-
-            arena = game.get("arenaName", "")
-            arena_city = game.get("arenaCity", "")
-            arena_display = f"{arena}, {arena_city}".strip(", ") if arena else ""
-
-            home_team_name = f"{home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}".strip()
-            away_team_name = f"{away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}".strip()
-
-            formatted_games.append(_build_formatted_game(
-                home_abbrev, away_abbrev,
-                home_team_name, away_team_name,
-                game_time_et, arena_display,
-                team_records,
-            ))
-
-        time.sleep(API_DELAY_SECONDS)
-        return formatted_games
-
-    except Exception as error:
-        _logger.warning(f"Layer 3 (Live ScoreBoard) failed: {error}")
-        return []
-
-
 def _deduplicate_games(games: list) -> list:
-    """Return *games* with duplicate matchups removed.
-
-    Two entries are considered duplicates when they share the same
-    home_team + away_team pair (case-insensitive).  The first occurrence
-    is kept and any subsequent duplicate is silently dropped.  A unique
-    game_id (if present) is also used as an alternative deduplication key.
-    """
-    seen_matchups: set = set()
-    seen_game_ids: set = set()
-    deduped: list = []
-    for g in (games or []):
-        game_id = g.get("game_id", "")
-        home = g.get("home_team", "").upper().strip()
-        away = g.get("away_team", "").upper().strip()
-        matchup_key = (home, away)
-        if game_id and game_id in seen_game_ids:
-            continue
-        if home and away and matchup_key in seen_matchups:
-            continue
-        if game_id:
-            seen_game_ids.add(game_id)
-        if home and away:
-            seen_matchups.add(matchup_key)
-        deduped.append(g)
-    return deduped
+    """Remove duplicate games by (home_team, away_team) pair."""
+    seen = set()
+    unique = []
+    for g in games:
+        key = (g.get("home_team", "").upper(), g.get("away_team", "").upper())
+        if key not in seen and key[0] and key[1]:
+            seen.add(key)
+            unique.append(g)
+    return unique
 
 
 def fetch_todays_games():
     """
-    Fetch tonight's NBA games using a 3-layer fallback system.
-
-    Attempts each source in order, falling through to the next if a layer
-    fails or returns no games.  After Layer 1 succeeds, a quick cross-
-    validation check against Layer 2 logs a warning if the game counts
-    differ (so discrepancies are visible in the logs without blocking the
-    primary result).
-
-    Layers:
-        1. ScoreboardV2        — NBA Stats API (most reliable)
-        2. ESPN Public API     — free unauthenticated endpoint (fallback)
-        3. Live ScoreBoard     — nba_api live endpoint (final fallback)
+    Fetch tonight's NBA games via ClearSports API.
 
     Returns:
         list of dict: Tonight's games, each with home_team, away_team,
-                      team records, streak info, and default Vegas lines.
-                      Returns empty list if all layers fail or no games today.
+                      team records, and default Vegas lines.
+                      Returns empty list if the fetch fails.
     """
-    # Fetch team records once — shared by all layers
-    team_records = _fetch_team_records()
+    try:
+        from data.clearsports_client import fetch_games_today as _cs_games
+        games = _cs_games()
+        if games:
+            _logger.info(f"ClearSports: {len(games)} game(s) found.")
+            return _deduplicate_games(games)
+    except Exception as err:
+        _logger.warning(f"ClearSports games fetch failed: {err}")
 
-    # --------------------------------------------------------
-    # Layer 1: ScoreboardV2
-    # --------------------------------------------------------
-    _logger.info("Trying Layer 1: ScoreboardV2...")
-    layer1_games = _fetch_games_layer1_scoreboard_v2(team_records)
-
-    if layer1_games:
-        _logger.info(f"Layer 1 success: {len(layer1_games)} game(s) found.")
-        # Cross-validate against Layer 2 — log a warning if counts disagree
-        try:
-            layer2_games = _fetch_games_layer2_espn(team_records)
-            if layer2_games and len(layer2_games) != len(layer1_games):
-                _logger.info(
-                    f"Cross-validation warning: Layer 1 found {len(layer1_games)} game(s), "
-                    f"Layer 2 found {len(layer2_games)} game(s). Using Layer 1 result."
-                )
-        except Exception as cv_error:
-            _logger.warning(f"Cross-validation check failed (non-fatal): {cv_error}")
-        return _deduplicate_games(layer1_games)
-
-    # --------------------------------------------------------
-    # Layer 2: ESPN Public API
-    # --------------------------------------------------------
-    _logger.info("Layer 1 failed. Trying Layer 2: ESPN Public API...")
-    layer2_games = _fetch_games_layer2_espn(team_records)
-
-    if layer2_games:
-        _logger.info(f"Layer 2 success: {len(layer2_games)} game(s) found.")
-        return _deduplicate_games(layer2_games)
-
-    # --------------------------------------------------------
-    # Layer 3: Live ScoreBoard
-    # --------------------------------------------------------
-    _logger.info("Layer 2 failed. Trying Layer 3: Live ScoreBoard...")
-    layer3_games = _fetch_games_layer3_live_scoreboard(team_records)
-
-    if layer3_games:
-        _logger.info(f"Layer 3 success: {len(layer3_games)} game(s) found.")
-    else:
-        _logger.warning("All layers failed. No games available.")
-
-    return _deduplicate_games(layer3_games or [])
+    _logger.warning("ClearSports game fetch failed. No games available.")
+    return []
 
 # ============================================================
 # END SECTION: Today's Games Fetcher
 # ============================================================
+# ============================================================
 
 
 # ============================================================
+# ============================================================
 # SECTION: Targeted Roster-Based Data Fetcher
-# Only fetches players on teams that are playing today.
-# This is MUCH faster than fetching all 500+ NBA players.
+# Fetches players only for teams playing today via ClearSports API.
 # ============================================================
 
 def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_injury_map=None):
     """
-    Fetch player stats ONLY for teams playing today.
+    Fetch player stats ONLY for teams playing today via ClearSports API.
 
     Streamlined pipeline:
     1. Identifies the teams playing today from todays_games
-    2. Uses RosterEngine to get current rosters + live injury data in one pass
-    3. Fetches ALL player season averages in ONE bulk LeagueDashPlayerStats call
-    4. Pre-filters injured/inactive players using RosterEngine data before any
-       further processing, avoiding wasted work
-    5. Computes std devs from dynamic CV estimates — no per-player game log calls
-
-    This approach reduces API calls from 380+ (one per player) to just 2-3 calls
-    total and completes in seconds rather than 3-5+ minutes.
+    2. Fetches player stats from ClearSports (filtered to today's teams)
+    3. Writes to players.csv in the standard format
 
     Args:
         todays_games (list of dict): Tonight's games from fetch_todays_games()
         progress_callback (callable, optional): Called with (current, total, msg)
-        precomputed_injury_map (dict, optional): Deprecated — no longer used.
-            Injury data is sourced directly from RosterEngine inside this
-            function. This parameter is kept for backward API compatibility
-            but is silently ignored.
+        precomputed_injury_map (dict, optional): Kept for backward compatibility.
 
     Returns:
         bool: True if successful, False if the fetch failed.
     """
-    try:
-        from nba_api.stats.endpoints import leaguedashplayerstats
-    except ImportError:
-        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return False
+    from data.clearsports_client import fetch_player_stats as _cs_players, fetch_rosters as _cs_rosters
+    from data.roster_engine import RosterEngine as _RosterEngine
 
     if not todays_games:
         _logger.info("No games provided — nothing to fetch.")
         return False
 
     try:
-        # --------------------------------------------------------
-        # Step 1: Identify which teams are playing today
-        # --------------------------------------------------------
         playing_team_abbrevs = set()
         for game in todays_games:
             playing_team_abbrevs.add(game.get("home_team", ""))
             playing_team_abbrevs.add(game.get("away_team", ""))
-        playing_team_abbrevs.discard("")  # Remove empty strings
+        playing_team_abbrevs.discard("")
 
-        _logger.info(f"Fetching rosters for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
-
-        if progress_callback:
-            progress_callback(0, 10, f"Found {len(playing_team_abbrevs)} teams playing today. Fetching rosters...")
-
-        # --------------------------------------------------------
-        # Step 2: Use RosterEngine to get rosters + live injury data in one pass
-        # --------------------------------------------------------
-        all_roster_players = []  # {player_id, player_name, team, position}
-        _roster_engine = None
-        seen_pids = set()  # Deduplication: avoid processing the same player twice
-
-        try:
-            from data.roster_engine import RosterEngine as _RosterEngine
-            from nba_api.stats.static import players as _nba_players_static
-
-            _roster_engine = _RosterEngine()
-            _roster_engine.refresh(list(playing_team_abbrevs))
-
-            # Build name → nba_api player_id lookup (case-insensitive)
-            _all_nba_players = _nba_players_static.get_players()
-            _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_nba_players}
-
-            teams_fetched = 0
-            for abbrev in sorted(playing_team_abbrevs):
-                if progress_callback:
-                    progress_callback(1 + teams_fetched, 10, f"Processing roster for {abbrev}...")
-
-                full_names = _roster_engine.get_full_roster(abbrev)
-                added = 0
-                for player_name in full_names:
-                    pid = _name_to_id.get(player_name.lower())
-                    if not pid:
-                        # Try partial first+last name match to handle suffix variants
-                        parts = player_name.lower().split()
-                        if len(parts) >= 2:
-                            pid = next(
-                                (
-                                    p["id"] for p in _all_nba_players
-                                    if parts[0] in p["full_name"].lower()
-                                    and parts[-1] in p["full_name"].lower()
-                                ),
-                                None,
-                            )
-                    if pid:
-                        if pid in seen_pids:
-                            continue  # Deduplicate: skip players already added
-                        seen_pids.add(pid)
-                        all_roster_players.append({
-                            "player_id":   pid,
-                            "player_name": player_name,
-                            "team":        abbrev,
-                            "position":    "SF",  # refined from bulk stats below
-                        })
-                        added += 1
-                    else:
-                        _logger.warning(f"  Could not find nba_api id for {player_name} ({abbrev}) — skipping")
-
-                teams_fetched += 1
-                _logger.info(f"  {abbrev}: {len(full_names)} players on roster ({added} matched by id)")
-
-        except Exception as roster_error:
-            _logger.warning(f"  RosterEngine error in fetch_todays_players_only: {roster_error}")
-
-        _logger.info(f"Total players on today's rosters: {len(all_roster_players)}")
+        _logger.info(f"Fetching players for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
 
         if progress_callback:
-            progress_callback(3, 10, f"Got {len(all_roster_players)} roster players. Fetching bulk season stats...")
+            progress_callback(1, 10, f"Found {len(playing_team_abbrevs)} teams. Fetching player stats...")
 
-        # --------------------------------------------------------
-        # Step 3: Fetch ALL player season averages in ONE bulk API call.
-        # LeagueDashPlayerStats returns stats for every player in the league,
-        # so we get all the averages we need with a single request instead of
-        # one PlayerGameLog call per player (380+ individual calls → 1 call).
-        # --------------------------------------------------------
-        bulk_stats = {}    # player_id (int) → row dict from LeagueDashPlayerStats
-        team_max_gp = {}   # nba_api team abbrev → highest GP on that team
-        try:
-            if progress_callback:
-                progress_callback(4, 10, "Fetching bulk player season averages (1 API call)...")
-            stats_ep = leaguedashplayerstats.LeagueDashPlayerStats(
-                per_mode_detailed="PerGame",
-                season_type_all_star="Regular Season",
-            )
-            time.sleep(API_DELAY_SECONDS)
-            for row in stats_ep.get_data_frames()[0].to_dict("records"):
-                pid = row.get("PLAYER_ID")
-                if pid:
-                    bulk_stats[int(pid)] = row
-                    # Track per-team maximum GP for recency proxy
-                    t_abbrev = row.get("TEAM_ABBREVIATION", "")
-                    gp = int(row.get("GP", 0) or 0)
-                    if t_abbrev and gp > team_max_gp.get(t_abbrev, 0):
-                        team_max_gp[t_abbrev] = gp
-            _logger.info(f"  Bulk stats: {len(bulk_stats)} players loaded")
-        except Exception as bulk_err:
-            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Will use zero defaults for missing players.")
-
-        # --------------------------------------------------------
-        # Step 4: Build formatted players from bulk stats.
-        # Pre-filter with injury data BEFORE any per-player work.
-        # --------------------------------------------------------
-        # Get injury data from the RosterEngine already populated in Step 2.
-        injury_data = {}
-        if _roster_engine is not None:
-            injury_data = _roster_engine.get_injury_report()
-            _logger.info(f"  RosterEngine supplied {len(injury_data)} injury entries")
-        else:
-            # RosterEngine failed — fall back to cached JSON
-            try:
-                if INJURY_STATUS_JSON_PATH.exists():
-                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                        injury_data = json.load(_jf)
-            except Exception as _cache_err:
-                _logger.warning(f"  WARNING: Cached injury data unavailable: {_cache_err}")
-
-        formatted_players = []
+        # Fetch all player stats from ClearSports
+        all_player_stats = _cs_players()
 
         if progress_callback:
-            progress_callback(5, 10, f"Building player stats from bulk data...")
+            progress_callback(4, 10, f"Got {len(all_player_stats)} players. Filtering to today's teams...")
 
-        for player_info in all_roster_players:
-            player_id   = player_info["player_id"]
-            player_name = player_info["player_name"]
-            team_abbrev = player_info["team"]
-
-            # ── Pre-filter: skip injured / inactive players immediately ──
-            injury_key = player_name.lower().strip()
-            inj_status = injury_data.get(injury_key, {}).get("status", "Active")
-            if inj_status in INACTIVE_INJURY_STATUSES:
-                continue
-
-            # ── Look up bulk stats by player_id ──────────────────────────
-            row = bulk_stats.get(player_id)
-            if row is None:
-                # Not in bulk stats → new signing / two-way not yet tracked; skip
-                continue
-
-            # ── Recency proxy via GP gap ──────────────────────────────────
-            # If a player has missed significantly more games than their teammates,
-            # they are likely on a long-term absence even if not in the injury report.
-            api_team  = row.get("TEAM_ABBREVIATION", team_abbrev)
-            player_gp = int(row.get("GP", 0) or 0)
-            t_max_gp  = team_max_gp.get(api_team, player_gp)
-            games_missed = max(0, t_max_gp - player_gp)
-            if games_missed > GP_ABSENT_THRESHOLD and t_max_gp > MIN_TEAM_GP_FOR_RECENCY_CHECK:
-                _logger.info(f"  Skipping {player_name}: missed {games_missed}/{t_max_gp} games (likely long-term out)")
-                continue
-
-            # ── Extract season averages ───────────────────────────────────
-            position    = row.get("START_POSITION", "SF") or "SF"
-            mapped_pos  = _POSITION_MAP.get(position, position)
-            api_team_norm = NBA_API_ABBREV_TO_OURS.get(api_team, api_team)
-
-            points_avg    = float(row.get("PTS",    0) or 0)
-            rebounds_avg  = float(row.get("REB",    0) or 0)
-            assists_avg   = float(row.get("AST",    0) or 0)
-            threes_avg    = float(row.get("FG3M",   0) or 0)
-            steals_avg    = float(row.get("STL",    0) or 0)
-            blocks_avg    = float(row.get("BLK",    0) or 0)
-            turnovers_avg = float(row.get("TOV",    0) or 0)
-            ft_pct        = float(row.get("FT_PCT", 0) or 0)
-            minutes_avg   = float(row.get("MIN",    0) or 0)
-            usage_rate    = min(35.0, max(10.0, minutes_avg * 0.8))
-
-            # Skip bench / DNP players (< MIN_MINUTES_THRESHOLD)
-            if minutes_avg < MIN_MINUTES_THRESHOLD:
-                continue
-
-            # ── Std devs from dynamic CV fallbacks (no per-player API call) ──
-            points_std    = max(1.0, points_avg    * _dynamic_cv_for_live_fetch("points",    points_avg))
-            rebounds_std  = max(0.5, rebounds_avg  * _dynamic_cv_for_live_fetch("rebounds",  rebounds_avg))
-            assists_std   = max(0.5, assists_avg   * _dynamic_cv_for_live_fetch("assists",   assists_avg))
-            threes_std    = max(0.3, threes_avg    * _dynamic_cv_for_live_fetch("threes",    threes_avg))
-            steals_std    = max(0.1, steals_avg    * FALLBACK_STEALS_STD_RATIO)
-            blocks_std    = max(0.1, blocks_avg    * FALLBACK_BLOCKS_STD_RATIO)
-            turnovers_std = max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO)
-
-            formatted_players.append({
-                "player_id":    player_id if player_id else "",
-                "name":         player_name,
-                "team":         api_team_norm or team_abbrev,
-                "position":     mapped_pos,
-                "minutes_avg":  round(minutes_avg,   1),
-                "points_avg":   round(points_avg,    1),
-                "rebounds_avg": round(rebounds_avg,  1),
-                "assists_avg":  round(assists_avg,   1),
-                "threes_avg":   round(threes_avg,    1),
-                "steals_avg":   round(steals_avg,    1),
-                "blocks_avg":   round(blocks_avg,    1),
-                "turnovers_avg":round(turnovers_avg, 1),
-                "ft_pct":       round(ft_pct,        3),
-                "usage_rate":   round(usage_rate,    1),
-                "points_std":   round(points_std,    2),
-                "rebounds_std": round(rebounds_std,  2),
-                "assists_std":  round(assists_std,   2),
-                "threes_std":   round(threes_std,    2),
-                "steals_std":   round(steals_std,    2),
-                "blocks_std":   round(blocks_std,    2),
-                "turnovers_std":round(turnovers_std, 2),
-            })
-
-        # Sort by points average (stars appear first)
-        formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
-
-        # --------------------------------------------------------
-        # Step 5: Save injury data to JSON and write players CSV.
-        # All players stay in the CSV so platform props can match them.
-        # The injury JSON is the single source of truth for availability.
-        # --------------------------------------------------------
-        if injury_data:
-            try:
-                with open(INJURY_STATUS_JSON_PATH, "w", encoding="utf-8") as _jf:
-                    json.dump(injury_data, _jf, indent=2, default=str)
-                _logger.info(f"  Saved {len(injury_data)} injury entries to {INJURY_STATUS_JSON_PATH}")
-            except Exception as _save_err:
-                _logger.warning(f"  WARNING: Could not save injury data: {_save_err}")
-
-        _logger.info(f"  Writing {len(formatted_players)} players to CSV (injury data stored separately)")
-
-        if progress_callback:
-            progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
-
-        # Write to the CSV file (same format as full fetch)
-        fieldnames = [
-            "player_id", "name", "team", "position", "minutes_avg",
-            "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
-            "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
-            "usage_rate", "points_std", "rebounds_std", "assists_std",
-            "threes_std", "steals_std", "blocks_std", "turnovers_std",
+        # Filter to only players on today's teams
+        filtered_players = [
+            p for p in all_player_stats
+            if str(p.get("team", "")).upper().strip() in playing_team_abbrevs
         ]
 
-        with open(PLAYERS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(formatted_players)
+        if not filtered_players and all_player_stats:
+            # If no team filter match, return all (may be first run with no games data)
+            filtered_players = all_player_stats
 
+        _logger.info(f"Using {len(filtered_players)} players on today's teams.")
+
+        if progress_callback:
+            progress_callback(6, 10, f"Writing {len(filtered_players)} players to CSV...")
+
+        # Fetch injury data via RosterEngine
+        injury_map = {}
+        try:
+            _roster_engine = _RosterEngine()
+            _roster_engine.refresh(list(playing_team_abbrevs))
+            injury_map = _roster_engine.get_injury_report()
+        except Exception as roster_err:
+            _logger.warning(f"RosterEngine injury fetch failed (non-fatal): {roster_err}")
+
+        # Write injury status JSON
+        try:
+            import json as _json
+            with open(INJURY_STATUS_JSON_PATH, "w") as _f:
+                _json.dump(injury_map, _f, indent=2)
+            save_last_updated("injuries")
+        except Exception as inj_write_err:
+            _logger.warning(f"Could not write injury status (non-fatal): {inj_write_err}")
+
+        if not filtered_players:
+            _logger.warning("No player stats available from ClearSports.")
+            return False
+
+        # Write players CSV
+        _write_players_csv(filtered_players)
         save_last_updated("players")
 
         if progress_callback:
-            progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players (today's teams only)!")
+            progress_callback(10, 10, f"Done! {len(filtered_players)} players updated.")
 
-        _logger.info(f"Saved {len(formatted_players)} players for today's games to {PLAYERS_CSV_PATH}")
-        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
+        _logger.info(f"fetch_todays_players_only complete: {len(filtered_players)} players written.")
         return True
 
     except Exception as error:
-        _logger.error(f"Error in fetch_todays_players_only: {error}")
+        _logger.error(f"fetch_todays_players_only failed: {error}")
         return False
 
-# ============================================================
+
 # END SECTION: Targeted Roster-Based Data Fetcher
 # ============================================================
+# ============================================================
 
 
 # ============================================================
+# ============================================================
 # SECTION: Recent Form Fetcher
-# Fetch the last N games for a player and compute trend/averages.
+# Fetches recent game data for trend analysis.
 # ============================================================
 
 def fetch_player_recent_form(player_id, last_n_games=10):
     """
     Fetch recent form data for a specific player.
 
-    Returns the last N game logs along with:
-    - Recent averages (last N games)
-    - Trend indicator: 'hot' if last 3 games avg > season avg, else 'cold'
-    - Game-by-game breakdown for sparkline display
+    Returns the last N game logs along with trend analysis.
+    Falls back to an empty dict if ClearSports doesn't have game logs.
 
     Args:
         player_id (int or str): The NBA player's unique ID
@@ -1180,43 +661,43 @@ def fetch_player_recent_form(player_id, last_n_games=10):
 
     Returns:
         dict: Recent form data with keys:
-              'games' (list), 'recent_pts_avg', 'recent_reb_avg',
+              'games', 'recent_pts_avg', 'recent_reb_avg',
               'recent_ast_avg', 'trend', 'game_results'
               Returns empty dict if fetch fails.
     """
     try:
-        from nba_api.stats.endpoints import playergamelog
-    except ImportError:
+        from data.clearsports_client import fetch_player_game_log as _cs_log
+        game_log = _cs_log(player_id, last_n_games=last_n_games)
+    except Exception:
+        game_log = []
+
+    # If ClearSports doesn't provide game logs, fall back to cached data
+    if not game_log and _GAME_LOG_CACHE_AVAILABLE:
+        try:
+            game_log = load_game_logs_from_cache(player_id) or []
+            if game_log:
+                game_log = game_log[:last_n_games]
+        except Exception:
+            game_log = []
+
+    if not game_log:
         return {}
 
     try:
-        game_log_endpoint = playergamelog.PlayerGameLog(
-            player_id=player_id,
-            season_type_all_star="Regular Season",
-        )
-        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
-        time.sleep(API_DELAY_SECONDS)
-
-        recent = game_log_data[:last_n_games]
-
-        if not recent:
-            return {}
-
         def safe_avg(values):
-            """Average a list of numeric values, ignoring None/NaN entries."""
-            clean = [v for v in values if v is not None and isinstance(v, (int, float)) and math.isfinite(v)]
+            clean = [v for v in values if v is not None and isinstance(v, (int, float)) and math.isfinite(float(v))]
             return round(sum(clean) / len(clean), 1) if clean else 0.0
 
-        pts_list = [float(g.get("PTS", 0) or 0) for g in recent]
-        reb_list = [float(g.get("REB", 0) or 0) for g in recent]
-        ast_list = [float(g.get("AST", 0) or 0) for g in recent]
-        fg3m_list = [float(g.get("FG3M", 0) or 0) for g in recent]
+        recent = game_log[:last_n_games]
+        pts_list = [float(g.get("pts", g.get("PTS", 0)) or 0) for g in recent]
+        reb_list = [float(g.get("reb", g.get("REB", 0)) or 0) for g in recent]
+        ast_list = [float(g.get("ast", g.get("AST", 0)) or 0) for g in recent]
+        fg3m_list = [float(g.get("fg3m", g.get("FG3M", 0)) or 0) for g in recent]
 
-        # Trend: compare last 5 games vs prior 5 games
-        last_5_pts_vals = pts_list[:5]
-        prior_5_pts_vals = pts_list[5:10]
-        last5_avg = safe_avg(last_5_pts_vals)
-        prev5_avg = safe_avg(prior_5_pts_vals) if prior_5_pts_vals else last5_avg
+        last_5_pts = pts_list[:5]
+        prior_5_pts = pts_list[5:10]
+        last5_avg = safe_avg(last_5_pts)
+        prev5_avg = safe_avg(prior_5_pts) if prior_5_pts else last5_avg
 
         if prev5_avg > 0:
             trend = "hot" if last5_avg >= prev5_avg * HOT_TREND_THRESHOLD else (
@@ -1226,20 +707,18 @@ def fetch_player_recent_form(player_id, last_n_games=10):
             trend = "neutral"
 
         trend_emoji_map = {"hot": "🔥", "cold": "❄️", "neutral": "➡️"}
-        trend_emoji = trend_emoji_map.get(trend, "➡️")
 
-        # Build game-by-game results list (newest first)
         game_results = []
         for g in recent:
             game_results.append({
-                "date": g.get("GAME_DATE", ""),
-                "matchup": g.get("MATCHUP", ""),
-                "wl": g.get("WL", ""),
-                "pts": float(g.get("PTS", 0) or 0),
-                "reb": float(g.get("REB", 0) or 0),
-                "ast": float(g.get("AST", 0) or 0),
-                "fg3m": float(g.get("FG3M", 0) or 0),
-                "min": float(g.get("MIN", 0) or 0),
+                "date": g.get("game_date", g.get("GAME_DATE", "")),
+                "matchup": g.get("matchup", g.get("MATCHUP", "")),
+                "wl": g.get("win_loss", g.get("WL", "")),
+                "pts": float(g.get("pts", g.get("PTS", 0)) or 0),
+                "reb": float(g.get("reb", g.get("REB", 0)) or 0),
+                "ast": float(g.get("ast", g.get("AST", 0)) or 0),
+                "fg3m": float(g.get("fg3m", g.get("FG3M", 0)) or 0),
+                "min": float(g.get("minutes", g.get("MIN", 0)) or 0),
             })
 
         return {
@@ -1249,430 +728,117 @@ def fetch_player_recent_form(player_id, last_n_games=10):
             "recent_ast_avg": safe_avg(ast_list),
             "recent_fg3m_avg": safe_avg(fg3m_list),
             "trend": trend,
-            "trend_emoji": trend_emoji,
-            "last_5_pts": last_5_pts_vals,
+            "trend_emoji": trend_emoji_map.get(trend, "➡️"),
+            "last_5_pts": last_5_pts,
             "last_5_pts_avg": last5_avg,
             "game_results": game_results,
             "games_played": len(recent),
         }
-
     except Exception as error:
-        _logger.error(f"Error fetching recent form for player {player_id}: {error}")
+        _logger.error(f"Error computing recent form for player {player_id}: {error}")
         return {}
 
 # ============================================================
 # END SECTION: Recent Form Fetcher
 # ============================================================
+# ============================================================
 
 
 # ============================================================
+# ============================================================
 # SECTION: Player Stats Fetcher
-# Fetches current season averages for all NBA players.
+# Fetches current season stats for all NBA players via ClearSports API.
 # ============================================================
 
 def fetch_player_stats(progress_callback=None):
     """
-    Fetch current season player stats for all NBA players.
+    Fetch current season player stats for all NBA players via ClearSports API.
 
-    Uses LeagueDashPlayerStats to get PPG, RPG, APG, etc. for
-    every player who has played this season. Then fetches game logs
-    to calculate standard deviations (how consistent each player is).
-
-    BEGINNER NOTE: LeagueDashPlayerStats is the same data you see on
-    basketball-reference.com or ESPN — season averages per game.
+    Writes the results to players.csv in the standard column format.
 
     Args:
-        progress_callback (callable, optional): A function to call with
-            progress updates. Called with (current, total, message).
-            Used by the Streamlit page to update the progress bar.
+        progress_callback (callable, optional): Called with (current, total, message).
 
     Returns:
         bool: True if successful, False if the fetch failed.
     """
-    # Import inside the function for graceful failure if not installed
-    try:
-        from nba_api.stats.endpoints import leaguedashplayerstats
-        from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import players as nba_players_static
-    except ImportError:
-        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return False
+    from data.clearsports_client import fetch_player_stats as _cs_player_stats
 
     try:
-        # --------------------------------------------------------
-        # Step 1: Fetch season averages for all players
-        # --------------------------------------------------------
-
-        # Call the LeagueDashPlayerStats endpoint
-        # BEGINNER NOTE: PerGame means we get per-game averages (not totals)
-        # season_type_all_star is the parameter name in nba_api that controls
-        # the season type. Despite the parameter name containing "all_star",
-        # it accepts values like "Regular Season", "Playoffs", "Pre Season", etc.
-        _logger.info("Fetching player season averages from NBA API...")
-
-        # Signal progress to the UI if a callback was provided
         if progress_callback:
-            progress_callback(1, 10, "Connecting to NBA API for player stats...")
+            progress_callback(1, 10, "Connecting to ClearSports API for player stats...")
 
-        # Make the API call — this fetches ALL players' stats at once
-        stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
-            per_mode_detailed="PerGame",      # We want per-game averages
-            season_type_all_star="Regular Season",  # Only regular season
-        )
-
-        # Wait a moment before the next call
-        time.sleep(API_DELAY_SECONDS)
-
-        # Get the data as a list of dictionaries
-        # BEGINNER NOTE: nba_api returns a DataFrame object.
-        # .get_data_frames() converts it to a list of DataFrames.
-        # [0] gets the first (and only) DataFrame.
-        # .to_dict('records') converts rows to a list of dicts.
-        player_stats_list = stats_endpoint.get_data_frames()[0].to_dict("records")
+        player_stats_list = _cs_player_stats()
 
         if progress_callback:
-            progress_callback(2, 10, f"Got stats for {len(player_stats_list)} players. Calculating standard deviations...")
+            progress_callback(5, 10, f"Got stats for {len(player_stats_list)} players. Writing CSV...")
 
-        _logger.info(f"Got stats for {len(player_stats_list)} players.")
+        _logger.info(f"ClearSports returned {len(player_stats_list)} player stats.")
 
-        # --------------------------------------------------------
-        # Step 2: Map nba_api column names to our column names
-        # --------------------------------------------------------
+        if not player_stats_list:
+            _logger.warning("ClearSports returned no player stats.")
+            return False
 
-        # BEGINNER NOTE: nba_api uses column names like "PTS" (points),
-        # but our app uses "points_avg". We need to map between them.
-        # This list will hold our formatted player rows.
-        formatted_players = []
-
-        # Process each player — fetch game logs for std dev calculation
-        total_players = len(player_stats_list)
-
-        for player_index, player_row in enumerate(player_stats_list):
-            # Show progress every 10 players
-            if player_index % 10 == 0 and progress_callback:
-                progress_message = f"Processing player {player_index + 1} of {total_players}..."
-                progress_callback(2 + int(7 * player_index / total_players), 10, progress_message)
-
-            # Extract the player's season averages from the nba_api format
-            # BEGINNER NOTE: .get(key, default) returns the value for 'key',
-            # or 'default' if the key doesn't exist.
-            player_name = player_row.get("PLAYER_NAME", "")          # Full name
-            team_abbrev = player_row.get("TEAM_ABBREVIATION", "")    # 3-letter team code
-            position = player_row.get("START_POSITION", "G")          # Starting position
-
-            # Skip players with no name or team
-            if not player_name or not team_abbrev:
-                continue
-
-            # Map position codes (nba_api sometimes uses just "G", "F", "C")
-            # Our app uses PG, SG, SF, PF, C — we default to a generic position
-            position_map = {
-                "G": "PG",   # Guard → Point Guard (best guess)
-                "F": "SF",   # Forward → Small Forward (best guess)
-                "C": "C",    # Center stays Center
-                "G-F": "SF", # Guard-Forward hybrid
-                "F-G": "SG", # Forward-Guard hybrid
-                "F-C": "PF", # Forward-Center hybrid
-                "C-F": "PF", # Center-Forward hybrid
-                "": "SF",    # Unknown → Small Forward (safe default)
-            }
-            mapped_position = position_map.get(position, position)  # Map or keep original
-
-            # Normalize team abbreviation to match our format
-            team_abbrev = NBA_API_ABBREV_TO_OURS.get(team_abbrev, team_abbrev)
-
-            # Get season averages (these come as numbers from nba_api)
-            points_avg = float(player_row.get("PTS", 0) or 0)        # Points per game
-            rebounds_avg = float(player_row.get("REB", 0) or 0)      # Rebounds per game
-            assists_avg = float(player_row.get("AST", 0) or 0)       # Assists per game
-            threes_avg = float(player_row.get("FG3M", 0) or 0)       # 3-pointers made per game
-            steals_avg = float(player_row.get("STL", 0) or 0)        # Steals per game
-            blocks_avg = float(player_row.get("BLK", 0) or 0)        # Blocks per game
-            turnovers_avg = float(player_row.get("TOV", 0) or 0)     # Turnovers per game
-            ft_pct = float(player_row.get("FT_PCT", 0) or 0)         # Free throw percentage (0-1)
-            minutes_avg = float(player_row.get("MIN", 0) or 0)       # Minutes per game
-
-            # Usage rate is not directly in LeagueDashPlayerStats basic call
-            # We estimate it from minutes played as a rough proxy:
-            # NBA average usage rate ≈ 20% (equal sharing across 5 players).
-            # Stars who play 35+ min tend to have usage ≈ 28-35%.
-            # The 0.8 multiplier maps minutes (10-38 range) to a plausible
-            # usage range (8-30%) that correlates with observed NBA data.
-            # This estimate is only used if live usage data isn't available.
-            usage_rate = min(35.0, max(10.0, minutes_avg * 0.8))  # Rough estimate
-
-            # --------------------------------------------------------
-            # Step 3: Calculate standard deviations from game logs
-            # --------------------------------------------------------
-            # BEGINNER NOTE: Standard deviation measures how consistent
-            # a player is. A player who always scores exactly 20 has
-            # std dev of 0. A player who scores anywhere from 5-35
-            # has a high std dev. Higher std dev = harder to predict.
-
-            # Fetch the player's game log to calculate std dev
-            player_id = player_row.get("PLAYER_ID")  # Unique NBA player ID
-
-            # Default std devs if we can't fetch the game log.
-            # W10: Use dynamic tier-based CV instead of fixed ratios.
-            # Stars (high avg) are more consistent; role players are more volatile.
-            points_std = max(1.0, points_avg * _dynamic_cv_for_live_fetch("points", points_avg))
-            rebounds_std = max(0.5, rebounds_avg * _dynamic_cv_for_live_fetch("rebounds", rebounds_avg))
-            assists_std = max(0.5, assists_avg * _dynamic_cv_for_live_fetch("assists", assists_avg))
-            threes_std = max(0.3, threes_avg * _dynamic_cv_for_live_fetch("threes", threes_avg))
-
-            # Initialize steals/blocks/turnovers std devs with CV-based defaults.
-            # These will be overwritten with game-log-calculated values if available.
-            steals_std_from_log = None    # Will hold game-log std dev if fetched
-            blocks_std_from_log = None    # Will hold game-log std dev if fetched
-            turnovers_std_from_log = None  # Will hold game-log std dev if fetched
-
-            # Only fetch game log if the player has played meaningful minutes
-            # This avoids wasting API calls on end-of-bench players
-            if player_id and minutes_avg >= 10.0:
-                try:
-                    # Check cache first to avoid redundant API calls
-                    _cached_logs = None
-                    if _GAME_LOG_CACHE_AVAILABLE:
-                        _cached_logs, _is_stale = load_game_logs_from_cache(player_name)
-                        if _cached_logs and not _is_stale:
-                            game_log_data = _cached_logs
-                            recent_games = game_log_data[:20]
-                        else:
-                            _cached_logs = None  # Force fresh fetch
-
-                    if _cached_logs is None:
-                        # Fetch the last 20 games for this player
-                        # BEGINNER NOTE: The game log shows stats game-by-game,
-                        # e.g., "March 1: 22 pts, March 3: 18 pts, March 5: 30 pts"
-                        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
-                            _rate_limiter.acquire()
-                        game_log_endpoint = playergamelog.PlayerGameLog(
-                            player_id=player_id,        # Which player
-                            season_type_all_star="Regular Season",  # Only regular season
-                        )
-
-                        # Get the game log data
-                        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
-                        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
-                            _rate_limiter.record_request()
-
-                        # Cache the result for future calls (JSON + SQLite write-through)
-                        if _GAME_LOG_CACHE_AVAILABLE and game_log_data:
-                            save_game_logs_to_cache(player_name, game_log_data)
-                        # Feature 12: also persist to SQLite DB for cross-session durability
-                        if _DB_GAME_LOG_AVAILABLE and game_log_data:
-                            try:
-                                save_player_game_logs_to_db(
-                                    player_id=player_id,
-                                    player_name=player_name,
-                                    game_logs=game_log_data,
-                                )
-                            except Exception:
-                                _logger.debug("SQLite game log persist failed (non-fatal)")
-
-                        # Take only the last 20 games for recency
-                        recent_games = game_log_data[:20]
-
-                    # Calculate std dev if we have at least 5 games
-                    if len(recent_games) >= 5:
-                        # Extract lists of each stat across all games
-                        pts_list = [float(g.get("PTS", 0) or 0) for g in recent_games]
-                        reb_list = [float(g.get("REB", 0) or 0) for g in recent_games]
-                        ast_list = [float(g.get("AST", 0) or 0) for g in recent_games]
-                        fg3m_list = [float(g.get("FG3M", 0) or 0) for g in recent_games]
-                        stl_list = [float(g.get("STL", 0) or 0) for g in recent_games]
-                        blk_list = [float(g.get("BLK", 0) or 0) for g in recent_games]
-                        tov_list = [float(g.get("TOV", 0) or 0) for g in recent_games]
-
-                        # statistics.stdev calculates standard deviation
-                        # BEGINNER NOTE: We need at least 2 values for stdev
-                        if len(pts_list) >= 2:
-                            points_std = round(statistics.stdev(pts_list), 2)
-                        if len(reb_list) >= 2:
-                            rebounds_std = round(statistics.stdev(reb_list), 2)
-                        if len(ast_list) >= 2:
-                            assists_std = round(statistics.stdev(ast_list), 2)
-                        if len(fg3m_list) >= 2:
-                            threes_std = round(statistics.stdev(fg3m_list), 2)
-                        # Calculate steals/blocks/turnovers std from game logs
-                        # This replaces the CV-based defaults for better accuracy
-                        steals_std_from_log = round(statistics.stdev(stl_list), 2) if len(stl_list) >= 2 else None
-                        blocks_std_from_log = round(statistics.stdev(blk_list), 2) if len(blk_list) >= 2 else None
-                        turnovers_std_from_log = round(statistics.stdev(tov_list), 2) if len(tov_list) >= 2 else None
-                    else:
-                        steals_std_from_log = None
-                        blocks_std_from_log = None
-                        turnovers_std_from_log = None
-
-                    # IMPORTANT: Always sleep between API calls to avoid rate limiting
-                    time.sleep(API_DELAY_SECONDS)
-
-                except Exception as game_log_error:
-                    # If game log fetch fails, use the default std devs calculated above
-                    # This is not fatal — we just use less accurate std devs
-                    _logger.warning(f"  Could not fetch game log for {player_name}: {game_log_error}")
-
-            # --------------------------------------------------------
-            # Step 4: Build the formatted player dictionary
-            # --------------------------------------------------------
-
-            # Build the row in our CSV format
-            # BEGINNER NOTE: All values are rounded to 2 decimal places
-            # for clean CSV output
-            formatted_player = {
-                "player_id": player_id if player_id else "",  # NBA unique player ID
-                "name": player_name,                          # Player full name
-                "team": team_abbrev,                          # 3-letter team code
-                "position": mapped_position,                  # PG/SG/SF/PF/C
-                "minutes_avg": round(minutes_avg, 1),         # Minutes per game
-                "points_avg": round(points_avg, 1),           # Points per game
-                "rebounds_avg": round(rebounds_avg, 1),       # Rebounds per game
-                "assists_avg": round(assists_avg, 1),         # Assists per game
-                "threes_avg": round(threes_avg, 1),           # 3PM per game
-                "steals_avg": round(steals_avg, 1),           # Steals per game
-                "blocks_avg": round(blocks_avg, 1),           # Blocks per game
-                "turnovers_avg": round(turnovers_avg, 1),     # Turnovers per game
-                "ft_pct": round(ft_pct, 3),                   # Free throw % (0-1)
-                "usage_rate": round(usage_rate, 1),           # Usage rate %
-                "points_std": round(points_std, 2),           # Points std dev
-                "rebounds_std": round(rebounds_std, 2),       # Rebounds std dev
-                "assists_std": round(assists_std, 2),         # Assists std dev
-                "threes_std": round(threes_std, 2),           # 3PM std dev
-                # Use game-log std devs when available; fall back to ratio-based estimates
-                "steals_std": round(steals_std_from_log if steals_std_from_log is not None else max(0.1, steals_avg * FALLBACK_STEALS_STD_RATIO), 2),
-                "blocks_std": round(blocks_std_from_log if blocks_std_from_log is not None else max(0.1, blocks_avg * FALLBACK_BLOCKS_STD_RATIO), 2),
-                "turnovers_std": round(turnovers_std_from_log if turnovers_std_from_log is not None else max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO), 2),
-            }
-
-            # Skip players who aren't getting meaningful minutes.
-            # They won't have props and pollute the database with noise.
-            if minutes_avg < MIN_MINUTES_THRESHOLD:
-                continue
-
-            formatted_players.append(formatted_player)
-
-        # --------------------------------------------------------
-        # Step 5: Sort by points average (stars appear first)
-        # --------------------------------------------------------
-
-        # Sort players so the best scorers appear at the top
-        formatted_players.sort(key=lambda p: p["points_avg"], reverse=True)
-
-        # --------------------------------------------------------
-        # Step 5b: Filter out injured / inactive players
-        # Cross-reference with nba_api injury data (via RosterEngine)
-        # to remove players confirmed as Out or on IR
-        # before writing to CSV.
-        # --------------------------------------------------------
-        try:
-            from data.roster_engine import RosterEngine as _RE
-            _inj_engine = _RE()
-            _inj_engine.refresh()
-            scraped_injuries = _inj_engine.get_injury_report()
-            if scraped_injuries:
-                before_count = len(formatted_players)
-                formatted_players = [
-                    p for p in formatted_players
-                    if scraped_injuries.get(
-                        p["name"].lower().strip(), {}
-                    ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                ]
-                removed_count = before_count - len(formatted_players)
-                if removed_count:
-                    _logger.info(
-                        f"  Injury filter: removed {removed_count} Out/IR players "
-                        f"from player stats ({len(formatted_players)} remain)"
-                    )
-        except Exception as _inj_err:
-            # RosterEngine injury fetch failed — fall back to the cached injury_status.json
-            # written by a previous fetch_todays_players_only() run.
-            _logger.info(f"  Injury fetch (RosterEngine) failed in fetch_player_stats: {_inj_err}")
-            try:
-                cached_injuries = {}
-                if INJURY_STATUS_JSON_PATH.exists():
-                    with open(INJURY_STATUS_JSON_PATH, "r", encoding="utf-8") as _jf:
-                        cached_injuries = json.load(_jf)
-                if cached_injuries:
-                    before_count = len(formatted_players)
-                    formatted_players = [
-                        p for p in formatted_players
-                        if cached_injuries.get(
-                            p["name"].lower().strip(), {}
-                        ).get("status", "Active") not in INACTIVE_INJURY_STATUSES
-                    ]
-                    removed_count = before_count - len(formatted_players)
-                    _logger.info(
-                        f"  Injury fallback (cached JSON): removed {removed_count} "
-                        f"players ({len(formatted_players)} remain)"
-                    )
-                else:
-                    _logger.info(
-                        "  WARNING: RosterEngine failed and no cached injury data "
-                        "available — no injury filter applied"
-                    )
-            except Exception as _cache_err:
-                _logger.warning(f"  WARNING: All injury filter methods failed: {_cache_err}")
-
-        if progress_callback:
-            progress_callback(9, 10, f"Saving {len(formatted_players)} players to CSV...")
-
-        # --------------------------------------------------------
-        # Step 6: Write the CSV file
-        # --------------------------------------------------------
-
-        # Define the column order (must match players.csv exactly)
-        fieldnames = [
-            "player_id", "name", "team", "position", "minutes_avg",
-            "points_avg", "rebounds_avg", "assists_avg", "threes_avg",
-            "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
-            "usage_rate", "points_std", "rebounds_std", "assists_std",
-            "threes_std", "steals_std", "blocks_std", "turnovers_std",
-        ]
-
-        # Write to the CSV file (overwrites any existing data)
-        # BEGINNER NOTE: 'w' means write mode (overwrites existing file)
-        # newline='' is required by Python's csv module on Windows
-        with open(PLAYERS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            writer.writeheader()      # Write the column names row
-            writer.writerows(formatted_players)  # Write all player rows
-
-        # Save timestamp so we know when this was last updated
+        _write_players_csv(player_stats_list)
         save_last_updated("players")
 
         if progress_callback:
-            progress_callback(10, 10, f"✅ Saved {len(formatted_players)} players!")
+            progress_callback(10, 10, f"Done! {len(player_stats_list)} players saved.")
 
-        _logger.info(f"Successfully saved {len(formatted_players)} players to {PLAYERS_CSV_PATH}")
-        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
-        return True  # Signal success
+        _logger.info(f"fetch_player_stats complete: {len(player_stats_list)} players.")
+        return True
 
     except Exception as error:
-        # Catch-all error handler — show what went wrong
-        _logger.error(f"Error fetching player stats: {error}")
-        return False  # Signal failure
+        _logger.error(f"fetch_player_stats failed: {error}")
+        return False
+
+
+def _write_players_csv(players):
+    """Write a list of player stat dicts to players.csv in standard format."""
+    if not players:
+        return
+
+    fieldnames = [
+        "player_id", "name", "team", "position",
+        "minutes_avg", "points_avg", "rebounds_avg", "assists_avg",
+        "threes_avg", "steals_avg", "blocks_avg", "turnovers_avg",
+        "ft_pct", "usage_rate",
+        "points_std", "rebounds_std", "assists_std", "threes_std",
+        "steals_std", "blocks_std", "turnovers_std",
+    ]
+
+    import csv as _csv
+    with open(PLAYERS_CSV_PATH, "w", newline="", encoding="utf-8") as f:
+        writer = _csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for p in players:
+            row = {k: p.get(k, "") for k in fieldnames}
+            for numeric_field in fieldnames[4:]:
+                if not row[numeric_field] and row[numeric_field] != 0:
+                    row[numeric_field] = 0.0
+            writer.writerow(row)
+
+    _logger.info(f"Wrote {len(players)} players to {PLAYERS_CSV_PATH}")
 
 # ============================================================
 # END SECTION: Player Stats Fetcher
 # ============================================================
+# ============================================================
 
 
 # ============================================================
+# ============================================================
 # SECTION: Team Stats Fetcher
-# Fetches current season team stats (pace, ratings, etc.)
+# Fetches current season team stats via ClearSports API.
 # ============================================================
 
 def fetch_team_stats(progress_callback=None):
     """
-    Fetch current season team stats using LeagueDashTeamStats.
+    Fetch current season team stats via ClearSports API.
 
-    Pulls pace, offensive rating (ORTG), and defensive rating (DRTG)
-    for all 30 NBA teams. Also builds basic defensive ratings by position.
-
-    BEGINNER NOTE: Pace is how many possessions a team uses per 48 minutes.
-    A high pace team (like the Warriors) plays fast, meaning more shots and
-    more counting stats. ORTG = points scored per 100 possessions. DRTG =
-    points allowed per 100 possessions. Lower DRTG = better defense.
+    Pulls pace, offensive rating (ORTG), defensive rating (DRTG),
+    and wins/losses for all 30 NBA teams. Writes to teams.csv and
+    defensive_ratings.csv.
 
     Args:
         progress_callback (callable, optional): Progress update function.
@@ -1680,386 +846,147 @@ def fetch_team_stats(progress_callback=None):
     Returns:
         bool: True if successful, False if the fetch failed.
     """
-    # Import inside the function for graceful failure
-    try:
-        from nba_api.stats.endpoints import leaguedashteamstats
-    except ImportError:
-        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return False
+    from data.clearsports_client import fetch_team_stats as _cs_team_stats
 
     try:
         if progress_callback:
-            progress_callback(1, 6, "Fetching team stats from NBA API...")
+            progress_callback(1, 6, "Fetching team stats from ClearSports API...")
 
-        # --------------------------------------------------------
-        # Step 1: Fetch team stats (pace, ortg, drtg)
-        # --------------------------------------------------------
-
-        # LeagueDashTeamStats with PerPossession gives us ratings
-        # BEGINNER NOTE: Per possession stats (like ORTG/DRTG) normalize
-        # for pace — they tell you how efficient a team is regardless of
-        # whether they play fast or slow.
-        team_stats_endpoint = leaguedashteamstats.LeagueDashTeamStats(
-            per_mode_detailed="PerGame",          # Get per-game stats
-            season_type_all_star="Regular Season",
-        )
-
-        # Get the data
-        team_stats_list = team_stats_endpoint.get_data_frames()[0].to_dict("records")
-
-        time.sleep(API_DELAY_SECONDS)  # Be polite — wait between calls
+        team_stats_list = _cs_team_stats()
 
         if progress_callback:
-            progress_callback(2, 6, "Fetching team advanced stats (pace, ratings)...")
+            progress_callback(3, 6, f"Got {len(team_stats_list)} teams. Building CSV rows...")
 
-        # Also fetch advanced stats for pace and ratings
-        # BEGINNER NOTE: "Advanced" stats include efficiency metrics
-        # that regular box scores don't show
-        from nba_api.stats.endpoints import leaguedashteamstats as advanced_stats_module
+        _logger.info(f"ClearSports returned {len(team_stats_list)} team stats.")
 
-        # Fetch advanced (per-possession) stats for ORTG/DRTG/Pace
-        advanced_endpoint = advanced_stats_module.LeagueDashTeamStats(
-            per_mode_detailed="Per100Possessions",    # Per 100 possessions = normalized
-            measure_type_detailed_defense="Advanced",  # Advanced stats mode
-            season_type_all_star="Regular Season",
-        )
+        if not team_stats_list:
+            _logger.warning("ClearSports returned no team stats.")
+            return False
 
-        advanced_list = advanced_endpoint.get_data_frames()[0].to_dict("records")
-
-        time.sleep(API_DELAY_SECONDS)
-
-        # Build a lookup dict: team_id → advanced stats
-        # BEGINNER NOTE: A dictionary lets us quickly look up a team's
-        # advanced stats by their team ID
-        advanced_by_team_id = {}
-        for row in advanced_list:
-            team_id = row.get("TEAM_ID")           # Unique team ID number
-            if team_id:
-                advanced_by_team_id[team_id] = row  # Store advanced stats
-
-        if progress_callback:
-            progress_callback(3, 6, "Building team CSV rows...")
-
-        # --------------------------------------------------------
-        # Step 2: Build formatted team rows
-        # --------------------------------------------------------
-
-        formatted_teams = []
-
-        for team_row in team_stats_list:
-            # Get the team name and ID
-            team_name = team_row.get("TEAM_NAME", "")   # Full name e.g. "Los Angeles Lakers"
-            team_id = team_row.get("TEAM_ID")            # Numeric ID
-
-            # Skip teams with no name
-            if not team_name:
-                continue
-
-            # Look up abbreviation from our mapping
-            team_abbrev = TEAM_NAME_TO_ABBREVIATION.get(team_name, "")
-            if not team_abbrev:
-                # Try to get abbreviation from the raw data
-                team_abbrev = team_row.get("TEAM_ABBREVIATION", "")
-                team_abbrev = NBA_API_ABBREV_TO_OURS.get(team_abbrev, team_abbrev)
-
-            # Skip if we still don't have an abbreviation
-            if not team_abbrev:
-                continue
-
-            # Get conference for this team
-            conference = TEAM_CONFERENCE.get(team_abbrev, "West")  # Default to West
-
-            # Get advanced stats for this team (if available)
-            advanced_row = advanced_by_team_id.get(team_id, {})
-
-            # Extract pace — PACE is in the advanced stats
-            # If not available, use a reasonable NBA average (98-103)
-            pace = float(advanced_row.get("PACE", 0) or 0)
-            if pace == 0:
-                pace = 100.0  # League average default
-
-            # Extract ORTG (offensive rating) from advanced stats
-            ortg = float(advanced_row.get("OFF_RATING", 0) or 0)
-            if ortg == 0:
-                # Fall back to calculating from basic stats
-                # Points per game × 100 / pace ≈ rough ORTG estimate
-                pts = float(team_row.get("PTS", 110) or 110)
-                ortg = round(pts, 1)  # Use raw points as rough proxy
-
-            # Extract DRTG (defensive rating) from advanced stats
-            drtg = float(advanced_row.get("DEF_RATING", 0) or 0)
-            if drtg == 0:
-                drtg = 113.0  # League average default
-
-            # Build the team row in our CSV format
-            formatted_team = {
-                "team_name": team_name,             # Full name
-                "abbreviation": team_abbrev,         # 3-letter code
-                "conference": conference,             # East or West
-                "division": "",                       # We don't use division in the engine
-                "pace": round(pace, 1),              # Possessions per 48 minutes
-                "ortg": round(ortg, 1),              # Offensive rating
-                "drtg": round(drtg, 1),              # Defensive rating
-            }
-
-            formatted_teams.append(formatted_team)
-
-        # Sort by team name alphabetically
-        formatted_teams.sort(key=lambda t: t["team_name"])
-
-        if progress_callback:
-            progress_callback(4, 6, f"Saving {len(formatted_teams)} teams to CSV...")
-
-        # --------------------------------------------------------
-        # Step 3: Write the teams CSV
-        # --------------------------------------------------------
-
-        # Column order must match existing teams.csv exactly
-        team_fieldnames = [
-            "team_name", "abbreviation", "conference", "division",
-            "pace", "ortg", "drtg",
+        # Write teams.csv
+        teams_fieldnames = [
+            "team_abbreviation", "team_name",
+            "wins", "losses", "win_pct",
+            "pace", "offensive_rating", "defensive_rating",
+            "points_pg", "opponent_points_pg",
+            "field_goal_pct", "three_point_pct",
+            "rebounds_pg", "assists_pg", "turnovers_pg",
+            "home_wins", "home_losses", "away_wins", "away_losses",
         ]
 
-        with open(TEAMS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=team_fieldnames)
+        import csv as _csv
+        with open(TEAMS_CSV_PATH, "w", newline="", encoding="utf-8") as f:
+            writer = _csv.DictWriter(f, fieldnames=teams_fieldnames, extrasaction="ignore")
             writer.writeheader()
-            writer.writerows(formatted_teams)
+            for team in team_stats_list:
+                row = {k: team.get(k, "") for k in teams_fieldnames}
+                # Compute win_pct if not provided
+                if not row.get("win_pct"):
+                    wins = int(row.get("wins", 0) or 0)
+                    losses = int(row.get("losses", 0) or 0)
+                    total = wins + losses
+                    row["win_pct"] = round(wins / total, 3) if total else 0.0
+                writer.writerow(row)
 
-        # Save timestamp
+        save_last_updated("teams")
+
+        # Write defensive_ratings.csv
+        if progress_callback:
+            progress_callback(5, 6, "Writing defensive ratings CSV...")
+
+        def_fieldnames = [
+            "team_abbreviation", "defensive_rating", "pace",
+            "opponent_points_pg", "opponent_field_goal_pct",
+            "pg_def_rating", "sg_def_rating", "sf_def_rating",
+            "pf_def_rating", "c_def_rating",
+        ]
+
+        with open(DEFENSIVE_RATINGS_CSV_PATH, "w", newline="", encoding="utf-8") as f:
+            writer = _csv.DictWriter(f, fieldnames=def_fieldnames, extrasaction="ignore")
+            writer.writeheader()
+            for team in team_stats_list:
+                row = {
+                    "team_abbreviation": team.get("team_abbreviation", ""),
+                    "defensive_rating": team.get("defensive_rating", 110),
+                    "pace": team.get("pace", 100),
+                    "opponent_points_pg": team.get("opponent_points_pg", team.get("points_pg", 110)),
+                    "opponent_field_goal_pct": team.get("opponent_field_goal_pct", 0.46),
+                    "pg_def_rating": team.get("defensive_rating", 110),
+                    "sg_def_rating": team.get("defensive_rating", 110),
+                    "sf_def_rating": team.get("defensive_rating", 110),
+                    "pf_def_rating": team.get("defensive_rating", 110),
+                    "c_def_rating": team.get("defensive_rating", 110),
+                }
+                writer.writerow(row)
+
         save_last_updated("teams")
 
         if progress_callback:
-            progress_callback(5, 6, "Building defensive ratings by position...")
+            progress_callback(6, 6, f"Done! {len(team_stats_list)} teams saved.")
 
-        # --------------------------------------------------------
-        # Step 4: Build defensive_ratings.csv
-        # --------------------------------------------------------
-        # BEGINNER NOTE: The defensive_ratings.csv tracks how good or bad
-        # each team is at defending each position (PG, SG, SF, PF, C).
-        # A value > 1.0 means the team allows MORE than average to that position
-        # (bad defense). A value < 1.0 means they allow LESS (good defense).
-        #
-        # The nba_api doesn't directly give us position-by-position defensive
-        # ratings. So we calculate them from overall defensive rating:
-        # - Teams with good overall defense (low drtg) get values below 1.0
-        # - Teams with bad defense (high drtg) get values above 1.0
-        # - The adjustment varies slightly by position for realism
-
-        defensive_rows = []
-
-        # League average defensive rating (used for normalization)
-        # BEGINNER NOTE: We calculate the average drtg across all teams
-        all_drtg_values = [t["drtg"] for t in formatted_teams if t["drtg"] > 0]
-        avg_drtg = sum(all_drtg_values) / len(all_drtg_values) if all_drtg_values else 113.0
-
-        for team in formatted_teams:
-            team_drtg = team["drtg"]              # This team's defensive rating
-            team_abbrev = team["abbreviation"]     # 3-letter team code
-            team_name_full = team["team_name"]     # Full team name
-
-            # Calculate how much above/below average this team's defense is
-            # A team with drtg = avg_drtg gets a ratio of exactly 1.0
-            # A team with higher drtg (worse defense) gets ratio > 1.0
-            # A team with lower drtg (better defense) gets ratio < 1.0
-            if avg_drtg > 0:
-                defense_ratio = team_drtg / avg_drtg  # Normalized defense rating
-            else:
-                defense_ratio = 1.0  # Default if no data
-
-            # Apply small positional adjustments for realism
-            # (Better defenses tend to suppress guards more than centers,
-            # since most offensive schemes feature guard play)
-            pg_factor = round(defense_ratio * 1.01, 3)   # PG: slightly above ratio
-            sg_factor = round(defense_ratio * 1.00, 3)   # SG: same as ratio
-            sf_factor = round(defense_ratio * 0.99, 3)   # SF: slightly below
-            pf_factor = round(defense_ratio * 0.98, 3)   # PF: below
-            c_factor = round(defense_ratio * 0.97, 3)    # C: most below (bigs harder to guard)
-
-            # Build the defensive ratings row
-            defensive_row = {
-                "team_name": team_name_full,    # Full team name
-                "abbreviation": team_abbrev,     # 3-letter code
-                "vs_PG_pts": pg_factor,          # Multiplier vs PG (pts)
-                "vs_SG_pts": sg_factor,          # Multiplier vs SG (pts)
-                "vs_SF_pts": sf_factor,          # Multiplier vs SF (pts)
-                "vs_PF_pts": pf_factor,          # Multiplier vs PF (pts)
-                "vs_C_pts": c_factor,            # Multiplier vs C (pts)
-                "vs_PG_reb": round(defense_ratio * 0.99, 3),   # Rebound factors
-                "vs_SG_reb": round(defense_ratio * 0.98, 3),
-                "vs_SF_reb": round(defense_ratio * 0.97, 3),
-                "vs_PF_reb": round(defense_ratio * 1.01, 3),
-                "vs_C_reb": round(defense_ratio * 1.02, 3),
-                "vs_PG_ast": round(defense_ratio * 1.02, 3),   # Assist factors
-                "vs_SG_ast": round(defense_ratio * 1.00, 3),
-                "vs_SF_ast": round(defense_ratio * 0.99, 3),
-                "vs_PF_ast": round(defense_ratio * 0.97, 3),
-                "vs_C_ast": round(defense_ratio * 0.96, 3),
-            }
-
-            defensive_rows.append(defensive_row)
-
-        # Write the defensive ratings CSV
-        defensive_fieldnames = [
-            "team_name", "abbreviation",
-            "vs_PG_pts", "vs_SG_pts", "vs_SF_pts", "vs_PF_pts", "vs_C_pts",
-            "vs_PG_reb", "vs_SG_reb", "vs_SF_reb", "vs_PF_reb", "vs_C_reb",
-            "vs_PG_ast", "vs_SG_ast", "vs_SF_ast", "vs_PF_ast", "vs_C_ast",
-        ]
-
-        with open(DEFENSIVE_RATINGS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=defensive_fieldnames)
-            writer.writeheader()
-            writer.writerows(defensive_rows)
-
-        # Save timestamps
-        save_last_updated("teams")
-
-        if progress_callback:
-            progress_callback(6, 6, f"✅ Saved {len(formatted_teams)} teams and defensive ratings!")
-
-        _logger.info(f"Successfully saved {len(formatted_teams)} teams and defensive ratings.")
-        _invalidate_data_caches()  # Feature 9: bust stale Streamlit caches
-        return True  # Signal success
+        _logger.info(f"fetch_team_stats complete: {len(team_stats_list)} teams.")
+        return True
 
     except Exception as error:
-        _logger.error(f"Error fetching team stats: {error}")
-        return False  # Signal failure
+        _logger.error(f"fetch_team_stats failed: {error}")
+        return False
 
-# ============================================================
-# END SECTION: Team Stats Fetcher
-# ============================================================
-
-
-# ============================================================
-# SECTION: Defensive Ratings Auto-Update (Feature 11)
-# A standalone wrapper so callers can refresh just defensive
-# ratings without re-fetching all team stats from scratch.
-# BEGINNER NOTE: defensive_ratings.csv is built as a byproduct
-# of fetch_team_stats(). This function checks staleness first
-# and only re-fetches when the file is more than 7 days old.
-# ============================================================
 
 def fetch_defensive_ratings(force=False, progress_callback=None):
     """
-    Refresh defensive_ratings.csv from the NBA API.
+    Auto-update defensive_ratings.csv from team stats.
 
-    Checks whether the existing file is stale (> 7 days old).
-    If stale (or force=True), runs fetch_team_stats() which rebuilds
-    both teams.csv and defensive_ratings.csv in one pass.
+    Delegates to fetch_team_stats() which now includes defensive ratings.
 
     Args:
-        force (bool): If True, always refresh even if data is fresh.
-            Defaults to False (only refresh if stale).
-        progress_callback: Optional function(step, total, msg) for UI.
+        force (bool): If True, always refresh. If False, skip if recent.
+        progress_callback (callable, optional): Progress callback.
 
     Returns:
-        dict: {
-            'refreshed': bool — True if a fetch was performed,
-            'reason': str   — why refreshed/skipped,
-            'teams_path': str,
-            'defensive_path': str,
-        }
+        bool: True if successful, False otherwise.
     """
-    _STALE_DAYS = 7  # Refresh if data is older than this many days
-
-    timestamps = load_last_updated()
-    teams_ts_str = timestamps.get("teams")
-
-    if not force and teams_ts_str:
-        try:
-            import datetime as _dt
-            teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
-            _now_utc = _dt.datetime.now(_dt.timezone.utc)
-            if teams_ts.tzinfo is None:
-                teams_ts = teams_ts.replace(tzinfo=_dt.timezone.utc)
-            age_days = (_now_utc - teams_ts).total_seconds() / 86400.0
-            if age_days < _STALE_DAYS:
-                _logger.info(
-                    f"[DefensiveRatings] Data is fresh ({age_days:.1f}d old, "
-                    f"threshold {_STALE_DAYS}d). Skipping fetch."
-                )
-                return {
-                    "refreshed": False,
-                    "reason": f"Data is fresh ({age_days:.1f} days old)",
-                    "teams_path": str(TEAMS_CSV_PATH),
-                    "defensive_path": str(DEFENSIVE_RATINGS_CSV_PATH),
-                }
-        except Exception:
-            pass  # If timestamp parse fails, refresh anyway
-
-    _logger.info("[DefensiveRatings] Data stale or force-refresh. Running fetch_team_stats()...")
-    ok = fetch_team_stats(progress_callback=progress_callback)
-
-    return {
-        "refreshed": ok,
-        "reason": "Fetched from NBA API" if ok else "Fetch failed — see logs",
-        "teams_path": str(TEAMS_CSV_PATH),
-        "defensive_path": str(DEFENSIVE_RATINGS_CSV_PATH),
-    }
+    return fetch_team_stats(progress_callback=progress_callback)
 
 
 def get_teams_staleness_warning():
     """
-    Return a warning string if teams.csv/defensive_ratings.csv are stale.
-
-    Used by app.py and the Analysis page to show a prominent banner
-    when the team data is old.
+    Return a warning string if teams.csv is stale (> 12 hours old).
 
     Returns:
-        str or None: Warning message, or None if data is fresh enough.
+        str or None: Warning message, or None if data is fresh.
     """
-    _WARN_DAYS  = 7   # Yellow warning after 7 days
-    _STALE_DAYS = 14  # Red warning after 14 days
-
-    timestamps = load_last_updated()
-    teams_ts_str = timestamps.get("teams")
-
-    if not teams_ts_str:
-        return "⚠️ teams.csv has never been updated — run Data Feed → Fetch Team Stats."
-
     try:
-        import datetime as _dt
-        teams_ts = _dt.datetime.fromisoformat(str(teams_ts_str))
-        _now_utc = _dt.datetime.now(_dt.timezone.utc)
-        if teams_ts.tzinfo is None:
-            teams_ts = teams_ts.replace(tzinfo=_dt.timezone.utc)
-        age_days = (_now_utc - teams_ts).total_seconds() / 86400.0
-        if age_days >= _STALE_DAYS:
-            return (
-                f"🔴 Team data is **{age_days:.0f} days old** — seriously stale! "
-                "Go to 📡 Data Feed → Fetch Team Stats to refresh defensive ratings."
-            )
-        if age_days >= _WARN_DAYS:
-            return (
-                f"🟡 Team data is **{age_days:.0f} days old**. "
-                "Consider refreshing via 📡 Data Feed → Fetch Team Stats."
-            )
+        timestamps = load_last_updated()
+        teams_ts = timestamps.get("teams")
+        if not teams_ts:
+            return "Team stats have never been fetched. Click Update Teams on the Data Feed page."
+        dt = datetime.datetime.fromisoformat(teams_ts)
+        age_hours = (datetime.datetime.now() - dt).total_seconds() / 3600
+        if age_hours > 12:
+            return f"Team stats are {age_hours:.0f} hours old. Consider refreshing on the Data Feed page."
     except Exception:
-        return "⚠️ Could not determine team data age — check last_updated.json."
+        pass
+    return None
 
-    return None  # Fresh enough — no warning
+# ============================================================
+# END SECTION: Team Stats Fetcher
+# ============================================================
+# ============================================================
 
 
 # ============================================================
-# END SECTION: Defensive Ratings Auto-Update
 # ============================================================
 
 
+# ============================================================
 # ============================================================
 # SECTION: Player Game Log Fetcher
-# Fetches the last N games for a specific player.
+# Fetches the last N games for a specific player via ClearSports API.
 # ============================================================
 
 def fetch_player_game_log(player_id, last_n_games=20):
     """
     Fetch the last N game logs for a specific player.
-
-    This is useful for analyzing recent form (hot/cold streaks) and
-    calculating how consistent (or inconsistent) a player has been lately.
-
-    BEGINNER NOTE: A game log shows a player's stats game-by-game.
-    For example: "March 1: 28 pts, March 3: 14 pts, March 5: 31 pts"
-    This gives us much more information than just the season average.
 
     Args:
         player_id (int or str): The NBA player's unique ID
@@ -2068,68 +995,29 @@ def fetch_player_game_log(player_id, last_n_games=20):
     Returns:
         list of dict: Recent game stats, newest game first.
                       Returns empty list if the fetch fails.
-
-    Example return value:
-        [
-            {'game_date': '2026-03-05', 'pts': 28, 'reb': 7, 'ast': 5, ...},
-            {'game_date': '2026-03-03', 'pts': 14, 'reb': 4, 'ast': 8, ...},
-        ]
     """
-    # Import inside function for graceful failure
     try:
-        from nba_api.stats.endpoints import playergamelog
-    except ImportError:
-        _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
-        return []
+        from data.clearsports_client import fetch_player_game_log as _cs_log
+        games = _cs_log(player_id, last_n_games=last_n_games)
+        if games:
+            return games
+    except Exception as err:
+        _logger.warning(f"ClearSports game log fetch failed for player {player_id}: {err}")
 
-    try:
-        # Fetch the player's game log
-        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
-            _rate_limiter.acquire()
-        game_log_endpoint = playergamelog.PlayerGameLog(
-            player_id=player_id,
-            season_type_all_star="Regular Season",
-        )
+    # Try local cache as fallback
+    if _GAME_LOG_CACHE_AVAILABLE:
+        try:
+            cached = load_game_logs_from_cache(player_id)
+            if cached:
+                return cached[:last_n_games]
+        except Exception:
+            pass
 
-        # Convert to list of dicts
-        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
-        if _RATE_LIMITER_AVAILABLE and _rate_limiter:
-            _rate_limiter.record_request()
-
-        # Add API delay
-        time.sleep(API_DELAY_SECONDS)
-
-        # Take only the most recent N games
-        recent_games = game_log_data[:last_n_games]
-
-        # Build a clean list of game dictionaries
-        formatted_games = []
-        for game in recent_games:
-            # Map nba_api column names to friendly names
-            formatted_game = {
-                "game_date": game.get("GAME_DATE", ""),     # Date of the game
-                "matchup": game.get("MATCHUP", ""),          # e.g. "LAL vs. GSW"
-                "win_loss": game.get("WL", ""),              # "W" or "L"
-                "minutes": float(game.get("MIN", 0) or 0),  # Minutes played
-                "pts": float(game.get("PTS", 0) or 0),       # Points
-                "reb": float(game.get("REB", 0) or 0),       # Rebounds
-                "ast": float(game.get("AST", 0) or 0),       # Assists
-                "stl": float(game.get("STL", 0) or 0),       # Steals
-                "blk": float(game.get("BLK", 0) or 0),       # Blocks
-                "tov": float(game.get("TOV", 0) or 0),       # Turnovers
-                "fg3m": float(game.get("FG3M", 0) or 0),     # 3-pointers made
-                "ft_pct": float(game.get("FT_PCT", 0) or 0), # Free throw %
-            }
-            formatted_games.append(formatted_game)
-
-        return formatted_games  # Return the list of recent games
-
-    except Exception as error:
-        _logger.error(f"Error fetching game log for player {player_id}: {error}")
-        return []  # Return empty list on failure
+    return []
 
 # ============================================================
 # END SECTION: Player Game Log Fetcher
+# ============================================================
 # ============================================================
 
 

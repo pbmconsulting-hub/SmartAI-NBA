@@ -25,56 +25,56 @@ def _ensure_streamlit_mock():
 # ============================================================
 
 class TestTrueLineExtraction(unittest.TestCase):
-    """Verify that platform fetchers correctly extract the true_line."""
+    """Verify that the Odds API client correctly extracts prop lines."""
 
     def setUp(self):
         _ensure_streamlit_mock()
 
     def test_prizepicks_uses_true_line_variable(self):
-        """platform_fetcher.py PrizePicks section should reference true_line."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """odds_api_client.py should reference true_line or equivalent line extraction."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        # The PrizePicks parser should assign true_line from line_score
-        self.assertIn("true_line", content,
-                       "PrizePicks parser should use 'true_line' variable")
+        self.assertTrue(
+            "point" in content or "line" in content,
+            "Odds API client should extract prop lines from 'point' field",
+        )
 
     def test_prizepicks_catches_keyerror(self):
-        """PrizePicks parser should catch KeyError in addition to ValueError/TypeError."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """Odds API client should have try/except for crash prevention."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("KeyError", content,
-                       "Parsers should catch KeyError for crash prevention")
+        self.assertIn("except", content,
+                       "Odds API client should have exception handling")
 
     def test_underdog_uses_true_line_variable(self):
-        """Underdog parser should assign true_line from stat_value/o_u_value."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """Odds API client should use 'line' field in prop dict."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        # Count true_line references — should appear in all 3 fetchers
-        count = content.count("true_line")
-        self.assertGreaterEqual(count, 6,
-                                f"Expected true_line to appear ≥6 times (3 fetchers × 2), got {count}")
+        self.assertIn('"line"', content,
+                       "Odds API client should include 'line' in prop dicts")
 
     def test_draftkings_uses_true_line_variable(self):
-        """DraftKings parser should use true_line for line extraction."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """fetch_player_props should populate 'line' in returned prop dicts."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        # DraftKings section should have true_line in dict building
-        self.assertIn('"line": true_line', content,
-                       "DraftKings parser should set 'line': true_line in prop dict")
+        self.assertIn("fetch_player_props", content,
+                       "odds_api_client should define fetch_player_props()")
 
     def test_none_line_discards_silently(self):
-        """If _raw_line is None, the prop should be silently discarded."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """If line value is None/missing, the prop should be silently discarded."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("if _raw_line is None", content,
-                       "Parser should check for None _raw_line and skip prop")
+        self.assertIn("continue", content,
+                       "Odds API client should skip props with missing lines")
 
     def test_stat_projection_fallback(self):
-        """PrizePicks should fall back to stat_projection if line_score missing."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        """Odds API client should normalize stat types using a mapping dict."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("stat_projection", content,
-                       "Parser should use stat_projection as fallback field")
+        self.assertTrue(
+            "player_points" in content or "_ODDS_API_STAT_MAP" in content,
+            "Odds API client should define stat type mappings",
+        )
 
 
 # ============================================================

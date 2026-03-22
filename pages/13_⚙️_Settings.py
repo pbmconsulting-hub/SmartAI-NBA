@@ -458,33 +458,32 @@ st.divider()
 st.subheader("🔑 API Keys")
 
 st.markdown(get_education_box_html(
-    "📖 API Keys for Live Prop Fetching",
+    "📖 API Keys for Live Data",
     """
-    <strong>PrizePicks</strong> and <strong>Underdog Fantasy</strong> have free public APIs — 
-    no key needed. Just click "Fetch Live Props" on the Prop Scanner page.<br><br>
-    <strong>DraftKings Pick6</strong> lines are fetched via 
-    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">The Odds API</a> 
-    (free tier: 500 requests/month). Enter your key below — it's stored only in this 
-    browser session and never saved to disk or sent anywhere else.
+    <strong>The Odds API</strong> provides player props from all major US sportsbooks 
+    (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one unified call.
+    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">Free tier: 500 req/month</a>.<br><br>
+    <strong>ClearSports API</strong> provides NBA games, player stats, team stats, injuries, 
+    and rosters. 
+    <a href="https://clearsportsapi.com" target="_blank" style="color:#00f0ff;">Free tier: 1,000 req/month</a>.<br><br>
+    Keys are stored only in this browser session and never saved to disk.
     """
 ), unsafe_allow_html=True)
 
-with st.expander("🔑 Configure The Odds API Key (DraftKings)", expanded=False):
+with st.expander("🔑 Configure The Odds API Key (Props from all sportsbooks)", expanded=False):
     st.markdown(
         "Get your free API key at "
         "[https://the-odds-api.com](https://the-odds-api.com) — free tier gives you "
-        "500 requests/month, which is plenty for daily prop fetching."
+        "500 requests/month. Covers DraftKings, FanDuel, BetMGM, Caesars, and 15+ more."
     )
 
-    # Show the current key status (masked) without revealing the full key
     current_key = st.session_state.get("odds_api_key", "")
     if current_key:
         masked = current_key[:4] + "••••••••" + current_key[-4:] if len(current_key) > 8 else "••••••••"
-        st.success(f"✅ API key configured: `{masked}`")
+        st.success(f"✅ Odds API key configured: `{masked}`")
     else:
-        st.info("ℹ️ No Odds API key set. DraftKings props will be skipped.")
+        st.info("ℹ️ No Odds API key set. Player props will be unavailable.")
 
-    # Text input for the key — uses password type to hide it from screen
     new_key = st.text_input(
         "The Odds API Key",
         value=current_key,
@@ -496,17 +495,55 @@ with st.expander("🔑 Configure The Odds API Key (DraftKings)", expanded=False)
 
     col_save_key, col_clear_key = st.columns([1, 1])
     with col_save_key:
-        if st.button("💾 Save API Key", width="stretch"):
+        if st.button("💾 Save Odds API Key", width="stretch"):
             st.session_state["odds_api_key"] = new_key.strip()
             if new_key.strip():
-                st.success("✅ API key saved for this session!")
+                st.success("✅ Odds API key saved for this session!")
             else:
                 st.info("API key cleared.")
             st.rerun()
     with col_clear_key:
-        if st.button("🗑️ Clear API Key", width="stretch"):
+        if st.button("🗑️ Clear Odds API Key", width="stretch"):
             st.session_state["odds_api_key"] = ""
             st.info("API key cleared.")
+            st.rerun()
+
+with st.expander("🔑 Configure ClearSports API Key (Games, Stats, Injuries, Rosters)", expanded=False):
+    st.markdown(
+        "Get your free API key at "
+        "[https://clearsportsapi.com](https://clearsportsapi.com) — free tier gives you "
+        "1,000 requests/month, which is plenty for daily data updates."
+    )
+
+    cs_key = st.session_state.get("clearsports_api_key", "")
+    if cs_key:
+        masked_cs = cs_key[:4] + "••••••••" + cs_key[-4:] if len(cs_key) > 8 else "••••••••"
+        st.success(f"✅ ClearSports API key configured: `{masked_cs}`")
+    else:
+        st.info("ℹ️ No ClearSports API key set. Game/player/team data updates will be limited.")
+
+    new_cs_key = st.text_input(
+        "ClearSports API Key",
+        value=cs_key,
+        type="password",
+        placeholder="e.g., cs_live_abc123...",
+        help="Your ClearSports API key from clearsportsapi.com. Stored in this session only.",
+        key="clearsports_api_key_input",
+    )
+
+    cs_col1, cs_col2 = st.columns([1, 1])
+    with cs_col1:
+        if st.button("💾 Save ClearSports Key", width="stretch"):
+            st.session_state["clearsports_api_key"] = new_cs_key.strip()
+            if new_cs_key.strip():
+                st.success("✅ ClearSports API key saved for this session!")
+            else:
+                st.info("ClearSports API key cleared.")
+            st.rerun()
+    with cs_col2:
+        if st.button("🗑️ Clear ClearSports Key", width="stretch"):
+            st.session_state["clearsports_api_key"] = ""
+            st.info("ClearSports API key cleared.")
             st.rerun()
 
 st.divider()
@@ -583,10 +620,8 @@ settings_summary = {
     "Blowout Sensitivity": f"{st.session_state.get('blowout_sensitivity', 1.0):.1f}x",
     "Fatigue Sensitivity": f"{st.session_state.get('fatigue_sensitivity', 1.0):.1f}x",
     "Pace Sensitivity": f"{st.session_state.get('pace_sensitivity', 1.0):.1f}x",
-    "PrizePicks Fetch": "Enabled" if st.session_state.get("fetch_prizepicks_enabled", True) else "Disabled",
-    "Underdog Fetch": "Enabled" if st.session_state.get("fetch_underdog_enabled", True) else "Disabled",
-    "DraftKings Fetch": "Enabled" if st.session_state.get("fetch_draftkings_enabled", True) else "Disabled",
     "Odds API Key": "Configured ✓" if st.session_state.get("odds_api_key", "") else "Not set",
+    "ClearSports API Key": "Configured ✓" if st.session_state.get("clearsports_api_key", "") else "Not set",
     "Goblin Min Std Devs": f"{st.session_state.get('goblin_min_std_devs', 2.0):.2f}σ",
     "Goblin Min Probability": f"{st.session_state.get('goblin_min_probability_pct', 80.0):.0f}%",
     "Goblin Min Edge": f"{st.session_state.get('goblin_min_edge_pct', 25.0):.0f}%",

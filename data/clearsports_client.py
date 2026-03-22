@@ -525,3 +525,62 @@ def lookup_player_id(player_name: str) -> int | None:
     # Cache the result (even if None) to prevent repeated failed lookups
     _PLAYER_ID_CACHE[name_key] = player_id
     return player_id
+
+
+def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
+    """
+    Fetch the last N game logs for a specific player from ClearSports API.
+
+    Args:
+        player_id (int or str): The NBA player's unique ID.
+        last_n_games (int): How many recent games to return (default: 20).
+
+    Returns:
+        list of dict: Recent game stats, newest game first.
+                      Each dict has: game_date, matchup, win_loss, minutes,
+                      pts, reb, ast, stl, blk, tov, fg3m, ft_pct.
+                      Returns empty list if the fetch fails.
+    """
+    api_key = _get_api_key()
+    if not api_key:
+        _logger.warning("ClearSports API key not configured — cannot fetch player game log.")
+        return []
+
+    url = f"{CLEARSPORTS_BASE_URL}/nba/players/{player_id}/game_log"
+    params = {"apiKey": api_key, "last_n": last_n_games}
+    cache_key = f"{url}?player_id={player_id}&last_n={last_n_games}"
+
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        data = _fetch_with_retry(url, params=params)
+        if not data:
+            _PLAYER_ID_CACHE[str(player_id)] = None
+            return []
+
+        games = []
+        for g in (data if isinstance(data, list) else data.get("games", data.get("data", []))):
+            games.append({
+                "game_date": _safe_str(g.get("date", g.get("game_date", ""))),
+                "matchup": _safe_str(g.get("matchup", g.get("opponent", ""))),
+                "win_loss": _safe_str(g.get("result", g.get("win_loss", g.get("wl", "")))),
+                "minutes": _safe_float(g.get("minutes", g.get("min", 0))),
+                "pts": _safe_float(g.get("points", g.get("pts", 0))),
+                "reb": _safe_float(g.get("rebounds", g.get("reb", 0))),
+                "ast": _safe_float(g.get("assists", g.get("ast", 0))),
+                "stl": _safe_float(g.get("steals", g.get("stl", 0))),
+                "blk": _safe_float(g.get("blocks", g.get("blk", 0))),
+                "tov": _safe_float(g.get("turnovers", g.get("tov", 0))),
+                "fg3m": _safe_float(g.get("threes_made", g.get("fg3m", 0))),
+                "ft_pct": _safe_float(g.get("ft_pct", g.get("free_throw_pct", 0))),
+            })
+
+        result = games[:last_n_games]
+        _cache_set(cache_key, result)
+        return result
+
+    except Exception as exc:
+        _logger.warning("fetch_player_game_log failed for player_id=%s: %s", player_id, exc)
+        return []

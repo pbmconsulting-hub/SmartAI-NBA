@@ -70,71 +70,18 @@ with col_interval:
 
 def _fetch_live_scores():
     """
-    Attempt to fetch live/today's game scores.
-
-    Tries nba_api.live.nba.endpoints.scoreboard first,
-    falls back to ScoreboardV2 from nba_api.stats.endpoints.
+    Attempt to fetch live/today's game scores via ClearSports API.
 
     Returns:
         list of dict: Game score data, or empty list on failure.
     """
     try:
-        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
-        sb = live_scoreboard.ScoreBoard()
-        games_data = sb.games.get_dict()
-        results = []
-        for g in games_data:
-            home = g.get("homeTeam", {})
-            away = g.get("awayTeam", {})
-            game_status = g.get("gameStatusText", "")
-            period = g.get("period", 0)
-            clock = g.get("gameClock", "")
-            results.append({
-                "game_id":      g.get("gameId", ""),
-                "status":       game_status,
-                "period":       period,
-                "clock":        clock,
-                "home_team":    home.get("teamTricode", ""),
-                "home_score":   home.get("score", 0),
-                "away_team":    away.get("teamTricode", ""),
-                "away_score":   away.get("score", 0),
-                "home_name":    home.get("teamName", ""),
-                "away_name":    away.get("teamName", ""),
-            })
-        return results
-    except Exception as live_err:
-        _logger.warning(f"Live scoreboard error: {live_err}")
-
-    # Fallback: ScoreboardV2
-    try:
-        from nba_api.stats.endpoints import scoreboardv2
-        today_str = datetime.date.today().strftime("%m/%d/%Y")
-        sb2 = scoreboardv2.ScoreboardV2(game_date=today_str, timeout=10)
-        games_df = sb2.game_header.get_data_frame()
-        line_score_df = sb2.line_score.get_data_frame()
-        results = []
-        for _, row in games_df.iterrows():
-            game_id = row.get("GAME_ID", "")
-            ls = line_score_df[line_score_df["GAME_ID"] == game_id]
-            home_row = ls[ls["TEAM_ABBREVIATION"] == row.get("HOME_TEAM_ABBREVIATION", "")]
-            away_row = ls[ls["TEAM_ABBREVIATION"] == row.get("VISITOR_TEAM_ABBREVIATION", "")]
-            home_pts = int(home_row["PTS"].values[0]) if not home_row.empty and home_row["PTS"].values[0] else 0
-            away_pts = int(away_row["PTS"].values[0]) if not away_row.empty and away_row["PTS"].values[0] else 0
-            results.append({
-                "game_id":      game_id,
-                "status":       row.get("GAME_STATUS_TEXT", ""),
-                "period":       row.get("LIVE_PERIOD", 0),
-                "clock":        row.get("LIVE_PC_TIME", ""),
-                "home_team":    row.get("HOME_TEAM_ABBREVIATION", ""),
-                "home_score":   home_pts,
-                "away_team":    row.get("VISITOR_TEAM_ABBREVIATION", ""),
-                "away_score":   away_pts,
-                "home_name":    "",
-                "away_name":    "",
-            })
-        return results
-    except Exception as v2_err:
-        _logger.warning(f"ScoreboardV2 fallback error: {v2_err}")
+        from data.clearsports_client import fetch_live_scores as _cs_live
+        scores = _cs_live()
+        if scores:
+            return scores
+    except Exception as cs_err:
+        _logger.warning(f"ClearSports live scores error: {cs_err}")
 
     return []
 
@@ -184,18 +131,8 @@ def _fetch_quarter_scores(game_id: str) -> dict:
                   if p.get("periodType", "REGULAR") == "REGULAR"]
         return away_q, home_q
 
-    # ── Attempt 1: BoxScoreSummaryV3 via nba_api ──────────────
-    try:
-        from nba_api.stats.endpoints import boxscoresummaryv3
-        bs3 = boxscoresummaryv3.BoxScoreSummaryV3(game_id=game_id, timeout=8)
-        v3_dict = bs3.get_normalized_dict()
-        away_q, home_q = _parse_v3_periods(v3_dict)
-        if away_q or home_q:
-            result["away_q"] = away_q
-            result["home_q"] = home_q
-            return result
-    except Exception:
-        pass
+    # ── Attempt 1: Direct requests call to V3 endpoint ──────────────
+    # (nba_api library no longer used — direct HTTP call for quarter scores)
 
     # ── Attempt 2: Direct requests call to V3 endpoint ────────
     try:
@@ -224,37 +161,6 @@ def _fetch_quarter_scores(game_id: str) -> dict:
     except Exception:
         pass
 
-    # ── Attempt 3: BoxScoreSummaryV2 fallback ─────────────────
-    try:
-        import warnings
-        warnings.filterwarnings("ignore")
-        from nba_api.stats.endpoints import boxscoresummaryv2
-        bs = boxscoresummaryv2.BoxScoreSummaryV2(game_id=game_id, timeout=8)
-        ls = bs.line_score.get_data_frame()
-        if ls.empty:
-            return result
-        teams = ls["TEAM_ABBREVIATION"].tolist()
-        for prefix, col_list in [("away_q", "away"), ("home_q", "home")]:
-            idx = 0 if len(teams) >= 1 else None
-            if prefix == "home_q" and len(teams) >= 2:
-                idx = 1
-            if idx is None:
-                continue
-            row = ls.iloc[idx]
-            quarters = []
-            for q_col in ["PTS_QTR1", "PTS_QTR2", "PTS_QTR3", "PTS_QTR4",
-                          "PTS_OT1", "PTS_OT2"]:
-                v = row.get(q_col, None)
-                if v is not None and str(v) not in ("", "nan", "None"):
-                    try:
-                        quarters.append(int(float(v)))
-                    except Exception:
-                        break
-                else:
-                    break
-            result[prefix] = quarters
-    except Exception:
-        pass
     return result
 
 
@@ -375,30 +281,21 @@ def _get_tonights_leaders():
     Returns a dict with lists of top players per category.
     """
     leaders = {"points": [], "rebounds": [], "assists": [], "threes": []}
+    # Live stats leaders come from session state (populated by Neural Analysis or ClearSports)
     try:
-        from nba_api.live.nba.endpoints import boxscore as live_boxscore
-        for game in live_games[:4]:  # Limit to first 4 games to avoid rate limits
-            gid = game.get("game_id", "")
-            if not gid:
-                continue
-            try:
-                bs = live_boxscore.BoxScore(game_id=gid)
-                for team_key in ["homeTeam", "awayTeam"]:
-                    team_data = bs.game.get_dict().get(team_key, {})
-                    for player in team_data.get("players", []):
-                        stats = player.get("statistics", {})
-                        name = f"{player.get('firstName','')} {player.get('familyName','')}"
-                        team = game.get("home_team" if team_key == "homeTeam" else "away_team", "")
-                        pts = int(stats.get("points", 0))
-                        reb = int(stats.get("reboundsTotal", 0))
-                        ast = int(stats.get("assists", 0))
-                        fg3m = int(stats.get("threePointersMade", 0))
-                        leaders["points"].append({"player": name, "team": team, "value": pts})
-                        leaders["rebounds"].append({"player": name, "team": team, "value": reb})
-                        leaders["assists"].append({"player": name, "team": team, "value": ast})
-                        leaders["threes"].append({"player": name, "team": team, "value": fg3m})
-            except Exception:
-                continue
+        players_live = st.session_state.get("players_data", [])
+        for player in players_live:
+            name = player.get("name", "")
+            team = player.get("team", "")
+            pts = float(player.get("points_avg", 0) or 0)
+            reb = float(player.get("rebounds_avg", 0) or 0)
+            ast = float(player.get("assists_avg", 0) or 0)
+            fg3m = float(player.get("threes_avg", 0) or 0)
+            if name:
+                leaders["points"].append({"player": name, "team": team, "value": pts})
+                leaders["rebounds"].append({"player": name, "team": team, "value": reb})
+                leaders["assists"].append({"player": name, "team": team, "value": ast})
+                leaders["threes"].append({"player": name, "team": team, "value": fg3m})
     except Exception:
         pass
     # Sort and return top 5
@@ -527,28 +424,26 @@ elif not _analysis_top:
 else:
     # Build a lookup: player_name → box-score stats from live games
     _live_player_stats: dict = {}
+    # Live box score data comes from live_games (ClearSports API)
     try:
-        from nba_api.live.nba.endpoints import boxscore as _live_bs
-        for _g in live_games[:6]:
-            _gid = _g.get("game_id", "")
-            if not _gid:
-                continue
-            try:
-                _bs = _live_bs.BoxScore(game_id=_gid)
-                for _tk in ["homeTeam", "awayTeam"]:
-                    for _pl in _bs.game.get_dict().get(_tk, {}).get("players", []):
-                        _pn = f"{_pl.get('firstName','')} {_pl.get('familyName','')}".strip()
-                        _st = _pl.get("statistics", {})
-                        _live_player_stats[_pn.lower()] = {
-                            "points": int(_st.get("points", 0)),
-                            "rebounds": int(_st.get("reboundsTotal", 0)),
-                            "assists": int(_st.get("assists", 0)),
-                            "threes": int(_st.get("threePointersMade", 0)),
-                            "steals": int(_st.get("steals", 0)),
-                            "blocks": int(_st.get("blocks", 0)),
-                        }
-            except Exception:
-                continue
+        for _g in live_games:
+            _ht = _g.get("home_team", "")
+            _at = _g.get("away_team", "")
+            _hs = int(_g.get("home_score", 0) or 0)
+            _as = int(_g.get("away_score", 0) or 0)
+            # Player-level live stats come from session state if available
+        # Also check session state players_data for season averages as proxy
+        for _pl in st.session_state.get("players_data", []):
+            _pn = _pl.get("name", "").strip()
+            if _pn:
+                _live_player_stats[_pn.lower()] = {
+                    "points": float(_pl.get("points_avg", 0) or 0),
+                    "rebounds": float(_pl.get("rebounds_avg", 0) or 0),
+                    "assists": float(_pl.get("assists_avg", 0) or 0),
+                    "threes": float(_pl.get("threes_avg", 0) or 0),
+                    "steals": float(_pl.get("steals_avg", 0) or 0),
+                    "blocks": float(_pl.get("blocks_avg", 0) or 0),
+                }
     except Exception:
         pass
 

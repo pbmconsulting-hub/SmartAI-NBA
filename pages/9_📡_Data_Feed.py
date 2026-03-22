@@ -63,9 +63,9 @@ inject_joseph_floating()
 # Page title and description
 st.title("📡 Data Feed")
 st.markdown(
-    "Pull real, up-to-date NBA stats from the **nba_api** library "
-    "(free, no API key required). Update before each betting session "
-    "for the most accurate predictions!"
+    "Pull real, up-to-date NBA stats from **ClearSports API** and player prop lines "
+    "from **The Odds API** (DraftKings, FanDuel, BetMGM, etc.). "
+    "Update before each betting session for the most accurate predictions!"
 )
 st.divider()
 
@@ -73,12 +73,14 @@ st.markdown(get_education_box_html(
     "📖 How Data Updates Work",
     """
     <strong>Smart Update (Recommended)</strong>: Only fetches players on tonight's teams. 
-    10x faster than Full Update — use this before each session.<br><br>
-    <strong>Full Update</strong>: Fetches all 450+ NBA players. Takes 5-10 minutes. 
-    Use once a week to keep historical averages current.<br><br>
-    <strong>Live data</strong>: Real current season stats from NBA.com, saved to players.csv and teams.csv. 
-    Fetch live data before each session for accurate predictions.<br><br>
-    <strong>Rate limiting</strong>: We wait 1.5 seconds between API calls to respect NBA.com's limits.
+    Fast and efficient — use this before each session.<br><br>
+    <strong>Full Update</strong>: Fetches all NBA player season stats. 
+    Use this once a day or week to keep averages current.<br><br>
+    <strong>Live data</strong>: Real current season stats from <strong>ClearSports API</strong>, 
+    saved to players.csv and teams.csv. Fetch before each session for accurate predictions.<br><br>
+    <strong>Prop lines</strong>: Fetched from <strong>The Odds API</strong> — covers DraftKings, 
+    FanDuel, BetMGM, Caesars, and 15+ other US sportsbooks in one call. 
+    Requires your Odds API key (see Settings page).
     """
 ), unsafe_allow_html=True)
 
@@ -88,55 +90,11 @@ st.markdown(get_education_box_html(
 
 
 # ============================================================
-# SECTION: Check if nba_api is Installed
-# If it's not installed, show installation instructions and stop.
+# SECTION: Data Source Status
+# ClearSports API and The Odds API are now the primary data sources.
 # ============================================================
 
-# Try to import nba_api to see if it's available
-try:
-    import nba_api  # This will succeed if nba_api is installed
-    NBA_API_AVAILABLE = True  # Flag: API is available
-except ImportError:
-    NBA_API_AVAILABLE = False  # Flag: API is NOT available
-
-# If nba_api is not installed, show a clear error and stop
-if not NBA_API_AVAILABLE:
-    # Show a big red error message
-    st.error("⚠️ **nba_api is not installed!**")
-
-    # Explain what to do
-    st.markdown("""
-    ### How to Install nba_api
-
-    The `nba_api` library is not installed yet. Run this command in your terminal:
-
-    ```bash
-    pip install nba_api
-    ```
-
-    Or:
-    ```bash
-    python -m pip install nba_api
-    ```
-
-    After installing, **refresh this page** (press F5 or click the browser reload button).
-
-    ---
-
-    **What is nba_api?**
-    It's a free Python library that pulls real-time stats from the NBA's official website.
-    No API key or account needed — it's completely free!
-    """)
-
-    # BEGINNER NOTE: st.stop() stops the page from rendering anything else
-    # This prevents errors from the code below that requires nba_api
-    st.stop()
-
-# ============================================================
-# END SECTION: Check if nba_api is Installed
-# ============================================================
-
-# RosterEngine is available when nba_api is installed (guaranteed at this point).
+# RosterEngine uses ClearSports API.
 _roster_engine_available = True
 
 

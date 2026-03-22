@@ -55,73 +55,56 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
         """_fetch_with_retry must handle HTTP 429 rate limit responses."""
         self.assertIn("status_code == 429", self.content)
 
-    def test_prizepicks_uses_fetch_with_retry(self):
-        """PrizePicks sync fetcher should call _fetch_with_retry, not raw requests.get."""
-        # Find the PrizePicks fetch section (bounded by function defs)
-        pp_start = self.content.find("def fetch_prizepicks_props(")
-        pp_next_func = self.content.find("\ndef ", pp_start + 1)
-        pp_section = self.content[pp_start:pp_next_func]
-
+    def test_prizepicks_stub_exists(self):
+        """fetch_prizepicks_props stub must still exist for backward compatibility."""
         self.assertIn(
-            "_fetch_with_retry(",
-            pp_section,
-            "PrizePicks fetcher should use _fetch_with_retry for retry logic",
+            "def fetch_prizepicks_props(",
+            self.content,
+            "fetch_prizepicks_props should still be defined (backward compat stub)",
         )
 
-    def test_underdog_uses_fetch_with_retry(self):
-        """Underdog sync fetcher should call _fetch_with_retry, not raw requests.get."""
-        ud_start = self.content.find("def fetch_underdog_props(")
-        ud_next_func = self.content.find("\ndef ", ud_start + 1)
-        ud_section = self.content[ud_start:ud_next_func]
-
+    def test_underdog_stub_exists(self):
+        """fetch_underdog_props stub must still exist for backward compatibility."""
         self.assertIn(
-            "_fetch_with_retry(",
-            ud_section,
-            "Underdog fetcher should use _fetch_with_retry for retry logic",
+            "def fetch_underdog_props(",
+            self.content,
+            "fetch_underdog_props should still be defined (backward compat stub)",
         )
 
-    def test_draftkings_events_uses_fetch_with_retry(self):
-        """DraftKings events fetch should call _fetch_with_retry."""
+    def test_odds_api_client_delegated(self):
+        """fetch_all_platform_props should delegate to odds_api_client."""
+        fap_start = self.content.find("def fetch_all_platform_props(")
+        fap_end = self.content.find("\ndef ", fap_start + 1)
+        fap_section = self.content[fap_start:fap_end]
+
+        self.assertIn(
+            "odds_api_client",
+            fap_section,
+            "fetch_all_platform_props should delegate to odds_api_client",
+        )
+
+    def test_draftkings_stub_delegates_to_master(self):
+        """fetch_draftkings_props should delegate to fetch_all_platform_props."""
         dk_start = self.content.find("def fetch_draftkings_props(")
-        # The events fetch is Step 1, before the per-event loop
-        step1_marker = "Step 1: Get list of today"
-        step1_pos = self.content.find(step1_marker, dk_start)
-        step2_marker = "Step 2: Fetch player props"
-        step2_pos = self.content.find(step2_marker, dk_start)
-        events_section = self.content[step1_pos:step2_pos]
+        dk_next_func = self.content.find("\ndef ", dk_start + 1)
+        dk_section = self.content[dk_start:dk_next_func]
 
         self.assertIn(
-            "_fetch_with_retry(",
-            events_section,
-            "DraftKings events fetch should use _fetch_with_retry",
-        )
-
-    def test_draftkings_props_uses_fetch_with_retry(self):
-        """DraftKings per-event props fetch should call _fetch_with_retry."""
-        dk_start = self.content.find("def fetch_draftkings_props(")
-        step2_marker = "Step 2: Fetch player props"
-        step2_pos = self.content.find(step2_marker, dk_start)
-        # Find the next function definition to bound the search
-        next_func = self.content.find("\ndef ", step2_pos + 1)
-        props_section = self.content[step2_pos:next_func]
-
-        self.assertIn(
-            "_fetch_with_retry(",
-            props_section,
-            "DraftKings per-event props fetch should use _fetch_with_retry",
+            "fetch_all_platform_props",
+            dk_section,
+            "fetch_draftkings_props should delegate to fetch_all_platform_props",
         )
 
     def test_fetch_with_retry_handles_none_response(self):
-        """Sync fetch functions must handle None return from _fetch_with_retry."""
-        # After switching to _fetch_with_retry, callers must check for None
-        # (returned when all retries are exhausted)
-        pp_start = self.content.find("def fetch_prizepicks_props(")
-        pp_next_func = self.content.find("\ndef ", pp_start + 1)
-        pp_section = self.content[pp_start:pp_next_func]
+        """_fetch_with_retry must handle None return (check in platform_fetcher)."""
+        # _fetch_with_retry returns None when all retries exhausted
+        retry_start = self.content.find("def _fetch_with_retry(")
+        retry_end = self.content.find("\ndef ", retry_start + 1)
+        retry_section = self.content[retry_start:retry_end]
         self.assertIn(
-            "response is None",
-            pp_section,
-            "PrizePicks must handle None return from _fetch_with_retry",
+            "None",
+            retry_section,
+            "_fetch_with_retry should return None on complete failure",
         )
 
 
