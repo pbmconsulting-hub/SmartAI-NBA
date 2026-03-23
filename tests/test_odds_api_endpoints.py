@@ -331,5 +331,116 @@ class TestOddsApiKeyInParams(unittest.TestCase):
         self.assertIn("x-requests-used", self.src)
 
 
+# ── Section: Outcome parsing uses point for spreads/totals ────────────────────
+
+class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
+    """Verify fetch_game_odds uses point (not price) for spreads and totals."""
+
+    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_api_client._cache_get", return_value=None)
+    @patch("data.odds_api_client._cache_set")
+    @patch("data.odds_api_client._fetch_with_retry")
+    def test_spreads_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+        """Spreads outcomes should map name → point (spread value), not price (juice)."""
+        from data.odds_api_client import fetch_game_odds
+
+        mock_fetch.return_value = [{
+            "id": "ev1",
+            "home_team": "Los Angeles Lakers",
+            "away_team": "Boston Celtics",
+            "bookmakers": [{
+                "key": "draftkings",
+                "markets": [{
+                    "key": "spreads",
+                    "outcomes": [
+                        {"name": "Los Angeles Lakers", "price": -110, "point": -3.5},
+                        {"name": "Boston Celtics", "price": -110, "point": 3.5},
+                    ],
+                }],
+            }],
+        }]
+
+        games = fetch_game_odds()
+        spreads = games[0]["bookmakers"][0]["markets"]["spreads"]
+        self.assertAlmostEqual(spreads["Los Angeles Lakers"], -3.5)
+        self.assertAlmostEqual(spreads["Boston Celtics"], 3.5)
+
+    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_api_client._cache_get", return_value=None)
+    @patch("data.odds_api_client._cache_set")
+    @patch("data.odds_api_client._fetch_with_retry")
+    def test_totals_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+        """Totals outcomes should map name → point (total value), not price (juice)."""
+        from data.odds_api_client import fetch_game_odds
+
+        mock_fetch.return_value = [{
+            "id": "ev1",
+            "home_team": "Los Angeles Lakers",
+            "away_team": "Boston Celtics",
+            "bookmakers": [{
+                "key": "fanduel",
+                "markets": [{
+                    "key": "totals",
+                    "outcomes": [
+                        {"name": "Over", "price": -110, "point": 224.5},
+                        {"name": "Under", "price": -110, "point": 224.5},
+                    ],
+                }],
+            }],
+        }]
+
+        games = fetch_game_odds()
+        totals = games[0]["bookmakers"][0]["markets"]["totals"]
+        self.assertAlmostEqual(totals["Over"], 224.5)
+        self.assertAlmostEqual(totals["Under"], 224.5)
+
+    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_api_client._cache_get", return_value=None)
+    @patch("data.odds_api_client._cache_set")
+    @patch("data.odds_api_client._fetch_with_retry")
+    def test_h2h_uses_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+        """h2h (moneyline) outcomes should map name → price (no point field)."""
+        from data.odds_api_client import fetch_game_odds
+
+        mock_fetch.return_value = [{
+            "id": "ev1",
+            "home_team": "Los Angeles Lakers",
+            "away_team": "Boston Celtics",
+            "bookmakers": [{
+                "key": "draftkings",
+                "markets": [{
+                    "key": "h2h",
+                    "outcomes": [
+                        {"name": "Los Angeles Lakers", "price": -150},
+                        {"name": "Boston Celtics", "price": 130},
+                    ],
+                }],
+            }],
+        }]
+
+        games = fetch_game_odds()
+        h2h = games[0]["bookmakers"][0]["markets"]["h2h"]
+        self.assertEqual(h2h["Los Angeles Lakers"], -150)
+        self.assertEqual(h2h["Boston Celtics"], 130)
+
+
+class TestPlayerPropsRegion(unittest.TestCase):
+    """Verify fetch_player_props uses the correct API region."""
+
+    def setUp(self):
+        self.src = _OA_SRC.read_text(encoding="utf-8")
+
+    def test_player_props_uses_us_region(self):
+        """fetch_player_props must use 'us' region for DraftKings/FanDuel coverage."""
+        idx = self.src.find("def fetch_player_props(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 2500]
+        # Must contain "us" region assignment
+        self.assertIn('"regions"', snippet)
+        self.assertIn('"us"', snippet)
+        # Must NOT use "us2" only (which lacks DK/FD player props)
+        self.assertNotIn('"us2"', snippet)
+
+
 if __name__ == "__main__":
     unittest.main()

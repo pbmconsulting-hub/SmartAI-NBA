@@ -517,8 +517,14 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
                     if not isinstance(mkt, dict):
                         continue
                     mkt_key = mkt.get("key", "")
+                    # For spreads/totals the useful number is "point"
+                    # (e.g. -3.5 or 224.5); for h2h it is "price" (moneyline).
+                    # Use "point" when present, else fall back to "price".
                     outcomes = {
-                        o.get("name"): o.get("price")
+                        o.get("name"): (
+                            o.get("point") if o.get("point") is not None
+                            else o.get("price")
+                        )
                         for o in (mkt.get("outcomes") or [])
                         if isinstance(o, dict)
                     }
@@ -590,10 +596,9 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
             params = {
                 "apiKey":     resolved_key,
                 "markets":    markets_param,
-                # "us2" is intentional: The Odds API uses it for the secondary US
-                # region (BetMGM, Caesars, PointsBet, etc.) which carries most
-                # player-prop markets.  "us" covers DraftKings / FanDuel only.
-                "regions":    "us2",
+                # "us" covers DraftKings / FanDuel — the primary sources
+                # for NBA player-prop markets.
+                "regions":    "us",
                 "oddsFormat": "american",
                 "dateFormat": "iso",
             }

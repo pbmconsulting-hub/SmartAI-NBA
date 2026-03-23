@@ -1074,5 +1074,137 @@ class TestEnrichStandingsNonDictItemRuntime(unittest.TestCase):
         self.assertEqual(result[0]["away_wins"], 50)
 
 
+# ── Section: Non-NBA team filtering in fetch_games_today ──────────────────────
+
+class TestNonNbaTeamFiltering(unittest.TestCase):
+    """Verify that non-NBA teams (All-Star, Rising Stars, TBD) are filtered out."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_non_nba_teams_filtered(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """Games with non-NBA teams like STARS, STRIPES, TBD, WORLD should be excluded."""
+        from data.clearsports_client import fetch_games_today
+
+        mock_fetch.return_value = [
+            {"game_id": "real_1", "home_team": "LAL", "away_team": "BOS"},
+            {"game_id": "allstar", "home_team": "STARS", "away_team": "STRIPES"},
+            {"game_id": "real_2", "home_team": "MIA", "away_team": "NYK"},
+            {"game_id": "tbd", "home_team": "TBD", "away_team": "TBD"},
+            {"game_id": "rising", "home_team": "WORLD", "away_team": "USA"},
+        ]
+
+        games = fetch_games_today()
+        team_pairs = {(g["home_team"], g["away_team"]) for g in games}
+        self.assertEqual(len(games), 2)
+        self.assertIn(("LAL", "BOS"), team_pairs)
+        self.assertIn(("MIA", "NYK"), team_pairs)
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_common_aliases_accepted(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """Common NBA abbreviation aliases (GS, NY, SA, etc.) should be accepted."""
+        from data.clearsports_client import fetch_games_today
+
+        mock_fetch.return_value = [
+            {"game_id": "g1", "home_team": "GS", "away_team": "NY"},
+            {"game_id": "g2", "home_team": "SA", "away_team": "NO"},
+            {"game_id": "g3", "home_team": "UTAH", "away_team": "WSH"},
+        ]
+
+        games = fetch_games_today()
+        self.assertEqual(len(games), 3)
+
+
+class TestExpandedDateFieldMatching(unittest.TestCase):
+    """Verify that the date filter tries additional date field names."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_gameDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """gameDate field should be recognized for date filtering."""
+        from data.clearsports_client import fetch_games_today, _today_str
+
+        today = _today_str()
+        all_games = []
+        # Need >20 games to trigger client-side date filtering
+        for i in range(23):
+            all_games.append({
+                "game_id": f"old_{i}", "home_team": "LAL", "away_team": "BOS",
+                "gameDate": "2025-01-01",
+            })
+        all_games.append({
+            "game_id": "today_1", "home_team": "MIA", "away_team": "CHI",
+            "gameDate": today,
+        })
+
+        mock_fetch.return_value = all_games
+        games = fetch_games_today()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "MIA")
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_startDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """startDate field should be recognized for date filtering."""
+        from data.clearsports_client import fetch_games_today, _today_str
+
+        today = _today_str()
+        all_games = []
+        # Need >20 games to trigger client-side date filtering
+        for i in range(23):
+            all_games.append({
+                "game_id": f"old_{i}", "home_team": "LAL", "away_team": "BOS",
+                "startDate": "2025-02-15",
+            })
+        all_games.append({
+            "game_id": "today_1", "home_team": "PHX", "away_team": "DEN",
+            "startDate": today,
+        })
+
+        mock_fetch.return_value = all_games
+        games = fetch_games_today()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "PHX")
+
+
+class TestValidNbaAbbrevs(unittest.TestCase):
+    """Verify the _VALID_NBA_ABBREVS set covers all 30 teams and aliases."""
+
+    def test_contains_all_30_canonical(self):
+        from data.clearsports_client import _VALID_NBA_ABBREVS
+        canonical = {
+            "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+            "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+            "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS",
+        }
+        self.assertTrue(canonical.issubset(_VALID_NBA_ABBREVS))
+
+    def test_excludes_non_nba(self):
+        from data.clearsports_client import _VALID_NBA_ABBREVS
+        for fake in ("STARS", "STRIPES", "TBD", "WORLD", "USA", "TEAM"):
+            self.assertNotIn(fake, _VALID_NBA_ABBREVS)
+
+    def test_includes_common_aliases(self):
+        from data.clearsports_client import _VALID_NBA_ABBREVS
+        for alias in ("GS", "NY", "NO", "SA", "UTAH", "WSH"):
+            self.assertIn(alias, _VALID_NBA_ABBREVS)
+
+
+class TestNbaStatsFallbackTimeout(unittest.TestCase):
+    """Verify that the NBA stats fallback timeout is reasonable."""
+
+    def test_timeout_at_least_30(self):
+        from data.nba_stats_fallback import _REQUEST_TIMEOUT
+        self.assertGreaterEqual(_REQUEST_TIMEOUT, 30)
+
+
 if __name__ == "__main__":
     unittest.main()

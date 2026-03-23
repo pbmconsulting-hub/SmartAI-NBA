@@ -68,6 +68,17 @@ MAX_API_RETRIES = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
 REQUEST_TIMEOUT_SECONDS = 10
 
+# Valid NBA team abbreviations — canonical 30 plus common API aliases.
+# Used to discard non-NBA entries (e.g. All-Star "STARS", "STRIPES", "WORLD", "TBD").
+_VALID_NBA_ABBREVS = frozenset({
+    # Canonical 30
+    "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
+    "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
+    "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS",
+    # Common API aliases
+    "GS", "NY", "NO", "SA", "UTAH", "WSH", "BRK", "PHO", "CHO",
+})
+
 # ── Time-based response cache (mirrors platform_fetcher._API_CACHE) ───────────
 
 _API_CACHE: dict = {}
@@ -438,11 +449,19 @@ def fetch_games_today() -> list[dict]:
             for g in games_raw:
                 if not isinstance(g, dict):
                     continue
+                # Try many date-field variants the API may use
                 g_date = str(
                     g.get("game_date")
                     or g.get("date")
                     or g.get("scheduled")
-                    or g.get("start_time", "")
+                    or g.get("start_time")
+                    or g.get("gameDate")
+                    or g.get("startDate")
+                    or g.get("start_date")
+                    or g.get("datetime")
+                    or g.get("game_datetime")
+                    or g.get("gameDateTime")
+                    or ""
                 ).strip()
                 # Accept if the date field starts with today's YYYY-MM-DD
                 if g_date.startswith(today):
@@ -462,6 +481,7 @@ def fetch_games_today() -> list[dict]:
 
         games: list[dict] = []
         skipped = 0
+        non_nba = 0
         for g in games_raw:
             if not isinstance(g, dict):
                 continue
@@ -471,6 +491,11 @@ def fetch_games_today() -> list[dict]:
 
             if not home_abbrev or not away_abbrev:
                 skipped += 1
+                continue
+
+            # Skip non-NBA teams (All-Star, Rising Stars, TBD, etc.)
+            if home_abbrev not in _VALID_NBA_ABBREVS or away_abbrev not in _VALID_NBA_ABBREVS:
+                non_nba += 1
                 continue
 
             games.append({
@@ -485,6 +510,10 @@ def fetch_games_today() -> list[dict]:
                 "game_total":  _safe_float(g.get("game_total") or g.get("total", 220)),
             })
 
+        if non_nba:
+            _logger.info(
+                "fetch_games_today: filtered out %d game(s) with non-NBA teams.", non_nba
+            )
         if skipped:
             _logger.warning(
                 "fetch_games_today: skipped %d game(s) with missing team abbreviations.", skipped

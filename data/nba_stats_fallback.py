@@ -32,14 +32,14 @@ except ImportError:
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 _NBA_STATS_BASE = "https://stats.nba.com/stats"
-_REQUEST_TIMEOUT = 15
+_REQUEST_TIMEOUT = 30
 
 # Headers required by stats.nba.com to accept non-browser requests.
 _NBA_STATS_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
+        "Chrome/130.0.0.0 Safari/537.36"
     ),
     "Referer": "https://www.nba.com/",
     "Accept": "application/json, text/plain, */*",
