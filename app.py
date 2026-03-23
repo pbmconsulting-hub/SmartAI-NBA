@@ -269,6 +269,24 @@ if "session_props" not in st.session_state:
 if "fetched_live_picks" not in st.session_state:
     st.session_state["fetched_live_picks"] = []
 
+# ═══ Auto-populate API keys from st.secrets (.streamlit/secrets.toml) ═══
+# Keys loaded here are available immediately and persist for the session.
+# Users can still override them via the Settings page.
+try:
+    if not st.session_state.get("clearsports_api_key"):
+        _cs_secret = st.secrets.get("CLEARSPORTS_API_KEY", "")
+        if _cs_secret:
+            st.session_state["clearsports_api_key"] = _cs_secret
+except Exception:
+    pass
+try:
+    if not st.session_state.get("odds_api_key"):
+        _odds_secret = st.secrets.get("ODDS_API_KEY", "")
+        if _odds_secret:
+            st.session_state["odds_api_key"] = _odds_secret
+except Exception:
+    pass
+
 # ═══ Joseph M. Smith Session State ═══
 st.session_state.setdefault("joseph_enabled", True)
 st.session_state.setdefault("joseph_used_fragments", set())

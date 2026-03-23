@@ -50,7 +50,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     This page shows **real-time NBA scores** and **statistical leaderboards** for the current season.
     
     **Live Scores**
-    - Automatically refreshed from the NBA API
+    - Automatically refreshed from the NBA data feed
     - Shows current score, quarter, and time remaining for active games
     - Completed games show final scores
     
@@ -281,8 +281,7 @@ else:
         "📡 No live scores available right now.\n\n"
         "This may be because:\n"
         "- No games are currently scheduled or in progress\n"
-        "- The ClearSports API key is not configured (⚙️ Settings)\n"
-        "- The ClearSports API is temporarily unavailable\n\n"
+        "- The data feed is temporarily unavailable\n\n"
         "Check back when games are live!"
     )
 
@@ -538,7 +537,7 @@ else:
 # ============================================================
 
 with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
-    st.caption("Completed NBA scores via The Odds API · data refreshes every 5 minutes")
+    st.caption("Completed NBA scores · data refreshes every 5 minutes")
     try:
         from data.odds_api_client import fetch_recent_scores as _fetch_scores
         _recent_scores = []
@@ -584,10 +583,10 @@ with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
             st.info(
                 "No recent completed scores found. "
                 "Either no games completed in the last 3 days, "
-                "or the Odds API key isn't configured (set on ⚙️ Settings)."
+                "or the data feed is temporarily unavailable."
             )
     except Exception as _scores_exc:
-        st.info("Recent scores unavailable — configure your Odds API key on ⚙️ Settings.")
+        st.info("Recent scores unavailable — please try again later.")
 
 # ============================================================
 # END SECTION: Recent Game Results

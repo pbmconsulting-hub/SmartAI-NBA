@@ -14,7 +14,8 @@ Provides:
 
 API key resolution (first match wins):
   1. st.session_state["clearsports_api_key"]
-  2. CLEARSPORTS_API_KEY environment variable
+  2. st.secrets["CLEARSPORTS_API_KEY"]  (via .streamlit/secrets.toml)
+  3. CLEARSPORTS_API_KEY environment variable
 
 Caching uses the same TTL-based pattern as platform_fetcher.py.
 Retry logic applies exponential backoff (1 s → 2 s → 4 s, capped at 10 s).
@@ -82,10 +83,16 @@ def _cache_set(url: str, payload) -> None:
 # ── API key resolution ────────────────────────────────────────────────────────
 
 def _resolve_api_key() -> str | None:
-    """Return the ClearSports API key from session state or environment."""
+    """Return the ClearSports API key from session state, secrets, or environment."""
     if _ST_AVAILABLE:
         try:
             key = st.session_state.get("clearsports_api_key")
+            if key:
+                return key
+        except Exception:
+            pass
+        try:
+            key = st.secrets.get("CLEARSPORTS_API_KEY")
             if key:
                 return key
         except Exception:

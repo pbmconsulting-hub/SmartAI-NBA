@@ -240,9 +240,9 @@ with _sim_btn_col1:
     )
 with _sim_btn_col2:
     _fetch_logs_btn = st.button(
-        "🔄 Fetch Game Logs from ClearSports",
+        "🔄 Fetch Game Logs",
         use_container_width=True,
-        help="Load the last 20 games per player from ClearSports API for more accurate simulation",
+        help="Load the last 20 games per player for more accurate simulation",
         disabled=not selected_names,
     )
 

@@ -258,8 +258,7 @@ elif _PLATFORM_FETCHER_AVAILABLE:
             st.rerun()  # Refresh so the current_props table shows the new data
         else:
             st.warning(
-                "⚠️ No live props fetched. Check your internet connection. "
-                "PrizePicks and Underdog APIs should work without a key."
+                "⚠️ No live props fetched. Check your internet connection."
             )
 
     # ── Cross-Platform Comparison Table ───────────────────────────

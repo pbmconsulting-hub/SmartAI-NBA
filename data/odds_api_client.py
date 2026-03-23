@@ -11,7 +11,8 @@ Provides:
 API key resolution (first match wins):
   1. explicit *api_key* argument
   2. st.session_state["odds_api_key"]
-  3. ODDS_API_KEY environment variable
+  3. st.secrets["ODDS_API_KEY"]  (via .streamlit/secrets.toml)
+  4. ODDS_API_KEY environment variable
 
 Caching uses the same TTL-based pattern as platform_fetcher.py.
 Retry logic applies exponential backoff (1 s → 2 s → 4 s, capped at 10 s).
@@ -140,12 +141,18 @@ def _cache_set(url: str, payload) -> None:
 # ── API key resolution ────────────────────────────────────────────────────────
 
 def _resolve_api_key(explicit_key: str | None = None) -> str | None:
-    """Return the Odds API key, trying (in order): argument → session → env."""
+    """Return the Odds API key, trying: argument → session → secrets → env."""
     if explicit_key:
         return explicit_key
     if _ST_AVAILABLE:
         try:
             key = st.session_state.get("odds_api_key")
+            if key:
+                return key
+        except Exception:
+            pass
+        try:
+            key = st.secrets.get("ODDS_API_KEY")
             if key:
                 return key
         except Exception:

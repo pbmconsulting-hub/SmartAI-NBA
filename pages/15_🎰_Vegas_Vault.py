@@ -431,22 +431,7 @@ with st.sidebar:
 
     st.divider()
 
-    # ── API quota display ─────────────────────────────────────
-    st.subheader("📡 API Status")
-    if get_odds_api_usage is not None:
-        try:
-            usage = get_odds_api_usage()
-            remaining = usage.get("requests_remaining", "—")
-            used = usage.get("requests_used", "—")
-            updated = usage.get("updated_at", "—")
-            st.metric("Requests Remaining", remaining)
-            st.metric("Requests Used", used)
-            if updated and updated != "—":
-                st.caption(f"Updated: {updated}")
-        except Exception:
-            st.metric("Requests Remaining", "—")
-    else:
-        st.caption("API client not available.")
+    # ── API quota display (hidden from users) ───────────────────
 
 # ── Scan button (main area) ──────────────────────────────────
 scan_col1, scan_col2 = st.columns([3, 1])

@@ -117,8 +117,8 @@ with st.sidebar:
     # ── Historical data refresh ───────────────────────────────
     st.subheader("📡 Historical Data")
     st.caption(
-        "Auto-fetch game logs for tonight's players via ClearSports API "
-        "and update CLV closing lines from The Odds API."
+        "Auto-fetch game logs for tonight's players "
+        "and update CLV closing lines."
     )
     refresh_hist_btn = st.button(
         "🔄 Refresh Historical Data",
@@ -160,9 +160,8 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
         )
     else:
         st.info(
-            "ℹ️ No game logs fetched. This typically means the ClearSports API key "
-            "isn't configured, or players don't have IDs in the loaded data. "
-            "Configure your API key on the **⚙️ Settings** page."
+            "ℹ️ No game logs fetched. This typically means the data feed is "
+            "temporarily unavailable, or players don't have IDs in the loaded data."
         )
 
 # ── Load cached game logs ─────────────────────────────────────
