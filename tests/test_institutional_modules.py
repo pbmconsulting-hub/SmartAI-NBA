@@ -348,11 +348,11 @@ class TestInlineBreakdownKellyAllocation(unittest.TestCase):
         self.assertIn("wager_html", content)
 
 
-class TestSyntheticSliderRobustness(unittest.TestCase):
-    """Test synthetic slider edge-case handling."""
+class TestFairOddsSliderRobustness(unittest.TestCase):
+    """Test fair-odds explore-line slider edge-case handling."""
 
     def test_slider_key_includes_platform(self):
-        """Verify the synthetic slider key includes platform for uniqueness."""
+        """Verify the fair-odds slider key includes platform for uniqueness."""
         import os
         helper_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),

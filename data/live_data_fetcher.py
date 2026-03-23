@@ -1,16 +1,15 @@
 # ============================================================
 # FILE: data/live_data_fetcher.py
-# PURPOSE: Fetch live, real NBA data from the nba_api library.
+# PURPOSE: Fetch live, real NBA data via the ClearSports API.
 #          Pulls today's games, player stats, team stats, and
 #          player game logs. Saves everything to CSV files so
 #          the rest of the app works without any changes.
-# CONNECTS TO: pages/8_🔄_Update_Data.py, data/data_manager.py
+# CONNECTS TO: pages/9_📡_Data_Feed.py, data/data_manager.py
 # CONCEPTS COVERED: APIs, rate limiting, CSV writing, error handling
 #
 # BEGINNER NOTE: An API (Application Programming Interface) is a
-# way for programs to talk to each other. nba_api is a free Python
-# library that talks to the NBA's official stats website for us.
-# We never need an API key — it's completely free to use!
+# way for programs to talk to each other. ClearSports is a real-time
+# NBA data provider — configure your API key in the Settings page.
 # ============================================================
 
 # Standard library imports (no install needed — built into Python)
