@@ -70,7 +70,7 @@ REQUEST_TIMEOUT_SECONDS = 10
 
 # Valid NBA team abbreviations — canonical 30 plus common API aliases.
 # Used to discard non-NBA entries (e.g. All-Star "STARS", "STRIPES", "WORLD", "TBD").
-_VALID_NBA_ABBREVS: frozenset = frozenset({
+_VALID_NBA_ABBREVS = frozenset({
     # Canonical 30
     "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
     "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",

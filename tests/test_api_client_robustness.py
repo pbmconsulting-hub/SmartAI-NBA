@@ -1132,6 +1132,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
 
         today = _today_str()
         all_games = []
+        # Need >20 games to trigger client-side date filtering
         for i in range(23):
             all_games.append({
                 "game_id": f"old_{i}", "home_team": "LAL", "away_team": "BOS",
@@ -1157,6 +1158,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
 
         today = _today_str()
         all_games = []
+        # Need >20 games to trigger client-side date filtering
         for i in range(23):
             all_games.append({
                 "game_id": f"old_{i}", "home_team": "LAL", "away_team": "BOS",
