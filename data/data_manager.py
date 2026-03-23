@@ -90,7 +90,7 @@ def load_props_data():
     Returns:
         list of dict: Prop rows, e.g.:
             [{'player_name': 'LeBron James', 'stat_type': 'points',
-              'line': '24.5', 'platform': 'PrizePicks', ...}, ...]
+              'line': '24.5', 'platform': 'FanDuel', ...}, ...]
     """
     return _load_csv_file(PROPS_CSV_PATH)
 
@@ -248,7 +248,7 @@ def find_player_by_name(players_list, player_name):
 
 # ============================================================
 # SECTION: Player Name Normalization & Fuzzy Matching
-# These helpers ensure props from PrizePicks/Underdog/DraftKings
+# These helpers ensure props from sportsbook platforms
 # match our internal player database even when names differ in
 # capitalization, unicode accents, Jr./III suffixes, or nicknames.
 # ============================================================
@@ -1146,7 +1146,7 @@ def filter_props_to_platform_players(
 ) -> list:
     """
     Filter auto-generated props to only include players that appear in
-    real platform data (PrizePicks / Underdog / DraftKings).
+    real platform data (sportsbook platforms).
 
     Players whose name matches one in platform_props will have their
     generated props returned.  Players not found on any platform are
@@ -1209,7 +1209,7 @@ def parse_props_from_csv_text(csv_text):
         tuple: (list of valid prop dicts, list of error messages)
 
     Example:
-        text = "LeBron James,LAL,points,24.5,PrizePicks"
+        text = "LeBron James,LAL,points,24.5,FanDuel"
         props, errors = parse_props_from_csv_text(text)
     """
     parsed_props = []   # Successfully parsed props
@@ -1250,7 +1250,7 @@ def parse_props_from_csv_text(csv_text):
                 "team": row_lower.get("team", ""),
                 "stat_type": row_lower.get("stat_type", "points").lower(),
                 "line": line_value,
-                "platform": row_lower.get("platform", "PrizePicks"),
+                "platform": row_lower.get("platform", "FanDuel"),
                 "game_date": row_lower.get("game_date", ""),
             }
             parsed_props.append(prop)
@@ -1271,8 +1271,8 @@ def get_csv_template():
     # Template with headers and one example row
     template_lines = [
         "player_name,team,stat_type,line,platform,game_date",
-        "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05",
-        "Stephen Curry,GSW,threes,3.5,Underdog,2026-03-05",
+        "LeBron James,LAL,points,24.5,FanDuel,2026-03-05",
+        "Stephen Curry,GSW,threes,3.5,BetMGM,2026-03-05",
     ]
     return "\n".join(template_lines)
 
@@ -1284,7 +1284,7 @@ def get_csv_template():
 # ============================================================
 # SECTION: Platform Props — Save / Load helpers
 # These functions save and load live props fetched from betting
-# platforms (PrizePicks, Underdog, DraftKings) to/from both
+# platforms (sportsbook platforms) to/from both
 # session state and an optional CSV file on disk.
 # ============================================================
 

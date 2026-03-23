@@ -27,8 +27,6 @@ from styles.theme import (
     get_form_dots_html,
     get_matchup_grade_badge_html,
     get_intel_strip_html,
-    GOBLIN_LOGO_PATH as _GOBLIN_LOGO_PATH,
-    DEMON_LOGO_PATH as _DEMON_LOGO_PATH,
 )
 
 try:
@@ -111,7 +109,7 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
     - Directional forces: OVER / UNDER force lists with star ratings
     - Score breakdown: confidence-factor progress bars
 
-    This is used by the Best Single Bets, Goblin, Demon, and Uncertain
+    This is used by the Best Single Bets, 50/50, and Uncertain
     sections so that every card shows the full quantitative picture
     without requiring the user to expand anything.
 
@@ -1009,42 +1007,13 @@ def display_prop_analysis_card_qds(result):
     tier_icon_map = {"Platinum": "💎", "Gold": "🔒", "Silver": "✓", "Bronze": "⭐"}
     tier_icon = tier_icon_map.get(tier, "⭐")
 
-    # ── Goblin / 50/50 / Demon badge ─────────────────────────────
+    # ── Bet Classification badge ─────────────────────────────────
     bet_type       = result.get("bet_type", "normal")
     bet_type_emoji = result.get("bet_type_emoji", "")
     bet_type_label = result.get("bet_type_label", "")
     bet_type_reasons = result.get("bet_type_reasons", []) or []
 
-    if bet_type == "goblin":
-        _goblin_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
-        st.markdown(
-            f'<div style="background:rgba(76,175,80,0.12);border:1px solid #4caf50;border-radius:6px;'
-            f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_GOBLIN_LOGO_PATH, width=28, alt="Goblin")}</span>'
-            f'<div>'
-            f'<span style="color:#4caf50;font-weight:700;font-size:0.9rem;">GOBLIN BET — Safe Floor</span>'
-            + (f'<br><span style="color:#a5d6a7;font-size:0.78rem;">{_html.escape(_goblin_reasons_str)}</span>'
-               if _goblin_reasons_str else "")
-            + f'</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    elif bet_type == "demon":
-        # True Demon Bet — alternate line set ABOVE the standard O/U
-        _demon_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
-        st.markdown(
-            f'<div style="background:rgba(255,140,0,0.12);border:1px solid #ff8c00;border-radius:6px;'
-            f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.3rem;">{get_logo_img_tag(_DEMON_LOGO_PATH, width=28, alt="Demon")}</span>'
-            f'<div>'
-            f'<span style="color:#ff8c00;font-weight:700;font-size:0.9rem;">DEMON BET — High Ceiling</span>'
-            + (f'<br><span style="color:#ffd580;font-size:0.78rem;">{_html.escape(_demon_reasons_str)}</span>'
-               if _demon_reasons_str else "")
-            + f'</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    elif bet_type in ("50_50",):
+    if bet_type in ("50_50",):
         # 50/50 Bet — the standard O/U line (neutral baseline)
         _fifty_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
         st.markdown(

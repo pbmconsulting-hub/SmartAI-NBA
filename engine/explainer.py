@@ -480,7 +480,7 @@ def generate_pick_explanation(
             (confidence_score, tier, tier_emoji, direction, recommendation)
         game_context (dict): Tonight's game context
             (opponent, is_home, rest_days, game_total, vegas_spread)
-        platform (str): Platform name (PrizePicks, DraftKings, Underdog)
+        platform (str): Platform name (FanDuel, DraftKings, BetMGM, etc.)
         recent_form_games (list of dict, optional): Last N game logs
         should_avoid (bool): Whether the prop is on the avoid list
         avoid_reasons (list of str, optional): Reasons for avoid flag
@@ -710,8 +710,12 @@ def generate_pick_explanation(
 
     # 14. Platform notes
     platform_notes_map = {
+        "FanDuel": "FanDuel offers standard sportsbook parlays. All legs must hit for the full payout.",
+        "DraftKings": "DraftKings offers standard sportsbook parlays with same-game parlay options.",
+        "BetMGM": "BetMGM offers standard sportsbook parlays with one-game parlay insurance options.",
+        "Caesars": "Caesars offers standard sportsbook parlays. All legs must hit for the full payout.",
+        # Backward-compat DFS entries
         "PrizePicks": "PrizePicks uses a 2-4 pick entry format. This pick can be parlayed with others for multiplied payouts.",
-        "DraftKings": "DraftKings Pick6 uses a 3-6 pick entry. All picks must hit for the top payout tier.",
         "Underdog": "Underdog Fantasy uses a 2-6 pick entry. Higher entry counts yield higher multipliers.",
     }
     platform_notes = platform_notes_map.get(platform, f"{platform} — check platform rules for payout structure.")

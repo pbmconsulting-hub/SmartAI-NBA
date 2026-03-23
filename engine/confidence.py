@@ -137,14 +137,18 @@ STREAK_MAX_ADJUSTMENT   = 10.0  # Maximum absolute adjustment (±10)
 
 # Platform-specific tier score premiums (3D).
 # Higher premium = harder to achieve high tier on that platform.
-# PrizePicks Flex: 0 (partial payouts reduce risk).
-# DraftKings: +3 (traditional vig makes each leg harder to beat).
+# Standard sportsbooks: +3 (traditional vig makes each leg harder to beat).
 # PrizePicks Power: +5 (all-or-nothing structure is harder).
 PLATFORM_TIER_PREMIUMS = {
-    "PrizePicks":        0,   # Flex: no additional premium
-    "PrizePicks Power":  5,   # All-or-nothing: raise all thresholds by 5
-    "DraftKings":        3,   # Traditional vig: raise by 3
-    "Underdog":          0,   # Similar to PrizePicks Flex
+    # Sportsbook-standard adjustments
+    "FanDuel":           3,
+    "DraftKings":        3,
+    "BetMGM":            3,
+    "Caesars":           3,
+    # Backward-compat DFS entries (tests may reference)
+    "PrizePicks":        0,
+    "PrizePicks Power":  5,
+    "Underdog":          0,
     "Underdog Fantasy":  0,
 }
 
@@ -250,7 +254,7 @@ def calculate_confidence_score(
         streak_info (dict, optional): Streak context for momentum adjustment (3C).
             Keys: 'type' ('hot'|'cold'|'none'), 'length' (int).
         platform (str, optional): Betting platform name for tier premium (3D).
-            E.g. 'PrizePicks', 'PrizePicks Power', 'DraftKings'.
+            E.g. 'FanDuel', 'DraftKings', 'PrizePicks Power'.
 
     Returns:
         dict: {

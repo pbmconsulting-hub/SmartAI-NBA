@@ -26,9 +26,9 @@ COMBO_STAT_TYPES = frozenset({
 
 # Fantasy score stat types (weighted sum using platform formula).
 FANTASY_STAT_TYPES = frozenset({
-    "fantasy_score_pp",   # PrizePicks fantasy scoring
+    "fantasy_score_pp",   # Fantasy scoring (legacy)
     "fantasy_score_dk",   # DraftKings fantasy scoring
-    "fantasy_score_ud",   # Underdog fantasy scoring
+    "fantasy_score_ud",   # Fantasy scoring (legacy)
 })
 
 # Yes/No prop types.

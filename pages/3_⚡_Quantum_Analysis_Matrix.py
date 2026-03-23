@@ -34,7 +34,7 @@ from engine.simulation import (
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
-from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, format_goblin_demon_prediction, calculate_composite_win_score
+from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, calculate_composite_win_score
 
 try:
     from engine.rotation_tracker import track_minutes_trend
@@ -130,8 +130,6 @@ from utils.player_modal import show_player_spotlight as _show_spotlight
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
 _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 # Legacy logo paths disabled – branding removed from UI
-_GOBLIN_LOGO_PATH = ""
-_DEMON_LOGO_PATH  = ""
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
@@ -1501,9 +1499,9 @@ if run_analysis:
             if simulation_output.get("dfs_platform"):
                 full_result["dfs_platform"] = simulation_output["dfs_platform"]
 
-            # ── Goblin / 50_50 / Demon Bet Classification ───────────────
+            # ── Bet Classification ──────────────────────────────────────
             # Primary classification is driven by line_category (from the
-            # ingestion layer).  Statistical Goblin overlay applies to
+            # ingestion layer).  Statistical overlay applies to
             # standard-line picks.  Risk flags (conflicting forces, variance,
             # fatigue, regression) are separate from bet_type and feed into
             # the avoid-list system via is_uncertain.
@@ -1512,19 +1510,20 @@ if run_analysis:
                 # Determine the source of the prop line so the classifier can
                 # validate whether it is a real platform line or a synthetic one.
                 # Props with no platform or marked as estimated are treated as
-                # synthetic to prevent garbage-in/garbage-out Goblin awards.
+                # synthetic to prevent garbage-in/garbage-out classification.
                 _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
                 # Extract line-position category from the ingestion layer
                 _line_category = prop.get("line_category", None)
                 _standard_line = prop.get("standard_line", None)
                 # Pull user-configured thresholds from session state (set on Settings page)
                 _ss = st.session_state
-                _g_std  = _ss.get("goblin_min_std_devs")
-                _g_prob = (_ss.get("goblin_min_probability_pct", 80.0) / 100.0
-                           if _ss.get("goblin_min_probability_pct") is not None else None)
-                _g_edge = _ss.get("goblin_min_edge_pct")
-                _d_conf = _ss.get("demon_conflict_ratio")
-                _d_regr = _ss.get("demon_regression_pct")
+                # Goblin/Demon thresholds removed from UI; pass None so
+                # classify_bet_type() uses its module-level defaults.
+                _g_std  = None
+                _g_prob = None
+                _g_edge = None
+                _d_conf = None
+                _d_regr = None
                 _bet_classification = classify_bet_type(
                     probability_over=probability_over,
                     edge_percentage=edge_pct,
@@ -1558,8 +1557,9 @@ if run_analysis:
                 full_result["standard_line"]   = _standard_line
                 full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
                 full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
-                full_result["goblin_floor"]    = _bet_classification.get("goblin_floor")
-                full_result["demon_ceiling"]   = _bet_classification.get("demon_ceiling")
+                # Kept as None — downstream renderers expect these keys.
+                full_result["goblin_floor"]    = None
+                full_result["demon_ceiling"]   = None
                 # Risk flags (conflicting forces, high-variance stat, etc.) are
                 # informational — they appear on the card UI as warnings but do NOT
                 # block the pick from being displayed or auto-logged.  The genuine
@@ -1583,22 +1583,18 @@ if run_analysis:
             full_result["over_odds"]  = prop.get("over_odds",  -110)
             full_result["under_odds"] = prop.get("under_odds", -110)
 
-            # ── Alt-Line Probability Generation (Goblin & Demon) ─────────
-            # Generate 3 Goblin lines (L-1, L-2, L-3) and 3 Demon lines
-            # (L+2, L+4, L+6) from the base prop line.  Probabilities are
-            # computed from the raw simulation distribution.
+            # ── Alt-Line Probability Generation ──────────────────────────
+            # Generate alt lines for analysis.
+            # Probabilities are computed from the raw simulation distribution.
             try:
                 _alt_lines = generate_alt_line_probabilities(simulation_output, prop_line)
                 full_result["alt_lines"] = _alt_lines
                 _best_alt = _alt_lines.get("best_alt", {})
                 full_result["prediction"] = _best_alt.get("prediction", "")
-                # Override: when the bet classification says this prop IS a
-                # goblin/demon, use the strict prediction string from the
+                # Override: when the bet classification says this prop IS an
+                # alt-line bet type, use the strict prediction string from the
                 # edge_detection formatter (anchored to the actual prop line)
                 # rather than the simulation-best line which may differ.
-                _bt = full_result.get("bet_type", "normal")
-                if _bt in ("goblin", "demon"):
-                    full_result["prediction"] = format_goblin_demon_prediction(_bt, prop_line)
             except Exception:
                 full_result["alt_lines"] = {}
                 full_result["prediction"] = ""

@@ -82,7 +82,7 @@ def classify_uncertain_subtype(notes: str) -> str:
     return "Other"
 
 
-# Backward-compat alias
+# Backward-compat alias (deprecated)
 classify_demon_subtype = classify_uncertain_subtype
 
 
@@ -103,9 +103,9 @@ def get_uncertain_subtype_counts(uncertain_bets: list) -> dict:
     return {k: v for k, v in counts.items() if v > 0}
 
 
-# Backward-compat alias
+# Backward-compat alias (deprecated)
 def get_demon_subtype_counts(demon_bets: list) -> dict:
-    """Backward-compat alias for get_uncertain_subtype_counts()."""
+    """Backward-compat alias for get_uncertain_subtype_counts() (deprecated)."""
     return get_uncertain_subtype_counts(demon_bets)
 
 

@@ -503,8 +503,8 @@ def calculate_dynamic_vig(over_odds=None, under_odds=None, platform=None):
     Calculate the dynamic vig percentage for a prop bet. (2C)
 
     Different platforms have different vig structures:
-    - PrizePicks/Underdog: 0% per-leg vig (profit is in payout structure)
-    - DraftKings with real odds: actual vig from the juice
+    - DFS platforms (PrizePicks/Underdog): 0% per-leg vig (profit is in payout structure)
+    - Sportsbooks with real odds: actual vig from the juice
     - Default: 2.38% (standard -110/-110 lines)
 
     BEGINNER NOTE: Vig (or "juice") is the sportsbook's fee. At -110/-110,
@@ -580,9 +580,9 @@ def should_avoid_prop(
         stat_standard_deviation (float): Variability
         stat_average (float): Average for this stat
         stat_type (str, optional): Stat type for low-volume check
-        platform (str, optional): Platform name — PrizePicks/Underdog have 0%
+        platform (str, optional): Platform name — DFS platforms have 0%
             structural vig on individual legs (payout baked into table).
-            DraftKings uses variable juice from actual odds.
+            Sportsbooks use variable juice from actual odds.
         over_odds (float): American odds on the over side (used for DraftKings
             vig calculation). Default -110.
 
@@ -632,7 +632,7 @@ def should_avoid_prop(
     _stat_min_edge = STAT_EDGE_THRESHOLDS.get(stat_type_lower, MIN_EDGE_AFTER_VIG)
     if effective_edge < _stat_min_edge:
         _vig_adj_display = max(0.0, vig_adjusted_edge)  # show 0 if negative to avoid confusion
-        _vig_label = f"{effective_vig:.1f}% vig" if effective_vig > 0 else "no vig (PrizePicks/Underdog)"
+        _vig_label = f"{effective_vig:.1f}% vig" if effective_vig > 0 else "no vig (DFS platforms)"
         avoid_reasons.append(
             f"Insufficient edge after vig ({edge_percentage:.1f}% raw → "
             f"{_vig_adj_display:.1f}% after {_vig_label}) — "

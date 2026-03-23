@@ -17,10 +17,7 @@ from engine.entry_optimizer import (
     calculate_correlation_risk,
     identify_weakest_link,
     suggest_swap,
-    PRIZEPICKS_FLEX_PAYOUT_TABLE,
-    PRIZEPICKS_POWER_PAYOUT_TABLE,
-    UNDERDOG_FLEX_PAYOUT_TABLE,
-    DRAFTKINGS_PICK6_PAYOUT_TABLE,
+    SPORTSBOOK_PARLAY_TABLE,
     PLATFORM_FLEX_TABLES,
     optimize_play_type,
     build_optimal_entries_with_play_type,
@@ -423,7 +420,7 @@ if selected_picks:
             for p in picks_to_include
         ]
         
-        platform_flex_table = PLATFORM_FLEX_TABLES.get(quick_platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+        platform_flex_table = PLATFORM_FLEX_TABLES.get(quick_platform, SPORTSBOOK_PARLAY_TABLE)
         payout_for_selected = platform_flex_table.get(len(picks_to_include), {})
         
         if payout_for_selected:
@@ -510,12 +507,7 @@ else:
 
 with st.expander(f"📋 {selected_platform} Payout Table"):
     # Get the right payout table
-    payout_tables = {
-        "DraftKings Pick6": DRAFTKINGS_PICK6_PAYOUT_TABLE,
-    }
-
-    table_to_show_key = "DraftKings Pick6"
-    table_to_show = payout_tables.get(table_to_show_key, DRAFTKINGS_PICK6_PAYOUT_TABLE)
+    table_to_show = PLATFORM_FLEX_TABLES.get(selected_platform, SPORTSBOOK_PARLAY_TABLE)
 
     if entry_size in table_to_show:
         payout_for_size = table_to_show[entry_size]
@@ -794,7 +786,7 @@ if len(selected_pick_labels) >= 2:
     ]
 
     # Get payout table
-    platform_flex_table = PLATFORM_FLEX_TABLES.get(selected_platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+    platform_flex_table = PLATFORM_FLEX_TABLES.get(selected_platform, SPORTSBOOK_PARLAY_TABLE)
     payout_for_custom = platform_flex_table.get(len(selected_picks_data), {})
 
     if payout_for_custom:

@@ -890,9 +890,6 @@ if platform_props_clicked:
                 if "prize" in plat_lower:
                     icon = "🟢"
                     badge_color = "#00c853"
-                elif "underdog" in plat_lower:
-                    icon = "🟣"
-                    badge_color = "#7c4dff"
                 elif "draft" in plat_lower:
                     icon = "🔵"
                     badge_color = "#2196f3"

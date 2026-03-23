@@ -25,14 +25,14 @@ BRONZE_MIN_EDGE_PCT   = 1.0
 PLATINUM_MIN_PROBABILITY = 0.62
 GOLD_MIN_PROBABILITY     = 0.57
 
-# ── Goblin bet classification thresholds ─────────────────────────────────────
+# ── Internal bet classification thresholds (legacy) ─────────────────────
 GOBLIN_MIN_STD_DEVS   = 2.0    # Projection ≥2 std devs from line
 GOBLIN_MIN_PROBABILITY = 0.80  # Model probability ≥80%
 GOBLIN_MIN_EDGE       = 25.0   # Edge ≥25%
 GOBLIN_LINE_MIN_RATIO = 0.25   # Line ≥25% of season average
 GOBLIN_LINE_MAX_RATIO = 4.0    # Line ≤4× season average
 
-# ── Uncertain (risk-flag) detection thresholds ───────────────────────────────
+# ── Legacy backward-compat aliases (deprecated) ──────────────────────────────
 # These replace the old "Demon" threshold names — conflicting forces /
 # variance / fatigue / regression are RISK FLAGS, not bet types.
 UNCERTAIN_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% = conflicting
