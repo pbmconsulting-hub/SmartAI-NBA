@@ -1094,8 +1094,14 @@ if current_games:
 
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
-        spread = game.get("vegas_spread", 0.0)
-        total = game.get("game_total", 220.0)
+        try:
+            spread = float(game.get("vegas_spread") or 0)
+        except (TypeError, ValueError):
+            spread = 0.0
+        try:
+            total = float(game.get("game_total") or 220)
+        except (TypeError, ValueError):
+            total = 220.0
 
         # Format streak with color class
         def streak_html(s):
@@ -1287,19 +1293,31 @@ if current_games:
         for i, game in enumerate(current_games):
             col_label, col_spread, col_total = st.columns([3, 2, 2])
             with col_label:
-                st.markdown(f"**{game['away_team']} @ {game['home_team']}**")
+                st.markdown(f"**{game.get('away_team', '')} @ {game.get('home_team', '')}**")
             with col_spread:
+                _spread_raw = game.get("vegas_spread")
+                try:
+                    _spread_val = float(_spread_raw) if _spread_raw is not None else 0.0
+                except (TypeError, ValueError):
+                    _spread_val = 0.0
+                _spread_val = max(-30.0, min(30.0, _spread_val))
                 new_spread = st.number_input(
                     "Spread (Home)",
                     min_value=-30.0, max_value=30.0,
-                    value=float(game.get("vegas_spread", 0.0)), step=0.5,
+                    value=_spread_val, step=0.5,
                     key=f"edit_spread_{i}",
                 )
             with col_total:
+                _total_raw = game.get("game_total")
+                try:
+                    _total_val = float(_total_raw) if _total_raw is not None else 220.0
+                except (TypeError, ValueError):
+                    _total_val = 220.0
+                _total_val = max(180.0, min(270.0, _total_val))
                 new_total = st.number_input(
                     "Total (O/U)",
                     min_value=180.0, max_value=270.0,
-                    value=float(game.get("game_total", 220.0)), step=0.5,
+                    value=_total_val, step=0.5,
                     key=f"edit_total_{i}",
                 )
             updated_game = dict(game)

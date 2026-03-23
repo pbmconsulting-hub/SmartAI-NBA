@@ -898,10 +898,23 @@ def fetch_todays_games():
     games = []
     try:
         from data.clearsports_client import fetch_games_today as _cs_games
-        games = _cs_games() or []
+        raw_games = _cs_games() or []
+
+        # Validate: keep only games that have both home_team and away_team.
+        games = [
+            g for g in raw_games
+            if g.get("home_team", "").strip() and g.get("away_team", "").strip()
+        ]
+
         if games:
-            _logger.info(f"ClearSports: {len(games)} game(s) found.")
+            _logger.info(f"ClearSports: {len(games)} valid game(s) found.")
             games = _deduplicate_games(games)
+        elif raw_games:
+            _logger.warning(
+                "ClearSports returned %d game(s) but none had valid team "
+                "abbreviations — possible API format change.",
+                len(raw_games),
+            )
     except Exception as err:
         _logger.warning(f"ClearSports games fetch failed: {err}")
 

@@ -221,5 +221,227 @@ class TestClearSportsGameParsingEdgeCases(unittest.TestCase):
         self.assertEqual(games[0]["away_losses"], 22)
 
 
+# ── Section 6: Cache key includes params ─────────────────────────────────────
+
+class TestCacheKeyIncludesParams(unittest.TestCase):
+    """Verify that _build_cache_key builds unique keys for different params."""
+
+    def test_build_cache_key_exists(self):
+        """_build_cache_key function must exist in clearsports_client source."""
+        src = _CS_SRC.read_text(encoding="utf-8")
+        self.assertIn("def _build_cache_key(", src)
+
+    def test_build_cache_key_behaviour(self):
+        """Different params must produce different cache keys."""
+        from data.clearsports_client import _build_cache_key
+
+        key1 = _build_cache_key("https://example.com/games", {"date": "2026-03-23"})
+        key2 = _build_cache_key("https://example.com/games", {"date": "2026-03-24"})
+        key3 = _build_cache_key("https://example.com/games")
+
+        self.assertNotEqual(key1, key2, "Different date params must produce different keys")
+        self.assertNotEqual(key1, key3, "Params vs no params must produce different keys")
+
+    def test_build_cache_key_no_params(self):
+        """No params should return the URL as-is."""
+        from data.clearsports_client import _build_cache_key
+
+        self.assertEqual(_build_cache_key("https://example.com/games"), "https://example.com/games")
+
+
+# ── Section 7: _extract_team_abbrev resilience ───────────────────────────────
+
+class TestExtractTeamAbbrev(unittest.TestCase):
+    """Verify _extract_team_abbrev handles multiple field naming conventions."""
+
+    def test_direct_home_team_field(self):
+        """home_team field should be extracted correctly."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"home_team": "LAL"}, "home")
+        self.assertEqual(result, "LAL")
+
+    def test_abbreviation_field(self):
+        """home_abbreviation / away_abbreviation should work."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"away_abbreviation": "bos"}, "away")
+        self.assertEqual(result, "BOS")
+
+    def test_tricode_field(self):
+        """home_tricode / away_tricode should work."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"home_tricode": "gsw"}, "home")
+        self.assertEqual(result, "GSW")
+
+    def test_team_abbreviation_field(self):
+        """home_team_abbreviation / away_team_abbreviation should work."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"away_team_abbreviation": "MIA"}, "away")
+        self.assertEqual(result, "MIA")
+
+    def test_nested_dict(self):
+        """Nested dict like home: {abbreviation: 'LAL'} should work."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"home": {"abbreviation": "LAL"}}, "home")
+        self.assertEqual(result, "LAL")
+
+    def test_nested_team_dict(self):
+        """Nested dict like home_team: {tricode: 'BOS'} should work."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"home_team": {"tricode": "BOS"}}, "home")
+        self.assertEqual(result, "BOS")
+
+    def test_empty_on_missing_fields(self):
+        """Should return empty string when no matching fields found."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"unrelated": "data"}, "home")
+        self.assertEqual(result, "")
+
+    def test_empty_string_field_returns_empty(self):
+        """Empty string in team field should return empty."""
+        from data.clearsports_client import _extract_team_abbrev
+
+        result = _extract_team_abbrev({"home_team": ""}, "home")
+        self.assertEqual(result, "")
+
+
+# ── Section 8: fetch_games_today skips empty-team entries ────────────────────
+
+class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
+    """Verify that games with empty team abbreviations are skipped."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_skips_games_with_empty_teams(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """Games missing team abbreviations should be skipped."""
+        from data.clearsports_client import fetch_games_today
+
+        mock_fetch.return_value = [
+            {"game_id": "g1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.5},
+            {"game_id": "g2"},  # no team info at all
+            {"game_id": "g3", "home_team": "MIA"},  # missing away_team
+        ]
+
+        games = fetch_games_today()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "LAL")
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_alternate_field_names_work(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """Games with alternate field names (tricode, nested) should parse."""
+        from data.clearsports_client import fetch_games_today
+
+        mock_fetch.return_value = [
+            {"game_id": "g1", "home_tricode": "LAL", "away_tricode": "BOS", "vegas_spread": -2.0},
+        ]
+
+        games = fetch_games_today()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "LAL")
+        self.assertEqual(games[0]["away_team"], "BOS")
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_client_side_date_filter(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """When API returns >20 games, client-side date filter should apply."""
+        from data.clearsports_client import fetch_games_today, _today_str
+
+        today = _today_str()
+        # 25 games total, but only 2 match today's date
+        all_games = []
+        for i in range(23):
+            all_games.append({
+                "game_id": f"old_{i}",
+                "home_team": "LAL",
+                "away_team": "BOS",
+                "game_date": "2025-01-01",
+            })
+        all_games.append({
+            "game_id": "today_1",
+            "home_team": "MIA",
+            "away_team": "NYK",
+            "game_date": today,
+        })
+        all_games.append({
+            "game_id": "today_2",
+            "home_team": "GSW",
+            "away_team": "PHX",
+            "game_date": today,
+        })
+
+        mock_fetch.return_value = all_games
+        games = fetch_games_today()
+        self.assertEqual(len(games), 2)
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_nested_team_objects(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """Games with nested team objects should parse correctly."""
+        from data.clearsports_client import fetch_games_today
+
+        mock_fetch.return_value = [
+            {
+                "game_id": "g1",
+                "home": {"abbreviation": "CHI"},
+                "away": {"abbreviation": "CLE"},
+                "vegas_spread": -1.0,
+                "game_total": 210,
+            }
+        ]
+
+        games = fetch_games_today()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "CHI")
+        self.assertEqual(games[0]["away_team"], "CLE")
+
+
+# ── Section 9: fetch_todays_games validates team names ───────────────────────
+
+class TestFetchTodaysGamesValidation(unittest.TestCase):
+    """Verify fetch_todays_games validates games have team names."""
+
+    @patch("data.live_data_fetcher._enrich_games_with_standings", side_effect=lambda g: g)
+    @patch("data.live_data_fetcher._enrich_games_with_predictions", side_effect=lambda g: g)
+    @patch("data.live_data_fetcher._enrich_games_with_clearsports_odds", side_effect=lambda g: g)
+    @patch("data.live_data_fetcher._enrich_games_with_odds_api", side_effect=lambda g: g)
+    @patch("data.live_data_fetcher._build_games_from_odds_api", return_value=[
+        {"game_id": "fallback_1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.0, "game_total": 220}
+    ])
+    @patch("data.clearsports_client.fetch_games_today")
+    def test_falls_back_when_all_teams_empty(
+        self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_cs,
+        mock_enrich_pred, mock_enrich_stand,
+    ):
+        """When ClearSports returns games with empty teams, fallback should trigger."""
+        from data.live_data_fetcher import fetch_todays_games
+
+        # ClearSports returns games but all have empty team names
+        mock_cs.return_value = [
+            {"game_id": "g1", "home_team": "", "away_team": ""},
+            {"game_id": "g2", "home_team": "", "away_team": ""},
+        ]
+
+        games = fetch_todays_games()
+        # Should use fallback since ClearSports games had no valid teams
+        mock_build.assert_called_once()
+        self.assertEqual(len(games), 1)
+        self.assertEqual(games[0]["home_team"], "LAL")
+
+
 if __name__ == "__main__":
     unittest.main()

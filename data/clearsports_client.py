@@ -113,6 +113,15 @@ def _resolve_api_key() -> str | None:
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
 
+def _build_cache_key(url: str, params: dict | None = None) -> str:
+    """Build a cache key from *url* and optional *params*."""
+    if not params:
+        return url
+    sorted_items = sorted(params.items())
+    qs = "&".join(f"{k}={v}" for k, v in sorted_items)
+    return f"{url}?{qs}"
+
+
 def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | None:
     """
     GET *url* with exponential-backoff retry and response caching.
@@ -124,7 +133,8 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
         _logger.warning("requests library is not available — cannot call ClearSports API")
         return None
 
-    cached = _cache_get(url)
+    cache_key = _build_cache_key(url, params)
+    cached = _cache_get(cache_key)
     if cached is not None:
         return cached
 
@@ -182,7 +192,7 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 return None
 
             data = resp.json()
-            _cache_set(url, data)
+            _cache_set(cache_key, data)
             return data
 
         except Exception as exc:
@@ -223,6 +233,46 @@ def _today_str() -> str:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _extract_team_abbrev(g: dict, side: str) -> str:
+    """
+    Extract team abbreviation from a game dict for *side* ('home' or 'away').
+
+    Tries multiple field-name conventions that different API versions use:
+      - home_team / away_team                     (original)
+      - home_abbreviation / away_abbreviation     (original fallback)
+      - home_team_abbreviation / away_team_abbreviation
+      - home_tricode / away_tricode
+      - home_team_tricode / away_team_tricode
+      - Nested: home.abbreviation / away.abbreviation
+      - Nested: home_team.abbreviation / away_team.abbreviation
+
+    Returns the abbreviation string (upper-cased) or empty string.
+    """
+    # Direct field names
+    for key in (
+        f"{side}_team",
+        f"{side}_abbreviation",
+        f"{side}_team_abbreviation",
+        f"{side}_tricode",
+        f"{side}_team_tricode",
+    ):
+        val = g.get(key)
+        if val and isinstance(val, str) and val.strip():
+            return val.strip().upper()
+
+    # Nested objects: e.g. {"home": {"abbreviation": "LAL"}} or
+    #                      {"home_team": {"abbreviation": "LAL"}}
+    for key in (side, f"{side}_team", f"{side}Team"):
+        nested = g.get(key)
+        if isinstance(nested, dict):
+            for sub in ("abbreviation", "tricode", "teamTricode", "team_abbreviation"):
+                val = nested.get(sub)
+                if val and isinstance(val, str) and val.strip():
+                    return val.strip().upper()
+
+    return ""
+
+
 def fetch_games_today() -> list[dict]:
     """
     Fetch today's NBA games with team records and betting lines.
@@ -235,7 +285,8 @@ def fetch_games_today() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/nba/games"
-    params = {"date": _today_str()}
+    today = _today_str()
+    params = {"date": today}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -247,14 +298,53 @@ def fetch_games_today() -> list[dict]:
             _logger.warning("fetch_games_today: unexpected response shape, returning []")
             return []
 
+        # ── Client-side date filter ──────────────────────────────────────
+        # If the API returns more games than a single NBA day can have
+        # (max ~15), it likely returned the full season.  Filter to today.
+        if len(games_raw) > 20:
+            filtered: list[dict] = []
+            for g in games_raw:
+                if not isinstance(g, dict):
+                    continue
+                g_date = str(
+                    g.get("game_date")
+                    or g.get("date")
+                    or g.get("scheduled")
+                    or g.get("start_time", "")
+                ).strip()
+                # Accept if the date field starts with today's YYYY-MM-DD
+                if g_date.startswith(today):
+                    filtered.append(g)
+            if filtered:
+                _logger.info(
+                    "fetch_games_today: API returned %d games, filtered to %d for %s.",
+                    len(games_raw), len(filtered), today,
+                )
+                games_raw = filtered
+            else:
+                _logger.warning(
+                    "fetch_games_today: API returned %d games but none matched today (%s). "
+                    "Proceeding with unfiltered list.",
+                    len(games_raw), today,
+                )
+
         games: list[dict] = []
+        skipped = 0
         for g in games_raw:
             if not isinstance(g, dict):
                 continue
+
+            home_abbrev = _extract_team_abbrev(g, "home")
+            away_abbrev = _extract_team_abbrev(g, "away")
+
+            if not home_abbrev or not away_abbrev:
+                skipped += 1
+                continue
+
             games.append({
                 "game_id":     _safe_str(g.get("game_id") or g.get("id")),
-                "home_team":   _safe_str(g.get("home_team") or g.get("home_abbreviation")),
-                "away_team":   _safe_str(g.get("away_team") or g.get("away_abbreviation")),
+                "home_team":   home_abbrev,
+                "away_team":   away_abbrev,
                 "home_wins":   int(_safe_float(g.get("home_wins", (g.get("home_record") or {}).get("wins", 0)))),
                 "home_losses": int(_safe_float(g.get("home_losses", (g.get("home_record") or {}).get("losses", 0)))),
                 "away_wins":   int(_safe_float(g.get("away_wins", (g.get("away_record") or {}).get("wins", 0)))),
@@ -262,6 +352,12 @@ def fetch_games_today() -> list[dict]:
                 "vegas_spread": _safe_float(g.get("vegas_spread") or g.get("spread", 0)),
                 "game_total":  _safe_float(g.get("game_total") or g.get("total", 220)),
             })
+
+        if skipped:
+            _logger.warning(
+                "fetch_games_today: skipped %d game(s) with missing team abbreviations.", skipped
+            )
+
         return games
 
     except Exception as exc:
