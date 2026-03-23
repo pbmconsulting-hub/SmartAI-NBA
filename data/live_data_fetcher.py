@@ -851,6 +851,7 @@ def _enrich_games_with_standings(games: list) -> list:
     standings_map: dict = {
         str(s.get("team_abbreviation", "")).upper(): s
         for s in standings_list
+        if isinstance(s, dict)
     }
 
     enriched = 0

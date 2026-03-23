@@ -915,5 +915,164 @@ class TestClearSportsCacheParamNaming(unittest.TestCase):
                        "_cache_set parameter should be named 'key' not 'url'")
 
 
+# ── Section 16: isinstance(dict) guard in iteration loops ─────────────────────
+
+_LDF_SRC = pathlib.Path(__file__).parent.parent / "data" / "live_data_fetcher.py"
+
+
+class TestIsinstanceDictGuardsSource(unittest.TestCase):
+    """Verify that iteration loops over API list data include isinstance(item, dict)
+    guards to prevent AttributeError when the list contains None or non-dict items.
+    
+    This is the defensive counterpart to the (x or []) envelope extraction pattern:
+    even after extracting a list from the response, individual items may be null or
+    non-dict types if the API returns heterogeneous data.
+    """
+
+    def setUp(self):
+        self.cs_src = _CS_SRC.read_text(encoding="utf-8")
+        self.ldf_src = _LDF_SRC.read_text(encoding="utf-8")
+
+    def test_fetch_standings_has_isinstance_guard(self):
+        """fetch_standings must check isinstance(row, dict) before row.get()."""
+        idx = self.cs_src.find("def fetch_standings(")
+        self.assertGreater(idx, 0)
+        snippet = self.cs_src[idx:idx + 2000]
+        self.assertIn("isinstance(row, dict)", snippet,
+                      "fetch_standings must guard iteration with isinstance(row, dict)")
+
+    def test_fetch_news_has_isinstance_guard(self):
+        """fetch_news must check isinstance(item, dict) before item.get()."""
+        idx = self.cs_src.find("def fetch_news(")
+        self.assertGreater(idx, 0)
+        snippet = self.cs_src[idx:idx + 2000]
+        self.assertIn("isinstance(item, dict)", snippet,
+                      "fetch_news must guard iteration with isinstance(item, dict)")
+
+    def test_fetch_player_game_log_has_isinstance_guard(self):
+        """fetch_player_game_log must check isinstance(g, dict) before g.get()."""
+        idx = self.cs_src.find("def fetch_player_game_log(")
+        self.assertGreater(idx, 0)
+        snippet = self.cs_src[idx:idx + 2000]
+        self.assertIn("isinstance(g, dict)", snippet,
+                      "fetch_player_game_log must guard iteration with isinstance(g, dict)")
+
+    def test_enrich_standings_has_isinstance_guard(self):
+        """_enrich_games_with_standings dict comprehension must guard with isinstance(s, dict)."""
+        idx = self.ldf_src.find("def _enrich_games_with_standings(")
+        self.assertGreater(idx, 0)
+        snippet = self.ldf_src[idx:idx + 1500]
+        self.assertIn("isinstance(s, dict)", snippet,
+                      "_enrich_games_with_standings must guard dict comprehension with isinstance(s, dict)")
+
+
+class TestStandingsNonDictItemRuntime(unittest.TestCase):
+    """Runtime test: fetch_standings must skip non-dict items without crashing."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_skips_none_items_in_standings_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """If the standings list contains None items, they should be skipped."""
+        from data.clearsports_client import fetch_standings
+
+        mock_fetch.return_value = {
+            "standings": [
+                None,
+                {"team": "LAL", "wins": 45, "losses": 20},
+                "not-a-dict",
+                {"team": "BOS", "wins": 50, "losses": 15},
+            ]
+        }
+
+        result = fetch_standings()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        abbrevs = {s["team_abbreviation"] for s in result}
+        self.assertIn("LAL", abbrevs)
+        self.assertIn("BOS", abbrevs)
+
+
+class TestNewsNonDictItemRuntime(unittest.TestCase):
+    """Runtime test: fetch_news must skip non-dict items without crashing."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_skips_none_items_in_news_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """If the news list contains None items, they should be skipped."""
+        from data.clearsports_client import fetch_news
+
+        mock_fetch.return_value = {
+            "news": [
+                None,
+                {"title": "LeBron 40pts", "body": "Great game"},
+                42,
+                {"title": "Celtics win", "body": "Banner 19"},
+            ]
+        }
+
+        result = fetch_news(limit=10)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["title"], "LeBron 40pts")
+        self.assertEqual(result[1]["title"], "Celtics win")
+
+
+class TestGameLogNonDictItemRuntime(unittest.TestCase):
+    """Runtime test: fetch_player_game_log must skip non-dict items without crashing."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._cache_get", return_value=None)
+    @patch("data.clearsports_client._cache_set")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_skips_none_items_in_game_log_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+        """If the game log list contains None items, they should be skipped."""
+        from data.clearsports_client import fetch_player_game_log
+
+        mock_fetch.return_value = {
+            "games": [
+                None,
+                {"date": "2026-03-20", "pts": 28, "reb": 7, "ast": 10},
+                "garbage",
+                {"date": "2026-03-18", "pts": 15, "reb": 3, "ast": 5},
+            ]
+        }
+
+        result = fetch_player_game_log(player_id=12345, last_n_games=10)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        self.assertAlmostEqual(result[0]["pts"], 28.0)
+        self.assertAlmostEqual(result[1]["pts"], 15.0)
+
+
+class TestEnrichStandingsNonDictItemRuntime(unittest.TestCase):
+    """Runtime test: _enrich_games_with_standings must skip non-dict standings."""
+
+    @patch("data.clearsports_client.fetch_standings")
+    def test_skips_non_dict_standings_entries(self, mock_standings):
+        """If standings list contains non-dict items, they should be skipped."""
+        from data.live_data_fetcher import _enrich_games_with_standings
+
+        mock_standings.return_value = [
+            None,
+            {"team_abbreviation": "LAL", "wins": 45, "losses": 20, "streak": "W3"},
+            "not-a-dict",
+            {"team_abbreviation": "BOS", "wins": 50, "losses": 15, "streak": "L1"},
+        ]
+
+        games = [
+            {"game_id": "g1", "home_team": "LAL", "away_team": "BOS",
+             "home_wins": 0, "home_losses": 0, "away_wins": 0, "away_losses": 0},
+        ]
+
+        result = _enrich_games_with_standings(games)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["home_wins"], 45)
+        self.assertEqual(result[0]["away_wins"], 50)
+
+
 if __name__ == "__main__":
     unittest.main()

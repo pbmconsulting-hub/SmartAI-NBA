@@ -691,6 +691,8 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
 
         games = []
         for g in (data if isinstance(data, list) else (data.get("games") or data.get("data") or [])):
+            if not isinstance(g, dict):
+                continue
             games.append({
                 "game_date": _safe_str(g.get("date", g.get("game_date", ""))),
                 "matchup": _safe_str(g.get("matchup", g.get("opponent", ""))),
@@ -766,6 +768,8 @@ def fetch_standings() -> list[dict]:
 
         standings = []
         for row in rows_raw:
+            if not isinstance(row, dict):
+                continue
             abbrev = _safe_str(
                 row.get("teamAbbreviation", row.get("team_abbreviation",
                 row.get("abbreviation", row.get("team", ""))))
@@ -867,6 +871,8 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
         news = []
         for item in items_raw[:limit]:
+            if not isinstance(item, dict):
+                continue
             news.append({
                 "title":            _safe_str(item.get("title", item.get("headline", ""))),
                 "body":             _safe_str(item.get("body", item.get("description", item.get("content", "")))),
