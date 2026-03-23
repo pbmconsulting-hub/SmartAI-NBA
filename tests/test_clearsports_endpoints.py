@@ -213,13 +213,13 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("/games", snippet)
 
     def test_fetch_games_has_params(self):
-        """fetch_games must accept season, date, and team_id parameters."""
+        """fetch_games must accept season, date, and team parameters (API-Sports v2 convention)."""
         idx = self.src.find("def fetch_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
         self.assertIn('"season"', snippet)
         self.assertIn('"date"', snippet)
-        self.assertIn('"team_id"', snippet)
+        self.assertIn('"team"', snippet)
 
     # -- fetch_players --
 
@@ -234,12 +234,12 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         snippet = self.src[idx:idx + 500]
         self.assertIn("/players", snippet)
 
-    def test_fetch_players_has_team_id_param(self):
-        """fetch_players must accept team_id parameter."""
+    def test_fetch_players_has_team_param(self):
+        """fetch_players must pass team parameter (API-Sports v2 convention)."""
         idx = self.src.find("def fetch_players(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn('"team_id"', snippet)
+        self.assertIn('"team"', snippet)
 
     # -- fetch_injury_report team_id param --
 

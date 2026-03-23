@@ -355,7 +355,7 @@ def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
     if date is not None:
         params["date"] = date
     if team_id is not None:
-        params["team_id"] = team_id
+        params["team"] = team_id
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -390,7 +390,7 @@ def fetch_players(team_id=None) -> list[dict]:
     url = f"{_BASE_URL}/players"
     params: dict = {}
     if team_id is not None:
-        params["team_id"] = team_id
+        params["team"] = team_id
 
     try:
         raw = _fetch_with_retry(url, params=params)
