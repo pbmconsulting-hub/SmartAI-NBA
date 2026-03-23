@@ -92,6 +92,7 @@ class TestRowsToDicts(unittest.TestCase):
         # With no headers, should produce empty dicts
         dicts = _rows_to_dicts(result_set)
         self.assertEqual(len(dicts), 1)
+        self.assertEqual(dicts[0], {})
 
 
 # ── Section 3: fetch_team_stats_fallback ─────────────────────────────────────
@@ -241,8 +242,10 @@ class TestFetchPlayerStatsFallback(unittest.TestCase):
         self.assertAlmostEqual(p["rebounds_avg"], 7.2)
         self.assertAlmostEqual(p["assists_avg"], 8.1)
         self.assertAlmostEqual(p["ft_pct"], 0.75)
-        # std-dev fields should be 0.0
-        self.assertEqual(p["points_std"], 0.0)
+        # std-dev fields should all be 0.0 (not available from fallback)
+        for std_field in ("points_std", "rebounds_std", "assists_std",
+                          "threes_std", "steals_std", "blocks_std", "turnovers_std"):
+            self.assertEqual(p[std_field], 0.0, f"{std_field} should be 0.0")
 
     @patch("data.nba_stats_fallback._fetch_nba_stats", return_value=None)
     def test_returns_empty_on_failure(self, mock_fetch):
