@@ -697,6 +697,8 @@ def fetch_injury_report(team_id=None) -> dict:
                 continue
             report[name.lower()] = {
                 "status":      _safe_str(entry.get("status", "Unknown")),
+                # API-Sports uses "type" for injury category (e.g. "Ankle")
+                # and "description" for detail (e.g. "Left ankle soreness")
                 "injury_note": _safe_str(entry.get("type") or entry.get("description") or entry.get("injury") or entry.get("injury_note")),
                 "return_date": _safe_str(entry.get("return_date") or entry.get("date") or entry.get("expected_return", "")),
             }
