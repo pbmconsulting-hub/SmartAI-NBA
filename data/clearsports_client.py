@@ -74,21 +74,21 @@ _API_CACHE_TTL: int = int(os.environ.get("API_CACHE_TTL_SECONDS", "300"))
 _PLAYER_ID_CACHE: dict = {}
 
 
-def _cache_get(url: str):
-    """Return cached payload for *url* if still within TTL, else None."""
-    entry = _API_CACHE.get(url)
+def _cache_get(key: str):
+    """Return cached payload for *key* if still within TTL, else None."""
+    entry = _API_CACHE.get(key)
     if entry is None:
         return None
     payload, ts = entry
     if time.time() - ts > _API_CACHE_TTL:
-        del _API_CACHE[url]
+        del _API_CACHE[key]
         return None
     return payload
 
 
-def _cache_set(url: str, payload) -> None:
-    """Store *payload* in the cache keyed by *url*."""
-    _API_CACHE[url] = (payload, time.time())
+def _cache_set(key: str, payload) -> None:
+    """Store *payload* in the cache keyed by *key*."""
+    _API_CACHE[key] = (payload, time.time())
 
 
 # ── API key resolution ────────────────────────────────────────────────────────
@@ -113,6 +113,15 @@ def _resolve_api_key() -> str | None:
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
 
+def _build_cache_key(url: str, params: dict | None = None) -> str:
+    """Build a cache key from *url* and optional *params*."""
+    if not params:
+        return url
+    sorted_items = sorted(params.items())
+    qs = "&".join(f"{k}={v}" for k, v in sorted_items)
+    return f"{url}?{qs}"
+
+
 def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | None:
     """
     GET *url* with exponential-backoff retry and response caching.
@@ -124,7 +133,8 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
         _logger.warning("requests library is not available — cannot call ClearSports API")
         return None
 
-    cached = _cache_get(url)
+    cache_key = _build_cache_key(url, params)
+    cached = _cache_get(cache_key)
     if cached is not None:
         return cached
 
@@ -182,7 +192,7 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 return None
 
             data = resp.json()
-            _cache_set(url, data)
+            _cache_set(cache_key, data)
             return data
 
         except Exception as exc:
@@ -223,6 +233,46 @@ def _today_str() -> str:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def _extract_team_abbrev(g: dict, side: str) -> str:
+    """
+    Extract team abbreviation from a game dict for *side* ('home' or 'away').
+
+    Tries multiple field-name conventions that different API versions use:
+      - home_team / away_team                     (original)
+      - home_abbreviation / away_abbreviation     (original fallback)
+      - home_team_abbreviation / away_team_abbreviation
+      - home_tricode / away_tricode
+      - home_team_tricode / away_team_tricode
+      - Nested: home.abbreviation / away.abbreviation
+      - Nested: home_team.abbreviation / away_team.abbreviation
+
+    Returns the abbreviation string (upper-cased) or empty string.
+    """
+    # Direct field names
+    for key in (
+        f"{side}_team",
+        f"{side}_abbreviation",
+        f"{side}_team_abbreviation",
+        f"{side}_tricode",
+        f"{side}_team_tricode",
+    ):
+        val = g.get(key)
+        if val and isinstance(val, str) and val.strip():
+            return val.strip().upper()
+
+    # Nested objects: e.g. {"home": {"abbreviation": "LAL"}} or
+    #                      {"home_team": {"abbreviation": "LAL"}}
+    for key in (side, f"{side}_team", f"{side}Team"):
+        nested = g.get(key)
+        if isinstance(nested, dict):
+            for sub in ("abbreviation", "tricode", "teamTricode", "team_abbreviation"):
+                val = nested.get(sub)
+                if val and isinstance(val, str) and val.strip():
+                    return val.strip().upper()
+
+    return ""
+
+
 def fetch_games_today() -> list[dict]:
     """
     Fetch today's NBA games with team records and betting lines.
@@ -235,26 +285,66 @@ def fetch_games_today() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/nba/games"
-    params = {"date": _today_str()}
+    today = _today_str()
+    params = {"date": today}
 
     try:
         raw = _fetch_with_retry(url, params=params)
         if not raw:
             return []
 
-        games_raw = raw if isinstance(raw, list) else raw.get("games", raw.get("data", []))
+        games_raw = raw if isinstance(raw, list) else (raw.get("games") or raw.get("data") or [])
         if not isinstance(games_raw, list):
             _logger.warning("fetch_games_today: unexpected response shape, returning []")
             return []
 
+        # ── Client-side date filter ──────────────────────────────────────
+        # If the API returns more games than a single NBA day can have
+        # (max ~15), it likely returned the full season.  Filter to today.
+        if len(games_raw) > 20:
+            filtered: list[dict] = []
+            for g in games_raw:
+                if not isinstance(g, dict):
+                    continue
+                g_date = str(
+                    g.get("game_date")
+                    or g.get("date")
+                    or g.get("scheduled")
+                    or g.get("start_time", "")
+                ).strip()
+                # Accept if the date field starts with today's YYYY-MM-DD
+                if g_date.startswith(today):
+                    filtered.append(g)
+            if filtered:
+                _logger.info(
+                    "fetch_games_today: API returned %d games, filtered to %d for %s.",
+                    len(games_raw), len(filtered), today,
+                )
+                games_raw = filtered
+            else:
+                _logger.warning(
+                    "fetch_games_today: API returned %d games but none matched today (%s). "
+                    "Proceeding with unfiltered list.",
+                    len(games_raw), today,
+                )
+
         games: list[dict] = []
+        skipped = 0
         for g in games_raw:
             if not isinstance(g, dict):
                 continue
+
+            home_abbrev = _extract_team_abbrev(g, "home")
+            away_abbrev = _extract_team_abbrev(g, "away")
+
+            if not home_abbrev or not away_abbrev:
+                skipped += 1
+                continue
+
             games.append({
                 "game_id":     _safe_str(g.get("game_id") or g.get("id")),
-                "home_team":   _safe_str(g.get("home_team") or g.get("home_abbreviation")),
-                "away_team":   _safe_str(g.get("away_team") or g.get("away_abbreviation")),
+                "home_team":   home_abbrev,
+                "away_team":   away_abbrev,
                 "home_wins":   int(_safe_float(g.get("home_wins", (g.get("home_record") or {}).get("wins", 0)))),
                 "home_losses": int(_safe_float(g.get("home_losses", (g.get("home_record") or {}).get("losses", 0)))),
                 "away_wins":   int(_safe_float(g.get("away_wins", (g.get("away_record") or {}).get("wins", 0)))),
@@ -262,6 +352,12 @@ def fetch_games_today() -> list[dict]:
                 "vegas_spread": _safe_float(g.get("vegas_spread") or g.get("spread", 0)),
                 "game_total":  _safe_float(g.get("game_total") or g.get("total", 220)),
             })
+
+        if skipped:
+            _logger.warning(
+                "fetch_games_today: skipped %d game(s) with missing team abbreviations.", skipped
+            )
+
         return games
 
     except Exception as exc:
@@ -291,7 +387,7 @@ def fetch_player_stats() -> list[dict]:
         if not raw:
             return []
 
-        players_raw = raw if isinstance(raw, list) else raw.get("players", raw.get("data", []))
+        players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
         if not isinstance(players_raw, list):
             _logger.warning("fetch_player_stats: unexpected response shape, returning []")
             return []
@@ -352,7 +448,7 @@ def fetch_team_stats() -> list[dict]:
         if not raw:
             return []
 
-        teams_raw = raw if isinstance(raw, list) else raw.get("teams", raw.get("data", []))
+        teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
         if not isinstance(teams_raw, list):
             _logger.warning("fetch_team_stats: unexpected response shape, returning []")
             return []
@@ -397,7 +493,7 @@ def fetch_injury_report() -> dict:
         if not raw:
             return {}
 
-        injuries_raw = raw if isinstance(raw, list) else raw.get("injuries", raw.get("data", []))
+        injuries_raw = raw if isinstance(raw, list) else (raw.get("injuries") or raw.get("data") or [])
         if not isinstance(injuries_raw, list):
             _logger.warning("fetch_injury_report: unexpected response shape, returning {}")
             return {}
@@ -440,7 +536,7 @@ def fetch_live_scores() -> list[dict]:
         if not raw:
             return []
 
-        scores_raw = raw if isinstance(raw, list) else raw.get("scores", raw.get("games", raw.get("data", [])))
+        scores_raw = raw if isinstance(raw, list) else (raw.get("scores") or raw.get("games") or raw.get("data") or [])
         if not isinstance(scores_raw, list):
             _logger.warning("fetch_live_scores: unexpected response shape, returning []")
             return []
@@ -490,7 +586,7 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
 
             roster_raw = (
                 raw if isinstance(raw, list)
-                else raw.get("roster", raw.get("players", raw.get("data", [])))
+                else (raw.get("roster") or raw.get("players") or raw.get("data") or [])
             )
             if not isinstance(roster_raw, list):
                 _logger.warning("fetch_rosters: unexpected shape for team %s", abbrev)
@@ -579,7 +675,9 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
 
     url = f"{_BASE_URL}/nba/players/{player_id}/game_log"
     params = {"last_n": last_n_games}
-    cache_key = f"{url}?player_id={player_id}&last_n={last_n_games}"
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -592,7 +690,9 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
             return []
 
         games = []
-        for g in (data if isinstance(data, list) else data.get("games", data.get("data", []))):
+        for g in (data if isinstance(data, list) else (data.get("games") or data.get("data") or [])):
+            if not isinstance(g, dict):
+                continue
             games.append({
                 "game_date": _safe_str(g.get("date", g.get("game_date", ""))),
                 "matchup": _safe_str(g.get("matchup", g.get("opponent", ""))),
@@ -647,8 +747,10 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/nba/standings"
-    params = {}
-    cache_key = f"{url}?season=current"
+    params = {"season": "current"}
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -661,11 +763,13 @@ def fetch_standings() -> list[dict]:
 
         rows_raw = (
             data if isinstance(data, list)
-            else data.get("standings", data.get("data", []))
+            else (data.get("standings") or data.get("data") or [])
         )
 
         standings = []
         for row in rows_raw:
+            if not isinstance(row, dict):
+                continue
             abbrev = _safe_str(
                 row.get("teamAbbreviation", row.get("team_abbreviation",
                 row.get("abbreviation", row.get("team", ""))))
@@ -747,7 +851,9 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
     url = f"{_BASE_URL}/nba/news"
     params = {"limit": limit}
-    cache_key = f"{url}?limit={limit}"
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -760,11 +866,13 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
         items_raw = (
             data if isinstance(data, list)
-            else data.get("news", data.get("articles", data.get("data", [])))
+            else (data.get("news") or data.get("articles") or data.get("data") or [])
         )
 
         news = []
         for item in items_raw[:limit]:
+            if not isinstance(item, dict):
+                continue
             news.append({
                 "title":            _safe_str(item.get("title", item.get("headline", ""))),
                 "body":             _safe_str(item.get("body", item.get("description", item.get("content", "")))),
@@ -884,7 +992,7 @@ def fetch_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
         if not raw:
             return []
 
-        usage_raw = raw if isinstance(raw, list) else raw.get("usage", raw.get("data", []))
+        usage_raw = raw if isinstance(raw, list) else (raw.get("usage") or raw.get("data") or [])
         if not isinstance(usage_raw, list):
             _logger.warning("fetch_api_key_usage: unexpected response shape, returning []")
             return []
@@ -981,7 +1089,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        odds_raw = raw if isinstance(raw, list) else raw.get("odds", raw.get("data", []))
+        odds_raw = raw if isinstance(raw, list) else (raw.get("odds") or raw.get("data") or [])
         if not isinstance(odds_raw, list):
             _logger.warning("fetch_game_odds: unexpected response shape, returning []")
             return []
@@ -1018,7 +1126,7 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
         if not raw:
             return []
 
-        stats_raw = raw if isinstance(raw, list) else raw.get("stats", raw.get("data", []))
+        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
         if not isinstance(stats_raw, list):
             _logger.warning("fetch_nba_team_stats: unexpected response shape, returning []")
             return []
@@ -1055,7 +1163,7 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        stats_raw = raw if isinstance(raw, list) else raw.get("stats", raw.get("data", []))
+        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
         if not isinstance(stats_raw, list):
             _logger.warning("fetch_nba_player_stats: unexpected response shape, returning []")
             return []
@@ -1089,7 +1197,7 @@ def fetch_predictions(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        predictions_raw = raw if isinstance(raw, list) else raw.get("predictions", raw.get("data", []))
+        predictions_raw = raw if isinstance(raw, list) else (raw.get("predictions") or raw.get("data") or [])
         if not isinstance(predictions_raw, list):
             _logger.warning("fetch_predictions: unexpected response shape, returning []")
             return []

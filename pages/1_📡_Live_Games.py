@@ -641,12 +641,22 @@ if platform_props_clicked:
                     away_team = g.get("away_team", "")
                     if player_team in (home_team, away_team):
                         is_home = player_team == home_team
+                        _vs_raw = g.get("vegas_spread")
+                        _gt_raw = g.get("game_total")
+                        try:
+                            _vs_val = float(_vs_raw) if _vs_raw is not None else 0.0
+                        except (TypeError, ValueError):
+                            _vs_val = 0.0
+                        try:
+                            _gt_val = float(_gt_raw) if _gt_raw is not None else 220.0
+                        except (TypeError, ValueError):
+                            _gt_val = 220.0
                         game_ctx = {
                             "opponent": away_team if is_home else home_team,
                             "home_team": home_team,
                             "away_team": away_team,
-                            "vegas_spread": float(g.get("vegas_spread", 0) or 0),
-                            "game_total": float(g.get("game_total", 220) or 220),
+                            "vegas_spread": _vs_val,
+                            "game_total": _gt_val,
                             "is_home": is_home,
                             "rest_days": 2,
                             # Odds API consensus fields (may be None if key not configured)
@@ -1076,16 +1086,16 @@ if current_games:
         away_w = game.get("away_wins", 0)
         away_l = game.get("away_losses", 0)
 
-        home_streak = game.get("home_streak", "")
-        away_streak = game.get("away_streak", "")
+        home_streak = game.get("home_streak") or ""
+        away_streak = game.get("away_streak") or ""
 
         # Extended standings fields (populated by _enrich_games_with_standings)
         home_rank   = game.get("home_conference_rank", 0)
-        home_conf   = game.get("home_conference", "")[:1].upper()
-        home_l10    = game.get("home_last_10", "")
+        home_conf   = (game.get("home_conference") or "")[:1].upper()
+        home_l10    = game.get("home_last_10") or ""
         away_rank   = game.get("away_conference_rank", 0)
-        away_conf   = game.get("away_conference", "")[:1].upper()
-        away_l10    = game.get("away_last_10", "")
+        away_conf   = (game.get("away_conference") or "")[:1].upper()
+        away_l10    = game.get("away_last_10") or ""
 
         def _conf_badge(rank, conf):
             if rank and conf:
@@ -1094,8 +1104,16 @@ if current_games:
 
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
-        spread = game.get("vegas_spread", 0.0)
-        total = game.get("game_total", 220.0)
+        try:
+            _spread_raw = game.get("vegas_spread")
+            spread = float(_spread_raw) if _spread_raw is not None else 0.0
+        except (TypeError, ValueError):
+            spread = 0.0
+        try:
+            _total_raw = game.get("game_total")
+            total = float(_total_raw) if _total_raw is not None else 220.0
+        except (TypeError, ValueError):
+            total = 220.0
 
         # Format streak with color class
         def streak_html(s):
@@ -1287,19 +1305,31 @@ if current_games:
         for i, game in enumerate(current_games):
             col_label, col_spread, col_total = st.columns([3, 2, 2])
             with col_label:
-                st.markdown(f"**{game['away_team']} @ {game['home_team']}**")
+                st.markdown(f"**{game.get('away_team', '')} @ {game.get('home_team', '')}**")
             with col_spread:
+                _spread_raw = game.get("vegas_spread")
+                try:
+                    _spread_val = float(_spread_raw) if _spread_raw is not None else 0.0
+                except (TypeError, ValueError):
+                    _spread_val = 0.0
+                _spread_val = max(-30.0, min(30.0, _spread_val))
                 new_spread = st.number_input(
                     "Spread (Home)",
                     min_value=-30.0, max_value=30.0,
-                    value=float(game.get("vegas_spread", 0.0)), step=0.5,
+                    value=_spread_val, step=0.5,
                     key=f"edit_spread_{i}",
                 )
             with col_total:
+                _total_raw = game.get("game_total")
+                try:
+                    _total_val = float(_total_raw) if _total_raw is not None else 220.0
+                except (TypeError, ValueError):
+                    _total_val = 220.0
+                _total_val = max(180.0, min(270.0, _total_val))
                 new_total = st.number_input(
                     "Total (O/U)",
                     min_value=180.0, max_value=270.0,
-                    value=float(game.get("game_total", 220.0)), step=0.5,
+                    value=_total_val, step=0.5,
                     key=f"edit_total_{i}",
                 )
             updated_game = dict(game)

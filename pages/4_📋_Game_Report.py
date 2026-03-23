@@ -455,8 +455,8 @@ def _render_game_team_stats(game, game_pred):
             w = sd.get("wins", 0)
             l = sd.get("losses", 0)
             rank = sd.get("conference_rank", "")
-            conf = sd.get("conference", "")[:1].upper()
-            streak = sd.get("streak", "")
+            conf = (sd.get("conference") or "")[:1].upper()
+            streak = sd.get("streak") or ""
             l10w = sd.get("last_10_wins", 0)
             l10l = sd.get("last_10_losses", 0)
             parts = [f"**{w}-{l}**"]

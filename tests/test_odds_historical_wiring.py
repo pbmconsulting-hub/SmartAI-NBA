@@ -345,14 +345,14 @@ class TestOddsWiringSourceLevel(unittest.TestCase):
         """fetch_todays_games must call _enrich_games_with_clearsports_odds."""
         idx = self.src.find("def fetch_todays_games(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 2000]
+        snippet = self.src[idx:idx + 3000]
         self.assertIn("_enrich_games_with_clearsports_odds", snippet)
 
     def test_fetch_todays_games_calls_predictions(self):
         """fetch_todays_games must call _enrich_games_with_predictions."""
         idx = self.src.find("def fetch_todays_games(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 2000]
+        snippet = self.src[idx:idx + 3000]
         self.assertIn("_enrich_games_with_predictions", snippet)
 
     def test_historical_refresher_uses_cs_player_stats(self):
