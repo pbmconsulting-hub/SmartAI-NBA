@@ -1517,6 +1517,8 @@ if run_analysis:
                 _standard_line = prop.get("standard_line", None)
                 # Pull user-configured thresholds from session state (set on Settings page)
                 _ss = st.session_state
+                # Goblin/Demon thresholds removed from UI; pass None so
+                # classify_bet_type() uses its module-level defaults.
                 _g_std  = None
                 _g_prob = None
                 _g_edge = None
@@ -1555,6 +1557,7 @@ if run_analysis:
                 full_result["standard_line"]   = _standard_line
                 full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
                 full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
+                # Kept as None — downstream renderers expect these keys.
                 full_result["goblin_floor"]    = None
                 full_result["demon_ceiling"]   = None
                 # Risk flags (conflicting forces, high-variance stat, etc.) are
