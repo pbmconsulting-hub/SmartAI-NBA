@@ -224,8 +224,8 @@ elif _PLATFORM_FETCHER_AVAILABLE:
 
         with st.spinner("Fetching live props..."):
             _live_props = fetch_all_platform_props(
-                include_prizepicks=_pp_on,
-                include_underdog=_ud_on,
+                include_prizepicks=False,
+                include_underdog=False,
                 include_draftkings=_dk_on and bool(_dk_key),
                 odds_api_key=_dk_key or None,
                 progress_callback=_scanner_progress,
