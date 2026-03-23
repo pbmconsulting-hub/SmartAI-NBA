@@ -171,6 +171,23 @@ def _build_cache_key(url: str, params: dict | None = None) -> str:
 
 # ── API key resolution ────────────────────────────────────────────────────────
 
+def validate_api_key(key: str | None) -> tuple[bool, str]:
+    """Check whether *key* looks like a valid Odds API key.
+
+    Returns:
+        (is_valid, message): True with a success message when the format
+        is acceptable, False with a reason when it is not.
+    """
+    if not key or not isinstance(key, str):
+        return False, "API key is empty or missing."
+    key = key.strip()
+    if len(key) < 10:
+        return False, "API key is too short."
+    if " " in key:
+        return False, "API key must not contain spaces."
+    return True, "API key format looks valid."
+
+
 def _resolve_api_key(explicit_key: str | None = None) -> str | None:
     """Return the Odds API key, trying: argument → session → secrets → env."""
     if explicit_key:
