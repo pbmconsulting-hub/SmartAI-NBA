@@ -26,8 +26,11 @@
 # ============================================================
 
 import os
+import logging
 import streamlit as st
 import datetime
+
+_logger = logging.getLogger(__name__)
 
 from utils.stripe_manager import (
     is_stripe_configured,
@@ -289,6 +292,7 @@ def is_premium_user() -> bool:
     # production, set the environment variable:
     #     SMARTAI_PRODUCTION=true
     if os.environ.get("SMARTAI_PRODUCTION", "").lower() not in ("true", "1", "yes"):
+        _logger.debug("Premium bypass active — SMARTAI_PRODUCTION is not set")
         return True
 
     # ── Layer 1: Dev/demo mode — no Stripe configured ─────────
