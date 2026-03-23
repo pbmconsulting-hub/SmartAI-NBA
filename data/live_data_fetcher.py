@@ -940,7 +940,7 @@ def fetch_todays_games():
     games = _enrich_games_with_standings(games)
 
     if not games:
-        _logger.warning("No games available from any source.")
+        _logger.info("No games available from any source.")
 
     return games
 
