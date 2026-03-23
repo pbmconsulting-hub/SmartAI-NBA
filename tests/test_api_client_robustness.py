@@ -231,7 +231,7 @@ class TestCacheKeyIncludesParams(unittest.TestCase):
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("def _build_cache_key(", src)
 
-    def test_build_cache_key_behaviour(self):
+    def test_build_cache_key_behavior(self):
         """Different params must produce different cache keys."""
         from data.clearsports_client import _build_cache_key
 

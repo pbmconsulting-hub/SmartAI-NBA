@@ -1095,11 +1095,13 @@ if current_games:
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
         try:
-            spread = float(game.get("vegas_spread") or 0)
+            _spread_raw = game.get("vegas_spread")
+            spread = float(_spread_raw) if _spread_raw is not None else 0.0
         except (TypeError, ValueError):
             spread = 0.0
         try:
-            total = float(game.get("game_total") or 220)
+            _total_raw = game.get("game_total")
+            total = float(_total_raw) if _total_raw is not None else 220.0
         except (TypeError, ValueError):
             total = 220.0
 
