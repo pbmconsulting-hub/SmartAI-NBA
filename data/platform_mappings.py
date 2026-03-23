@@ -1,8 +1,7 @@
 # ============================================================
 # FILE: data/platform_mappings.py
 # PURPOSE: Platform-specific stat name mappings, fantasy scoring
-#          formulas, and combo stat definitions for PrizePicks,
-#          DraftKings Pick6, and Underdog Fantasy.
+#          formulas, and combo stat definitions for major sportsbooks.
 # USAGE:
 #   from data.platform_mappings import normalize_stat_type, COMBO_STATS
 # ============================================================
@@ -16,7 +15,7 @@
 # These maps convert platform-native names to our internal keys.
 # ============================================================
 
-# PrizePicks stat type mappings
+# Legacy PrizePicks stat type mappings (backward compat)
 PRIZEPICKS_STAT_MAP = {
     "Points": "points",
     "Rebounds": "rebounds",
@@ -35,7 +34,7 @@ PRIZEPICKS_STAT_MAP = {
     "Blks+Stls": "blocks_steals",
 }
 
-# DraftKings Pick6 stat type mappings
+# DraftKings Pick6 stat type mappings (also used for standard sportsbooks)
 DRAFTKINGS_STAT_MAP = {
     "Points": "points",
     "Rebounds": "rebounds",
@@ -54,7 +53,7 @@ DRAFTKINGS_STAT_MAP = {
     "Fantasy Points": "fantasy_score_dk",
 }
 
-# Underdog Fantasy stat type mappings
+# Legacy Underdog Fantasy stat type mappings (backward compat)
 UNDERDOG_STAT_MAP = {
     "Points": "points",
     "Rebounds": "rebounds",
@@ -150,6 +149,14 @@ COMBO_AND_FANTASY_STAT_TYPES = frozenset(COMBO_STATS.keys()) | frozenset(FANTASY
 
 # Map platform names (lower-cased) to their stat dictionaries
 _PLATFORM_MAPS = {
+    "fanduel": DRAFTKINGS_STAT_MAP,
+    "betmgm": DRAFTKINGS_STAT_MAP,
+    "caesars": DRAFTKINGS_STAT_MAP,
+    "fanatics": DRAFTKINGS_STAT_MAP,
+    "espn bet": DRAFTKINGS_STAT_MAP,
+    "hard rock bet": DRAFTKINGS_STAT_MAP,
+    "betrivers": DRAFTKINGS_STAT_MAP,
+    # Legacy DFS mappings (backward compat)
     "prizepicks": PRIZEPICKS_STAT_MAP,
     "draftkings": DRAFTKINGS_STAT_MAP,
     "underdog": UNDERDOG_STAT_MAP,
@@ -167,7 +174,7 @@ def normalize_stat_type(raw_stat_name, platform=None):
         raw_stat_name (str): Stat name as it appears on the platform,
             e.g., "Pts+Rebs", "3PM", "Fantasy Points"
         platform (str, optional): Platform name for preferential lookup.
-            One of "PrizePicks", "DraftKings", "Underdog".
+            e.g., "FanDuel", "DraftKings", "BetMGM".
 
     Returns:
         str: Internal stat key (e.g., "points_rebounds"), or the
@@ -207,26 +214,25 @@ def detect_platform_from_stat_names(stat_names):
         stat_names (list of str): Raw stat names from a prop upload.
 
     Returns:
-        str or None: "PrizePicks", "DraftKings", "Underdog", or None if
-                     no platform matches confidently.
+        str or None: Platform name (e.g., "FanDuel", "DraftKings"), or
+                     None if no platform matches confidently.
 
     Example:
         detect_platform_from_stat_names(["Pts+Rebs", "Blks+Stls"])
-        → "PrizePicks"
+        → "PrizePicks"  # legacy stat names still detected
     """
-    scores = {"PrizePicks": 0, "DraftKings": 0, "Underdog": 0}
+    scores = {"FanDuel": 0, "DraftKings": 0, "PrizePicks": 0, "Underdog": 0}
     for name in stat_names:
         for plat, stat_map in _PLATFORM_MAPS.items():
             if name in stat_map:
-                # Map internal key back to title-case platform name
-                plat_title = plat.title().replace("kings", "Kings").replace("picks", "Picks")
                 if plat == "prizepicks":
-                    plat_title = "PrizePicks"
-                elif plat == "draftkings":
-                    plat_title = "DraftKings"
+                    scores["PrizePicks"] += 1
+                # Sportsbooks share the same stat names; group under DraftKings
+                elif plat in ("draftkings", "fanduel", "betmgm", "caesars",
+                              "fanatics", "espn bet", "hard rock bet", "betrivers"):
+                    scores["DraftKings"] += 1
                 elif plat == "underdog":
-                    plat_title = "Underdog"
-                scores[plat_title] += 1
+                    scores["Underdog"] += 1
 
     best_platform = max(scores, key=scores.get)
     return best_platform if scores[best_platform] > 0 else None

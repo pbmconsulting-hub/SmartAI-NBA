@@ -23,8 +23,8 @@ import os as _os
 _logger_theme = _logging.getLogger(__name__)
 
 # ── Centralised logo paths ──────────────────────────────────────
-GOBLIN_LOGO_PATH = _os.path.join("assets", "New_Goblin_Logo.png")
-DEMON_LOGO_PATH  = _os.path.join("assets", "New_Demon_Logo.png")
+GOBLIN_LOGO_PATH = ""  # Legacy — no longer used
+DEMON_LOGO_PATH  = ""  # Legacy — no longer used
 GOLD_LOGO_PATH   = _os.path.join("assets", "NewGold_Logo.png")
 
 
@@ -1986,9 +1986,13 @@ def get_player_card_html(result):
     dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
     platform_colors = {
+        "FanDuel": "rgba(20,90,200,0.9)",
+        "DraftKings": "rgba(43,108,176,0.9)",
+        "BetMGM": "rgba(180,155,60,0.9)",
+        "Caesars": "rgba(0,100,60,0.9)",
+        # Legacy DFS entries (backward compat)
         "PrizePicks": "rgba(39,103,73,0.9)",
         "Underdog": "rgba(85,60,154,0.9)",
-        "DraftKings": "rgba(43,108,176,0.9)",
     }
     plat_color = platform_colors.get(platform, "rgba(45,55,72,0.9)")
 
@@ -2312,7 +2316,7 @@ def get_roster_health_html(matched, fuzzy_matched, unmatched):
 
 def get_platform_badge_html(platform):
     """
-    Return a styled platform badge for PrizePicks, DraftKings, or Underdog.
+    Return a styled platform badge for sportsbook platforms.
 
     Args:
         platform (str): Platform name
@@ -2321,11 +2325,21 @@ def get_platform_badge_html(platform):
         str: HTML span with platform-specific gradient and styling
     """
     platform_styles = {
-        "PrizePicks": (
-            "background:linear-gradient(135deg,#276749,#48bb78);color:#f0fff4;"
+        "FanDuel": (
+            "background:linear-gradient(135deg,#1456c8,#4a8bf5);color:#d4e6ff;"
         ),
         "DraftKings": (
             "background:linear-gradient(135deg,#1a202c,#2b6cb0);color:#bee3f8;"
+        ),
+        "BetMGM": (
+            "background:linear-gradient(135deg,#8b7520,#c4a930);color:#fff8e0;"
+        ),
+        "Caesars": (
+            "background:linear-gradient(135deg,#006440,#00a060);color:#d0ffe0;"
+        ),
+        # Legacy DFS entries (backward compat)
+        "PrizePicks": (
+            "background:linear-gradient(135deg,#276749,#48bb78);color:#f0fff4;"
         ),
         "Underdog": (
             "background:linear-gradient(135deg,#44337a,#805ad5);color:#e9d8fd;"
@@ -2453,9 +2467,13 @@ def get_player_analysis_card_html(result, show_add_button=True):
     dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
     platform_colors = {
+        "FanDuel": "rgba(20,90,200,0.85)",
+        "DraftKings": "rgba(43,108,176,0.85)",
+        "BetMGM": "rgba(180,155,60,0.85)",
+        "Caesars": "rgba(0,100,60,0.85)",
+        # Legacy DFS entries (backward compat)
         "PrizePicks": "rgba(0,120,70,0.85)",
         "Underdog": "rgba(85,60,154,0.85)",
-        "DraftKings": "rgba(43,108,176,0.85)",
     }
     plat_color = platform_colors.get(platform, "rgba(30,40,60,0.85)")
     fill_class = "prob-gauge-fill-over" if direction == "OVER" else "prob-gauge-fill-under"
@@ -4506,12 +4524,14 @@ def get_bet_card_html(bet, show_live_status=False):
 
     # Platform left-border color
     plat_lower = platform.lower()
-    if "prize" in plat_lower or "pp" in plat_lower:
-        platform_border_color = "#00c853"
-    elif "underdog" in plat_lower or "ud" in plat_lower:
-        platform_border_color = "#7c4dff"
+    if "fanduel" in plat_lower or "fd" in plat_lower:
+        platform_border_color = "#1456c8"
     elif "draftkings" in plat_lower or "dk" in plat_lower:
         platform_border_color = "#2196f3"
+    elif "betmgm" in plat_lower or "mgm" in plat_lower:
+        platform_border_color = "#c4a930"
+    elif "caesars" in plat_lower:
+        platform_border_color = "#00a060"
     else:
         platform_border_color = "rgba(0,240,255,0.35)"
 
@@ -4541,12 +4561,14 @@ def get_bet_card_html(bet, show_live_status=False):
     # PENDING keeps the platform color
 
     # Platform badge
-    if "prize" in plat_lower or "pp" in plat_lower:
-        plat_html = f'<span class="platform-badge-pp">🟢 PrizePicks</span>'
-    elif "underdog" in plat_lower or "ud" in plat_lower:
-        plat_html = f'<span class="platform-badge-ud">🟣 Underdog</span>'
+    if "fanduel" in plat_lower or "fd" in plat_lower:
+        plat_html = f'<span class="platform-badge-fd">🔵 FanDuel</span>'
     elif "draftkings" in plat_lower or "dk" in plat_lower:
         plat_html = f'<span class="platform-badge-dk">🔵 DraftKings</span>'
+    elif "betmgm" in plat_lower or "mgm" in plat_lower:
+        plat_html = f'<span class="platform-badge-mgm">🟡 BetMGM</span>'
+    elif "caesars" in plat_lower:
+        plat_html = f'<span class="platform-badge-caesars">🟢 Caesars</span>'
     else:
         safe_plat = _h.escape(platform)
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'

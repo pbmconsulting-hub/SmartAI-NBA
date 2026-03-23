@@ -133,11 +133,9 @@ _BASE_HEADERS = {
     "Connection": "keep-alive",
 }
 
-# PrizePicks public projections endpoint (no API key required)
-PRIZEPICKS_URL = "https://api.prizepicks.com/projections"
-
-# Underdog Fantasy public over/under lines endpoint (no API key required)
-UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
+# Legacy DFS endpoints (deprecated — no longer used)
+PRIZEPICKS_URL = ""
+UNDERDOG_URL = ""
 
 # The Odds API base URL — used to fetch DraftKings player props
 # Documentation: https://the-odds-api.com/liveapi/guides/v4/
@@ -145,7 +143,7 @@ ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 
 # Default American odds for platforms without traditional juice (e.g. -110)
 # BEGINNER NOTE: -110 is the standard American odds for prop bets on DraftKings.
-# Breakeven at -110 = 52.38% win rate. PrizePicks/Underdog don't use odds,
+# Breakeven at -110 = 52.38% win rate. DFS platforms don't use odds,
 # so we default to -110 for their implied probability calculations.
 _DEFAULT_AMERICAN_ODDS = -110
 
@@ -314,17 +312,17 @@ def fetch_all_platform_props(
     """
     Fetch live prop lines from all major sportsbooks via The Odds API.
 
-    Replaces the old PrizePicks/Underdog/DraftKings individual fetchers with
+    Unified fetcher for
     a single unified call to The Odds API, which returns props from all
     US bookmakers (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one place.
 
-    The `include_prizepicks`, `include_underdog`, and `include_draftkings`
-    parameters are kept for backward compatibility but are no longer used to
-    gate individual fetchers — all props now come from The Odds API.
+    The legacy include_* parameters are kept for backward compatibility but
+    are no longer used to gate individual fetchers — all props now come
+    from The Odds API.
 
     Args:
-        include_prizepicks (bool): Kept for backward compatibility. Ignored.
-        include_underdog (bool): Kept for backward compatibility. Ignored.
+        include_prizepicks (bool): Deprecated. Ignored.
+        include_underdog (bool): Deprecated. Ignored.
         include_draftkings (bool): If False, returns empty list (no props source).
         odds_api_key (str, optional): The Odds API key. If None, reads from
             session state ("odds_api_key") or ODDS_API_KEY env var.
@@ -387,8 +385,8 @@ async def fetch_all_platforms_async(
     backward compatibility with any code that awaits this function.
 
     Args:
-        include_prizepicks (bool): Kept for backward compatibility. Ignored.
-        include_underdog (bool): Kept for backward compatibility. Ignored.
+        include_prizepicks (bool): Deprecated. Ignored.
+        include_underdog (bool): Deprecated. Ignored.
         include_draftkings (bool): If False, returns empty list.
         odds_api_key (str, optional): The Odds API key.
 
@@ -438,9 +436,9 @@ def build_cross_platform_comparison(all_props):
         comparison = build_cross_platform_comparison(props)
         # → {
         #     ("LeBron James", "points"): {
-        #         "PrizePicks": 24.5,
-        #         "Underdog": 25.5,
-        #         "DraftKings": 24.5,
+        #         "FanDuel": 24.5,
+        #         "DraftKings": 25.5,
+        #         "BetMGM": 24.5,
         #     },
         #     ...
         # }
@@ -481,13 +479,13 @@ def recommend_best_platform(comparison, projected_value, direction):
 
     Args:
         comparison (dict): Platform → line dict for one (player, stat_type) key.
-            e.g., {"PrizePicks": 24.5, "Underdog": 25.5, "DraftKings": 24.5}
+            e.g., {"FanDuel": 24.5, "DraftKings": 25.5, "BetMGM": 24.5}
         projected_value (float): Model's projected stat value for this player.
         direction (str): "OVER" or "UNDER" (case-insensitive).
 
     Returns:
         dict: {
-            "platform": "PrizePicks",    # Best platform name
+            "platform": "FanDuel",       # Best platform name
             "line": 24.5,                # Best line on that platform
             "edge": 0.3,                 # projected_value - line (OVER) or line - projected_value (UNDER)
             "all_lines": {...}           # All platform lines for reference
@@ -496,11 +494,11 @@ def recommend_best_platform(comparison, projected_value, direction):
 
     Example:
         recommend_best_platform(
-            {"PrizePicks": 24.5, "Underdog": 25.5},
+            {"FanDuel": 24.5, "DraftKings": 25.5},
             projected_value=25.8,
             direction="OVER"
         )
-        # → {"platform": "PrizePicks", "line": 24.5, "edge": 1.3, ...}
+        # → {"platform": "FanDuel", "line": 24.5, "edge": 1.3, ...}
     """
     if not comparison:
         return None
@@ -664,7 +662,7 @@ def extract_active_players_from_props(props):
     """
     Extract the set of active players implied by tonight's platform props.
 
-    Since betting platforms (PrizePicks, Underdog, DraftKings) only list
+    Since betting platforms (sportsbooks) only list
     props for players who are CONFIRMED active and playing tonight, every
     player who appears in the props list is de-facto confirmed:
       1. Active (not injured/out)
@@ -682,7 +680,7 @@ def extract_active_players_from_props(props):
         active = extract_active_players_from_props(props)
         # → {
         #     "lebron james": {"name": "LeBron James", "team": "LAL",
-        #                      "platforms": ["PrizePicks", "Underdog"]},
+        #                      "platforms": ["FanDuel", "DraftKings"]},
         #     ...
         # }
     """
@@ -875,7 +873,7 @@ def summarize_props_by_platform(props):
 
     Example:
         summarize_props_by_platform(props)
-        # → {"PrizePicks": 84, "Underdog": 76, "DraftKings": 32}
+        # → {"FanDuel": 84, "DraftKings": 76, "BetMGM": 32}
     """
     summary = {}
     for prop in props:
@@ -1310,11 +1308,11 @@ def parse_alt_lines_from_platform_props(props):
 
         props = [
             {"player_name": "SGA", "stat_type": "points",
-             "line": 28.5, "platform": "PrizePicks"},
+             "line": 28.5, "platform": "FanDuel"},
             {"player_name": "SGA", "stat_type": "points",
-             "line": 31.5, "platform": "PrizePicks"},
+             "line": 31.5, "platform": "FanDuel"},
             {"player_name": "SGA", "stat_type": "points",
-             "line": 34.5, "platform": "PrizePicks"},
+             "line": 34.5, "platform": "FanDuel"},
         ]
         enriched = parse_alt_lines_from_platform_props(props)
         # → [

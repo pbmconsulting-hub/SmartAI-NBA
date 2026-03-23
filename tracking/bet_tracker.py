@@ -44,7 +44,12 @@ VALID_DIRECTIONS = {"OVER", "UNDER"}
 VALID_RESULTS = {"WIN", "LOSS", "PUSH"}
 
 # Valid platforms
-VALID_PLATFORMS = {"PrizePicks", "Underdog", "DraftKings"}
+VALID_PLATFORMS = {
+    "FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics",
+    "ESPN Bet", "Hard Rock Bet", "BetRivers",
+    # Legacy DFS platforms (backward compat)
+    "PrizePicks", "Underdog",
+}
 
 # Valid tier names
 VALID_TIERS = {"Platinum", "Gold", "Silver", "Bronze"}
@@ -107,7 +112,7 @@ _STAT_COL = {
     "turnovers":        "tov",
     "three_pointers":   "fg3m",
     "minutes":          "minutes",
-    # ── PrizePicks aliases ─────────────────────────────────────
+    # ── Platform name aliases ─────────────────────────────────────
     "pts":              "pts",
     "rebs":             "reb",
     "asts":             "ast",
@@ -119,7 +124,7 @@ _STAT_COL = {
     "blocked shots":    "blk",
     "free throws made": "ftm",
     "ftm":              "ftm",
-    # ── DraftKings / Underdog aliases ──────────────────────────
+    # ── Platform name aliases ──────────────────────────
     "three pointers":   "fg3m",
     "3-pointers":       "fg3m",
     "three_point":      "fg3m",
@@ -189,7 +194,7 @@ def log_new_bet(
         stat_type (str): 'points', 'rebounds', etc.
         prop_line (float): The line being bet (e.g., 24.5)
         direction (str): 'OVER' or 'UNDER'
-        platform (str): 'PrizePicks', 'Underdog', or 'DraftKings'
+        platform (str): Sportsbook name (e.g., 'FanDuel', 'DraftKings')
         confidence_score (float): 0-100 model confidence
         probability_over (float): Model's P(over), 0-1
         edge_percentage (float): Edge in percentage points
@@ -206,7 +211,7 @@ def log_new_bet(
 
     Example:
         success, msg = log_new_bet('LeBron James', 'points',
-                                    24.5, 'OVER', 'PrizePicks',
+                                    24.5, 'OVER', 'FanDuel',
                                     72.3, 0.58, 8.0, 'Gold')
     """
     # ============================================================
@@ -1698,7 +1703,7 @@ def save_top_picks_from_analysis(analysis_results):
 
         direction = str(result.get("direction", "OVER")).upper()
         prop_line = float(result.get("line", 0) or 0)
-        platform = str(result.get("platform", "PrizePicks"))
+        platform = str(result.get("platform", "FanDuel"))
         edge = float(result.get("edge_percentage", result.get("edge", 0)) or 0)
         confidence = float(result.get("confidence_score", 0) or 0)
         bet_type = str(result.get("bet_type", "normal"))
@@ -1836,7 +1841,7 @@ def log_props_to_tracker(props_list, direction="OVER"):
         if bet_direction not in VALID_DIRECTIONS:
             bet_direction = direction.upper()
 
-        platform = str(prop.get("platform", "PrizePicks"))
+        platform = str(prop.get("platform", "FanDuel"))
         team = str(prop.get("team", prop.get("player_team", "")))
         game_date = str(prop.get("game_date", today_str))
 
