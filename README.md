@@ -234,6 +234,12 @@ pip install -r requirements.txt
 ```
 2. Run the app: `streamlit run app.py`
 3. Go to **⚙️ Settings** (page 13) to enter your API keys
+
+**Alternative — file-based keys (persistent across sessions):**
+```bash
+cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+# Edit .streamlit/secrets.toml and replace the placeholder values with your real keys
+```
 4. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
 5. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
 
