@@ -64,13 +64,26 @@ st.markdown(
     "Apply a pre-configured profile to instantly tune all settings for your strategy."
 )
 
+_PRIMARY_PLATFORMS = [
+    "FanDuel", "DraftKings", "BetMGM", "Caesars",
+    "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+]
+
+_SECONDARY_PLATFORMS = [
+    "William Hill", "Unibet", "BetUS", "Bovada", "MyBookie",
+    "BetOnline", "LowVig", "Pinnacle", "SuperBook", "WynnBet",
+    "TwinSpires", "BetFred", "Fliff",
+]
+
+_ALL_PLATFORMS = _PRIMARY_PLATFORMS + _SECONDARY_PLATFORMS
+
 _PROFILES = {
     "🛡️ Conservative": {
         "description": "Fewer, higher-confidence picks. Lower risk, steadier returns.",
         "simulation_depth": 2000,
         "minimum_edge_threshold": 8.0,
         "entry_fee": 10.0,
-        "selected_platforms": ["DraftKings"],
+        "selected_platforms": _PRIMARY_PLATFORMS[:4],
         "home_court_boost": 0.02,
         "blowout_sensitivity": 1.5,
         "fatigue_sensitivity": 1.5,
@@ -81,7 +94,7 @@ _PROFILES = {
         "simulation_depth": 2000,
         "minimum_edge_threshold": 5.0,
         "entry_fee": 10.0,
-        "selected_platforms": ["DraftKings"],
+        "selected_platforms": list(_PRIMARY_PLATFORMS),
         "home_court_boost": 0.025,
         "blowout_sensitivity": 1.0,
         "fatigue_sensitivity": 1.0,
@@ -92,7 +105,7 @@ _PROFILES = {
         "simulation_depth": 500,
         "minimum_edge_threshold": 2.0,
         "entry_fee": 25.0,
-        "selected_platforms": ["DraftKings"],
+        "selected_platforms": list(_ALL_PLATFORMS),
         "home_court_boost": 0.03,
         "blowout_sensitivity": 0.5,
         "fatigue_sensitivity": 0.5,
@@ -242,7 +255,7 @@ with edge_col2:
         "- 63% probability = +10.6% edge (63% − 52.38%)\n"
         "- 55% probability = +2.6% edge (55% − 52.38%)\n"
         "- 52% probability = −0.4% edge (no value at -110)\n\n"
-        "For DraftKings with different juice (e.g. -130), the breakeven is higher (~56.5%), "
+        "For sportsbooks with different juice (e.g. -130), the breakeven is higher (~56.5%), "
         "so the displayed edge automatically adjusts to the actual odds.\n\n"
         "We recommend at least **5% edge** to justify a bet."
     )
@@ -274,6 +287,48 @@ st.caption(f"Default entry fee: **${new_entry_fee:.2f}**")
 
 # ============================================================
 # END SECTION: Entry Fee
+# ============================================================
+
+st.divider()
+
+# ============================================================
+# SECTION: Sportsbook Platform Settings
+# ============================================================
+
+st.subheader("🎰 Sportsbook Platforms")
+
+st.markdown(
+    "Select which sportsbooks to include in analysis. "
+    "All odds are fetched from The Odds API."
+)
+
+current_platforms = st.session_state.get("selected_platforms", list(_PRIMARY_PLATFORMS))
+
+st.markdown("**Primary Sportsbooks**")
+new_platforms = st.multiselect(
+    "Primary Sportsbooks",
+    options=_PRIMARY_PLATFORMS,
+    default=[p for p in current_platforms if p in _PRIMARY_PLATFORMS],
+    help="Major US sportsbooks — FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, Hard Rock Bet, BetRivers",
+    label_visibility="collapsed",
+)
+
+with st.expander("📋 Secondary Sportsbooks", expanded=False):
+    secondary_selection = st.multiselect(
+        "Secondary Sportsbooks",
+        options=_SECONDARY_PLATFORMS,
+        default=[p for p in current_platforms if p in _SECONDARY_PLATFORMS],
+        help="Additional sportsbooks for broader market coverage",
+        label_visibility="collapsed",
+    )
+
+combined = new_platforms + secondary_selection
+if combined:
+    st.session_state["selected_platforms"] = combined
+st.caption(f"Active: **{', '.join(st.session_state.get('selected_platforms', []))}**")
+
+# ============================================================
+# END SECTION: Sportsbook Platform Settings
 # ============================================================
 
 st.divider()
@@ -364,6 +419,7 @@ settings_summary = {
     "Simulation Depth": f"{st.session_state.get('simulation_depth', 1000):,} simulations",
     "Minimum Edge": f"{st.session_state.get('minimum_edge_threshold', 5.0)}%",
     "Entry Fee": f"${st.session_state.get('entry_fee', 10.0):.2f}",
+    "Active Sportsbooks": ", ".join(st.session_state.get("selected_platforms", [])),
     "Home Court Boost": f"{st.session_state.get('home_court_boost', 0.025)*100:.1f}%",
     "Blowout Sensitivity": f"{st.session_state.get('blowout_sensitivity', 1.0):.1f}x",
     "Fatigue Sensitivity": f"{st.session_state.get('fatigue_sensitivity', 1.0):.1f}x",
@@ -379,7 +435,7 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
     # Clear all settings from session state
     settings_keys_to_clear = [
         "simulation_depth", "minimum_edge_threshold", "entry_fee",
-        "home_court_boost", "blowout_sensitivity",
+        "selected_platforms", "home_court_boost", "blowout_sensitivity",
         "fatigue_sensitivity", "pace_sensitivity",
     ]
     for key in settings_keys_to_clear:

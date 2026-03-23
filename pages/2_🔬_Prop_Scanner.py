@@ -92,7 +92,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     
     **Option 3: Fetch Live Platform Lines**
     - Go to the **📡 Live Games** page and click **📊 Fetch Live Props & Analyze**
-    - Fetches real live lines from DraftKings via The Odds API
+    - Fetches real live lines from all major sportsbooks via The Odds API
     
     💡 **Pro Tips:**
     - Fetch live lines for the most accurate analysis
@@ -109,7 +109,7 @@ st.markdown(get_education_box_html(
     Example: "LeBron James Points OVER 24.5" — you win if LeBron scores 25 or more points.<br><br>
     <strong>How to read a prop line</strong>: The number (24.5) is the threshold. 
     Always bet OVER or UNDER — never equal (that's a push/tie).<br><br>
-    <strong>Platforms</strong>: DraftKings Pick6 requires all picks to hit for full payout.
+    <strong>Platforms</strong>: FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, Hard Rock Bet, BetRivers — each platform may have different line values.
     """
 ), unsafe_allow_html=True)
 
@@ -131,7 +131,10 @@ valid_stat_types = (
     + sorted(FANTASY_SCORING.keys())
     + ["double_double", "triple_double"]
 )
-valid_platforms = ["DraftKings"]
+valid_platforms = [
+    "FanDuel", "DraftKings", "BetMGM", "Caesars",
+    "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+]
 
 # ── Import platform fetcher (optional — app works without it) ──
 try:
@@ -158,7 +161,7 @@ except ImportError:
 
 # ============================================================
 # SECTION: Fetch Live Props
-# One-click button to pull live lines from DraftKings
+# One-click button to pull live lines from all major sportsbooks
 # (via The Odds API) and populate the prop list.
 # ============================================================
 
@@ -170,7 +173,7 @@ if not _user_is_premium:
         '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
         'border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
         '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
-        f' — Live platform fetching (DraftKings) requires a '
+        f' — Live platform fetching (all major sportsbooks) requires a '
         f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>. '
         'You can still enter up to 5 props manually below.</div>',
         unsafe_allow_html=True,
@@ -182,7 +185,7 @@ elif _PLATFORM_FETCHER_AVAILABLE:
     # Show which platforms are enabled
     _enabled_names = []
     if _dk_on and _dk_key:
-        _enabled_names.append("DraftKings")
+        _enabled_names.extend(valid_platforms)
 
     st.markdown(
         f"Fetch tonight's live prop lines from: **{', '.join(_enabled_names) if _enabled_names else 'no platforms enabled'}**. "
@@ -281,8 +284,9 @@ elif _PLATFORM_FETCHER_AVAILABLE:
                         "Player": player_name,
                         "Stat": stat_type,
                     }
-                    # Add column for DraftKings
-                    row["DraftKings"] = lines.get("DraftKings", "—")
+                    # Add columns for each sportsbook
+                    for platform in valid_platforms:
+                        row[platform] = lines.get(platform, "—")
 
                     # Calculate spread (max - min line)
                     numeric_lines = [v for v in lines.values() if isinstance(v, (int, float))]
@@ -391,7 +395,7 @@ if _display_props_enriched:
         with _sf1:
             _filter_platform = st.multiselect(
                 "Platform",
-                options=["DraftKings"],
+                options=valid_platforms,
                 default=[],
                 placeholder="All platforms",
                 key="scan_platform_filter",
@@ -680,7 +684,7 @@ st.divider()
 st.info(
     "💡 **To get prop lines:** Use the **📡 Live Games** page — click "
     "**📊 Fetch Live Props & Analyze** or **⚡ One-Click Setup** to fetch "
-    "real live lines from DraftKings."
+    "real live lines from all major sportsbooks."
 )
 
 # ============================================================
@@ -805,7 +809,7 @@ else:
     st.markdown("**Required CSV format:**")
     st.code(
         "player_name,team,stat_type,line,platform,game_date\n"
-        "LeBron James,LAL,points,24.5,DraftKings,2026-03-05\n"
+        "LeBron James,LAL,points,24.5,FanDuel,2026-03-05\n"
         "Stephen Curry,GSW,threes,3.5,DraftKings,2026-03-05",
         language="csv",
     )
@@ -899,7 +903,7 @@ st.markdown("Paste prop lines directly as CSV text:")
 
 quick_add_text = st.text_area(
     "Paste CSV data here",
-    placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,DraftKings\nStephen Curry,GSW,threes,3.5,DraftKings",
+    placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,FanDuel\nStephen Curry,GSW,threes,3.5,DraftKings",
     height=150,
 )
 
