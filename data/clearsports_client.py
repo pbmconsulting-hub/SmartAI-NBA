@@ -156,7 +156,16 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 _logger.warning("ClearSports endpoint not found (404): %s", url)
                 return None
 
+            if resp.status_code == 422:
+                _logger.warning("ClearSports 422 (unsupported request) for %s", url)
+                return None
+
             resp.raise_for_status()
+
+            if not resp.text:
+                _logger.warning("Empty response body from %s", url)
+                return None
+
             data = resp.json()
             _cache_set(url, data)
             return data
@@ -231,10 +240,10 @@ def fetch_games_today() -> list[dict]:
                 "game_id":     _safe_str(g.get("game_id") or g.get("id")),
                 "home_team":   _safe_str(g.get("home_team") or g.get("home_abbreviation")),
                 "away_team":   _safe_str(g.get("away_team") or g.get("away_abbreviation")),
-                "home_wins":   int(_safe_float(g.get("home_wins", g.get("home_record", {}).get("wins", 0)))),
-                "home_losses": int(_safe_float(g.get("home_losses", g.get("home_record", {}).get("losses", 0)))),
-                "away_wins":   int(_safe_float(g.get("away_wins", g.get("away_record", {}).get("wins", 0)))),
-                "away_losses": int(_safe_float(g.get("away_losses", g.get("away_record", {}).get("losses", 0)))),
+                "home_wins":   int(_safe_float(g.get("home_wins", (g.get("home_record") or {}).get("wins", 0)))),
+                "home_losses": int(_safe_float(g.get("home_losses", (g.get("home_record") or {}).get("losses", 0)))),
+                "away_wins":   int(_safe_float(g.get("away_wins", (g.get("away_record") or {}).get("wins", 0)))),
+                "away_losses": int(_safe_float(g.get("away_losses", (g.get("away_record") or {}).get("losses", 0)))),
                 "vegas_spread": _safe_float(g.get("vegas_spread") or g.get("spread", 0)),
                 "game_total":  _safe_float(g.get("game_total") or g.get("total", 220)),
             })
@@ -554,7 +563,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
         return []
 
     url = f"{_BASE_URL}/nba/players/{player_id}/game_log"
-    params = {"apiKey": api_key, "last_n": last_n_games}
+    params = {"last_n": last_n_games}
     cache_key = f"{url}?player_id={player_id}&last_n={last_n_games}"
 
     cached = _cache_get(cache_key)
@@ -623,7 +632,7 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/nba/standings"
-    params = {"apiKey": api_key}
+    params = {}
     cache_key = f"{url}?season=current"
 
     cached = _cache_get(cache_key)
@@ -722,7 +731,7 @@ def fetch_news(limit: int = 20) -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/nba/news"
-    params = {"apiKey": api_key, "limit": limit}
+    params = {"limit": limit}
     cache_key = f"{url}?limit={limit}"
 
     cached = _cache_get(cache_key)
