@@ -129,8 +129,9 @@ from utils.player_modal import show_player_spotlight as _show_spotlight
 # ── Section logo paths ────────────────────────────────────────────────────────
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
 _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
-_GOBLIN_LOGO_PATH = os.path.join(_ASSETS_DIR, "New_Goblin_Logo.png")
-_DEMON_LOGO_PATH  = os.path.join(_ASSETS_DIR, "New_Demon_Logo.png")
+# Legacy logo paths disabled – branding removed from UI
+_GOBLIN_LOGO_PATH = ""
+_DEMON_LOGO_PATH  = ""
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
@@ -468,7 +469,7 @@ with status_col:
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
     st.caption(f"⚙️ Min Edge: **{minimum_edge}%**")
-    _shown_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog", "DraftKings"])
+    _shown_platforms = st.session_state.get("selected_platforms", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"])
     st.caption(f"⚙️ Platforms: **{', '.join(_shown_platforms)}**")
     st.caption("Change on the ⚙️ Settings page")
 
@@ -740,13 +741,13 @@ if run_analysis:
         if plat_players_skipped > 0:
             st.info(
                 f"ℹ️ Skipping **{plat_players_skipped}** prop(s) for players not found on "
-                f"PrizePicks / Underdog / DraftKings today. "
+                f"all major sportsbooks today. "
                 f"Only platform-verified players are shown. ({len(props_to_analyze)} remaining)"
             )
 
     # ── Filter to selected platforms (from ⚙️ Settings) ──────────────
     _selected_platforms = st.session_state.get(
-        "selected_platforms", ["PrizePicks", "Underdog", "DraftKings"]
+        "selected_platforms", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"]
     )
     if _selected_platforms:
         before_plat = len(props_to_analyze)
@@ -828,7 +829,7 @@ if run_analysis:
             player_name = prop.get("player_name", "")
             stat_type   = prop.get("stat_type", "points").lower()
             prop_line   = float(prop.get("line", 0))
-            platform    = prop.get("platform", "PrizePicks")
+            platform    = prop.get("platform", "DraftKings")
 
             # Phase 2: Use quarantined main line when available
             _raw_target = prop.get("prop_target_line")
@@ -1302,13 +1303,12 @@ if run_analysis:
 
             # Use actual odds from the prop when available so the edge reflects the
             # true implied probability for this platform/line, not a fixed -110 default.
-            # For PrizePicks / Underdog (no vig), we still default to 0.5238 (-110 equiv)
-            # since they use fixed-payout structures, not per-leg juice.
+            # No-vig platform list cleared — all platforms now use actual odds.
             _prop_over_odds  = prop.get("over_odds", -110)
             _prop_under_odds = prop.get("under_odds", -110)
             _platform_for_odds = prop.get("platform", "")
             # Platforms without per-leg vig: treat as standard -110 breakeven
-            _NO_VIG_PLATFORMS = {"PrizePicks", "Underdog", "Underdog Fantasy"}
+            _NO_VIG_PLATFORMS = set()  # Legacy no-vig platforms removed
             if _platform_for_odds in _NO_VIG_PLATFORMS:
                 # No vig — use the standard -110 breakeven (0.5238)
                 _implied_prob_for_edge = None  # let calculate_edge_percentage use default
@@ -1681,7 +1681,7 @@ if run_analysis:
                 "player_position": "",
                 "stat_type": _err_stat,
                 "line": _err_line,
-                "platform": prop.get("platform", "PrizePicks"),
+                "platform": prop.get("platform", "DraftKings"),
                 "season_pts_avg": 0, "season_reb_avg": 0, "season_ast_avg": 0,
                 "points_avg": 0, "rebounds_avg": 0, "assists_avg": 0,
                 "opponent": "",
@@ -2418,7 +2418,7 @@ if analysis_results:
             _sb_platform = _html.escape(str(_sb.get("platform", "")))
             _sb_team  = _html.escape(str(_sb.get("player_team", _sb.get("team", ""))))
             _sb_bet_type = _sb.get("bet_type", "normal")
-            _sb_bet_icon = {"goblin": "🟢", "demon": "👹"}.get(_sb_bet_type, "")
+            _sb_bet_icon = ""  # Bet-type icons removed from UI
             _sb_breakdown_html = _render_inline_breakdown(_sb, accent_color=_sb_color)
             st.markdown(
                 f'<div style="background:#14192b;border-radius:10px;padding:14px 18px;'
