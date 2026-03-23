@@ -115,7 +115,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     4. Takes ~30-60 seconds depending on the number of games
     
     **📊 Fetch Live Platform Props & Analyze** (for real prop lines):
-    1. Select which platforms to include (DraftKings)
+    1. Select which platforms to include (all major sportsbooks via The Odds API)
     2. Optionally configure Smart Filter settings
     3. Click the button to fetch REAL live prop lines from those platforms
     4. The engine automatically runs Neural Analysis on all fetched props
@@ -136,7 +136,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
 #   or to refresh data.
 #
 # BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
-#   Fetches REAL live prop lines from DraftKings APIs, runs them
+#   Fetches REAL live prop lines from all major sportsbooks, runs them
 #   through Neural Analysis, and shows the best bets grouped by
 #   platform. Does NOT depend on Auto-Load.
 #
@@ -171,7 +171,7 @@ with _one_click_col:
     )
 with _one_click_info:
     st.caption(
-        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from DraftKings. "
+        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from all major sportsbooks. "
         "Best choice for a fresh session — everything in one click."
     )
 
@@ -187,7 +187,7 @@ st.markdown("""
   </span><br>
   <span style="color:#8a9bb8;font-size:0.84rem;">
     <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
-    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from DraftKings → Neural Analysis
+    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from all major sportsbooks → Neural Analysis
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -236,7 +236,7 @@ _include_ud = False
 _dk_col, _fetch_btn_col = st.columns([1, 2])
 
 with _dk_col:
-    _include_dk = st.checkbox("🔵 DraftKings", value=True, key="platform_dk_checkbox")
+    _include_dk = st.checkbox("🔵 All Major Sportsbooks", value=True, key="platform_dk_checkbox")
 
 # Smart Filter controls (collapsible)
 with st.expander("🧠 Smart Filter Settings", expanded=False):
@@ -274,9 +274,12 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
 
 # ── Platform Preference ──────────────────────────────────────
 with st.expander("⚙️ Platform Settings", expanded=False):
-    _PLATFORM_OPTIONS = ["DraftKings"]
+    _PLATFORM_OPTIONS = [
+        "FanDuel", "DraftKings", "BetMGM", "Caesars",
+        "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+    ]
     if "joseph_preferred_platform" not in st.session_state:
-        st.session_state["joseph_preferred_platform"] = "DraftKings"
+        st.session_state["joseph_preferred_platform"] = "FanDuel"
 
     st.markdown(
         '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
@@ -419,7 +422,7 @@ if platform_props_clicked:
     st.subheader("📊 Platform Props & Neural Analysis")
 
     _platforms_label = ", ".join(filter(None, [
-        "DraftKings" if _include_dk else "",
+        "All Major Sportsbooks" if _include_dk else "",
     ]))
     st.markdown(f"Fetching live props from **{_platforms_label}** and running Neural Analysis…")
 
@@ -869,7 +872,10 @@ if platform_props_clicked:
             )
 
             # Group by platform
-            platforms_order = ["DraftKings"]
+            platforms_order = [
+                "FanDuel", "DraftKings", "BetMGM", "Caesars",
+                "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+            ]
             all_platforms = sorted({p["platform"] for p in analyzed_props})
             # Show known platforms first, then any others
             ordered_platforms = [pl for pl in platforms_order if pl in all_platforms]
