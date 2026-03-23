@@ -115,7 +115,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     4. Takes ~30-60 seconds depending on the number of games
     
     **📊 Fetch Live Platform Props & Analyze** (for real prop lines):
-    1. Select which platforms to include (PrizePicks, Underdog, DraftKings)
+    1. Select which platforms to include (DraftKings)
     2. Optionally configure Smart Filter settings
     3. Click the button to fetch REAL live prop lines from those platforms
     4. The engine automatically runs Neural Analysis on all fetched props
@@ -136,9 +136,9 @@ with st.expander("📖 How to Use This Page", expanded=False):
 #   or to refresh data.
 #
 # BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
-#   Fetches REAL live prop lines from PrizePicks, Underdog, and
-#   DraftKings APIs, runs them through Neural Analysis, and shows
-#   the best bets grouped by platform. Does NOT depend on Auto-Load.
+#   Fetches REAL live prop lines from DraftKings APIs, runs them
+#   through Neural Analysis, and shows the best bets grouped by
+#   platform. Does NOT depend on Auto-Load.
 #
 # BUTTON 3 — ⚡ One-Click Setup (COMBINED):
 #   Runs BOTH Auto-Load AND Fetch Platform Props in one click.
@@ -171,7 +171,7 @@ with _one_click_col:
     )
 with _one_click_info:
     st.caption(
-        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from PrizePicks/Underdog/DraftKings. "
+        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from DraftKings. "
         "Best choice for a fresh session — everything in one click."
     )
 
@@ -187,7 +187,7 @@ st.markdown("""
   </span><br>
   <span style="color:#8a9bb8;font-size:0.84rem;">
     <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
-    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from PrizePicks / Underdog / DraftKings → Neural Analysis
+    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from DraftKings → Neural Analysis
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -231,12 +231,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-_pp_col, _ud_col, _dk_col, _fetch_btn_col = st.columns([1, 1, 1, 2])
+_include_pp = False
+_include_ud = False
+_dk_col, _fetch_btn_col = st.columns([1, 2])
 
-with _pp_col:
-    _include_pp = st.checkbox("🟢 PrizePicks", value=True, key="platform_pp_checkbox")
-with _ud_col:
-    _include_ud = st.checkbox("🟣 Underdog", value=True, key="platform_ud_checkbox")
 with _dk_col:
     _include_dk = st.checkbox("🔵 DraftKings", value=True, key="platform_dk_checkbox")
 
@@ -276,9 +274,9 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
 
 # ── Platform Preference ──────────────────────────────────────
 with st.expander("⚙️ Platform Settings", expanded=False):
-    _PLATFORM_OPTIONS = ["PrizePicks", "Underdog", "DraftKings"]
+    _PLATFORM_OPTIONS = ["DraftKings"]
     if "joseph_preferred_platform" not in st.session_state:
-        st.session_state["joseph_preferred_platform"] = "PrizePicks"
+        st.session_state["joseph_preferred_platform"] = "DraftKings"
 
     st.markdown(
         '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
@@ -421,8 +419,6 @@ if platform_props_clicked:
     st.subheader("📊 Platform Props & Neural Analysis")
 
     _platforms_label = ", ".join(filter(None, [
-        "PrizePicks" if _include_pp else "",
-        "Underdog" if _include_ud else "",
         "DraftKings" if _include_dk else "",
     ]))
     st.markdown(f"Fetching live props from **{_platforms_label}** and running Neural Analysis…")
@@ -873,7 +869,7 @@ if platform_props_clicked:
             )
 
             # Group by platform
-            platforms_order = ["PrizePicks", "Underdog", "DraftKings"]
+            platforms_order = ["DraftKings"]
             all_platforms = sorted({p["platform"] for p in analyzed_props})
             # Show known platforms first, then any others
             ordered_platforms = [pl for pl in platforms_order if pl in all_platforms]
