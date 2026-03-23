@@ -257,7 +257,7 @@ if "total_bankroll" not in st.session_state:
 if "kelly_multiplier" not in st.session_state:
     st.session_state["kelly_multiplier"] = 0.25
 if "selected_platforms" not in st.session_state:
-    st.session_state["selected_platforms"] = ["PrizePicks", "Underdog", "DraftKings"]
+    st.session_state["selected_platforms"] = ["DraftKings"]
 if "todays_games" not in st.session_state:
     st.session_state["todays_games"] = []
 if "analysis_results" not in st.session_state:
@@ -630,13 +630,13 @@ with left_column:
     Everything you need in a single button press!
 
     **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually, upload a CSV,
-    or fetch live lines from PrizePicks / Underdog / DraftKings.
+    or fetch live lines from DraftKings via The Odds API.
 
     **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Quantum Matrix Engine 5.6
     simulation. See probability gauges, tier badges, and force breakdowns.
 
     **Step 3** → 🧬 **Entry Builder** — Build optimal parlays with exact EV
-    calculations for PrizePicks, Underdog, and DraftKings.
+    calculations for DraftKings.
 
     **Step 4** → 📈 **Bet Tracker & Model Health** — After games, log results to track
     how accurate the model is over time.
@@ -678,7 +678,7 @@ with st.expander("⚠️ Important Legal Disclaimer — Please Read", expanded=F
     - 🔢 All predictions are based on statistical models that have inherent limitations  
     - 💰 Sports betting involves significant financial risk — **never bet more than you can afford to lose**
     - 🔞 You must be **21+** (or legal age in your jurisdiction) to participate in sports betting
-    - ⚠️ This tool is **not affiliated** with the NBA, PrizePicks, Underdog Fantasy, or DraftKings
+    - ⚠️ This tool is **not affiliated** with the NBA or DraftKings
     - 🆘 Always gamble responsibly. If you or someone you know has a gambling problem, call **1-800-GAMBLER (1-800-426-2537)**
     
     **By using this application, you acknowledge that all betting decisions are your own responsibility.**

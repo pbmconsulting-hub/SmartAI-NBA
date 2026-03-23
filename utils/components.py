@@ -37,12 +37,18 @@ def _get_hero_banner_b64() -> str:
 
 
 def render_joseph_hero_banner() -> None:
-    """Render the Joseph A Smith Hero Banner at the top of the page.
-
-    Currently disabled — the hero banner image has been removed from
-    all pages.
-    """
-    return
+    """Render the Joseph A Smith Hero Banner at the top of the page."""
+    b64 = _get_hero_banner_b64()
+    if not b64:
+        return
+    st.markdown(
+        f'<div style="width:100%;margin-bottom:12px;">'
+        f'<img src="data:image/png;base64,{b64}" '
+        f'style="width:100%;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);" '
+        f'alt="Joseph A Smith Hero Banner" />'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_global_settings():

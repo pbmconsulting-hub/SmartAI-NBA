@@ -38,7 +38,8 @@ st.markdown(get_live_sweat_css(), unsafe_allow_html=True)
 # ── Joseph M. Smith Floating Widget ──────────────────────────
 
 try:
-    from utils.components import inject_joseph_floating
+    from utils.components import inject_joseph_floating, render_joseph_hero_banner
+    render_joseph_hero_banner()
     st.session_state["joseph_page_context"] = "page_live_sweat"
     inject_joseph_floating()
 except ImportError:
