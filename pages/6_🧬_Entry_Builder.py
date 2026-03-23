@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: pages/6_🧬_Entry_Builder.py
-# PURPOSE: Build optimal parlay entries for PrizePicks,
-#          Underdog, and DraftKings. Calculates EV for each.
+# PURPOSE: Build optimal parlay entries for major sportsbooks
+#          (FanDuel, DraftKings, BetMGM, etc.). Calculates EV.
 # CONNECTS TO: entry_optimizer.py, analysis results in session
 # CONCEPTS COVERED: Parlays, EV, combinatorics, entry building
 # ============================================================
@@ -220,7 +220,7 @@ settings_col1, settings_col2, settings_col3, settings_col4, settings_col5 = st.c
 with settings_col1:
     selected_platform = st.selectbox(
         "Platform",
-        options=["PrizePicks", "Underdog", "DraftKings"],
+        options=["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"],
         help="Which platform are you building entries for?",
     )
 
@@ -354,10 +354,10 @@ if selected_picks:
     with _eb_filter_col2:
         _eb_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
+            ["50/50 — Standard Line", "⚡ Normal"],
             default=[],
             key="eb_bet_type_filter",
-            help="Filter by bet classification. 'Goblin' = alt line below standard (safe floor). '50/50' = standard line. 'Demon' = alt line above standard (high ceiling).",
+            help="Filter by bet classification. '50/50' = standard line. 'Normal' = standard play.",
         )
     _filtered_picks = selected_picks
     if _eb_tier_filter:
@@ -365,9 +365,7 @@ if selected_picks:
         _filtered_picks = [p for p in _filtered_picks if p.get("tier") in _eb_tier_names]
     if _eb_bet_type_filter:
         _eb_bt_map = {
-            "Goblin — Safe Floor":     "goblin",
             "50/50 — Standard Line":   "50_50",
-            "Demon — High Ceiling":    "demon",
             "⚡ Normal":               "normal",
         }
         _eb_bt_values = {_eb_bt_map[t] for t in _eb_bet_type_filter if t in _eb_bt_map}
@@ -416,7 +414,7 @@ if selected_picks:
         st.divider()
         st.subheader("💰 Quick EV Calculation for Selected Picks")
         
-        quick_platform = st.selectbox("Platform for EV calc:", ["PrizePicks", "Underdog", "DraftKings"], key="quick_platform")
+        quick_platform = st.selectbox("Platform for EV calc:", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"], key="quick_platform")
         quick_fee = st.number_input("Entry Fee ($):", min_value=1.0, value=10.0, key="quick_fee")
         
         selected_probs = [
@@ -513,14 +511,11 @@ else:
 with st.expander(f"📋 {selected_platform} Payout Table"):
     # Get the right payout table
     payout_tables = {
-        "PrizePicks (Flex)": PRIZEPICKS_FLEX_PAYOUT_TABLE,
-        "PrizePicks (Power)": PRIZEPICKS_POWER_PAYOUT_TABLE,
-        "Underdog (Flex)": UNDERDOG_FLEX_PAYOUT_TABLE,
         "DraftKings Pick6": DRAFTKINGS_PICK6_PAYOUT_TABLE,
     }
 
-    table_to_show_key = f"{selected_platform} (Flex)" if selected_platform != "DraftKings" else "DraftKings Pick6"
-    table_to_show = payout_tables.get(table_to_show_key, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+    table_to_show_key = "DraftKings Pick6"
+    table_to_show = payout_tables.get(table_to_show_key, DRAFTKINGS_PICK6_PAYOUT_TABLE)
 
     if entry_size in table_to_show:
         payout_for_size = table_to_show[entry_size]
@@ -688,14 +683,14 @@ if build_button:
 
             # Feature 10: Flex vs Power recommendation
             try:
-                if selected_platform == "PrizePicks":
+                if selected_platform == "DraftKings":
                     _entry_probs = [
                         p.get("probability_over", 0.5) if p.get("direction") == "OVER"
                         else 1.0 - p.get("probability_over", 0.5)
                         for p in entry.get("picks", [])
                     ]
                     if len(_entry_probs) >= 2:
-                        _play_type = optimize_play_type(_entry_probs, len(_entry_probs), "PrizePicks")
+                        _play_type = optimize_play_type(_entry_probs, len(_entry_probs), "DraftKings")
                         _pt_color = "green" if _play_type["recommended_play_type"] == "Power" else "blue"
                         st.markdown(
                             f"**Play Type:** :{_pt_color}[{_play_type['recommended_play_type']} recommended]** — "
@@ -855,7 +850,7 @@ _opt_c1, _opt_c2 = st.columns(2)
 with _opt_c1:
     _opt_platform = st.selectbox(
         "Platform",
-        options=["PrizePicks", "Underdog", "DraftKings"],
+        options=["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"],
         index=0,
         key="auto_slip_platform",
     )
