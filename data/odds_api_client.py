@@ -490,15 +490,21 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
             if not isinstance(ev, dict):
                 continue
 
-            bookmakers_raw = ev.get("bookmakers", [])
+            bookmakers_raw = ev.get("bookmakers") or []
             bookmakers: list[dict] = []
             for bm in bookmakers_raw:
                 if not isinstance(bm, dict):
                     continue
                 markets_parsed: dict[str, dict] = {}
-                for mkt in bm.get("markets", []):
+                for mkt in bm.get("markets") or []:
+                    if not isinstance(mkt, dict):
+                        continue
                     mkt_key = mkt.get("key", "")
-                    outcomes = {o.get("name"): o.get("price") for o in mkt.get("outcomes", [])}
+                    outcomes = {
+                        o.get("name"): o.get("price")
+                        for o in (mkt.get("outcomes") or [])
+                        if isinstance(o, dict)
+                    }
                     markets_parsed[mkt_key] = outcomes
                 bookmakers.append({
                     "key":     bm.get("key", ""),
@@ -580,7 +586,7 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
                 if not ev_data or not isinstance(ev_data, dict):
                     continue
 
-                bookmakers_raw = ev_data.get("bookmakers", [])
+                bookmakers_raw = ev_data.get("bookmakers") or []
                 for bm in bookmakers_raw:
                     if not isinstance(bm, dict):
                         continue
@@ -588,13 +594,13 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
                     bm_key          = bm.get("key", "")
                     platform_name   = _bookmaker_display_name(bm_key)
 
-                    for mkt in bm.get("markets", []):
+                    for mkt in bm.get("markets") or []:
                         if not isinstance(mkt, dict):
                             continue
 
                         market_key = mkt.get("key", "")
                         stat_type  = _normalize_stat(market_key)
-                        outcomes   = mkt.get("outcomes", [])
+                        outcomes   = mkt.get("outcomes") or []
 
                         # Group Over/Under outcomes by player name
                         # Outcome shape: {"name": "<player>", "description": "Over"/"Under", "price": -115, "point": 25.5}
@@ -724,7 +730,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
     for game in games_odds:
         home_full = str(game.get("home_team", "")).strip()
         away_full = str(game.get("away_team", "")).strip()
-        bookmakers = game.get("bookmakers", [])
+        bookmakers = game.get("bookmakers") or []
 
         if not bookmakers:
             continue
@@ -735,10 +741,12 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
         ml_away: list[float] = []
 
         for bm in bookmakers:
-            mkts = bm.get("markets", {})
+            if not isinstance(bm, dict):
+                continue
+            mkts = bm.get("markets") or {}
 
             # Spread: Odds API uses home team name as key
-            sp = mkts.get("spreads", {})
+            sp = mkts.get("spreads") or {}
             if sp and home_full in sp:
                 try:
                     spreads_home.append(float(sp[home_full]))
@@ -746,7 +754,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
                     pass
 
             # Totals: sum (over) is the relevant market
-            tot = mkts.get("totals", {})
+            tot = mkts.get("totals") or {}
             for val in tot.values():
                 try:
                     totals.append(float(val))
@@ -755,7 +763,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
                     pass
 
             # Moneyline
-            h2h = mkts.get("h2h", {})
+            h2h = mkts.get("h2h") or {}
             if home_full in h2h:
                 try:
                     ml_home.append(float(h2h[home_full]))
@@ -833,7 +841,9 @@ def fetch_recent_scores(days_from: int = 1,
         "daysFrom":  days_from,
         "dateFormat": "iso",
     }
-    cache_key = f"{url}?daysFrom={days_from}"
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:

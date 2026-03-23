@@ -675,7 +675,9 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
 
     url = f"{_BASE_URL}/nba/players/{player_id}/game_log"
     params = {"last_n": last_n_games}
-    cache_key = f"{url}?player_id={player_id}&last_n={last_n_games}"
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -743,8 +745,10 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/nba/standings"
-    params = {}
-    cache_key = f"{url}?season=current"
+    params = {"season": "current"}
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -843,7 +847,9 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
     url = f"{_BASE_URL}/nba/news"
     params = {"limit": limit}
-    cache_key = f"{url}?limit={limit}"
+    # Use _build_cache_key so the outer cache key matches the one
+    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
     if cached is not None:

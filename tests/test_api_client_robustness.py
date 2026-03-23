@@ -551,5 +551,165 @@ class TestLiveGamesNoneSafeSlicing(unittest.TestCase):
                           "Must not use 'or 220' pattern which treats 0 as falsy")
 
 
+# ── Section 13: Odds API null-safe .get() patterns ───────────────────────────
+
+class TestOddsApiNullSafeGet(unittest.TestCase):
+    """Verify that the Odds API client uses 'or []' / 'or {}' instead of
+    .get(key, []) / .get(key, {}) for nested API data that may be null."""
+
+    def setUp(self):
+        self.src = _OA_SRC.read_text(encoding="utf-8")
+
+    def test_bookmakers_uses_or_pattern(self):
+        """bookmakers access must use 'or []' pattern for null safety."""
+        # Find all bookmaker accesses that use the unsafe .get("bookmakers", [])
+        self.assertNotIn('.get("bookmakers", [])', self.src,
+                         "bookmakers access must use (x or []) pattern, not .get(key, [])")
+
+    def test_markets_list_uses_or_pattern(self):
+        """markets list access in for-loops must use 'or []' for null safety."""
+        # In fetch_game_odds and fetch_player_props, markets are iterated
+        self.assertNotIn('bm.get("markets", [])', self.src,
+                         "markets list access must use (x or []) pattern")
+
+    def test_outcomes_uses_or_pattern(self):
+        """outcomes access must use 'or []' for null safety."""
+        self.assertNotIn('mkt.get("outcomes", [])', self.src,
+                         "outcomes access must use (x or []) pattern")
+
+    def test_markets_dict_uses_or_pattern(self):
+        """markets dict access in get_consensus_odds must use 'or {}' for null safety."""
+        self.assertNotIn('bm.get("markets", {})', self.src,
+                         "markets dict access must use (x or {}) pattern")
+
+    def test_spreads_uses_or_pattern(self):
+        """spreads access must use 'or {}' for null safety."""
+        self.assertNotIn('mkts.get("spreads", {})', self.src,
+                         "spreads access must use (x or {}) pattern")
+
+    def test_totals_uses_or_pattern(self):
+        """totals access must use 'or {}' for null safety."""
+        self.assertNotIn('mkts.get("totals", {})', self.src,
+                         "totals access must use (x or {}) pattern")
+
+    def test_h2h_uses_or_pattern(self):
+        """h2h access must use 'or {}' for null safety."""
+        self.assertNotIn('mkts.get("h2h", {})', self.src,
+                         "h2h access must use (x or {}) pattern")
+
+
+class TestOddsApiOutcomeTypeCheck(unittest.TestCase):
+    """Verify that outcome dict comprehensions in fetch_game_odds guard
+    against non-dict elements in the outcomes list."""
+
+    def test_fetch_game_odds_checks_outcome_type(self):
+        """fetch_game_odds outcome comprehension must check isinstance(o, dict)."""
+        src = _OA_SRC.read_text(encoding="utf-8")
+        idx = src.find("def fetch_game_odds(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 2500]
+        self.assertIn("isinstance(o, dict)", snippet,
+                       "outcomes comprehension must guard against non-dict elements")
+
+
+# ── Section 14: Double-caching elimination ───────────────────────────────────
+
+class TestDoubleCachingEliminated(unittest.TestCase):
+    """Verify that functions with manual cache keys use _build_cache_key
+    consistently so inner/outer cache keys match."""
+
+    def test_fetch_recent_scores_uses_build_cache_key(self):
+        """fetch_recent_scores must use _build_cache_key for its cache key."""
+        src = _OA_SRC.read_text(encoding="utf-8")
+        idx = src.find("def fetch_recent_scores(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 2000]
+        self.assertIn("_build_cache_key(", snippet,
+                       "fetch_recent_scores must use _build_cache_key")
+        # Must NOT contain a manually-built cache_key string
+        self.assertNotIn('f"{url}?daysFrom=', snippet,
+                          "fetch_recent_scores must not use manual cache key string")
+
+    def test_fetch_standings_uses_build_cache_key(self):
+        """fetch_standings must use _build_cache_key for its cache key."""
+        src = _CS_SRC.read_text(encoding="utf-8")
+        idx = src.find("def fetch_standings(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1500]
+        self.assertIn("_build_cache_key(", snippet,
+                       "fetch_standings must use _build_cache_key")
+        self.assertNotIn('f"{url}?season=', snippet,
+                          "fetch_standings must not use manual cache key string")
+
+    def test_fetch_player_game_log_uses_build_cache_key(self):
+        """fetch_player_game_log must use _build_cache_key for its cache key."""
+        src = _CS_SRC.read_text(encoding="utf-8")
+        idx = src.find("def fetch_player_game_log(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1500]
+        self.assertIn("_build_cache_key(", snippet,
+                       "fetch_player_game_log must use _build_cache_key")
+        self.assertNotIn('f"{url}?player_id=', snippet,
+                          "fetch_player_game_log must not use manual cache key string")
+
+    def test_fetch_news_uses_build_cache_key(self):
+        """fetch_news must use _build_cache_key for its cache key."""
+        src = _CS_SRC.read_text(encoding="utf-8")
+        idx = src.find("def fetch_news(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1500]
+        self.assertIn("_build_cache_key(", snippet,
+                       "fetch_news must use _build_cache_key")
+        self.assertNotIn('f"{url}?limit=', snippet,
+                          "fetch_news must not use manual cache key string")
+
+
+# ── Section 15: platform_fetcher dead code removed ───────────────────────────
+
+class TestPlatformFetcherDeadCodeRemoved(unittest.TestCase):
+    """Verify that unused _cache_get / _cache_set dead code has been
+    removed from platform_fetcher.py."""
+
+    def setUp(self):
+        self.src_path = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        self.src = self.src_path.read_text(encoding="utf-8")
+
+    def test_no_cache_get_function(self):
+        """platform_fetcher must not define _cache_get (dead code removed)."""
+        self.assertNotIn("def _cache_get(", self.src,
+                          "_cache_get should be removed from platform_fetcher")
+
+    def test_no_cache_set_function(self):
+        """platform_fetcher must not define _cache_set (dead code removed)."""
+        self.assertNotIn("def _cache_set(", self.src,
+                          "_cache_set should be removed from platform_fetcher")
+
+    def test_no_api_cache_dict(self):
+        """platform_fetcher must not have unused _API_CACHE dict."""
+        self.assertNotIn("_API_CACHE:", self.src,
+                          "_API_CACHE should be removed from platform_fetcher")
+
+    def test_no_api_cache_ttl(self):
+        """platform_fetcher must not have unused _API_CACHE_TTL."""
+        self.assertNotIn("_API_CACHE_TTL", self.src,
+                          "_API_CACHE_TTL should be removed from platform_fetcher")
+
+
+# ── Section 16: get_consensus_odds bookmaker type check ──────────────────────
+
+class TestConsensusOddsBookmakerTypeCheck(unittest.TestCase):
+    """Verify that get_consensus_odds checks isinstance(bm, dict) for
+    each bookmaker entry to avoid crashes on unexpected data."""
+
+    def test_bookmaker_type_checked(self):
+        """get_consensus_odds must check isinstance(bm, dict) for bookmakers."""
+        src = _OA_SRC.read_text(encoding="utf-8")
+        idx = src.find("def get_consensus_odds(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 2500]
+        self.assertIn("isinstance(bm, dict)", snippet,
+                       "get_consensus_odds must type-check bookmaker entries")
+
+
 if __name__ == "__main__":
     unittest.main()

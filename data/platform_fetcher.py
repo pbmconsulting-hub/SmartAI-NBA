@@ -72,28 +72,6 @@ except ImportError:
 
 import time as _time
 
-# ── Simple time-based API response cache ─────────────────────────────────────
-_API_CACHE: dict = {}
-# TTL is configurable via API_CACHE_TTL_SECONDS env var; default 5 minutes.
-_API_CACHE_TTL: int = int(__import__("os").environ.get("API_CACHE_TTL_SECONDS", "300"))
-
-
-def _cache_get(url: str):
-    """Return cached response for *url* if not expired, else None."""
-    entry = _API_CACHE.get(url)
-    if entry is None:
-        return None
-    payload, ts = entry
-    if _time.time() - ts > _API_CACHE_TTL:
-        del _API_CACHE[url]
-        return None
-    return payload
-
-
-def _cache_set(url: str, payload) -> None:
-    """Store *payload* in the cache keyed by *url*."""
-    _API_CACHE[url] = (payload, _time.time())
-
 # Import the rate limiter for polite API access with circuit breaker
 try:
     from utils.rate_limiter import RateLimiter as _RateLimiter
