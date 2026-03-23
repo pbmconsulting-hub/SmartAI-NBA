@@ -270,15 +270,20 @@ with _api_btn_col3:
         _odds_key = st.session_state.get("odds_api_key", "")
         if _odds_key:
             try:
-                from data.odds_api_client import fetch_events, get_odds_api_usage
-                _events = fetch_events()
+                from data.odds_api_client import fetch_sports, get_odds_api_usage
+                _sports = fetch_sports()
                 _usage = get_odds_api_usage()
                 _remaining = _usage.get("requests_remaining")
-                if _events is not None:
-                    _count = len(_events) if isinstance(_events, list) else 0
+                if _sports is not None:
+                    # Check that basketball_nba is in the list
+                    _nba_active = any(
+                        s.get("key") == "basketball_nba" and s.get("active")
+                        for s in _sports if isinstance(s, dict)
+                    )
+                    _nba_str = "NBA is active ✅" if _nba_active else "NBA not in season"
                     _quota_str = f", {_remaining} requests remaining" if _remaining is not None else ""
                     _test_results.append(
-                        f"✅ **Odds API**: connected — {_count} events found{_quota_str}"
+                        f"✅ **Odds API**: connected — {len(_sports)} sports available, {_nba_str}{_quota_str}"
                     )
                 else:
                     _test_results.append("⚠️ **Odds API**: key is set but API returned no data")

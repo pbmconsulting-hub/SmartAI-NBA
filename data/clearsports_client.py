@@ -1135,17 +1135,41 @@ def fetch_api_key_info() -> dict:
 
     Returns:
         dict: API key info with keys:
-            key_prefix, email, credits_remaining, credits_total,
-            is_active, last_used_at, created_at
+            credits_remaining, credits_total, is_active, plan, email
         Returns {} on failure.
     """
-    url = f"{_BASE_URL}/api-keys/me"
+    url = f"{_BASE_URL}/status"
 
     try:
         raw = _fetch_with_retry(url)
         if not raw or not isinstance(raw, dict):
             return {}
-        return raw
+
+        # API-Sports wraps status in {"response": {...}} envelope
+        response = raw.get("response") or raw
+
+        # Parse the API-Sports status response format:
+        # {"account": {"firstname": ..., "email": ...},
+        #  "subscription": {"plan": ..., "end": ...},
+        #  "requests": {"current": N, "limit_day": N}}
+        account = response.get("account") or {}
+        subscription = response.get("subscription") or {}
+        requests_info = response.get("requests") or {}
+
+        current = requests_info.get("current", 0)
+        limit_day = requests_info.get("limit_day", 0)
+        try:
+            remaining = int(limit_day) - int(current)
+        except (TypeError, ValueError):
+            remaining = None
+
+        return {
+            "credits_remaining": remaining,
+            "credits_total":     limit_day,
+            "is_active":         bool(subscription.get("plan")),
+            "plan":              subscription.get("plan", ""),
+            "email":             account.get("email", ""),
+        }
 
     except Exception as exc:
         _logger.warning("fetch_api_key_info failed: %s", exc)

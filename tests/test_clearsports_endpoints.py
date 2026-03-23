@@ -118,11 +118,11 @@ class TestApiKeyManagementEndpoints(unittest.TestCase):
         self.assertIn("def fetch_api_key_info(", self.src)
 
     def test_fetch_api_key_info_url(self):
-        """fetch_api_key_info must call /api-keys/me."""
+        """fetch_api_key_info must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def fetch_api_key_info(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/api-keys/me", snippet)
+        self.assertIn("/status", snippet)
 
     def test_fetch_api_key_usage_exists(self):
         """fetch_api_key_usage function must exist."""
@@ -475,16 +475,30 @@ class TestApiKeyInfoRuntime(unittest.TestCase):
     @patch("data.clearsports_client._fetch_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
         from data.clearsports_client import fetch_api_key_info
+        # API-Sports /status response format
         mock_fetch.return_value = {
-            "key_prefix": "sk_live_abc...",
-            "email": "user@example.com",
-            "credits_remaining": 985,
-            "credits_total": 1000,
-            "is_active": True,
+            "response": {
+                "account": {
+                    "firstname": "John",
+                    "lastname": "Doe",
+                    "email": "user@example.com",
+                },
+                "subscription": {
+                    "plan": "Free",
+                    "end": "2026-12-31",
+                },
+                "requests": {
+                    "current": 15,
+                    "limit_day": 100,
+                },
+            }
         }
         result = fetch_api_key_info()
         self.assertIsInstance(result, dict)
-        self.assertEqual(result["credits_remaining"], 985)
+        self.assertEqual(result["credits_remaining"], 85)
+        self.assertEqual(result["credits_total"], 100)
+        self.assertTrue(result["is_active"])
+        self.assertEqual(result["email"], "user@example.com")
 
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
     @patch("data.clearsports_client._fetch_with_retry", return_value=None)

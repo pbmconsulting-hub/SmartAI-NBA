@@ -144,9 +144,9 @@ class TestSettingsPageApiKeySection(unittest.TestCase):
         """Test Connection must call fetch_api_key_info for API-NBA."""
         self.assertIn("fetch_api_key_info", self.src)
 
-    def test_calls_fetch_events(self):
-        """Test Connection must call fetch_events for Odds API."""
-        self.assertIn("fetch_events", self.src)
+    def test_calls_fetch_sports(self):
+        """Test Connection must call fetch_sports for Odds API (free endpoint)."""
+        self.assertIn("fetch_sports", self.src)
 
     def test_uses_api_nba_key_session_state(self):
         """Settings page must use api_nba_key in session state."""
