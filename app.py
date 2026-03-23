@@ -611,8 +611,8 @@ with left_column:
     fetches tonight's matchups + current rosters + player stats + team stats.
     Everything you need in a single button press!
 
-    **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually or upload a CSV.
-    Sample props are pre-loaded so you can start immediately.
+    **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually, upload a CSV,
+    or fetch live lines from PrizePicks / Underdog / DraftKings.
 
     **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Quantum Matrix Engine 5.6
     simulation. See probability gauges, tier badges, and force breakdowns.

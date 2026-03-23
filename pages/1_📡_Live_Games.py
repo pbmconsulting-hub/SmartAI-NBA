@@ -132,8 +132,8 @@ with st.expander("📖 How to Use This Page", expanded=False):
 # ─────────────────────────────────────────────────────────────
 # BUTTON 1 — Auto-Load Tonight's Games:
 #   Fetches the schedule, rosters, player/team stats from ClearSports API,
-#   enriches with Odds API consensus lines, then auto-generates SYNTHETIC
-#   props from season averages. Use this as a first step or to refresh data.
+#   and enriches with Odds API consensus lines. Use this as a first step
+#   or to refresh data.
 #
 # BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
 #   Fetches REAL live prop lines from PrizePicks, Underdog, and

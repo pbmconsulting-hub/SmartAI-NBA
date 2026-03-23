@@ -1094,13 +1094,13 @@ def load_props_from_session(session_state):
     Checks keys in priority order:
       1. ``current_props``  — user-entered or platform-filtered props
       2. ``platform_props`` — live-fetched platform props (fallback)
-      3. Sample CSV         — last resort (stale / demo data)
+      3. ``props.csv``      — on-disk fallback (empty on fresh installs)
 
     Args:
         session_state: Streamlit's st.session_state object
 
     Returns:
-        list of dict: Current props (entered, platform-fetched, or sample)
+        list of dict: Current props (entered, platform-fetched, or disk)
     """
     # 1. Check user/filtered props
     if session_state.get("current_props"):
@@ -1111,7 +1111,7 @@ def load_props_from_session(session_state):
     if session_state.get("platform_props"):
         return session_state["platform_props"]
 
-    # 3. Last resort — stale sample CSV
+    # 3. Last resort — on-disk props.csv (empty list on fresh installs)
     return load_props_data()
 
 
@@ -1288,7 +1288,7 @@ def get_csv_template():
 # session state and an optional CSV file on disk.
 # ============================================================
 
-# Path for saving live platform-fetched props (separate from sample_props)
+# Path for saving live platform-fetched props (separate from user-entered props)
 LIVE_PROPS_CSV_PATH = DATA_DIRECTORY / "live_props.csv"
 
 # CSV columns for platform props
@@ -1394,19 +1394,19 @@ def load_platform_props_from_csv(file_path=None):
 
 def is_using_live_data():
     """
-    Check whether the app is currently using live NBA data or sample data.
+    Check whether the app has fetched live NBA data from real APIs.
 
     Looks for the last_updated.json file created by live_data_fetcher.py.
     If the file exists and has the 'is_live' flag, we're using live data.
 
     Returns:
-        bool: True if live data is loaded, False if using sample data.
+        bool: True if live data is loaded, False if no live fetch has occurred.
 
     Example:
         if is_using_live_data():
             st.success("Using live data!")
         else:
-            st.info("Using sample data.")
+            st.info("No live data loaded — go to Data Feed to update.")
     """
     # Check if the timestamp file exists
     if not LAST_UPDATED_JSON_PATH.exists():
@@ -1422,7 +1422,7 @@ def is_using_live_data():
         return bool(timestamps.get("is_live", False))
 
     except Exception:
-        return False  # If file is broken, assume sample data
+        return False  # If file is broken, assume no live data
 
 
 def get_data_last_updated(data_type="players"):

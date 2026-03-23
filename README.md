@@ -51,35 +51,64 @@ Your browser will automatically open to `http://localhost:8501` with the app run
 
 ```
 SmartAI-NBA/
-├── app.py                              # Main entry point — run this!
-├── requirements.txt                    # streamlit + nba_api
+├── app.py                              # Main entry point — home dashboard
+├── requirements.txt                    # All dependencies
 ├── README.md                           # This file
 │
 ├── pages/
-│   ├── 1_🏀_Todays_Games.py           # Select tonight's games (+ auto-load)
-│   ├── 2_📥_Import_Props.py           # Enter/upload prop lines
-│   ├── 3_🏆_Analysis.py               # Run analysis + see top picks
-│   ├── 4_🎰_Entry_Builder.py          # Build optimal parlays
-│   ├── 5_🚫_Avoid_List.py             # What NOT to bet
-│   ├── 11_📈_Bet_Tracker.py          # Bet Tracker & Model Health (unified)
-│   ├── 7_⚙️_Settings.py              # Configure settings
-│   └── 8_🔄_Update_Data.py           # Fetch live NBA data ← NEW!
+│   ├── 0_🏆_Live_Scores_&_Props.py    # Real-time NBA scores & stat leaders
+│   ├── 1_📡_Live_Games.py             # Tonight's games + one-click setup
+│   ├── 2_🔬_Prop_Scanner.py           # Enter/upload/fetch prop lines
+│   ├── 3_⚡_Quantum_Analysis_Matrix.py # Run Neural Analysis — main engine
+│   ├── 4_📋_Game_Report.py            # AI-powered game reports (SAFE Score™)
+│   ├── 5_💦_Live_Sweat.py             # Live AI Panic Room — in-game tracking
+│   ├── 5_🔮_Player_Simulator.py       # What-if player scenario simulator
+│   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
+│   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
+│   ├── 8_🛡️_Risk_Shield.py           # Flagged picks to avoid
+│   ├── 9_📡_Data_Feed.py              # Fetch live NBA data from APIs
+│   ├── 10_🗺️_Correlation_Matrix.py   # Prop correlation analysis
+│   ├── 11_📈_Bet_Tracker.py           # Bet tracking & model health
+│   ├── 12_📊_Backtester.py            # Historical backtesting engine
+│   ├── 13_⚙️_Settings.py             # Configure engine settings + API keys
+│   ├── 14_💎_Subscription_Level.py    # Premium subscription management
+│   └── 15_🎰_Vegas_Vault.py           # Cross-book edge scanner
 │
 ├── engine/
 │   ├── math_helpers.py                 # All math from scratch (no scipy)
 │   ├── simulation.py                   # Quantum Matrix Engine 5.6 simulator
 │   ├── projections.py                  # Player stat projections
-│   ├── edge_detection.py              # Find betting edges
+│   ├── edge_detection.py              # Find betting edges + Goblin/Demon/Gold
 │   ├── entry_optimizer.py             # Build optimal entries
-│   └── confidence.py                  # Confidence + tier system
+│   ├── confidence.py                  # Confidence + tier system
+│   ├── joseph_brain.py                # Joseph M. Smith AI persona engine
+│   ├── arbitrage_matcher.py           # Cross-book EV scanner
+│   ├── live_math.py                   # Live game pacing engine
+│   └── ...                            # + 25 more engine modules
 │
 ├── data/
-│   ├── data_manager.py                # Load/save CSV data
-│   ├── live_data_fetcher.py           # Live NBA data fetcher ← NEW!
-│   ├── players.csv                    # Player stats (written by live data fetch)
+│   ├── data_manager.py                # Load/save CSV data + session state
+│   ├── live_data_fetcher.py           # ClearSports API integration
+│   ├── odds_api_client.py             # The Odds API — live sportsbook odds
+│   ├── platform_fetcher.py            # Multi-platform prop fetcher
+│   ├── live_tracker.py                # Live game score tracker
 │   ├── teams.csv                      # All 30 NBA teams with pace/ratings
-│   ├── defensive_ratings.csv          # Team defense by position
-│   └── last_updated.json              # Timestamps (created after first update)
+│   └── defensive_ratings.csv          # Team defense by position
+│
+├── agent/
+│   ├── payload_builder.py             # Live Sweat game state classifier
+│   ├── live_persona.py                # Joseph's live commentary persona
+│   └── response_parser.py             # Vibe response parsing
+│
+├── styles/
+│   ├── theme.py                       # Global CSS + education box helpers
+│   └── live_theme.py                  # Live Sweat custom CSS
+│
+├── utils/
+│   ├── components.py                  # Shared UI components
+│   ├── joseph_widget.py               # Joseph floating widget
+│   ├── premium_gate.py                # Premium feature gates
+│   └── ...                            # + auth, logger, renderers, etc.
 │
 ├── tracking/
 │   ├── bet_tracker.py                 # Log bets + results
@@ -94,101 +123,119 @@ SmartAI-NBA/
 ## 📖 What Each Page Does
 
 ### 🏠 Home (app.py)
-The dashboard. Shows status, quick-start guide, and links to all pages.
+The dashboard. Shows tonight's slate, quick-start workflow guide, status
+dashboard, and links to all pages.
 
-### 🏀 Page 1: Today's Games
-Select which teams are playing tonight. Enter the Vegas spread (who's favored)
-and the over/under total for each game. This helps the model adjust for:
-- Blowout risk (large spreads = stars might sit late)
-- Game environment (high totals = fast-paced, high-scoring game)
-- Home/away advantage
+### 🏆 Page 0: Live Scores & Props
+Real-time NBA scores and season stat leaders, updated automatically.
 
-### 📥 Page 2: Import Props
-Enter the prop lines from PrizePicks, Underdog, or DraftKings.
-You can:
-- Add props one at a time using the form
-- Upload a CSV file
-- Paste CSV data directly into the text box
+### 📡 Page 1: Live Games
+Load tonight's matchups, fetch rosters and stats from ClearSports API,
+and enrich with Odds API consensus lines. Features:
+- **⚡ One-Click Setup** — loads games + fetches live platform props in one step
+- **Auto-Load** — fetches tonight's schedule, rosters, player/team stats
+- **Fetch Platform Props** — pulls real live lines from PrizePicks, Underdog, DraftKings
 
-Sample props are pre-loaded so you can see the app working immediately!
+### 🔬 Page 2: Prop Scanner
+Enter prop lines manually, upload a CSV, or fetch live lines from platforms.
+Three input methods:
+- Manual form entry
+- CSV upload
+- Live platform fetch (from the Live Games page)
 
-### 🏆 Page 3: Analysis (Main Page)
-Click **Run Analysis** to simulate each prop. For every prop you'll see:
+### ⚡ Page 3: Neural Analysis (Quantum Analysis Matrix)
+The main engine. Click **Run Analysis** to simulate each prop. For every prop you'll see:
 - **Probability**: % chance of going over (or under) the line
 - **Edge**: How far above 50% the probability is (bigger = better)
-- **Tier**: Platinum 💎, Gold [Gold], Silver 🥈, or Bronze 🥉
+- **Tier**: Platinum 💎, Gold 🥇, Silver 🥈, or Bronze 🥉
 - **Direction**: OVER or UNDER
 - **Forces**: All the factors pushing the stat up or down
-- **Distribution**: Range of likely outcomes (10th, 50th, 90th percentile)
+- **Win Score**: Composite score combining probability, confidence, edge, and risk
+- **Fair-Value Odds Explorer**: Slide to see fair odds at different prop lines
 
-### 🎰 Page 4: Entry Builder
-Build optimal parlays. The engine tests all combinations of top picks
-and finds the ones with the highest **Expected Value (EV)**. You'll see:
-- Exact EV in dollars for each entry
-- ROI percentage
-- Probability breakdown (chance of hitting 2/3, 3/3, etc.)
+### 📋 Page 4: Game Report
+AI-powered game reports with SAFE Score™ analysis, collapsible sections,
+confidence bars, and entry strategy matrix.
 
-You can also build custom entries by selecting picks manually.
+### 💦 Page 5: Live Sweat
+The Live AI Panic Room — track your active bets in real-time during games.
+Features pace tracking, Joseph M. Smith live commentary, and sweat cards
+that show whether your bets are on track to cash.
 
-### 🚫 Page 5: Avoid List
+### 🔮 Page 5: Player Simulator
+What-if scenario simulator. Adjust minutes, pace, matchup factors and see
+how projected stats change in real-time.
+
+### 🧬 Page 6: Entry Builder
+Build optimal DFS parlays. The engine tests all combinations of top picks
+and finds the ones with the highest **Expected Value (EV)**. Supports
+PrizePicks, Underdog, and DraftKings payout structures.
+
+### 🎙️ Page 7: The Studio
+Joseph M. Smith's broadcast desk. Three modes:
+- **Games Tonight** — Joseph breaks down every game
+- **Scout a Player** — deep-dive player analysis
+- **Build My Bets** — Joseph constructs optimal tickets
+
+### 🛡️ Page 8: Risk Shield
 Shows which props to skip and explains exactly WHY:
-- "Insufficient edge" = too close to a coin flip
-- "High variance stat" = too unpredictable to bet reliably
-- "Conflicting forces" = model is uncertain, both sides nearly equal
-- "Blowout risk" = player may not play full minutes
+- Low edge, trap lines, sharp lines, high variance, low confidence
+- Educational content explains each risk flag
+
+### 📡 Page 9: Data Feed
+Fetch live NBA data from ClearSports API and The Odds API:
+- **Smart Update** — only tonight's teams (fast)
+- **Full Update** — all NBA player stats
+- **Fetch Props** — live odds from 15+ sportsbooks
+
+### 🗺️ Page 10: Correlation Matrix
+Analyze how player props correlate with each other within games.
+Helps build smarter parlays by avoiding correlated risk.
 
 ### 📈 Page 11: Bet Tracker & Model Health
-After games, log your results here. The app tracks:
-- Overall win rate
-- Win rate by tier (Platinum should beat Gold, Gold should beat Silver, etc.)
-- Win rate by platform and stat type
-- AI-auto-logged picks from Neural Analysis
-- Auto-resolve: fetch actual stats and mark WIN/LOSS/PUSH automatically
+Track your betting results. Features:
+- Overall win rate by tier
+- Auto-resolve bets against real game results
+- Model health monitoring
 - Performance predictor and bankroll allocation
-- Helps you see if the model is working!
 
-### ⚙️ Page 7: Settings
+### 📊 Page 12: Backtester
+Validate the model against historical game logs. See win rates, ROI,
+and tier-by-tier performance metrics.
+
+### ⚙️ Page 13: Settings
 Configure:
 - **Simulation Depth**: 500 (fast) to 5,000 (most accurate)
 - **Minimum Edge**: How much edge before showing a pick (default: 5%)
-- **Entry Fee**: Default dollar amount for EV calculations
+- **Preset Profiles**: Conservative, Balanced, Aggressive, Research
+- **API Keys**: Odds API + ClearSports API keys
 - **Advanced factors**: Home court boost, fatigue sensitivity, etc.
 
-### 🔄 Page 8: Update Data *(NEW!)*
-Fetch live, real-time NBA data from the official NBA stats API:
-- **Fetch Tonight's Games** — Auto-loads tonight's real matchups
-- **Update Player Stats** — Pulls current season averages for all players
-- **Update Team Stats** — Pulls real pace, ORTG, DRTG for all teams
-- **Update Everything** — Does all of the above in one click
+### 💎 Page 14: Subscription Level
+Premium subscription management powered by Stripe.
 
-See the **Live Data** section below for full details.
+### 🎰 Page 15: Vegas Vault
+Cross-book edge scanner — finds pricing discrepancies across
+DraftKings, FanDuel, BetMGM, and 15+ sportsbooks.
 
 ---
 
 ## 🔴 Live NBA Data
 
-SmartAI-NBA can use **real, up-to-date NBA stats** via the free `nba_api` library.
-No API key or account needed!
+SmartAI-NBA uses **real, up-to-date NBA stats** from two primary APIs:
+- **ClearSports API** — player stats, team metrics, game schedules, rosters
+- **The Odds API** — live sportsbook odds from DraftKings, FanDuel, BetMGM, and 15+ books
 
-### Installing nba_api
+### Setup
 
-```bash
-python -m pip install nba_api
-```
-
-Or install all dependencies at once:
+1. Install all dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-
-### How to Use Live Data
-
-1. Install `nba_api` (see above)
 2. Run the app: `streamlit run app.py`
-3. Go to the **🔄 Update Data** page (page 8 in the sidebar)
-4. Click **"🔄 Update Everything"** to fetch all live stats
-5. Wait a few minutes (the fetcher is polite — it delays 1.5s between calls)
-6. All other pages will now use real stats!
+3. Go to **⚙️ Settings** (page 13) to enter your API keys
+4. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
+5. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
 
 ### When to Update
 
@@ -198,21 +245,21 @@ pip install -r requirements.txt
 
 ### What Gets Updated
 
-| Data | Source | File Updated |
-|------|--------|-------------|
-| Player stats (PPG, RPG, APG, etc.) | LeagueDashPlayerStats | `players.csv` |
-| Standard deviations | PlayerGameLog (last 20 games) | `players.csv` |
-| Team pace + ratings (ORTG/DRTG) | LeagueDashTeamStats | `teams.csv` |
-| Defensive ratings by position | Calculated from team drtg | `defensive_ratings.csv` |
-| Tonight's games | ScoreboardV2 | Session state |
+| Data | Source | Storage |
+|------|--------|---------|
+| Player stats (PPG, RPG, APG, etc.) | ClearSports API | `players.csv` |
+| Team pace + ratings (ORTG/DRTG) | ClearSports API | `teams.csv` |
+| Tonight's games + spreads/totals | ClearSports API + Odds API | Session state |
+| Live prop lines | The Odds API (15+ books) | Session state |
+| Defensive ratings by position | Calculated from team DRTG | `defensive_ratings.csv` |
 
 ### Live Data
 
-The app is designed to work with live data pulled from the NBA API.
+The app is designed to work with live data pulled from real APIs.
 On first run, no player data will be loaded — go to **📡 Data Feed** and click
 **Smart Update** to pull tonight's rosters and stats.
 
-After running **Update Everything**, the CSVs are written with real data.
+After running an update, the CSVs are written with real data.
 The home page shows a banner indicating whether live data has been loaded.
 
 ---
@@ -224,10 +271,10 @@ Go to **📡 Data Feed** and run a **Smart Update** to pull tonight's active ros
 Player data is stored in `data/players.csv` — you can also edit it directly.
 
 ### Entering Tonight's Props
-Go to **📥 Import Props** and either:
+Go to **🔬 Prop Scanner** (page 2) and either:
 1. Type them in the form (one at a time)
 2. Upload a CSV using the template provided
-3. Paste CSV text directly
+3. Or use **📡 Live Games** → **📊 Fetch Platform Props** to pull real live lines automatically
 
 ---
 
@@ -240,7 +287,8 @@ Run: `pip install streamlit` first.
 Run: `pip install streamlit` and make sure you're using the right Python version.
 
 ### "ModuleNotFoundError: No module named 'nba_api'"
-Run: `pip install nba_api`. You need it to fetch live stats on the **📡 Data Feed** page.
+The app primarily uses ClearSports API and The Odds API now.
+Run `pip install -r requirements.txt` to install all dependencies.
 
 ### Live data update takes too long
 This is normal! The fetcher adds a 1.5-second delay between API calls to avoid

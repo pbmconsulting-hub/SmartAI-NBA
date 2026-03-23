@@ -1482,7 +1482,7 @@ if run_analysis:
                 "ensemble_model_weights": (
                     _ensemble_result.get("model_weights", {}) if _ensemble_result else {}
                 ),
-                # Simulation array for synthetic pricing / slider
+                # Simulation array for fair-value odds explorer / slider
                 "simulated_results": simulation_output.get("simulated_results", []),
             }
 

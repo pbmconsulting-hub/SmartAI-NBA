@@ -351,7 +351,14 @@ class TestBackwardCompatibility:
         assert generate_optimal_slip([]) == []
         assert generate_optimal_slip(None) == []
 
-    def test_calculate_synthetic_odds_unchanged(self):
+    def test_calculate_fair_odds_from_simulation_unchanged(self):
+        from engine.odds_engine import calculate_fair_odds_from_simulation
+        result = calculate_fair_odds_from_simulation([20, 22, 18, 25, 19], 19.5, "OVER")
+        assert result["win_probability"] > 0
+        assert result["sample_size"] == 5
+
+    def test_backward_compat_alias_synthetic_odds(self):
+        """Backward-compatible alias must still work."""
         from engine.odds_engine import calculate_synthetic_odds
         result = calculate_synthetic_odds([20, 22, 18, 25, 19], 19.5, "OVER")
         assert result["win_probability"] > 0
