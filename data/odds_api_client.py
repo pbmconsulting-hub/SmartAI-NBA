@@ -362,7 +362,7 @@ def _fetch_events(api_key: str) -> list[dict]:
     }
     raw = _fetch_with_retry(url, params=params)
     if not isinstance(raw, list):
-        _logger.info("_fetch_events: no NBA events available (NBA may not be in season)")
+        _logger.debug("_fetch_events: no NBA events available (NBA may not be in season)")
         return []
     return raw
 
@@ -543,7 +543,7 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
     try:
         raw = _fetch_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.info("fetch_game_odds: no NBA odds available (NBA may not be in season)")
+            _logger.debug("fetch_game_odds: no NBA odds available (NBA may not be in season)")
             return []
 
         games: list[dict] = []
@@ -621,7 +621,7 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
     try:
         events = _fetch_events(resolved_key)
         if not events:
-            _logger.info("fetch_player_props: no NBA events returned from Odds API")
+            _logger.debug("fetch_player_props: no NBA events returned from Odds API")
             return []
 
         team_lookup = _build_team_lookup(events)
@@ -918,7 +918,7 @@ def fetch_recent_scores(days_from: int = 1,
     try:
         raw = _fetch_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.info("fetch_recent_scores: no scores available (NBA may not be in season)")
+            _logger.debug("fetch_recent_scores: no scores available (NBA may not be in season)")
             return []
 
         scores: list[dict] = []

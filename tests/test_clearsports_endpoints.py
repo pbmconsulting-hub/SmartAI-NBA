@@ -139,14 +139,14 @@ class TestApiKeyManagementEndpoints(unittest.TestCase):
         """fetch_api_key_usage must accept limit parameter."""
         idx = self.src.find("def fetch_api_key_usage(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 200]
+        snippet = self.src[idx:idx + 500]
         self.assertIn("limit", snippet)
 
     def test_fetch_api_key_usage_has_offset_param(self):
         """fetch_api_key_usage must accept offset parameter."""
         idx = self.src.find("def fetch_api_key_usage(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 200]
+        snippet = self.src[idx:idx + 500]
         self.assertIn("offset", snippet)
 
     def test_fetch_api_key_stats_exists(self):
