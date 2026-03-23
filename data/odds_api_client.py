@@ -216,6 +216,10 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
             # ── Capture API quota from response headers ──────────────
             _update_quota_from_headers(resp.headers)
 
+            if not resp.text:
+                _logger.warning("Empty response body from %s", url)
+                return None
+
             data = resp.json()
             _cache_set(url, data)
             return data
