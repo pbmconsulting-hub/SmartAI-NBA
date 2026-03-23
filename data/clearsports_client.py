@@ -368,6 +368,7 @@ def fetch_players(team_id=None) -> list[dict]:
     Retrieve NBA players.
 
     Endpoint: GET /api/v1/nba/players
+    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
 
     Args:
         team_id: Optional team ID to filter by.
@@ -383,17 +384,24 @@ def fetch_players(team_id=None) -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
-        if not raw:
-            return []
-
-        players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
-        if not isinstance(players_raw, list):
-            _logger.warning("fetch_players: unexpected response shape, returning []")
-            return []
-        return [p for p in players_raw if isinstance(p, dict)]
-
+        if raw:
+            players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
+            if isinstance(players_raw, list):
+                result = [p for p in players_raw if isinstance(p, dict)]
+                if result:
+                    return result
+            else:
+                _logger.warning("fetch_players: unexpected response shape from ClearSports")
     except Exception as exc:
-        _logger.warning("fetch_players failed: %s", exc)
+        _logger.warning("fetch_players ClearSports failed: %s", exc)
+
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    try:
+        from data.nba_stats_fallback import fetch_players_fallback
+        _logger.info("fetch_players: falling back to free NBA.com stats endpoint")
+        return fetch_players_fallback(team_id=team_id)
+    except Exception as exc:
+        _logger.warning("fetch_players fallback also failed: %s", exc)
         return []
 
 
@@ -493,6 +501,8 @@ def fetch_player_stats() -> list[dict]:
     """
     Fetch current-season player averages and standard deviations.
 
+    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+
     Returns:
         list[dict]: Each dict has keys:
             player_id, name, team, position,
@@ -508,54 +518,61 @@ def fetch_player_stats() -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
-        if not raw:
-            return []
-
-        players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
-        if not isinstance(players_raw, list):
-            _logger.warning("fetch_player_stats: unexpected response shape, returning []")
-            return []
-
-        players: list[dict] = []
-        for p in players_raw:
-            if not isinstance(p, dict):
-                continue
-            stats = p.get("stats") or p.get("averages") or p  # allow flat or nested shape
-            players.append({
-                "player_id":     _safe_str(p.get("player_id") or p.get("id")),
-                "name":          _safe_str(p.get("name") or p.get("full_name")),
-                "team":          _safe_str(p.get("team") or p.get("team_abbreviation")),
-                "position":      _safe_str(p.get("position") or p.get("pos")),
-                # Averages
-                "minutes_avg":   _safe_float(stats.get("minutes") or stats.get("min", 0)),
-                "points_avg":    _safe_float(stats.get("points") or stats.get("pts", 0)),
-                "rebounds_avg":  _safe_float(stats.get("rebounds") or stats.get("reb", 0)),
-                "assists_avg":   _safe_float(stats.get("assists") or stats.get("ast", 0)),
-                "threes_avg":    _safe_float(stats.get("threes") or stats.get("three_pm") or stats.get("fg3m", 0)),
-                "steals_avg":    _safe_float(stats.get("steals") or stats.get("stl", 0)),
-                "blocks_avg":    _safe_float(stats.get("blocks") or stats.get("blk", 0)),
-                "turnovers_avg": _safe_float(stats.get("turnovers") or stats.get("tov", 0)),
-                "ft_pct":        _safe_float(stats.get("ft_pct") or stats.get("ftm_pct", 0)),
-                "usage_rate":    _safe_float(stats.get("usage_rate") or stats.get("usg_pct", 0)),
-                # Standard deviations (may not be present in all responses)
-                "points_std":    _safe_float(stats.get("points_std", 0)),
-                "rebounds_std":  _safe_float(stats.get("rebounds_std", 0)),
-                "assists_std":   _safe_float(stats.get("assists_std", 0)),
-                "threes_std":    _safe_float(stats.get("threes_std", 0)),
-                "steals_std":    _safe_float(stats.get("steals_std", 0)),
-                "blocks_std":    _safe_float(stats.get("blocks_std", 0)),
-                "turnovers_std": _safe_float(stats.get("turnovers_std", 0)),
-            })
-        return players
-
+        if raw:
+            players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
+            if isinstance(players_raw, list):
+                players: list[dict] = []
+                for p in players_raw:
+                    if not isinstance(p, dict):
+                        continue
+                    stats = p.get("stats") or p.get("averages") or p  # allow flat or nested shape
+                    players.append({
+                        "player_id":     _safe_str(p.get("player_id") or p.get("id")),
+                        "name":          _safe_str(p.get("name") or p.get("full_name")),
+                        "team":          _safe_str(p.get("team") or p.get("team_abbreviation")),
+                        "position":      _safe_str(p.get("position") or p.get("pos")),
+                        # Averages
+                        "minutes_avg":   _safe_float(stats.get("minutes") or stats.get("min", 0)),
+                        "points_avg":    _safe_float(stats.get("points") or stats.get("pts", 0)),
+                        "rebounds_avg":  _safe_float(stats.get("rebounds") or stats.get("reb", 0)),
+                        "assists_avg":   _safe_float(stats.get("assists") or stats.get("ast", 0)),
+                        "threes_avg":    _safe_float(stats.get("threes") or stats.get("three_pm") or stats.get("fg3m", 0)),
+                        "steals_avg":    _safe_float(stats.get("steals") or stats.get("stl", 0)),
+                        "blocks_avg":    _safe_float(stats.get("blocks") or stats.get("blk", 0)),
+                        "turnovers_avg": _safe_float(stats.get("turnovers") or stats.get("tov", 0)),
+                        "ft_pct":        _safe_float(stats.get("ft_pct") or stats.get("ftm_pct", 0)),
+                        "usage_rate":    _safe_float(stats.get("usage_rate") or stats.get("usg_pct", 0)),
+                        # Standard deviations (may not be present in all responses)
+                        "points_std":    _safe_float(stats.get("points_std", 0)),
+                        "rebounds_std":  _safe_float(stats.get("rebounds_std", 0)),
+                        "assists_std":   _safe_float(stats.get("assists_std", 0)),
+                        "threes_std":    _safe_float(stats.get("threes_std", 0)),
+                        "steals_std":    _safe_float(stats.get("steals_std", 0)),
+                        "blocks_std":    _safe_float(stats.get("blocks_std", 0)),
+                        "turnovers_std": _safe_float(stats.get("turnovers_std", 0)),
+                    })
+                if players:
+                    return players
+            else:
+                _logger.warning("fetch_player_stats: unexpected response shape from ClearSports")
     except Exception as exc:
-        _logger.warning("fetch_player_stats failed: %s", exc)
+        _logger.warning("fetch_player_stats ClearSports failed: %s", exc)
+
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    try:
+        from data.nba_stats_fallback import fetch_player_stats_fallback
+        _logger.info("fetch_player_stats: falling back to free NBA.com stats endpoint")
+        return fetch_player_stats_fallback()
+    except Exception as exc:
+        _logger.warning("fetch_player_stats fallback also failed: %s", exc)
         return []
 
 
 def fetch_team_stats() -> list[dict]:
     """
     Fetch current-season team pace, ratings, and win/loss record.
+
+    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -569,33 +586,38 @@ def fetch_team_stats() -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
-        if not raw:
-            return []
-
-        teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
-        if not isinstance(teams_raw, list):
-            _logger.warning("fetch_team_stats: unexpected response shape, returning []")
-            return []
-
-        teams: list[dict] = []
-        for t in teams_raw:
-            if not isinstance(t, dict):
-                continue
-            stats = t.get("stats") or t.get("advanced") or t
-            record = t.get("record") or {}
-            teams.append({
-                "team_abbreviation":  _safe_str(t.get("abbreviation") or t.get("team_abbreviation")),
-                "team_name":          _safe_str(t.get("name") or t.get("team_name")),
-                "pace":               _safe_float(stats.get("pace", 0)),
-                "offensive_rating":   _safe_float(stats.get("offensive_rating") or stats.get("off_rtg", 0)),
-                "defensive_rating":   _safe_float(stats.get("defensive_rating") or stats.get("def_rtg", 0)),
-                "wins":               int(_safe_float(t.get("wins") or record.get("wins", 0))),
-                "losses":             int(_safe_float(t.get("losses") or record.get("losses", 0))),
-            })
-        return teams
-
+        if raw:
+            teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
+            if isinstance(teams_raw, list):
+                teams: list[dict] = []
+                for t in teams_raw:
+                    if not isinstance(t, dict):
+                        continue
+                    stats = t.get("stats") or t.get("advanced") or t
+                    record = t.get("record") or {}
+                    teams.append({
+                        "team_abbreviation":  _safe_str(t.get("abbreviation") or t.get("team_abbreviation")),
+                        "team_name":          _safe_str(t.get("name") or t.get("team_name")),
+                        "pace":               _safe_float(stats.get("pace", 0)),
+                        "offensive_rating":   _safe_float(stats.get("offensive_rating") or stats.get("off_rtg", 0)),
+                        "defensive_rating":   _safe_float(stats.get("defensive_rating") or stats.get("def_rtg", 0)),
+                        "wins":               int(_safe_float(t.get("wins") or record.get("wins", 0))),
+                        "losses":             int(_safe_float(t.get("losses") or record.get("losses", 0))),
+                    })
+                if teams:
+                    return teams
+            else:
+                _logger.warning("fetch_team_stats: unexpected response shape from ClearSports")
     except Exception as exc:
-        _logger.warning("fetch_team_stats failed: %s", exc)
+        _logger.warning("fetch_team_stats ClearSports failed: %s", exc)
+
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    try:
+        from data.nba_stats_fallback import fetch_team_stats_fallback
+        _logger.info("fetch_team_stats: falling back to free NBA.com stats endpoint")
+        return fetch_team_stats_fallback()
+    except Exception as exc:
+        _logger.warning("fetch_team_stats fallback also failed: %s", exc)
         return []
 
 
@@ -1237,6 +1259,7 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
     Retrieve team statistics for NBA games.
 
     Endpoint: GET /api/v1/nba/team-stats
+    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
 
     Args:
         team_id: Optional team ID to filter by.
@@ -1255,17 +1278,22 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
-        if not raw:
-            return []
-
-        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
-        if not isinstance(stats_raw, list):
-            _logger.warning("fetch_nba_team_stats: unexpected response shape, returning []")
-            return []
-        return stats_raw
-
+        if raw:
+            stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
+            if isinstance(stats_raw, list) and stats_raw:
+                return stats_raw
+            elif not isinstance(stats_raw, list):
+                _logger.warning("fetch_nba_team_stats: unexpected response shape from ClearSports")
     except Exception as exc:
-        _logger.warning("fetch_nba_team_stats failed: %s", exc)
+        _logger.warning("fetch_nba_team_stats ClearSports failed: %s", exc)
+
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    try:
+        from data.nba_stats_fallback import fetch_nba_team_stats_fallback
+        _logger.info("fetch_nba_team_stats: falling back to free NBA.com stats endpoint")
+        return fetch_nba_team_stats_fallback(team_id=team_id, season=None)
+    except Exception as exc:
+        _logger.warning("fetch_nba_team_stats fallback also failed: %s", exc)
         return []
 
 
@@ -1274,6 +1302,7 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
     Retrieve player statistics for NBA games.
 
     Endpoint: GET /api/v1/nba/player-stats
+    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
 
     Args:
         player_id: Optional player ID to filter by.
@@ -1292,17 +1321,22 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
-        if not raw:
-            return []
-
-        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
-        if not isinstance(stats_raw, list):
-            _logger.warning("fetch_nba_player_stats: unexpected response shape, returning []")
-            return []
-        return stats_raw
-
+        if raw:
+            stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
+            if isinstance(stats_raw, list) and stats_raw:
+                return stats_raw
+            elif not isinstance(stats_raw, list):
+                _logger.warning("fetch_nba_player_stats: unexpected response shape from ClearSports")
     except Exception as exc:
-        _logger.warning("fetch_nba_player_stats failed: %s", exc)
+        _logger.warning("fetch_nba_player_stats ClearSports failed: %s", exc)
+
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    try:
+        from data.nba_stats_fallback import fetch_nba_player_stats_fallback
+        _logger.info("fetch_nba_player_stats: falling back to free NBA.com stats endpoint")
+        return fetch_nba_player_stats_fallback(player_id=player_id, game_id=game_id)
+    except Exception as exc:
+        _logger.warning("fetch_nba_player_stats fallback also failed: %s", exc)
         return []
 
 

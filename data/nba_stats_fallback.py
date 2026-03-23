@@ -1,0 +1,414 @@
+"""
+data/nba_stats_fallback.py
+--------------------------
+Free NBA stats fallback — supplements ClearSports when its
+team-stats, players, and player-stats endpoints are unavailable.
+
+Uses the public stats.nba.com endpoints (no API key required).
+These endpoints power nba.com itself and are free to query with
+the correct HTTP headers.
+
+All public functions return data in the same dict schema that the
+corresponding ClearSports functions produce, so callers are unaware
+of the data source.
+"""
+
+import logging
+import time
+
+try:
+    import requests
+    _REQUESTS_AVAILABLE = True
+except ImportError:
+    _REQUESTS_AVAILABLE = False
+
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    _logger = logging.getLogger(__name__)
+
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+_NBA_STATS_BASE = "https://stats.nba.com/stats"
+_REQUEST_TIMEOUT = 15
+
+# Headers required by stats.nba.com to accept non-browser requests.
+_NBA_STATS_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.nba.com/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://www.nba.com",
+}
+
+# Cache to avoid hammering the free endpoints.
+_cache: dict = {}
+_CACHE_TTL = 600  # 10 minutes
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _safe_float(value, default: float = 0.0) -> float:
+    """Coerce *value* to float, returning *default* on failure."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_str(value, default: str = "") -> str:
+    """Coerce *value* to str, returning *default* on None."""
+    if value is None:
+        return default
+    return str(value)
+
+
+def _cache_get(key: str):
+    """Return cached payload or None if expired / missing."""
+    entry = _cache.get(key)
+    if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
+        return entry["data"]
+    return None
+
+
+def _cache_set(key: str, data):
+    """Store *data* in the cache under *key*."""
+    _cache[key] = {"data": data, "ts": time.time()}
+
+
+def _current_season_str() -> str:
+    """Return the current NBA season in 'YYYY-YY' format (e.g. '2024-25')."""
+    import datetime
+    now = datetime.date.today()
+    # NBA season starts in October; if before October, use previous year
+    year = now.year if now.month >= 10 else now.year - 1
+    return f"{year}-{str(year + 1)[-2:]}"
+
+
+def _fetch_nba_stats(endpoint: str, params: dict) -> dict | None:
+    """
+    GET an NBA stats endpoint and return the parsed JSON, or None on error.
+
+    The response shape from stats.nba.com is:
+      {"resultSets": [{"headers": [...], "rowSet": [[...], ...]}, ...]}
+    """
+    if not _REQUESTS_AVAILABLE:
+        _logger.debug("requests library unavailable — cannot call NBA stats fallback")
+        return None
+
+    url = f"{_NBA_STATS_BASE}/{endpoint}"
+    try:
+        resp = requests.get(
+            url,
+            headers=_NBA_STATS_HEADERS,
+            params=params,
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if resp.status_code != 200:
+            _logger.warning(
+                "NBA stats fallback: HTTP %d from %s", resp.status_code, endpoint
+            )
+            return None
+        return resp.json()
+    except Exception as exc:
+        _logger.warning("NBA stats fallback: %s request failed — %s", endpoint, exc)
+        return None
+
+
+def _rows_to_dicts(result_set: dict) -> list[dict]:
+    """
+    Convert an NBA stats resultSet (headers + rowSet) into a list of dicts.
+    """
+    headers = result_set.get("headers") or []
+    rows = result_set.get("rowSet") or []
+    lower_headers = [h.lower() for h in headers]
+    return [dict(zip(lower_headers, row)) for row in rows]
+
+
+# ── Public fallback functions ─────────────────────────────────────────────────
+
+def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
+    """
+    Fetch team stats from the free NBA.com stats endpoint.
+
+    Returns data in the same schema as ClearSports ``fetch_team_stats()``:
+        team_abbreviation, team_name, pace, offensive_rating,
+        defensive_rating, wins, losses
+    """
+    cache_key = "fallback:team_stats"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    season = season or _current_season_str()
+
+    # LeagueDashTeamStats gives basic stats
+    basic_data = _fetch_nba_stats("leaguedashteamstats", {
+        "Season": season,
+        "SeasonType": "Regular Season",
+        "MeasureType": "Base",
+        "PerMode": "PerGame",
+        "LeagueID": "00",
+    })
+    # LeagueDashTeamStats with MeasureType=Advanced gives pace/ratings
+    adv_data = _fetch_nba_stats("leaguedashteamstats", {
+        "Season": season,
+        "SeasonType": "Regular Season",
+        "MeasureType": "Advanced",
+        "PerMode": "PerGame",
+        "LeagueID": "00",
+    })
+
+    if not basic_data:
+        _logger.warning("fetch_team_stats_fallback: no data from NBA stats")
+        return []
+
+    try:
+        basic_rows = _rows_to_dicts(basic_data["resultSets"][0])
+    except (KeyError, IndexError, TypeError):
+        _logger.warning("fetch_team_stats_fallback: unexpected basic response shape")
+        return []
+
+    # Build advanced lookup by team_id
+    adv_lookup: dict = {}
+    if adv_data:
+        try:
+            for row in _rows_to_dicts(adv_data["resultSets"][0]):
+                tid = row.get("team_id")
+                if tid is not None:
+                    adv_lookup[tid] = row
+        except (KeyError, IndexError, TypeError):
+            pass
+
+    teams: list[dict] = []
+    for row in basic_rows:
+        tid = row.get("team_id")
+        adv = adv_lookup.get(tid, {})
+        teams.append({
+            "team_abbreviation": _safe_str(row.get("team_abbreviation")),
+            "team_name": _safe_str(row.get("team_name")),
+            "pace": _safe_float(adv.get("pace", 0)),
+            "offensive_rating": _safe_float(adv.get("off_rating", 0)),
+            "defensive_rating": _safe_float(adv.get("def_rating", 0)),
+            "wins": int(_safe_float(row.get("w", 0))),
+            "losses": int(_safe_float(row.get("l", 0))),
+        })
+
+    _cache_set(cache_key, teams)
+    _logger.info("fetch_team_stats_fallback: got %d teams from NBA.com stats", len(teams))
+    return teams
+
+
+def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict]:
+    """
+    Fetch NBA players from the free NBA.com stats endpoint.
+
+    Returns data in the same schema as ClearSports ``fetch_players()``:
+        id, name, team_id (optional filtering)
+    """
+    cache_key = f"fallback:players:{team_id}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    season = season or _current_season_str()
+
+    data = _fetch_nba_stats("commonallplayers", {
+        "Season": season,
+        "LeagueID": "00",
+        "IsOnlyCurrentSeason": "1",
+    })
+
+    if not data:
+        _logger.warning("fetch_players_fallback: no data from NBA stats")
+        return []
+
+    try:
+        rows = _rows_to_dicts(data["resultSets"][0])
+    except (KeyError, IndexError, TypeError):
+        _logger.warning("fetch_players_fallback: unexpected response shape")
+        return []
+
+    players: list[dict] = []
+    for row in rows:
+        # Filter by team_id if specified
+        if team_id is not None and row.get("team_id") != team_id:
+            continue
+        display_name = _safe_str(row.get("display_first_last") or row.get("display_last_comma_first"))
+        players.append({
+            "id": row.get("person_id"),
+            "name": display_name,
+            "full_name": display_name,
+            "team_id": row.get("team_id"),
+            "team_abbreviation": _safe_str(row.get("team_abbreviation")),
+        })
+
+    _cache_set(cache_key, players)
+    _logger.info("fetch_players_fallback: got %d players from NBA.com stats", len(players))
+    return players
+
+
+def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
+    """
+    Fetch player season averages from the free NBA.com stats endpoint.
+
+    Returns data in the same schema as ClearSports ``fetch_player_stats()``:
+        player_id, name, team, position,
+        minutes_avg, points_avg, rebounds_avg, assists_avg,
+        threes_avg, steals_avg, blocks_avg, turnovers_avg,
+        ft_pct, usage_rate,
+        points_std, rebounds_std, assists_std, threes_std,
+        steals_std, blocks_std, turnovers_std
+    """
+    cache_key = "fallback:player_stats"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    season = season or _current_season_str()
+
+    data = _fetch_nba_stats("leaguedashplayerstats", {
+        "Season": season,
+        "SeasonType": "Regular Season",
+        "MeasureType": "Base",
+        "PerMode": "PerGame",
+        "LeagueID": "00",
+    })
+
+    if not data:
+        _logger.warning("fetch_player_stats_fallback: no data from NBA stats")
+        return []
+
+    try:
+        rows = _rows_to_dicts(data["resultSets"][0])
+    except (KeyError, IndexError, TypeError):
+        _logger.warning("fetch_player_stats_fallback: unexpected response shape")
+        return []
+
+    players: list[dict] = []
+    for row in rows:
+        players.append({
+            "player_id": _safe_str(row.get("player_id")),
+            "name": _safe_str(row.get("player_name")),
+            "team": _safe_str(row.get("team_abbreviation")),
+            "position": "",
+            "minutes_avg": _safe_float(row.get("min", 0)),
+            "points_avg": _safe_float(row.get("pts", 0)),
+            "rebounds_avg": _safe_float(row.get("reb", 0)),
+            "assists_avg": _safe_float(row.get("ast", 0)),
+            "threes_avg": _safe_float(row.get("fg3m", 0)),
+            "steals_avg": _safe_float(row.get("stl", 0)),
+            "blocks_avg": _safe_float(row.get("blk", 0)),
+            "turnovers_avg": _safe_float(row.get("tov", 0)),
+            "ft_pct": _safe_float(row.get("ft_pct", 0)),
+            "usage_rate": 0.0,
+            # std-dev not available from the basic endpoint
+            "points_std": 0.0,
+            "rebounds_std": 0.0,
+            "assists_std": 0.0,
+            "threes_std": 0.0,
+            "steals_std": 0.0,
+            "blocks_std": 0.0,
+            "turnovers_std": 0.0,
+        })
+
+    _cache_set(cache_key, players)
+    _logger.info(
+        "fetch_player_stats_fallback: got %d player stat rows from NBA.com stats",
+        len(players),
+    )
+    return players
+
+
+def fetch_nba_team_stats_fallback(
+    team_id=None, season: str | None = None
+) -> list[dict]:
+    """
+    Fetch per-team statistics from the free NBA.com stats endpoint.
+
+    Returns raw stat rows (same schema as ClearSports ``fetch_nba_team_stats()``).
+    """
+    cache_key = f"fallback:nba_team_stats:{team_id}:{season}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    season = season or _current_season_str()
+
+    data = _fetch_nba_stats("leaguedashteamstats", {
+        "Season": season,
+        "SeasonType": "Regular Season",
+        "MeasureType": "Base",
+        "PerMode": "PerGame",
+        "LeagueID": "00",
+    })
+
+    if not data:
+        _logger.warning("fetch_nba_team_stats_fallback: no data from NBA stats")
+        return []
+
+    try:
+        rows = _rows_to_dicts(data["resultSets"][0])
+    except (KeyError, IndexError, TypeError):
+        _logger.warning("fetch_nba_team_stats_fallback: unexpected response shape")
+        return []
+
+    if team_id is not None:
+        rows = [r for r in rows if r.get("team_id") == team_id]
+
+    _cache_set(cache_key, rows)
+    _logger.info(
+        "fetch_nba_team_stats_fallback: got %d team stat rows from NBA.com stats",
+        len(rows),
+    )
+    return rows
+
+
+def fetch_nba_player_stats_fallback(
+    player_id=None, game_id=None, season: str | None = None
+) -> list[dict]:
+    """
+    Fetch per-player statistics from the free NBA.com stats endpoint.
+
+    Returns raw stat rows (same schema as ClearSports ``fetch_nba_player_stats()``).
+    """
+    cache_key = f"fallback:nba_player_stats:{player_id}:{game_id}:{season}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    season = season or _current_season_str()
+
+    data = _fetch_nba_stats("leaguedashplayerstats", {
+        "Season": season,
+        "SeasonType": "Regular Season",
+        "MeasureType": "Base",
+        "PerMode": "PerGame",
+        "LeagueID": "00",
+    })
+
+    if not data:
+        _logger.warning("fetch_nba_player_stats_fallback: no data from NBA stats")
+        return []
+
+    try:
+        rows = _rows_to_dicts(data["resultSets"][0])
+    except (KeyError, IndexError, TypeError):
+        _logger.warning("fetch_nba_player_stats_fallback: unexpected response shape")
+        return []
+
+    if player_id is not None:
+        rows = [r for r in rows if r.get("player_id") == player_id]
+
+    _cache_set(cache_key, rows)
+    _logger.info(
+        "fetch_nba_player_stats_fallback: got %d player stat rows from NBA.com stats",
+        len(rows),
+    )
+    return rows
