@@ -454,16 +454,6 @@ if current_action:
                 _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
             if _bonus_parts:
                 st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
-
-            # Show Odds API quota if available
-            try:
-                from data.odds_api_client import get_odds_api_usage
-                _usage = get_odds_api_usage()
-                _remaining = _usage.get("requests_remaining")
-                if _remaining is not None:
-                    pass  # quota tracked internally
-            except Exception:
-                pass
         else:
             st.warning(
                 "⚠️ Could not fetch tonight's games (no games tonight, or data unavailable). "
