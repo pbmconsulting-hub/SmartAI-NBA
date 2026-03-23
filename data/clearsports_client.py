@@ -64,6 +64,9 @@ except ImportError:
 
 _BASE_URL = "https://v2.nba.api-sports.io"
 
+# Current NBA season year (API-Sports uses the starting year: "2025" = 2025-26 season).
+_CURRENT_SEASON = "2025"
+
 MAX_API_RETRIES = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
 REQUEST_TIMEOUT_SECONDS = 10
@@ -542,7 +545,7 @@ def fetch_player_stats() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/players"
-    params = {"season": "2025"}
+    params = {"season": _CURRENT_SEASON}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -610,7 +613,7 @@ def fetch_team_stats() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/teams"
-    params = {"season": "2025"}
+    params = {"season": _CURRENT_SEASON}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -856,7 +859,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
         return []
 
     url = f"{_BASE_URL}/players/statistics"
-    params = {"id": player_id, "season": "2025"}
+    params = {"id": player_id, "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -929,7 +932,7 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/standings"
-    params = {"league": "standard", "season": "2025"}
+    params = {"league": "standard", "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
