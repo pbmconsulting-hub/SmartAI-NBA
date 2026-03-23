@@ -4,9 +4,25 @@ data/odds_api_client.py
 Unified client for The Odds API (https://the-odds-api.com).
 
 Provides:
+  Featured Markets:
   - fetch_game_odds(api_key=None)   → list of game-level odds dicts
+                                      (h2h, spreads, totals for all live/upcoming games)
+
+  Event-level:
+  - fetch_events(api_key=None)      → list of upcoming NBA event dicts
+  - fetch_event_odds(event_id, ...) → odds for any supported markets on a single event
+
+  Player Props:
   - fetch_player_props(api_key=None) → list of prop dicts matching the
                                        platform_fetcher prop format exactly
+
+  Consensus / Scores:
+  - get_consensus_odds(...)          → median consensus lines across bookmakers
+  - fetch_recent_scores(days_from)   → completed game scores (1-3 days back)
+
+  Usage / Utility:
+  - get_odds_api_usage()             → latest quota snapshot from response headers
+  - calculate_implied_probability()  → american odds → implied probability %
 
 API key resolution (first match wins):
   1. explicit *api_key* argument
@@ -202,6 +218,10 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 _logger.error("Odds API key is invalid or unauthorised (401) for %s", url)
                 return None
 
+            if resp.status_code == 403:
+                _logger.error("Odds API access denied (403) for %s — quota may be exhausted", url)
+                return None
+
             if resp.status_code == 422:
                 # Unprocessable entity — endpoint/market combo not supported today
                 _logger.warning("Odds API 422 (unsupported request) for %s", url)
@@ -300,7 +320,7 @@ def _today_str() -> str:
 
 
 def _fetch_events(api_key: str) -> list[dict]:
-    """Return all upcoming NBA events from the Odds API."""
+    """Return all upcoming NBA events from the Odds API (internal)."""
     url = f"{_BASE_URL}/sports/{_SPORT}/events"
     params = {
         "apiKey":     api_key,
@@ -332,6 +352,88 @@ def _build_team_lookup(events: list[dict]) -> dict[str, str]:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+def fetch_events(api_key: str | None = None) -> list[dict]:
+    """
+    Fetch all live and upcoming NBA events from The Odds API.
+
+    Endpoint: GET /v4/sports/basketball_nba/events
+
+    Each event includes an ``id`` that can be used with
+    :func:`fetch_event_odds` to query any supported market.
+
+    Args:
+        api_key: Optional explicit API key; falls back to session state / env.
+
+    Returns:
+        list[dict]: Each dict has keys:
+            id, sport_key, sport_title, commence_time,
+            home_team, away_team
+        Returns [] on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.warning("fetch_events: no Odds API key found — returning []")
+        return []
+    return _fetch_events(resolved_key)
+
+
+def fetch_event_odds(
+    event_id: str,
+    markets: str = "h2h",
+    regions: str = "us",
+    odds_format: str = "american",
+    api_key: str | None = None,
+) -> dict:
+    """
+    Fetch odds for any supported markets on a single NBA event.
+
+    Endpoint: GET /v4/sports/basketball_nba/events/{eventId}/odds
+
+    This is the most flexible odds endpoint — it supports featured markets
+    (h2h, spreads, totals) as well as additional markets like player props
+    (player_points, player_rebounds, etc.) and period markets (h2h_h1, etc.).
+
+    Usage cost: ``[number of markets] × [number of regions]`` credits.
+
+    Args:
+        event_id:    The unique event ID (from :func:`fetch_events`).
+        markets:     Comma-separated market keys, e.g.
+                     ``"h2h,spreads,totals"`` or ``"player_points,player_rebounds"``.
+        regions:     Bookmaker regions, e.g. ``"us"`` or ``"us,us2"``.
+        odds_format: ``"american"`` (default) or ``"decimal"``.
+        api_key:     Optional explicit API key; falls back to session state / env.
+
+    Returns:
+        dict: The full event-odds response from the API, including:
+            id, sport_key, sport_title, commence_time,
+            home_team, away_team, bookmakers
+        Returns {} on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.warning("fetch_event_odds: no Odds API key found — returning {}")
+        return {}
+
+    url = f"{_BASE_URL}/sports/{_SPORT}/events/{event_id}/odds"
+    params = {
+        "apiKey":     resolved_key,
+        "markets":    markets,
+        "regions":    regions,
+        "oddsFormat": odds_format,
+        "dateFormat": "iso",
+    }
+
+    try:
+        raw = _fetch_with_retry(url, params=params)
+        if not raw or not isinstance(raw, dict):
+            return {}
+        return raw
+
+    except Exception as exc:
+        _logger.warning("fetch_event_odds failed for event %s: %s", event_id, exc)
+        return {}
+
 
 def fetch_game_odds(api_key: str | None = None) -> list[dict]:
     """
