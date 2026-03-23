@@ -200,17 +200,40 @@ with _api_col2:
     else:
         st.caption("⚠️ Odds API key is **not set** — odds data will be unavailable")
 
-_api_btn_col1, _api_btn_col2, _ = st.columns([1, 1, 2])
+_api_btn_col1, _api_btn_col2, _api_btn_col3, _ = st.columns([1, 1, 1, 1])
 with _api_btn_col1:
     if st.button("💾 Save Keys", key="save_api_keys"):
+        from data.clearsports_client import validate_api_key as _validate_cs_key
+        from data.odds_api_client import validate_api_key as _validate_odds_key
+
         _changed = False
+        _errors: list[str] = []
         if _new_cs_key != _current_cs_key:
-            st.session_state["clearsports_api_key"] = _new_cs_key
-            _changed = True
+            if _new_cs_key:
+                _ok, _msg = _validate_cs_key(_new_cs_key)
+                if not _ok:
+                    _errors.append(f"ClearSports: {_msg}")
+                else:
+                    st.session_state["clearsports_api_key"] = _new_cs_key
+                    _changed = True
+            else:
+                st.session_state["clearsports_api_key"] = _new_cs_key
+                _changed = True
         if _new_odds_key != _current_odds_key:
-            st.session_state["odds_api_key"] = _new_odds_key
-            _changed = True
-        if _changed:
+            if _new_odds_key:
+                _ok, _msg = _validate_odds_key(_new_odds_key)
+                if not _ok:
+                    _errors.append(f"Odds API: {_msg}")
+                else:
+                    st.session_state["odds_api_key"] = _new_odds_key
+                    _changed = True
+            else:
+                st.session_state["odds_api_key"] = _new_odds_key
+                _changed = True
+        if _errors:
+            for _e in _errors:
+                st.error(f"❌ {_e}")
+        elif _changed:
             st.success("✅ API keys saved to session!")
             st.rerun()
         else:
@@ -221,6 +244,51 @@ with _api_btn_col2:
         st.session_state.pop("odds_api_key", None)
         st.warning("API keys cleared.")
         st.rerun()
+with _api_btn_col3:
+    if st.button("🔍 Test Connection", key="test_api_keys"):
+        _test_results: list[str] = []
+        # ── ClearSports ──
+        _cs_key = st.session_state.get("clearsports_api_key", "")
+        if _cs_key:
+            try:
+                from data.clearsports_client import fetch_api_key_info
+                _info = fetch_api_key_info()
+                if _info:
+                    _credits = _info.get("credits_remaining", "?")
+                    _active = _info.get("is_active", None)
+                    _status = "active" if _active else ("inactive" if _active is False else "unknown")
+                    _test_results.append(
+                        f"✅ **ClearSports**: connected — {_credits} credits remaining, status: {_status}"
+                    )
+                else:
+                    _test_results.append("⚠️ **ClearSports**: key is set but API returned no data")
+            except Exception as _exc:
+                _test_results.append(f"❌ **ClearSports**: connection error — {_exc}")
+        else:
+            _test_results.append("⚠️ **ClearSports**: no API key configured")
+        # ── Odds API ──
+        _odds_key = st.session_state.get("odds_api_key", "")
+        if _odds_key:
+            try:
+                from data.odds_api_client import fetch_events, get_odds_api_usage
+                _events = fetch_events()
+                _usage = get_odds_api_usage()
+                _remaining = _usage.get("requests_remaining")
+                if _events is not None:
+                    _count = len(_events) if isinstance(_events, list) else 0
+                    _quota_str = f", {_remaining} requests remaining" if _remaining is not None else ""
+                    _test_results.append(
+                        f"✅ **Odds API**: connected — {_count} events found{_quota_str}"
+                    )
+                else:
+                    _test_results.append("⚠️ **Odds API**: key is set but API returned no data")
+            except Exception as _exc:
+                _test_results.append(f"❌ **Odds API**: connection error — {_exc}")
+        else:
+            _test_results.append("⚠️ **Odds API**: no API key configured")
+        # ── Display results ──
+        for _msg in _test_results:
+            st.markdown(_msg)
 
 # ============================================================
 # END SECTION: API Keys
