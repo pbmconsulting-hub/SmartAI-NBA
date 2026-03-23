@@ -1291,7 +1291,7 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
     try:
         from data.nba_stats_fallback import fetch_nba_team_stats_fallback
         _logger.info("fetch_nba_team_stats: falling back to free NBA.com stats endpoint")
-        return fetch_nba_team_stats_fallback(team_id=team_id, season=None)
+        return fetch_nba_team_stats_fallback(team_id=team_id, season=season)
     except Exception as exc:
         _logger.warning("fetch_nba_team_stats fallback also failed: %s", exc)
         return []

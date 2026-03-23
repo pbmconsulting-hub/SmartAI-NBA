@@ -60,7 +60,37 @@ class TestModuleStructure(unittest.TestCase):
         self.assertTrue(callable(fetch_nba_player_stats_fallback))
 
 
-# ── Section 2: _rows_to_dicts helper ─────────────────────────────────────────
+# ── Section 2a: _normalize_season helper ─────────────────────────────────────
+
+class TestNormalizeSeason(unittest.TestCase):
+    """Verify season format conversion for NBA.com stats API."""
+
+    def test_none_returns_current_season(self):
+        from data.nba_stats_fallback import _normalize_season, _current_season_str
+        result = _normalize_season(None)
+        self.assertEqual(result, _current_season_str())
+
+    def test_nba_format_passthrough(self):
+        from data.nba_stats_fallback import _normalize_season
+        self.assertEqual(_normalize_season("2024-25"), "2024-25")
+        self.assertEqual(_normalize_season("2023-24"), "2023-24")
+
+    def test_year_string_converted(self):
+        from data.nba_stats_fallback import _normalize_season
+        self.assertEqual(_normalize_season("2024"), "2024-25")
+        self.assertEqual(_normalize_season("2023"), "2023-24")
+
+    def test_year_int_converted(self):
+        from data.nba_stats_fallback import _normalize_season
+        self.assertEqual(_normalize_season(2024), "2024-25")
+        self.assertEqual(_normalize_season(2023), "2023-24")
+
+    def test_unknown_string_passthrough(self):
+        from data.nba_stats_fallback import _normalize_season
+        self.assertEqual(_normalize_season("current"), "current")
+
+
+# ── Section 2b: _rows_to_dicts helper ────────────────────────────────────────
 
 class TestRowsToDicts(unittest.TestCase):
     """Verify the NBA stats resultSet → list[dict] conversion."""
@@ -426,6 +456,16 @@ class TestClearSportsFallbackIntegration(unittest.TestCase):
         result = fetch_nba_team_stats()
         self.assertEqual(len(result), 1)
         mock_fallback.assert_called_once()
+
+    @patch("data.nba_stats_fallback.fetch_nba_team_stats_fallback")
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry", return_value=None)
+    def test_fetch_nba_team_stats_forwards_season(self, mock_fetch, mock_key, mock_fallback):
+        """Season parameter must be forwarded to fallback (not hardcoded None)."""
+        from data.clearsports_client import fetch_nba_team_stats
+        mock_fallback.return_value = [{"team_id": 1, "w": 30}]
+        fetch_nba_team_stats(team_id=5, season="2024")
+        mock_fallback.assert_called_once_with(team_id=5, season="2024")
 
     @patch("data.nba_stats_fallback.fetch_nba_player_stats_fallback")
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")

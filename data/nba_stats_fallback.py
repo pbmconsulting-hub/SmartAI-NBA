@@ -91,6 +91,30 @@ def _current_season_str() -> str:
     return f"{year}-{str(year + 1)[-2:]}"
 
 
+def _normalize_season(season) -> str:
+    """
+    Normalise a season value to NBA.com 'YYYY-YY' format.
+
+    Accepts:
+      - None           → current season via ``_current_season_str()``
+      - ``"2024-25"``  → returned as-is (already correct)
+      - ``"2024"``     → converted to ``"2024-25"``
+      - ``2024`` (int) → converted to ``"2024-25"``
+    """
+    if season is None:
+        return _current_season_str()
+    s = str(season).strip()
+    # Already in YYYY-YY format?
+    if "-" in s and len(s) >= 6:
+        return s
+    # Year-only (e.g. "2024" or 2024) → "2024-25"
+    try:
+        year = int(s)
+        return f"{year}-{str(year + 1)[-2:]}"
+    except (ValueError, TypeError):
+        return s
+
+
 def _fetch_nba_stats(endpoint: str, params: dict) -> dict | None:
     """
     GET an NBA stats endpoint and return the parsed JSON, or None on error.
@@ -146,9 +170,7 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
     if cached is not None:
         return cached
 
-    season = season or _current_season_str()
-
-    # LeagueDashTeamStats gives basic stats
+    season = _normalize_season(season)
     basic_data = _fetch_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
@@ -217,7 +239,7 @@ def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict
     if cached is not None:
         return cached
 
-    season = season or _current_season_str()
+    season = _normalize_season(season)
 
     data = _fetch_nba_stats("commonallplayers", {
         "Season": season,
@@ -271,7 +293,7 @@ def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
     if cached is not None:
         return cached
 
-    season = season or _current_season_str()
+    season = _normalize_season(season)
 
     data = _fetch_nba_stats("leaguedashplayerstats", {
         "Season": season,
@@ -339,7 +361,7 @@ def fetch_nba_team_stats_fallback(
     if cached is not None:
         return cached
 
-    season = season or _current_season_str()
+    season = _normalize_season(season)
 
     data = _fetch_nba_stats("leaguedashteamstats", {
         "Season": season,
@@ -383,7 +405,7 @@ def fetch_nba_player_stats_fallback(
     if cached is not None:
         return cached
 
-    season = season or _current_season_str()
+    season = _normalize_season(season)
 
     data = _fetch_nba_stats("leaguedashplayerstats", {
         "Season": season,
