@@ -5,11 +5,14 @@ ClearSports API client for NBA data.
 
 Provides:
   NBA Data:
+  - fetch_teams()                     → all NBA teams
+  - fetch_games(season=None, date=None, team_id=None) → NBA games with optional filters
+  - fetch_players(team_id=None)            → NBA players with optional team filter
   - fetch_games_today()               → today's scheduled games with lines
   - fetch_player_stats()              → season-average player stats with std-dev fields
   - fetch_team_stats()                → team pace / ratings / record
   - fetch_team_by_id(team_id)         → a specific NBA team by ID
-  - fetch_injury_report()             → player injury status keyed by lowercased name
+  - fetch_injury_report(team_id)      → player injury status keyed by lowercased name
   - fetch_live_scores()               → live / recent game scores
   - fetch_rosters()                   → team rosters keyed by team abbreviation
   - lookup_player_id()                → NBA player-ID integer or None
@@ -290,6 +293,110 @@ def _extract_team_abbrev(g: dict, side: str) -> str:
     return ""
 
 
+# ── Core NBA resource endpoints ──────────────────────────────────────────────
+
+def fetch_teams() -> list[dict]:
+    """
+    Retrieve all NBA teams.
+
+    Endpoint: GET /api/v1/nba/teams
+
+    Returns:
+        list[dict]: Team entries.
+        Returns [] on failure.
+    """
+    url = f"{_BASE_URL}/nba/teams"
+
+    try:
+        raw = _fetch_with_retry(url)
+        if not raw:
+            return []
+
+        teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
+        if not isinstance(teams_raw, list):
+            _logger.warning("fetch_teams: unexpected response shape, returning []")
+            return []
+        return [t for t in teams_raw if isinstance(t, dict)]
+
+    except Exception as exc:
+        _logger.warning("fetch_teams failed: %s", exc)
+        return []
+
+
+def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
+    """
+    Retrieve NBA games.
+
+    Endpoint: GET /api/v1/nba/games
+
+    Args:
+        season:  Optional season year (e.g. 2024).
+        date:    Optional game date in YYYY-MM-DD format (e.g. "2024-12-25").
+        team_id: Optional team ID to filter by.
+
+    Returns:
+        list[dict]: Game entries.
+        Returns [] on failure.
+    """
+    url = f"{_BASE_URL}/nba/games"
+    params: dict = {}
+    if season is not None:
+        params["season"] = season
+    if date is not None:
+        params["date"] = date
+    if team_id is not None:
+        params["team_id"] = team_id
+
+    try:
+        raw = _fetch_with_retry(url, params=params)
+        if not raw:
+            return []
+
+        games_raw = raw if isinstance(raw, list) else (raw.get("games") or raw.get("data") or [])
+        if not isinstance(games_raw, list):
+            _logger.warning("fetch_games: unexpected response shape, returning []")
+            return []
+        return [g for g in games_raw if isinstance(g, dict)]
+
+    except Exception as exc:
+        _logger.warning("fetch_games failed: %s", exc)
+        return []
+
+
+def fetch_players(team_id=None) -> list[dict]:
+    """
+    Retrieve NBA players.
+
+    Endpoint: GET /api/v1/nba/players
+
+    Args:
+        team_id: Optional team ID to filter by.
+
+    Returns:
+        list[dict]: Player entries.
+        Returns [] on failure.
+    """
+    url = f"{_BASE_URL}/nba/players"
+    params: dict = {}
+    if team_id is not None:
+        params["team_id"] = team_id
+
+    try:
+        raw = _fetch_with_retry(url, params=params)
+        if not raw:
+            return []
+
+        players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
+        if not isinstance(players_raw, list):
+            _logger.warning("fetch_players: unexpected response shape, returning []")
+            return []
+        return [p for p in players_raw if isinstance(p, dict)]
+
+    except Exception as exc:
+        _logger.warning("fetch_players failed: %s", exc)
+        return []
+
+
 def fetch_games_today() -> list[dict]:
     """
     Fetch today's NBA games with team records and betting lines.
@@ -492,9 +599,14 @@ def fetch_team_stats() -> list[dict]:
         return []
 
 
-def fetch_injury_report() -> dict:
+def fetch_injury_report(team_id=None) -> dict:
     """
     Fetch the current NBA injury report.
+
+    Endpoint: GET /api/v1/nba/injury-stats
+
+    Args:
+        team_id: Optional team ID to filter by.
 
     Returns:
         dict: Keyed by player_name.lower().  Each value is a dict with:
@@ -504,9 +616,12 @@ def fetch_injury_report() -> dict:
         Returns {} on failure.
     """
     url = f"{_BASE_URL}/nba/injury-stats"
+    params: dict = {}
+    if team_id is not None:
+        params["team_id"] = team_id
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _fetch_with_retry(url, params=params if params else None)
         if not raw:
             return {}
 
