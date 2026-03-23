@@ -146,20 +146,32 @@ def _find_game_context(team: str, games: list) -> dict:
     for g in games:
         home = g.get("home_team", "").upper()
         away = g.get("away_team", "").upper()
+
+        _vs_raw = g.get("vegas_spread")
+        try:
+            _vs_val = float(_vs_raw) if _vs_raw is not None else 0.0
+        except (TypeError, ValueError):
+            _vs_val = 0.0
+        _gt_raw = g.get("game_total")
+        try:
+            _gt_val = float(_gt_raw) if _gt_raw is not None else 220.0
+        except (TypeError, ValueError):
+            _gt_val = 220.0
+
         if team.upper() == home:
             return {
                 "opponent": g.get("away_team", ""),
                 "is_home": True,
-                "game_total": g.get("game_total", 220.0),
-                "vegas_spread": g.get("vegas_spread", 0.0),
+                "game_total": _gt_val,
+                "vegas_spread": _vs_val,
                 "rest_days": 2,
             }
         if team.upper() == away:
             return {
                 "opponent": g.get("home_team", ""),
                 "is_home": False,
-                "game_total": g.get("game_total", 220.0),
-                "vegas_spread": -float(g.get("vegas_spread", 0.0)),
+                "game_total": _gt_val,
+                "vegas_spread": -_vs_val,
                 "rest_days": 2,
             }
     return {"opponent": "", "is_home": True, "game_total": 220.0, "vegas_spread": 0.0, "rest_days": 2}

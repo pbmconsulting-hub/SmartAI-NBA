@@ -443,5 +443,113 @@ class TestFetchTodaysGamesValidation(unittest.TestCase):
         self.assertEqual(games[0]["home_team"], "LAL")
 
 
+# ── Section 10: Odds API cache key includes params ───────────────────────────
+
+class TestOddsApiCacheKeyIncludesParams(unittest.TestCase):
+    """Verify that the Odds API client builds cache keys including params."""
+
+    def test_build_cache_key_exists(self):
+        """_build_cache_key function must exist in odds_api_client source."""
+        src = _OA_SRC.read_text(encoding="utf-8")
+        self.assertIn("def _build_cache_key(", src)
+
+    def test_build_cache_key_behavior(self):
+        """Different params must produce different cache keys."""
+        from data.odds_api_client import _build_cache_key
+
+        key1 = _build_cache_key("https://api.example.com/odds", {"markets": "h2h", "regions": "us"})
+        key2 = _build_cache_key("https://api.example.com/odds", {"markets": "player_points", "regions": "us2"})
+        key3 = _build_cache_key("https://api.example.com/odds")
+
+        self.assertNotEqual(key1, key2, "Different market params must produce different keys")
+        self.assertNotEqual(key1, key3, "Params vs no params must produce different keys")
+
+    def test_build_cache_key_excludes_api_key(self):
+        """apiKey must NOT appear in the cache key (different users = same data)."""
+        from data.odds_api_client import _build_cache_key
+
+        key_a = _build_cache_key("https://api.example.com/odds", {"apiKey": "key1", "markets": "h2h"})
+        key_b = _build_cache_key("https://api.example.com/odds", {"apiKey": "key2", "markets": "h2h"})
+
+        self.assertEqual(key_a, key_b, "Different API keys should produce the same cache key")
+        self.assertNotIn("key1", key_a, "apiKey value should not appear in cache key")
+
+    def test_build_cache_key_no_params(self):
+        """No params should return the URL as-is."""
+        from data.odds_api_client import _build_cache_key
+
+        self.assertEqual(
+            _build_cache_key("https://api.example.com/odds"),
+            "https://api.example.com/odds",
+        )
+
+    def test_fetch_with_retry_uses_cache_key(self):
+        """_fetch_with_retry must use _build_cache_key, not raw url for caching."""
+        src = _OA_SRC.read_text(encoding="utf-8")
+        idx = src.find("def _fetch_with_retry(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1200]
+        self.assertIn("_build_cache_key(", snippet,
+                       "_fetch_with_retry must call _build_cache_key for cache keying")
+        self.assertIn("cache_key", snippet,
+                       "_fetch_with_retry must use cache_key variable")
+
+
+# ── Section 11: Player Simulator safe float handling ─────────────────────────
+
+class TestPlayerSimulatorGameContext(unittest.TestCase):
+    """Verify _find_game_context handles None and invalid spread/total values."""
+
+    def test_source_uses_safe_float_pattern(self):
+        """_find_game_context must not use raw float() on game dict values."""
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5_🔮_Player_Simulator.py"
+        src = src_path.read_text(encoding="utf-8")
+        idx = src.find("def _find_game_context(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1500]
+        # Must NOT have raw float(g.get("vegas_spread", ...)) without None check
+        self.assertNotIn('float(g.get("vegas_spread', snippet,
+                          "_find_game_context must use safe float conversion")
+        self.assertNotIn('-float(g.get("vegas_spread', snippet,
+                          "_find_game_context must not negate raw float(g.get(...))")
+
+    def test_source_uses_none_check(self):
+        """_find_game_context must check for None before float conversion."""
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5_🔮_Player_Simulator.py"
+        src = src_path.read_text(encoding="utf-8")
+        idx = src.find("def _find_game_context(")
+        self.assertGreater(idx, 0)
+        snippet = src[idx:idx + 1500]
+        self.assertIn("is not None", snippet,
+                       "_find_game_context must use 'is not None' pattern for safety")
+
+
+# ── Section 12: Live Games page None-safe string slicing ─────────────────────
+
+class TestLiveGamesNoneSafeSlicing(unittest.TestCase):
+    """Verify game card rendering handles None in conference/streak fields."""
+
+    def test_conference_field_none_safe(self):
+        """home_conference .get() must use 'or' pattern to handle explicit None."""
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "1_📡_Live_Games.py"
+        src = src_path.read_text(encoding="utf-8")
+        # The pattern (game.get("home_conference") or "")[:1] is safe
+        # The pattern game.get("home_conference", "")[:1] is NOT safe when value is None
+        self.assertIn('(game.get("home_conference") or "")[:1]', src,
+                       "home_conference must use (x or '') pattern for None-safe slicing")
+        self.assertIn('(game.get("away_conference") or "")[:1]', src,
+                       "away_conference must use (x or '') pattern for None-safe slicing")
+
+    def test_game_context_uses_safe_float(self):
+        """Game context construction must use safe float (not 'or' falsy pattern)."""
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "1_📡_Live_Games.py"
+        src = src_path.read_text(encoding="utf-8")
+        # Must NOT have: float(g.get("vegas_spread", 0) or 0)  (treats 0.0 as falsy)
+        self.assertNotIn('float(g.get("vegas_spread", 0) or 0)', src,
+                          "Must not use 'or 0' pattern which treats 0.0 as falsy")
+        self.assertNotIn('float(g.get("game_total", 220) or 220)', src,
+                          "Must not use 'or 220' pattern which treats 0 as falsy")
+
+
 if __name__ == "__main__":
     unittest.main()
