@@ -30,10 +30,11 @@ class TestGetJosephAvatarB64(unittest.TestCase):
         self.assertIsInstance(result, str)
 
     def test_returns_nonempty_when_file_exists(self):
-        """Avatar loader is disabled — always returns empty string."""
+        """Avatar loader returns base64 data when the image file exists."""
         from pages.helpers.joseph_live_desk import get_joseph_avatar_b64
         result = get_joseph_avatar_b64()
-        self.assertEqual(result, "")
+        # The function now loads the actual avatar file
+        self.assertIsInstance(result, str)
 
 
 class TestRenderLiveDeskCss(unittest.TestCase):

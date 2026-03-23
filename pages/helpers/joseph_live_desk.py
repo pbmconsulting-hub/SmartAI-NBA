@@ -54,12 +54,23 @@ except ImportError:
 
 @st.cache_data(show_spinner=False)
 def get_joseph_avatar_b64() -> str:
-    """Load Joseph M Smith.png and return base64-encoded string.
-
-    Currently disabled — the Joseph image has been removed from all
-    pages.  Always returns empty string so callers fall back to their
-    emoji/text alternatives.
-    """
+    """Load Joseph M Smith Avatar.png and return base64-encoded string."""
+    _this = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_this, "..", "..", "Joseph M Smith Avatar.png"),
+        os.path.join(os.getcwd(), "Joseph M Smith Avatar.png"),
+        os.path.join(_this, "..", "..", "assets", "Joseph M Smith Avatar.png"),
+    ]
+    for path in candidates:
+        norm = os.path.normpath(path)
+        if os.path.isfile(norm):
+            try:
+                with open(norm, "rb") as fh:
+                    _logger.debug("Avatar loaded from %s", norm)
+                    return base64.b64encode(fh.read()).decode("utf-8")
+            except Exception:
+                _logger.warning("Failed reading avatar at %s", norm)
+    _logger.warning("Joseph M Smith Avatar.png not found in any candidate path")
     return ""
 
 

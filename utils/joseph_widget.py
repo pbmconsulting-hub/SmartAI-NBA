@@ -357,16 +357,13 @@ def _inject_widget_css() -> None:
     """Inject the Joseph widget CSS into the page.
 
     Uses ``st.markdown`` with ``unsafe_allow_html=True``.
-    Guarded by a session-state flag so the ``<style>`` block is
-    emitted at most once per session.
+    Re-injected on every page render so the CSS survives
+    Streamlit page navigation (each page re-renders fully).
     """
     if st is None:
         return
     try:
-        if st.session_state.get("_joseph_widget_css_injected"):
-            return
         st.markdown(_WIDGET_CSS, unsafe_allow_html=True)
-        st.session_state["_joseph_widget_css_injected"] = True
     except Exception as exc:
         _logger.debug("_inject_widget_css skipped: %s", exc)
 

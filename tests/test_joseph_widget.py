@@ -332,20 +332,21 @@ class TestInjectWidgetCss(unittest.TestCase):
         self.assertTrue(call_args[1].get("unsafe_allow_html", False))
 
     def test_idempotent_injection(self):
-        """Second call should not re-inject CSS."""
+        """CSS is re-injected on every call to survive page navigation."""
         from utils.joseph_widget import _inject_widget_css
         _mock_st.session_state = {}
         _inject_widget_css()
         first_count = _mock_st.markdown.call_count
         _inject_widget_css()
         second_count = _mock_st.markdown.call_count
-        self.assertEqual(first_count, second_count)
+        self.assertEqual(second_count, first_count + 1)
 
     def test_session_flag_set(self):
         from utils.joseph_widget import _inject_widget_css
         _mock_st.session_state = {}
         _inject_widget_css()
-        self.assertTrue(_mock_st.session_state.get("_joseph_widget_css_injected"))
+        # Session flag is no longer set; CSS re-injects every call
+        self.assertNotIn("_joseph_widget_css_injected", _mock_st.session_state)
 
 
 # ============================================================

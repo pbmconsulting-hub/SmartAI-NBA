@@ -960,8 +960,8 @@ if current_action:
 
 # ============================================================
 # SECTION: Fetch Platform Props
-# Pull live prop lines from PrizePicks, Underdog Fantasy,
-# and DraftKings Pick6 (via The Odds API) without needing
+# Pull live prop lines from all major sportsbooks
+# (via The Odds API) without needing
 # the nba_api at all. Platforms only list players who are
 # active and playing tonight, which naturally handles
 # the injury/availability problem.
@@ -979,11 +979,11 @@ st.markdown(
 st.markdown(get_education_box_html(
     "📖 How Platform Prop Fetching Works",
     """
-    <strong>PrizePicks & Underdog</strong>: Fetches all of tonight's NBA prop lines 
-    in seconds.<br><br>
-    <strong>DraftKings Pick6</strong>: Fetched from 15+ US sportsbooks in one call.<br><br>
+    <strong>Sportsbook Lines</strong>: Fetches tonight's NBA prop lines from all major 
+    sportsbooks (FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, 
+    Hard Rock Bet, BetRivers) in one call.<br><br>
     <strong>Cross-platform comparison</strong>: After fetching, the app shows all lines 
-    side-by-side so you can see which platform has the best line for each pick.
+    side-by-side so you can see which sportsbook has the best line for each pick.
     """
 ), unsafe_allow_html=True)
 
@@ -1008,8 +1008,8 @@ except ImportError as _pf_err:
 if _PLATFORM_FETCHER_AVAILABLE:
 
     # ── Read current settings ──────────────────────────────────
-    _pp_on = st.session_state.get("fetch_prizepicks_enabled", True)
-    _ud_on = st.session_state.get("fetch_underdog_enabled", True)
+    _pp_on = False
+    _ud_on = False
     _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 
@@ -1018,20 +1018,12 @@ if _PLATFORM_FETCHER_AVAILABLE:
         "padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;"
         "margin-right:8px;display:inline-block;"
     )
-    _pp_badge = (
-        f'<span style="{_badge_style}background:#1a3d2b;color:#9ae6b4;">'
-        f'{"✅" if _pp_on else "⏸️"} PrizePicks</span>'
-    )
-    _ud_badge = (
-        f'<span style="{_badge_style}background:#2d1b69;color:#d6bcfa;">'
-        f'{"✅" if _ud_on else "⏸️"} Underdog</span>'
-    )
     _dk_badge = (
         f'<span style="{_badge_style}background:#1a2f4d;color:#bee3f8;">'
-        f'{"✅" if _dk_on else "⏸️"} DraftKings</span>'
+        f'{"✅" if _dk_on else "⏸️"} Sportsbook Lines</span>'
     )
     st.markdown(
-        f'<div style="margin-bottom:12px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>',
+        f'<div style="margin-bottom:12px;">{_dk_badge}</div>',
         unsafe_allow_html=True,
     )
     st.caption("Enable/disable platforms on the ⚙️ Settings page.")
@@ -1047,30 +1039,19 @@ if _PLATFORM_FETCHER_AVAILABLE:
         )
 
     # ── Fetch buttons ─────────────────────────────────────────
-    _fetch_col1, _fetch_col2, _fetch_col3, _fetch_col4 = st.columns(4)
+    _fetch_col1, _fetch_col2 = st.columns(2)
+
+    _fetch_pp = False
+    _fetch_ud = False
 
     with _fetch_col1:
-        _fetch_pp = st.button(
-            "🟢 Fetch PrizePicks",
-            disabled=not _pp_on,
-            width="stretch",
-            help="Fetch live prop lines from PrizePicks.",
-        )
-    with _fetch_col2:
-        _fetch_ud = st.button(
-            "🟣 Fetch Underdog",
-            disabled=not _ud_on,
-            width="stretch",
-            help="Fetch live prop lines from Underdog Fantasy.",
-        )
-    with _fetch_col3:
         _fetch_dk = st.button(
-            "🔵 Fetch DraftKings",
+            "🔵 Fetch Sportsbook Lines",
             disabled=not _dk_on,
             width="stretch",
-            help="Fetch DraftKings lines.",
+            help="Fetch lines from all major sportsbooks.",
         )
-    with _fetch_col4:
+    with _fetch_col2:
         _fetch_all = st.button(
             "🔄 Refresh All Props",
             type="primary",
@@ -1086,12 +1067,6 @@ if _PLATFORM_FETCHER_AVAILABLE:
 
     if _fetch_all:
         _fetch_triggered = True
-    elif _fetch_pp:
-        _fetch_triggered = True
-        _fetch_pp_only = True
-    elif _fetch_ud:
-        _fetch_triggered = True
-        _fetch_ud_only = True
     elif _fetch_dk:
         _fetch_triggered = True
         _fetch_dk_only = True
@@ -1105,8 +1080,8 @@ if _PLATFORM_FETCHER_AVAILABLE:
 
         with st.spinner("Fetching live props from betting platforms..."):
             _new_props = fetch_all_platform_props(
-                include_prizepicks=_pp_on and (_fetch_all or _fetch_pp_only),
-                include_underdog=_ud_on and (_fetch_all or _fetch_ud_only),
+                include_prizepicks=False,
+                include_underdog=False,
                 include_draftkings=_dk_on and (_fetch_all or _fetch_dk_only),
                 odds_api_key=_dk_key or None,
                 progress_callback=_progress_cb,
@@ -1423,7 +1398,7 @@ with st.expander("💡 Tips & FAQ", expanded=False):
     **Q: Where does the data come from?**
     A: Player stats, team stats, rosters, injuries, standings, and live scores
     are fetched from professional sports data providers.
-    Prop lines come from DraftKings, PrizePicks, and Underdog Fantasy.
+    Prop lines come from all major sportsbooks.
 
     ---
 

@@ -227,7 +227,7 @@ st.divider()
 
 platform_filter = st.radio(
     "Filter by Platform",
-    ["🏠 All Platforms", "🟢 PrizePicks", "🟣 Underdog Fantasy", "🔵 DraftKings Pick6"],
+    ["🏠 All Sportsbooks", "🔵 FanDuel", "🟢 DraftKings", "🟣 BetMGM", "🔴 Caesars"],
     horizontal=True,
     label_visibility="collapsed",
 )
@@ -236,14 +236,16 @@ platform_filter = st.radio(
 def _platform_filter_fn(bet):
     """Return True if this bet matches the selected platform filter."""
     plat = str(bet.get("platform") or "").lower()
-    if platform_filter == "🏠 All Platforms":
+    if platform_filter == "🏠 All Sportsbooks":
         return True
-    elif platform_filter == "🟢 PrizePicks":
-        return "prize" in plat or plat == "pp"
-    elif platform_filter == "🟣 Underdog Fantasy":
-        return "underdog" in plat or plat == "ud"
-    elif platform_filter == "🔵 DraftKings Pick6":
+    elif platform_filter == "🔵 FanDuel":
+        return "fanduel" in plat or plat == "fd"
+    elif platform_filter == "🟢 DraftKings":
         return "draftkings" in plat or plat == "dk"
+    elif platform_filter == "🟣 BetMGM":
+        return "betmgm" in plat or plat == "mgm"
+    elif platform_filter == "🔴 Caesars":
+        return "caesars" in plat or plat == "czr"
     return True
 
 st.divider()
@@ -447,11 +449,11 @@ with tab_model_health:
             else:
                 st.caption("No stat type data yet.")
 
-        # Win rate by Goblin / 50_50 / Demon / Normal bet classification
+        # Win rate by bet classification
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
             with st.expander("Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"goblin": "🟢 Goblin", "50_50": "⚖️ 50/50", "demon": "🔥 Demon", "normal": "Normal"}
+                _bt_emoji_map = {"50_50": "⚖️ 50/50", "normal": "Normal"}
                 bt_rows = [
                     {
                         "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
@@ -470,81 +472,16 @@ with tab_model_health:
                     unsafe_allow_html=True,
                 )
                 # Highlight the key insight
-                _goblin_data = bet_type_perf.get("goblin", {})
-                _demon_data  = bet_type_perf.get("demon", {})
                 _fifty_data  = bet_type_perf.get("50_50", {})
-                _metric_cols = st.columns(3)
-                if _goblin_data.get("total", 0) > 0:
-                    _metric_cols[0].metric(
-                        "🟢 Goblin Win Rate",
-                        f"{_goblin_data.get('win_rate', 0):.1f}%",
-                        help=f"Based on {_goblin_data.get('total', 0)} logged Goblin bets (alt line below standard O/U)",
-                    )
-                if _demon_data.get("total", 0) > 0:
-                    _d_total = _demon_data.get("total", 1)
-                    _d_wins  = _demon_data.get("wins", 0)
-                    _d_wr    = round(_d_wins / max(_d_total, 1) * 100, 1)
-                    _metric_cols[1].metric(
-                        "🔥 Demon Win Rate",
-                        f"{_d_wr:.1f}%",
-                        help=f"Based on {_d_total} logged Demon bets (alt line above standard O/U)",
-                    )
                 if _fifty_data.get("total", 0) > 0:
                     _f_total = _fifty_data.get("total", 1)
                     _f_wins  = _fifty_data.get("wins", 0)
                     _f_wr    = round(_f_wins / max(_f_total, 1) * 100, 1)
-                    _metric_cols[2].metric(
+                    st.metric(
                         "⚖️ 50/50 Win Rate",
                         f"{_f_wr:.1f}%",
                         help=f"Based on {_f_total} logged 50/50 bets (standard line picks)",
                     )
-
-            # ── Individual Goblin Bet Results ──────────────────────────
-            _goblin_resolved = [
-                b for b in filtered_health
-                if b.get("bet_type", "") == "goblin"
-                and b.get("result") in ("WIN", "LOSS", "PUSH")
-            ]
-            if _goblin_resolved:
-                _gb_wins   = sum(1 for b in _goblin_resolved if b.get("result") == "WIN")
-                _gb_losses = sum(1 for b in _goblin_resolved if b.get("result") == "LOSS")
-                with st.expander(
-                    f"Goblin Bet Results — {_gb_wins} Wins / {_gb_losses} Losses",
-                    expanded=False,
-                ):
-                    _gbc_a, _gbc_b = st.columns(2)
-                    for _gbi, _gb in enumerate(_goblin_resolved):
-                        _res = _gb.get("result", "")
-                        _res_icon = "✅" if _res == "WIN" else ("❌" if _res == "LOSS" else "🔄")
-                        _gbc = _gbc_a if _gbi % 2 == 0 else _gbc_b
-                        with _gbc:
-                            st.markdown(get_bet_card_html(_gb), unsafe_allow_html=True)
-
-            # ── Individual Demon Bet Results (High Ceiling) ─────────────
-            _demon_resolved = [
-                b for b in filtered_health
-                if b.get("bet_type", "") == "demon"
-                and b.get("result") in ("WIN", "LOSS", "PUSH")
-            ]
-            if _demon_resolved:
-                _dm_wins   = sum(1 for b in _demon_resolved if b.get("result") == "WIN")
-                _dm_losses = sum(1 for b in _demon_resolved if b.get("result") == "LOSS")
-                _dm_pushes = sum(1 for b in _demon_resolved if b.get("result") == "PUSH")
-                _dm_total  = len(_demon_resolved)
-                with st.expander(
-                    f"🔥 Demon Bet Results — {_dm_wins}W / {_dm_losses}L / {_dm_pushes}P  "
-                    f"({round(_dm_wins/_dm_total*100,1) if _dm_total else 0:.1f}% win rate)",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "**Demon bets** are alternate lines set ABOVE the standard O/U — "
-                        "high ceiling, high reward plays. Lower probability but bigger payout."
-                    )
-                    _dmc_a, _dmc_b = st.columns(2)
-                    for _dmi, _dm in enumerate(_demon_resolved):
-                        _dmc = _dmc_a if _dmi % 2 == 0 else _dmc_b
-                        with _dmc:
-                            st.markdown(get_bet_card_html(_dm), unsafe_allow_html=True)
 
             # ── Individual Uncertain Pick Results (50/50 + risk flags) ──
             _uncertain_resolved = [
@@ -694,8 +631,8 @@ with tab_ai_picks:
     all_bets_for_ai = load_all_bets(limit=500)
     ai_bets_raw = [
         b for b in all_bets_for_ai
-        if b.get("platform", "") in ("SmartAI-Auto", "PrizePicks", "Underdog", "DraftKings",
-                                      "Underdog Fantasy", "DraftKings Pick6")
+        if b.get("platform", "") in ("SmartAI-Auto", "FanDuel", "DraftKings", "BetMGM",
+                                      "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers")
         or str(b.get("notes", "")).startswith("Auto-logged")
         or int(b.get("auto_logged", 0) or 0) == 1
     ]
@@ -714,7 +651,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
+            ["50/50 — Standard Line", "⚡ Normal"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -724,9 +661,7 @@ with tab_ai_picks:
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
         _ai_bt_map = {
-            "Goblin — Safe Floor":    "goblin",
             "50/50 — Standard Line":  "50_50",
-            "Demon — High Ceiling":   "demon",
             "⚡ Normal":              "normal",
         }
         _ai_bt_values = {_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map}
@@ -1024,7 +959,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
+            ["50/50 — Standard Line", "⚡ Normal"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1037,9 +972,7 @@ with tab_all_picks:
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
         _ap_bt_map = {
-            "Goblin — Safe Floor":    "goblin",
             "50/50 — Standard Line":  "50_50",
-            "Demon — High Ceiling":   "demon",
             "⚡ Normal":              "normal",
         }
         _ap_bt_values = {_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map}
@@ -1236,9 +1169,7 @@ with tab_all_picks:
         # ── Win Rate by Bet Classification ────────────────────────────
         _ap_bt_data: dict = {}
         _ap_bt_display_map = {
-            "goblin": "🟢 Goblin",
             "50_50": "⚖️ 50/50",
-            "demon": "🔥 Demon",
             "normal": "Normal",
         }
         for _p in all_picks_data:
@@ -1273,106 +1204,15 @@ with tab_all_picks:
                     ),
                     unsafe_allow_html=True,
                 )
-                _ap_bt_metric_cols = st.columns(3)
-                _goblin_d = _ap_bt_data.get("goblin", {})
-                _demon_d  = _ap_bt_data.get("demon", {})
                 _fifty_d  = _ap_bt_data.get("50_50", {})
-                if _goblin_d.get("total", 0) > 0:
-                    _g_wr = round(
-                        _goblin_d["wins"] / max(_goblin_d["wins"] + _goblin_d["losses"], 1) * 100, 1
-                    )
-                    _ap_bt_metric_cols[0].metric(
-                        "🟢 Goblin Win Rate",
-                        f"{_g_wr:.1f}%",
-                        help=f"Based on {_goblin_d['total']} logged Goblin bets (alt line below standard O/U)",
-                    )
-                if _demon_d.get("total", 0) > 0:
-                    _d_wr = round(
-                        _demon_d["wins"] / max(_demon_d["wins"] + _demon_d["losses"], 1) * 100, 1
-                    )
-                    _ap_bt_metric_cols[1].metric(
-                        "🔥 Demon Win Rate",
-                        f"{_d_wr:.1f}%",
-                        help=f"Based on {_demon_d['total']} logged Demon bets (alt line above standard O/U)",
-                    )
                 if _fifty_d.get("total", 0) > 0:
                     _f_wr = round(
                         _fifty_d["wins"] / max(_fifty_d["wins"] + _fifty_d["losses"], 1) * 100, 1
                     )
-                    _ap_bt_metric_cols[2].metric(
+                    st.metric(
                         "⚖️ 50/50 Win Rate",
                         f"{_f_wr:.1f}%",
                         help=f"Based on {_fifty_d['total']} logged 50/50 bets (standard O/U line)",
-                    )
-
-            # ── Goblin Bet Results ────────────────────────────────────
-            _ap_goblin_picks = [
-                p for p in all_picks_data if p.get("bet_type") == "goblin"
-            ]
-            if _ap_goblin_picks:
-                _apg_wins    = sum(1 for p in _ap_goblin_picks if p.get("result") == "WIN")
-                _apg_losses  = sum(1 for p in _ap_goblin_picks if p.get("result") == "LOSS")
-                _apg_pending = sum(1 for p in _ap_goblin_picks if not p.get("result"))
-                with st.expander(
-                    f"🧌 Goblin Bet Results — {_apg_wins}W / {_apg_losses}L / {_apg_pending} Pending",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "**Goblin bets** are alternate lines set BELOW the standard O/U — "
-                        "safe floor plays with higher probability."
-                    )
-                    _apg_result_rows = []
-                    for _gpick in _ap_goblin_picks:
-                        _gr = _gpick.get("result") or ""
-                        _apg_result_rows.append({
-                            "Player":    _gpick.get("player_name", ""),
-                            "Stat":      (_gpick.get("stat_type") or "").replace("_", " ").title(),
-                            "Line":      _gpick.get("line") or _gpick.get("prop_line", ""),
-                            "Direction": _gpick.get("direction", ""),
-                            "Result":    "✅ Win" if _gr == "WIN" else ("❌ Loss" if _gr == "LOSS" else ("🔄 Push" if _gr == "PUSH" else "⏳ Pending")),
-                            "Date":      _gpick.get("pick_date", ""),
-                        })
-                    st.markdown(
-                        get_styled_stats_table_html(
-                            _apg_result_rows,
-                            ["Player", "Stat", "Line", "Direction", "Result", "Date"],
-                        ),
-                        unsafe_allow_html=True,
-                    )
-
-            # ── Demon Bet Results ─────────────────────────────────────
-            _ap_demon_picks = [
-                p for p in all_picks_data if p.get("bet_type") == "demon"
-            ]
-            if _ap_demon_picks:
-                _apd_wins    = sum(1 for p in _ap_demon_picks if p.get("result") == "WIN")
-                _apd_losses  = sum(1 for p in _ap_demon_picks if p.get("result") == "LOSS")
-                _apd_pending = sum(1 for p in _ap_demon_picks if not p.get("result"))
-                with st.expander(
-                    f"🔥 Demon Bet Results — {_apd_wins}W / {_apd_losses}L / {_apd_pending} Pending",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "**Demon bets** are alternate lines set ABOVE the standard O/U — "
-                        "high ceiling, high reward plays. Lower probability but bigger payout."
-                    )
-                    _apd_result_rows = []
-                    for _dpick in _ap_demon_picks:
-                        _dr = _dpick.get("result") or ""
-                        _apd_result_rows.append({
-                            "Player":    _dpick.get("player_name", ""),
-                            "Stat":      (_dpick.get("stat_type") or "").replace("_", " ").title(),
-                            "Line":      _dpick.get("line") or _dpick.get("prop_line", ""),
-                            "Direction": _dpick.get("direction", ""),
-                            "Result":    "✅ Win" if _dr == "WIN" else ("❌ Loss" if _dr == "LOSS" else ("🔄 Push" if _dr == "PUSH" else "⏳ Pending")),
-                            "Date":      _dpick.get("pick_date", ""),
-                        })
-                    st.markdown(
-                        get_styled_stats_table_html(
-                            _apd_result_rows,
-                            ["Player", "Stat", "Line", "Direction", "Result", "Date"],
-                        ),
-                        unsafe_allow_html=True,
                     )
 
         # ── Model Tier Accuracy placeholder ──────────────────────────
@@ -1688,7 +1528,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Goblin — Safe Floor", "50/50 — Standard Line", "Demon — High Ceiling", "⚡ Normal"],
+            ["50/50 — Standard Line", "⚡ Normal"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1708,9 +1548,7 @@ with tab_bets:
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
             _bets_bt_map = {
-                "Goblin — Safe Floor":    "goblin",
                 "50/50 — Standard Line":  "50_50",
-                "Demon — High Ceiling":   "demon",
                 "⚡ Normal":              "normal",
             }
             _bets_bt_values = {_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map}
@@ -1837,8 +1675,8 @@ with tab_log:
             expanded=False,
         ):
             st.caption(
-                "These are today's live platform props loaded from PrizePicks, "
-                "Underdog, and DraftKings. Click **Add All** to log them as "
+                "These are today's live platform props loaded from all major sportsbooks. "
+                "Click **Add All** to log them as "
                 "PENDING bets so you can track their results."
             )
 
@@ -1934,7 +1772,7 @@ with tab_log:
             direction  = st.radio("Direction", ["OVER", "UNDER"], horizontal=True)
 
         with col2:
-            platform   = st.selectbox("Platform", ["PrizePicks", "Underdog", "DraftKings"])
+            platform   = st.selectbox("Platform", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"])
             tier       = st.selectbox("Tier", ["Platinum", "Gold", "Silver", "Bronze"])
             entry_fee  = st.number_input("Entry Fee ($)", min_value=0.0, max_value=10000.0, value=10.0, step=5.0)
             team       = st.text_input("Team (optional)", placeholder="e.g., LAL")
