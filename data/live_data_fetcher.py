@@ -741,7 +741,7 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
             except (TypeError, ValueError):
                 pass
 
-        if cs_total is not None and (current_total == 0.0 or current_total == 220.0):
+        if cs_total is not None and (current_total == 0.0 or current_total == DEFAULT_GAME_TOTAL):
             try:
                 game["game_total"] = round(float(cs_total), 1)
                 filled += 1
