@@ -16,12 +16,12 @@ _components_logger = logging.getLogger(__name__)
 # ── Cached Hero Banner Loader ─────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def _get_hero_banner_b64() -> str:
-    """Load the Joseph A Smith Hero Banner and return base64-encoded string."""
+    """Load the Joseph M Smith Hero Banner and return base64-encoded string."""
     _this = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(_this, "..", "Joseph A Smith Hero Banner.png"),
-        os.path.join(os.getcwd(), "Joseph A Smith Hero Banner.png"),
-        os.path.join(_this, "..", "assets", "Joseph A Smith Hero Banner.png"),
+        os.path.join(_this, "..", "Joseph M Smith Hero Banner.png"),
+        os.path.join(os.getcwd(), "Joseph M Smith Hero Banner.png"),
+        os.path.join(_this, "..", "assets", "Joseph M Smith Hero Banner.png"),
     ]
     for path in candidates:
         norm = os.path.normpath(path)
