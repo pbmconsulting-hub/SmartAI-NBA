@@ -987,6 +987,10 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             playing_team_abbrevs.add(game.get("away_team", ""))
         playing_team_abbrevs.discard("")
 
+        # Filter out non-NBA team abbreviations (All-Star, TBD, etc.)
+        from data.clearsports_client import _VALID_NBA_ABBREVS
+        playing_team_abbrevs = {t for t in playing_team_abbrevs if t in _VALID_NBA_ABBREVS}
+
         _logger.info(f"Fetching players for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
 
         if progress_callback:
