@@ -500,6 +500,8 @@ st.markdown(get_education_box_html(
     rosters, live scores, standings, and player news.
     <a href="https://clearsportsapi.com" target="_blank" style="color:#00f0ff;">Free tier: 1,000 req/month</a>.<br><br>
     Keys are stored only in this browser session and never saved to disk.
+    Keys can also be pre-configured via <code>.streamlit/secrets.toml</code> or
+    the Streamlit Cloud Secrets dashboard so they load automatically on startup.
     """
 ), unsafe_allow_html=True)
 
