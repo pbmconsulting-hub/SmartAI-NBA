@@ -1951,8 +1951,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 "qme_edge": round(qme_edge, 2),
                 "is_override": is_override,
             })
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Failed to log prediction for %s: %s",
+                         player.get("name", "unknown"), exc)
 
         nerd_stats = {
             "qme_probability": round(qme_prob, 2),
@@ -2080,8 +2081,9 @@ def joseph_analyze_game(game: dict, teams_data: dict,
                 player_data = prop.get("player_data", prop.get("player", {}))
                 try:
                     best_props[i] = joseph_full_analysis(prop, player_data, game, teams_data)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Prop reanalysis failed for %s: %s",
+                                 prop.get("player_name", "unknown"), exc)
 
         # Generate narratives
         strategy_narrative = strategy.get("game_narrative", "")
@@ -2881,15 +2883,15 @@ def joseph_commentary(results: list, context_type: str) -> str:
         return "Joseph M. Smith has thoughts on this."
 
 
-def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
+def joseph_auto_log_bets(joseph_results: list, session_state: dict = None) -> tuple:
     """Pass-through to engine.joseph_bets.joseph_auto_log_bets().
 
     Parameters
     ----------
     joseph_results : list[dict]
         Joseph's analysis results to auto-log.
-    session_state : dict
-        Streamlit session state dict.
+    session_state : dict, optional
+        Deprecated — kept for backward compatibility but ignored.
 
     Returns
     -------
@@ -2898,7 +2900,7 @@ def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
     """
     try:
         from engine.joseph_bets import joseph_auto_log_bets as _log
-        return _log(joseph_results, session_state)
+        return _log(joseph_results)
     except ImportError:
         return (0, "Joseph bets module not installed yet")
     except Exception as exc:

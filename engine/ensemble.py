@@ -179,7 +179,7 @@ def _model_b_recent_form(player_data, game_context, game_logs):
         weighted_sum += val * w
         total_weight += w
 
-    recent_avg = weighted_sum / total_weight if total_weight > 0 else sum(recent_values) / len(recent_values)
+    recent_avg = weighted_sum / total_weight if total_weight > 0 else (sum(recent_values) / len(recent_values) if recent_values else 15.0)
 
     # Variance from recent games
     n = len(recent_values)
