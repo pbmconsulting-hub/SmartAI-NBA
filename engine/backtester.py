@@ -5,12 +5,15 @@
 
 import math
 import statistics
+import logging
 from datetime import date
 
 try:
     from engine.simulation import run_quantum_matrix_simulation
 except ImportError:
     run_quantum_matrix_simulation = None
+
+_logger = logging.getLogger(__name__)
 
 # Implied probability for -110 odds (standard breakeven for edge calculation)
 # -110 → breakeven = 110 / (110 + 100) = 0.5238
@@ -164,7 +167,9 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                         stat_type=stat_type,
                         recent_game_logs=prior_log_values if len(prior_log_values) >= 15 else None,
                     )
-                except Exception:
+                except Exception as exc:
+                    _logger.debug("Backtest simulation failed for %s on %s: %s",
+                                  stat_type, game_date, exc)
                     continue
 
                 if not sim_result:

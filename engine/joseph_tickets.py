@@ -369,8 +369,8 @@ def validate_ticket_correlation(legs: list, threshold: float = -0.1) -> dict:
                     "worst_pair": worst_pair if worst_corr < threshold else None,
                     "correlation_score": round(avg_corr, 3),
                 }
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Correlation matrix lookup failed: %s", exc)
 
         # Fallback: heuristic based on game diversity
         game_ids = [l.get("game_id", l.get("game", "")) for l in legs]
@@ -618,8 +618,8 @@ def _calc_combined_probability(legs: list) -> float:
             adj = adjust_parlay_probability(combined, legs)
             if adj > 0:
                 combined = adj
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Parlay probability adjustment failed: %s", exc)
 
         return max(0.001, min(0.99, combined))
     except Exception:
