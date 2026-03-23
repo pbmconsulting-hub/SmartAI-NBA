@@ -49,6 +49,11 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - **Platforms**: Which betting platforms to target (affects payout calculations)
     - **Sensitivity Sliders**: Fine-tune how much weight the model gives to pace, fatigue, blowout risk, etc.
     
+    **API Keys**
+    - **Odds API Key**: Required for fetching live sportsbook odds
+    - **ClearSports API Key**: Required for fetching live NBA stats
+    - Keys are stored in your session only and never sent to our servers
+    
     💡 **Pro Tips:**
     - Start with the Conservative preset and adjust from there
     - Higher simulation depth (3000+) gives more precise results but takes longer
@@ -475,6 +480,188 @@ with st.expander("⚙️ Goblin / Demon Thresholds (Advanced)", expanded=False):
 st.divider()
 
 # ============================================================
+# SECTION: API Keys
+# Configure API keys needed for live data and prop fetching.
+# PrizePicks and Underdog have free public APIs (no key needed).
+# DraftKings requires The Odds API key (free tier: 500 req/month).
+# ============================================================
+
+st.subheader("🔑 API Keys")
+
+st.markdown(get_education_box_html(
+    "📖 API Keys for Live Data",
+    """
+    <strong>The Odds API</strong> provides player props from all major US sportsbooks
+    (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one unified call. Also provides
+    game-level moneylines, spreads, and totals from 15+ bookmakers — used for consensus
+    Vegas line calculation and market movement tracking.
+    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">Free tier: 500 req/month</a>.<br><br>
+    <strong>ClearSports API</strong> provides NBA games, player stats, team stats, injuries,
+    rosters, live scores, standings, and player news.
+    <a href="https://clearsportsapi.com" target="_blank" style="color:#00f0ff;">Free tier: 1,000 req/month</a>.<br><br>
+    Keys are stored only in this browser session. You can also place them in
+    <code>.streamlit/secrets.toml</code> for automatic loading.
+    """
+), unsafe_allow_html=True)
+
+with st.expander("🔑 Configure The Odds API Key (Props from all sportsbooks)", expanded=False):
+    st.markdown(
+        "Get your free API key at "
+        "[https://the-odds-api.com](https://the-odds-api.com) — free tier gives you "
+        "500 requests/month. Covers DraftKings, FanDuel, BetMGM, Caesars, and 15+ more."
+    )
+
+    current_key = st.session_state.get("odds_api_key", "")
+    if current_key:
+        masked = current_key[:4] + "••••••••" + current_key[-4:] if len(current_key) > 8 else "••••••••"
+        st.success(f"✅ Odds API key configured: `{masked}`")
+    else:
+        st.info("ℹ️ No Odds API key set. Player props will be unavailable.")
+
+    new_key = st.text_input(
+        "The Odds API Key",
+        value=current_key,
+        type="password",
+        placeholder="e.g., a1b2c3d4e5f6...",
+        help="Your Odds API key from the-odds-api.com. Stored in this session only.",
+        key="odds_api_key_input",
+    )
+
+    col_save_key, col_clear_key = st.columns([1, 1])
+    with col_save_key:
+        if st.button("💾 Save Odds API Key", use_container_width=True):
+            st.session_state["odds_api_key"] = new_key.strip()
+            if new_key.strip():
+                st.success("✅ Odds API key saved for this session!")
+            else:
+                st.info("API key cleared.")
+            st.rerun()
+    with col_clear_key:
+        if st.button("🗑️ Clear Odds API Key", use_container_width=True):
+            st.session_state["odds_api_key"] = ""
+            st.info("API key cleared.")
+            st.rerun()
+
+with st.expander("🔑 Configure ClearSports API Key (Games, Stats, Injuries, Rosters)", expanded=False):
+    st.markdown(
+        "Get your free API key at "
+        "[https://clearsportsapi.com](https://clearsportsapi.com) — free tier gives you "
+        "1,000 requests/month, which is plenty for daily data updates."
+    )
+
+    cs_key = st.session_state.get("clearsports_api_key", "")
+    if cs_key:
+        masked_cs = cs_key[:4] + "••••••••" + cs_key[-4:] if len(cs_key) > 8 else "••••••••"
+        st.success(f"✅ ClearSports API key configured: `{masked_cs}`")
+    else:
+        st.info("ℹ️ No ClearSports API key set. Game/player/team data updates will be limited.")
+
+    new_cs_key = st.text_input(
+        "ClearSports API Key",
+        value=cs_key,
+        type="password",
+        placeholder="e.g., cs_live_abc123...",
+        help="Your ClearSports API key from clearsportsapi.com. Stored in this session only.",
+        key="clearsports_api_key_input",
+    )
+
+    cs_col1, cs_col2 = st.columns([1, 1])
+    with cs_col1:
+        if st.button("💾 Save ClearSports Key", use_container_width=True):
+            st.session_state["clearsports_api_key"] = new_cs_key.strip()
+            if new_cs_key.strip():
+                st.success("✅ ClearSports API key saved for this session!")
+            else:
+                st.info("ClearSports API key cleared.")
+            st.rerun()
+    with cs_col2:
+        if st.button("🗑️ Clear ClearSports Key", use_container_width=True):
+            st.session_state["clearsports_api_key"] = ""
+            st.info("ClearSports API key cleared.")
+            st.rerun()
+
+# ── API Connection Status & Quota ──────────────────────────────────────────
+with st.expander("📊 API Connection Status & Usage", expanded=False):
+    _status_col_a, _status_col_b = st.columns(2)
+
+    # ── Odds API Status ──
+    with _status_col_a:
+        st.markdown("**The Odds API**")
+        _odds_key = st.session_state.get("odds_api_key", "")
+        if _odds_key:
+            try:
+                from data.odds_api_client import get_odds_api_usage
+                _usage = get_odds_api_usage()
+                _remaining = _usage.get("requests_remaining")
+                _used = _usage.get("requests_used")
+                _updated = _usage.get("updated_at")
+                if _remaining is not None:
+                    _pct_used = round(_used / max(_used + _remaining, 1) * 100) if _used is not None else 0
+                    _bar_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
+                    st.markdown(
+                        f'<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                        f'border:1px solid rgba(0,240,255,0.15);">'
+                        f'<div style="font-weight:700;color:#c0d0e8;margin-bottom:4px;">✅ Connected</div>'
+                        f'<div style="color:{_bar_color};font-size:1.1rem;font-weight:700;">'
+                        f'{_remaining:,} requests remaining</div>'
+                        f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
+                        f'<div style="height:6px;width:{100-_pct_used}%;background:{_bar_color};'
+                        f'border-radius:3px;"></div></div>'
+                        f'<div style="color:#8b949e;font-size:0.75rem;">'
+                        f'{_used if _used is not None else "?"} used · '
+                        f'Updated: {_updated[:16] if _updated else "pending first request"}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.markdown(
+                        '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                        'border:1px solid rgba(0,240,255,0.15);">'
+                        '<div style="font-weight:700;color:#ffd700;">🔑 Key set — quota loads after first API call</div>'
+                        '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                        'Run a data fetch or load tonight\'s games to check quota.</div></div>',
+                        unsafe_allow_html=True,
+                    )
+            except ImportError:
+                st.info("Odds API client not available.")
+        else:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(255,107,107,0.3);">'
+                '<div style="font-weight:700;color:#ff6b6b;">❌ Not configured</div>'
+                '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                'Set your Odds API key above to enable player props and market data.</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # ── ClearSports API Status ──
+    with _status_col_b:
+        st.markdown("**ClearSports API**")
+        _cs_key = st.session_state.get("clearsports_api_key", "")
+        if _cs_key:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(0,240,255,0.15);">'
+                '<div style="font-weight:700;color:#c0d0e8;">✅ Connected</div>'
+                '<div style="color:#9ae6b4;font-size:0.85rem;margin-top:4px;">'
+                'Games · Players · Teams · Injuries · Scores · Standings · News</div>'
+                '<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">'
+                'All ClearSports endpoints active</div></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div style="background:#14192b;border-radius:8px;padding:12px 14px;'
+                'border:1px solid rgba(255,107,107,0.3);">'
+                '<div style="font-weight:700;color:#ff6b6b;">❌ Not configured</div>'
+                '<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+                'Set your ClearSports API key above to enable game data, stats, and injuries.</div></div>',
+                unsafe_allow_html=True,
+            )
+
+st.divider()
+
+# ============================================================
 # SECTION: Platform Fetch Toggles
 # Enable or disable fetching from each platform.
 # These are used by the "Fetch Live Props" button on the Prop Scanner
@@ -491,7 +678,7 @@ with toggle_col1:
     pp_enabled = st.toggle(
         "✅ PrizePicks",
         value=st.session_state.get("fetch_prizepicks_enabled", True),
-        help="Fetch props from PrizePicks.",
+        help="Fetch props from PrizePicks (free public API, no key required).",
     )
     st.session_state["fetch_prizepicks_enabled"] = pp_enabled
 
@@ -499,7 +686,7 @@ with toggle_col2:
     ud_enabled = st.toggle(
         "✅ Underdog Fantasy",
         value=st.session_state.get("fetch_underdog_enabled", True),
-        help="Fetch props from Underdog Fantasy.",
+        help="Fetch props from Underdog Fantasy (free public API, no key required).",
     )
     st.session_state["fetch_underdog_enabled"] = ud_enabled
 
@@ -507,7 +694,7 @@ with toggle_col3:
     dk_enabled = st.toggle(
         "✅ DraftKings Pick6",
         value=st.session_state.get("fetch_draftkings_enabled", True),
-        help="Fetch DraftKings lines.",
+        help="Fetch DraftKings lines via The Odds API. Requires a free API key.",
     )
     st.session_state["fetch_draftkings_enabled"] = dk_enabled
 

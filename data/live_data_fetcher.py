@@ -515,6 +515,77 @@ def _deduplicate_games(games: list) -> list:
     return unique
 
 
+def _build_games_from_odds_api() -> list:
+    """
+    Build a game list from The Odds API when ClearSports is unavailable.
+
+    Fetches game-level odds (which include home/away team names), converts
+    full team names to abbreviations, and extracts consensus spread/total
+    from the bookmaker data.
+
+    Returns:
+        list of dict: Games in the same format as ClearSports
+            ``fetch_games_today()`` — each dict has home_team, away_team
+            (abbreviations), vegas_spread, game_total, and consensus fields.
+            Returns [] on failure or missing API key.
+    """
+    try:
+        from data.odds_api_client import fetch_game_odds as _odds_games
+        from data.odds_api_client import get_consensus_odds as _get_consensus
+
+        raw_odds = _odds_games()
+        if not raw_odds:
+            return []
+
+        # Compute consensus once from the raw odds (avoids a second API call)
+        consensus = _get_consensus(games_odds=raw_odds)
+
+        games: list[dict] = []
+        for ev in raw_odds:
+            home_full = str(ev.get("home_team", "")).strip()
+            away_full = str(ev.get("away_team", "")).strip()
+
+            home_abbrev = _TEAM_NAME_LOWER_TO_ABBREV.get(home_full.lower(), "")
+            away_abbrev = _TEAM_NAME_LOWER_TO_ABBREV.get(away_full.lower(), "")
+
+            if not home_abbrev or not away_abbrev:
+                _logger.debug(
+                    "_build_games_from_odds_api: skipping unrecognised matchup %s vs %s",
+                    home_full, away_full,
+                )
+                continue
+
+            entry = consensus.get(home_full) or consensus.get(away_full) or {}
+
+            spread_val = entry.get("consensus_spread")
+            total_val = entry.get("consensus_total")
+
+            games.append({
+                "game_id":          str(ev.get("game_id", "")),
+                "home_team":        home_abbrev,
+                "away_team":        away_abbrev,
+                "home_wins":        0,
+                "home_losses":      0,
+                "away_wins":        0,
+                "away_losses":      0,
+                "vegas_spread":     round(float(spread_val), 1) if spread_val is not None else 0,
+                "game_total":       round(float(total_val), 1) if total_val is not None else 220,
+                "consensus_spread": spread_val,
+                "consensus_total":  total_val,
+                "moneyline_home":   entry.get("moneyline_home"),
+                "moneyline_away":   entry.get("moneyline_away"),
+                "bookmaker_count":  entry.get("bookmaker_count", 0),
+                "spread_range":     entry.get("spread_range", (None, None)),
+                "total_range":      entry.get("total_range", (None, None)),
+            })
+
+        return games
+
+    except Exception as exc:
+        _logger.warning("_build_games_from_odds_api fallback failed: %s", exc)
+        return []
+
+
 def _enrich_games_with_odds_api(games: list) -> list:
     """
     Enrich a list of game dicts with consensus Vegas lines from The Odds API.
@@ -674,6 +745,9 @@ def fetch_todays_games():
     Fetch tonight's NBA games via ClearSports API, then enrich with
     consensus Vegas lines from The Odds API (spread, total, moneyline).
 
+    Falls back to building the game list directly from The Odds API
+    when ClearSports returns no games.
+
     Returns:
         list of dict: Tonight's games, each with home_team, away_team,
                       team records, and Vegas lines from Odds API consensus.
@@ -688,6 +762,14 @@ def fetch_todays_games():
             games = _deduplicate_games(games)
     except Exception as err:
         _logger.warning(f"ClearSports games fetch failed: {err}")
+
+    # ── Fallback: build game list from The Odds API when ClearSports is empty ──
+    if not games:
+        _logger.info("ClearSports returned no games — trying Odds API fallback.")
+        games = _build_games_from_odds_api()
+        if games:
+            _logger.info(f"Odds API fallback: {len(games)} game(s) found.")
+            games = _deduplicate_games(games)
 
     # Enrich every game with Odds API consensus lines (moneyline + spread + total)
     games = _enrich_games_with_odds_api(games)
