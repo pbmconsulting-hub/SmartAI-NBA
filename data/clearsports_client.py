@@ -74,21 +74,21 @@ _API_CACHE_TTL: int = int(os.environ.get("API_CACHE_TTL_SECONDS", "300"))
 _PLAYER_ID_CACHE: dict = {}
 
 
-def _cache_get(url: str):
-    """Return cached payload for *url* if still within TTL, else None."""
-    entry = _API_CACHE.get(url)
+def _cache_get(key: str):
+    """Return cached payload for *key* if still within TTL, else None."""
+    entry = _API_CACHE.get(key)
     if entry is None:
         return None
     payload, ts = entry
     if time.time() - ts > _API_CACHE_TTL:
-        del _API_CACHE[url]
+        del _API_CACHE[key]
         return None
     return payload
 
 
-def _cache_set(url: str, payload) -> None:
-    """Store *payload* in the cache keyed by *url*."""
-    _API_CACHE[url] = (payload, time.time())
+def _cache_set(key: str, payload) -> None:
+    """Store *payload* in the cache keyed by *key*."""
+    _API_CACHE[key] = (payload, time.time())
 
 
 # ── API key resolution ────────────────────────────────────────────────────────
@@ -293,7 +293,7 @@ def fetch_games_today() -> list[dict]:
         if not raw:
             return []
 
-        games_raw = raw if isinstance(raw, list) else raw.get("games", raw.get("data", []))
+        games_raw = raw if isinstance(raw, list) else (raw.get("games") or raw.get("data") or [])
         if not isinstance(games_raw, list):
             _logger.warning("fetch_games_today: unexpected response shape, returning []")
             return []
@@ -387,7 +387,7 @@ def fetch_player_stats() -> list[dict]:
         if not raw:
             return []
 
-        players_raw = raw if isinstance(raw, list) else raw.get("players", raw.get("data", []))
+        players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
         if not isinstance(players_raw, list):
             _logger.warning("fetch_player_stats: unexpected response shape, returning []")
             return []
@@ -448,7 +448,7 @@ def fetch_team_stats() -> list[dict]:
         if not raw:
             return []
 
-        teams_raw = raw if isinstance(raw, list) else raw.get("teams", raw.get("data", []))
+        teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
         if not isinstance(teams_raw, list):
             _logger.warning("fetch_team_stats: unexpected response shape, returning []")
             return []
@@ -493,7 +493,7 @@ def fetch_injury_report() -> dict:
         if not raw:
             return {}
 
-        injuries_raw = raw if isinstance(raw, list) else raw.get("injuries", raw.get("data", []))
+        injuries_raw = raw if isinstance(raw, list) else (raw.get("injuries") or raw.get("data") or [])
         if not isinstance(injuries_raw, list):
             _logger.warning("fetch_injury_report: unexpected response shape, returning {}")
             return {}
@@ -536,7 +536,7 @@ def fetch_live_scores() -> list[dict]:
         if not raw:
             return []
 
-        scores_raw = raw if isinstance(raw, list) else raw.get("scores", raw.get("games", raw.get("data", [])))
+        scores_raw = raw if isinstance(raw, list) else (raw.get("scores") or raw.get("games") or raw.get("data") or [])
         if not isinstance(scores_raw, list):
             _logger.warning("fetch_live_scores: unexpected response shape, returning []")
             return []
@@ -586,7 +586,7 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
 
             roster_raw = (
                 raw if isinstance(raw, list)
-                else raw.get("roster", raw.get("players", raw.get("data", [])))
+                else (raw.get("roster") or raw.get("players") or raw.get("data") or [])
             )
             if not isinstance(roster_raw, list):
                 _logger.warning("fetch_rosters: unexpected shape for team %s", abbrev)
@@ -690,7 +690,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
             return []
 
         games = []
-        for g in (data if isinstance(data, list) else data.get("games", data.get("data", []))):
+        for g in (data if isinstance(data, list) else (data.get("games") or data.get("data") or [])):
             games.append({
                 "game_date": _safe_str(g.get("date", g.get("game_date", ""))),
                 "matchup": _safe_str(g.get("matchup", g.get("opponent", ""))),
@@ -761,7 +761,7 @@ def fetch_standings() -> list[dict]:
 
         rows_raw = (
             data if isinstance(data, list)
-            else data.get("standings", data.get("data", []))
+            else (data.get("standings") or data.get("data") or [])
         )
 
         standings = []
@@ -862,7 +862,7 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
         items_raw = (
             data if isinstance(data, list)
-            else data.get("news", data.get("articles", data.get("data", [])))
+            else (data.get("news") or data.get("articles") or data.get("data") or [])
         )
 
         news = []
@@ -986,7 +986,7 @@ def fetch_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
         if not raw:
             return []
 
-        usage_raw = raw if isinstance(raw, list) else raw.get("usage", raw.get("data", []))
+        usage_raw = raw if isinstance(raw, list) else (raw.get("usage") or raw.get("data") or [])
         if not isinstance(usage_raw, list):
             _logger.warning("fetch_api_key_usage: unexpected response shape, returning []")
             return []
@@ -1083,7 +1083,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        odds_raw = raw if isinstance(raw, list) else raw.get("odds", raw.get("data", []))
+        odds_raw = raw if isinstance(raw, list) else (raw.get("odds") or raw.get("data") or [])
         if not isinstance(odds_raw, list):
             _logger.warning("fetch_game_odds: unexpected response shape, returning []")
             return []
@@ -1120,7 +1120,7 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
         if not raw:
             return []
 
-        stats_raw = raw if isinstance(raw, list) else raw.get("stats", raw.get("data", []))
+        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
         if not isinstance(stats_raw, list):
             _logger.warning("fetch_nba_team_stats: unexpected response shape, returning []")
             return []
@@ -1157,7 +1157,7 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        stats_raw = raw if isinstance(raw, list) else raw.get("stats", raw.get("data", []))
+        stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
         if not isinstance(stats_raw, list):
             _logger.warning("fetch_nba_player_stats: unexpected response shape, returning []")
             return []
@@ -1191,7 +1191,7 @@ def fetch_predictions(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        predictions_raw = raw if isinstance(raw, list) else raw.get("predictions", raw.get("data", []))
+        predictions_raw = raw if isinstance(raw, list) else (raw.get("predictions") or raw.get("data") or [])
         if not isinstance(predictions_raw, list):
             _logger.warning("fetch_predictions: unexpected response shape, returning []")
             return []

@@ -711,5 +711,209 @@ class TestConsensusOddsBookmakerTypeCheck(unittest.TestCase):
                        "get_consensus_odds must type-check bookmaker entries")
 
 
+# ── Section 17: ClearSports null-safe 'or' chain patterns ───────────────────
+
+class TestClearSportsNullSafeOrChainPatterns(unittest.TestCase):
+    """Verify that ClearSports endpoint functions use (x or y or []) instead
+    of .get("key", .get("key2", [])) for extracting the top-level response
+    data list from API response envelopes.
+
+    The .get("key", default) pattern returns None when the key EXISTS with
+    an explicit null value — only returns the default when the key is MISSING.
+    The (x or y or []) pattern handles both cases correctly.
+
+    NOTE: We only check the response-envelope extraction (e.g.
+    ``raw.get("games") or raw.get("data") or []``).  Individual field-level
+    nesting like ``g.get("date", g.get("game_date", ""))`` is safe because
+    those values are wrapped in _safe_str/_safe_float helpers.
+    """
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def _assert_no_envelope_nested_get(self, func_name: str, old_pattern: str):
+        """Assert *func_name* does NOT contain the specified nested-get envelope pattern."""
+        idx = self.src.find(f"def {func_name}(")
+        self.assertGreater(idx, 0, f"Cannot find def {func_name}(")
+        snippet = self.src[idx:idx + 2500]
+        self.assertNotIn(
+            old_pattern, snippet,
+            f"{func_name} still uses unsafe nested .get() for response envelope extraction"
+        )
+
+    def test_fetch_games_today_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_games_today",
+            'raw.get("games", raw.get("data"',
+        )
+
+    def test_fetch_player_stats_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_player_stats",
+            'raw.get("players", raw.get("data"',
+        )
+
+    def test_fetch_team_stats_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_team_stats",
+            'raw.get("teams", raw.get("data"',
+        )
+
+    def test_fetch_injury_report_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_injury_report",
+            'raw.get("injuries", raw.get("data"',
+        )
+
+    def test_fetch_live_scores_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_live_scores",
+            'raw.get("scores", raw.get("games"',
+        )
+
+    def test_fetch_rosters_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_rosters",
+            'raw.get("roster", raw.get("players"',
+        )
+
+    def test_fetch_player_game_log_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_player_game_log",
+            'data.get("games", data.get("data"',
+        )
+
+    def test_fetch_standings_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_standings",
+            'data.get("standings", data.get("data"',
+        )
+
+    def test_fetch_news_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_news",
+            'data.get("news", data.get("articles"',
+        )
+
+    def test_fetch_api_key_usage_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_api_key_usage",
+            'raw.get("usage", raw.get("data"',
+        )
+
+    def test_fetch_game_odds_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_game_odds",
+            'raw.get("odds", raw.get("data"',
+        )
+
+    def test_fetch_nba_team_stats_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_nba_team_stats",
+            'raw.get("stats", raw.get("data"',
+        )
+
+    def test_fetch_nba_player_stats_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_nba_player_stats",
+            'raw.get("stats", raw.get("data"',
+        )
+
+    def test_fetch_predictions_uses_or_chain(self):
+        self._assert_no_envelope_nested_get(
+            "fetch_predictions",
+            'raw.get("predictions", raw.get("data"',
+        )
+
+
+# ── Section 18: Runtime crash-safety with explicit null values ───────────────
+
+class TestClearSportsExplicitNullCrashSafety(unittest.TestCase):
+    """Runtime tests proving that fetch_player_game_log, fetch_standings,
+    and fetch_news do NOT crash when the API returns an explicit null for
+    the expected data key (e.g. {"games": null}).
+
+    These three functions previously lacked the isinstance(list) guard that
+    other endpoints had, making them vulnerable to TypeError crashes.
+    """
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_player_game_log_null_games_key(self, mock_fetch, mock_key):
+        """fetch_player_game_log must not crash when API returns {"games": null}."""
+        from data.clearsports_client import fetch_player_game_log
+        mock_fetch.return_value = {"games": None}
+        result = fetch_player_game_log(player_id=123)
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_player_game_log_null_data_key(self, mock_fetch, mock_key):
+        """fetch_player_game_log must not crash when API returns {"data": null}."""
+        from data.clearsports_client import fetch_player_game_log
+        mock_fetch.return_value = {"data": None}
+        result = fetch_player_game_log(player_id=123)
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_standings_null_standings_key(self, mock_fetch, mock_key):
+        """fetch_standings must not crash when API returns {"standings": null}."""
+        from data.clearsports_client import fetch_standings
+        mock_fetch.return_value = {"standings": None}
+        result = fetch_standings()
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_standings_null_data_key(self, mock_fetch, mock_key):
+        """fetch_standings must not crash when API returns {"data": null}."""
+        from data.clearsports_client import fetch_standings
+        mock_fetch.return_value = {"data": None}
+        result = fetch_standings()
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_news_null_news_key(self, mock_fetch, mock_key):
+        """fetch_news must not crash when API returns {"news": null}."""
+        from data.clearsports_client import fetch_news
+        mock_fetch.return_value = {"news": None}
+        result = fetch_news()
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_fetch_news_null_articles_key(self, mock_fetch, mock_key):
+        """fetch_news must not crash when API returns {"articles": null}."""
+        from data.clearsports_client import fetch_news
+        mock_fetch.return_value = {"articles": None}
+        result = fetch_news()
+        self.assertIsInstance(result, list)
+        self.assertEqual(result, [])
+
+
+# ── Section 19: ClearSports _cache_get/_cache_set param name ─────────────────
+
+class TestClearSportsCacheParamNaming(unittest.TestCase):
+    """Verify that _cache_get and _cache_set use 'key' as the parameter name
+    (not 'url') to match the Odds API convention and reflect actual usage."""
+
+    def test_cache_get_param_named_key(self):
+        src = _CS_SRC.read_text(encoding="utf-8")
+        self.assertIn("def _cache_get(key:", src,
+                       "_cache_get parameter should be named 'key' not 'url'")
+
+    def test_cache_set_param_named_key(self):
+        src = _CS_SRC.read_text(encoding="utf-8")
+        self.assertIn("def _cache_set(key:", src,
+                       "_cache_set parameter should be named 'key' not 'url'")
+
+
 if __name__ == "__main__":
     unittest.main()
