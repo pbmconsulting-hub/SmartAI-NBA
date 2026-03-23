@@ -1,10 +1,15 @@
 # ============================================================
 # FILE: data/live_data_fetcher.py
-# PURPOSE: Fetch live, real NBA data via the ClearSports API.
-#          Pulls today's games, player stats, team stats, and
-#          player game logs. Saves everything to CSV files so
-#          the rest of the app works without any changes.
+# PURPOSE: Fetch live, real NBA data via ClearSports + Odds API.
+#          Pulls today's games, player stats, team stats, odds,
+#          predictions, and player game logs. Saves everything to
+#          CSV files so the rest of the app works without changes.
 # CONNECTS TO: pages/9_📡_Data_Feed.py, data/data_manager.py
+# DATA SOURCES:
+#   - ClearSports API: games, player stats, team stats, standings,
+#     injury reports, rosters, game-odds, predictions, player-stats
+#   - The Odds API: game odds (h2h/spreads/totals), player props,
+#     recent scores, events, event-level odds
 # CONCEPTS COVERED: APIs, rate limiting, CSV writing, error handling
 #
 # BEGINNER NOTE: An API (Application Programming Interface) is a
@@ -674,6 +679,143 @@ def _enrich_games_with_odds_api(games: list) -> list:
     return games
 
 
+def _enrich_games_with_clearsports_odds(games: list) -> list:
+    """
+    Supplement game odds with ClearSports ``fetch_game_odds`` data.
+
+    The primary odds source is The Odds API (via ``_enrich_games_with_odds_api``).
+    This function provides a secondary layer from ClearSports — useful when
+    the Odds API key is missing, or when ClearSports returns odds that the
+    Odds API does not cover (e.g. game-specific lines).
+
+    Only fills in ``vegas_spread`` and ``game_total`` that are still 0 or
+    missing after the primary enrichment pass.  Never overwrites non-zero
+    values already set by The Odds API.
+
+    Falls back gracefully — returns the original list unchanged on failure.
+
+    Args:
+        games: List of game dicts (already enriched by ``_enrich_games_with_odds_api``).
+
+    Returns:
+        list: Same games, enriched in-place with ClearSports odds fields.
+    """
+    if not games:
+        return games
+
+    try:
+        from data.clearsports_client import fetch_game_odds as _cs_odds
+        cs_odds_list = _cs_odds()
+        if not cs_odds_list:
+            return games
+    except Exception as exc:
+        _logger.debug("_enrich_games_with_clearsports_odds: ClearSports game-odds unavailable — %s", exc)
+        return games
+
+    # Build lookup by game_id for direct matching
+    cs_by_game_id: dict = {}
+    for entry in cs_odds_list:
+        if not isinstance(entry, dict):
+            continue
+        gid = str(entry.get("game_id", "")).strip()
+        if gid:
+            cs_by_game_id[gid] = entry
+
+    filled = 0
+    for game in games:
+        gid = str(game.get("game_id", "")).strip()
+        cs_entry = cs_by_game_id.get(gid)
+        if not cs_entry:
+            continue
+
+        current_spread = float(game.get("vegas_spread") or 0)
+        current_total  = float(game.get("game_total") or 0)
+
+        cs_spread = cs_entry.get("spread") or cs_entry.get("vegas_spread")
+        cs_total  = cs_entry.get("total") or cs_entry.get("game_total")
+
+        if cs_spread is not None and current_spread == 0.0:
+            try:
+                game["vegas_spread"] = round(float(cs_spread), 1)
+                filled += 1
+            except (TypeError, ValueError):
+                pass
+
+        if cs_total is not None and (current_total == 0.0 or current_total == DEFAULT_GAME_TOTAL):
+            try:
+                game["game_total"] = round(float(cs_total), 1)
+                filled += 1
+            except (TypeError, ValueError):
+                pass
+
+    if filled:
+        _logger.info(
+            "_enrich_games_with_clearsports_odds: filled %d odds field(s) from ClearSports.", filled
+        )
+    return games
+
+
+def _enrich_games_with_predictions(games: list) -> list:
+    """
+    Enrich game dicts with ClearSports AI-powered predictions.
+
+    Calls ClearSports ``fetch_predictions()`` and maps prediction data
+    onto each game dict.  Adds the following fields when available:
+
+    * ``cs_predicted_winner`` — team abbreviation the model favours
+    * ``cs_predicted_spread`` — ClearSports predicted spread (float)
+    * ``cs_predicted_total``  — ClearSports predicted total (float)
+    * ``cs_win_probability``  — model confidence (0.0–1.0, if provided)
+
+    Falls back gracefully — returns the original list unchanged on failure.
+
+    Args:
+        games: List of game dicts.
+
+    Returns:
+        list: Same games, enriched in-place with prediction fields.
+    """
+    if not games:
+        return games
+
+    try:
+        from data.clearsports_client import fetch_predictions as _cs_preds
+        preds = _cs_preds()
+        if not preds:
+            return games
+    except Exception as exc:
+        _logger.debug("_enrich_games_with_predictions: ClearSports predictions unavailable — %s", exc)
+        return games
+
+    # Build lookup by game_id
+    preds_by_id: dict = {}
+    for p in preds:
+        if not isinstance(p, dict):
+            continue
+        gid = str(p.get("game_id", "")).strip()
+        if gid:
+            preds_by_id[gid] = p
+
+    enriched = 0
+    for game in games:
+        gid = str(game.get("game_id", "")).strip()
+        pred = preds_by_id.get(gid)
+        if not pred:
+            continue
+
+        game["cs_predicted_winner"] = pred.get("predicted_winner", "")
+        game["cs_predicted_spread"] = pred.get("predicted_spread")
+        game["cs_predicted_total"]  = pred.get("predicted_total")
+        game["cs_win_probability"]  = pred.get("win_probability")
+        enriched += 1
+
+    if enriched:
+        _logger.info(
+            "_enrich_games_with_predictions: enriched %d game(s) with ClearSports predictions.", enriched
+        )
+    return games
+
+
 def _enrich_games_with_standings(games: list) -> list:
     """
     Enrich game dicts with ClearSports standings data (W-L, streak, rank).
@@ -773,6 +915,12 @@ def fetch_todays_games():
 
     # Enrich every game with Odds API consensus lines (moneyline + spread + total)
     games = _enrich_games_with_odds_api(games)
+
+    # Supplement with ClearSports game-level odds (fills gaps the Odds API missed)
+    games = _enrich_games_with_clearsports_odds(games)
+
+    # Enrich with ClearSports AI predictions (predicted winner, spread, total)
+    games = _enrich_games_with_predictions(games)
 
     # Enrich with ClearSports standings (W-L, streak, conference rank)
     games = _enrich_games_with_standings(games)
@@ -1483,6 +1631,36 @@ def fetch_all_todays_data(progress_callback=None):
     except Exception as _news_exc:
         _logger.debug("fetch_all_todays_data: news pre-load skipped — %s", _news_exc)
 
+    # --------------------------------------------------------
+    # Bonus: Pre-load ClearSports game-level odds + predictions
+    # into session state so Vegas Vault and other pages can use them.
+    # --------------------------------------------------------
+    try:
+        from data.clearsports_client import fetch_game_odds as _cs_odds
+        _cs_game_odds = _cs_odds()
+        if _cs_game_odds:
+            results["cs_game_odds"] = _cs_game_odds
+            try:
+                import streamlit as _st_odds
+                _st_odds.session_state["cs_game_odds"] = _cs_game_odds
+            except Exception:
+                pass
+    except Exception as _odds_exc:
+        _logger.debug("fetch_all_todays_data: ClearSports odds pre-load skipped — %s", _odds_exc)
+
+    try:
+        from data.clearsports_client import fetch_predictions as _cs_preds
+        _preds = _cs_preds()
+        if _preds:
+            results["cs_predictions"] = _preds
+            try:
+                import streamlit as _st_preds
+                _st_preds.session_state["cs_predictions"] = _preds
+            except Exception:
+                pass
+    except Exception as _preds_exc:
+        _logger.debug("fetch_all_todays_data: ClearSports predictions pre-load skipped — %s", _preds_exc)
+
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]
     games_count = len(results["games"])
@@ -1825,6 +2003,43 @@ def refresh_historical_data_for_tonight(
         results["clv_updated"] = clv_result.get("updated", 0)
     except Exception as exc:
         _logger.debug("refresh_historical_data_for_tonight: CLV update skipped — %s", exc)
+
+    # ── Cross-reference: ClearSports per-game player stats ────────────────
+    # fetch_nba_player_stats returns detailed box-score data from ClearSports
+    # for recently completed games.  Store it in session state so downstream
+    # pages (Game Report, Backtester) can reference historical actuals.
+    try:
+        from data.clearsports_client import fetch_nba_player_stats as _cs_pstats
+        cs_player_stats = _cs_pstats()  # all recent player stats
+        if cs_player_stats:
+            try:
+                import streamlit as _st_hist
+                _st_hist.session_state["cs_historical_player_stats"] = cs_player_stats
+            except Exception:
+                pass
+            results["cs_player_stats_count"] = len(cs_player_stats)
+    except Exception as exc:
+        _logger.debug(
+            "refresh_historical_data_for_tonight: ClearSports player stats skipped — %s", exc
+        )
+
+    # ── Cross-reference: Odds API recent scores ───────────────────────────
+    # Fetch recently completed game scores from The Odds API so downstream
+    # pages can validate projections against actual outcomes.
+    try:
+        from data.odds_api_client import fetch_recent_scores as _fetch_scores
+        recent = _fetch_scores(days_from=1)
+        if recent:
+            try:
+                import streamlit as _st_scores
+                _st_scores.session_state["recent_completed_scores"] = recent
+            except Exception:
+                pass
+            results["recent_scores_count"] = len(recent)
+    except Exception as exc:
+        _logger.debug(
+            "refresh_historical_data_for_tonight: recent scores skipped — %s", exc
+        )
 
     _logger.info(
         "refresh_historical_data_for_tonight: players_refreshed=%d, clv_updated=%d, errors=%d",
