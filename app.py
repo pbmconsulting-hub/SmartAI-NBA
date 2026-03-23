@@ -273,14 +273,14 @@ if "fetched_live_picks" not in st.session_state:
 # Keys loaded here are available immediately and persist for the session.
 # Users can still override them via the Settings page.
 try:
-    if "clearsports_api_key" not in st.session_state or not st.session_state["clearsports_api_key"]:
+    if not st.session_state.get("clearsports_api_key"):
         _cs_secret = st.secrets.get("CLEARSPORTS_API_KEY", "")
         if _cs_secret:
             st.session_state["clearsports_api_key"] = _cs_secret
 except Exception:
     pass
 try:
-    if "odds_api_key" not in st.session_state or not st.session_state["odds_api_key"]:
+    if not st.session_state.get("odds_api_key"):
         _odds_secret = st.secrets.get("ODDS_API_KEY", "")
         if _odds_secret:
             st.session_state["odds_api_key"] = _odds_secret
