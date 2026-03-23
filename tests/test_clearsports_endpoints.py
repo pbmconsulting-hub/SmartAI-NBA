@@ -1,12 +1,12 @@
 """
 tests/test_clearsports_endpoints.py
 ------------------------------------
-Tests for ClearSports API client endpoint structure:
-  1. Base URL correctness (/api/v1 prefix)
-  2. Injury endpoint uses /nba/injury-stats (not /nba/injuries)
+Tests for API-NBA client endpoint structure:
+  1. Base URL correctness (v2.nba.api-sports.io)
+  2. Injury endpoint uses /nba/injury-stats
   3. 403 status code handling (credit exhaustion)
-  4. New API key management endpoints (api-keys/me, usage, stats)
-  5. New NBA endpoints (teams/:id, game-odds, team-stats, player-stats, predictions)
+  4. API key management endpoints (api-keys/me, usage, stats)
+  5. NBA endpoints (teams, players, standings, teams/statistics, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
 
@@ -34,28 +34,27 @@ _CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "clearsports_client.py
 # ── Section 1: Base URL correctness ──────────────────────────────────────────
 
 class TestBaseURL(unittest.TestCase):
-    """Verify the ClearSports base URL uses the /api/v1 prefix."""
+    """Verify the API-NBA base URL uses v2.nba.api-sports.io."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
-    def test_base_url_has_api_v1_prefix(self):
-        """_BASE_URL must use /api/v1 path prefix."""
+    def test_base_url_has_api_sports_domain(self):
+        """_BASE_URL must use v2.nba.api-sports.io."""
         self.assertIn(
-            'https://api.clearsportsapi.com/api/v1',
+            'https://v2.nba.api-sports.io',
             self.src,
-            "_BASE_URL must be https://api.clearsportsapi.com/api/v1",
+            "_BASE_URL must be https://v2.nba.api-sports.io",
         )
 
-    def test_base_url_not_old_v1(self):
-        """_BASE_URL must NOT use the old /v1 path (without /api prefix)."""
-        # Make sure _BASE_URL line doesn't have the old form
+    def test_base_url_not_old_clearsports(self):
+        """_BASE_URL must NOT use the old clearsportsapi.com domain."""
         for line in self.src.splitlines():
             if line.strip().startswith("_BASE_URL"):
                 self.assertNotIn(
-                    'clearsportsapi.com/v1"',
+                    'clearsportsapi.com',
                     line,
-                    "_BASE_URL must not use old /v1 path without /api prefix",
+                    "_BASE_URL must not use old clearsportsapi.com domain",
                 )
 
 
@@ -71,7 +70,7 @@ class TestInjuryEndpointPath(unittest.TestCase):
         """fetch_injury_report must call /nba/injury-stats."""
         idx = self.src.find("def fetch_injury_report(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
+        snippet = self.src[idx:idx + 800]
         self.assertIn("/nba/injury-stats", snippet,
                        "fetch_injury_report must use /nba/injury-stats endpoint")
 
@@ -79,7 +78,7 @@ class TestInjuryEndpointPath(unittest.TestCase):
         """fetch_injury_report must NOT use old /nba/injuries path."""
         idx = self.src.find("def fetch_injury_report(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
+        snippet = self.src[idx:idx + 800]
         self.assertNotIn('"/nba/injuries"', snippet,
                          "fetch_injury_report must not use old /nba/injuries path")
 
@@ -194,11 +193,11 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_teams(", self.src)
 
     def test_fetch_teams_url(self):
-        """fetch_teams must call /nba/teams."""
+        """fetch_teams must call /teams."""
         idx = self.src.find("def fetch_teams(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/teams", snippet)
+        self.assertIn("/teams", snippet)
 
     # -- fetch_games --
 
@@ -207,11 +206,11 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_games(", self.src)
 
     def test_fetch_games_url(self):
-        """fetch_games must call /nba/games."""
+        """fetch_games must call /games."""
         idx = self.src.find("def fetch_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/games", snippet)
+        self.assertIn("/games", snippet)
 
     def test_fetch_games_has_params(self):
         """fetch_games must accept season, date, and team_id parameters."""
@@ -229,11 +228,11 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_players(", self.src)
 
     def test_fetch_players_url(self):
-        """fetch_players must call /nba/players."""
+        """fetch_players must call /players."""
         idx = self.src.find("def fetch_players(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/players", snippet)
+        self.assertIn("/players", snippet)
 
     def test_fetch_players_has_team_id_param(self):
         """fetch_players must accept team_id parameter."""
@@ -274,11 +273,11 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_team_by_id(", self.src)
 
     def test_fetch_team_by_id_url(self):
-        """fetch_team_by_id must call /nba/teams/{team_id}."""
+        """fetch_team_by_id must call /teams."""
         idx = self.src.find("def fetch_team_by_id(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/teams/{team_id}", snippet)
+        self.assertIn("/teams", snippet)
 
     # -- fetch_game_odds --
 
@@ -291,7 +290,7 @@ class TestNewNBAEndpoints(unittest.TestCase):
         idx = self.src.find("def fetch_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/game-odds", snippet)
+        self.assertIn("/game-odds", snippet)
 
     def test_fetch_game_odds_has_game_id_param(self):
         """fetch_game_odds must accept game_id parameter."""
@@ -307,18 +306,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_nba_team_stats(", self.src)
 
     def test_fetch_nba_team_stats_url(self):
-        """fetch_nba_team_stats must call /nba/team-stats."""
+        """fetch_nba_team_stats must call /teams/statistics."""
         idx = self.src.find("def fetch_nba_team_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/team-stats", snippet)
+        self.assertIn("/teams/statistics", snippet)
 
     def test_fetch_nba_team_stats_has_params(self):
-        """fetch_nba_team_stats must accept team_id and season parameters."""
+        """fetch_nba_team_stats must accept id and season parameters."""
         idx = self.src.find("def fetch_nba_team_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn('"team_id"', snippet)
+        self.assertIn('"id"', snippet)
         self.assertIn('"season"', snippet)
 
     # -- fetch_nba_player_stats --
@@ -328,19 +327,19 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_nba_player_stats(", self.src)
 
     def test_fetch_nba_player_stats_url(self):
-        """fetch_nba_player_stats must call /nba/player-stats."""
+        """fetch_nba_player_stats must call /players/statistics."""
         idx = self.src.find("def fetch_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/player-stats", snippet)
+        self.assertIn("/players/statistics", snippet)
 
     def test_fetch_nba_player_stats_has_params(self):
-        """fetch_nba_player_stats must accept player_id and game_id parameters."""
+        """fetch_nba_player_stats must accept id and game parameters."""
         idx = self.src.find("def fetch_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn('"player_id"', snippet)
-        self.assertIn('"game_id"', snippet)
+        self.assertIn('"id"', snippet)
+        self.assertIn('"game"', snippet)
 
     # -- fetch_predictions --
 
@@ -641,21 +640,21 @@ class TestPredictionsRuntime(unittest.TestCase):
 
 # ── Section 7: Authentication structure ───────────────────────────────────────
 
-class TestBearerAuthentication(unittest.TestCase):
-    """Verify Bearer token is used in Authorization header."""
+class TestApiSportsAuthentication(unittest.TestCase):
+    """Verify x-apisports-key header is used for authentication."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
-    def test_bearer_token_in_headers(self):
-        """_fetch_with_retry must use Bearer token in Authorization header."""
-        self.assertIn('f"Bearer {api_key}"', self.src,
-                       "Must use Bearer token format in Authorization header")
+    def test_apisports_key_in_headers(self):
+        """_fetch_with_retry must use x-apisports-key header."""
+        self.assertIn('"x-apisports-key"', self.src,
+                       "Must use x-apisports-key header for authentication")
 
-    def test_accept_json_header(self):
-        """_fetch_with_retry must request application/json."""
-        self.assertIn('"application/json"', self.src,
-                       "Must include Accept: application/json header")
+    def test_no_bearer_token(self):
+        """_fetch_with_retry must not use Bearer token (old auth)."""
+        self.assertNotIn('f"Bearer {api_key}"', self.src,
+                         "Must not use old Bearer token authentication")
 
 
 if __name__ == "__main__":

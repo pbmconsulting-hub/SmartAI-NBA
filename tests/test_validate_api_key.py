@@ -141,12 +141,16 @@ class TestSettingsPageApiKeySection(unittest.TestCase):
         self.assertIn("validate_api_key", self.src)
 
     def test_calls_fetch_api_key_info(self):
-        """Test Connection must call fetch_api_key_info for ClearSports."""
+        """Test Connection must call fetch_api_key_info for API-NBA."""
         self.assertIn("fetch_api_key_info", self.src)
 
     def test_calls_fetch_events(self):
         """Test Connection must call fetch_events for Odds API."""
         self.assertIn("fetch_events", self.src)
+
+    def test_uses_api_nba_key_session_state(self):
+        """Settings page must use api_nba_key in session state."""
+        self.assertIn("api_nba_key", self.src)
 
 
 if __name__ == "__main__":

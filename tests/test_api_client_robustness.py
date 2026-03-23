@@ -48,7 +48,7 @@ class TestClearSportsNoApiKeyInParams(unittest.TestCase):
         self.assertGreater(idx, 0)
         # Use a 1500-char window to reach past the docstring
         snippet = self.src[idx:idx + 1500]
-        self.assertIn('"last_n"', snippet)
+        self.assertIn('"id"', snippet)
         self.assertNotIn('"apiKey"', snippet,
                          "fetch_player_game_log params must not include apiKey")
 

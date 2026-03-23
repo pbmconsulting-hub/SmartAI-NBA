@@ -1,7 +1,7 @@
 """
 data/clearsports_client.py
 --------------------------
-ClearSports API client for NBA data.
+API-NBA client for NBA data (via API-Sports).
 
 Provides:
   NBA Data:
@@ -27,9 +27,9 @@ Provides:
   - fetch_api_key_stats(start_date, end_date) → aggregated usage statistics
 
 API key resolution (first match wins):
-  1. st.session_state["clearsports_api_key"]
-  2. st.secrets["CLEARSPORTS_API_KEY"]  (via .streamlit/secrets.toml)
-  3. CLEARSPORTS_API_KEY environment variable
+  1. st.session_state["api_nba_key"]
+  2. st.secrets["API_NBA_KEY"]  (via .streamlit/secrets.toml)
+  3. API_NBA_KEY environment variable
 
 Caching uses the same TTL-based pattern as platform_fetcher.py.
 Retry logic applies exponential backoff (1 s → 2 s → 4 s, capped at 10 s).
@@ -62,7 +62,7 @@ except ImportError:
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-_BASE_URL = "https://api.clearsportsapi.com/api/v1"
+_BASE_URL = "https://v2.nba.api-sports.io"
 
 MAX_API_RETRIES = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
@@ -108,7 +108,7 @@ def _cache_set(key: str, payload) -> None:
 # ── API key resolution ────────────────────────────────────────────────────────
 
 def validate_api_key(key: str | None) -> tuple[bool, str]:
-    """Check whether *key* looks like a valid ClearSports API key.
+    """Check whether *key* looks like a valid API-NBA key.
 
     Returns:
         (is_valid, message): True with a success message when the format
@@ -125,21 +125,21 @@ def validate_api_key(key: str | None) -> tuple[bool, str]:
 
 
 def _resolve_api_key() -> str | None:
-    """Return the ClearSports API key from session state, secrets, or environment."""
+    """Return the API-NBA key from session state, secrets, or environment."""
     if _ST_AVAILABLE:
         try:
-            key = st.session_state.get("clearsports_api_key")
+            key = st.session_state.get("api_nba_key")
             if key:
                 return key
         except Exception:
             pass
         try:
-            key = st.secrets.get("CLEARSPORTS_API_KEY")
+            key = st.secrets.get("API_NBA_KEY")
             if key:
                 return key
         except Exception:
             pass
-    return os.environ.get("CLEARSPORTS_API_KEY")
+    return os.environ.get("API_NBA_KEY")
 
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
@@ -161,7 +161,7 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
     Results are cached for _API_CACHE_TTL seconds.
     """
     if not REQUESTS_AVAILABLE:
-        _logger.warning("requests library is not available — cannot call ClearSports API")
+        _logger.warning("requests library is not available — cannot call API-NBA")
         return None
 
     cache_key = _build_cache_key(url, params)
@@ -171,12 +171,11 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
 
     api_key = _resolve_api_key()
     if not api_key:
-        _logger.warning("No ClearSports API key found — skipping request to %s", url)
+        _logger.warning("No API-NBA key found — skipping request to %s", url)
         return None
 
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json",
+        "x-apisports-key": api_key,
     }
 
     for attempt in range(MAX_API_RETRIES + 1):
@@ -201,19 +200,19 @@ def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | Non
                 return None
 
             if resp.status_code == 401:
-                _logger.error("ClearSports API key is invalid or unauthorised (401) for %s", url)
+                _logger.error("API-NBA key is invalid or unauthorised (401) for %s", url)
                 return None
 
             if resp.status_code == 403:
-                _logger.error("ClearSports API access denied (403) for %s — credits may be exhausted", url)
+                _logger.error("API-NBA access denied (403) for %s — credits may be exhausted", url)
                 return None
 
             if resp.status_code == 404:
-                _logger.warning("ClearSports endpoint not found (404): %s", url)
+                _logger.warning("API-NBA endpoint not found (404): %s", url)
                 return None
 
             if resp.status_code == 422:
-                _logger.warning("ClearSports 422 (unsupported request) for %s", url)
+                _logger.warning("API-NBA 422 (unsupported request) for %s", url)
                 return None
 
             resp.raise_for_status()
@@ -310,20 +309,20 @@ def fetch_teams() -> list[dict]:
     """
     Retrieve all NBA teams.
 
-    Endpoint: GET /api/v1/nba/teams
+    Endpoint: GET /teams
 
     Returns:
         list[dict]: Team entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/teams"
+    url = f"{_BASE_URL}/teams"
 
     try:
         raw = _fetch_with_retry(url)
         if not raw:
             return []
 
-        teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
+        teams_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("teams") or raw.get("data") or [])
         if not isinstance(teams_raw, list):
             _logger.warning("fetch_teams: unexpected response shape, returning []")
             return []
@@ -338,7 +337,7 @@ def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
     """
     Retrieve NBA games.
 
-    Endpoint: GET /api/v1/nba/games
+    Endpoint: GET /games
 
     Args:
         season:  Optional season year (e.g. 2024).
@@ -349,7 +348,7 @@ def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
         list[dict]: Game entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/games"
+    url = f"{_BASE_URL}/games"
     params: dict = {}
     if season is not None:
         params["season"] = season
@@ -363,7 +362,7 @@ def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
         if not raw:
             return []
 
-        games_raw = raw if isinstance(raw, list) else (raw.get("games") or raw.get("data") or [])
+        games_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("games") or raw.get("data") or [])
         if not isinstance(games_raw, list):
             _logger.warning("fetch_games: unexpected response shape, returning []")
             return []
@@ -378,8 +377,8 @@ def fetch_players(team_id=None) -> list[dict]:
     """
     Retrieve NBA players.
 
-    Endpoint: GET /api/v1/nba/players
-    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+    Endpoint: GET /players
+    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
         team_id: Optional team ID to filter by.
@@ -388,7 +387,7 @@ def fetch_players(team_id=None) -> list[dict]:
         list[dict]: Player entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/players"
+    url = f"{_BASE_URL}/players"
     params: dict = {}
     if team_id is not None:
         params["team_id"] = team_id
@@ -396,15 +395,15 @@ def fetch_players(team_id=None) -> list[dict]:
     try:
         raw = _fetch_with_retry(url, params=params)
         if raw:
-            players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
+            players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
             if isinstance(players_raw, list):
                 result = [p for p in players_raw if isinstance(p, dict)]
                 if result:
                     return result
             else:
-                _logger.warning("fetch_players: unexpected response shape from ClearSports")
+                _logger.warning("fetch_players: unexpected response shape from API-NBA")
     except Exception as exc:
-        _logger.warning("fetch_players ClearSports failed: %s", exc)
+        _logger.warning("fetch_players API-NBA failed: %s", exc)
 
     # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
@@ -427,7 +426,7 @@ def fetch_games_today() -> list[dict]:
             vegas_spread, game_total
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/games"
+    url = f"{_BASE_URL}/games"
     today = _today_str()
     params = {"date": today}
 
@@ -436,7 +435,7 @@ def fetch_games_today() -> list[dict]:
         if not raw:
             return []
 
-        games_raw = raw if isinstance(raw, list) else (raw.get("games") or raw.get("data") or [])
+        games_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("games") or raw.get("data") or [])
         if not isinstance(games_raw, list):
             _logger.warning("fetch_games_today: unexpected response shape, returning []")
             return []
@@ -530,7 +529,7 @@ def fetch_player_stats() -> list[dict]:
     """
     Fetch current-season player averages and standard deviations.
 
-    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -542,13 +541,13 @@ def fetch_player_stats() -> list[dict]:
             steals_std, blocks_std, turnovers_std
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/players"
+    url = f"{_BASE_URL}/players"
     params = {"season": "2025"}
 
     try:
         raw = _fetch_with_retry(url, params=params)
         if raw:
-            players_raw = raw if isinstance(raw, list) else (raw.get("players") or raw.get("data") or [])
+            players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
             if isinstance(players_raw, list):
                 players: list[dict] = []
                 for p in players_raw:
@@ -583,9 +582,9 @@ def fetch_player_stats() -> list[dict]:
                 if players:
                     return players
             else:
-                _logger.warning("fetch_player_stats: unexpected response shape from ClearSports")
+                _logger.warning("fetch_player_stats: unexpected response shape from API-NBA")
     except Exception as exc:
-        _logger.warning("fetch_player_stats ClearSports failed: %s", exc)
+        _logger.warning("fetch_player_stats API-NBA failed: %s", exc)
 
     # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
@@ -601,7 +600,7 @@ def fetch_team_stats() -> list[dict]:
     """
     Fetch current-season team pace, ratings, and win/loss record.
 
-    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -610,13 +609,13 @@ def fetch_team_stats() -> list[dict]:
             wins, losses
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/teams"
+    url = f"{_BASE_URL}/teams"
     params = {"season": "2025"}
 
     try:
         raw = _fetch_with_retry(url, params=params)
         if raw:
-            teams_raw = raw if isinstance(raw, list) else (raw.get("teams") or raw.get("data") or [])
+            teams_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("teams") or raw.get("data") or [])
             if isinstance(teams_raw, list):
                 teams: list[dict] = []
                 for t in teams_raw:
@@ -636,9 +635,9 @@ def fetch_team_stats() -> list[dict]:
                 if teams:
                     return teams
             else:
-                _logger.warning("fetch_team_stats: unexpected response shape from ClearSports")
+                _logger.warning("fetch_team_stats: unexpected response shape from API-NBA")
     except Exception as exc:
-        _logger.warning("fetch_team_stats ClearSports failed: %s", exc)
+        _logger.warning("fetch_team_stats API-NBA failed: %s", exc)
 
     # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
@@ -654,7 +653,7 @@ def fetch_injury_report(team_id=None) -> dict:
     """
     Fetch the current NBA injury report.
 
-    Endpoint: GET /api/v1/nba/injury-stats
+    Endpoint: GET /injuries
 
     Args:
         team_id: Optional team ID to filter by.
@@ -676,7 +675,7 @@ def fetch_injury_report(team_id=None) -> dict:
         if not raw:
             return {}
 
-        injuries_raw = raw if isinstance(raw, list) else (raw.get("injuries") or raw.get("data") or [])
+        injuries_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("injuries") or raw.get("data") or [])
         if not isinstance(injuries_raw, list):
             _logger.warning("fetch_injury_report: unexpected response shape, returning {}")
             return {}
@@ -711,7 +710,7 @@ def fetch_live_scores() -> list[dict]:
             period, game_clock, status
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/scores"
+    url = f"{_BASE_URL}/games"
     params = {"date": _today_str()}
 
     try:
@@ -719,7 +718,7 @@ def fetch_live_scores() -> list[dict]:
         if not raw:
             return []
 
-        scores_raw = raw if isinstance(raw, list) else (raw.get("scores") or raw.get("games") or raw.get("data") or [])
+        scores_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("scores") or raw.get("games") or raw.get("data") or [])
         if not isinstance(scores_raw, list):
             _logger.warning("fetch_live_scores: unexpected response shape, returning []")
             return []
@@ -759,7 +758,7 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
     rosters: dict[str, list[str]] = {}
 
     for abbrev in team_abbrevs:
-        url = f"{_BASE_URL}/nba/rosters"
+        url = f"{_BASE_URL}/players"
         params = {"team": abbrev}
 
         try:
@@ -769,7 +768,7 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
 
             roster_raw = (
                 raw if isinstance(raw, list)
-                else (raw.get("roster") or raw.get("players") or raw.get("data") or [])
+                else (raw.get("response") or raw.get("roster") or raw.get("players") or raw.get("data") or [])
             )
             if not isinstance(roster_raw, list):
                 _logger.warning("fetch_rosters: unexpected shape for team %s", abbrev)
@@ -813,7 +812,7 @@ def lookup_player_id(player_name: str) -> int | None:
     if name_key in _PLAYER_ID_CACHE:
         return _PLAYER_ID_CACHE[name_key]
 
-    # 2. Try to resolve via ClearSports player data
+    # 2. Try to resolve via API-NBA player data
     player_id: int | None = None
     try:
         players = fetch_player_stats()
@@ -839,7 +838,7 @@ def lookup_player_id(player_name: str) -> int | None:
 
 def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
     """
-    Fetch the last N game logs for a specific player from ClearSports API.
+    Fetch the last N game logs for a specific player from API-NBA.
 
     Args:
         player_id (int or str): The NBA player's unique ID.
@@ -853,11 +852,11 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
     """
     api_key = _resolve_api_key()
     if not api_key:
-        _logger.warning("ClearSports API key not configured — cannot fetch player game log.")
+        _logger.warning("API-NBA key not configured — cannot fetch player game log.")
         return []
 
-    url = f"{_BASE_URL}/nba/players/{player_id}/game_log"
-    params = {"last_n": last_n_games}
+    url = f"{_BASE_URL}/players/statistics"
+    params = {"id": player_id, "season": "2024"}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -873,7 +872,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
             return []
 
         games = []
-        for g in (data if isinstance(data, list) else (data.get("games") or data.get("data") or [])):
+        for g in (data if isinstance(data, list) else (data.get("response") or data.get("games") or data.get("data") or [])):
             if not isinstance(g, dict):
                 continue
             games.append({
@@ -902,7 +901,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
 
 def fetch_standings() -> list[dict]:
     """
-    Fetch current NBA standings from ClearSports API.
+    Fetch current NBA standings from API-NBA.
 
     Returns a list of team standing entries including conference rank,
     win-loss record, home/away splits, last-10 record, and streak.
@@ -926,11 +925,11 @@ def fetch_standings() -> list[dict]:
     """
     api_key = _resolve_api_key()
     if not api_key:
-        _logger.debug("fetch_standings: no ClearSports API key — returning []")
+        _logger.debug("fetch_standings: no API-NBA key — returning []")
         return []
 
-    url = f"{_BASE_URL}/nba/standings"
-    params = {"season": "current"}
+    url = f"{_BASE_URL}/standings"
+    params = {"league": "standard", "season": "2024"}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -946,7 +945,7 @@ def fetch_standings() -> list[dict]:
 
         rows_raw = (
             data if isinstance(data, list)
-            else (data.get("standings") or data.get("data") or [])
+            else (data.get("response") or data.get("standings") or data.get("data") or [])
         )
 
         standings = []
@@ -1007,7 +1006,7 @@ def fetch_standings() -> list[dict]:
 
 def fetch_news(limit: int = 20) -> list[dict]:
     """
-    Fetch recent NBA player/team news from ClearSports API.
+    Fetch recent NBA player/team news from API-NBA.
 
     Useful for Joseph M. Smith's contextual commentary and for
     surfacing injury updates, trade news, and performance notes.
@@ -1029,7 +1028,7 @@ def fetch_news(limit: int = 20) -> list[dict]:
     """
     api_key = _resolve_api_key()
     if not api_key:
-        _logger.debug("fetch_news: no ClearSports API key — returning []")
+        _logger.debug("fetch_news: no API-NBA key — returning []")
         return []
 
     url = f"{_BASE_URL}/nba/news"
@@ -1049,7 +1048,7 @@ def fetch_news(limit: int = 20) -> list[dict]:
 
         items_raw = (
             data if isinstance(data, list)
-            else (data.get("news") or data.get("articles") or data.get("data") or [])
+            else (data.get("response") or data.get("news") or data.get("articles") or data.get("data") or [])
         )
 
         news = []
@@ -1080,7 +1079,7 @@ def fetch_season_game_logs_batch(
     last_n_games: int = 30,
 ) -> dict:
     """
-    Batch-fetch game logs for multiple players from ClearSports API.
+    Batch-fetch game logs for multiple players from API-NBA.
 
     Fetches each player's game log sequentially with a short pause to
     respect rate limits, then returns a name-keyed dict suitable for
@@ -1132,7 +1131,7 @@ def fetch_api_key_info() -> dict:
     """
     Retrieve information about the current API key.
 
-    Endpoint: GET /api/v1/api-keys/me
+    Endpoint: GET /status
 
     Returns:
         dict: API key info with keys:
@@ -1157,7 +1156,7 @@ def fetch_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
     """
     Retrieve detailed usage history for the current API key.
 
-    Endpoint: GET /api/v1/api-keys/me/usage
+    Endpoint: GET /api-keys/me/usage
 
     Args:
         limit:  Number of records to return (default: 50).
@@ -1175,7 +1174,7 @@ def fetch_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
         if not raw:
             return []
 
-        usage_raw = raw if isinstance(raw, list) else (raw.get("usage") or raw.get("data") or [])
+        usage_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("usage") or raw.get("data") or [])
         if not isinstance(usage_raw, list):
             _logger.warning("fetch_api_key_usage: unexpected response shape, returning []")
             return []
@@ -1193,7 +1192,7 @@ def fetch_api_key_stats(
     """
     Get aggregated usage statistics for the current API key.
 
-    Endpoint: GET /api/v1/api-keys/me/stats
+    Endpoint: GET /api-keys/me/stats
 
     Args:
         start_date: Start date for statistics (ISO 8601 format).
@@ -1227,7 +1226,7 @@ def fetch_team_by_id(team_id) -> dict:
     """
     Retrieve a specific NBA team by its ID.
 
-    Endpoint: GET /api/v1/nba/teams/:teamId
+    Endpoint: GET /teams?id={team_id}
 
     Args:
         team_id: The team ID (int or str).
@@ -1236,12 +1235,19 @@ def fetch_team_by_id(team_id) -> dict:
         dict: Team details.
         Returns {} on failure.
     """
-    url = f"{_BASE_URL}/nba/teams/{team_id}"
+    url = f"{_BASE_URL}/teams"
+    params = {"id": team_id}
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _fetch_with_retry(url, params=params)
         if not raw or not isinstance(raw, dict):
             return {}
+        # API-Sports wraps responses in "response" key
+        response = raw.get("response")
+        if isinstance(response, list) and response:
+            return response[0] if isinstance(response[0], dict) else {}
+        if isinstance(response, dict):
+            return response
         return raw
 
     except Exception as exc:
@@ -1253,7 +1259,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
     """
     Retrieve betting odds for NBA games.
 
-    Endpoint: GET /api/v1/nba/game-odds
+    Endpoint: GET /odds
 
     Args:
         game_id: Optional game ID to filter odds for a specific game.
@@ -1272,7 +1278,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        odds_raw = raw if isinstance(raw, list) else (raw.get("odds") or raw.get("data") or [])
+        odds_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("odds") or raw.get("data") or [])
         if not isinstance(odds_raw, list):
             _logger.warning("fetch_game_odds: unexpected response shape, returning []")
             return []
@@ -1287,8 +1293,8 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
     """
     Retrieve team statistics for NBA games.
 
-    Endpoint: GET /api/v1/nba/team-stats
-    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+    Endpoint: GET /teams/statistics
+    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
         team_id: Optional team ID to filter by.
@@ -1298,23 +1304,23 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
         list[dict]: Team statistics entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/team-stats"
+    url = f"{_BASE_URL}/teams/statistics"
     params: dict = {}
     if team_id is not None:
-        params["team_id"] = team_id
+        params["id"] = team_id
     if season is not None:
         params["season"] = season
 
     try:
         raw = _fetch_with_retry(url, params=params)
         if raw:
-            stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
+            stats_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("stats") or raw.get("data") or [])
             if isinstance(stats_raw, list) and stats_raw:
                 return stats_raw
             elif not isinstance(stats_raw, list):
-                _logger.warning("fetch_nba_team_stats: unexpected response shape from ClearSports")
+                _logger.warning("fetch_nba_team_stats: unexpected response shape from API-NBA")
     except Exception as exc:
-        _logger.warning("fetch_nba_team_stats ClearSports failed: %s", exc)
+        _logger.warning("fetch_nba_team_stats API-NBA failed: %s", exc)
 
     # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
@@ -1330,8 +1336,8 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
     """
     Retrieve player statistics for NBA games.
 
-    Endpoint: GET /api/v1/nba/player-stats
-    Fallback: free NBA.com stats endpoint when ClearSports is unavailable.
+    Endpoint: GET /players/statistics
+    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
         player_id: Optional player ID to filter by.
@@ -1341,23 +1347,23 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
         list[dict]: Player statistics entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/player-stats"
+    url = f"{_BASE_URL}/players/statistics"
     params: dict = {}
     if player_id is not None:
-        params["player_id"] = player_id
+        params["id"] = player_id
     if game_id is not None:
-        params["game_id"] = game_id
+        params["game"] = game_id
 
     try:
         raw = _fetch_with_retry(url, params=params)
         if raw:
-            stats_raw = raw if isinstance(raw, list) else (raw.get("stats") or raw.get("data") or [])
+            stats_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("stats") or raw.get("data") or [])
             if isinstance(stats_raw, list) and stats_raw:
                 return stats_raw
             elif not isinstance(stats_raw, list):
-                _logger.warning("fetch_nba_player_stats: unexpected response shape from ClearSports")
+                _logger.warning("fetch_nba_player_stats: unexpected response shape from API-NBA")
     except Exception as exc:
-        _logger.warning("fetch_nba_player_stats ClearSports failed: %s", exc)
+        _logger.warning("fetch_nba_player_stats API-NBA failed: %s", exc)
 
     # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
@@ -1373,7 +1379,7 @@ def fetch_predictions(game_id=None) -> list[dict]:
     """
     Retrieve AI-powered NBA game predictions.
 
-    Endpoint: GET /api/v1/nba/predictions
+    Endpoint: GET /nba/predictions
 
     Args:
         game_id: Optional game ID to filter predictions for a specific game.
@@ -1392,7 +1398,7 @@ def fetch_predictions(game_id=None) -> list[dict]:
         if not raw:
             return []
 
-        predictions_raw = raw if isinstance(raw, list) else (raw.get("predictions") or raw.get("data") or [])
+        predictions_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("predictions") or raw.get("data") or [])
         if not isinstance(predictions_raw, list):
             _logger.warning("fetch_predictions: unexpected response shape, returning []")
             return []
