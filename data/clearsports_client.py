@@ -856,7 +856,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
         return []
 
     url = f"{_BASE_URL}/players/statistics"
-    params = {"id": player_id, "season": "2024"}
+    params = {"id": player_id, "season": "2025"}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -929,7 +929,7 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/standings"
-    params = {"league": "standard", "season": "2024"}
+    params = {"league": "standard", "season": "2025"}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
