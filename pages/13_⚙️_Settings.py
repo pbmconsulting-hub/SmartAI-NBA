@@ -164,9 +164,10 @@ st.markdown(get_education_box_html(
 
 st.subheader("🔑 API Keys")
 st.markdown(
-    "Enter your API keys below. Keys are stored in your browser session and "
-    "never saved to disk. For persistent keys, add them to "
-    "`.streamlit/secrets.toml` (see `secrets.toml.example`)."
+    "Enter your API keys below. Keys entered here are stored in your browser "
+    "session only (temporary). For persistent keys across sessions, copy "
+    "`.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add "
+    "your keys there."
 )
 
 _api_col1, _api_col2 = st.columns(2)
@@ -180,8 +181,6 @@ with _api_col1:
         placeholder="Enter your ClearSports API key",
         help="Get your key at https://clearsportsapi.com",
     )
-    if _new_cs_key != _current_cs_key:
-        st.session_state["clearsports_api_key"] = _new_cs_key
     if st.session_state.get("clearsports_api_key"):
         st.caption("✅ ClearSports API key is set")
     else:
@@ -196,8 +195,6 @@ with _api_col2:
         placeholder="Enter your Odds API key",
         help="Get your key at https://the-odds-api.com",
     )
-    if _new_odds_key != _current_odds_key:
-        st.session_state["odds_api_key"] = _new_odds_key
     if st.session_state.get("odds_api_key"):
         st.caption("✅ Odds API key is set")
     else:
@@ -206,8 +203,18 @@ with _api_col2:
 _api_btn_col1, _api_btn_col2, _ = st.columns([1, 1, 2])
 with _api_btn_col1:
     if st.button("💾 Save Keys", key="save_api_keys"):
-        st.success("✅ API keys saved to session!")
-        st.rerun()
+        _changed = False
+        if _new_cs_key != _current_cs_key:
+            st.session_state["clearsports_api_key"] = _new_cs_key
+            _changed = True
+        if _new_odds_key != _current_odds_key:
+            st.session_state["odds_api_key"] = _new_odds_key
+            _changed = True
+        if _changed:
+            st.success("✅ API keys saved to session!")
+            st.rerun()
+        else:
+            st.info("No changes to save.")
 with _api_btn_col2:
     if st.button("🗑️ Clear Keys", key="clear_api_keys"):
         st.session_state.pop("clearsports_api_key", None)
