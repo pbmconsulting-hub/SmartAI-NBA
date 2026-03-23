@@ -85,6 +85,41 @@ st.markdown(
     "Tracking your locked bets against real-time box scores.  "
     "Auto-refreshes every **2 minutes**."
 )
+
+with st.expander("📖 How to Use the Live Sweat Dashboard", expanded=False):
+    st.markdown("""
+### What This Page Does
+The Live Sweat Dashboard monitors your **locked player prop bets** against
+real-time NBA box-score data.  It calculates whether each player is
+**on pace** to hit their line (OVER or UNDER) and surfaces Joseph M. Smith's
+live vibe-check reactions so you know the emotional temperature of every bet.
+
+### How Bets Get Here
+Your active bets are pulled automatically from **three sources** (in priority order):
+1. **Manual Locks** — props you locked on the Neural Analysis or Prop Scanner pages.
+2. **Analysis Results** — the last Neural Analysis run stored in your session.
+3. **Bet Tracker Database** — bets recorded through the 📈 Bet Tracker page.
+
+If no bets appear, head to **📡 Live Games → ⚡ Quantum Analysis Matrix** and
+lock some props first, or record a bet in the **📈 Bet Tracker**.
+
+### Reading the Sweat Cards
+| Element | Meaning |
+|---------|---------|
+| **Pace Bar** | Green = on pace to cash, Red = falling behind |
+| **Projected Total** | Current stat total + pace × remaining minutes |
+| **OVER / UNDER Badge** | Which direction you bet |
+| **🔥 / 😰 Emoji** | Joseph's real-time vibe on this bet |
+| **Awaiting Tip-Off** | Game hasn't started yet — card is greyed out |
+| **OT Badge** | Game is in overtime — pace recalculated accordingly |
+
+### Tips
+- 💡 The dashboard **auto-refreshes every 2 minutes** — no need to manually reload.
+- 💡 Pace projections are most reliable after the **first quarter** of play.
+- 💡 UNDER bets flip the pace bar — green means the player is staying low.
+- 💡 Use this page alongside the **📈 Bet Tracker** to log final results once games finish.
+""")
+
 st.divider()
 
 # ============================================================

@@ -325,6 +325,33 @@ st.markdown(f"""
 # END SECTION: Hero Banner
 # ============================================================
 
+with st.expander("📖 How to Use SmartBetPro NBA", expanded=False):
+    st.markdown("""
+    ### Welcome to SmartBetPro NBA — Your Quantum-Powered Betting Edge
+    
+    This app uses **Monte Carlo simulations**, **machine learning confidence scoring**, 
+    and **real-time NBA data** to analyze player prop bets.
+    
+    **Recommended Workflow**
+    1. **📡 Data Feed** — Update player stats and team metrics (do this first each day)
+    2. **📡 Live Games** — Load tonight's games and fetch live prop lines
+    3. **⚡ Quantum Analysis** — Run the Neural Analysis engine on your props
+    4. **📋 Game Report** — Review detailed breakdowns for each game
+    5. **🧬 Entry Builder** — Build optimal parlays from the best picks
+    6. **📈 Bet Tracker** — Log your bets and track performance over time
+    
+    **Key Pages**
+    - 🔬 **Prop Scanner**: Enter props manually or upload CSV files
+    - 🎙️ **The Studio**: Get AI analysis from Joseph M. Smith
+    - 🛡️ **Risk Shield**: See which props to avoid and why
+    - 🗺️ **Correlation Matrix**: Understand how props relate to each other
+    - 🔮 **Player Simulator**: Run what-if scenarios for any player
+    - 📊 **Backtester**: Validate the model against historical results
+    - 🎰 **Vegas Vault**: Find edge across multiple sportsbooks
+    
+    💡 **Pro Tip:** Start with the Data Feed → Live Games → Quantum Analysis workflow each session.
+    """)
+
 # ============================================================
 # SECTION: Tonight's Slate
 # ============================================================
@@ -584,8 +611,8 @@ with left_column:
     fetches tonight's matchups + current rosters + player stats + team stats.
     Everything you need in a single button press!
 
-    **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually or upload a CSV.
-    Sample props are pre-loaded so you can start immediately.
+    **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually, upload a CSV,
+    or fetch live lines from PrizePicks / Underdog / DraftKings.
 
     **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Quantum Matrix Engine 5.6
     simulation. See probability gauges, tier badges, and force breakdowns.

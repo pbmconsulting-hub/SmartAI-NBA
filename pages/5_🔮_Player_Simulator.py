@@ -56,6 +56,51 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.expander("📖 How to Use the Player Simulator", expanded=False):
+    st.markdown("""
+### What This Page Does
+The Player Simulator runs the **Quantum Matrix Engine 5.6** Monte Carlo
+simulation for any player you select, projecting their **full stat line**
+(points, rebounds, assists, steals, blocks, turnovers, and threes) for
+tonight's game.  It automatically flags **dark horse** upside picks —
+stat categories where a player's simulated ceiling is meaningfully above
+the market line.
+
+### Step-by-Step Workflow
+1. **Load Tonight's Games** — visit **📡 Live Games** first and click
+   *Auto-Load Tonight's Games* so the simulator knows which players are active.
+   If you skip this step, all players in the database will appear — but
+   projections will be less accurate without tonight's game context.
+2. **Select a Player** — use the sidebar dropdown to pick a player from
+   tonight's slate.
+3. **Review Context** — the simulator auto-detects the opponent, home/away
+   status, game total, and spread for accurate projections.
+4. **Run Simulation** — click **Simulate** to generate thousands of
+   Monte Carlo iterations per stat category.
+5. **Read Results** — each stat shows a distribution chart plus summary
+   metrics (median, mean, floor, ceiling, standard deviation).
+
+### Understanding the Output
+| Metric | Meaning |
+|--------|---------|
+| **Median** | The 50th-percentile outcome — what the player hits "most nights" |
+| **Mean** | Average across all simulated outcomes (slightly different from median if skewed) |
+| **Floor (10th pctile)** | The low-end — what the player produces on a bad night |
+| **Ceiling (90th pctile)** | The high-end — what the player hits when everything clicks |
+| **Std Dev** | How much the outcome varies night-to-night; higher = more volatile |
+| **🟠 Dark Horse** | The ceiling is well above the current prop line — upside opportunity |
+
+### Tips
+- 💡 Use the simulator to **pressure-test a prop** before locking it — if the
+  median is near the line, the bet is close to a coin flip.
+- 💡 Players with **high standard deviation** are better OVER plays; low-variance
+  players are safer UNDER plays.
+- 💡 The simulator accounts for opponent defensive rating, pace, and game total —
+  results change game-to-game even for the same player.
+- 💡 Compare simulator output to the lines on **🔬 Prop Scanner** or **⚡ Quantum
+  Analysis Matrix** to spot discrepancies.
+""")
+
 # ─── Load data ───────────────────────────────────────────────
 players_data = load_players_data()
 teams_data = load_teams_data()

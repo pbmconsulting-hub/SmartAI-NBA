@@ -68,6 +68,32 @@ st.markdown(
     "from **The Odds API** (DraftKings, FanDuel, BetMGM, etc.). "
     "Update before each betting session for the most accurate predictions!"
 )
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Data Feed — Keep Your Data Fresh
+    
+    The Data Feed connects to **live NBA data sources** to keep your analysis accurate and current.
+    
+    **Recommended Daily Workflow**
+    1. **Smart Update**: Click this before each betting session — fetches stats for tonight's teams only
+    2. **Full Update**: Run once a day or once a week to refresh all 450+ NBA player stats
+    3. **Fetch Props**: After updating stats, fetch live prop lines from sportsbooks
+    
+    **Data Sources**
+    - **ClearSports API**: Real-time NBA player stats, team metrics, and game logs
+    - **The Odds API**: Live odds from DraftKings, FanDuel, BetMGM, and 15+ sportsbooks
+    
+    **API Keys Required**
+    - Enter your API keys on the **⚙️ Settings** page
+    - Both APIs offer free tiers sufficient for daily use
+    
+    💡 **Pro Tips:**
+    - Always update data BEFORE running analysis — stale data leads to bad predictions
+    - The status cards at the top show when each data source was last refreshed
+    - Use "Refresh Game Logs" for backtesting — it pulls 10-20 game historical logs per player
+    """)
+
 st.divider()
 
 st.markdown(get_education_box_html(

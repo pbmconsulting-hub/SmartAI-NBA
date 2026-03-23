@@ -1,12 +1,12 @@
 # ============================================================
 # FILE: data/roster_engine.py
 # PURPOSE: Centralised active-roster and injury resolution engine.
-#          Uses nba_api as the single authoritative data source for
+#          Uses ClearSports API as the primary data source for
 #          both roster and injury data.
 #
 # DATA SOURCES (in priority order):
-#   1. nba_api live Injuries      — daily injury designations (Out/GTD/Doubtful)
-#   2. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
+#   1. ClearSports injury report  — daily injury designations (Out/GTD/Doubtful)
+#   2. ClearSports team rosters   — authoritative roster (trades/signings)
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)

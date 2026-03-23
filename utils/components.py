@@ -144,23 +144,34 @@ def inject_joseph_floating():
 # ── on_change callbacks ──────────────────────────────────────────
 # These propagate widget values into the canonical session-state keys
 # that the rest of the app reads (simulation_depth, minimum_edge_threshold,
-# entry_fee).
+# entry_fee).  Each uses .get() with a safe default in case the widget
+# key hasn't been registered yet (avoids KeyError on first render).
 
 def _sync_sim_depth():
-    st.session_state["simulation_depth"] = st.session_state["sim_depth_widget"]
+    st.session_state["simulation_depth"] = st.session_state.get(
+        "sim_depth_widget", st.session_state.get("simulation_depth", 1000)
+    )
 
 
 def _sync_edge_threshold():
-    st.session_state["minimum_edge_threshold"] = st.session_state["edge_threshold_widget"]
+    st.session_state["minimum_edge_threshold"] = st.session_state.get(
+        "edge_threshold_widget", st.session_state.get("minimum_edge_threshold", 5.0)
+    )
 
 
 def _sync_entry_fee():
-    st.session_state["entry_fee"] = st.session_state["entry_fee_widget"]
+    st.session_state["entry_fee"] = st.session_state.get(
+        "entry_fee_widget", st.session_state.get("entry_fee", 10.0)
+    )
 
 
 def _sync_total_bankroll():
-    st.session_state["total_bankroll"] = st.session_state["total_bankroll_widget"]
+    st.session_state["total_bankroll"] = st.session_state.get(
+        "total_bankroll_widget", st.session_state.get("total_bankroll", 1000.0)
+    )
 
 
 def _sync_kelly_multiplier():
-    st.session_state["kelly_multiplier"] = st.session_state["kelly_multiplier_widget"]
+    st.session_state["kelly_multiplier"] = st.session_state.get(
+        "kelly_multiplier_widget", st.session_state.get("kelly_multiplier", 0.25)
+    )

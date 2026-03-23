@@ -337,6 +337,33 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+with st.expander("📖 How to Use The Studio", expanded=False):
+    st.markdown("""
+    ### The Studio — Joseph M. Smith's Analysis Desk
+    
+    The Studio is your **interactive AI analyst experience** with Joseph M. Smith. Choose from three modes:
+    
+    **🏀 GAMES TONIGHT**
+    - Joseph breaks down every game on tonight's slate
+    - Get his takes, overrides, and situational reads
+    - Hear the "broadcast segments" like a real sports show
+    
+    **👤 SCOUT A PLAYER**
+    - Deep dive into any specific player's outlook
+    - Get archetype analysis, matchup grades, and ceiling/floor projections
+    - Joseph shares his honest evaluation and betting take
+    
+    **🎰 BUILD MY BETS**
+    - Let Joseph construct optimal tickets (2-6 legs)
+    - He ranks picks by conviction and builds parlays using real analysis
+    - See the Dawg Board — his highest-confidence plays
+    
+    💡 **Pro Tips:**
+    - Select your betting platform (PrizePicks, Underdog, DraftKings) for tailored advice
+    - Use the Regenerate button to get fresh takes with different narrative angles
+    - The Dawg Board at the bottom shows Joseph's strongest picks across all games
+    """)
+
 
 # Helper for small inline avatar (defined early so all modes can use it)
 def _avatar_inline(size=48):

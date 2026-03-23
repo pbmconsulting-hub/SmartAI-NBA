@@ -2,7 +2,7 @@
 # FILE: tests/test_institutional_modules.py
 # PURPOSE: Tests for the institutional-grade modules:
 #          - calculate_fractional_kelly
-#          - calculate_synthetic_odds
+#          - calculate_fair_odds_from_simulation (fair-value odds)
 #          - generate_optimal_slip
 #          - pearson_sim_correlation (Correlation Matrix)
 # ============================================================
@@ -72,12 +72,12 @@ class TestFractionalKelly(unittest.TestCase):
         self.assertEqual(result["kelly_fraction"], 0.0)
 
 
-class TestSyntheticOdds(unittest.TestCase):
-    """Tests for engine/odds_engine.py calculate_synthetic_odds()."""
+class TestFairOddsFromSimulation(unittest.TestCase):
+    """Tests for engine/odds_engine.py calculate_fair_odds_from_simulation()."""
 
     def setUp(self):
-        from engine.odds_engine import calculate_synthetic_odds
-        self.calc = calculate_synthetic_odds
+        from engine.odds_engine import calculate_fair_odds_from_simulation
+        self.calc = calculate_fair_odds_from_simulation
 
     def test_simple_over_probability(self):
         # 7 out of 10 values > 5.0
@@ -348,11 +348,11 @@ class TestInlineBreakdownKellyAllocation(unittest.TestCase):
         self.assertIn("wager_html", content)
 
 
-class TestSyntheticSliderRobustness(unittest.TestCase):
-    """Test synthetic slider edge-case handling."""
+class TestFairOddsSliderRobustness(unittest.TestCase):
+    """Test fair-odds explore-line slider edge-case handling."""
 
     def test_slider_key_includes_platform(self):
-        """Verify the synthetic slider key includes platform for uniqueness."""
+        """Verify the fair-odds slider key includes platform for uniqueness."""
         import os
         helper_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),

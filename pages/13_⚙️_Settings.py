@@ -30,6 +30,36 @@ inject_joseph_floating()
 
 st.title("⚙️ Settings")
 st.markdown("Configure the SmartBetPro NBA prediction engine.")
+
+with st.expander("📖 How to Use This Page", expanded=False):
+    st.markdown("""
+    ### Settings — Tune Your Prediction Engine
+    
+    Configure the SmartBetPro prediction engine to match your betting style and risk tolerance.
+    
+    **Quick Start — Preset Profiles**
+    - **🛡️ Conservative**: Fewer picks, higher confidence. Best for beginners.
+    - **⚖️ Balanced**: Middle ground — good mix of volume and quality.
+    - **🔥 Aggressive**: More picks, lower thresholds. For experienced bettors.
+    - **🧪 Research Mode**: Maximum simulation depth for detailed analysis.
+    
+    **Key Settings Explained**
+    - **Simulation Depth**: How many Monte Carlo simulations to run (higher = more accurate, slower)
+    - **Minimum Edge Threshold**: Only show props where the model finds at least this much edge
+    - **Platforms**: Which betting platforms to target (affects payout calculations)
+    - **Sensitivity Sliders**: Fine-tune how much weight the model gives to pace, fatigue, blowout risk, etc.
+    
+    **API Keys**
+    - **Odds API Key**: Required for fetching live sportsbook odds
+    - **ClearSports API Key**: Required for fetching live NBA stats
+    - Keys are stored locally and never sent to our servers
+    
+    💡 **Pro Tips:**
+    - Start with the Conservative preset and adjust from there
+    - Higher simulation depth (3000+) gives more precise results but takes longer
+    - Minimum edge threshold of 5-8% works well for most bettors
+    """)
+
 st.divider()
 
 # ============================================================

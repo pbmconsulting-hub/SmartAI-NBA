@@ -383,7 +383,7 @@ def calculate_fractional_kelly(model_prob, book_odds, multiplier=0.25):
         }
 
 
-def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
+def calculate_fair_odds_from_simulation(sim_array, target_line, direction="OVER"):
     """
     Calculate fair-value American odds from a Monte Carlo simulation array.
 
@@ -408,7 +408,7 @@ def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
         Returns +100/0.50 defaults when the array is empty.
 
     Examples:
-        calculate_synthetic_odds([20, 22, 18, 25, 19], 19.5, "OVER")
+        calculate_fair_odds_from_simulation([20, 22, 18, 25, 19], 19.5, "OVER")
         → win_probability ~0.60, fair_odds ~ -150
     """
     try:
@@ -450,6 +450,10 @@ def calculate_synthetic_odds(sim_array, target_line, direction="OVER"):
             "direction": direction.upper() if direction else "OVER",
             "sample_size": 0,
         }
+
+
+# Backward-compatible alias (deprecated name)
+calculate_synthetic_odds = calculate_fair_odds_from_simulation
 
 
 # ── DFS Fixed-Payout Tables ──────────────────────────────────────────────

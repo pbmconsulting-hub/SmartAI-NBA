@@ -327,36 +327,36 @@ class TestKellyOutputGuards(unittest.TestCase):
         self.assertEqual(result["fractional_kelly"], 0.0)
 
 
-class TestSyntheticOddsOutputGuards(unittest.TestCase):
-    """Verify calculate_synthetic_odds returns finite values."""
+class TestFairOddsOutputGuards(unittest.TestCase):
+    """Verify calculate_fair_odds_from_simulation returns finite values."""
 
     def setUp(self):
         _ensure_streamlit_mock()
-        from engine.odds_engine import calculate_synthetic_odds
-        self.synth = calculate_synthetic_odds
+        from engine.odds_engine import calculate_fair_odds_from_simulation
+        self.calc = calculate_fair_odds_from_simulation
 
     def test_standard_array_all_finite(self):
         """Standard sim array returns all-finite values."""
-        result = self.synth([20, 22, 18, 25, 19, 21, 23, 17, 24, 20], 19.5, "OVER")
+        result = self.calc([20, 22, 18, 25, 19, 21, 23, 17, 24, 20], 19.5, "OVER")
         self.assertTrue(math.isfinite(result["win_probability"]))
         self.assertTrue(math.isfinite(result["fair_odds"]))
 
     def test_empty_array_returns_defaults(self):
         """Empty array returns safe defaults without NaN."""
-        result = self.synth([], 19.5, "OVER")
+        result = self.calc([], 19.5, "OVER")
         self.assertEqual(result["win_probability"], 0.5)
         self.assertEqual(result["fair_odds"], 100.0)
         self.assertEqual(result["sample_size"], 0)
 
     def test_all_same_values_finite(self):
         """Array where all values equal the line should return finite odds."""
-        result = self.synth([19.5] * 100, 19.5, "OVER")
+        result = self.calc([19.5] * 100, 19.5, "OVER")
         self.assertTrue(math.isfinite(result["win_probability"]))
         self.assertTrue(math.isfinite(result["fair_odds"]))
 
     def test_under_direction_finite(self):
         """UNDER direction should also return finite values."""
-        result = self.synth([20, 22, 18, 25, 19], 19.5, "UNDER")
+        result = self.calc([20, 22, 18, 25, 19], 19.5, "UNDER")
         self.assertTrue(math.isfinite(result["win_probability"]))
         self.assertTrue(math.isfinite(result["fair_odds"]))
 

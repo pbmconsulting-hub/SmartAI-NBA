@@ -1255,7 +1255,7 @@ def display_prop_analysis_card_qds(result):
 
         # ── [TARGET ALLOCATION] — Kelly Criterion wager ──────────
         try:
-            from engine.odds_engine import calculate_fractional_kelly, calculate_synthetic_odds
+            from engine.odds_engine import calculate_fractional_kelly, calculate_fair_odds_from_simulation
             _bankroll = float(st.session_state.get("total_bankroll", 1000.0))
             _kelly_mult = float(st.session_state.get("kelly_multiplier", 0.25))
             _book_odds = result.get("over_odds", -110) if direction == "OVER" else result.get("under_odds", -110)
@@ -1283,7 +1283,7 @@ def display_prop_analysis_card_qds(result):
         if _dfs_strip:
             st.markdown(_dfs_strip, unsafe_allow_html=True)
 
-        # ── Synthetic Odds Slider ────────────────────────────────
+        # ── Fair-Value Odds Slider ────────────────────────────────
         _sim_array = result.get("simulated_results", [])
         if _sim_array and len(_sim_array) >= 10:
             try:
@@ -1298,11 +1298,11 @@ def display_prop_analysis_card_qds(result):
                 # Clamp base_line inside slider range
                 _base_line = max(_slider_min, min(_slider_max, _base_line))
                 _slider_key = (
-                    f"synth_{result.get('player_name', '')}_{stat}_{line}"
+                    f"fair_odds_{result.get('player_name', '')}_{stat}_{line}"
                     f"_{platform}_{direction}"
                 )
                 _target = st.slider(
-                    "🔬 Synthetic Line",
+                    "🔬 Explore Line",
                     min_value=_slider_min,
                     max_value=_slider_max,
                     value=_base_line,
@@ -1310,10 +1310,10 @@ def display_prop_analysis_card_qds(result):
                     key=_slider_key,
                     help="Slide to explore fair-value odds at different prop lines.",
                 )
-                _synth = calculate_synthetic_odds(_sim_array, _target, direction)
-                _synth_odds = _synth["fair_odds"]
-                _synth_prob = _synth["win_probability"] * 100
-                _odds_str = f"+{_synth_odds:.0f}" if _synth_odds > 0 else f"{_synth_odds:.0f}"
+                _fair_result = calculate_fair_odds_from_simulation(_sim_array, _target, direction)
+                _fair_odds = _fair_result["fair_odds"]
+                _fair_prob = _fair_result["win_probability"] * 100
+                _odds_str = f"+{_fair_odds:.0f}" if _fair_odds > 0 else f"{_fair_odds:.0f}"
                 st.markdown(
                     f'<div style="text-align:center;padding:6px 10px;background:rgba(0,198,255,0.06);'
                     f'border:1px solid rgba(0,198,255,0.18);border-radius:6px;margin-top:4px;">'
@@ -1323,7 +1323,7 @@ def display_prop_analysis_card_qds(result):
                     f'font-variant-numeric:tabular-nums;text-shadow:0 0 12px rgba(0,198,255,0.5);">'
                     f'{_odds_str}</span>'
                     f'<span style="color:#475569;font-size:0.68rem;margin-left:6px;">'
-                    f'({_synth_prob:.1f}%)</span></div>',
+                    f'({_fair_prob:.1f}%)</span></div>',
                     unsafe_allow_html=True,
                 )
             except Exception:
