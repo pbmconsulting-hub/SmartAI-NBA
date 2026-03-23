@@ -93,7 +93,7 @@ def _current_season_str() -> str:
 
 def _normalize_season(season) -> str:
     """
-    Normalise a season value to NBA.com 'YYYY-YY' format.
+    Normalize a season value to NBA.com 'YYYY-YY' format.
 
     Accepts:
       - None           → current season via ``_current_season_str()``
