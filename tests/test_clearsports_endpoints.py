@@ -181,6 +181,86 @@ class TestApiKeyManagementEndpoints(unittest.TestCase):
 
 # ── Section 5: New NBA endpoint functions ─────────────────────────────────────
 
+class TestCoreNBAEndpoints(unittest.TestCase):
+    """Verify core NBA resource endpoint functions exist and use correct paths."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    # -- fetch_teams --
+
+    def test_fetch_teams_exists(self):
+        """fetch_teams function must exist."""
+        self.assertIn("def fetch_teams(", self.src)
+
+    def test_fetch_teams_url(self):
+        """fetch_teams must call /nba/teams."""
+        idx = self.src.find("def fetch_teams(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/nba/teams", snippet)
+
+    # -- fetch_games --
+
+    def test_fetch_games_exists(self):
+        """fetch_games function must exist."""
+        self.assertIn("def fetch_games(", self.src)
+
+    def test_fetch_games_url(self):
+        """fetch_games must call /nba/games."""
+        idx = self.src.find("def fetch_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/nba/games", snippet)
+
+    def test_fetch_games_has_params(self):
+        """fetch_games must accept season, date, and team_id parameters."""
+        idx = self.src.find("def fetch_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('"season"', snippet)
+        self.assertIn('"date"', snippet)
+        self.assertIn('"team_id"', snippet)
+
+    # -- fetch_players --
+
+    def test_fetch_players_exists(self):
+        """fetch_players function must exist."""
+        self.assertIn("def fetch_players(", self.src)
+
+    def test_fetch_players_url(self):
+        """fetch_players must call /nba/players."""
+        idx = self.src.find("def fetch_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/nba/players", snippet)
+
+    def test_fetch_players_has_team_id_param(self):
+        """fetch_players must accept team_id parameter."""
+        idx = self.src.find("def fetch_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn('"team_id"', snippet)
+
+    # -- fetch_injury_report team_id param --
+
+    def test_fetch_injury_report_has_team_id_param(self):
+        """fetch_injury_report must accept team_id parameter."""
+        idx = self.src.find("def fetch_injury_report(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('"team_id"', snippet)
+
+    def test_core_nba_functions_no_apikey_in_params(self):
+        """Core NBA endpoint functions must not put apiKey in query params."""
+        for func_name in ("fetch_teams", "fetch_games", "fetch_players"):
+            idx = self.src.find(f"def {func_name}(")
+            self.assertGreater(idx, 0, f"{func_name} not found")
+            snippet = self.src[idx:idx + 800]
+            self.assertNotIn('"apiKey"', snippet,
+                             f"{func_name} must not include apiKey in params")
+
+
 class TestNewNBAEndpoints(unittest.TestCase):
     """Verify new NBA endpoint functions exist and use correct paths."""
 
@@ -296,6 +376,98 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
 
 # ── Section 6: Runtime tests — new functions with mocked API ──────────────────
+
+class TestFetchTeamsRuntime(unittest.TestCase):
+    """Runtime tests for fetch_teams."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_returns_list_on_success(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_teams
+        mock_fetch.return_value = [
+            {"id": 1, "name": "Los Angeles Lakers", "abbreviation": "LAL"},
+            {"id": 2, "name": "Boston Celtics", "abbreviation": "BOS"},
+        ]
+        result = fetch_teams()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_teams
+        result = fetch_teams()
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_teams
+        mock_fetch.return_value = {"teams": [{"id": 1, "name": "Lakers"}]}
+        result = fetch_teams()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+
+class TestFetchGamesRuntime(unittest.TestCase):
+    """Runtime tests for fetch_games."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_returns_list_on_success(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_games
+        mock_fetch.return_value = [{"game_id": "g1", "home_team": "LAL", "away_team": "BOS"}]
+        result = fetch_games(season=2024, date="2024-12-25", team_id=123)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_games
+        result = fetch_games()
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_games
+        mock_fetch.return_value = {"games": [{"game_id": "g1"}]}
+        result = fetch_games()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+
+class TestFetchPlayersRuntime(unittest.TestCase):
+    """Runtime tests for fetch_players."""
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_returns_list_on_success(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_players
+        mock_fetch.return_value = [
+            {"id": 10, "name": "LeBron James", "team_id": 1},
+        ]
+        result = fetch_players(team_id=1)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_players
+        result = fetch_players()
+        self.assertEqual(result, [])
+
+    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
+    @patch("data.clearsports_client._fetch_with_retry")
+    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+        from data.clearsports_client import fetch_players
+        mock_fetch.return_value = {"players": [{"id": 10, "name": "LeBron James"}]}
+        result = fetch_players()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
 
 class TestApiKeyInfoRuntime(unittest.TestCase):
     """Runtime tests for fetch_api_key_info."""
