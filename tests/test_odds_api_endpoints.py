@@ -75,7 +75,71 @@ class TestOddsApi403Handling(unittest.TestCase):
                        "403 should return None immediately without retry")
 
 
-# ── Section 3: fetch_events() public function ────────────────────────────────
+# ── Section 3: fetch_sports() and fetch_events() public functions ─────────────
+
+class TestFetchSportsEndpoint(unittest.TestCase):
+    """Verify fetch_sports() exists and uses the correct free endpoint."""
+
+    def setUp(self):
+        self.src = _OA_SRC.read_text(encoding="utf-8")
+
+    def test_fetch_sports_exists(self):
+        """fetch_sports function must exist as a public function."""
+        self.assertIn("def fetch_sports(", self.src)
+
+    def test_fetch_sports_url(self):
+        """fetch_sports must call /sports (free, no quota cost)."""
+        idx = self.src.find("def fetch_sports(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1500]
+        self.assertIn("/sports", snippet)
+
+
+class TestFetchSportsRuntime(unittest.TestCase):
+    """Runtime tests for fetch_sports()."""
+
+    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_api_client._fetch_with_retry")
+    def test_returns_list_on_success(self, mock_fetch, mock_key):
+        from data.odds_api_client import fetch_sports
+        mock_fetch.return_value = [
+            {
+                "key": "basketball_nba",
+                "group": "Basketball",
+                "title": "NBA",
+                "description": "US Basketball",
+                "active": True,
+                "has_outrights": False,
+            },
+            {
+                "key": "americanfootball_nfl",
+                "group": "American Football",
+                "title": "NFL",
+                "description": "US Football",
+                "active": True,
+                "has_outrights": False,
+            },
+        ]
+        result = fetch_sports()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        nba_sport = [s for s in result if s["key"] == "basketball_nba"]
+        self.assertEqual(len(nba_sport), 1)
+        self.assertTrue(nba_sport[0]["active"])
+
+    @patch("data.odds_api_client._resolve_api_key", return_value=None)
+    def test_returns_empty_list_when_no_key(self, mock_key):
+        from data.odds_api_client import fetch_sports
+        result = fetch_sports()
+        self.assertEqual(result, [])
+
+    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_api_client._fetch_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+        from data.odds_api_client import fetch_sports
+        result = fetch_sports()
+        self.assertEqual(result, [])
+
 
 class TestFetchEventsEndpoint(unittest.TestCase):
     """Verify fetch_events() exists and uses the correct endpoint."""

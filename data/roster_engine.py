@@ -1,12 +1,12 @@
 # ============================================================
 # FILE: data/roster_engine.py
 # PURPOSE: Centralised active-roster and injury resolution engine.
-#          Uses ClearSports API as the primary data source for
+#          Uses API-NBA API as the primary data source for
 #          both roster and injury data.
 #
 # DATA SOURCES (in priority order):
-#   1. ClearSports injury report  — daily injury designations (Out/GTD/Doubtful)
-#   2. ClearSports team rosters   — authoritative roster (trades/signings)
+#   1. API-NBA injury report  — daily injury designations (Out/GTD/Doubtful)
+#   2. API-NBA team rosters   — authoritative roster (trades/signings)
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
@@ -220,7 +220,7 @@ class RosterEngine:
     def __init__(self):
         # {normalized_player_name → {status, injury, team, return_date, source}}
         self._injury_map: dict = {}
-        # {team_abbrev → [player_name, ...]}  — all names from ClearSports roster
+        # {team_abbrev → [player_name, ...]}  — all names from API-NBA roster
         self._full_rosters: dict = {}
         # {team_abbrev → [player_name, ...]}  — filtered active-only
         self._active_rosters: dict = {}
@@ -292,28 +292,28 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from ClearSports API — the single authoritative source.
+        Fetch fresh data from API-NBA API — the single authoritative source.
 
         Sources used (in order):
-            1. ClearSports injury report endpoint — daily injury designations
-            2. ClearSports rosters endpoint       — official roster per team
+            1. API-NBA injury report endpoint — daily injury designations
+            2. API-NBA rosters endpoint       — official roster per team
 
         Args:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-        _logger.info("RosterEngine.refresh() — starting data pull (ClearSports)")
+        _logger.info("RosterEngine.refresh() — starting data pull (API-NBA)")
         merged: dict = {}
 
-        # ── Source 1: ClearSports injury report ──────────────────
+        # ── Source 1: API-NBA injury report ──────────────────
         src1 = self._fetch_clearsports_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
-        _logger.info(f"  Source 1 (ClearSports injuries): {len(src1)} players")
+        _logger.info(f"  Source 1 (API-NBA injuries): {len(src1)} players")
 
         self._injury_map = merged
 
-        # ── Source 2: ClearSports rosters ────────────────────────
+        # ── Source 2: API-NBA rosters ────────────────────────
         if team_abbrevs:
             self._fetch_clearsports_rosters(team_abbrevs)
 
@@ -327,14 +327,14 @@ class RosterEngine:
         )
 
     # ----------------------------------------------------------
-    # Source 1: ClearSports injury report
+    # Source 1: API-NBA injury report
     # ----------------------------------------------------------
 
     def _fetch_clearsports_injuries(self) -> dict:
         """
-        Fetch today's injury report from ClearSports API.
+        Fetch today's injury report from API-NBA API.
 
-        Falls back to NBA CDN public injury JSON feed if ClearSports fails.
+        Falls back to NBA CDN public injury JSON feed if API-NBA fails.
         Returns an empty dict if all sources fail.
         """
         try:
@@ -351,11 +351,11 @@ class RosterEngine:
                         "injury": info.get("injury_note", ""),
                         "team": "",
                         "return_date": info.get("return_date", ""),
-                        "source": "ClearSports",
+                        "source": "API-NBA",
                     }
                 return result
         except Exception as err:
-            _logger.warning(f"ClearSports injury fetch failed: {err}")
+            _logger.warning(f"API-NBA injury fetch failed: {err}")
 
         # Fallback: NBA CDN public injury JSON
         return self._fetch_nba_cdn_injuries()
@@ -407,21 +407,21 @@ class RosterEngine:
         return result
 
     # ----------------------------------------------------------
-    # Source 2: ClearSports rosters endpoint
+    # Source 2: API-NBA rosters endpoint
     # ----------------------------------------------------------
 
     def _fetch_clearsports_rosters(self, team_abbrevs: list):
         """
-        Fetch full rosters from ClearSports API, store in _full_rosters.
+        Fetch full rosters from API-NBA API, store in _full_rosters.
         """
         try:
             from data.clearsports_client import fetch_rosters as _cs_rosters
             rosters = _cs_rosters(list(team_abbrevs))
             for abbrev, players in rosters.items():
                 self._full_rosters[abbrev.upper()] = players
-                _logger.info(f"  RosterEngine ClearSports: {abbrev} → {len(players)} players")
+                _logger.info(f"  RosterEngine API-NBA: {abbrev} → {len(players)} players")
         except Exception as err:
-            _logger.warning(f"ClearSports roster fetch failed: {err}")
+            _logger.warning(f"API-NBA roster fetch failed: {err}")
 
 # ============================================================
 # END SECTION: RosterEngine class

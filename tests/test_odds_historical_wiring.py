@@ -2,11 +2,11 @@
 tests/test_odds_historical_wiring.py
 -------------------------------------
 Tests for the odds and historical data endpoint wiring:
-  1. _enrich_games_with_clearsports_odds fills missing odds from ClearSports
-  2. _enrich_games_with_predictions adds ClearSports predictions to games
+  1. _enrich_games_with_clearsports_odds fills missing odds from ApiNba
+  2. _enrich_games_with_predictions adds ApiNba predictions to games
   3. fetch_todays_games calls new enrichment functions
-  4. refresh_historical_data_for_tonight fetches ClearSports player stats
-  5. fetch_all_todays_data stores ClearSports odds/predictions in session state
+  4. refresh_historical_data_for_tonight fetches ApiNba player stats
+  5. fetch_all_todays_data stores ApiNba odds/predictions in session state
 """
 
 import sys
@@ -81,8 +81,8 @@ SAMPLE_CS_PREDICTIONS = [
 
 # ── Section 1: _enrich_games_with_clearsports_odds ───────────────────────────
 
-class TestEnrichWithClearSportsOdds(unittest.TestCase):
-    """Test that ClearSports odds fill in missing game-level odds."""
+class TestEnrichWithApiNbaOdds(unittest.TestCase):
+    """Test that ApiNba odds fill in missing game-level odds."""
 
     def setUp(self):
         from data.live_data_fetcher import _enrich_games_with_clearsports_odds
@@ -90,18 +90,18 @@ class TestEnrichWithClearSportsOdds(unittest.TestCase):
 
     @patch("data.clearsports_client.fetch_game_odds", return_value=SAMPLE_CS_ODDS)
     def test_fills_missing_spread_and_total(self, mock_cs_odds):
-        """When Odds API left spread=0 and total=220, ClearSports should fill them."""
+        """When Odds API left spread=0 and total=220, ApiNba should fill them."""
         import copy
         games = copy.deepcopy(SAMPLE_GAMES)
         result = self.fn(games)
 
-        # Game g1 had spread=0, total=220 — should be filled from ClearSports
+        # Game g1 had spread=0, total=220 — should be filled from ApiNba
         self.assertAlmostEqual(result[0]["vegas_spread"], -3.5)
         self.assertAlmostEqual(result[0]["game_total"], 218.0)
 
     @patch("data.clearsports_client.fetch_game_odds", return_value=SAMPLE_CS_ODDS)
     def test_does_not_overwrite_existing_odds(self, mock_cs_odds):
-        """When Odds API already set non-zero odds, ClearSports should NOT overwrite."""
+        """When Odds API already set non-zero odds, ApiNba should NOT overwrite."""
         import copy
         games = copy.deepcopy(SAMPLE_GAMES)
         result = self.fn(games)
@@ -112,7 +112,7 @@ class TestEnrichWithClearSportsOdds(unittest.TestCase):
 
     @patch("data.clearsports_client.fetch_game_odds", return_value=[])
     def test_returns_unchanged_when_no_cs_odds(self, mock_cs_odds):
-        """When ClearSports returns no odds, games should be unchanged."""
+        """When ApiNba returns no odds, games should be unchanged."""
         import copy
         games = copy.deepcopy(SAMPLE_GAMES)
         result = self.fn(games)
@@ -136,7 +136,7 @@ class TestEnrichWithClearSportsOdds(unittest.TestCase):
 # ── Section 2: _enrich_games_with_predictions ─────────────────────────────────
 
 class TestEnrichWithPredictions(unittest.TestCase):
-    """Test that ClearSports predictions are added to game dicts."""
+    """Test that ApiNba predictions are added to game dicts."""
 
     def setUp(self):
         from data.live_data_fetcher import _enrich_games_with_predictions
@@ -244,7 +244,7 @@ class TestHistoricalDataRefresherWiring(unittest.TestCase):
         self, mock_load, mock_save, mock_batch, mock_clv,
         mock_cs_pstats, mock_scores
     ):
-        """Historical refresh should fetch ClearSports player stats."""
+        """Historical refresh should fetch ApiNba player stats."""
         from data.live_data_fetcher import refresh_historical_data_for_tonight
         result = refresh_historical_data_for_tonight(
             games=[{"home_team": "LAL", "away_team": "BOS"}]
@@ -279,7 +279,7 @@ class TestHistoricalDataRefresherWiring(unittest.TestCase):
 # ── Section 5: fetch_all_todays_data stores odds/predictions ─────────────────
 
 class TestFetchAllTodaysDataStoresOdds(unittest.TestCase):
-    """Verify fetch_all_todays_data stores ClearSports odds/predictions."""
+    """Verify fetch_all_todays_data stores ApiNba odds/predictions."""
 
     @patch("data.live_data_fetcher.fetch_player_news", return_value=[])
     @patch("data.live_data_fetcher.fetch_standings", return_value=[])
@@ -370,7 +370,7 @@ class TestOddsWiringSourceLevel(unittest.TestCase):
         self.assertIn("fetch_recent_scores", snippet)
 
     def test_fetch_all_stores_cs_odds(self):
-        """fetch_all_todays_data must reference fetch_game_odds from ClearSports."""
+        """fetch_all_todays_data must reference fetch_game_odds from ApiNba."""
         idx = self.src.find("def fetch_all_todays_data(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 8000]

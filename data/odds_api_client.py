@@ -386,6 +386,45 @@ def _build_team_lookup(events: list[dict]) -> dict[str, str]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+def fetch_sports(api_key: str | None = None) -> list[dict]:
+    """
+    Fetch all in-season sports from The Odds API.
+
+    Endpoint: GET /v4/sports/?apiKey={apiKey}
+
+    This is a **free** endpoint — it does NOT count against the usage quota.
+    Useful for verifying the API key and checking that basketball_nba is active.
+
+    Args:
+        api_key: Optional explicit API key; falls back to session state / env.
+
+    Returns:
+        list[dict]: Each dict has keys:
+            key, group, title, description, active, has_outrights
+        Returns [] on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.warning("fetch_sports: no Odds API key found — returning []")
+        return []
+
+    url = f"{_BASE_URL}/sports"
+    params = {
+        "apiKey": resolved_key,
+    }
+
+    try:
+        raw = _fetch_with_retry(url, params=params)
+        if not isinstance(raw, list):
+            _logger.warning("fetch_sports: unexpected response shape")
+            return []
+        return raw
+
+    except Exception as exc:
+        _logger.warning("fetch_sports failed: %s", exc)
+        return []
+
+
 def fetch_events(api_key: str | None = None) -> list[dict]:
     """
     Fetch all live and upcoming NBA events from The Odds API.
@@ -727,7 +766,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
 
     Returns:
         dict: Keyed by ``"HOME_TEAM"`` or ``"AWAY_TEAM"`` abbreviation
-              (upper-case, ClearSports-style) with sub-dicts:
+              (upper-case, API-NBA-style) with sub-dicts:
 
             {
                 "home_team": str,

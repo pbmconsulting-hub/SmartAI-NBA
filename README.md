@@ -88,7 +88,7 @@ SmartAI-NBA/
 │
 ├── data/
 │   ├── data_manager.py                # Load/save CSV data + session state
-│   ├── live_data_fetcher.py           # ClearSports API integration
+│   ├── live_data_fetcher.py           # API-NBA API integration
 │   ├── odds_api_client.py             # The Odds API — live sportsbook odds
 │   ├── platform_fetcher.py            # Multi-platform prop fetcher
 │   ├── live_tracker.py                # Live game score tracker
@@ -130,7 +130,7 @@ dashboard, and links to all pages.
 Real-time NBA scores and season stat leaders, updated automatically.
 
 ### 📡 Page 1: Live Games
-Load tonight's matchups, fetch rosters and stats from ClearSports API,
+Load tonight's matchups, fetch rosters and stats from API-NBA API,
 and enrich with Odds API consensus lines. Features:
 - **⚡ One-Click Setup** — loads games + fetches live platform props in one step
 - **Auto-Load** — fetches tonight's schedule, rosters, player/team stats
@@ -183,7 +183,7 @@ Shows which props to skip and explains exactly WHY:
 - Educational content explains each risk flag
 
 ### 📡 Page 9: Data Feed
-Fetch live NBA data from ClearSports API and The Odds API:
+Fetch live NBA data from API-NBA API and The Odds API:
 - **Smart Update** — only tonight's teams (fast)
 - **Full Update** — all NBA player stats
 - **Fetch Props** — live odds from 15+ sportsbooks
@@ -208,7 +208,7 @@ Configure:
 - **Simulation Depth**: 500 (fast) to 5,000 (most accurate)
 - **Minimum Edge**: How much edge before showing a pick (default: 5%)
 - **Preset Profiles**: Conservative, Balanced, Aggressive, Research
-- **API Keys**: Odds API + ClearSports API keys
+- **API Keys**: Odds API + API-NBA API keys
 - **Advanced factors**: Home court boost, fatigue sensitivity, etc.
 
 ### 💎 Page 14: Subscription Level
@@ -223,7 +223,7 @@ DraftKings, FanDuel, BetMGM, and 15+ sportsbooks.
 ## 🔴 Live NBA Data
 
 SmartAI-NBA uses **real, up-to-date NBA stats** from two primary APIs:
-- **ClearSports API** — player stats, team metrics, game schedules, rosters
+- **API-NBA API** — player stats, team metrics, game schedules, rosters
 - **The Odds API** — live sportsbook odds from DraftKings, FanDuel, BetMGM, and 15+ books
 
 ### Setup
@@ -253,9 +253,9 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 
 | Data | Source | Storage |
 |------|--------|---------|
-| Player stats (PPG, RPG, APG, etc.) | ClearSports API | `players.csv` |
-| Team pace + ratings (ORTG/DRTG) | ClearSports API | `teams.csv` |
-| Tonight's games + spreads/totals | ClearSports API + Odds API | Session state |
+| Player stats (PPG, RPG, APG, etc.) | API-NBA API | `players.csv` |
+| Team pace + ratings (ORTG/DRTG) | API-NBA API | `teams.csv` |
+| Tonight's games + spreads/totals | API-NBA API + Odds API | Session state |
 | Live prop lines | The Odds API (15+ books) | Session state |
 | Defensive ratings by position | Calculated from team DRTG | `defensive_ratings.csv` |
 
@@ -293,7 +293,7 @@ Run: `pip install streamlit` first.
 Run: `pip install streamlit` and make sure you're using the right Python version.
 
 ### "ModuleNotFoundError: No module named 'nba_api'"
-The app primarily uses ClearSports API and The Odds API now.
+The app primarily uses API-NBA API and The Odds API now.
 Run `pip install -r requirements.txt` to install all dependencies.
 
 ### Live data update takes too long

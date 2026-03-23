@@ -801,7 +801,7 @@ class TestLiveSweatPageFile(unittest.TestCase):
 # ============================================================
 
 class TestFetchLiveBoxscoresImpl(unittest.TestCase):
-    """Test _fetch_live_boxscores_impl with mocked ClearSports data."""
+    """Test _fetch_live_boxscores_impl with mocked ApiNba data."""
 
     def test_returns_list(self):
         from data.live_tracker import _fetch_live_boxscores_impl

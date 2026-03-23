@@ -1,14 +1,14 @@
 # ============================================================
 # FILE: pages/9_📡_Data_Feed.py
 # PURPOSE: Streamlit page that lets the user fetch live NBA data
-#          from the ClearSports API and The Odds API. Updates player
+#          from the API-NBA API and The Odds API. Updates player
 #          stats, team stats, standings, and today's games with real,
 #          current data.
 # CONNECTS TO: data/live_data_fetcher.py, data/data_manager.py
 # CONCEPTS COVERED: Progress bars, API calls, session state, error handling
 #
 # BEGINNER NOTE: This page is your "data refresh" control panel.
-# Click a button to pull live stats from ClearSports and The Odds API.
+# Click a button to pull live stats from API-NBA and The Odds API.
 # After updating, all the other pages in the app will use the fresh data!
 # ============================================================
 
@@ -26,7 +26,7 @@ from data.data_manager import (
 )
 
 # Import our live data fetcher functions
-# These functions call ClearSports API for roster/stats/injury data
+# These functions call API-NBA API for roster/stats/injury data
 # and The Odds API for sportsbook lines.
 from data.live_data_fetcher import (
     fetch_todays_games,          # Fetch tonight's NBA games
@@ -39,7 +39,7 @@ from data.live_data_fetcher import (
 )
 
 # RosterEngine is the single source for injury data.
-# It uses ClearSports API as the primary source, with NBA CDN feed as fallback.
+# It uses API-NBA API as the primary source, with NBA CDN feed as fallback.
 
 # ============================================================
 # SECTION: Page Setup
@@ -113,10 +113,10 @@ st.markdown(get_education_box_html(
 
 # ============================================================
 # SECTION: Data Source Status
-# ClearSports API and The Odds API are now the primary data sources.
+# API-NBA API and The Odds API are now the primary data sources.
 # ============================================================
 
-# RosterEngine uses ClearSports API.
+# RosterEngine uses API-NBA API.
 _roster_engine_available = True
 
 
@@ -782,7 +782,7 @@ if current_action:
             st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
 
     # --------------------------------------------------------
-    # Action: Refresh Injury Report (ClearSports + NBA CDN fallback)
+    # Action: Refresh Injury Report (API-NBA + NBA CDN fallback)
     # --------------------------------------------------------
     elif current_action == "injury_report":
         st.subheader("🏥 Refreshing Injury Report…")
@@ -796,7 +796,7 @@ if current_action:
         # Clear the action flag immediately so a page reload doesn't re-run it
         st.session_state["update_action"] = None
 
-        with st.spinner("Fetching injury data from ClearSports…"):
+        with st.spinner("Fetching injury data from API-NBA…"):
             try:
                 from data.roster_engine import RosterEngine as _RE
                 _re = _RE()
@@ -833,9 +833,9 @@ if current_action:
                 )
 
             # Show a summary table
-            st.markdown("### 📋 Injury Data (ClearSports + NBA CDN)")
+            st.markdown("### 📋 Injury Data (API-NBA + NBA CDN)")
             st.caption(
-                "Showing players with a non-Active designation from ClearSports / NBA CDN. "
+                "Showing players with a non-Active designation from API-NBA / NBA CDN. "
                 "Run a Smart Update or Full Setup to apply these to the "
                 "full injury_status.json."
             )
@@ -914,7 +914,7 @@ if current_action:
                 )
 
     # --------------------------------------------------------
-    # Action: Refresh Standings & News (ClearSports)
+    # Action: Refresh Standings & News (API-NBA)
     # --------------------------------------------------------
     elif current_action == "standings_news":
         st.subheader("📊 Refreshing Standings & News…")
@@ -922,7 +922,7 @@ if current_action:
 
         import datetime as _dt_sn
 
-        with st.spinner("Fetching NBA standings from ClearSports…"):
+        with st.spinner("Fetching NBA standings from API-NBA…"):
             try:
                 from data.live_data_fetcher import fetch_standings as _fetch_standings_ldf
                 _standings_data = _fetch_standings_ldf()
@@ -931,7 +931,7 @@ if current_action:
                 _standings_data = []
                 st.warning(f"Standings fetch failed: {_sn_err}")
 
-        with st.spinner("Fetching recent NBA news from ClearSports…"):
+        with st.spinner("Fetching recent NBA news from API-NBA…"):
             try:
                 from data.live_data_fetcher import fetch_player_news as _fetch_news_ldf
                 _news_data = _fetch_news_ldf(limit=30)
@@ -1256,7 +1256,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
 
 # ============================================================
 # SECTION: Standings & News Display
-# Shows current NBA standings and recent news from ClearSports.
+# Shows current NBA standings and recent news from API-NBA.
 # ============================================================
 
 _standings_display = st.session_state.get("league_standings", [])

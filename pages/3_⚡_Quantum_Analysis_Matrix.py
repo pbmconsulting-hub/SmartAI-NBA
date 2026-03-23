@@ -1821,7 +1821,7 @@ if run_analysis:
 
 analysis_results = st.session_state.get("analysis_results", [])
 
-# Build a player → news lookup from ClearSports news in session state.
+# Build a player → news lookup from API-NBA news in session state.
 # This is used to show injury/trade/performance alerts on prop cards.
 _player_news_lookup: dict = {}  # {player_name_lower: [news_item, ...]}
 for _ni in st.session_state.get("player_news", []):
@@ -2152,7 +2152,7 @@ if analysis_results:
         )
 
     # ============================================================
-    # SECTION: Player News Alerts (ClearSports)
+    # SECTION: Player News Alerts (API-NBA)
     # Show injury/trade/performance news for players in today's slate.
     # ============================================================
     _slate_players = {

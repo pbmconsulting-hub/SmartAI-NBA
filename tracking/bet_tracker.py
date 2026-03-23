@@ -97,10 +97,10 @@ def _nba_today_et():
 # ============================================================
 # SECTION: Unified Stat Column Mapping
 # Maps ALL known internal stat keys AND platform-native aliases
-# to ClearSports game log field names (lowercase).
+# to API-NBA game log field names (lowercase).
 # ============================================================
 
-# ClearSports game log uses lowercase keys: pts, reb, ast, stl, blk, tov, fg3m, minutes
+# API-NBA game log uses lowercase keys: pts, reb, ast, stl, blk, tov, fg3m, minutes
 _STAT_COL = {
     # ── Internal canonical keys ────────────────────────────────
     "points":           "pts",
@@ -586,10 +586,10 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
 def auto_resolve_bet_results(date_str=None):
     """
     For all pending bets on date_str (default: yesterday), fetch actual
-    player stats from ClearSports API and automatically mark WIN/LOSS/PUSH.
+    player stats from API-NBA API and automatically mark WIN/LOSS/PUSH.
 
     Uses data.live_data_fetcher.fetch_player_game_log() to get actual stat
-    values from ClearSports. Falls back to game_log_cache if the API is
+    values from API-NBA. Falls back to game_log_cache if the API is
     unavailable. Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
 
     Args:
@@ -632,7 +632,7 @@ def auto_resolve_bet_results(date_str=None):
         def _normalize_name(n):
             return n.lower().strip()
 
-    # Player ID lookup: ClearSports API → nba_api static list (local, no network)
+    # Player ID lookup: API-NBA API → nba_api static list (local, no network)
     try:
         from data.nba_context_fetcher import lookup_player_id as _lookup_pid
     except ImportError:
@@ -680,8 +680,8 @@ def auto_resolve_bet_results(date_str=None):
     if not _bet_prep:
         return resolved_count, errors_list
 
-    # ── Resolve player names → ClearSports player IDs ────────
-    # lookup_player_id() checks: cache → ClearSports API → nba_api static (local)
+    # ── Resolve player names → API-NBA player IDs ────────
+    # lookup_player_id() checks: cache → API-NBA API → nba_api static (local)
     _name_to_pid: dict = {}
     for pname in _names_to_fetch:
         if _lookup_pid is not None:
@@ -701,10 +701,10 @@ def auto_resolve_bet_results(date_str=None):
     _ids_to_fetch = {
         pid for pid in _name_to_pid.values() if pid
     }
-    _game_log_cache: dict = {}  # player_id → list[dict] of ClearSports game log rows
+    _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _fetch_player_log(pid):
-        """Fetch a single player's ClearSports game log with retry + backoff."""
+        """Fetch a single player's API-NBA game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
@@ -743,7 +743,7 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
-            # Find the game on target date (ClearSports returns "YYYY-MM-DD")
+            # Find the game on target date (API-NBA returns "YYYY-MM-DD")
             matching_log = None
             for log_row in logs:
                 raw_date = log_row.get("game_date", "")
@@ -811,9 +811,9 @@ PUSH_THRESHOLD_EPSILON = 0.01
 
 def resolve_todays_bets():
     """
-    Resolve today's pending bets by checking live game status via ClearSports API.
+    Resolve today's pending bets by checking live game status via API-NBA API.
 
-    Uses ClearSports fetch_live_scores() to detect finished games,
+    Uses API-NBA fetch_live_scores() to detect finished games,
     then fetches player game logs via data.live_data_fetcher.fetch_player_game_log().
     Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
     Only resolves bets where the game has a FINAL status.
@@ -866,13 +866,13 @@ def resolve_todays_bets():
         def _normalize_name(n):
             return str(n).lower().strip()
 
-    # Player ID lookup via ClearSports → nba_api static list (local)
+    # Player ID lookup via API-NBA → nba_api static list (local)
     try:
         from data.nba_context_fetcher import lookup_player_id as _lookup_pid
     except ImportError:
         _lookup_pid = None
 
-    # ── Check ClearSports live scores for finished games ──────
+    # ── Check API-NBA live scores for finished games ──────
     _scoreboard_available = False
     has_final_games = False
     try:
@@ -885,7 +885,7 @@ def resolve_todays_bets():
                 for g in live_scores
             )
     except Exception as exc:
-        summary["errors"].append(f"ClearSports live scores unavailable: {exc}")
+        summary["errors"].append(f"API-NBA live scores unavailable: {exc}")
 
     # Short-circuit: if the scoreboard responded but no games are Final yet,
     # skip the expensive per-player API calls and tell the user clearly.
@@ -951,10 +951,10 @@ def resolve_todays_bets():
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     _ids_to_fetch = {pid for pid in _name_to_pid.values() if pid}
-    _game_log_cache: dict = {}  # player_id → list[dict] of ClearSports game log rows
+    _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _fetch_player_log(pid):
-        """Fetch a single player's ClearSports game log with retry + backoff."""
+        """Fetch a single player's API-NBA game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
@@ -999,7 +999,7 @@ def resolve_todays_bets():
                 summary["pending"] += 1
                 continue
 
-            # Find the game log entry for today (ClearSports returns "YYYY-MM-DD")
+            # Find the game log entry for today (API-NBA returns "YYYY-MM-DD")
             latest = None
             for log_row in logs:
                 raw_date = log_row.get("game_date", "")
@@ -1079,7 +1079,7 @@ def resolve_all_pending_bets():
     Resolve ALL pending bets regardless of date — manual bets, AI picks, any platform.
 
     Queries every bet with no ``result`` set, groups them by date for efficient
-    API calls, and resolves WIN/LOSS/PUSH for each using ClearSports game logs.
+    API calls, and resolves WIN/LOSS/PUSH for each using API-NBA game logs.
     Has rate limiting (1 second between API calls per player).
 
     Returns:
@@ -1182,7 +1182,7 @@ def resolve_all_pending_bets():
                 summary["pending"] += 1
                 continue
 
-            # Player ID lookup: ClearSports → nba_api static (local)
+            # Player ID lookup: API-NBA → nba_api static (local)
             player_id = None
             if _lookup_pid is not None:
                 player_id = _lookup_pid(player_name)
@@ -1218,7 +1218,7 @@ def resolve_all_pending_bets():
                 summary["pending"] += 1
                 continue
 
-            # Find the game on target date (ClearSports returns "YYYY-MM-DD")
+            # Find the game on target date (API-NBA returns "YYYY-MM-DD")
             matching_log = None
             for log_row in logs:
                 raw_date = log_row.get("game_date", "")
@@ -1294,7 +1294,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
     (not the ``bets`` table).  Without this function the "Resolve All
     Picks" button would never actually update what the user sees.
 
-    Uses the same ClearSports game log approach as
+    Uses the same API-NBA game log approach as
     ``resolve_all_pending_bets()``:
       - Loads every row in ``all_analysis_picks`` where result is NULL
       - Groups by date, fetches game logs per player per season
@@ -1431,7 +1431,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
-            # ── Player ID lookup: ClearSports → nba_api static (local) ──
+            # ── Player ID lookup: API-NBA → nba_api static (local) ──
             player_id = None
             if _lookup_pid is not None:
                 player_id = _lookup_pid(player_name)
@@ -1474,7 +1474,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
-            # ── Match game by date (ClearSports: "YYYY-MM-DD") ────────
+            # ── Match game by date (API-NBA: "YYYY-MM-DD") ────────
             matching_log = None
             for log_row in logs:
                 raw_date = log_row.get("game_date", "")
@@ -1544,7 +1544,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
 def get_live_bet_status(bets_list):
     """
-    Check live box scores for today's pending bets via ClearSports live scores.
+    Check live box scores for today's pending bets via API-NBA live scores.
 
     Args:
         bets_list (list[dict]): Today's pending bets from the database.
@@ -1557,7 +1557,7 @@ def get_live_bet_status(bets_list):
     """
     augmented = []
 
-    # Fetch live box scores from ClearSports
+    # Fetch live box scores from API-NBA
     live_box: dict = {}  # player_name_lower → current stat totals
     try:
         from data.clearsports_client import fetch_live_scores as _cs_live
@@ -1570,7 +1570,7 @@ def get_live_bet_status(bets_list):
             if not (is_final or is_live):
                 continue
 
-            # ClearSports may include player stats in the game object
+            # API-NBA may include player stats in the game object
             for team_key in ("home_players", "away_players", "players"):
                 for player in g.get(team_key, []):
                     stats = player.get("statistics", player)

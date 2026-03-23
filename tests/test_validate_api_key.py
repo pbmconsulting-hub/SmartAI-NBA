@@ -1,7 +1,7 @@
 """
 tests/test_validate_api_key.py
 ------------------------------
-Tests for validate_api_key() in both ClearSports and Odds API clients.
+Tests for validate_api_key() in both ApiNba and Odds API clients.
 """
 
 import sys
@@ -33,9 +33,9 @@ class TestValidateApiKeyFunctionExists(unittest.TestCase):
         self.assertIn("def validate_api_key(", src)
 
 
-# ── ClearSports validate_api_key runtime tests ───────────────────────────────
+# ── ApiNba validate_api_key runtime tests ───────────────────────────────
 
-class TestClearSportsValidateApiKey(unittest.TestCase):
+class TestApiNbaValidateApiKey(unittest.TestCase):
     """Runtime tests for clearsports_client.validate_api_key."""
 
     def setUp(self):
@@ -141,12 +141,16 @@ class TestSettingsPageApiKeySection(unittest.TestCase):
         self.assertIn("validate_api_key", self.src)
 
     def test_calls_fetch_api_key_info(self):
-        """Test Connection must call fetch_api_key_info for ClearSports."""
+        """Test Connection must call fetch_api_key_info for API-NBA."""
         self.assertIn("fetch_api_key_info", self.src)
 
-    def test_calls_fetch_events(self):
-        """Test Connection must call fetch_events for Odds API."""
-        self.assertIn("fetch_events", self.src)
+    def test_calls_fetch_sports(self):
+        """Test Connection must call fetch_sports for Odds API (free endpoint)."""
+        self.assertIn("fetch_sports", self.src)
+
+    def test_uses_api_nba_key_session_state(self):
+        """Settings page must use api_nba_key in session state."""
+        self.assertIn("api_nba_key", self.src)
 
 
 if __name__ == "__main__":

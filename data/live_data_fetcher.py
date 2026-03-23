@@ -1,19 +1,19 @@
 # ============================================================
 # FILE: data/live_data_fetcher.py
-# PURPOSE: Fetch live, real NBA data via ClearSports + Odds API.
+# PURPOSE: Fetch live, real NBA data via API-NBA + Odds API.
 #          Pulls today's games, player stats, team stats, odds,
 #          predictions, and player game logs. Saves everything to
 #          CSV files so the rest of the app works without changes.
 # CONNECTS TO: pages/9_📡_Data_Feed.py, data/data_manager.py
 # DATA SOURCES:
-#   - ClearSports API: games, player stats, team stats, standings,
+#   - API-NBA API: games, player stats, team stats, standings,
 #     injury reports, rosters, game-odds, predictions, player-stats
 #   - The Odds API: game odds (h2h/spreads/totals), player props,
 #     recent scores, events, event-level odds
 # CONCEPTS COVERED: APIs, rate limiting, CSV writing, error handling
 #
 # BEGINNER NOTE: An API (Application Programming Interface) is a
-# way for programs to talk to each other. ClearSports is a real-time
+# way for programs to talk to each other. API-NBA is a real-time
 # NBA data provider — configure your API key in the Settings page.
 # ============================================================
 
@@ -433,12 +433,12 @@ def _utc_to_et_display(game_time_utc):
 # ============================================================
 # ============================================================
 # SECTION: Today's Games Fetcher
-# Fetches which NBA games are being played today via ClearSports API.
+# Fetches which NBA games are being played today via API-NBA API.
 # ============================================================
 
 def _fetch_team_records():
     """
-    Fetch team records (W-L) from ClearSports API team stats.
+    Fetch team records (W-L) from API-NBA API team stats.
 
     Returns:
         dict: Maps team abbreviation → {wins, losses, streak, ...}.
@@ -522,14 +522,14 @@ def _deduplicate_games(games: list) -> list:
 
 def _build_games_from_odds_api() -> list:
     """
-    Build a game list from The Odds API when ClearSports is unavailable.
+    Build a game list from The Odds API when API-NBA is unavailable.
 
     Fetches game-level odds (which include home/away team names), converts
     full team names to abbreviations, and extracts consensus spread/total
     from the bookmaker data.
 
     Returns:
-        list of dict: Games in the same format as ClearSports
+        list of dict: Games in the same format as API-NBA
             ``fetch_games_today()`` — each dict has home_team, away_team
             (abbreviations), vegas_spread, game_total, and consensus fields.
             Returns [] on failure or missing API key.
@@ -597,8 +597,8 @@ def _enrich_games_with_odds_api(games: list) -> list:
 
     For each game, computes the median spread/total/moneyline across all
     bookmakers (DraftKings, FanDuel, BetMGM, Caesars, etc.) and:
-      - Fills in ``vegas_spread`` when ClearSports returned 0 or None
-      - Fills in ``game_total`` when ClearSports returned 0 or 220 (default)
+      - Fills in ``vegas_spread`` when API-NBA returned 0 or None
+      - Fills in ``game_total`` when API-NBA returned 0 or 220 (default)
       - Adds ``moneyline_home``, ``moneyline_away``, ``consensus_spread``,
         ``consensus_total``, ``bookmaker_count`` to every game dict
 
@@ -606,7 +606,7 @@ def _enrich_games_with_odds_api(games: list) -> list:
     fails, the original games list is returned unchanged.
 
     Args:
-        games: List of game dicts from ClearSports (or anywhere).
+        games: List of game dicts from API-NBA (or anywhere).
 
     Returns:
         list: Same games, enriched in-place with consensus odds fields.
@@ -662,7 +662,7 @@ def _enrich_games_with_odds_api(games: list) -> list:
         game["spread_range"]      = entry.get("spread_range", (None, None))
         game["total_range"]       = entry.get("total_range", (None, None))
 
-        # Override ClearSports spread/total when it's missing (0 or default 220)
+        # Override API-NBA spread/total when it's missing (0 or default 220)
         current_spread = float(game.get("vegas_spread") or 0)
         current_total  = float(game.get("game_total")  or 0)
 
@@ -681,11 +681,11 @@ def _enrich_games_with_odds_api(games: list) -> list:
 
 def _enrich_games_with_clearsports_odds(games: list) -> list:
     """
-    Supplement game odds with ClearSports ``fetch_game_odds`` data.
+    Supplement game odds with API-NBA ``fetch_game_odds`` data.
 
     The primary odds source is The Odds API (via ``_enrich_games_with_odds_api``).
-    This function provides a secondary layer from ClearSports — useful when
-    the Odds API key is missing, or when ClearSports returns odds that the
+    This function provides a secondary layer from API-NBA — useful when
+    the Odds API key is missing, or when API-NBA returns odds that the
     Odds API does not cover (e.g. game-specific lines).
 
     Only fills in ``vegas_spread`` and ``game_total`` that are still 0 or
@@ -698,7 +698,7 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
         games: List of game dicts (already enriched by ``_enrich_games_with_odds_api``).
 
     Returns:
-        list: Same games, enriched in-place with ClearSports odds fields.
+        list: Same games, enriched in-place with API-NBA odds fields.
     """
     if not games:
         return games
@@ -709,7 +709,7 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
         if not cs_odds_list:
             return games
     except Exception as exc:
-        _logger.debug("_enrich_games_with_clearsports_odds: ClearSports game-odds unavailable — %s", exc)
+        _logger.debug("_enrich_games_with_clearsports_odds: API-NBA game-odds unavailable — %s", exc)
         return games
 
     # Build lookup by game_id for direct matching
@@ -750,21 +750,21 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
 
     if filled:
         _logger.info(
-            "_enrich_games_with_clearsports_odds: filled %d odds field(s) from ClearSports.", filled
+            "_enrich_games_with_clearsports_odds: filled %d odds field(s) from API-NBA.", filled
         )
     return games
 
 
 def _enrich_games_with_predictions(games: list) -> list:
     """
-    Enrich game dicts with ClearSports AI-powered predictions.
+    Enrich game dicts with API-NBA AI-powered predictions.
 
-    Calls ClearSports ``fetch_predictions()`` and maps prediction data
+    Calls API-NBA ``fetch_predictions()`` and maps prediction data
     onto each game dict.  Adds the following fields when available:
 
     * ``cs_predicted_winner`` — team abbreviation the model favours
-    * ``cs_predicted_spread`` — ClearSports predicted spread (float)
-    * ``cs_predicted_total``  — ClearSports predicted total (float)
+    * ``cs_predicted_spread`` — API-NBA predicted spread (float)
+    * ``cs_predicted_total``  — API-NBA predicted total (float)
     * ``cs_win_probability``  — model confidence (0.0–1.0, if provided)
 
     Falls back gracefully — returns the original list unchanged on failure.
@@ -784,7 +784,7 @@ def _enrich_games_with_predictions(games: list) -> list:
         if not preds:
             return games
     except Exception as exc:
-        _logger.debug("_enrich_games_with_predictions: ClearSports predictions unavailable — %s", exc)
+        _logger.debug("_enrich_games_with_predictions: API-NBA predictions unavailable — %s", exc)
         return games
 
     # Build lookup by game_id
@@ -811,19 +811,19 @@ def _enrich_games_with_predictions(games: list) -> list:
 
     if enriched:
         _logger.info(
-            "_enrich_games_with_predictions: enriched %d game(s) with ClearSports predictions.", enriched
+            "_enrich_games_with_predictions: enriched %d game(s) with API-NBA predictions.", enriched
         )
     return games
 
 
 def _enrich_games_with_standings(games: list) -> list:
     """
-    Enrich game dicts with ClearSports standings data (W-L, streak, rank).
+    Enrich game dicts with API-NBA standings data (W-L, streak, rank).
 
     Populates ``home_wins``, ``home_losses``, ``home_streak``,
     ``away_wins``, ``away_losses``, ``away_streak`` on every game dict
-    when data is available from ClearSports standings.  Existing non-zero
-    values are never overwritten (ClearSports game data takes priority).
+    when data is available from API-NBA standings.  Existing non-zero
+    values are never overwritten (API-NBA game data takes priority).
 
     Falls back gracefully — returns the original list unchanged if the
     API key is missing or the fetch fails.
@@ -861,7 +861,7 @@ def _enrich_games_with_standings(games: list) -> list:
             entry  = standings_map.get(abbrev)
             if not entry:
                 continue
-            # Only fill in if the current value is absent / zero (ClearSports game data wins)
+            # Only fill in if the current value is absent / zero (API-NBA game data wins)
             if not game.get(f"{side}_wins"):
                 game[f"{side}_wins"]   = entry.get("wins", 0)
             if not game.get(f"{side}_losses"):
@@ -885,11 +885,11 @@ def _enrich_games_with_standings(games: list) -> list:
 
 def fetch_todays_games():
     """
-    Fetch tonight's NBA games via ClearSports API, then enrich with
+    Fetch tonight's NBA games via API-NBA API, then enrich with
     consensus Vegas lines from The Odds API (spread, total, moneyline).
 
     Falls back to building the game list directly from The Odds API
-    when ClearSports returns no games.
+    when API-NBA returns no games.
 
     Returns:
         list of dict: Tonight's games, each with home_team, away_team,
@@ -908,20 +908,20 @@ def fetch_todays_games():
         ]
 
         if games:
-            _logger.info(f"ClearSports: {len(games)} valid game(s) found.")
+            _logger.info(f"API-NBA: {len(games)} valid game(s) found.")
             games = _deduplicate_games(games)
         elif raw_games:
             _logger.warning(
-                "ClearSports returned %d game(s) but none had valid team "
+                "API-NBA returned %d game(s) but none had valid team "
                 "abbreviations — possible API format change.",
                 len(raw_games),
             )
     except Exception as err:
-        _logger.warning(f"ClearSports games fetch failed: {err}")
+        _logger.warning(f"API-NBA games fetch failed: {err}")
 
-    # ── Fallback: build game list from The Odds API when ClearSports is empty ──
+    # ── Fallback: build game list from The Odds API when API-NBA is empty ──
     if not games:
-        _logger.info("ClearSports returned no games — trying Odds API fallback.")
+        _logger.info("API-NBA returned no games — trying Odds API fallback.")
         games = _build_games_from_odds_api()
         if games:
             _logger.info(f"Odds API fallback: {len(games)} game(s) found.")
@@ -930,13 +930,13 @@ def fetch_todays_games():
     # Enrich every game with Odds API consensus lines (moneyline + spread + total)
     games = _enrich_games_with_odds_api(games)
 
-    # Supplement with ClearSports game-level odds (fills gaps the Odds API missed)
+    # Supplement with API-NBA game-level odds (fills gaps the Odds API missed)
     games = _enrich_games_with_clearsports_odds(games)
 
-    # Enrich with ClearSports AI predictions (predicted winner, spread, total)
+    # Enrich with API-NBA AI predictions (predicted winner, spread, total)
     games = _enrich_games_with_predictions(games)
 
-    # Enrich with ClearSports standings (W-L, streak, conference rank)
+    # Enrich with API-NBA standings (W-L, streak, conference rank)
     games = _enrich_games_with_standings(games)
 
     if not games:
@@ -953,16 +953,16 @@ def fetch_todays_games():
 # ============================================================
 # ============================================================
 # SECTION: Targeted Roster-Based Data Fetcher
-# Fetches players only for teams playing today via ClearSports API.
+# Fetches players only for teams playing today via API-NBA API.
 # ============================================================
 
 def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_injury_map=None):
     """
-    Fetch player stats ONLY for teams playing today via ClearSports API.
+    Fetch player stats ONLY for teams playing today via API-NBA API.
 
     Streamlined pipeline:
     1. Identifies the teams playing today from todays_games
-    2. Fetches player stats from ClearSports (filtered to today's teams)
+    2. Fetches player stats from API-NBA (filtered to today's teams)
     3. Writes to players.csv in the standard format
 
     Args:
@@ -996,7 +996,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
         if progress_callback:
             progress_callback(1, 10, f"Found {len(playing_team_abbrevs)} teams. Fetching player stats...")
 
-        # Fetch all player stats from ClearSports
+        # Fetch all player stats from API-NBA
         all_player_stats = _cs_players()
 
         if progress_callback:
@@ -1036,7 +1036,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             _logger.warning(f"Could not write injury status (non-fatal): {inj_write_err}")
 
         if not filtered_players:
-            _logger.warning("No player stats available from ClearSports.")
+            _logger.warning("No player stats available from API-NBA.")
             return False
 
         # Write players CSV
@@ -1070,7 +1070,7 @@ def fetch_player_recent_form(player_id, last_n_games=10):
     Fetch recent form data for a specific player.
 
     Returns the last N game logs along with trend analysis.
-    Falls back to an empty dict if ClearSports doesn't have game logs.
+    Falls back to an empty dict if API-NBA doesn't have game logs.
 
     Args:
         player_id (int or str): The NBA player's unique ID
@@ -1088,7 +1088,7 @@ def fetch_player_recent_form(player_id, last_n_games=10):
     except Exception:
         game_log = []
 
-    # If ClearSports doesn't provide game logs, fall back to cached data
+    # If API-NBA doesn't provide game logs, fall back to cached data
     if not game_log and _GAME_LOG_CACHE_AVAILABLE:
         try:
             game_log = load_game_logs_from_cache(player_id) or []
@@ -1164,12 +1164,12 @@ def fetch_player_recent_form(player_id, last_n_games=10):
 # ============================================================
 # ============================================================
 # SECTION: Player Stats Fetcher
-# Fetches current season stats for all NBA players via ClearSports API.
+# Fetches current season stats for all NBA players via API-NBA API.
 # ============================================================
 
 def fetch_player_stats(progress_callback=None):
     """
-    Fetch current season player stats for all NBA players via ClearSports API.
+    Fetch current season player stats for all NBA players via API-NBA API.
 
     Writes the results to players.csv in the standard column format.
 
@@ -1183,17 +1183,17 @@ def fetch_player_stats(progress_callback=None):
 
     try:
         if progress_callback:
-            progress_callback(1, 10, "Connecting to ClearSports API for player stats...")
+            progress_callback(1, 10, "Connecting to API-NBA API for player stats...")
 
         player_stats_list = _cs_player_stats()
 
         if progress_callback:
             progress_callback(5, 10, f"Got stats for {len(player_stats_list)} players. Writing CSV...")
 
-        _logger.info(f"ClearSports returned {len(player_stats_list)} player stats.")
+        _logger.info(f"API-NBA returned {len(player_stats_list)} player stats.")
 
         if not player_stats_list:
-            _logger.warning("ClearSports returned no player stats.")
+            _logger.warning("API-NBA returned no player stats.")
             return False
 
         _write_players_csv(player_stats_list)
@@ -1246,12 +1246,12 @@ def _write_players_csv(players):
 # ============================================================
 # ============================================================
 # SECTION: Team Stats Fetcher
-# Fetches current season team stats via ClearSports API.
+# Fetches current season team stats via API-NBA API.
 # ============================================================
 
 def fetch_team_stats(progress_callback=None):
     """
-    Fetch current season team stats via ClearSports API.
+    Fetch current season team stats via API-NBA API.
 
     Pulls pace, offensive rating (ORTG), defensive rating (DRTG),
     and wins/losses for all 30 NBA teams. Writes to teams.csv and
@@ -1267,17 +1267,17 @@ def fetch_team_stats(progress_callback=None):
 
     try:
         if progress_callback:
-            progress_callback(1, 6, "Fetching team stats from ClearSports API...")
+            progress_callback(1, 6, "Fetching team stats from API-NBA API...")
 
         team_stats_list = _cs_team_stats()
 
         if progress_callback:
             progress_callback(3, 6, f"Got {len(team_stats_list)} teams. Building CSV rows...")
 
-        _logger.info(f"ClearSports returned {len(team_stats_list)} team stats.")
+        _logger.info(f"API-NBA returned {len(team_stats_list)} team stats.")
 
         if not team_stats_list:
-            _logger.warning("ClearSports returned no team stats.")
+            _logger.warning("API-NBA returned no team stats.")
             return False
 
         # Write teams.csv
@@ -1398,7 +1398,7 @@ def get_teams_staleness_warning():
 # ============================================================
 # ============================================================
 # SECTION: Player Game Log Fetcher
-# Fetches the last N games for a specific player via ClearSports API.
+# Fetches the last N games for a specific player via API-NBA API.
 # ============================================================
 
 def fetch_player_game_log(player_id, last_n_games=20):
@@ -1419,7 +1419,7 @@ def fetch_player_game_log(player_id, last_n_games=20):
         if games:
             return games
     except Exception as err:
-        _logger.warning(f"ClearSports game log fetch failed for player {player_id}: {err}")
+        _logger.warning(f"API-NBA game log fetch failed for player {player_id}: {err}")
 
     # Try local cache as fallback
     if _GAME_LOG_CACHE_AVAILABLE:
@@ -1650,7 +1650,7 @@ def fetch_all_todays_data(progress_callback=None):
         _logger.debug("fetch_all_todays_data: news pre-load skipped — %s", _news_exc)
 
     # --------------------------------------------------------
-    # Bonus: Pre-load ClearSports game-level odds + predictions
+    # Bonus: Pre-load API-NBA game-level odds + predictions
     # into session state so Vegas Vault and other pages can use them.
     # --------------------------------------------------------
     try:
@@ -1664,7 +1664,7 @@ def fetch_all_todays_data(progress_callback=None):
             except Exception:
                 pass
     except Exception as _odds_exc:
-        _logger.debug("fetch_all_todays_data: ClearSports odds pre-load skipped — %s", _odds_exc)
+        _logger.debug("fetch_all_todays_data: API-NBA odds pre-load skipped — %s", _odds_exc)
 
     try:
         from data.clearsports_client import fetch_predictions as _cs_preds
@@ -1677,7 +1677,7 @@ def fetch_all_todays_data(progress_callback=None):
             except Exception:
                 pass
     except Exception as _preds_exc:
-        _logger.debug("fetch_all_todays_data: ClearSports predictions pre-load skipped — %s", _preds_exc)
+        _logger.debug("fetch_all_todays_data: API-NBA predictions pre-load skipped — %s", _preds_exc)
 
     players_updated = results["players_updated"]
     teams_updated = results["teams_updated"]
@@ -1837,7 +1837,7 @@ def _record_odds_api_snapshots(games: list | None = None) -> None:
 
 def fetch_standings(progress_callback=None) -> list[dict]:
     """
-    Fetch current NBA standings from ClearSports API.
+    Fetch current NBA standings from API-NBA API.
 
     Returns a list of team standing entries including conference rank,
     win-loss record, home/away splits, last-10 record, and streak.
@@ -1851,7 +1851,7 @@ def fetch_standings(progress_callback=None) -> list[dict]:
                     conference_rank, wins, losses, win_pct, streak, etc.
     """
     if progress_callback:
-        progress_callback(0, 10, "Fetching NBA standings from ClearSports...")
+        progress_callback(0, 10, "Fetching NBA standings from API-NBA...")
 
     try:
         from data.clearsports_client import fetch_standings as _cs_standings
@@ -1866,7 +1866,7 @@ def fetch_standings(progress_callback=None) -> list[dict]:
 
 def fetch_player_news(player_name: str | None = None, limit: int = 20) -> list[dict]:
     """
-    Fetch recent NBA news from ClearSports API, optionally filtered to
+    Fetch recent NBA news from API-NBA API, optionally filtered to
     a specific player.
 
     Useful for enriching Joseph M. Smith's contextual commentary with
@@ -1903,7 +1903,7 @@ def fetch_player_news(player_name: str | None = None, limit: int = 20) -> list[d
 # ============================================================
 # SECTION: Historical Data Refresher
 # Auto-populates game log cache and updates CLV closing lines
-# using ClearSports player game logs + Odds API completed scores.
+# using API-NBA player game logs + Odds API completed scores.
 # ============================================================
 
 def refresh_historical_data_for_tonight(
@@ -1918,7 +1918,7 @@ def refresh_historical_data_for_tonight(
     This function is the "historical data refresh" entry point. It:
 
     1. Resolves tonight's playing teams from ``games`` (or session state)
-    2. Fetches each player's recent game log from ClearSports API
+    2. Fetches each player's recent game log from API-NBA API
     3. Saves results to ``data/game_log_cache.py`` for the Backtester
     4. Calls ``engine/clv_tracker.auto_update_closing_lines()`` to close
        open CLV records using today's Odds API prop lines (closing lines)
@@ -1983,7 +1983,7 @@ def refresh_historical_data_for_tonight(
     if progress_callback:
         progress_callback(0, total, f"Fetching historical logs for {total} player(s)…")
 
-    # Batch-fetch game logs from ClearSports
+    # Batch-fetch game logs from API-NBA
     try:
         from data.clearsports_client import fetch_season_game_logs_batch as _batch
         from data.game_log_cache import save_game_logs_to_cache as _save_cache
@@ -2022,8 +2022,8 @@ def refresh_historical_data_for_tonight(
     except Exception as exc:
         _logger.debug("refresh_historical_data_for_tonight: CLV update skipped — %s", exc)
 
-    # ── Cross-reference: ClearSports per-game player stats ────────────────
-    # fetch_nba_player_stats returns detailed box-score data from ClearSports
+    # ── Cross-reference: API-NBA per-game player stats ────────────────
+    # fetch_nba_player_stats returns detailed box-score data from API-NBA
     # for recently completed games.  Store it in session state so downstream
     # pages (Game Report, Backtester) can reference historical actuals.
     try:
@@ -2038,7 +2038,7 @@ def refresh_historical_data_for_tonight(
             results["cs_player_stats_count"] = len(cs_player_stats)
     except Exception as exc:
         _logger.debug(
-            "refresh_historical_data_for_tonight: ClearSports player stats skipped — %s", exc
+            "refresh_historical_data_for_tonight: API-NBA player stats skipped — %s", exc
         )
 
     # ── Cross-reference: Odds API recent scores ───────────────────────────

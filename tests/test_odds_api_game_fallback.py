@@ -3,7 +3,7 @@ tests/test_odds_api_game_fallback.py
 ------------------------------------
 Tests for the Odds API fallback in fetch_todays_games().
 
-When ClearSports returns no games, the app should fall back to building
+When ApiNba returns no games, the app should fall back to building
 the game list from The Odds API's fetch_game_odds() data.
 """
 
@@ -103,7 +103,7 @@ class TestBuildGamesFromOddsApi(unittest.TestCase):
 
     @patch("data.odds_api_client.fetch_game_odds", return_value=SAMPLE_ODDS_API_GAMES)
     def test_game_format_matches_clearsports(self, mock_odds):
-        """Game dicts must have all keys that ClearSports would provide."""
+        """Game dicts must have all keys that ApiNba would provide."""
         games = self.fn()
         required_keys = [
             "game_id", "home_team", "away_team",
@@ -151,7 +151,7 @@ class TestBuildGamesFromOddsApi(unittest.TestCase):
 
 
 class TestFetchTodaysGamesFallback(unittest.TestCase):
-    """Test that fetch_todays_games() falls back to Odds API when ClearSports fails."""
+    """Test that fetch_todays_games() falls back to Odds API when ApiNba fails."""
 
     def setUp(self):
         from data.live_data_fetcher import fetch_todays_games
@@ -164,7 +164,7 @@ class TestFetchTodaysGamesFallback(unittest.TestCase):
     def test_fallback_called_when_clearsports_empty(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_standings
     ):
-        """When ClearSports returns [], the Odds API fallback should be invoked."""
+        """When ApiNba returns [], the Odds API fallback should be invoked."""
         mock_build.return_value = [
             {"home_team": "LAL", "away_team": "BOS", "game_id": "1",
              "home_wins": 0, "home_losses": 0, "away_wins": 0, "away_losses": 0,
@@ -182,7 +182,7 @@ class TestFetchTodaysGamesFallback(unittest.TestCase):
     def test_fallback_not_called_when_clearsports_succeeds(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_standings
     ):
-        """When ClearSports returns games, Odds API fallback should NOT be called."""
+        """When ApiNba returns games, Odds API fallback should NOT be called."""
         mock_cs.return_value = [
             {"home_team": "LAL", "away_team": "BOS", "game_id": "1",
              "home_wins": 40, "home_losses": 20, "away_wins": 38, "away_losses": 22,
@@ -199,7 +199,7 @@ class TestFetchTodaysGamesFallback(unittest.TestCase):
     def test_returns_empty_when_both_fail(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_standings
     ):
-        """When both ClearSports and Odds API fail, return empty list."""
+        """When both ApiNba and Odds API fail, return empty list."""
         games = self.fn()
         self.assertEqual(games, [])
 

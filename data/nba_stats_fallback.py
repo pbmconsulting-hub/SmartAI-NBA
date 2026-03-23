@@ -1,7 +1,7 @@
 """
 data/nba_stats_fallback.py
 --------------------------
-Free NBA stats fallback — supplements ClearSports when its
+Free NBA stats fallback — supplements API-NBA when its
 team-stats, players, and player-stats endpoints are unavailable.
 
 Uses the public stats.nba.com endpoints (no API key required).
@@ -9,7 +9,7 @@ These endpoints power nba.com itself and are free to query with
 the correct HTTP headers.
 
 All public functions return data in the same dict schema that the
-corresponding ClearSports functions produce, so callers are unaware
+corresponding API-NBA functions produce, so callers are unaware
 of the data source.
 """
 
@@ -161,7 +161,7 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
     """
     Fetch team stats from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as ClearSports ``fetch_team_stats()``:
+    Returns data in the same schema as API-NBA ``fetch_team_stats()``:
         team_abbreviation, team_name, pace, offensive_rating,
         defensive_rating, wins, losses
     """
@@ -231,7 +231,7 @@ def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict
     """
     Fetch NBA players from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as ClearSports ``fetch_players()``:
+    Returns data in the same schema as API-NBA ``fetch_players()``:
         id, name, team_id (optional filtering)
     """
     cache_key = f"fallback:players:{team_id}"
@@ -280,7 +280,7 @@ def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
     """
     Fetch player season averages from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as ClearSports ``fetch_player_stats()``:
+    Returns data in the same schema as API-NBA ``fetch_player_stats()``:
         player_id, name, team, position,
         minutes_avg, points_avg, rebounds_avg, assists_avg,
         threes_avg, steals_avg, blocks_avg, turnovers_avg,
@@ -354,7 +354,7 @@ def fetch_nba_team_stats_fallback(
     """
     Fetch per-team statistics from the free NBA.com stats endpoint.
 
-    Returns raw stat rows (same schema as ClearSports ``fetch_nba_team_stats()``).
+    Returns raw stat rows (same schema as API-NBA ``fetch_nba_team_stats()``).
     """
     cache_key = f"fallback:nba_team_stats:{team_id}:{season}"
     cached = _cache_get(cache_key)
@@ -398,7 +398,7 @@ def fetch_nba_player_stats_fallback(
     """
     Fetch per-player statistics from the free NBA.com stats endpoint.
 
-    Returns raw stat rows (same schema as ClearSports ``fetch_nba_player_stats()``).
+    Returns raw stat rows (same schema as API-NBA ``fetch_nba_player_stats()``).
     """
     cache_key = f"fallback:nba_player_stats:{player_id}:{game_id}:{season}"
     cached = _cache_get(cache_key)

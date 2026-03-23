@@ -173,18 +173,18 @@ st.markdown(
 _api_col1, _api_col2 = st.columns(2)
 
 with _api_col1:
-    _current_cs_key = st.session_state.get("clearsports_api_key", "")
+    _current_cs_key = st.session_state.get("api_nba_key", "")
     _new_cs_key = st.text_input(
-        "ClearSports API Key",
+        "API-NBA Key",
         value=_current_cs_key,
         type="password",
-        placeholder="Enter your ClearSports API key",
-        help="Get your key at https://clearsportsapi.com",
+        placeholder="Enter your API-NBA key",
+        help="Get your key at https://v2.nba.api-sports.io/",
     )
-    if st.session_state.get("clearsports_api_key"):
-        st.caption("✅ ClearSports API key is set")
+    if st.session_state.get("api_nba_key"):
+        st.caption("✅ API-NBA key is set")
     else:
-        st.caption("⚠️ ClearSports API key is **not set** — live data will be unavailable")
+        st.caption("⚠️ API-NBA key is **not set** — live data will be unavailable")
 
 with _api_col2:
     _current_odds_key = st.session_state.get("odds_api_key", "")
@@ -212,12 +212,12 @@ with _api_btn_col1:
             if _new_cs_key:
                 _ok, _msg = _validate_cs_key(_new_cs_key)
                 if not _ok:
-                    _errors.append(f"ClearSports: {_msg}")
+                    _errors.append(f"API-NBA: {_msg}")
                 else:
-                    st.session_state["clearsports_api_key"] = _new_cs_key
+                    st.session_state["api_nba_key"] = _new_cs_key
                     _changed = True
             else:
-                st.session_state["clearsports_api_key"] = _new_cs_key
+                st.session_state["api_nba_key"] = _new_cs_key
                 _changed = True
         if _new_odds_key != _current_odds_key:
             if _new_odds_key:
@@ -240,15 +240,15 @@ with _api_btn_col1:
             st.info("No changes to save.")
 with _api_btn_col2:
     if st.button("🗑️ Clear Keys", key="clear_api_keys"):
-        st.session_state.pop("clearsports_api_key", None)
+        st.session_state.pop("api_nba_key", None)
         st.session_state.pop("odds_api_key", None)
         st.warning("API keys cleared.")
         st.rerun()
 with _api_btn_col3:
     if st.button("🔍 Test Connection", key="test_api_keys"):
         _test_results: list[str] = []
-        # ── ClearSports ──
-        _cs_key = st.session_state.get("clearsports_api_key", "")
+        # ── API-NBA ──
+        _cs_key = st.session_state.get("api_nba_key", "")
         if _cs_key:
             try:
                 from data.clearsports_client import fetch_api_key_info
@@ -258,27 +258,32 @@ with _api_btn_col3:
                     _active = _info.get("is_active", None)
                     _status = "active" if _active else ("inactive" if _active is False else "unknown")
                     _test_results.append(
-                        f"✅ **ClearSports**: connected — {_credits} credits remaining, status: {_status}"
+                        f"✅ **API-NBA**: connected — {_credits} credits remaining, status: {_status}"
                     )
                 else:
-                    _test_results.append("⚠️ **ClearSports**: key is set but API returned no data")
+                    _test_results.append("⚠️ **API-NBA**: key is set but API returned no data")
             except Exception as _exc:
-                _test_results.append(f"❌ **ClearSports**: connection error — {_exc}")
+                _test_results.append(f"❌ **API-NBA**: connection error — {_exc}")
         else:
-            _test_results.append("⚠️ **ClearSports**: no API key configured")
+            _test_results.append("⚠️ **API-NBA**: no API key configured")
         # ── Odds API ──
         _odds_key = st.session_state.get("odds_api_key", "")
         if _odds_key:
             try:
-                from data.odds_api_client import fetch_events, get_odds_api_usage
-                _events = fetch_events()
+                from data.odds_api_client import fetch_sports, get_odds_api_usage
+                _sports = fetch_sports()
                 _usage = get_odds_api_usage()
                 _remaining = _usage.get("requests_remaining")
-                if _events is not None:
-                    _count = len(_events) if isinstance(_events, list) else 0
+                if _sports is not None:
+                    # Check that basketball_nba is in the list
+                    _nba_active = any(
+                        s.get("key") == "basketball_nba" and s.get("active")
+                        for s in _sports if isinstance(s, dict)
+                    )
+                    _nba_str = "NBA is active ✅" if _nba_active else "NBA not in season"
                     _quota_str = f", {_remaining} requests remaining" if _remaining is not None else ""
                     _test_results.append(
-                        f"✅ **Odds API**: connected — {_count} events found{_quota_str}"
+                        f"✅ **Odds API**: connected — {len(_sports)} sports available, {_nba_str}{_quota_str}"
                     )
                 else:
                     _test_results.append("⚠️ **Odds API**: key is set but API returned no data")
@@ -554,7 +559,7 @@ st.divider()
 st.subheader("📋 Current Settings Summary")
 
 settings_summary = {
-    "ClearSports API Key": "✅ Set" if st.session_state.get("clearsports_api_key") else "⚠️ Not set",
+    "API-NBA Key": "✅ Set" if st.session_state.get("api_nba_key") else "⚠️ Not set",
     "Odds API Key": "✅ Set" if st.session_state.get("odds_api_key") else "⚠️ Not set",
     "Simulation Depth": f"{st.session_state.get('simulation_depth', 1000):,} simulations",
     "Minimum Edge": f"{st.session_state.get('minimum_edge_threshold', 5.0)}%",
@@ -577,7 +582,7 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
         "simulation_depth", "minimum_edge_threshold", "entry_fee",
         "selected_platforms", "home_court_boost", "blowout_sensitivity",
         "fatigue_sensitivity", "pace_sensitivity",
-        "clearsports_api_key", "odds_api_key",
+        "api_nba_key", "odds_api_key",
     ]
     for key in settings_keys_to_clear:
         if key in st.session_state:
