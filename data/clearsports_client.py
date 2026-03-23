@@ -653,7 +653,7 @@ def fetch_injury_report(team_id=None) -> dict:
     """
     Fetch the current NBA injury report.
 
-    Endpoint: GET /injuries
+    Endpoint: GET /nba/injury-stats
 
     Args:
         team_id: Optional team ID to filter by.
@@ -1259,7 +1259,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
     """
     Retrieve betting odds for NBA games.
 
-    Endpoint: GET /odds
+    Endpoint: GET /nba/game-odds
 
     Args:
         game_id: Optional game ID to filter odds for a specific game.
