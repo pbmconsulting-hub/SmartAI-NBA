@@ -284,6 +284,13 @@ _tab_report, _tab_builder, _tab_narrative = st.tabs([
 
 # Helper functions are defined at module level below before the tab content
 
+_FANTASY_SCORE_STAT_PREFIX = "fantasy_score"
+
+
+def _is_fantasy_score_stat(stat_type: str) -> bool:
+    """Return True if *stat_type* is a composite fantasy-score stat."""
+    return str(stat_type).startswith(_FANTASY_SCORE_STAT_PREFIX)
+
 
 def _build_entry_strategy(results):
     """Build entry strategy matrix entries from analysis results.
@@ -298,7 +305,7 @@ def _build_entry_strategy(results):
         and not r.get("player_is_out", False)
         and abs(r.get("edge_percentage", 0)) >= 5.0
         # Exclude fantasy-score composite stats from parlay legs
-        and not str(r.get("stat_type", "")).startswith("fantasy_score")
+        and not _is_fantasy_score_stat(r.get("stat_type", ""))
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 

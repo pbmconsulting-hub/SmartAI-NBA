@@ -304,8 +304,17 @@ def get_movement_summary(player_name, stat_type, platform=None):
     # Sort chronologically
     all_snapshots.sort(key=lambda s: s.get('timestamp', ''))
 
-    initial_line  = all_snapshots[0]['line']
-    current_line  = all_snapshots[-1]['line']
+    initial_line  = all_snapshots[0].get('line')
+    current_line  = all_snapshots[-1].get('line')
+    if initial_line is None or current_line is None:
+        return {
+            'has_movement_data': False,
+            'snapshots':         all_snapshots,
+            'initial_line':      initial_line,
+            'current_line':      current_line,
+            'movement':          None,
+            'time_span_hours':   None,
+        }
     movement      = current_line - initial_line
 
     # Compute time span between first and last snapshot

@@ -2898,7 +2898,7 @@ def joseph_auto_log_bets(joseph_results: list, session_state: dict) -> tuple:
     """
     try:
         from engine.joseph_bets import joseph_auto_log_bets as _log
-        return _log(joseph_results, session_state)
+        return _log(joseph_results)
     except ImportError:
         return (0, "Joseph bets module not installed yet")
     except Exception as exc:

@@ -845,6 +845,8 @@ def _build_lineup_joseph_take(
 ) -> str:
     """Generate a Joseph-style text blurb for a lineup combination."""
     parts: list[str] = []
+    if not names:
+        return "Could not analyze this lineup — no player names provided."
     lineup_str = ", ".join(names[:-1]) + f" and {names[-1]}" if len(names) > 1 else names[0]
 
     # Overall verdict

@@ -324,7 +324,8 @@ def analyze_directional_forces(
     # When multiple platforms post different lines, consensus shows the "true" line.
     # A prop line far below consensus = OVER value; far above consensus = UNDER value.
     if platform_lines and len(platform_lines) >= 2:
-        platform_values = [float(v) for v in platform_lines.values() if v is not None]
+        platform_values = [_safe_float(v) for v in platform_lines.values() if v is not None]
+        platform_values = [v for v in platform_values if v is not None]
         if len(platform_values) >= 2:
             consensus_line = sum(platform_values) / len(platform_values)
             if consensus_line > 0:
