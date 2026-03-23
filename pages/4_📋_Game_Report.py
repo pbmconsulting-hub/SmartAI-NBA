@@ -660,7 +660,7 @@ with _tab_report:
                     )
                     _oc3.metric(f"{home} Moneyline", _fmt_ml_gr(_ml_home), help="Consensus across all bookmakers")
                     _oc4.metric(f"{away} Moneyline", _fmt_ml_gr(_ml_away), help="Consensus across all bookmakers")
-                    st.caption(f"📚 Consensus from {_bk_count} bookmakers via The Odds API")
+                    st.caption(f"📚 Consensus from {_bk_count} bookmakers")
 
                 if game_pred:
                     # Rich multi-metric caption if engine provided full output

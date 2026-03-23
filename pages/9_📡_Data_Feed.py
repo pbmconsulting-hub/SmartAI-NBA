@@ -64,8 +64,8 @@ inject_joseph_floating()
 # Page title and description
 st.title("📡 Data Feed")
 st.markdown(
-    "Pull real, up-to-date NBA stats from **ClearSports API** and player prop lines "
-    "from **The Odds API** (DraftKings, FanDuel, BetMGM, etc.). "
+    "Pull real, up-to-date NBA stats and player prop lines "
+    "from DraftKings, FanDuel, BetMGM, and more. "
     "Update before each betting session for the most accurate predictions!"
 )
 
@@ -81,12 +81,8 @@ with st.expander("📖 How to Use This Page", expanded=False):
     3. **Fetch Props**: After updating stats, fetch live prop lines from sportsbooks
     
     **Data Sources**
-    - **ClearSports API**: Real-time NBA player stats, team metrics, and game logs
-    - **The Odds API**: Live odds from DraftKings, FanDuel, BetMGM, and 15+ sportsbooks
-    
-    **API Keys Required**
-    - Enter your API keys on the **⚙️ Settings** page
-    - Both APIs offer free tiers sufficient for daily use
+    - Real-time NBA player stats, team metrics, and game logs
+    - Live odds from DraftKings, FanDuel, BetMGM, and 15+ sportsbooks
     
     💡 **Pro Tips:**
     - Always update data BEFORE running analysis — stale data leads to bad predictions
@@ -103,11 +99,10 @@ st.markdown(get_education_box_html(
     Fast and efficient — use this before each session.<br><br>
     <strong>Full Update</strong>: Fetches all NBA player season stats. 
     Use this once a day or week to keep averages current.<br><br>
-    <strong>Live data</strong>: Real current season stats from <strong>ClearSports API</strong>, 
+    <strong>Live data</strong>: Real current season stats,
     saved to players.csv and teams.csv. Fetch before each session for accurate predictions.<br><br>
-    <strong>Prop lines</strong>: Fetched from <strong>The Odds API</strong> — covers DraftKings, 
-    FanDuel, BetMGM, Caesars, and 15+ other US sportsbooks in one call. 
-    Requires your Odds API key (see Settings page).
+    <strong>Prop lines</strong>: Covers DraftKings, 
+    FanDuel, BetMGM, Caesars, and 15+ other US sportsbooks in one call.
     """
 ), unsafe_allow_html=True)
 
@@ -209,68 +204,6 @@ try:
         st.warning(f"⏰ {_stale_warning}")
 except Exception:
     pass
-
-# ── API quota status row ───────────────────────────────────────
-_api_q_col1, _api_q_col2 = st.columns(2)
-with _api_q_col1:
-    _odds_key = st.session_state.get("odds_api_key", "")
-    if _odds_key:
-        try:
-            from data.odds_api_client import get_odds_api_usage
-            _usage = get_odds_api_usage()
-            _remaining = _usage.get("requests_remaining")
-            if _remaining is not None:
-                _used = _usage.get("requests_used") or 0
-                _pct_remaining = round(_remaining / max(_used + _remaining, 1) * 100)
-                _bar_color = "#00ff9d" if _remaining > 100 else ("#ffd700" if _remaining > 20 else "#ff4444")
-                st.markdown(
-                    f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
-                    f'border:1px solid rgba(0,240,255,0.15);">'
-                    f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
-                    f'📡 Odds API Quota</div>'
-                    f'<span style="background:{"#276749" if _remaining > 100 else ("#744210" if _remaining > 20 else "#742a2a")};'
-                    f'color:{"#9ae6b4" if _remaining > 100 else ("#fbd38d" if _remaining > 20 else "#feb2b2")};'
-                    f'padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">'
-                    f'{_remaining:,} remaining</span>'
-                    f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
-                    f'<div style="height:6px;width:{_pct_remaining}%;background:{_bar_color};'
-                    f'border-radius:3px;"></div></div>'
-                    f'<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">'
-                    f'{_used:,} used this month</div></div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    '<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
-                    'border:1px solid rgba(0,240,255,0.15);">'
-                    '<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
-                    '📡 Odds API Quota</div>'
-                    '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;'
-                    'font-size:0.75rem;font-weight:700;">PENDING</span>'
-                    '<div style="color:#8b949e;font-size:0.75rem;margin-top:8px;">'
-                    'Quota loads after first API call</div></div>',
-                    unsafe_allow_html=True,
-                )
-        except ImportError:
-            pass
-with _api_q_col2:
-    _cs_key = st.session_state.get("clearsports_api_key", "")
-    _cs_status = "✅ Active" if _cs_key else "❌ Not set"
-    _cs_badge_bg = "#276749" if _cs_key else "#742a2a"
-    _cs_badge_fg = "#9ae6b4" if _cs_key else "#feb2b2"
-    st.markdown(
-        f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
-        f'border:1px solid rgba(0,240,255,0.15);">'
-        f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">'
-        f'🔬 ClearSports API</div>'
-        f'<span style="background:{_cs_badge_bg};color:{_cs_badge_fg};'
-        f'padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">'
-        f'{_cs_status}</span>'
-        f'<div style="color:#8b949e;font-size:0.75rem;margin-top:8px;">'
-        f'{"Games · Players · Teams · Injuries · Standings · News" if _cs_key else "Set API key in ⚙️ Settings"}'
-        f'</div></div>',
-        unsafe_allow_html=True,
-    )
 
 st.divider()
 
@@ -395,7 +328,7 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#1a0a2e,#0f1a2e); border:1px solid #c800ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches live injury designations from the <strong>ClearSports API</strong> (primary) 
+    Fetches live injury designations 
     with NBA CDN feed as fallback —
     real-time GTD/Out/Doubtful status, specific injury details, and expected return dates.
   </div>
@@ -408,7 +341,7 @@ with injury_btn_col1:
     if st.button(
         "🔄 Refresh Injury Report",
         width="stretch",
-        help="Fetch live GTD/Out/injury data from ClearSports API (primary) with NBA CDN as fallback",
+        help="Fetch live GTD/Out/injury data with NBA CDN as fallback",
         disabled=_injury_btn_disabled,
     ):
         st.session_state["update_action"] = "injury_report"
@@ -420,7 +353,7 @@ with injury_btn_col2:
         if _last_scraped:
             st.caption(f"Last fetched: {_last_scraped}")
         else:
-            st.caption("Click to pull real-time injury designations from ClearSports API.")
+            st.caption("Click to pull real-time injury designations.")
     else:
         st.caption(
             "⚠️ RosterEngine unavailable. "
@@ -434,8 +367,8 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#0a1628,#0f2040); border:1px solid #00c9ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">📊 NBA Standings & Player News</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches current NBA standings and recent player/team news from the
-    <strong>ClearSports API</strong> — conference ranks, W-L records,
+    Fetches current NBA standings and recent player/team news —
+    conference ranks, W-L records,
     streaks, injury news, and trade updates.
   </div>
 </div>
@@ -446,7 +379,7 @@ with sn_col1:
     if st.button(
         "📊 Refresh Standings & News",
         use_container_width=True,
-        help="Fetch NBA standings and recent news from ClearSports API",
+        help="Fetch NBA standings and recent news",
     ):
         st.session_state["update_action"] = "standings_news"
 
@@ -457,7 +390,7 @@ with sn_col2:
     else:
         st.caption(
             "Fetches conference standings (rank, W-L, home/away splits, last-10, streak) "
-            "and recent player/team news. Requires your ClearSports API key."
+            "and recent player/team news."
         )
 
 # ============================================================
@@ -528,14 +461,12 @@ if current_action:
                 _usage = get_odds_api_usage()
                 _remaining = _usage.get("requests_remaining")
                 if _remaining is not None:
-                    st.caption(
-                        f"📡 Odds API quota: **{_remaining:,}** requests remaining"
-                    )
+                    pass  # quota tracked internally
             except Exception:
                 pass
         else:
             st.warning(
-                "⚠️ Could not fetch tonight's games (no games tonight, or API error). "
+                "⚠️ Could not fetch tonight's games (no games tonight, or data unavailable). "
                 "Try again or load games manually on the 🏀 Today's Games page."
             )
 
@@ -604,7 +535,7 @@ if current_action:
         # Show a spinner while we fetch
         # BEGINNER NOTE: st.spinner() shows a loading animation
         # while the code inside the "with" block runs
-        with st.spinner("Connecting to ClearSports API…"):
+        with st.spinner("Fetching game data…"):
             # Call the fetcher function
             todays_games = fetch_todays_games()
 
@@ -617,7 +548,7 @@ if current_action:
             # Show success message
             st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
             st.info(
-                "💡 Vegas lines and totals are fetched from The Odds API consensus. "
+                "💡 Vegas lines and totals are fetched from consensus data. "
                 "You can also edit them on the **🏀 Today's Games** page."
             )
 
@@ -639,14 +570,13 @@ if current_action:
             st.dataframe(games_display, width="stretch", hide_index=True)
 
         else:
-            # No games found or API error
+            # No games found or data error
             st.session_state["update_action"] = None  # Clear the action
 
             st.warning(
-                "⚠️ No games found for tonight, or there was an API error. "
+                "⚠️ No games found for tonight, or there was a data error. "
                 "\n\nPossible reasons:\n"
                 "- No NBA games are scheduled today\n"
-                "- ClearSports API key not configured (⚙️ Settings)\n"
                 "- Check your internet connection\n\n"
                 "You can still enter games manually on the **🏀 Today's Games** page."
             )
@@ -719,7 +649,6 @@ if current_action:
                 "❌ **Failed to update player stats.**\n\n"
                 "Possible reasons:\n"
                 "- No internet connection\n"
-                "- ClearSports API key not configured (⚙️ Settings)\n"
                 "- Try again in a few minutes\n\n"
                 "The app will continue to use the existing data until a successful update."
             )
@@ -869,7 +798,7 @@ if current_action:
         st.subheader("🏥 Refreshing Injury Report…")
 
         st.info(
-            "Fetching real-time injury data from **ClearSports API** (primary source) "
+            "Fetching real-time injury data "
             "with NBA CDN feed as fallback. "
             "This typically takes 5–15 seconds."
         )
@@ -904,8 +833,7 @@ if current_action:
             if total_count == 0:
                 st.warning(
                     "⚠️ **0 injuries found** — all data sources returned empty results. "
-                    "ClearSports API or NBA CDN feed may be temporarily unavailable. "
-                    "Confirm your ClearSports API key is set on ⚙️ Settings, then try again."
+                    "The data feed may be temporarily unavailable. Please try again."
                 )
             else:
                 st.success(
@@ -992,8 +920,7 @@ if current_action:
             if scraped_data is not None and not scraped_data:
                 st.warning(
                     "⚠️ **No injury data was returned.** "
-                    "ClearSports API may be unavailable or the API key is not configured. "
-                    "Check your ClearSports API key on the ⚙️ Settings page."
+                    "The data feed may be temporarily unavailable. Please try again."
                 )
 
     # --------------------------------------------------------
@@ -1033,7 +960,7 @@ if current_action:
             )
         elif not _standings_data:
             st.warning(
-                "No standings returned. Confirm your ClearSports API key is set on ⚙️ Settings."
+                "No standings returned. The data feed may be temporarily unavailable. Please try again."
             )
 
 # ============================================================
@@ -1062,12 +989,9 @@ st.markdown(
 st.markdown(get_education_box_html(
     "📖 How Platform Prop Fetching Works",
     """
-    <strong>PrizePicks & Underdog</strong>: Free public APIs — no API key required. 
-    Fetches all of tonight's NBA prop lines in seconds.<br><br>
-    <strong>DraftKings Pick6</strong>: Fetched via 
-    <a href="https://the-odds-api.com" target="_blank" style="color:#00f0ff;">The Odds API</a> 
-    (free tier: 500 req/month). Configure your API key on the 
-    <a href="/Settings" style="color:#ff5e00;">⚙️ Settings page</a>.<br><br>
+    <strong>PrizePicks & Underdog</strong>: Fetches all of tonight's NBA prop lines 
+    in seconds.<br><br>
+    <strong>DraftKings Pick6</strong>: Fetched from 15+ US sportsbooks in one call.<br><br>
     <strong>Cross-platform comparison</strong>: After fetching, the app shows all lines 
     side-by-side so you can see which platform has the best line for each pick.
     """
@@ -1114,14 +1038,13 @@ if _PLATFORM_FETCHER_AVAILABLE:
     )
     _dk_badge = (
         f'<span style="{_badge_style}background:#1a2f4d;color:#bee3f8;">'
-        f'{"✅" if _dk_on else "⏸️"} DraftKings '
-        f'{"(key ✓)" if _dk_key else "(no key)"}</span>'
+        f'{"✅" if _dk_on else "⏸️"} DraftKings</span>'
     )
     st.markdown(
         f'<div style="margin-bottom:12px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>',
         unsafe_allow_html=True,
     )
-    st.caption("Enable/disable platforms and add DraftKings API key on the ⚙️ Settings page.")
+    st.caption("Enable/disable platforms on the ⚙️ Settings page.")
 
     # ── Check for already-fetched props in session ─────────────
     _cached_platform_props = load_platform_props_from_session(st.session_state)
@@ -1141,21 +1064,21 @@ if _PLATFORM_FETCHER_AVAILABLE:
             "🟢 Fetch PrizePicks",
             disabled=not _pp_on,
             width="stretch",
-            help="Fetch live prop lines from PrizePicks (no key required).",
+            help="Fetch live prop lines from PrizePicks.",
         )
     with _fetch_col2:
         _fetch_ud = st.button(
             "🟣 Fetch Underdog",
             disabled=not _ud_on,
             width="stretch",
-            help="Fetch live prop lines from Underdog Fantasy (no key required).",
+            help="Fetch live prop lines from Underdog Fantasy.",
         )
     with _fetch_col3:
         _fetch_dk = st.button(
             "🔵 Fetch DraftKings",
-            disabled=not (_dk_on and _dk_key),
+            disabled=not _dk_on,
             width="stretch",
-            help="Fetch DraftKings lines via The Odds API (key required).",
+            help="Fetch DraftKings lines.",
         )
     with _fetch_col4:
         _fetch_all = st.button(
@@ -1194,7 +1117,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
             _new_props = fetch_all_platform_props(
                 include_prizepicks=_pp_on and (_fetch_all or _fetch_pp_only),
                 include_underdog=_ud_on and (_fetch_all or _fetch_ud_only),
-                include_draftkings=_dk_on and bool(_dk_key) and (_fetch_all or _fetch_dk_only),
+                include_draftkings=_dk_on and (_fetch_all or _fetch_dk_only),
                 odds_api_key=_dk_key or None,
                 progress_callback=_progress_cb,
             )
@@ -1242,8 +1165,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
         else:
             st.warning(
                 "⚠️ No props were returned. "
-                "Check your internet connection and platform API status. "
-                "PrizePicks and Underdog should always work without a key."
+                "Check your internet connection and try again."
             )
 
     # ── Show cached props preview ──────────────────────────────
@@ -1427,8 +1349,7 @@ if _standings_display or _news_display:
                 _standings_table(_west, "🏀 Western Conference")
         else:
             st.info(
-                "No standings loaded yet. Click **📊 Refresh Standings & News** above. "
-                "Requires your ClearSports API key (⚙️ Settings)."
+                "No standings loaded yet. Click **📊 Refresh Standings & News** above."
             )
 
     with _sn_tab2:
@@ -1493,8 +1414,8 @@ with st.expander("💡 Tips & FAQ", expanded=False):
     ---
 
     **Q: Why does the update take so long?**
-    A: We add a 1.5-second delay between each API call to avoid being blocked
-    by the NBA's servers. With 500+ players, fetching game logs takes time.
+    A: We add a 1.5-second delay between each data request to avoid being blocked
+    by the servers. With 500+ players, fetching game logs takes time.
     This is normal and necessary!
 
     BEGINNER NOTE: "Rate limiting" means a website limits how many requests
@@ -1505,15 +1426,14 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: What happens if the update fails?**
     A: Nothing breaks! The app just keeps using the existing CSV data.
-    Try again in a few minutes — the API may be temporarily slow or down.
+    Try again in a few minutes — the data feed may be temporarily slow or down.
 
     ---
 
     **Q: Where does the data come from?**
     A: Player stats, team stats, rosters, injuries, standings, and live scores
-    all come from the **ClearSports API** (configure your key on ⚙️ Settings).
-    Prop lines for DraftKings come from **The Odds API** (also on ⚙️ Settings).
-    PrizePicks and Underdog Fantasy have free public APIs — no key required.
+    are fetched from professional sports data providers.
+    Prop lines come from DraftKings, PrizePicks, and Underdog Fantasy.
 
     ---
 
@@ -1525,20 +1445,18 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: I see 'no data yet' even after updating. Why?**
     A: The players.csv file gets written when you click Update. If you still see "no data"
-    in the status, try refreshing the page or running the update again. Also confirm
-    your **ClearSports API key** is set on the ⚙️ Settings page.
+    in the status, try refreshing the page or running the update again.
 
     ---
 
     **Q: How do I get DraftKings props?**
-    A: Get a free API key from [the-odds-api.com](https://the-odds-api.com),
-    add it on the ⚙️ Settings page, then click "Fetch DraftKings" or "Refresh All Props".
+    A: Enable DraftKings on the ⚙️ Settings page, then click "Fetch DraftKings" or "Refresh All Props".
 
     ---
 
     **Q: How do I get NBA Standings and News?**
     A: Click **📊 Refresh Standings & News** (above). This fetches current conference
-    standings and recent player/team news from ClearSports. Standings are also
+    standings and recent player/team news. Standings are also
     auto-loaded whenever you run **One-Click Full Setup** or **🏀 Auto-Load Tonight's Games**.
     """)
 

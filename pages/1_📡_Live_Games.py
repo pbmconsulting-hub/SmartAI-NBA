@@ -226,7 +226,7 @@ st.markdown("""
     📊 Fetch Live Platform Props & Analyze
   </span>
   <span style="color:#8a9bb8;font-size:0.82rem;margin-left:10px;">
-    — Fetches <em>real</em> prop lines from live APIs, not season-average estimates
+    — Fetches <em>real</em> prop lines from live data, not season-average estimates
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -322,7 +322,6 @@ if auto_load_clicked:
             status_text.empty()
             st.warning(
                 "⚠️ Could not auto-load games. Possible reasons:\n"
-                "- ClearSports API key is not configured (⚙️ Settings)\n"
                 "- No games scheduled tonight\n"
                 "- No internet connection\n\n"
                 "Please enter games manually using the form below."
@@ -855,7 +854,7 @@ if platform_props_clicked:
             st.warning(
                 "⚠️ No qualifying picks found from platform props. "
                 "This may mean:\n"
-                "- Platform APIs returned no data (they may require API keys or be temporarily unavailable)\n"
+                "- No data returned from platforms (they may be temporarily unavailable)\n"
                 "- All props were filtered out by the Neural Analysis edge/confidence gates\n"
                 "- No player data loaded — try clicking **Auto-Load Tonight's Games** first"
             )
@@ -930,7 +929,7 @@ if platform_props_clicked:
             try:
                 st.error(
                     f"❌ Platform props pipeline failed: {_platform_err}\n\n"
-                    "This is usually caused by missing API access. "
+                    "This is usually caused by a temporary data issue. "
                     "You can still use Auto-Load + Neural Analysis for model-generated props."
                 )
             except Exception:
@@ -1009,7 +1008,7 @@ if one_click_setup_clicked:
                     pass
                 _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props fetched"
             else:
-                _oc_platform_msg = "⚠️ No live platform props returned (APIs may be unavailable)"
+                _oc_platform_msg = "⚠️ No live platform props returned (data may be unavailable)"
         except Exception as _oc_plat_err:
             _oc_platform_msg = f"⚠️ Platform fetch failed: {_oc_plat_err}"
 
@@ -1468,8 +1467,8 @@ with st.expander("💡 Tips for Best Results"):
 
     - **Total (O/U):** The Vegas over/under for the game (usually 210–235).
 
-    - **Auto-Load**: Fetches live game data + team records (W-L, streaks, standings) from
-      ClearSports API, then enriches with consensus lines from The Odds API.
+    - **Auto-Load**: Fetches live game data + team records (W-L, streaks, standings),
+      then enriches with consensus lines from multiple bookmakers.
 
     - **Key Players**: Loaded from your player database. Go to **Update Data** to
       refresh with today's team rosters.
