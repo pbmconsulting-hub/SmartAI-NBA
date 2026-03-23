@@ -5,7 +5,7 @@ Tests for API-NBA client endpoint structure:
   1. Base URL correctness (v2.nba.api-sports.io)
   2. Injury endpoint uses /nba/injury-stats
   3. 403 status code handling (credit exhaustion)
-  4. API key management endpoints (api-keys/me, usage, stats)
+  4. API key management endpoints (status, api-keys/me/usage, api-keys/me/stats)
   5. NBA endpoints (teams, players, standings, teams/statistics, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
@@ -286,18 +286,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_game_odds(", self.src)
 
     def test_fetch_game_odds_url(self):
-        """fetch_game_odds must call /nba/game-odds."""
+        """fetch_game_odds must call /odds (API-Sports endpoint)."""
         idx = self.src.find("def fetch_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/game-odds", snippet)
+        self.assertIn("/odds", snippet)
 
-    def test_fetch_game_odds_has_game_id_param(self):
-        """fetch_game_odds must accept game_id parameter."""
+    def test_fetch_game_odds_has_game_param(self):
+        """fetch_game_odds must pass game parameter (API-Sports convention)."""
         idx = self.src.find("def fetch_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn('"game_id"', snippet)
+        self.assertIn('"game"', snippet)
 
     # -- fetch_nba_team_stats --
 

@@ -1283,7 +1283,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
     """
     Retrieve betting odds for NBA games.
 
-    Endpoint: GET /nba/game-odds
+    Endpoint: GET /odds
 
     Args:
         game_id: Optional game ID to filter odds for a specific game.
@@ -1292,10 +1292,10 @@ def fetch_game_odds(game_id=None) -> list[dict]:
         list[dict]: Game odds entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/game-odds"
+    url = f"{_BASE_URL}/odds"
     params: dict = {}
     if game_id is not None:
-        params["game_id"] = game_id
+        params["game"] = game_id
 
     try:
         raw = _fetch_with_retry(url, params=params)
