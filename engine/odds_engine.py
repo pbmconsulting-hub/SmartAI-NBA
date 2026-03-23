@@ -456,12 +456,31 @@ def calculate_fair_odds_from_simulation(sim_array, target_line, direction="OVER"
 calculate_synthetic_odds = calculate_fair_odds_from_simulation
 
 
-# ── DFS Fixed-Payout Tables ──────────────────────────────────────────────
-# These are the actual payout multipliers for each DFS platform.
+# ── DFS / Sportsbook Fixed-Payout Tables ─────────────────────────────────
+# These are the actual payout multipliers for each platform.
 # Used by calculate_dfs_ev() to compute expected value against the real
-# payouts that DFS players receive (NOT sportsbook singles math).
+# payouts that players receive.
+
+# Standard sportsbook parlay payout table (all legs must hit).
+_SPORTSBOOK_PARLAY_PAYOUTS = {
+    2: {2: 2.64, 1: 0.0, 0: 0.0},
+    3: {3: 5.96, 2: 0.0, 1: 0.0, 0: 0.0},
+    4: {4: 12.28, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    5: {5: 24.35, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    6: {6: 47.77, 5: 0.0, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+}
 
 DFS_PAYOUT_TABLES = {
+    # Sportsbook standard parlays
+    "FanDuel": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "DraftKings": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "BetMGM": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "Caesars": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "Fanatics": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "ESPN Bet": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "Hard Rock Bet": _SPORTSBOOK_PARLAY_PAYOUTS,
+    "BetRivers": _SPORTSBOOK_PARLAY_PAYOUTS,
+    # Backward-compat DFS entries
     "PrizePicks": {
         3: {3: 2.25, 2: 1.25, 1: 0.0, 0: 0.0},
         4: {4: 5.0, 3: 1.50, 2: 0.40, 1: 0.0, 0: 0.0},
@@ -474,16 +493,10 @@ DFS_PAYOUT_TABLES = {
         5: {5: 10.0, 4: 2.0, 3: 0.50, 2: 0.0, 1: 0.0, 0: 0.0},
         6: {6: 25.0, 5: 2.5, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
     },
-    "DraftKings": {
-        3: {3: 2.50, 2: 0.0, 1: 0.0, 0: 0.0},
-        4: {4: 5.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
-        5: {5: 10.0, 4: 1.5, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
-        6: {6: 25.0, 5: 2.0, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
-    },
 }
 
 
-def calculate_dfs_breakeven_probability(platform="PrizePicks", pick_count=3):
+def calculate_dfs_breakeven_probability(platform="DraftKings", pick_count=3):
     """
     Calculate the per-leg breakeven probability for a DFS flex entry.
 
@@ -497,7 +510,7 @@ def calculate_dfs_breakeven_probability(platform="PrizePicks", pick_count=3):
     payout across all hit counts.
 
     Args:
-        platform (str): ``"PrizePicks"``, ``"Underdog"``, or ``"DraftKings"``.
+        platform (str): Sportsbook name (e.g., ``"FanDuel"``, ``"DraftKings"``).
         pick_count (int): Number of picks in the entry (3–6).
 
     Returns:
@@ -553,19 +566,19 @@ def _dfs_flex_ev_at_prob(per_leg_prob, n, tier):
     return ev
 
 
-def calculate_dfs_ev(leg_probabilities, platform="PrizePicks", pick_count=None, entry_fee=1.0):
+def calculate_dfs_ev(leg_probabilities, platform="DraftKings", pick_count=None, entry_fee=1.0):
     """
     Calculate the expected value of a DFS flex entry using the platform's
     actual payout table — NOT sportsbook singles math.
 
-    This is the correct EV for PrizePicks, Underdog, and DraftKings Pick6
-    entries.  The calculation sums the probability-weighted payout for
+    This is the correct EV for sportsbook parlays and DFS flex entries.
+    The calculation sums the probability-weighted payout for
     every possible number of correct legs (0 through N).
 
     Args:
         leg_probabilities (list[float]): Per-leg model probabilities
             (each 0.0–1.0), e.g. ``[0.62, 0.58, 0.71]`` for a 3-pick.
-        platform (str): ``"PrizePicks"``, ``"Underdog"``, or ``"DraftKings"``.
+        platform (str): Sportsbook name (e.g., ``"FanDuel"``, ``"DraftKings"``).
         pick_count (int or None): Override the number of picks (defaults to
             ``len(leg_probabilities)``).
         entry_fee (float): Dollar amount of the entry (default $1.00).
@@ -629,7 +642,7 @@ def calculate_dfs_ev(leg_probabilities, platform="PrizePicks", pick_count=None, 
 
 def calculate_dfs_parlay_ev_from_sim(
     model_probability,
-    platform="PrizePicks",
+    platform="DraftKings",
     direction="OVER",
 ):
     """
@@ -725,7 +738,7 @@ def calculate_dfs_parlay_ev_from_sim(
     }
 
 
-def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
+def generate_optimal_slip(filtered_props_list, platform="DraftKings"):
     """
     Generate optimal 2-to-5-man slips from a list of analysed props.
 
@@ -746,8 +759,8 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
                 - ``opponent`` (str, optional)
                 - ``confidence_score`` (float, optional)
                 - ``edge_percentage`` (float, optional)
-        platform (str): One of ``"PrizePicks"``, ``"Underdog"``,
-            ``"DraftKings"``.  Default ``"PrizePicks"``.
+        platform (str): Sportsbook name (e.g., ``"FanDuel"``,
+            ``"DraftKings"``).  Default ``"DraftKings"``.
 
     Returns:
         list of dict: Top slips sorted by cumulative EV (descending),
@@ -777,7 +790,7 @@ def generate_optimal_slip(filtered_props_list, platform="PrizePicks"):
     if not filtered_props_list or len(filtered_props_list) < 2:
         return []
 
-    payout_tables = PLATFORM_FLEX_TABLES.get(platform, PLATFORM_FLEX_TABLES.get("PrizePicks", {}))
+    payout_tables = PLATFORM_FLEX_TABLES.get(platform, PLATFORM_FLEX_TABLES.get("DraftKings", {}))
     power_table = PRIZEPICKS_POWER_PAYOUT_TABLE if platform == "PrizePicks" else {}
 
     all_slips = []

@@ -357,20 +357,24 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
 
 
 # Platform-specific implied probability baselines.
-# BEGINNER NOTE: PrizePicks and Underdog have NO per-leg vig — the house
-# edge is baked into the multi-leg payout table (e.g., you need 3/3 to win
-# the "power" play). So each individual leg is a fair 50/50 bet on those
-# platforms. DraftKings has standard -110 vig on individual legs.
+# BEGINNER NOTE: Standard sportsbooks have -110 vig on individual legs,
+# giving a 52.38% breakeven. DFS platforms (PrizePicks, Underdog) have
+# NO per-leg vig — the house edge is baked into the multi-leg payout table.
 _PLATFORM_BASELINE_PROBS = {
-    "prizepicks":       0.50,   # No individual leg vig
-    "prize picks":      0.50,
-    "underdog":         0.50,   # No individual leg vig
-    "underdog fantasy": 0.50,
-    "draftkings":       0.5238, # Standard -110 vig
-    "dk":               0.5238,
-    "fanduel":          0.5238, # Standard -110 vig
+    "fanduel":          0.5238,
+    "draftkings":       0.5238,
     "betmgm":           0.5238,
     "caesars":          0.5238,
+    "fanatics":         0.5238,
+    "espn bet":         0.5238,
+    "hard rock bet":    0.5238,
+    "betrivers":        0.5238,
+    "dk":               0.5238,
+    # Backward-compat DFS entries
+    "prizepicks":       0.50,
+    "prize picks":      0.50,
+    "underdog":         0.50,
+    "underdog fantasy": 0.50,
 }
 _DEFAULT_PLATFORM_BASELINE = 0.5238  # Conservative default (DraftKings-style)
 
@@ -395,7 +399,7 @@ def calculate_platform_edge_percentage(probability_over, platform=None, over_odd
         float: Edge in percentage points
 
     Examples:
-        calculate_platform_edge_percentage(0.63, 'PrizePicks') → +13.0% (vs 50%)
+        calculate_platform_edge_percentage(0.63, 'FanDuel') → +10.62% (vs 52.38%)
         calculate_platform_edge_percentage(0.63, 'DraftKings') → +10.62% (vs 52.38%)
         calculate_platform_edge_percentage(0.63, 'DraftKings', -120) → true edge vs -120
     """

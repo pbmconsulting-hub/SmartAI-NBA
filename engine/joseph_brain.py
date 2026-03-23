@@ -740,7 +740,7 @@ AMBIENT_POOLS = {
         "Build that entry and let's put together a MASTERPIECE!",
         "Parlay construction is an ART. And I'm the artist!",
         "Stack those correlated picks for MAXIMUM value!",
-        "PrizePicks, Underdog, DraftKings — I build for them ALL!",
+        "FanDuel, DraftKings, BetMGM — I build for them ALL!",
         "The entry builder optimizes your slip AUTOMATICALLY!",
         "Don't just pick random props. BUILD a smart entry!",
         "Correlation is KEY when building entries. I handle that!",
@@ -1212,7 +1212,7 @@ def build_rant(verdict, player="", stat="", line="", edge="", prob=""):
 
 
 def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
-                        platform="PrizePicks", recent_games=None):
+                        platform="DraftKings", recent_games=None):
     """Run full Joseph M. Smith analysis on a single player prop.
 
     Orchestrates simulation, edge detection, confidence scoring,
@@ -1407,7 +1407,7 @@ def joseph_rank_picks(picks, game_contexts=None):
     return []
 
 
-def joseph_evaluate_parlay(picks, platform="PrizePicks", entry_fee=10.0):
+def joseph_evaluate_parlay(picks, platform="DraftKings", entry_fee=10.0):
     """Evaluate a parlay / flex-play slate using correlation adjustments.
 
     Parameters
@@ -1434,7 +1434,7 @@ def joseph_evaluate_parlay(picks, platform="PrizePicks", entry_fee=10.0):
 
 
 def joseph_generate_full_slate_analysis(players, props, game_contexts,
-                                        platform="PrizePicks"):
+                                        platform="DraftKings"):
     """Produce a complete Joseph M. Smith slate analysis.
 
     Iterates over every player/prop pair, runs ``joseph_analyze_pick``,
@@ -2428,7 +2428,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
                         _pn = r.get("player_name", r.get("name", ""))
                         _st = r.get("stat_type", r.get("stat", "points"))
                         _ln = _safe_float(r.get("prop_line", r.get("line", 0)))
-                        _plat = r.get("platform", "PrizePicks")
+                        _plat = r.get("platform", "DraftKings")
                         if _pn and _ln > 0:
                             pick_result = joseph_analyze_pick(
                                 {"name": _pn, "player_name": _pn},

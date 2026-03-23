@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: engine/entry_optimizer.py
-# PURPOSE: Build optimal parlay entries for PrizePicks,
-#          Underdog Fantasy, and DraftKings Pick6.
+# PURPOSE: Build optimal parlay entries for major sportsbooks
+#          (FanDuel, DraftKings, BetMGM, etc.).
 #          Calculates exact EV (expected value) for each entry.
 # CONNECTS TO: edge_detection.py (picks), math_helpers.py (math)
 # CONCEPTS COVERED: Combinatorics, expected value, parlay math
@@ -73,11 +73,29 @@ DRAFTKINGS_PICK6_PAYOUT_TABLE = {
     6: {6: 25.0, 5: 2.0, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
 }
 
+# Standard sportsbook parlay payout table (all legs must hit).
+# Based on standard -110 per-leg juice.  All-or-nothing structure.
+SPORTSBOOK_PARLAY_TABLE = {
+    2: {2: 2.64, 1: 0.0, 0: 0.0},
+    3: {3: 5.96, 2: 0.0, 1: 0.0, 0: 0.0},
+    4: {4: 12.28, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    5: {5: 24.35, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    6: {6: 47.77, 5: 0.0, 4: 0.0, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+}
+
 # Map platform names to their payout tables
 PLATFORM_FLEX_TABLES = {
+    "FanDuel": SPORTSBOOK_PARLAY_TABLE,
+    "DraftKings": SPORTSBOOK_PARLAY_TABLE,
+    "BetMGM": SPORTSBOOK_PARLAY_TABLE,
+    "Caesars": SPORTSBOOK_PARLAY_TABLE,
+    "Fanatics": SPORTSBOOK_PARLAY_TABLE,
+    "ESPN Bet": SPORTSBOOK_PARLAY_TABLE,
+    "Hard Rock Bet": SPORTSBOOK_PARLAY_TABLE,
+    "BetRivers": SPORTSBOOK_PARLAY_TABLE,
+    # Backward-compat aliases for internal/test use
     "PrizePicks": PRIZEPICKS_FLEX_PAYOUT_TABLE,
     "Underdog": UNDERDOG_FLEX_PAYOUT_TABLE,
-    "DraftKings": DRAFTKINGS_PICK6_PAYOUT_TABLE,
 }
 
 # ============================================================
@@ -250,7 +268,7 @@ def build_optimal_entries(
         analyzed_picks (list of dict): All analyzed props, each with:
             'player_name', 'stat_type', 'line', 'probability_over',
             'direction', 'confidence_score', 'edge_percentage'
-        platform (str): 'PrizePicks', 'Underdog', or 'DraftKings'
+        platform (str): sportsbook name (e.g., 'FanDuel', 'DraftKings')
         entry_size (int): Number of picks per entry (2-6)
         entry_fee (float): Dollar amount per entry
         max_entries_to_show (int): How many top entries to return
@@ -293,7 +311,7 @@ def build_optimal_entries(
         qualifying_picks = qualifying_picks[:_GREEDY_POOL_SIZE]
 
     # Get the payout table for this platform and entry size
-    platform_flex_table = PLATFORM_FLEX_TABLES.get(platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+    platform_flex_table = PLATFORM_FLEX_TABLES.get(platform, SPORTSBOOK_PARLAY_TABLE)
     payout_table_for_size = platform_flex_table.get(entry_size, {})
 
     if not qualifying_picks or not payout_table_for_size:
@@ -652,12 +670,12 @@ def format_ev_display(ev_result, entry_fee):
 # ============================================================
 # SECTION: Flex vs Power Play Optimizer (Feature 10)
 # Determines whether a Power or Flex entry maximizes EV for
-# a given set of pick probabilities on PrizePicks. Includes
+# a given set of pick probabilities on sportsbooks. Includes
 # a binary-search breakeven calculator so users know the
 # exact probability threshold where Power becomes better.
 # ============================================================
 
-def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
+def optimize_play_type(pick_probabilities, entry_size, platform='DraftKings'):
     """
     Determine whether Flex or Power play is better for a given set of picks.
 
@@ -668,7 +686,7 @@ def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
         pick_probabilities (list of float): Win probabilities for each pick (0-1).
             Must have 2-6 elements.
         entry_size (int): Number of picks (must match len(pick_probabilities)).
-        platform (str): Platform name. Default 'PrizePicks'.
+        platform (str): Platform name. Default 'DraftKings'.
             Only PrizePicks supports both Flex and Power.
 
     Returns:
@@ -683,7 +701,7 @@ def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
         }
 
     Example:
-        optimize_play_type([0.68, 0.71, 0.65], entry_size=3, platform='PrizePicks')
+        optimize_play_type([0.68, 0.71, 0.65], entry_size=3, platform='DraftKings')
         # All probs >= 65% → Power recommended
         # Returns: {'recommended_play_type': 'Power', 'power_ev': 2.5, ...}
     """
@@ -692,9 +710,9 @@ def optimize_play_type(pick_probabilities, entry_size, platform='PrizePicks'):
     min_prob = min(pick_probabilities) if pick_probabilities else 0.5
     avg_prob = sum(pick_probabilities) / len(pick_probabilities) if pick_probabilities else 0.5
 
-    # Non-PrizePicks platforms don't offer Power play
-    if platform != 'PrizePicks':
-        flex_table = PLATFORM_FLEX_TABLES.get(platform, PRIZEPICKS_FLEX_PAYOUT_TABLE)
+    # Sportsbooks don't offer Power play (keep PrizePicks for backward compat)
+    if platform not in ('PrizePicks',):
+        flex_table = PLATFORM_FLEX_TABLES.get(platform, SPORTSBOOK_PARLAY_TABLE)
         flex_payout_for_size = flex_table.get(entry_size, {})
         flex_result = _compute_flex_ev(pick_probabilities, flex_payout_for_size, entry_fee)
         return {
@@ -900,7 +918,7 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
 def build_optimal_entries_with_play_type(
     picks,
     entry_sizes=None,
-    platform="PrizePicks",
+    platform="DraftKings",
     entry_fee=10.0,
     min_edge_pct=3.0,
     min_confidence_score=40.0,
@@ -929,7 +947,7 @@ def build_optimal_entries_with_play_type(
             'breakeven_probability': float or None,
 
     Example:
-        entries = build_optimal_entries_with_play_type(picks, platform='PrizePicks')
+        entries = build_optimal_entries_with_play_type(picks, platform='DraftKings')
         for e in entries:
             print(f"{e['recommended_play_type']}: Flex={e['flex_ev']:.2f}, Power={e['power_ev']:.2f}")
     """

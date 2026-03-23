@@ -2,7 +2,7 @@
 # FILE: engine/platform_line_compare.py
 # PURPOSE: Platform Line Comparison Engine
 #          When the same prop is available on multiple platforms
-#          (PrizePicks, Underdog, DraftKings), lines may differ.
+#          (FanDuel, DraftKings, BetMGM, etc.), lines may differ.
 #          This module finds the platform with the BEST line for
 #          our recommended direction, maximizing edge via line
 #          shopping — a free source of EV with zero model risk.
@@ -115,7 +115,7 @@ def compare_platform_lines(player_name, stat_type, direction, platform_lines):
         stat_type (str): Stat category, e.g. 'points', 'threes'.
         direction (str): 'OVER' or 'UNDER'.
         platform_lines (dict): {platform_name: line_value}, e.g.
-            {'PrizePicks': 24.5, 'Underdog': 25.0, 'DraftKings': 24.0}
+            {'FanDuel': 24.5, 'DraftKings': 25.0, 'BetMGM': 24.0}
 
     Returns:
         dict: {
@@ -134,9 +134,9 @@ def compare_platform_lines(player_name, stat_type, direction, platform_lines):
     Example:
         result = compare_platform_lines(
             'LeBron James', 'points', 'OVER',
-            {'PrizePicks': 24.5, 'Underdog': 25.0}
+            {'FanDuel': 24.5, 'DraftKings': 25.0}
         )
-        # result['best_platform'] → 'PrizePicks' (lower line = easier OVER)
+        # result['best_platform'] → 'FanDuel' (lower line = easier OVER)
         # result['edge_bonus_pct'] → ~3.1
     """
     if not platform_lines:
@@ -229,7 +229,7 @@ def calculate_line_shopping_value(
 
     Example:
         value = calculate_line_shopping_value(
-            {'PrizePicks': 24.5, 'Underdog': 25.5},
+            {'FanDuel': 24.5, 'DraftKings': 25.5},
             model_projection=26.0,
             stat_std=6.5,
             direction='OVER',
@@ -302,7 +302,7 @@ def annotate_picks_with_best_platform(picks, platform_lines_by_pick):
             least 'player_name', 'stat_type', and 'direction' keys.
         platform_lines_by_pick (dict): Keyed by (player_name, stat_type)
             tuples. Values are {platform_name: line_value} dicts.
-            Example: {('LeBron James', 'points'): {'PrizePicks': 24.5, ...}}
+            Example: {('LeBron James', 'points'): {'FanDuel': 24.5, ...}}
 
     Returns:
         list of dict: Same picks list (mutated in-place) with added keys:

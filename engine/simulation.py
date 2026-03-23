@@ -309,8 +309,8 @@ def run_quantum_matrix_simulation(
             probability evaluation and DFS metrics are computed STRICTLY
             against this line instead of ``prop_line``.  This prevents the
             engine from evaluating extreme alternate lines.
-        platform (str, optional): DFS platform name (``"PrizePicks"``,
-            ``"Underdog"``, ``"DraftKings"``).  When provided alongside
+        platform (str, optional): Sportsbook name (``"FanDuel"``,
+            ``"DraftKings"``, ``"BetMGM"``, etc.).  When provided alongside
             ``prop_target_line``, DFS-specific flex breakeven thresholds
             and parlay EV metrics are embedded in the output dict.
 
@@ -630,7 +630,7 @@ def run_quantum_matrix_simulation(
         )
 
         # Embed DFS flex breakeven thresholds per tier
-        _plat = str(platform or "PrizePicks")
+        _plat = str(platform or "DraftKings")
         try:
             from engine.odds_engine import (
                 calculate_dfs_breakeven_probability,
