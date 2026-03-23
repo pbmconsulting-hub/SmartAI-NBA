@@ -389,6 +389,7 @@ if "joseph_preferred_platform" not in st.session_state:
     st.session_state["joseph_preferred_platform"] = "FanDuel"
 
 _platform_fallback_icon = '<span style="font-size:16px">🎙️</span>'
+avatar_b64 = get_joseph_avatar_b64()
 _platform_avatar = _avatar_inline(32) if avatar_b64 else _platform_fallback_icon
 st.markdown(
     f'<div style="display:flex;align-items:center;gap:10px;'

@@ -18,6 +18,21 @@ import random      # random.gauss for Quantum Matrix Engine 5.6 sampling
 
 
 # ============================================================
+# SECTION: Safe Float Conversion
+# ============================================================
+
+def _safe_float(value, fallback=0.0):
+    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
+    try:
+        v = float(value)
+        if math.isfinite(v):
+            return v
+        return float(fallback)
+    except (ValueError, TypeError):
+        return float(fallback)
+
+
+# ============================================================
 # SECTION: Normal Distribution Helpers
 # A normal distribution (bell curve) is the most common
 # statistical shape. We use it to model player stat variability.

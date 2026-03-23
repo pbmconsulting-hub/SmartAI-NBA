@@ -18,10 +18,19 @@
 #   When Stripe is not configured (STRIPE_SECRET_KEY missing),
 #   is_premium_user() returns True so all features are unlocked.
 #   This is the "developer / free demo" mode.
+#
+# NON-PRODUCTION BYPASS:
+#   When the SMARTAI_PRODUCTION env var is absent or not "true",
+#   is_premium_user() returns True regardless of Stripe status.
+#   Set SMARTAI_PRODUCTION=true to enforce subscription checks.
 # ============================================================
 
+import os
+import logging
 import streamlit as st
 import datetime
+
+_logger = logging.getLogger(__name__)
 
 from utils.stripe_manager import (
     is_stripe_configured,
@@ -268,6 +277,7 @@ def is_premium_user() -> bool:
     Check if the current session has an active premium subscription.
 
     Check order (fastest to slowest):
+      0. Non-production bypass → return True (all features unlocked).
       1. If Stripe is NOT configured → return True (free/dev mode).
       2. Session state cache (if fresh) → return cached value.
       3. Database lookup (using stored subscription_id).
@@ -276,6 +286,15 @@ def is_premium_user() -> bool:
     Returns:
         bool: True if the user has an active premium subscription.
     """
+    # ── Layer 0: Non-production bypass — all features unlocked ─
+    # In development / staging, skip subscription enforcement so
+    # every feature is accessible.  To enforce subscriptions in
+    # production, set the environment variable:
+    #     SMARTAI_PRODUCTION=true
+    if os.environ.get("SMARTAI_PRODUCTION", "").lower() not in ("true", "1", "yes"):
+        _logger.debug("Premium bypass active — SMARTAI_PRODUCTION is not set")
+        return True
+
     # ── Layer 1: Dev/demo mode — no Stripe configured ─────────
     if not is_stripe_configured():
         return True  # Everything is free when Stripe isn't set up
