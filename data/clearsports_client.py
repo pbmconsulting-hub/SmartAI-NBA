@@ -6,8 +6,8 @@ ClearSports API client for NBA data.
 Provides:
   NBA Data:
   - fetch_teams()                     → all NBA teams
-  - fetch_games(season, date, team_id) → NBA games with optional filters
-  - fetch_players(team_id)            → NBA players with optional team filter
+  - fetch_games(season=None, date=None, team_id=None) → NBA games with optional filters
+  - fetch_players(team_id=None)            → NBA players with optional team filter
   - fetch_games_today()               → today's scheduled games with lines
   - fetch_player_stats()              → season-average player stats with std-dev fields
   - fetch_team_stats()                → team pace / ratings / record
