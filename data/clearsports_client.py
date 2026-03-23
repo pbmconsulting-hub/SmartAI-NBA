@@ -802,7 +802,7 @@ def lookup_player_id(player_name: str) -> int | None:
 
     Lookup order:
       1. Module-level _PLAYER_ID_CACHE (name → id)
-      2. ClearSports /nba/players endpoint (player_id field)
+      2. API-NBA /players endpoint (player_id field)
 
     The result (including None) is cached to avoid redundant API calls.
     """

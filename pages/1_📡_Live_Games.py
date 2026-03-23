@@ -131,7 +131,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
 # SECTION: Action Buttons — Two Independent Workflows
 # ─────────────────────────────────────────────────────────────
 # BUTTON 1 — Auto-Load Tonight's Games:
-#   Fetches the schedule, rosters, player/team stats from ClearSports API,
+#   Fetches the schedule, rosters, player/team stats from API-NBA API,
 #   and enriches with Odds API consensus lines. Use this as a first step
 #   or to refresh data.
 #

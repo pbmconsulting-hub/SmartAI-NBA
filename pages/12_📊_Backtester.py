@@ -138,7 +138,7 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
     def _prog_cb(current, total, msg):
         _prog.progress(min(current / max(total, 1), 1.0), text=msg)
 
-    with st.spinner("Fetching historical game logs from ClearSports…"):
+    with st.spinner("Fetching historical game logs from API-NBA…"):
         todays_games = st.session_state.get("todays_games", [])
         hist_result = _refresh_hist(games=todays_games, last_n_games=30, progress_callback=_prog_cb)
 

@@ -1,7 +1,7 @@
 """
 tests/test_validate_api_key.py
 ------------------------------
-Tests for validate_api_key() in both ClearSports and Odds API clients.
+Tests for validate_api_key() in both ApiNba and Odds API clients.
 """
 
 import sys
@@ -33,9 +33,9 @@ class TestValidateApiKeyFunctionExists(unittest.TestCase):
         self.assertIn("def validate_api_key(", src)
 
 
-# ── ClearSports validate_api_key runtime tests ───────────────────────────────
+# ── ApiNba validate_api_key runtime tests ───────────────────────────────
 
-class TestClearSportsValidateApiKey(unittest.TestCase):
+class TestApiNbaValidateApiKey(unittest.TestCase):
     """Runtime tests for clearsports_client.validate_api_key."""
 
     def setUp(self):

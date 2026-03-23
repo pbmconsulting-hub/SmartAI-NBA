@@ -110,7 +110,7 @@ def lookup_player_id(player_name: str) -> int | None:
 
     Lookup order:
     1. Module-level cache (instant, no I/O)
-    2. ClearSports API (if configured)
+    2. API-NBA API (if configured)
     3. nba_api local static player list (always fast, covers all players)
 
     The result is cached so subsequent calls for the same player are free.
@@ -133,7 +133,7 @@ def lookup_player_id(player_name: str) -> int | None:
 
     pid = None
 
-    # 2. ClearSports API
+    # 2. API-NBA API
     try:
         from data.clearsports_client import lookup_player_id as _cs_lookup
         pid = _cs_lookup(player_name)

@@ -2,11 +2,11 @@
 tests/test_api_client_robustness.py
 -----------------------------------
 Tests for API client robustness improvements:
-  1. ClearSports: no duplicate apiKey in query params for game_log/standings/news
-  2. ClearSports: 422 status code handled without retry
-  3. ClearSports: empty response body handled without JSONDecodeError retry
+  1. ApiNba: no duplicate apiKey in query params for game_log/standings/news
+  2. ApiNba: 422 status code handled without retry
+  3. ApiNba: empty response body handled without JSONDecodeError retry
   4. Odds API: empty response body handled without JSONDecodeError retry
-  5. ClearSports: cascading .get() safe when nested record fields are None
+  5. ApiNba: cascading .get() safe when nested record fields are None
 """
 
 import pathlib
@@ -32,9 +32,9 @@ _CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "clearsports_client.py
 _OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
 
 
-# ── Section 1: ClearSports source-level checks ──────────────────────────────
+# ── Section 1: ApiNba source-level checks ──────────────────────────────
 
-class TestClearSportsNoApiKeyInParams(unittest.TestCase):
+class TestApiNbaNoApiKeyInParams(unittest.TestCase):
     """Verify that fetch_player_game_log, fetch_standings, and fetch_news
     do NOT put the apiKey into the query params dict.  The Bearer header in
     _fetch_with_retry already handles authentication."""
@@ -70,9 +70,9 @@ class TestClearSportsNoApiKeyInParams(unittest.TestCase):
                          "fetch_news params must not include apiKey")
 
 
-# ── Section 2: ClearSports 422 handling ──────────────────────────────────────
+# ── Section 2: ApiNba 422 handling ──────────────────────────────────────
 
-class TestClearSports422Handling(unittest.TestCase):
+class TestApiNba422Handling(unittest.TestCase):
     """Verify that _fetch_with_retry in clearsports_client handles HTTP 422."""
 
     def setUp(self):
@@ -81,7 +81,7 @@ class TestClearSports422Handling(unittest.TestCase):
     def test_422_status_code_handled(self):
         """_fetch_with_retry should check for 422 status."""
         self.assertIn("status_code == 422", self.src,
-                      "ClearSports must handle 422 status code")
+                      "ApiNba must handle 422 status code")
 
     def test_422_returns_none_without_retry(self):
         """422 handler should return None (not continue to retry)."""
@@ -100,10 +100,10 @@ class TestEmptyResponseBodyHandling(unittest.TestCase):
     """Verify both API clients check for empty response bodies before .json()."""
 
     def test_clearsports_checks_empty_body(self):
-        """ClearSports _fetch_with_retry must check resp.text before .json()."""
+        """ApiNba _fetch_with_retry must check resp.text before .json()."""
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("not resp.text", src,
-                      "ClearSports must check for empty resp.text")
+                      "ApiNba must check for empty resp.text")
 
     def test_odds_api_checks_empty_body(self):
         """Odds API _fetch_with_retry must check resp.text before .json()."""
@@ -132,9 +132,9 @@ class TestCascadingGetSafety(unittest.TestCase):
                       "away_record access must use (x or {}) pattern")
 
 
-# ── Section 5: Runtime test — ClearSports games parsing with None records ────
+# ── Section 5: Runtime test — ApiNba games parsing with None records ────
 
-class TestClearSportsGameParsingEdgeCases(unittest.TestCase):
+class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
     """Runtime tests for fetch_games_today parsing logic with edge-case data."""
 
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
@@ -427,17 +427,17 @@ class TestFetchTodaysGamesValidation(unittest.TestCase):
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_cs,
         mock_enrich_pred, mock_enrich_stand,
     ):
-        """When ClearSports returns games with empty teams, fallback should trigger."""
+        """When ApiNba returns games with empty teams, fallback should trigger."""
         from data.live_data_fetcher import fetch_todays_games
 
-        # ClearSports returns games but all have empty team names
+        # ApiNba returns games but all have empty team names
         mock_cs.return_value = [
             {"game_id": "g1", "home_team": "", "away_team": ""},
             {"game_id": "g2", "home_team": "", "away_team": ""},
         ]
 
         games = fetch_todays_games()
-        # Should use fallback since ClearSports games had no valid teams
+        # Should use fallback since ApiNba games had no valid teams
         mock_build.assert_called_once()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "LAL")
@@ -711,10 +711,10 @@ class TestConsensusOddsBookmakerTypeCheck(unittest.TestCase):
                        "get_consensus_odds must type-check bookmaker entries")
 
 
-# ── Section 17: ClearSports null-safe 'or' chain patterns ───────────────────
+# ── Section 17: ApiNba null-safe 'or' chain patterns ───────────────────
 
-class TestClearSportsNullSafeOrChainPatterns(unittest.TestCase):
-    """Verify that ClearSports endpoint functions use (x or y or []) instead
+class TestApiNbaNullSafeOrChainPatterns(unittest.TestCase):
+    """Verify that ApiNba endpoint functions use (x or y or []) instead
     of .get("key", .get("key2", [])) for extracting the top-level response
     data list from API response envelopes.
 
@@ -828,7 +828,7 @@ class TestClearSportsNullSafeOrChainPatterns(unittest.TestCase):
 
 # ── Section 18: Runtime crash-safety with explicit null values ───────────────
 
-class TestClearSportsExplicitNullCrashSafety(unittest.TestCase):
+class TestApiNbaExplicitNullCrashSafety(unittest.TestCase):
     """Runtime tests proving that fetch_player_game_log, fetch_standings,
     and fetch_news do NOT crash when the API returns an explicit null for
     the expected data key (e.g. {"games": null}).
@@ -898,9 +898,9 @@ class TestClearSportsExplicitNullCrashSafety(unittest.TestCase):
         self.assertEqual(result, [])
 
 
-# ── Section 19: ClearSports _cache_get/_cache_set param name ─────────────────
+# ── Section 19: ApiNba _cache_get/_cache_set param name ─────────────────
 
-class TestClearSportsCacheParamNaming(unittest.TestCase):
+class TestApiNbaCacheParamNaming(unittest.TestCase):
     """Verify that _cache_get and _cache_set use 'key' as the parameter name
     (not 'url') to match the Odds API convention and reflect actual usage."""
 

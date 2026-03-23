@@ -9,7 +9,7 @@ Verifies:
   3. Each fallback function returns correct schema on mock success
   4. Each fallback function returns [] on mock failure
   5. Caching prevents duplicate HTTP calls
-  6. ClearSports functions fall back when primary returns empty
+  6. ApiNba functions fall back when primary returns empty
 """
 
 import os
@@ -412,10 +412,10 @@ class TestFallbackCaching(unittest.TestCase):
         mock_fetch.assert_not_called()
 
 
-# ── Section 9: ClearSports fallback integration ─────────────────────────────
+# ── Section 9: ApiNba fallback integration ─────────────────────────────
 
-class TestClearSportsFallbackIntegration(unittest.TestCase):
-    """Verify ClearSports functions fall back to free API when primary fails."""
+class TestApiNbaFallbackIntegration(unittest.TestCase):
+    """Verify ApiNba functions fall back to free API when primary fails."""
 
     @patch("data.nba_stats_fallback.fetch_player_stats_fallback")
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
@@ -478,10 +478,10 @@ class TestClearSportsFallbackIntegration(unittest.TestCase):
         mock_fallback.assert_called_once()
 
 
-# ── Section 10: ClearSports primary still works when not broken ──────────────
+# ── Section 10: ApiNba primary still works when not broken ──────────────
 
-class TestClearSportsPrimaryStillWorks(unittest.TestCase):
-    """When ClearSports returns valid data, fallback should NOT be called."""
+class TestApiNbaPrimaryStillWorks(unittest.TestCase):
+    """When ApiNba returns valid data, fallback should NOT be called."""
 
     @patch("data.nba_stats_fallback.fetch_player_stats_fallback")
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")

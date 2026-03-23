@@ -258,9 +258,9 @@ with _sim_btn_col2:
         disabled=not selected_names,
     )
 
-# ── On-demand ClearSports game log fetch ──────────────────────
+# ── On-demand API-NBA game log fetch ──────────────────────
 if _fetch_logs_btn and selected_names:
-    _gl_progress = st.progress(0, text="Fetching game logs from ClearSports…")
+    _gl_progress = st.progress(0, text="Fetching game logs from API-NBA…")
     _gl_fetched = 0
     _gl_errors  = 0
     for _gl_idx, _gl_pname in enumerate(selected_names):

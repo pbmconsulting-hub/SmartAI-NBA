@@ -441,7 +441,7 @@ def _render_game_team_stats(game, game_pred):
             f"**Winner:** {game_pred['predicted_winner']} by {game_pred['predicted_margin']:.0f}"
         )
 
-    # ── Standings Context (ClearSports) ──────────────────────────────
+    # ── Standings Context (API-NBA) ──────────────────────────────
     _standings_map: dict = {}
     for _s in st.session_state.get("league_standings", []):
         _standings_map[_s.get("team_abbreviation", "").upper()] = _s

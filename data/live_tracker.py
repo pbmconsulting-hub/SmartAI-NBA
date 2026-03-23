@@ -33,7 +33,7 @@ except ImportError:
 
 def _fetch_live_boxscores_impl() -> list[dict]:
     """
-    Fetch live NBA box scores from ClearSports API.
+    Fetch live NBA box scores from API-NBA API.
 
     Returns a list of game dicts, each containing:
         game_id, home_team, away_team, home_score, away_score,
@@ -46,7 +46,7 @@ def _fetch_live_boxscores_impl() -> list[dict]:
         from data.clearsports_client import fetch_live_scores as _cs_live
         raw_scores = _cs_live()
     except Exception as exc:
-        _logger.warning("live_tracker: ClearSports fetch failed: %s", exc)
+        _logger.warning("live_tracker: API-NBA fetch failed: %s", exc)
         raw_scores = []
 
     games: list[dict] = []

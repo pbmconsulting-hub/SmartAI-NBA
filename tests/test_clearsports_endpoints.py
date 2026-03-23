@@ -85,7 +85,7 @@ class TestInjuryEndpointPath(unittest.TestCase):
 
 # ── Section 3: 403 status code handling ──────────────────────────────────────
 
-class TestClearSports403Handling(unittest.TestCase):
+class TestApiNba403Handling(unittest.TestCase):
     """Verify that _fetch_with_retry handles HTTP 403 (credit exhaustion)."""
 
     def setUp(self):
@@ -94,7 +94,7 @@ class TestClearSports403Handling(unittest.TestCase):
     def test_403_status_code_handled(self):
         """_fetch_with_retry should check for 403 status."""
         self.assertIn("status_code == 403", self.src,
-                       "ClearSports must handle 403 status code")
+                       "ApiNba must handle 403 status code")
 
     def test_403_returns_none_without_retry(self):
         """403 handler should return None (not continue to retry)."""

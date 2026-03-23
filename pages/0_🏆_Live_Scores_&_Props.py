@@ -93,7 +93,7 @@ with col_interval:
 
 def _fetch_live_scores():
     """
-    Attempt to fetch live/today's game scores via ClearSports API.
+    Attempt to fetch live/today's game scores via API-NBA API.
 
     Returns:
         list of dict: Game score data, or empty list on failure.
@@ -104,7 +104,7 @@ def _fetch_live_scores():
         if scores:
             return scores
     except Exception as cs_err:
-        _logger.warning(f"ClearSports live scores error: {cs_err}")
+        _logger.warning(f"API-NBA live scores error: {cs_err}")
 
     return []
 
@@ -303,7 +303,7 @@ def _get_tonights_leaders():
     Returns a dict with lists of top players per category.
     """
     leaders = {"points": [], "rebounds": [], "assists": [], "threes": []}
-    # Live stats leaders come from session state (populated by Neural Analysis or ClearSports)
+    # Live stats leaders come from session state (populated by Neural Analysis or API-NBA)
     try:
         players_live = st.session_state.get("players_data", [])
         for player in players_live:
@@ -446,7 +446,7 @@ elif not _analysis_top:
 else:
     # Build a lookup: player_name → box-score stats from live games
     _live_player_stats: dict = {}
-    # Live box score data comes from live_games (ClearSports API)
+    # Live box score data comes from live_games (API-NBA API)
     try:
         for _g in live_games:
             _ht = _g.get("home_team", "")

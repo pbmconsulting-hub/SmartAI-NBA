@@ -766,7 +766,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
 
     Returns:
         dict: Keyed by ``"HOME_TEAM"`` or ``"AWAY_TEAM"`` abbreviation
-              (upper-case, ClearSports-style) with sub-dicts:
+              (upper-case, API-NBA-style) with sub-dicts:
 
             {
                 "home_team": str,
