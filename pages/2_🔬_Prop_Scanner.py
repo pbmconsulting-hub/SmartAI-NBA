@@ -206,7 +206,7 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
         _cached = load_platform_props_from_session(st.session_state)
         if _cached:
             _cached_summary = summarize_props_by_platform(_cached)
-            _retrieved_at = _cached[0].get("retrieved_at", _cached[0].get("fetched_at", "unknown time")) if _cached else ""
+            _retrieved_at = _cached[0].get("retrieved_at", "unknown time") if _cached else ""
             st.info(
                 f"📦 **{len(_cached)} props cached** "
                 f"({', '.join(f'{p}: {c}' for p, c in _cached_summary.items())}) "
