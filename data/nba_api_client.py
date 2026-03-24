@@ -734,7 +734,7 @@ def get_player_stats() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
-    params = {"season": _CURRENT_SEASON_YEAR}
+    params = {"season": int(_CURRENT_SEASON_YEAR)}
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -1184,7 +1184,7 @@ def get_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
         # Resolve abbreviation → numeric team ID; fall back to abbreviation
         # string so the call still works if the ID map cannot be built.
         team_param = _get_team_id(abbrev) or abbrev
-        params = {"season": _CURRENT_SEASON_YEAR, "team": team_param}
+        params = {"season": int(_CURRENT_SEASON_YEAR), "team": team_param}
 
         try:
             raw = _request_with_retry(url, params=params)
