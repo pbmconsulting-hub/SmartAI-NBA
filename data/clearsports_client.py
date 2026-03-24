@@ -744,7 +744,75 @@ def fetch_player_stats() -> list[dict]:
     except Exception as exc:
         _logger.warning("fetch_player_stats API-NBA failed: %s", exc)
 
-    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    # ── Fallback 1: API-Basketball v1 /players/statistics ─────────────────
+    # The /players endpoint may only return metadata; /players/statistics
+    # (without a player= filter) can return season-level stat rows.
+    try:
+        stats_url = f"{_BASE_URL}/players/statistics"
+        stats_params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
+        raw_stats = _fetch_with_retry(stats_url, params=stats_params)
+        if raw_stats:
+            stats_list = (
+                raw_stats if isinstance(raw_stats, list)
+                else (raw_stats.get("response") or raw_stats.get("data") or [])
+            )
+            if isinstance(stats_list, list) and stats_list:
+                players_from_stats: list[dict] = []
+                for entry in stats_list:
+                    if not isinstance(entry, dict):
+                        continue
+
+                    # Resolve player info (may be nested)
+                    player_obj = entry.get("player")
+                    if isinstance(player_obj, dict):
+                        pid = _safe_str(player_obj.get("id"))
+                        name = _safe_str(player_obj.get("name"))
+                        if not name:
+                            name = f"{_safe_str(player_obj.get('firstname'))} {_safe_str(player_obj.get('lastname'))}".strip()
+                    else:
+                        pid = _safe_str(entry.get("player_id") or entry.get("id"))
+                        name = _safe_str(entry.get("name") or entry.get("player_name"))
+
+                    # Resolve team
+                    team_obj = entry.get("team")
+                    if isinstance(team_obj, dict):
+                        team_abbrev = _team_name_to_abbrev(_safe_str(team_obj.get("name")))
+                    else:
+                        team_abbrev = _safe_str(team_obj)
+
+                    players_from_stats.append({
+                        "player_id":     pid,
+                        "name":          name,
+                        "team":          team_abbrev,
+                        "position":      _safe_str(entry.get("position") or entry.get("pos")),
+                        "minutes_avg":   _safe_float(entry.get("minutes") or entry.get("min", 0)),
+                        "points_avg":    _safe_float(entry.get("points") or entry.get("pts", 0)),
+                        "rebounds_avg":  _safe_float(entry.get("rebounds") or entry.get("reb", 0)),
+                        "assists_avg":   _safe_float(entry.get("assists") or entry.get("ast", 0)),
+                        "threes_avg":    _safe_float(entry.get("threes") or entry.get("fg3m", 0)),
+                        "steals_avg":    _safe_float(entry.get("steals") or entry.get("stl", 0)),
+                        "blocks_avg":    _safe_float(entry.get("blocks") or entry.get("blk", 0)),
+                        "turnovers_avg": _safe_float(entry.get("turnovers") or entry.get("tov", 0)),
+                        "ft_pct":        _safe_float(entry.get("ft_pct") or entry.get("ftm_pct", 0)),
+                        "usage_rate":    0.0,
+                        "points_std":    0.0,
+                        "rebounds_std":  0.0,
+                        "assists_std":   0.0,
+                        "threes_std":    0.0,
+                        "steals_std":    0.0,
+                        "blocks_std":    0.0,
+                        "turnovers_std": 0.0,
+                    })
+                if players_from_stats:
+                    _logger.info(
+                        "fetch_player_stats: got %d player(s) from /players/statistics",
+                        len(players_from_stats),
+                    )
+                    return players_from_stats
+    except Exception as exc:
+        _logger.warning("fetch_player_stats /players/statistics fallback failed: %s", exc)
+
+    # ── Fallback 2: free NBA.com stats ────────────────────────────────────
     try:
         from data.nba_stats_fallback import fetch_player_stats_fallback
         _logger.info("fetch_player_stats: falling back to free NBA.com stats endpoint")
