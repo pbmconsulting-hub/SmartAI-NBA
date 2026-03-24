@@ -314,8 +314,8 @@ if auto_load_clicked:
     status_text = st.empty()
 
     try:
-        status_text.text("⏳ Step 1/2 — Fetching tonight's games...")
-        progress_bar.progress(10)
+        status_text.text("⏳ Step 1/3 — Fetching tonight's games...")
+        progress_bar.progress(5)
         games = fetch_todays_games()
 
         if not games:
@@ -330,8 +330,8 @@ if auto_load_clicked:
         else:
             st.session_state["todays_games"] = games
 
-            status_text.text(f"⏳ Step 2/2 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
-            progress_bar.progress(35)
+            status_text.text(f"⏳ Step 2/3 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
+            progress_bar.progress(25)
 
             players_ok = fetch_todays_players_only(games)
 
@@ -345,7 +345,24 @@ if auto_load_clicked:
                 except Exception as _inj_load_err:
                     _logger.warning(f"Auto-load: could not load injury map: {_inj_load_err}")
 
+            # Step 3: Fetch team stats so teams.csv has real data
+            status_text.text("⏳ Step 3/3 — Fetching team stats & standings...")
+            progress_bar.progress(65)
+            teams_ok = False
+            try:
+                from data.live_data_fetcher import fetch_team_stats as _ldf_team_stats
+                teams_ok = _ldf_team_stats()
+            except Exception as _ts_err:
+                _logger.warning(f"Auto-load: team stats fetch failed (non-fatal): {_ts_err}")
 
+            # Pre-load standings into session state for other pages
+            try:
+                from data.live_data_fetcher import fetch_standings as _ldf_standings
+                _al_standings = _ldf_standings()
+                if _al_standings:
+                    st.session_state["league_standings"] = _al_standings
+            except Exception as _st_err:
+                _logger.debug(f"Auto-load: standings pre-load skipped: {_st_err}")
 
             status_text.text("⏳ Finalizing…")
             progress_bar.progress(90)
@@ -360,6 +377,7 @@ if auto_load_clicked:
             st.success(
                 f"✅ Loaded **{len(games)} game(s)** for tonight! "
                 f"Players: {'✅' if players_ok else '⚠️ failed'} | "
+                f"Teams: {'✅' if teams_ok else '⚠️ failed'} | "
                 f"Injuries: {'✅' if injury_map else '⚠️ unavailable'}"
             )
             st.rerun()
@@ -961,11 +979,13 @@ if one_click_setup_clicked:
 
     try:
         # ── Phase 1: Auto-Load Tonight's Games ────────────────────────
-        _oc_status.text("⏳ Phase 1/2 — Auto-loading tonight's games, rosters & stats…")
+        _oc_status.text("⏳ Phase 1/3 — Auto-loading tonight's games, rosters & stats…")
         _oc_bar.progress(5)
         from data.live_data_fetcher import (
             fetch_todays_games as _oc_fetch_games,
             fetch_todays_players_only as _oc_fetch_players,
+            fetch_team_stats as _oc_fetch_teams,
+            fetch_standings as _oc_fetch_standings,
         )
         from data.data_manager import (
             load_players_data as _oc_load_players,
@@ -981,10 +1001,10 @@ if one_click_setup_clicked:
             _oc_games = st.session_state.get("todays_games", [])
 
         _oc_bar.progress(25)
-        _oc_status.text(f"⏳ Phase 1/2 — {len(_oc_games)} game(s) loaded. Fetching player data…")
+        _oc_status.text(f"⏳ Phase 1/3 — {len(_oc_games)} game(s) loaded. Fetching player data…")
 
         _oc_players_ok = _oc_fetch_players(_oc_games) if _oc_games else False
-        _oc_bar.progress(45)
+        _oc_bar.progress(40)
 
         # Clear caches so freshly-written players.csv is read
         _oc_clear_caches()
@@ -994,10 +1014,26 @@ if one_click_setup_clicked:
         except Exception:
             pass
 
-        _oc_bar.progress(55)
+        # ── Phase 2: Fetch team stats & standings ─────────────────────
+        _oc_status.text("⏳ Phase 2/3 — Fetching team stats & standings…")
+        _oc_bar.progress(50)
 
-        # ── Phase 2: Fetch Live Platform Props ────────────────────────
-        _oc_status.text("⏳ Phase 2/2 — Fetching live prop lines from all platforms…")
+        try:
+            _oc_fetch_teams()
+        except Exception as _oc_ts_err:
+            _logger.debug(f"One-Click: team stats fetch failed (non-fatal): {_oc_ts_err}")
+
+        try:
+            _oc_standings = _oc_fetch_standings()
+            if _oc_standings:
+                st.session_state["league_standings"] = _oc_standings
+        except Exception as _oc_st_err:
+            _logger.debug(f"One-Click: standings pre-load skipped: {_oc_st_err}")
+
+        _oc_bar.progress(60)
+
+        # ── Phase 3: Fetch Live Platform Props ────────────────────────
+        _oc_status.text("⏳ Phase 3/3 — Fetching live prop lines from all platforms…")
 
         try:
             from data.platform_fetcher import fetch_all_platform_props as _oc_fetch_platform

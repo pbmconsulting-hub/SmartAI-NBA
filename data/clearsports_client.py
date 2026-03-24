@@ -214,21 +214,28 @@ def validate_api_key(key: str | None) -> tuple[bool, str]:
 
 
 def _resolve_api_key() -> str | None:
-    """Return the API-NBA key from session state, secrets, or environment."""
+    """Return the API-NBA key from session state, secrets, or environment.
+
+    All key sources are ``.strip()``-ed to tolerate whitespace from
+    copy-paste or mis-configured environment variables.
+    """
     if _ST_AVAILABLE:
         try:
             key = st.session_state.get("api_nba_key")
-            if key:
-                return key
+            if key and isinstance(key, str) and key.strip():
+                return key.strip()
         except Exception:
             pass
         try:
             key = st.secrets.get("API_NBA_KEY")
-            if key:
-                return key
+            if key and isinstance(key, str) and key.strip():
+                return key.strip()
         except Exception:
             pass
-    return os.environ.get("API_NBA_KEY")
+    env_key = os.environ.get("API_NBA_KEY")
+    if env_key and isinstance(env_key, str) and env_key.strip():
+        return env_key.strip()
+    return None
 
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
@@ -823,11 +830,28 @@ def fetch_player_stats() -> list[dict]:
         return []
 
 
+def _has_real_team_stats(teams: list[dict]) -> bool:
+    """Return True if any team entry has a non-zero stat value."""
+    for t in teams:
+        if (
+            _safe_float(t.get("pace", 0)) > 0
+            or _safe_float(t.get("offensive_rating", 0)) > 0
+            or _safe_float(t.get("defensive_rating", 0)) > 0
+            or int(_safe_float(t.get("wins", 0))) > 0
+            or int(_safe_float(t.get("losses", 0))) > 0
+        ):
+            return True
+    return False
+
+
 def fetch_team_stats() -> list[dict]:
     """
     Fetch current-season team pace, ratings, and win/loss record.
 
-    Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
+    Fallback chain:
+      1. API-Basketball v1 /teams (may return metadata only — no stats)
+      2. Standings data to provide W-L records
+      3. Free NBA.com stats endpoint for full stats (pace, ratings, W-L)
 
     Returns:
         list[dict]: Each dict has keys:
@@ -864,14 +888,61 @@ def fetch_team_stats() -> list[dict]:
                         "wins":               int(_safe_float(t.get("wins") or record.get("wins", 0))),
                         "losses":             int(_safe_float(t.get("losses") or record.get("losses", 0))),
                     })
-                if teams:
+                # API-Basketball v1 /teams returns metadata only (id, name,
+                # logo) without stats.  Detect this and fall through to the
+                # fallback chain so we get real pace / ratings / W-L data.
+                if teams and _has_real_team_stats(teams):
                     return teams
+                if teams:
+                    _logger.info(
+                        "fetch_team_stats: API returned %d team(s) but no "
+                        "stat fields — treating as metadata-only response.",
+                        len(teams),
+                    )
             else:
                 _logger.warning("fetch_team_stats: unexpected response shape from API-NBA")
     except Exception as exc:
         _logger.warning("fetch_team_stats API-NBA failed: %s", exc)
 
-    # ── Fallback: free NBA.com stats ──────────────────────────────────────
+    # ── Fallback 1: standings for W-L records ─────────────────────────────
+    # The /standings endpoint on API-Basketball v1 returns win/loss data
+    # even when /teams only returns metadata.  Use it as an intermediate
+    # fallback to provide W-L records, conference, and streak info.
+    try:
+        standings = fetch_standings()
+        if standings:
+            teams_from_standings: list[dict] = []
+            for s in standings:
+                if not isinstance(s, dict):
+                    continue
+                abbrev = _safe_str(s.get("team_abbreviation", ""))
+                if not abbrev:
+                    continue
+                teams_from_standings.append({
+                    "team_abbreviation":  abbrev,
+                    "team_name":          "",
+                    "pace":               0.0,
+                    "offensive_rating":   0.0,
+                    "defensive_rating":   0.0,
+                    "wins":               int(_safe_float(s.get("wins", 0))),
+                    "losses":             int(_safe_float(s.get("losses", 0))),
+                    "win_pct":            _safe_float(s.get("win_pct", 0.0)),
+                    "home_wins":          int(_safe_float(s.get("home_wins", 0))),
+                    "home_losses":        int(_safe_float(s.get("home_losses", 0))),
+                    "away_wins":          int(_safe_float(s.get("away_wins", 0))),
+                    "away_losses":        int(_safe_float(s.get("away_losses", 0))),
+                })
+            if teams_from_standings and _has_real_team_stats(teams_from_standings):
+                _logger.info(
+                    "fetch_team_stats: using standings data for %d team(s) "
+                    "(W-L records available, no pace/ratings).",
+                    len(teams_from_standings),
+                )
+                return teams_from_standings
+    except Exception as exc:
+        _logger.debug("fetch_team_stats: standings fallback failed — %s", exc)
+
+    # ── Fallback 2: free NBA.com stats ────────────────────────────────────
     try:
         from data.nba_stats_fallback import fetch_team_stats_fallback
         _logger.info("fetch_team_stats: falling back to free NBA.com stats endpoint")
