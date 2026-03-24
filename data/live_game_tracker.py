@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: data/live_game_tracker.py
 # PURPOSE: API Firewall & Fuzzy Entity Matcher for Live Sweat
-#          dashboard.  All live data fetching is wrapped in
+#          dashboard.  All live data retrieving is wrapped in
 #          @st.cache_data(ttl=120) to restrict API calls to
 #          once every 2 minutes.
 # ============================================================
@@ -27,13 +27,13 @@ except ImportError:
     _FUZZ_AVAILABLE = False
 
 # ============================================================
-# SECTION: API Firewall — Cached Live Box-Score Fetcher
+# SECTION: API Firewall — Cached Live Box-Score Service
 # ============================================================
 
 
 def _get_live_boxscores_impl() -> list[dict]:
     """
-    Fetch live NBA box scores from API-NBA API.
+    Retrieve live NBA box scores from API-NBA API.
 
     Returns a list of game dicts, each containing:
         game_id, home_team, away_team, home_score, away_score,
@@ -46,7 +46,7 @@ def _get_live_boxscores_impl() -> list[dict]:
         from data.nba_api_client import get_live_scores as _cs_live
         raw_scores = _cs_live()
     except Exception as exc:
-        _logger.warning("live_game_tracker: API-NBA fetch failed: %s", exc)
+        _logger.warning("live_game_tracker: API-NBA retrieval failed: %s", exc)
         raw_scores = []
 
     games: list[dict] = []
@@ -128,7 +128,7 @@ def _get_live_boxscores_impl() -> list[dict]:
 
 def get_live_boxscores() -> list[dict]:
     """
-    API-firewalled live box-score fetcher.
+    API-firewalled live box-score service.
 
     When Streamlit is available the result is cached for 120 seconds
     via ``@st.cache_data``.  Outside of Streamlit (e.g. tests) it
@@ -298,6 +298,3 @@ def get_game_for_player(player_name: str,
             return g
     return None
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-fetch_live_boxscores = get_live_boxscores

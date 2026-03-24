@@ -355,7 +355,7 @@ with st.expander("📖 How to Use SmartBetPro NBA", expanded=False):
     
     **Recommended Workflow**
     1. **📡 Data Feed** — Update player stats and team metrics (do this first each day)
-    2. **📡 Live Games** — Load tonight's games and fetch live prop lines
+    2. **📡 Live Games** — Load tonight's games and load live prop lines
     3. **⚡ Quantum Analysis** — Run the Neural Analysis engine on your props
     4. **📋 Game Report** — Review detailed breakdowns for each game
     5. **🧬 Entry Builder** — Build optimal parlays from the best picks
@@ -573,10 +573,10 @@ with left_column:
 
     # ── ⚡ One-Click Setup button ─────────────────────────────────────
     _home_one_click = st.button(
-        "⚡ One-Click Setup — Load Games + Fetch Live Props",
+        "⚡ One-Click Setup — Load Games + Get Live Props",
         key="home_one_click_btn",
         type="primary",
-        help="Runs Auto-Load Tonight's Games AND Fetch Live Props from all platforms in one click. Best starting point!",
+        help="Runs Auto-Load Tonight's Games AND Get Live Props from all platforms in one click. Best starting point!",
     )
     if _home_one_click:
         with st.spinner("⚡ Running One-Click Setup…"):
@@ -629,11 +629,11 @@ with left_column:
 
     **Step 0** → 📡 **Live Games** — Click
     "**Auto-Load Tonight's Games**" for a ONE-CLICK setup:
-    fetches tonight's matchups + current rosters + player stats + team stats.
+    retrieves tonight's matchups + current rosters + player stats + team stats.
     Everything you need in a single button press!
 
     **Step 1** → 🔬 **Prop Scanner** — Enter prop lines manually, upload a CSV,
-    or fetch live lines from all major sportsbooks via The Odds API.
+    or load live lines from all major sportsbooks via The Odds API.
 
     **Step 2** → ⚡ **Neural Analysis** — Click "Run Analysis" to run Quantum Matrix Engine 5.6
     simulation. See probability gauges, tier badges, and force breakdowns.
@@ -746,8 +746,8 @@ with st.expander("📖 How Does Smart Pick Pro Work?", expanded=False):
 
     ---
 
-    #### 🎯 Smart Data Fetching (New!)
-    The "Update Data" page now has a **Smart Update** option that only fetches
+    #### 🎯 Smart Data Loading (New!)
+    The "Update Data" page now has a **Smart Update** option that only loads
     players on today's teams using `CommonTeamRoster` — which reflects all
     trades and signings. This is 10x faster than the full update!
     """)

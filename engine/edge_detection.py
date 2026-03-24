@@ -1321,7 +1321,7 @@ def classify_bet_type(
     # ============================================================
     # LINE RELIABILITY CHECK
     # Before classifying as a Goblin we verify that prop_line is a
-    # real, fetched line — not a synthetic/default value (e.g. season
+    # real, retrieved line — not a synthetic/default value (e.g. season
     # average rounded to 0.5, or a stale placeholder).
     #
     # A line is considered UNVERIFIED if:

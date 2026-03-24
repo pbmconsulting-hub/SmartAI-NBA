@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: data/nba_data_service.py
-# PURPOSE: Fetch live, real NBA data via API-NBA + Odds API.
+# PURPOSE: Retrieve live, real NBA data via API-NBA + Odds API.
 #          Pulls today's games, player stats, team stats, odds,
 #          predictions, and player game logs. Saves everything to
 #          CSV files so the rest of the app works without changes.
@@ -103,7 +103,7 @@ FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
 
 # Minimum minutes threshold to include a player's stats.
 # Players below this threshold are considered inactive/garbage-time only.
-# Problem statement requires 15+ MPG for live fetch; we keep 10 for fallback.
+# Problem statement requires 15+ MPG for live retrieval; we keep 10 for fallback.
 MIN_MINUTES_THRESHOLD = 15.0
 
 # Games-missed threshold for the recency proxy in get_todays_players().
@@ -125,7 +125,7 @@ HOT_TREND_THRESHOLD = 1.1   # Last 3 games avg ≥ 110% of recent avg = hot
 COLD_TREND_THRESHOLD = 0.9  # Last 3 games avg ≤ 90% of recent avg = cold
 
 # ============================================================
-# Game fetcher defaults (placeholder values used until live odds are added)
+# Game service defaults (placeholder values used until live odds are added)
 # ============================================================
 DEFAULT_VEGAS_SPREAD = 0.0   # No live spread data yet; shown as 0 until integrated
 DEFAULT_GAME_TOTAL = 220.0   # Typical NBA over/under baseline used as placeholder
@@ -267,7 +267,7 @@ _TEAM_NAME_LOWER_TO_ABBREV: dict = {
 
 # ============================================================
 # SECTION: Timestamp Functions
-# Track when each piece of data was last fetched.
+# Track when each piece of data was last retrieved.
 # ============================================================
 
 def save_last_updated(data_type):
@@ -337,7 +337,7 @@ def _invalidate_data_caches():
         load_injury_status.clear()
         _logger.debug("Streamlit data caches cleared after CSV update.")
     except Exception:
-        pass  # Cache clearing is best-effort — never block a data fetch
+        pass  # Cache clearing is best-effort — never block a data retrieval
 
 
 def load_last_updated():
@@ -354,7 +354,7 @@ def load_last_updated():
             "is_live": True
         }
     """
-    # If no file exists, return empty dict (no data has been fetched)
+    # If no file exists, return empty dict (no data has been retrieved)
     if not LAST_UPDATED_JSON_PATH.exists():
         return {}  # Empty dict means no live data yet
 
@@ -372,7 +372,7 @@ def load_last_updated():
 
 # ============================================================
 # SECTION: Helper Utilities
-# Small internal helpers used by multiple fetcher functions.
+# Small internal helpers used by multiple service functions.
 # ============================================================
 
 def _parse_win_loss_record(record_str):
@@ -432,17 +432,17 @@ def _utc_to_et_display(game_time_utc):
 
 # ============================================================
 # ============================================================
-# SECTION: Today's Games Fetcher
-# Fetches which NBA games are being played today via API-NBA API.
+# SECTION: Today's Games Service
+# Retrieves which NBA games are being played today via API-NBA API.
 # ============================================================
 
 def _load_team_records():
     """
-    Fetch team records (W-L) from API-NBA API team stats.
+    Retrieve team records (W-L) from API-NBA API team stats.
 
     Returns:
         dict: Maps team abbreviation → {wins, losses, streak, ...}.
-              Returns empty dict if the fetch fails.
+              Returns empty dict if the retrieval fails.
     """
     try:
         from data.nba_api_client import get_team_stats as _cs_teams
@@ -461,7 +461,7 @@ def _load_team_records():
                 }
         return records
     except Exception as err:
-        _logger.warning(f"Could not fetch team records (non-fatal): {err}")
+        _logger.warning(f"Could not retrieve team records (non-fatal): {err}")
         return {}
 
 
@@ -524,7 +524,7 @@ def _build_games_from_odds_api() -> list:
     """
     Build a game list from The Odds API when API-NBA is unavailable.
 
-    Fetches game-level odds (which include home/away team names), converts
+    Retrieves game-level odds (which include home/away team names), converts
     full team names to abbreviations, and extracts consensus spread/total
     from the bookmaker data.
 
@@ -826,7 +826,7 @@ def _enrich_games_with_standings(games: list) -> list:
     values are never overwritten (API-NBA game data takes priority).
 
     Falls back gracefully — returns the original list unchanged if the
-    API key is missing or the fetch fails.
+    API key is missing or the retrieval fails.
 
     Args:
         games: List of game dicts.
@@ -885,7 +885,7 @@ def _enrich_games_with_standings(games: list) -> list:
 
 def get_todays_games():
     """
-    Fetch tonight's NBA games via API-NBA API, then enrich with
+    Retrieve tonight's NBA games via API-NBA API, then enrich with
     consensus Vegas lines from The Odds API (spread, total, moneyline).
 
     Falls back to building the game list directly from The Odds API
@@ -894,7 +894,7 @@ def get_todays_games():
     Returns:
         list of dict: Tonight's games, each with home_team, away_team,
                       team records, and Vegas lines from Odds API consensus.
-                      Returns empty list if all fetches fail.
+                      Returns empty list if all retrievals fail.
     """
     games = []
     try:
@@ -917,7 +917,7 @@ def get_todays_games():
                 len(raw_games),
             )
     except Exception as err:
-        _logger.warning(f"API-NBA games fetch failed: {err}")
+        _logger.warning(f"API-NBA games retrieval failed: {err}")
 
     # ── Fallback: build game list from The Odds API when API-NBA is empty ──
     if not games:
@@ -945,24 +945,24 @@ def get_todays_games():
     return games
 
 # ============================================================
-# END SECTION: Today's Games Fetcher
+# END SECTION: Today's Games Service
 # ============================================================
 # ============================================================
 
 
 # ============================================================
 # ============================================================
-# SECTION: Targeted Roster-Based Data Fetcher
-# Fetches players only for teams playing today via API-NBA API.
+# SECTION: Targeted Roster-Based Data Service
+# Retrieves players only for teams playing today via API-NBA API.
 # ============================================================
 
 def get_todays_players(todays_games, progress_callback=None, precomputed_injury_map=None):
     """
-    Fetch player stats ONLY for teams playing today via API-NBA API.
+    Retrieve player stats ONLY for teams playing today via API-NBA API.
 
     Streamlined pipeline:
     1. Identifies the teams playing today from todays_games
-    2. Fetches player stats from API-NBA (filtered to today's teams)
+    2. Retrieves player stats from API-NBA (filtered to today's teams)
     3. Writes to players.csv in the standard format
 
     Args:
@@ -971,13 +971,13 @@ def get_todays_players(todays_games, progress_callback=None, precomputed_injury_
         precomputed_injury_map (dict, optional): Kept for backward compatibility.
 
     Returns:
-        bool: True if successful, False if the fetch failed.
+        bool: True if successful, False if the retrieval failed.
     """
     from data.nba_api_client import get_player_stats as _cs_players, get_rosters as _cs_rosters
     from data.roster_engine import RosterEngine as _RosterEngine
 
     if not todays_games:
-        _logger.info("No games provided — nothing to fetch.")
+        _logger.info("No games provided — nothing to retrieve.")
         return False
 
     try:
@@ -991,12 +991,12 @@ def get_todays_players(todays_games, progress_callback=None, precomputed_injury_
         from data.nba_api_client import _VALID_NBA_ABBREVS
         playing_team_abbrevs = {t for t in playing_team_abbrevs if t in _VALID_NBA_ABBREVS}
 
-        _logger.info(f"Fetching players for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
+        _logger.info(f"Retrieving players for {len(playing_team_abbrevs)} teams: {sorted(playing_team_abbrevs)}")
 
         if progress_callback:
-            progress_callback(1, 10, f"Found {len(playing_team_abbrevs)} teams. Fetching player stats...")
+            progress_callback(1, 10, f"Found {len(playing_team_abbrevs)} teams. Retrieving player stats...")
 
-        # Fetch all player stats from API-NBA
+        # Retrieve all player stats from API-NBA
         all_player_stats = _cs_players()
 
         if progress_callback:
@@ -1017,14 +1017,14 @@ def get_todays_players(todays_games, progress_callback=None, precomputed_injury_
         if progress_callback:
             progress_callback(6, 10, f"Writing {len(filtered_players)} players to CSV...")
 
-        # Fetch injury data via RosterEngine
+        # Retrieve injury data via RosterEngine
         injury_map = {}
         try:
             _roster_engine = _RosterEngine()
             _roster_engine.refresh(list(playing_team_abbrevs))
             injury_map = _roster_engine.get_injury_report()
         except Exception as roster_err:
-            _logger.warning(f"RosterEngine injury fetch failed (non-fatal): {roster_err}")
+            _logger.warning(f"RosterEngine injury retrieval failed (non-fatal): {roster_err}")
 
         # Write injury status JSON
         try:
@@ -1054,20 +1054,20 @@ def get_todays_players(todays_games, progress_callback=None, precomputed_injury_
         return False
 
 
-# END SECTION: Targeted Roster-Based Data Fetcher
+# END SECTION: Targeted Roster-Based Data Service
 # ============================================================
 # ============================================================
 
 
 # ============================================================
 # ============================================================
-# SECTION: Recent Form Fetcher
-# Fetches recent game data for trend analysis.
+# SECTION: Recent Form Service
+# Retrieves recent game data for trend analysis.
 # ============================================================
 
 def get_player_recent_form(player_id, last_n_games=10):
     """
-    Fetch recent form data for a specific player.
+    Retrieve recent form data for a specific player.
 
     Returns the last N game logs along with trend analysis.
     Falls back to an empty dict if API-NBA doesn't have game logs.
@@ -1080,7 +1080,7 @@ def get_player_recent_form(player_id, last_n_games=10):
         dict: Recent form data with keys:
               'games', 'recent_pts_avg', 'recent_reb_avg',
               'recent_ast_avg', 'trend', 'game_results'
-              Returns empty dict if fetch fails.
+              Returns empty dict if retrieval fails.
     """
     try:
         from data.nba_api_client import get_player_game_log as _cs_log
@@ -1156,20 +1156,20 @@ def get_player_recent_form(player_id, last_n_games=10):
         return {}
 
 # ============================================================
-# END SECTION: Recent Form Fetcher
+# END SECTION: Recent Form Service
 # ============================================================
 # ============================================================
 
 
 # ============================================================
 # ============================================================
-# SECTION: Player Stats Fetcher
-# Fetches current season stats for all NBA players via API-NBA API.
+# SECTION: Player Stats Service
+# Retrieves current season stats for all NBA players via API-NBA API.
 # ============================================================
 
 def get_player_stats(progress_callback=None):
     """
-    Fetch current season player stats for all NBA players via API-NBA API.
+    Retrieve current season player stats for all NBA players via API-NBA API.
 
     Writes the results to players.csv in the standard column format.
 
@@ -1177,7 +1177,7 @@ def get_player_stats(progress_callback=None):
         progress_callback (callable, optional): Called with (current, total, message).
 
     Returns:
-        bool: True if successful, False if the fetch failed.
+        bool: True if successful, False if the retrieval failed.
     """
     from data.nba_api_client import get_player_stats as _cs_player_stats
 
@@ -1238,20 +1238,20 @@ def _write_players_csv(players):
     _logger.info(f"Wrote {len(players)} players to {PLAYERS_CSV_PATH}")
 
 # ============================================================
-# END SECTION: Player Stats Fetcher
+# END SECTION: Player Stats Service
 # ============================================================
 # ============================================================
 
 
 # ============================================================
 # ============================================================
-# SECTION: Team Stats Fetcher
-# Fetches current season team stats via API-NBA API.
+# SECTION: Team Stats Service
+# Retrieves current season team stats via API-NBA API.
 # ============================================================
 
 def get_team_stats(progress_callback=None):
     """
-    Fetch current season team stats via API-NBA API.
+    Retrieve current season team stats via API-NBA API.
 
     Pulls pace, offensive rating (ORTG), defensive rating (DRTG),
     and wins/losses for all 30 NBA teams. Writes to teams.csv and
@@ -1261,13 +1261,13 @@ def get_team_stats(progress_callback=None):
         progress_callback (callable, optional): Progress update function.
 
     Returns:
-        bool: True if successful, False if the fetch failed.
+        bool: True if successful, False if the retrieval failed.
     """
     from data.nba_api_client import get_team_stats as _cs_team_stats
 
     try:
         if progress_callback:
-            progress_callback(1, 6, "Fetching team stats from API-NBA API...")
+            progress_callback(1, 6, "Retrieving team stats from API-NBA API...")
 
         team_stats_list = _cs_team_stats()
 
@@ -1376,7 +1376,7 @@ def get_teams_staleness_warning():
         timestamps = load_last_updated()
         teams_ts = timestamps.get("teams")
         if not teams_ts:
-            return "Team stats have never been fetched. Click Update Teams on the Data Feed page."
+            return "Team stats have never been retrieved. Click Update Teams on the Data Feed page."
         dt = datetime.datetime.fromisoformat(teams_ts)
         age_hours = (datetime.datetime.now() - dt).total_seconds() / 3600
         if age_hours > 12:
@@ -1386,7 +1386,7 @@ def get_teams_staleness_warning():
     return None
 
 # ============================================================
-# END SECTION: Team Stats Fetcher
+# END SECTION: Team Stats Service
 # ============================================================
 # ============================================================
 
@@ -1397,13 +1397,13 @@ def get_teams_staleness_warning():
 
 # ============================================================
 # ============================================================
-# SECTION: Player Game Log Fetcher
-# Fetches the last N games for a specific player via API-NBA API.
+# SECTION: Player Game Log Service
+# Retrieves the last N games for a specific player via API-NBA API.
 # ============================================================
 
 def get_player_game_log(player_id, last_n_games=20):
     """
-    Fetch the last N game logs for a specific player.
+    Retrieve the last N game logs for a specific player.
 
     Args:
         player_id (int or str): The NBA player's unique ID
@@ -1411,7 +1411,7 @@ def get_player_game_log(player_id, last_n_games=20):
 
     Returns:
         list of dict: Recent game stats, newest game first.
-                      Returns empty list if the fetch fails.
+                      Returns empty list if the retrieval fails.
     """
     try:
         from data.nba_api_client import get_player_game_log as _cs_log
@@ -1419,7 +1419,7 @@ def get_player_game_log(player_id, last_n_games=20):
         if games:
             return games
     except Exception as err:
-        _logger.warning(f"API-NBA game log fetch failed for player {player_id}: {err}")
+        _logger.warning(f"API-NBA game log retrieval failed for player {player_id}: {err}")
 
     # Try local cache as fallback
     if _GAME_LOG_CACHE_AVAILABLE:
@@ -1433,24 +1433,24 @@ def get_player_game_log(player_id, last_n_games=20):
     return []
 
 # ============================================================
-# END SECTION: Player Game Log Fetcher
+# END SECTION: Player Game Log Service
 # ============================================================
 # ============================================================
 
 
 # ============================================================
 # SECTION: Full Update Function
-# Runs all fetchers in sequence to update everything at once.
+# Runs all services in sequence to update everything at once.
 # ============================================================
 
 def get_all_data(progress_callback=None, targeted=False, todays_games=None):
     """
-    Fetch ALL live data: player stats, team stats, and defensive ratings.
+    Retrieve ALL live data: player stats, team stats, and defensive ratings.
 
     Args:
         progress_callback (callable, optional): Progress function.
             Called with (current_step, total_steps, message).
-        targeted (bool): If True and todays_games is provided, only fetch
+        targeted (bool): If True and todays_games is provided, only retrieve
             players on teams playing today (faster, uses current rosters).
         todays_games (list, optional): Required when targeted=True.
 
@@ -1466,14 +1466,14 @@ def get_all_data(progress_callback=None, targeted=False, todays_games=None):
     _logger.info("Starting full data update...")
 
     # --------------------------------------------------------
-    # Step 1: Fetch player stats (targeted or full)
+    # Step 1: Retrieve player stats (targeted or full)
     # --------------------------------------------------------
 
     if progress_callback:
         progress_callback(0, 20, "Starting player stats update...")
 
     if targeted and todays_games:
-        # Targeted fetch: only players on today's teams
+        # Targeted retrieval: only players on today's teams
         def player_progress(current, total, message):
             if progress_callback:
                 progress_callback(current, 20, f"[Players] {message}")
@@ -1481,7 +1481,7 @@ def get_all_data(progress_callback=None, targeted=False, todays_games=None):
             todays_games, progress_callback=player_progress
         )
     else:
-        # Full fetch: all ~500 NBA players
+        # Full retrieval: all ~500 NBA players
         def player_progress(current, total, message):
             if progress_callback:
                 progress_callback(current, 20, f"[Players] {message}")
@@ -1490,7 +1490,7 @@ def get_all_data(progress_callback=None, targeted=False, todays_games=None):
     _logger.info("Player stats update complete. Starting team stats update...")
 
     # --------------------------------------------------------
-    # Step 2: Fetch team stats
+    # Step 2: Retrieve team stats
     # --------------------------------------------------------
 
     def team_progress(current, total, message):
@@ -1511,21 +1511,21 @@ def get_all_data(progress_callback=None, targeted=False, todays_games=None):
 
 
 # ============================================================
-# SECTION: One-Click Today's Data Fetcher
-# Fetches games, today's team rosters+stats, and team stats
+# SECTION: One-Click Today's Data Service
+# Retrieves games, today's team rosters+stats, and team stats
 # in a single call — the "Auto-Load" button entry point.
 # ============================================================
 
 def get_all_todays_data(progress_callback=None):
     """
-    One-click function: fetch tonight's games, player stats for those
+    One-click function: retrieve tonight's games, player stats for those
     teams, team stats, and player injury/availability status.
 
     Steps:
-        1. Fetch tonight's games (ScoreBoard)
-        2. Fetch current rosters + player stats (includes injury data via
-           RosterEngine — no separate injury fetch step needed)
-        3. Fetch team stats for the analysis engine
+        1. Retrieve tonight's games (ScoreBoard)
+        2. Retrieve current rosters + player stats (includes injury data via
+           RosterEngine — no separate injury retrieval step needed)
+        3. Retrieve team stats for the analysis engine
 
     Args:
         progress_callback (callable, optional): Called with (current, total, msg).
@@ -1546,10 +1546,10 @@ def get_all_todays_data(progress_callback=None):
     }
 
     # --------------------------------------------------------
-    # Step 1: Fetch tonight's games
+    # Step 1: Retrieve tonight's games
     # --------------------------------------------------------
     if progress_callback:
-        progress_callback(0, 40, "Step 1/3 — Fetching tonight's games...")
+        progress_callback(0, 40, "Step 1/3 — Retrieving tonight's games...")
 
     games = get_todays_games()
     results["games"] = games
@@ -1559,10 +1559,10 @@ def get_all_todays_data(progress_callback=None):
         return results
 
     if progress_callback:
-        progress_callback(2, 40, f"Step 1/3 ✅ Found {len(games)} game(s). Fetching players + injury data...")
+        progress_callback(2, 40, f"Step 1/3 ✅ Found {len(games)} game(s). Retrieving players + injury data...")
 
     # --------------------------------------------------------
-    # Step 2: Fetch player stats for tonight's teams.
+    # Step 2: Retrieve player stats for tonight's teams.
     # RosterEngine.refresh() is called inside get_todays_players(),
     # providing injury data and rosters in one pass.  The injury map is
     # written to INJURY_STATUS_JSON_PATH so it can be loaded after this call.
@@ -1584,14 +1584,14 @@ def get_all_todays_data(progress_callback=None):
             from data.data_manager import load_injury_status as _load_inj
             results["injury_status"] = _load_inj()
         except Exception as _inj_load_err:
-            _logger.info(f"get_all_todays_data: could not load injury map after player fetch: {_inj_load_err}")
+            _logger.info(f"get_all_todays_data: could not load injury map after player retrieval: {_inj_load_err}")
 
     if progress_callback:
         status = "✅" if results["players_updated"] else "⚠️"
-        progress_callback(29, 40, f"Step 2/3 {status} Player stats done. Fetching team stats...")
+        progress_callback(29, 40, f"Step 2/3 {status} Player stats done. Retrieving team stats...")
 
     # --------------------------------------------------------
-    # Step 3: Fetch team stats
+    # Step 3: Retrieve team stats
     # --------------------------------------------------------
     def team_progress(current, total, message):
         if progress_callback:
@@ -1606,7 +1606,7 @@ def get_all_todays_data(progress_callback=None):
 
     # --------------------------------------------------------
     # Bonus: Record market movement snapshots from Odds API
-    # This runs silently after the main data fetch — it's optional
+    # This runs silently after the main data retrieval — it's optional
     # and won't block or fail the main results.
     # --------------------------------------------------------
     _record_odds_api_snapshots(results["games"])
@@ -1687,7 +1687,7 @@ def get_all_todays_data(progress_callback=None):
     return results
 
 # ============================================================
-# END SECTION: One-Click Today's Data Fetcher
+# END SECTION: One-Click Today's Data Service
 # ============================================================
 
 
@@ -1700,13 +1700,13 @@ def get_all_todays_data(progress_callback=None):
 
 def get_active_rosters(team_abbrevs=None, progress_callback=None):
     """
-    Fetch current active rosters for the given teams.
+    Retrieve current active rosters for the given teams.
 
     Delegates to RosterEngine (nba_api CommonTeamRoster) — the single
     authoritative source — replacing the old direct CommonTeamRoster calls.
 
     Args:
-        team_abbrevs (list of str, optional): Team abbreviations to fetch.
+        team_abbrevs (list of str, optional): Team abbreviations to retrieve.
             If None, returns an empty dict (caller should specify teams).
         progress_callback (callable, optional): Accepted for API compatibility
             but not used (RosterEngine handles its own progress internally).
@@ -1751,7 +1751,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
     Get a dynamic coefficient of variation for fallback std estimation. (W10)
 
     Delegates to `_get_dynamic_cv()` in projections.py to avoid duplicating
-    the tier-threshold logic. This ensures both the live fetcher and the
+    the tier-threshold logic. This ensures both the live service and the
     projection engine use identical CV tiers.
 
     Args:
@@ -1784,7 +1784,7 @@ def _record_odds_api_snapshots(games: list | None = None) -> None:
     """
     Record prop line snapshots from The Odds API for market movement tracking.
 
-    Fetches current player props from all bookmakers and stores them via
+    Retrieves current player props from all bookmakers and stores them via
     engine.market_movement.track_line_snapshot(). These snapshots build
     the historical trail used by engine.market_movement.detect_line_movement()
     to identify sharp money, steam moves, and line drift.
@@ -1796,13 +1796,13 @@ def _record_odds_api_snapshots(games: list | None = None) -> None:
         games: Optional list of game dicts (for logging context only).
     """
     try:
-        from data.odds_client import get_player_props as _fetch_props
+        from data.odds_client import get_player_props as _get_props
         from engine.market_movement import track_line_snapshot as _snapshot
     except ImportError:
         return  # Engine or client not available — skip silently
 
     try:
-        props = _fetch_props()
+        props = _get_props()
         if not props:
             return
 
@@ -1837,7 +1837,7 @@ def _record_odds_api_snapshots(games: list | None = None) -> None:
 
 def get_standings(progress_callback=None) -> list[dict]:
     """
-    Fetch current NBA standings from API-NBA API.
+    Retrieve current NBA standings from API-NBA API.
 
     Returns a list of team standing entries including conference rank,
     win-loss record, home/away splits, last-10 record, and streak.
@@ -1851,7 +1851,7 @@ def get_standings(progress_callback=None) -> list[dict]:
                     conference_rank, wins, losses, win_pct, streak, etc.
     """
     if progress_callback:
-        progress_callback(0, 10, "Fetching NBA standings from API-NBA...")
+        progress_callback(0, 10, "Retrieving NBA standings from API-NBA...")
 
     try:
         from data.nba_api_client import get_standings as _cs_standings
@@ -1866,7 +1866,7 @@ def get_standings(progress_callback=None) -> list[dict]:
 
 def get_player_news(player_name: str | None = None, limit: int = 20) -> list[dict]:
     """
-    Fetch recent NBA news from API-NBA API, optionally filtered to
+    Retrieve recent NBA news from API-NBA API, optionally filtered to
     a specific player.
 
     Useful for enriching Joseph M. Smith's contextual commentary with
@@ -1912,13 +1912,13 @@ def refresh_historical_data_for_tonight(
     progress_callback=None,
 ) -> dict:
     """
-    Auto-fetch historical game logs for all players in tonight's lineup
+    Auto-retrieve historical game logs for all players in tonight's lineup
     and update CLV closing lines from recently completed games.
 
     This function is the "historical data refresh" entry point. It:
 
     1. Resolves tonight's playing teams from ``games`` (or session state)
-    2. Fetches each player's recent game log from API-NBA API
+    2. Retrieves each player's recent game log from API-NBA API
     3. Saves results to ``data/game_log_cache.py`` for the Backtester
     4. Calls ``engine/clv_tracker.auto_update_closing_lines()`` to close
        open CLV records using today's Odds API prop lines (closing lines)
@@ -1926,7 +1926,7 @@ def refresh_historical_data_for_tonight(
     Args:
         games:             List of tonight's game dicts.  If None, tries
                            ``st.session_state["todays_games"]``.
-        last_n_games:      How many recent games to fetch per player (30).
+        last_n_games:      How many recent games to retrieve per player (30).
         progress_callback: Optional callable(current, total, message).
 
     Returns:
@@ -1981,9 +1981,9 @@ def refresh_historical_data_for_tonight(
 
     total = len(tonight_players)
     if progress_callback:
-        progress_callback(0, total, f"Fetching historical logs for {total} player(s)…")
+        progress_callback(0, total, f"Retrieving historical logs for {total} player(s)…")
 
-    # Batch-fetch game logs from API-NBA
+    # Batch-retrieve game logs from API-NBA
     try:
         from data.nba_api_client import get_season_game_logs_batch as _batch
         from data.game_log_cache import save_game_logs_to_cache as _save_cache
@@ -2011,7 +2011,7 @@ def refresh_historical_data_for_tonight(
                 progress_callback(idx + 1, total, f"Cached logs for {player_name}")
 
     except Exception as exc:
-        _logger.warning("refresh_historical_data_for_tonight: batch fetch failed — %s", exc)
+        _logger.warning("refresh_historical_data_for_tonight: batch retrieval failed — %s", exc)
         results["errors"] += 1
 
     # Auto-update CLV closing lines from Odds API
@@ -2042,11 +2042,11 @@ def refresh_historical_data_for_tonight(
         )
 
     # ── Cross-reference: Odds API recent scores ───────────────────────────
-    # Fetch recently completed game scores from The Odds API so downstream
+    # Retrieve recently completed game scores from The Odds API so downstream
     # pages can validate projections against actual outcomes.
     try:
-        from data.odds_client import get_recent_scores as _fetch_scores
-        recent = _fetch_scores(days_from=1)
+        from data.odds_client import get_recent_scores as _get_scores
+        recent = _get_scores(days_from=1)
         if recent:
             try:
                 import streamlit as _st_scores
@@ -2069,17 +2069,3 @@ def refresh_historical_data_for_tonight(
 # END SECTION: Historical Data Refresher
 # ============================================================
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-fetch_todays_games = get_todays_games
-fetch_todays_players_only = get_todays_players
-fetch_player_recent_form = get_player_recent_form
-fetch_player_stats = get_player_stats
-fetch_team_stats = get_team_stats
-fetch_defensive_ratings = get_defensive_ratings
-fetch_player_game_log = get_player_game_log
-fetch_all_data = get_all_data
-fetch_all_todays_data = get_all_todays_data
-fetch_active_rosters = get_active_rosters
-fetch_standings = get_standings
-fetch_player_news = get_player_news

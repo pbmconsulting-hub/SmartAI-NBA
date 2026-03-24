@@ -88,12 +88,12 @@ with col_interval:
 
 
 # ============================================================
-# SECTION: Fetch Live Scoreboard
+# SECTION: Load Live Scoreboard
 # ============================================================
 
 def _get_live_scores():
     """
-    Attempt to fetch live/today's game scores via API-NBA API.
+    Attempt to retrieve live/today's game scores via API-NBA API.
 
     Returns:
         list of dict: Game score data, or empty list on failure.
@@ -123,7 +123,7 @@ with st.spinner("🏆 Loading live scores..."):
     live_games = _get_live_scores()
 
 # ============================================================
-# END SECTION: Fetch Live Scoreboard
+# END SECTION: Load Live Scoreboard
 # ============================================================
 
 
@@ -136,7 +136,7 @@ st.subheader("🏀 Live Scoreboard")
 
 def _get_quarter_scores(game_id: str) -> dict:
     """
-    Attempt to fetch per-quarter (period) line score for a given game_id.
+    Attempt to retrieve per-quarter (period) line score for a given game_id.
 
     Returns dict with keys 'away_q' and 'home_q' each being a list of
     quarter scores (indices 0-3 = Q1-Q4, index 4 = OT if present).
@@ -238,7 +238,7 @@ if live_games:
             score_color_home = "#00ff9d" if h_pts > a_pts else "#c8d8f0"
             score_color_away = "#00ff9d" if a_pts > h_pts else "#c8d8f0"
 
-            # Fetch quarter-by-quarter scores if game_id available
+            # Retrieve quarter-by-quarter scores if game_id available
             game_id = game.get("game_id", "")
             quarter_html = ""
             if game_id:

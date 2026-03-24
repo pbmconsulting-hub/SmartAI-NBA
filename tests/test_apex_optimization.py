@@ -103,14 +103,14 @@ class TestAsyncBetResolver(unittest.TestCase):
         src = pathlib.Path(__file__).parent.parent / "tracking" / "bet_tracker.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("_game_log_cache", content,
-                       "Resolver should maintain a _game_log_cache for parallel fetch results")
+                       "Resolver should maintain a _game_log_cache for parallel get results")
 
-    def test_parallel_fetch_helper_exists(self):
+    def test_parallel_get_helper_exists(self):
         """A _get_player_log helper should exist for the ThreadPoolExecutor."""
         src = pathlib.Path(__file__).parent.parent / "tracking" / "bet_tracker.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("def _get_player_log(", content,
-                       "_get_player_log helper should be defined for parallel fetching")
+                       "_get_player_log helper should be defined for parallel retrieval")
 
     def test_max_workers_capped(self):
         """ThreadPoolExecutor max_workers should be capped at 8."""

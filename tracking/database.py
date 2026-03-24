@@ -253,9 +253,9 @@ CREATE TABLE IF NOT EXISTS backtest_results (
 
 # SQL to create the player_game_logs cache table.
 # Feature 12: Game Log Persistence Across Sessions.
-# Stores per-player game log rows fetched from nba_api so browser
+# Stores per-player game log rows retrieved from nba_api so browser
 # refreshes and session resets don't lose expensive API data.
-# Cache invalidation: re-fetch if most recent game is > 24 hours old.
+# Cache invalidation: re-retrieve if most recent game is > 24 hours old.
 CREATE_PLAYER_GAME_LOGS_TABLE_SQL = """
 CREATE TABLE IF NOT EXISTS player_game_logs (
     log_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,7 +274,7 @@ CREATE TABLE IF NOT EXISTS player_game_logs (
     fg_pct REAL,
     ft_pct REAL,
     plus_minus INTEGER,
-    fetched_at TEXT DEFAULT (datetime('now')),
+    retrieved_at TEXT DEFAULT (datetime('now')),
     UNIQUE(player_id, game_date)
 );
 """
@@ -409,6 +409,17 @@ def initialize_database():
                 )
             except sqlite3.OperationalError:
                 pass
+
+            # ── Rename retrieved_at column in player_game_logs ──
+            # Older databases have the column named with old terminology; new schema
+            # uses retrieved_at.  SQLite ≥ 3.25 supports ALTER TABLE RENAME
+            # COLUMN, but we guard with try/except for older builds.
+            try:
+                cursor.execute(
+                    "ALTER TABLE player_game_logs RENAME COLUMN fetched_at TO retrieved_at"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already renamed or doesn't exist
 
             # Save the changes
             connection.commit()
@@ -943,7 +954,7 @@ def save_daily_snapshot(date_str=None):
         conn = get_database_connection()
         cursor = conn.cursor()
 
-        # Fetch all bets for that date
+        # Retrieve all bets for that date
         cursor.execute(
             "SELECT * FROM bets WHERE bet_date = ?",
             (date_str,),
@@ -1669,7 +1680,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
     """
     Persist a list of player game log rows to the player_game_logs table.
 
-    Uses INSERT OR REPLACE so re-running the fetch doesn't create
+    Uses INSERT OR REPLACE so re-running the retrieval doesn't create
     duplicate rows (the UNIQUE constraint on player_id + game_date
     handles deduplication).
 
@@ -1687,7 +1698,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
         return 0
 
     import datetime as _dt
-    fetched_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
+    retrieved_at = _dt.datetime.now(_dt.timezone.utc).isoformat()
     inserted = 0
 
     for _attempt in range(_WRITE_RETRY_ATTEMPTS):
@@ -1701,7 +1712,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
                             (player_id, player_name, game_date, opponent,
                              minutes, points, rebounds, assists, threes,
                              steals, blocks, turnovers, fg_pct, ft_pct,
-                             plus_minus, fetched_at)
+                             plus_minus, retrieved_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
@@ -1720,7 +1731,7 @@ def save_player_game_logs_to_db(player_id, player_name, game_logs):
                             _safe_float(g.get("fg_pct",  g.get("FG_PCT", g.get("fg_pct")))),
                             _safe_float(g.get("ft_pct",  g.get("FT_PCT", g.get("ft_pct")))),
                             _safe_int(g.get("plus_minus", g.get("PLUS_MINUS", g.get("plus_minus")))),
-                            fetched_at,
+                            retrieved_at,
                         ),
                     )
                     inserted += 1
@@ -1814,7 +1825,7 @@ def is_game_log_cache_stale(player_id, max_age_hours=24):
         with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             row = conn.execute(
-                "SELECT MAX(fetched_at) FROM player_game_logs WHERE player_id = ?",
+                "SELECT MAX(retrieved_at) FROM player_game_logs WHERE player_id = ?",
                 (str(player_id),),
             ).fetchone()
             if not row or not row[0]:
@@ -1828,7 +1839,7 @@ def is_game_log_cache_stale(player_id, max_age_hours=24):
             age_hours = (now_utc - latest_ts).total_seconds() / 3600.0
             return age_hours > max_age_hours
     except Exception:
-        return True  # If we can't check, assume stale and re-fetch
+        return True  # If we can't check, assume stale and re-retrieve
 
 
 # ============================================================

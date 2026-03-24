@@ -61,7 +61,7 @@ def load_players_data():
     Returns a list of dictionaries, where each dictionary
     represents one player with all their stats as keys.
     Returns an empty list if the file does not exist yet (first run before
-    a live data fetch has been performed).
+    a live data retrieval has been performed).
 
     Returns:
         list of dict: Player rows, e.g.:
@@ -70,7 +70,7 @@ def load_players_data():
     Example:
         players = load_players_data()
         if not players:
-            # Prompt user to fetch live data from the Data Feed page
+            # Prompt user to retrieve live data from the Data Feed page
             pass
         else:
             lebron = players[0]
@@ -85,7 +85,7 @@ def load_props_data():
     Load all prop lines from the props.csv file.
 
     Returns an empty list if the file does not exist yet (first run before
-    a live data fetch has been performed).
+    a live data retrieval has been performed).
 
     Returns:
         list of dict: Prop rows, e.g.:
@@ -1093,20 +1093,20 @@ def load_props_from_session(session_state):
 
     Checks keys in priority order:
       1. ``current_props``  — user-entered or platform-filtered props
-      2. ``platform_props`` — live-fetched platform props (fallback)
+      2. ``platform_props`` — live-retrieved platform props (fallback)
       3. ``props.csv``      — on-disk fallback (empty on fresh installs)
 
     Args:
         session_state: Streamlit's st.session_state object
 
     Returns:
-        list of dict: Current props (entered, platform-fetched, or disk)
+        list of dict: Current props (entered, platform-retrieved, or disk)
     """
     # 1. Check user/filtered props
     if session_state.get("current_props"):
         return session_state["current_props"]
 
-    # 2. Fall back to live-fetched platform props saved by Live Games /
+    # 2. Fall back to live-retrieved platform props saved by Live Games /
     #    Data Feed pages so Neural Analysis always finds real data.
     if session_state.get("platform_props"):
         return session_state["platform_props"]
@@ -1121,7 +1121,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
 
     This function previously auto-generated prop entries using season averages
     as estimated lines. It now returns an empty list immediately. Use the
-    platform prop fetcher (data/sportsbook_service.py) to load real live lines.
+    platform prop service (data/sportsbook_service.py) to load real live lines.
 
     Args:
         players_data: Unused.
@@ -1155,7 +1155,7 @@ def filter_props_to_platform_players(
 
     Args:
         generated_props: List of auto-generated prop dicts (may be synthetic).
-        platform_props: List of real platform prop dicts fetched from APIs.
+        platform_props: List of real platform prop dicts retrieved from APIs.
 
     Returns:
         List of props limited to platform-present players. If platform_props
@@ -1283,27 +1283,27 @@ def get_csv_template():
 
 # ============================================================
 # SECTION: Platform Props — Save / Load helpers
-# These functions save and load live props fetched from betting
+# These functions save and load live props retrieved from betting
 # platforms (sportsbook platforms) to/from both
 # session state and an optional CSV file on disk.
 # ============================================================
 
-# Path for saving live platform-fetched props (separate from user-entered props)
+# Path for saving live platform-retrieved props (separate from user-entered props)
 LIVE_PROPS_CSV_PATH = DATA_DIRECTORY / "live_props.csv"
 
 # CSV columns for platform props
 _PLATFORM_PROPS_COLUMNS = [
-    "player_name", "team", "stat_type", "line", "platform", "game_date", "fetched_at",
+    "player_name", "team", "stat_type", "line", "platform", "game_date", "retrieved_at",
     "line_category", "standard_line",
 ]
 
 
 def save_platform_props_to_session(props_list, session_state):
     """
-    Save platform-fetched props to Streamlit session state.
+    Save platform-retrieved props to Streamlit session state.
 
     These are separate from the user-entered "current_props" so that
-    platform-fetched data can be used for cross-platform comparison
+    platform-retrieved data can be used for cross-platform comparison
     without overwriting manually entered props.
 
     Args:
@@ -1315,20 +1315,20 @@ def save_platform_props_to_session(props_list, session_state):
 
 def load_platform_props_from_session(session_state):
     """
-    Load platform-fetched props from Streamlit session state.
+    Load platform-retrieved props from Streamlit session state.
 
     Args:
         session_state: Streamlit's st.session_state object.
 
     Returns:
-        list[dict]: Previously fetched platform props, or [].
+        list[dict]: Previously retrieved platform props, or [].
     """
     return session_state.get("platform_props", [])
 
 
 def save_platform_props_to_csv(props_list, file_path=None):
     """
-    Save platform-fetched props to a CSV file on disk.
+    Save platform-retrieved props to a CSV file on disk.
 
     Overwrites the existing file each time. This is intentional —
     platform props are always "today's live data", so old data
@@ -1365,7 +1365,7 @@ def save_platform_props_to_csv(props_list, file_path=None):
 
 def load_platform_props_from_csv(file_path=None):
     """
-    Load platform-fetched props from a CSV file on disk.
+    Load platform-retrieved props from a CSV file on disk.
 
     Args:
         file_path (Path, optional): Where to read from. Defaults to
@@ -1394,13 +1394,13 @@ def load_platform_props_from_csv(file_path=None):
 
 def is_using_live_data():
     """
-    Check whether the app has fetched live NBA data from real APIs.
+    Check whether the app has retrieved live NBA data from real APIs.
 
     Looks for the last_updated.json file created by nba_data_service.py.
     If the file exists and has the 'is_live' flag, we're using live data.
 
     Returns:
-        bool: True if live data is loaded, False if no live fetch has occurred.
+        bool: True if live data is loaded, False if no live retrieval has occurred.
 
     Example:
         if is_using_live_data():
@@ -1410,7 +1410,7 @@ def is_using_live_data():
     """
     # Check if the timestamp file exists
     if not LAST_UPDATED_JSON_PATH.exists():
-        return False  # File doesn't exist = no live data has been fetched
+        return False  # File doesn't exist = no live data has been retrieved
 
     try:
         # Read the JSON file
@@ -1462,7 +1462,7 @@ def save_last_updated_timestamp(data_type):
     """
     Save the current time as the last-updated timestamp for a data type.
 
-    This is called by nba_data_service.py after each successful fetch,
+    This is called by nba_data_service.py after each successful retrieval,
     but can also be called manually if data is updated another way.
 
     Args:
@@ -1502,7 +1502,7 @@ def clear_all_caches():
     """
     Clear all st.cache_data caches for data loading functions.
 
-    Call this after a successful data fetch to force fresh reads.
+    Call this after a successful data retrieval to force fresh reads.
     """
     try:
         load_players_data.clear()

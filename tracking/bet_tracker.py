@@ -585,7 +585,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
 
 def auto_resolve_bet_results(date_str=None):
     """
-    For all pending bets on date_str (default: yesterday), fetch actual
+    For all pending bets on date_str (default: yesterday), retrieve actual
     player stats from API-NBA API and automatically mark WIN/LOSS/PUSH.
 
     Uses data.nba_data_service.get_player_game_log() to get actual stat
@@ -693,7 +693,7 @@ def auto_resolve_bet_results(date_str=None):
             pid = None
         _name_to_pid[pname] = pid
 
-    # ── Fetch game logs in parallel using ThreadPoolExecutor ──
+    # ── Retrieve game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
     import time as _time
 
@@ -704,7 +704,7 @@ def auto_resolve_bet_results(date_str=None):
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _get_player_log(pid):
-        """Fetch a single player's API-NBA game log with retry + backoff."""
+        """Retrieve a single player's API-NBA game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
@@ -814,7 +814,7 @@ def resolve_todays_bets():
     Resolve today's pending bets by checking live game status via API-NBA API.
 
     Uses API-NBA get_live_scores() to detect finished games,
-    then fetches player game logs via data.nba_data_service.get_player_game_log().
+    then retrieves player game logs via data.nba_data_service.get_player_game_log().
     Player IDs are resolved via data.player_profile_service.get_player_id().
     Only resolves bets where the game has a FINAL status.
 
@@ -947,14 +947,14 @@ def resolve_todays_bets():
                 pid = _lookup_pid(_normalize_name(pname))
         _name_to_pid[pname] = pid
 
-    # ── Fetch game logs in parallel using ThreadPoolExecutor ──
+    # ── Retrieve game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     _ids_to_fetch = {pid for pid in _name_to_pid.values() if pid}
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _get_player_log(pid):
-        """Fetch a single player's API-NBA game log with retry + backoff."""
+        """Retrieve a single player's API-NBA game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
@@ -1297,7 +1297,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
     Uses the same API-NBA game log approach as
     ``resolve_all_pending_bets()``:
       - Loads every row in ``all_analysis_picks`` where result is NULL
-      - Groups by date, fetches game logs per player per season
+      - Groups by date, retrieves game logs per player per season
       - Computes WIN / LOSS / PUSH using prop_line + direction
       - Writes result & actual_value back via
         ``update_analysis_pick_result()``
@@ -1444,7 +1444,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
-            # ── Fetch game log (cached per player) ────────────────────
+            # ── Retrieve game log (cached per player) ────────────────────
             if player_id not in _log_cache:
                 _api_exc = None
                 for _attempt in range(RESOLVE_MAX_RETRIES):
@@ -1557,7 +1557,7 @@ def get_live_bet_status(bets_list):
     """
     augmented = []
 
-    # Fetch live box scores from API-NBA
+    # Retrieve live box scores from API-NBA
     live_box: dict = {}  # player_name_lower → current stat totals
     try:
         from data.nba_api_client import get_live_scores as _cs_live
@@ -1589,7 +1589,7 @@ def get_live_bet_status(bets_list):
                         "is_live": is_live,
                     }
     except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[BetTracker] Live box score fetch failed: {_exc}")
+        logging.getLogger(__name__).warning(f"[BetTracker] Live box score retrieval failed: {_exc}")
 
     STAT_TO_BOX = {
         "points": "pts",

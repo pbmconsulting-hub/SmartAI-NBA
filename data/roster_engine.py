@@ -235,7 +235,7 @@ class RosterEngine:
 
         Unlike get_active_roster(), this includes players who are Out, IR,
         or otherwise unavailable.  Use this when you need the complete roster
-        for a team (e.g., to fetch stats for every player before injury
+        for a team (e.g., to retrieve stats for every player before injury
         filtering is applied as a separate step).
 
         Args:
@@ -292,14 +292,14 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from API-NBA API — the single authoritative source.
+        Retrieve fresh data from API-NBA API — the single authoritative source.
 
         Sources used (in order):
             1. API-NBA injury report endpoint — daily injury designations
             2. API-NBA rosters endpoint       — official roster per team
 
         Args:
-            team_abbrevs: List of team abbreviations to fetch rosters for.
+            team_abbrevs: List of team abbreviations to retrieve rosters for.
                           If None, only the injury data is refreshed.
         """
         _logger.info("RosterEngine.refresh() — starting data pull (API-NBA)")
@@ -332,7 +332,7 @@ class RosterEngine:
 
     def _load_api_injuries(self) -> dict:
         """
-        Fetch today's injury report from API-NBA API.
+        Retrieve today's injury report from API-NBA API.
 
         Falls back to NBA CDN public injury JSON feed if API-NBA fails.
         Returns an empty dict if all sources fail.
@@ -355,14 +355,14 @@ class RosterEngine:
                     }
                 return result
         except Exception as err:
-            _logger.warning(f"API-NBA injury fetch failed: {err}")
+            _logger.warning(f"API-NBA injury retrieval failed: {err}")
 
         # Fallback: NBA CDN public injury JSON
         return self._load_nba_cdn_injuries()
 
     def _load_nba_cdn_injuries(self) -> dict:
         """
-        Fallback: fetch injury data from NBA's public CDN JSON feed.
+        Fallback: retrieve injury data from NBA's public CDN JSON feed.
         """
         import requests as _requests
 
@@ -412,7 +412,7 @@ class RosterEngine:
 
     def _load_api_rosters(self, team_abbrevs: list):
         """
-        Fetch full rosters from API-NBA API, store in _full_rosters.
+        Retrieve full rosters from API-NBA API, store in _full_rosters.
         """
         try:
             from data.nba_api_client import get_rosters as _cs_rosters
@@ -421,7 +421,7 @@ class RosterEngine:
                 self._full_rosters[abbrev.upper()] = players
                 _logger.info(f"  RosterEngine API-NBA: {abbrev} → {len(players)} players")
         except Exception as err:
-            _logger.warning(f"API-NBA roster fetch failed: {err}")
+            _logger.warning(f"API-NBA roster retrieval failed: {err}")
 
 # ============================================================
 # END SECTION: RosterEngine class

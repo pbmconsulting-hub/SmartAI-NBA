@@ -110,7 +110,7 @@ def validate_defensive_ratings_csv(ratings_data):
     errors = []
 
     if not ratings_data:
-        errors.append("defensive_ratings.csv is empty or missing — run team stats fetch")
+        errors.append("defensive_ratings.csv is empty or missing — run team stats retrieval")
         return errors
 
     first = ratings_data[0]
@@ -146,7 +146,7 @@ def check_data_freshness(last_updated_json_path):
 
     if not os.path.exists(last_updated_json_path):
         result["is_stale"] = True
-        result["warning_message"] = "No data has been fetched yet. Go to Data Feed to update."
+        result["warning_message"] = "No data has been retrieved yet. Go to Data Feed to update."
         return result
 
     try:

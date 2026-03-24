@@ -819,7 +819,7 @@ elif not scan_time:
     <div style="text-align:center; padding:3rem 0; color:#8a9bb8;">
         <p style="font-size:3rem; margin-bottom:0.5rem;">🎰</p>
         <h3 style="color:#c0d0e8; margin-bottom:0.5rem;">Ready to Scan</h3>
-        <p>Click <strong>Scan for EV Discrepancies</strong> to fetch live odds across
+        <p>Click <strong>Scan for EV Discrepancies</strong> to load live odds across
         sportsbooks and surface arbitrage opportunities.</p>
         <p style="font-size:0.85rem; margin-top:1rem;">
         Use the sidebar controls to adjust filters before or after scanning.

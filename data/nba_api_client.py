@@ -553,7 +553,7 @@ def get_players(team_id=None) -> list[dict]:
 
 def get_todays_games() -> list[dict]:
     """
-    Fetch today's NBA games with team records and betting lines.
+    Get today's NBA games with team records and betting lines.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -663,7 +663,7 @@ def get_todays_games() -> list[dict]:
 
 def get_player_stats() -> list[dict]:
     """
-    Fetch current-season player averages and standard deviations.
+    Get current-season player averages and standard deviations.
 
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
@@ -861,7 +861,7 @@ def _has_real_team_stats(teams: list[dict]) -> bool:
 
 def get_team_stats() -> list[dict]:
     """
-    Fetch current-season team pace, ratings, and win/loss record.
+    Get current-season team pace, ratings, and win/loss record.
 
     Fallback chain:
       1. API-Basketball v1 /teams (may return metadata only — no stats)
@@ -971,7 +971,7 @@ def get_team_stats() -> list[dict]:
 
 def get_injury_report(team_id=None) -> dict:
     """
-    Fetch the current NBA injury report.
+    Get the current NBA injury report.
 
     Endpoint: GET /injuries
 
@@ -1028,7 +1028,7 @@ def get_injury_report(team_id=None) -> dict:
 
 def get_live_scores() -> list[dict]:
     """
-    Fetch live / recently completed NBA game scores.
+    Get live / recently completed NBA game scores.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -1102,14 +1102,14 @@ def get_live_scores() -> list[dict]:
 
 def get_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
     """
-    Fetch player rosters for the given team abbreviations.
+    Retrieve player rosters for the given team abbreviations.
 
     Args:
         team_abbrevs: List of NBA team abbreviation strings, e.g. ["LAL", "BOS"].
 
     Returns:
         dict: {team_abbrev: [player_name, ...]}
-        Entries for teams whose roster could not be fetched are omitted.
+        Entries for teams whose roster could not be retrieved are omitted.
     """
     rosters: dict[str, list[str]] = {}
 
@@ -1203,7 +1203,7 @@ def get_player_id(player_name: str) -> int | None:
 
 def get_player_game_log(player_id, last_n_games: int = 20) -> list:
     """
-    Fetch the last N game logs for a specific player from API-NBA.
+    Retrieve the last N game logs for a specific player from API-NBA.
 
     Args:
         player_id (int or str): The NBA player's unique ID.
@@ -1213,11 +1213,11 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
         list of dict: Recent game stats, newest game first.
                       Each dict has: game_date, matchup, win_loss, minutes,
                       pts, reb, ast, stl, blk, tov, fg3m, ft_pct.
-                      Returns empty list if the fetch fails.
+                      Returns empty list if the retrieval fails.
     """
     api_key = _resolve_api_key()
     if not api_key:
-        _logger.warning("API-NBA key not configured — cannot fetch player game log.")
+        _logger.warning("API-NBA key not configured — cannot retrieve player game log.")
         return []
 
     url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
@@ -1266,7 +1266,7 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
 
 def get_standings() -> list[dict]:
     """
-    Fetch current NBA standings from API-NBA.
+    Get current NBA standings from API-NBA.
 
     Returns a list of team standing entries including conference rank,
     win-loss record, home/away splits, last-10 record, and streak.
@@ -1419,7 +1419,7 @@ def get_standings() -> list[dict]:
 
 def get_news(limit: int = 20) -> list[dict]:
     """
-    Fetch recent NBA player/team news from API-NBA.
+    Get recent NBA player/team news from API-NBA.
 
     Useful for Joseph M. Smith's contextual commentary and for
     surfacing injury updates, trade news, and performance notes.
@@ -1492,9 +1492,9 @@ def get_season_game_logs_batch(
     last_n_games: int = 30,
 ) -> dict:
     """
-    Batch-fetch game logs for multiple players from API-NBA.
+    Batch-retrieve game logs for multiple players from API-NBA.
 
-    Fetches each player's game log sequentially with a short pause to
+    Retrieves each player's game log sequentially with a short pause to
     respect rate limits, then returns a name-keyed dict suitable for
     direct use by the Backtester and the matchup history engine.
 
@@ -1502,11 +1502,11 @@ def get_season_game_logs_batch(
         player_ids: List of ``(player_name, player_id)`` tuples.
                     ``player_id`` may be an int or string; ``player_name``
                     is used as the dict key in the result.
-        last_n_games: How many recent games to fetch per player (default 30).
+        last_n_games: How many recent games to retrieve per player (default 30).
 
     Returns:
         dict: ``{player_name: [game_log_dict, ...]}``
-              Empty inner list when a player's fetch fails.
+              Empty inner list when a player's retrieval fails.
               Returns ``{}`` when the API key is not configured.
     """
     api_key = _resolve_api_key()
@@ -1532,7 +1532,7 @@ def get_season_game_logs_batch(
             result[player_name] = []
 
     _logger.info(
-        "get_season_game_logs_batch: fetched logs for %d player(s).",
+        "get_season_game_logs_batch: retrieved logs for %d player(s).",
         sum(1 for v in result.values() if v),
     )
     return result
@@ -1594,7 +1594,7 @@ def get_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
     Retrieve usage history for the current API key.
 
     API-Sports does not have a dedicated usage-history endpoint;
-    this fetches the ``/status`` response and returns a single-item
+    this retrieves the ``/status`` response and returns a single-item
     list with the current day's usage for callers that expect a list.
 
     Endpoint: GET /status
@@ -1640,7 +1640,7 @@ def get_api_key_stats(
     Get aggregated usage statistics for the current API key.
 
     API-Sports does not have a dedicated stats endpoint;
-    this fetches ``/status`` and returns the account/subscription/
+    this retrieves ``/status`` and returns the account/subscription/
     requests information as a stats dict.
 
     Endpoint: GET /status
@@ -1798,7 +1798,7 @@ def get_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
     """
     Retrieve player statistics for NBA games.
 
-    When *game_id* is provided, uses GET /games/statistics/players to fetch
+    When *game_id* is provided, uses GET /games/statistics/players to retrieve
     in-game player stats.  When only *player_id* is given, uses
     GET /players/statistics for season-level stats.
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
@@ -1874,28 +1874,3 @@ def get_predictions(game_id=None) -> list[dict]:
         _logger.warning("get_predictions failed: %s", exc)
         return []
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-validate_api_key = validate_nba_api_key
-fetch_teams = get_teams
-fetch_games = get_games
-fetch_players = get_players
-fetch_games_today = get_todays_games
-fetch_player_stats = get_player_stats
-fetch_team_stats = get_team_stats
-fetch_injury_report = get_injury_report
-fetch_live_scores = get_live_scores
-fetch_rosters = get_rosters
-lookup_player_id = get_player_id
-fetch_player_game_log = get_player_game_log
-fetch_standings = get_standings
-fetch_news = get_news
-fetch_season_game_logs_batch = get_season_game_logs_batch
-fetch_api_key_info = get_api_key_info
-fetch_api_key_usage = get_api_key_usage
-fetch_api_key_stats = get_api_key_stats
-fetch_team_by_id = get_team_by_id
-fetch_game_odds = get_game_odds
-fetch_nba_team_stats = get_nba_team_stats
-fetch_nba_player_stats = get_nba_player_stats
-fetch_predictions = get_predictions

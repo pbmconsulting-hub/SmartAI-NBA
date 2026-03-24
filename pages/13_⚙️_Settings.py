@@ -445,7 +445,7 @@ st.subheader("🎰 Sportsbook Platforms")
 
 st.markdown(
     "Select which sportsbooks to include in analysis. "
-    "All odds are fetched from The Odds API."
+    "All odds are retrieved from The Odds API."
 )
 
 current_platforms = st.session_state.get("selected_platforms", list(_PRIMARY_PLATFORMS))

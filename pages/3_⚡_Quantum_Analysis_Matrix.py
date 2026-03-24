@@ -189,7 +189,7 @@ if not st.session_state.get("analysis_results"):
         pass  # Non-fatal — just show empty state
 
 # ─── Auto-refresh injury data if empty or stale (>4 hours) ──
-# Use a 30-minute in-session cooldown to avoid re-fetching on every
+# Use a 30-minute in-session cooldown to avoid re-loading on every
 # page navigation, while still updating when data is genuinely stale.
 _INJURY_STALE_HOURS = 4
 _INJURY_REFRESH_COOLDOWN_SECS = 1800  # 30 minutes
@@ -729,7 +729,7 @@ if run_analysis:
             st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
 
     # ── Filter to only players on real betting platforms ───────────────
-    # If live platform props have been fetched, drop synthetic-only props
+    # If live platform props have been loaded, drop synthetic-only props
     # for players who don't appear on any real betting app today.
     _live_platform_props = st.session_state.get("platform_props", [])
     if _live_platform_props:
@@ -1716,7 +1716,7 @@ if run_analysis:
 
     # ── Auto-trigger Smart Update if >20% of players are unmatched ─
     # Unmatched players use skeleton stats which reduces accuracy.
-    # Fetching fresh rosters resolves most mismatches without user action.
+    # Loading fresh rosters resolves most mismatches without user action.
     _unmatched_players = list(dict.fromkeys(
         r.get("player_name", "")
         for r in analysis_results_list
@@ -1732,8 +1732,8 @@ if run_analysis:
             f"({_unmatched_ratio*100:.0f}% of props). Triggering Smart Roster Update…"
         )
         try:
-            from data.nba_data_service import get_todays_players as _fetch_today
-            _roster_result = _fetch_today(todays_games, progress_callback=None)
+            from data.nba_data_service import get_todays_players as _get_today
+            _roster_result = _get_today(todays_games, progress_callback=None)
             if _roster_result:
                 # Re-run the full analysis now that players.csv is populated.
                 # Simply clearing the analysis cache and re-running the page gives
@@ -2799,7 +2799,7 @@ elif not run_analysis:
             st.warning(
                 "⚠️ No props loaded and no games found. "
                 "Start on the **📡 Live Games** page — click **🔄 Auto-Load Tonight's Games** "
-                "to fetch tonight's schedule and auto-generate props for all active players."
+                "to load tonight's schedule and auto-generate props for all active players."
             )
 
 # ============================================================

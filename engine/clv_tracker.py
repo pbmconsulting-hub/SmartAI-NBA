@@ -611,7 +611,7 @@ def _save_clv_record(record):
 
 def auto_update_closing_lines(days_back: int = 1) -> dict:
     """
-    Fetch recently completed game scores from The Odds API and use the
+    Retrieve recently completed game scores from The Odds API and use the
     final game total as a proxy closing-line signal to close open CLV records.
 
     This completes the CLV tracking loop:
@@ -639,8 +639,8 @@ def auto_update_closing_lines(days_back: int = 1) -> dict:
         }
     """
     try:
-        from data.odds_client import get_recent_scores as _fetch_scores
-        from data.odds_client import get_player_props as _fetch_props
+        from data.odds_client import get_recent_scores as _get_scores
+        from data.odds_client import get_player_props as _get_props
     except ImportError:
         return {"updated": 0, "skipped": 0, "errors": 0}
 
@@ -656,9 +656,9 @@ def auto_update_closing_lines(days_back: int = 1) -> dict:
     if not open_records:
         return {"updated": 0, "skipped": 0, "errors": 0}
 
-    # Fetch current player props (reflects today's closing lines)
+    # Get current player props (reflects today's closing lines)
     try:
-        live_props = _fetch_props() or []
+        live_props = _get_props() or []
     except Exception:
         live_props = []
 
@@ -672,9 +672,9 @@ def auto_update_closing_lines(days_back: int = 1) -> dict:
         if key not in prop_lookup:
             prop_lookup[key] = float(p.get("line", 0) or 0)
 
-    # Fetch recently completed game scores for context
+    # Get recently completed game scores for context
     try:
-        completed_games = _fetch_scores(days_from=max(1, min(int(days_back), 3))) or []
+        completed_games = _get_scores(days_from=max(1, min(int(days_back), 3))) or []
     except Exception:
         completed_games = []
 

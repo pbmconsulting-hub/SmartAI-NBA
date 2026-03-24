@@ -251,17 +251,17 @@ with _sim_btn_col1:
         disabled=not selected_names,
     )
 with _sim_btn_col2:
-    _fetch_logs_btn = st.button(
-        "🔄 Fetch Game Logs",
+    _load_logs_btn = st.button(
+        "🔄 Get Game Logs",
         use_container_width=True,
         help="Load the last 20 games per player for more accurate simulation",
         disabled=not selected_names,
     )
 
-# ── On-demand API-NBA game log fetch ──────────────────────
-if _fetch_logs_btn and selected_names:
-    _gl_progress = st.progress(0, text="Fetching game logs from API-NBA…")
-    _gl_fetched = 0
+# ── On-demand API-NBA game log retrieval ──────────────────────
+if _load_logs_btn and selected_names:
+    _gl_progress = st.progress(0, text="Getting game logs from API-NBA…")
+    _gl_loaded = 0
     _gl_errors  = 0
     for _gl_idx, _gl_pname in enumerate(selected_names):
         _gl_pdata = next(
@@ -270,7 +270,7 @@ if _fetch_logs_btn and selected_names:
         _gl_player_id = _gl_pdata.get("player_id", "") if _gl_pdata else ""
         _gl_progress.progress(
             (_gl_idx + 1) / len(selected_names),
-            text=f"Fetching logs for {_gl_pname}…",
+            text=f"Getting logs for {_gl_pname}…",
         )
         if _gl_player_id:
             try:
@@ -280,8 +280,8 @@ if _fetch_logs_btn and selected_names:
                 _logs = _ldf_gl(_gl_player_id, last_n_games=20)
                 if _logs:
                     _gl_save(_gl_pname, _logs)
-                    _gl_fetched += 1
-                # Also fetch recent form trend for the player
+                    _gl_loaded += 1
+                # Also get recent form trend for the player
                 try:
                     _form = _ldf_form(_gl_player_id, last_n_games=10)
                     if _form and _gl_pdata:
@@ -289,21 +289,21 @@ if _fetch_logs_btn and selected_names:
                         _gl_pdata["recent_trend"] = _form.get("trend", "neutral")
                         _gl_pdata["recent_trend_emoji"] = _form.get("trend_emoji", "➡️")
                 except Exception as _form_exc:
-                    _logger.warning("Recent form fetch failed for %s: %s", _gl_pname, _form_exc)
+                    _logger.warning("Recent form request failed for %s: %s", _gl_pname, _form_exc)
             except Exception as _gl_exc:
-                _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
+                _logger.warning("Game log request failed for %s: %s", _gl_pname, _gl_exc)
                 _gl_errors += 1
         else:
             _gl_errors += 1
     _gl_progress.empty()
-    if _gl_fetched:
+    if _gl_loaded:
         st.success(
-            f"✅ Game logs fetched for **{_gl_fetched}** player(s). "
+            f"✅ Game logs loaded for **{_gl_loaded}** player(s). "
             "Re-run simulation to use the fresh data."
         )
     if _gl_errors:
         st.warning(
-            f"⚠️ Could not fetch logs for {_gl_errors} player(s) — "
+            f"⚠️ Could not load logs for {_gl_errors} player(s) — "
             "player IDs may be missing. Run a Smart Update on the Data Feed page first."
         )
 

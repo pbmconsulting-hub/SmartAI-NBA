@@ -277,7 +277,7 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
         # The function should NOT enforce an intake cap anymore
         self.assertNotIn("MAX_PROP_CAPACITY", source)
 
-    def test_async_fetch_function_exists(self):
+    def test_async_get_function_exists(self):
         from data.sportsbook_service import get_all_sportsbooks_async
         import asyncio
         self.assertTrue(asyncio.iscoroutinefunction(get_all_sportsbooks_async))

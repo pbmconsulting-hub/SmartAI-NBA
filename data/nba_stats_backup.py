@@ -159,7 +159,7 @@ def _rows_to_dicts(result_set: dict) -> list[dict]:
 
 def get_team_stats_backup(season: str | None = None) -> list[dict]:
     """
-    Fetch team stats from the free NBA.com stats endpoint.
+    Retrieve team stats from the free NBA.com stats endpoint.
 
     Returns data in the same schema as API-NBA ``get_team_stats()``:
         team_abbreviation, team_name, pace, offensive_rating,
@@ -229,7 +229,7 @@ def get_team_stats_backup(season: str | None = None) -> list[dict]:
 
 def get_players_backup(team_id=None, season: str | None = None) -> list[dict]:
     """
-    Fetch NBA players from the free NBA.com stats endpoint.
+    Retrieve NBA players from the free NBA.com stats endpoint.
 
     Returns data in the same schema as API-NBA ``get_players()``:
         id, name, team_id (optional filtering)
@@ -278,7 +278,7 @@ def get_players_backup(team_id=None, season: str | None = None) -> list[dict]:
 
 def get_player_stats_backup(season: str | None = None) -> list[dict]:
     """
-    Fetch player season averages from the free NBA.com stats endpoint.
+    Retrieve player season averages from the free NBA.com stats endpoint.
 
     Returns data in the same schema as API-NBA ``get_player_stats()``:
         player_id, name, team, position,
@@ -352,7 +352,7 @@ def get_nba_team_stats_backup(
     team_id=None, season: str | None = None
 ) -> list[dict]:
     """
-    Fetch per-team statistics from the free NBA.com stats endpoint.
+    Retrieve per-team statistics from the free NBA.com stats endpoint.
 
     Returns raw stat rows (same schema as API-NBA ``get_nba_team_stats()``).
     """
@@ -396,7 +396,7 @@ def get_nba_player_stats_backup(
     player_id=None, game_id=None, season: str | None = None
 ) -> list[dict]:
     """
-    Fetch per-player statistics from the free NBA.com stats endpoint.
+    Retrieve per-player statistics from the free NBA.com stats endpoint.
 
     Returns raw stat rows (same schema as API-NBA ``get_nba_player_stats()``).
     """
@@ -435,10 +435,3 @@ def get_nba_player_stats_backup(
     )
     return rows
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-fetch_team_stats_fallback = get_team_stats_backup
-fetch_players_fallback = get_players_backup
-fetch_player_stats_fallback = get_player_stats_backup
-fetch_nba_team_stats_fallback = get_nba_team_stats_backup
-fetch_nba_player_stats_fallback = get_nba_player_stats_backup

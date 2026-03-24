@@ -240,7 +240,7 @@ elif not todays_games and analysis_results:
 elif not todays_games and not analysis_results:
     st.info(
         "💡 No games loaded yet. "
-        "Go to **📡 Live Games** to fetch tonight's NBA slate, "
+        "Go to **📡 Live Games** to load tonight's NBA slate, "
         "then run **⚡ Neural Analysis** to generate prop predictions."
     )
 

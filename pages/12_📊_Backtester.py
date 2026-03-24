@@ -117,14 +117,14 @@ with st.sidebar:
     # ── Historical data refresh ───────────────────────────────
     st.subheader("📡 Historical Data")
     st.caption(
-        "Auto-fetch game logs for tonight's players "
+        "Auto-load game logs for tonight's players "
         "and update CLV closing lines."
     )
     refresh_hist_btn = st.button(
         "🔄 Refresh Historical Data",
         use_container_width=True,
         disabled=not _HIST_REFRESH_AVAILABLE,
-        help="Fetches the last 30 games per player for all teams playing tonight.",
+        help="Retrieves the last 30 games per player for all teams playing tonight.",
     )
 
 # ── Info if backtester not available ─────────────────────────
@@ -134,11 +134,11 @@ if not _BACKTESTER_AVAILABLE:
 
 # ── Historical Data Refresh Handler ──────────────────────────
 if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
-    _prog = st.progress(0, text="Fetching historical game logs…")
+    _prog = st.progress(0, text="Loading historical game logs…")
     def _prog_cb(current, total, msg):
         _prog.progress(min(current / max(total, 1), 1.0), text=msg)
 
-    with st.spinner("Fetching historical game logs from API-NBA…"):
+    with st.spinner("Loading historical game logs from API-NBA…"):
         todays_games = st.session_state.get("todays_games", [])
         hist_result = _refresh_hist(games=todays_games, last_n_games=30, progress_callback=_prog_cb)
 
@@ -160,7 +160,7 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
         )
     else:
         st.info(
-            "ℹ️ No game logs fetched. This typically means the data feed is "
+            "ℹ️ No game logs retrieved. This typically means the data feed is "
             "temporarily unavailable, or players don't have IDs in the loaded data."
         )
 

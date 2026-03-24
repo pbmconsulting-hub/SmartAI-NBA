@@ -637,7 +637,7 @@ AMBIENT_POOLS = {
     "page_live_games": [
         "Hit that Load Games button and let me COOK!",
         "Tonight's matchups are WAITING. Load them up RIGHT NOW!",
-        "Rosters auto-load when you fetch games. It's AUTOMATIC!",
+        "Rosters auto-load when you retrieve games. It's AUTOMATIC!",
         "I need those games loaded so I can find the EDGES!",
         "The slate is out there. Bring it to me and I'll DISSECT it!",
         "Loading games pulls rosters, injuries, and matchups. ALL of it!",

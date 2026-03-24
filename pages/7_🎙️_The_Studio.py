@@ -859,7 +859,7 @@ elif mode == "🎰 BUILD MY BETS":
                 )
             else:
                 st.info(
-                    "📡 Load games on **📡 Live Games** and fetch props, "
+                    "📡 Load games on **📡 Live Games** and get live props, "
                     "or run **⚡ Neural Analysis** to populate data for bet building!"
                 )
 

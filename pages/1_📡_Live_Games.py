@@ -109,20 +109,20 @@ with st.expander("📖 How to Use This Page", expanded=False):
     ### Live Games — Two Independent Workflows
     
     **🔄 Auto-Load Tonight's Games** (recommended first step):
-    1. Click this button to fetch tonight's NBA schedule
+    1. Click this button to load tonight's NBA schedule
     2. It automatically pulls current rosters, player stats, and team stats
     3. Props are auto-generated from season averages for all active players
     4. Takes ~30-60 seconds depending on the number of games
     
-    **📊 Fetch Live Platform Props & Analyze** (for real prop lines):
+    **📊 Get Live Platform Props & Analyze** (for real prop lines):
     1. Select which platforms to include (all major sportsbooks via The Odds API)
     2. Optionally configure Smart Filter settings
-    3. Click the button to fetch REAL live prop lines from those platforms
-    4. The engine automatically runs Neural Analysis on all fetched props
+    3. Click the button to get REAL live prop lines from those platforms
+    4. The engine automatically runs Neural Analysis on all retrieved props
     5. Results are merged with any props from Auto-Load
     
     💡 **Pro Tips:**
-    - Use Auto-Load first, then Fetch Platform Props for the most complete analysis
+    - Use Auto-Load first, then Get Platform Props for the most complete analysis
     - Smart Filter reduces noise by deduplicating props and removing injured players
     - Props from both sources are merged — no data is lost
     """)
@@ -131,17 +131,17 @@ with st.expander("📖 How to Use This Page", expanded=False):
 # SECTION: Action Buttons — Two Independent Workflows
 # ─────────────────────────────────────────────────────────────
 # BUTTON 1 — Auto-Load Tonight's Games:
-#   Fetches the schedule, rosters, player/team stats from API-NBA API,
+#   Retrieves the schedule, rosters, player/team stats from API-NBA API,
 #   and enriches with Odds API consensus lines. Use this as a first step
 #   or to refresh data.
 #
-# BUTTON 2 — Fetch Platform Props & Analyze (INDEPENDENT):
-#   Fetches REAL live prop lines from all major sportsbooks, runs them
+# BUTTON 2 — Get Platform Props & Analyze (INDEPENDENT):
+#   Retrieves REAL live prop lines from all major sportsbooks, runs them
 #   through Neural Analysis, and shows the best bets grouped by
 #   platform. Does NOT depend on Auto-Load.
 #
 # BUTTON 3 — ⚡ One-Click Setup (COMBINED):
-#   Runs BOTH Auto-Load AND Fetch Platform Props in one click.
+#   Runs BOTH Auto-Load AND Get Platform Props in one click.
 #   This is the recommended action for new sessions.
 # ============================================================
 
@@ -155,7 +155,7 @@ st.markdown("""
     ⚡ One-Click Setup — Recommended
   </div>
   <div style="color:#8a9bb8;font-size:0.84rem;margin-top:4px;">
-    Loads tonight's games + fetches live prop lines from all platforms in one step
+    Loads tonight's games + retrieves live prop lines from all platforms in one step
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -167,11 +167,11 @@ with _one_click_col:
         key="one_click_setup_btn",
         type="primary",
         width="stretch",
-        help="Runs BOTH Auto-Load (tonight's games + rosters + stats) AND Fetch Live Props from all platforms in one click.",
+        help="Runs BOTH Auto-Load (tonight's games + rosters + stats) AND Get Live Props from all platforms in one click.",
     )
 with _one_click_info:
     st.caption(
-        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Fetch Live Props from all major sportsbooks. "
+        "**⚡ One-Click Setup** = Auto-Load Tonight's Games **+** Get Live Props from all major sportsbooks. "
         "Best choice for a fresh session — everything in one click."
     )
 
@@ -187,7 +187,7 @@ st.markdown("""
   </span><br>
   <span style="color:#8a9bb8;font-size:0.84rem;">
     <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
-    <strong style="color:#e8f0ff;">📊 Fetch Platform Props</strong> = <em>real live lines</em> from all major sportsbooks → Neural Analysis
+    <strong style="color:#e8f0ff;">📊 Get Platform Props</strong> = <em>real live lines</em> from all major sportsbooks → Neural Analysis
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -199,23 +199,23 @@ with auto_col:
         "🔄 Auto-Load Tonight's Games",
         width="stretch",
         type="primary",
-        help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
+        help="ONE CLICK: load tonight's games + current rosters + player stats + team stats",
     )
 
 with load_col:
     load_players_clicked = st.button(
-        "⚡ Fetch Players Only",
+        "⚡ Load Players Only",
         width="stretch",
-        help="Re-fetch player stats for tonight's teams (games must already be loaded)",
+        help="Re-load player stats for tonight's teams (games must already be loaded)",
     )
 
 with info_col:
     st.caption(
         "**Auto-Load** = games + rosters + stats. "
-        "**Fetch Players Only** = refresh player data only."
+        "**Load Players Only** = refresh player data only."
     )
 
-# ── Platform Selector + Fetch Platform Props button ────────────────────────
+# ── Platform Selector + Get Platform Props button ────────────────────────
 st.markdown("---")
 
 # Platform Props row — visually distinct section
@@ -223,10 +223,10 @@ st.markdown("""
 <div style="margin-bottom:6px;">
   <span style="color:#c800ff;font-size:1.05rem;font-weight:800;font-family:'Orbitron',sans-serif;
                text-shadow:0 0 10px rgba(200,0,255,0.5);">
-    📊 Fetch Live Platform Props & Analyze
+    📊 Get Live Platform Props & Analyze
   </span>
   <span style="color:#8a9bb8;font-size:0.82rem;margin-left:10px;">
-    — Fetches <em>real</em> prop lines from live data, not season-average estimates
+    — Retrieves <em>real</em> prop lines from live data, not season-average estimates
   </span>
 </div>
 """, unsafe_allow_html=True)
@@ -299,10 +299,10 @@ with st.expander("⚙️ Platform Settings", expanded=False):
 with _load_btn_col:
     _any_platform_selected = _include_pp or _include_ud or _include_dk
     platform_props_clicked = st.button(
-        "📊 Fetch Live Props & Analyze",
+        "📊 Get Live Props & Analyze",
         width="stretch",
         type="primary",
-        help="Fetch REAL live prop lines from selected platforms, then run full Neural Analysis. Works independently — no need to Auto-Load first.",
+        help="Get REAL live prop lines from selected platforms, then run full Neural Analysis. Works independently — no need to Auto-Load first.",
         disabled=not _any_platform_selected,
         key="platform_props_btn",
     )
@@ -314,7 +314,7 @@ if auto_load_clicked:
     status_text = st.empty()
 
     try:
-        status_text.text("⏳ Step 1/3 — Fetching tonight's games...")
+        status_text.text("⏳ Step 1/3 — Loading tonight's games...")
         progress_bar.progress(5)
         games = get_todays_games()
 
@@ -330,7 +330,7 @@ if auto_load_clicked:
         else:
             st.session_state["todays_games"] = games
 
-            status_text.text(f"⏳ Step 2/3 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
+            status_text.text(f"⏳ Step 2/3 — Loading rosters, stats & injuries for {len(games)} game(s)...")
             progress_bar.progress(25)
 
             players_ok = get_todays_players(games)
@@ -345,15 +345,15 @@ if auto_load_clicked:
                 except Exception as _inj_load_err:
                     _logger.warning(f"Auto-load: could not load injury map: {_inj_load_err}")
 
-            # Step 3: Fetch team stats so teams.csv has real data
-            status_text.text("⏳ Step 3/3 — Fetching team stats & standings...")
+            # Step 3: Load team stats so teams.csv has real data
+            status_text.text("⏳ Step 3/3 — Loading team stats & standings...")
             progress_bar.progress(65)
             teams_ok = False
             try:
                 from data.nba_data_service import get_team_stats as _ldf_team_stats
                 teams_ok = _ldf_team_stats()
             except Exception as _ts_err:
-                _logger.warning(f"Auto-load: team stats fetch failed (non-fatal): {_ts_err}")
+                _logger.warning(f"Auto-load: team stats load failed (non-fatal): {_ts_err}")
 
             # Pre-load standings into session state for other pages
             try:
@@ -399,7 +399,7 @@ if load_players_clicked:
             "or add games manually below."
         )
     else:
-        progress_bar2 = st.progress(0, text="Fetching player data for tonight's teams...")
+        progress_bar2 = st.progress(0, text="Loading player data for tonight's teams...")
         status_text2 = st.empty()
 
         def _on_players_progress(current, total, message):
@@ -407,7 +407,7 @@ if load_players_clicked:
             progress_bar2.progress(frac, text=message)
             status_text2.caption(message)
 
-        with st.spinner("⚡ Fetching current rosters and player stats..."):
+        with st.spinner("⚡ Loading current rosters and player stats..."):
             success = get_todays_players(
                 todays_games_for_fetch,
                 progress_callback=_on_players_progress,
@@ -421,14 +421,14 @@ if load_players_clicked:
             st.rerun()
         else:
             st.error(
-                "❌ Could not fetch player stats. Check your internet connection "
+                "❌ Could not load player stats. Check your internet connection "
                 "or try the Update Data page."
             )
 
 # ============================================================
 # SECTION: Platform Props & Analyze Button (INDEPENDENT PIPELINE)
 # This is completely separate from Auto-Load. It:
-# 1. Fetches live props from selected platforms
+# 1. Retrieves live props from selected platforms
 # 2. Applies Smart Filter to reduce prop count
 # 3. Runs each prop through the full Neural Analysis engine
 # 4. Displays best bets grouped by platform
@@ -442,7 +442,7 @@ if platform_props_clicked:
     _platforms_label = ", ".join(filter(None, [
         "All Major Sportsbooks" if _include_dk else "",
     ]))
-    st.markdown(f"Fetching live props from **{_platforms_label}** and running Neural Analysis…")
+    st.markdown(f"Loading live props from **{_platforms_label}** and running Neural Analysis…")
 
     pp_bar = st.progress(0)
     pp_status = st.empty()
@@ -451,7 +451,7 @@ if platform_props_clicked:
         # ── Step 0: Auto-load games if not already loaded ──────────────
         _todays_games = st.session_state.get("todays_games", [])
         if not _todays_games:
-            pp_status.text("⏳ 0/5 — No games loaded. Auto-fetching tonight's schedule…")
+            pp_status.text("⏳ 0/5 — No games loaded. Auto-loading tonight's schedule…")
             pp_bar.progress(2)
             from data.nba_data_service import get_todays_games as _auto_get_games
             _todays_games = _auto_get_games()
@@ -465,13 +465,13 @@ if platform_props_clicked:
         from data.data_manager import load_players_data as _lp_check
         _check_players = _lp_check()
         if not _check_players and _todays_games:
-            pp_status.text("⏳ 0/5 — No player data. Fetching rosters for tonight's teams…")
+            pp_status.text("⏳ 0/5 — No player data. Loading rosters for tonight's teams…")
             pp_bar.progress(5)
             from data.nba_data_service import get_todays_players as _auto_get_players
             _auto_get_players(_todays_games)
 
-        # ── Step 1: Fetch props from selected platforms ────────────────
-        pp_status.text("⏳ 1/5 — Fetching props from selected platforms…")
+        # ── Step 1: Get props from selected platforms ────────────────
+        pp_status.text("⏳ 1/5 — Retrieving props from selected platforms…")
         pp_bar.progress(10)
 
         from data.sportsbook_service import (
@@ -488,7 +488,7 @@ if platform_props_clicked:
         )
 
         raw_count = len(all_platform_props)
-        pp_status.text(f"⏳ 2/5 — Fetched {raw_count:,} props. Applying Smart Filter…")
+        pp_status.text(f"⏳ 2/5 — Retrieved {raw_count:,} props. Applying Smart Filter…")
         pp_bar.progress(20)
 
         # ── Step 2: Smart Filter (optional) ───────────────────────────
@@ -507,7 +507,7 @@ if platform_props_clicked:
                 stat_types=_stat_sel if _stat_sel else None,
             )
             st.info(
-                f"🧠 **Smart Filter:** Fetched **{raw_count:,}** props → "
+                f"🧠 **Smart Filter:** Retrieved **{raw_count:,}** props → "
                 f"reduced to **{_filter_summary['final_count']:,}** high-signal props "
                 f"(**{_filter_summary['reduction_pct']:.0f}% reduction**) | "
                 f"After team filter: {_filter_summary['after_team_filter']:,} · "
@@ -594,7 +594,7 @@ if platform_props_clicked:
         _teams_data = _load_teams()
 
         analyzed_props: list = []
-        games_context = _todays_games  # Use auto-fetched games from Step 0
+        games_context = _todays_games  # Use auto-loaded games from Step 0
         injury_map = st.session_state.get("injury_status_map", {})
 
         _PLATFORM_STAT_MAP = {
@@ -886,7 +886,7 @@ if platform_props_clicked:
                 "- No player data loaded — try clicking **Auto-Load Tonight's Games** first"
             )
         else:
-            st.success("✅ Props fetched and merged! Go to ⚡ Neural Analysis to run analysis on all loaded props.")
+            st.success("✅ Props retrieved and merged! Go to ⚡ Neural Analysis to run analysis on all loaded props.")
             from styles.theme import get_bet_card_css, get_bet_card_html, get_summary_cards_html
             st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 
@@ -948,7 +948,7 @@ if platform_props_clicked:
         pp_bar.empty()
         pp_status.empty()
         # Silently ignore WebSocket/stream errors caused by user navigating away
-        # mid-fetch — these are not real failures, just closed connections.
+        # mid-load — these are not real failures, just closed connections.
         _err_str = str(_platform_err)
         if "WebSocketClosedError" in _err_str or "StreamClosedError" in _err_str:
             pass  # Connection closed — user navigated away; nothing to show
@@ -967,13 +967,13 @@ if platform_props_clicked:
 # ============================================================
 
 # ============================================================
-# SECTION: One-Click Setup (Auto-Load + Fetch Live Props combined)
+# SECTION: One-Click Setup (Auto-Load + Get Live Props combined)
 # ============================================================
 
 if one_click_setup_clicked:
     st.divider()
     st.subheader("⚡ One-Click Setup")
-    st.markdown("Running **Auto-Load** + **Fetch Live Props** in one step…")
+    st.markdown("Running **Auto-Load** + **Get Live Props** in one step…")
     _oc_bar = st.progress(0)
     _oc_status = st.empty()
 
@@ -1001,7 +1001,7 @@ if one_click_setup_clicked:
             _oc_games = st.session_state.get("todays_games", [])
 
         _oc_bar.progress(25)
-        _oc_status.text(f"⏳ Phase 1/3 — {len(_oc_games)} game(s) loaded. Fetching player data…")
+        _oc_status.text(f"⏳ Phase 1/3 — {len(_oc_games)} game(s) loaded. Loading player data…")
 
         _oc_players_ok = _oc_get_players(_oc_games) if _oc_games else False
         _oc_bar.progress(40)
@@ -1014,14 +1014,14 @@ if one_click_setup_clicked:
         except Exception:
             pass
 
-        # ── Phase 2: Fetch team stats & standings ─────────────────────
-        _oc_status.text("⏳ Phase 2/3 — Fetching team stats & standings…")
+        # ── Phase 2: Load team stats & standings ─────────────────────
+        _oc_status.text("⏳ Phase 2/3 — Loading team stats & standings…")
         _oc_bar.progress(50)
 
         try:
             _oc_get_teams()
         except Exception as _oc_ts_err:
-            _logger.debug(f"One-Click: team stats fetch failed (non-fatal): {_oc_ts_err}")
+            _logger.debug(f"One-Click: team stats load failed (non-fatal): {_oc_ts_err}")
 
         try:
             _oc_standings = _oc_get_standings()
@@ -1032,8 +1032,8 @@ if one_click_setup_clicked:
 
         _oc_bar.progress(60)
 
-        # ── Phase 3: Fetch Live Platform Props ────────────────────────
-        _oc_status.text("⏳ Phase 3/3 — Fetching live prop lines from all platforms…")
+        # ── Phase 3: Get Live Platform Props ────────────────────────
+        _oc_status.text("⏳ Phase 3/3 — Retrieving live prop lines from all platforms…")
 
         try:
             from data.sportsbook_service import get_all_sportsbook_props as _oc_get_sportsbook_props
@@ -1051,11 +1051,11 @@ if one_click_setup_clicked:
                     _oc_save_csv(_oc_platform_props)
                 except Exception:
                     pass
-                _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props fetched"
+                _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props retrieved"
             else:
                 _oc_platform_msg = "⚠️ No live platform props returned (data may be unavailable)"
         except Exception as _oc_plat_err:
-            _oc_platform_msg = f"⚠️ Platform fetch failed: {_oc_plat_err}"
+            _oc_platform_msg = f"⚠️ Platform retrieval failed: {_oc_plat_err}"
 
         _oc_bar.progress(100)
         _oc_status.empty()
@@ -1392,7 +1392,7 @@ else:
         '🚫 No Games Loaded Tonight</div>'
         '<div style="color:#c0d0e8;">'
         'No NBA games have been loaded yet. Click <strong>🔄 Auto-Load Tonight\'s Games</strong> above to '
-        'automatically fetch tonight\'s slate, player stats, injury reports, and props in one click.<br>'
+        'automatically load tonight\'s slate, player stats, injury reports, and props in one click.<br>'
         '<span style="color:#8b949e;font-size:0.85rem;">Or use the <strong>➕ Manually Add Games</strong> form below.</span>'
         '</div>'
         '</div>',
@@ -1532,7 +1532,7 @@ with st.expander("💡 Tips for Best Results"):
 
     - **Total (O/U):** The Vegas over/under for the game (usually 210–235).
 
-    - **Auto-Load**: Fetches live game data + team records (W-L, streaks, standings),
+    - **Auto-Load**: Retrieves live game data + team records (W-L, streaks, standings),
       then enriches with consensus lines from multiple bookmakers.
 
     - **Key Players**: Loaded from your player database. Go to **Update Data** to

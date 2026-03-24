@@ -395,7 +395,7 @@ def _build_team_lookup(events: list[dict]) -> dict[str, str]:
 
 def get_sports(api_key: str | None = None) -> list[dict] | None:
     """
-    Fetch all in-season sports from The Odds API.
+    Get all in-season sports from The Odds API.
 
     Endpoint: GET /v4/sports/?apiKey={apiKey}
 
@@ -438,7 +438,7 @@ def get_sports(api_key: str | None = None) -> list[dict] | None:
 
 def get_events(api_key: str | None = None) -> list[dict]:
     """
-    Fetch all live and upcoming NBA events from The Odds API.
+    Get all live and upcoming NBA events from The Odds API.
 
     Endpoint: GET /v4/sports/basketball_nba/events
 
@@ -469,7 +469,7 @@ def get_event_odds(
     api_key: str | None = None,
 ) -> dict:
     """
-    Fetch odds for any supported markets on a single NBA event.
+    Get odds for any supported markets on a single NBA event.
 
     Endpoint: GET /v4/sports/basketball_nba/events/{eventId}/odds
 
@@ -520,7 +520,7 @@ def get_event_odds(
 
 def get_game_odds(api_key: str | None = None) -> list[dict]:
     """
-    Fetch NBA game-level odds (moneyline, spread, totals) from The Odds API.
+    Get NBA game-level odds (moneyline, spread, totals) from The Odds API.
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -600,12 +600,12 @@ def get_game_odds(api_key: str | None = None) -> list[dict]:
 
 def get_player_props(api_key: str | None = None) -> list[dict]:
     """
-    Fetch NBA player prop lines from The Odds API and normalise them into
+    Get NBA player prop lines from The Odds API and normalise them into
     the same format used by sportsbook_service throughout the application.
 
     Each returned dict has these keys (matching sportsbook_service output):
         player_name, team, stat_type, line, platform,
-        game_date, fetched_at, over_odds, under_odds
+        game_date, retrieved_at, over_odds, under_odds
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -632,7 +632,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
 
         team_lookup = _build_team_lookup(events)
         markets_param = ",".join(_PROP_MARKETS)
-        fetched_at = datetime.datetime.utcnow().isoformat()
+        retrieved_at = datetime.datetime.utcnow().isoformat()
         game_date  = _today_str()
 
         all_props: list[dict] = []
@@ -723,7 +723,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
                                 "line":        line if line is not None else 0.0,
                                 "platform":    platform_name,
                                 "game_date":   game_date,
-                                "fetched_at":  fetched_at,
+                                "retrieved_at":  retrieved_at,
                                 "over_odds":   over_odds,
                                 "under_odds":  under_odds,
                             })
@@ -873,7 +873,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
 def get_recent_scores(days_from: int = 1,
                         api_key: str | None = None) -> list[dict]:
     """
-    Fetch recently completed NBA game scores from The Odds API.
+    Get recently completed NBA game scores from The Odds API.
 
     The Odds API ``/scores`` endpoint returns the results of games that
     finished within the last *days_from* calendar days (1–3 days max on
@@ -884,7 +884,7 @@ def get_recent_scores(days_from: int = 1,
     * Cross-reference injury / rest-day impact on final scores
 
     Args:
-        days_from: How many days back to fetch (1 = yesterday, 2 = 2 days
+        days_from: How many days back to retrieve (1 = yesterday, 2 = 2 days
                    ago, up to 3 on the free tier).
         api_key:   Optional explicit key; falls back to session state / env.
 
@@ -982,12 +982,3 @@ def calculate_implied_probability(american_odds: float) -> float:
     """
     return american_odds_to_implied_probability(american_odds) * 100
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-validate_api_key = validate_odds_api_key
-fetch_sports = get_sports
-fetch_events = get_events
-fetch_event_odds = get_event_odds
-fetch_game_odds = get_game_odds
-fetch_player_props = get_player_props
-fetch_recent_scores = get_recent_scores
