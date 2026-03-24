@@ -687,5 +687,270 @@ class TestApiSportsAuthentication(unittest.TestCase):
                          "Must not use old Bearer token authentication")
 
 
+# ── Section 8: get_standings and get_news endpoint validation ─────────────────
+
+class TestStandingsEndpoint(unittest.TestCase):
+    """Verify get_standings uses the correct endpoint."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_get_standings_exists(self):
+        """get_standings function must exist."""
+        self.assertIn("def get_standings(", self.src)
+
+    def test_get_standings_url(self):
+        """get_standings must call /standings."""
+        idx = self.src.find("def get_standings(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertTrue(
+            "/standings" in snippet or "ENDPOINT_STANDINGS" in snippet,
+            "get_standings must use /standings or ENDPOINT_STANDINGS",
+        )
+
+    def test_get_standings_uses_endpoint_constant(self):
+        """get_standings should reference ENDPOINT_STANDINGS."""
+        idx = self.src.find("def get_standings(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("ENDPOINT_STANDINGS", snippet)
+
+
+class TestStandingsRuntime(unittest.TestCase):
+    """Runtime tests for get_standings."""
+
+    def tearDown(self):
+        """Clear standings cache entries to avoid polluting other tests."""
+        from data.nba_api_client import _API_CACHE
+        keys_to_remove = [k for k in _API_CACHE if "/standings" in k]
+        for k in keys_to_remove:
+            del _API_CACHE[k]
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_standings, _API_CACHE
+        # Remove only the standings cache key (not the entire cache)
+        keys_to_remove = [k for k in _API_CACHE if "/standings" in k]
+        for k in keys_to_remove:
+            del _API_CACHE[k]
+
+        mock_request.return_value = {
+            "response": [[
+                {"team": {"name": "Boston Celtics", "abbreviation": "BOS"},
+                 "games": {"win": {"total": 50}, "lose": {"total": 12}},
+                 "group": {"name": "Eastern Conference"}},
+            ]]
+        }
+        result = get_standings()
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_standings, _API_CACHE
+        keys_to_remove = [k for k in _API_CACHE if "/standings" in k]
+        for k in keys_to_remove:
+            del _API_CACHE[k]
+
+        result = get_standings()
+        self.assertEqual(result, [])
+
+
+class TestNewsEndpoint(unittest.TestCase):
+    """Verify get_news uses the correct endpoint."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_get_news_exists(self):
+        """get_news function must exist."""
+        self.assertIn("def get_news(", self.src)
+
+    def test_get_news_url(self):
+        """get_news must call /news."""
+        idx = self.src.find("def get_news(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1000]
+        self.assertTrue(
+            "/news" in snippet or "ENDPOINT_NEWS" in snippet,
+            "get_news must use /news or ENDPOINT_NEWS",
+        )
+
+    def test_get_news_uses_endpoint_constant(self):
+        """get_news should reference ENDPOINT_NEWS."""
+        idx = self.src.find("def get_news(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1000]
+        self.assertIn("ENDPOINT_NEWS", snippet)
+
+    def test_get_news_has_limit_param(self):
+        """get_news must accept limit parameter."""
+        idx = self.src.find("def get_news(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 300]
+        self.assertIn("limit", snippet)
+
+
+class TestNewsRuntime(unittest.TestCase):
+    """Runtime tests for get_news."""
+
+    def tearDown(self):
+        """Clear news cache entries to avoid polluting other tests."""
+        from data.nba_api_client import _API_CACHE
+        keys_to_remove = [k for k in _API_CACHE if "/news" in k]
+        for k in keys_to_remove:
+            del _API_CACHE[k]
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_news
+        mock_request.return_value = [
+            {"title": "LeBron rests", "body": "Load management", "playerName": "LeBron James",
+             "teamAbbreviation": "LAL", "publishedAt": "2026-03-24T10:00:00Z",
+             "category": "injury", "impact": "high"},
+        ]
+        result = get_news(limit=5)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["title"], "LeBron rests")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_news
+        result = get_news()
+        self.assertEqual(result, [])
+
+
+# ── Section 9: ENDPOINT_* constants are all covered ──────────────────────────
+
+class TestAllEndpointConstantsCovered(unittest.TestCase):
+    """Verify every ENDPOINT_* constant in the API client maps to a get function."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_every_endpoint_has_a_get_function(self):
+        """Each ENDPOINT_* constant must be referenced by a get_* function body."""
+        import re
+        endpoint_pattern = re.compile(r'^(ENDPOINT_\w+)\s*=\s*["\'](.+?)["\']', re.MULTILINE)
+        endpoints = endpoint_pattern.findall(self.src)
+        self.assertGreater(len(endpoints), 0, "No ENDPOINT_* constants found")
+
+        for const_name, path in endpoints:
+            # The constant name must appear in at least one function body
+            # (not counting the definition line itself)
+            uses = [
+                line.strip() for line in self.src.splitlines()
+                if const_name in line and not line.strip().startswith(f"{const_name} =")
+                and not line.strip().startswith("#")
+            ]
+            self.assertGreater(
+                len(uses), 0,
+                f"{const_name} ({path}) is defined but never used in any function",
+            )
+
+    def test_verify_script_covers_all_api_sports_endpoints(self):
+        """The verify script must test every API-Basketball endpoint path."""
+        verify_path = pathlib.Path(__file__).parent.parent / "scripts" / "verify_api_endpoints.py"
+        verify_src = verify_path.read_text(encoding="utf-8")
+
+        import re
+        endpoint_pattern = re.compile(r'^(ENDPOINT_\w+)\s*=\s*["\'](.+?)["\']', re.MULTILINE)
+        endpoints = endpoint_pattern.findall(self.src)
+
+        missing = []
+        for const_name, path in endpoints:
+            # Verify the path appears in the verify script
+            if path not in verify_src:
+                missing.append(f"{const_name} ({path})")
+
+        self.assertEqual(
+            missing, [],
+            f"Verify script missing these API-Basketball endpoints: {missing}",
+        )
+
+
+class TestAllOddsEndpointConstantsCovered(unittest.TestCase):
+    """Verify every ENDPOINT_* constant in odds_client.py maps to a get function."""
+
+    def setUp(self):
+        oa_path = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
+        self.src = oa_path.read_text(encoding="utf-8")
+
+    def test_every_odds_endpoint_has_a_function(self):
+        """Each ENDPOINT_* constant in odds_client must be referenced in a function."""
+        import re
+        endpoint_pattern = re.compile(r'^(ENDPOINT_\w+)\s*=', re.MULTILINE)
+        endpoints = endpoint_pattern.findall(self.src)
+        self.assertGreater(len(endpoints), 0, "No ENDPOINT_* constants found in odds_client")
+
+        for const_name in endpoints:
+            uses = [
+                line.strip() for line in self.src.splitlines()
+                if const_name in line and not line.strip().startswith(f"{const_name} =")
+                and not line.strip().startswith("#")
+            ]
+            self.assertGreater(
+                len(uses), 0,
+                f"{const_name} is defined but never used in odds_client.py",
+            )
+
+
+# ── Section 10: Fallback endpoint URL validation ─────────────────────────────
+
+class TestNbaStatsBackupEndpoints(unittest.TestCase):
+    """Verify the nba_stats_backup fallback uses correct stats.nba.com URLs."""
+
+    def setUp(self):
+        fb_path = pathlib.Path(__file__).parent.parent / "data" / "nba_stats_backup.py"
+        self.src = fb_path.read_text(encoding="utf-8")
+
+    def test_base_url_is_stats_nba_com(self):
+        """_NBA_STATS_BASE must be https://stats.nba.com/stats."""
+        self.assertIn("https://stats.nba.com/stats", self.src)
+
+    def test_leaguedashteamstats_endpoint(self):
+        """Module must call leaguedashteamstats for team stats."""
+        self.assertIn("leaguedashteamstats", self.src)
+
+    def test_leaguedashplayerstats_endpoint(self):
+        """Module must call leaguedashplayerstats for player stats."""
+        self.assertIn("leaguedashplayerstats", self.src)
+
+    def test_commonallplayers_endpoint(self):
+        """Module must call commonallplayers for player lists."""
+        self.assertIn("commonallplayers", self.src)
+
+    def test_required_headers_present(self):
+        """Fallback must include x-nba-stats-origin and x-nba-stats-token headers."""
+        self.assertIn("x-nba-stats-origin", self.src)
+        self.assertIn("x-nba-stats-token", self.src)
+
+
+class TestRosterEngineCdnEndpoints(unittest.TestCase):
+    """Verify roster_engine CDN injury fallback URLs."""
+
+    def setUp(self):
+        re_path = pathlib.Path(__file__).parent.parent / "data" / "roster_engine.py"
+        self.src = re_path.read_text(encoding="utf-8")
+
+    def test_cdn_injuries_url(self):
+        """RosterEngine must try cdn.nba.com injuries.json."""
+        self.assertIn("cdn.nba.com/static/json/staticData/injuries.json", self.src)
+
+    def test_cdn_headline_injuries_url(self):
+        """RosterEngine must try cdn.nba.com headlineinjuries.json."""
+        self.assertIn("cdn.nba.com/static/json/staticData/headlineinjuries.json", self.src)
+
+    def test_stats_playerindex_fallback(self):
+        """RosterEngine must have stats.nba.com playerindex as tertiary fallback."""
+        self.assertIn("stats.nba.com/stats/playerindex", self.src)
+
+
 if __name__ == "__main__":
     unittest.main()
