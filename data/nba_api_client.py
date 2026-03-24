@@ -870,9 +870,9 @@ def _aggregate_player_stats(stats_raw: list) -> list[dict]:
             avg = sum(vals) / n if n else 0.0
             row[f"{key}_avg"] = round(avg, 2)
             if n >= 2:
-                row[f"{key}_std"] = round(_stats_mod.stdev(vals), 2) if key != "minutes" else 0.0
+                row[f"{key}_std"] = round(_stats_mod.stdev(vals), 2)
             else:
-                row[f"{key}_std"] = 0.0 if key != "minutes" else 0.0
+                row[f"{key}_std"] = 0.0
 
         # ft_pct and usage_rate are not std-tracked
         ft_vals = [g["ft_pct"] for g in games]
@@ -880,7 +880,7 @@ def _aggregate_player_stats(stats_raw: list) -> list[dict]:
         usage_vals = [g["usage_rate"] for g in games]
         row["usage_rate"] = round(sum(usage_vals) / n, 2) if n else 0.0
 
-        # Remove minutes_std (not part of schema)
+        # minutes_std is not part of the output schema
         row.pop("minutes_std", None)
 
         players.append(row)
