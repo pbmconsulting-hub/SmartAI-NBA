@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/5_🔮_Player_Simulator.py
+# FILE: pages/5b_🔮_Player_Simulator.py
 # PURPOSE: Player Simulator — run Quantum Matrix Engine 5.6 simulations for
 #          selected players to project their full stat line and
 #          surface "dark horse" upside picks for tonight's slate.

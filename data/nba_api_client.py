@@ -301,6 +301,18 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
             if resp.status_code == 429 or resp.status_code >= 500:
                 if attempt < MAX_API_RETRIES:
                     delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)
+                    # Honor Retry-After header when present (HTTP 429)
+                    if resp.status_code == 429:
+                        retry_after = resp.headers.get("Retry-After")
+                        if retry_after:
+                            try:
+                                delay = max(delay, min(float(retry_after), 60.0))
+                            except (ValueError, TypeError):
+                                pass
+                            _logger.warning(
+                                "HTTP 429 rate limited — Retry-After: %s, waiting %.1fs",
+                                retry_after, delay,
+                            )
                     _logger.warning(
                         "HTTP %d on attempt %d/%d for %s — retrying in %.1fs",
                         resp.status_code, attempt + 1, MAX_API_RETRIES + 1, url, delay,
