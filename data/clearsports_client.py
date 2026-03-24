@@ -85,6 +85,48 @@ _VALID_NBA_ABBREVS = frozenset({
     "GS", "NY", "NO", "SA", "UTAH", "WSH", "BRK", "PHO", "CHO",
 })
 
+# ── Full team-name → abbreviation mapping for API-Basketball v1 ───────────────
+# API-Basketball v1 returns full names (e.g. "Los Angeles Lakers") rather than
+# abbreviations.  This lookup converts them to our canonical 3-letter codes.
+_TEAM_FULL_NAME_TO_ABBREV: dict[str, str] = {
+    "atlanta hawks": "ATL",
+    "boston celtics": "BOS",
+    "brooklyn nets": "BKN",
+    "charlotte hornets": "CHA",
+    "chicago bulls": "CHI",
+    "cleveland cavaliers": "CLE",
+    "dallas mavericks": "DAL",
+    "denver nuggets": "DEN",
+    "detroit pistons": "DET",
+    "golden state warriors": "GSW",
+    "houston rockets": "HOU",
+    "indiana pacers": "IND",
+    "los angeles clippers": "LAC",
+    "la clippers": "LAC",
+    "los angeles lakers": "LAL",
+    "la lakers": "LAL",
+    "memphis grizzlies": "MEM",
+    "miami heat": "MIA",
+    "milwaukee bucks": "MIL",
+    "minnesota timberwolves": "MIN",
+    "new orleans pelicans": "NOP",
+    "new york knicks": "NYK",
+    "oklahoma city thunder": "OKC",
+    "orlando magic": "ORL",
+    "philadelphia 76ers": "PHI",
+    "phoenix suns": "PHX",
+    "portland trail blazers": "POR",
+    "sacramento kings": "SAC",
+    "san antonio spurs": "SAS",
+    "toronto raptors": "TOR",
+    "utah jazz": "UTA",
+    "washington wizards": "WAS",
+}
+
+# ── Dynamic team-abbreviation → numeric ID cache ─────────────────────────────
+# Populated lazily from fetch_teams() the first time it's needed.
+_TEAM_ABBREV_TO_ID: dict[str, int] = {}
+
 # ── Time-based response cache (mirrors platform_fetcher._API_CACHE) ───────────
 
 _API_CACHE: dict = {}
@@ -109,6 +151,47 @@ def _cache_get(key: str):
 def _cache_set(key: str, payload) -> None:
     """Store *payload* in the cache keyed by *key*."""
     _API_CACHE[key] = (payload, time.time())
+
+
+# ── Team name / ID resolution helpers ─────────────────────────────────────────
+
+def _team_name_to_abbrev(name: str) -> str:
+    """Convert a full team name (e.g. 'Los Angeles Lakers') to abbreviation."""
+    if not name:
+        return ""
+    return _TEAM_FULL_NAME_TO_ABBREV.get(name.strip().lower(), "")
+
+
+def _ensure_team_id_map() -> None:
+    """Populate ``_TEAM_ABBREV_TO_ID`` from ``fetch_teams()`` if empty."""
+    global _TEAM_ABBREV_TO_ID  # noqa: PLW0603
+    if _TEAM_ABBREV_TO_ID:
+        return
+    try:
+        teams = fetch_teams()
+        for t in teams:
+            if not isinstance(t, dict):
+                continue
+            tid = t.get("id")
+            if tid is None:
+                continue
+            # Try direct abbreviation first, then resolve from name
+            abbrev = _safe_str(
+                t.get("abbreviation") or t.get("team_abbreviation")
+            ).upper().strip()
+            if not abbrev:
+                name = _safe_str(t.get("name") or t.get("team_name"))
+                abbrev = _team_name_to_abbrev(name)
+            if abbrev:
+                _TEAM_ABBREV_TO_ID[abbrev] = int(tid)
+    except Exception as exc:
+        _logger.debug("_ensure_team_id_map: could not build map — %s", exc)
+
+
+def _get_team_id(abbrev: str) -> int | None:
+    """Resolve a team abbreviation to its API-Basketball v1 numeric team ID."""
+    _ensure_team_id_map()
+    return _TEAM_ABBREV_TO_ID.get(abbrev.upper().strip())
 
 
 # ── API key resolution ────────────────────────────────────────────────────────
@@ -281,6 +364,7 @@ def _extract_team_abbrev(g: dict, side: str) -> str:
       - home_team_tricode / away_team_tricode
       - Nested: home.abbreviation / away.abbreviation
       - Nested: home_team.abbreviation / away_team.abbreviation
+      - API-Basketball v1: teams.home.name / teams.away.name (full name → abbrev)
 
     Returns the abbreviation string (upper-cased) or empty string.
     """
@@ -305,6 +389,27 @@ def _extract_team_abbrev(g: dict, side: str) -> str:
                 val = nested.get(sub)
                 if val and isinstance(val, str) and val.strip():
                     return val.strip().upper()
+            # Resolve full team name → abbreviation (API-Basketball v1)
+            name = nested.get("name") or nested.get("team_name") or ""
+            if name:
+                abbrev = _team_name_to_abbrev(name)
+                if abbrev:
+                    return abbrev.upper()
+
+    # API-Basketball v1: {"teams": {"home": {"name": "Los Angeles Lakers"}}}
+    teams_obj = g.get("teams")
+    if isinstance(teams_obj, dict):
+        side_obj = teams_obj.get(side)
+        if isinstance(side_obj, dict):
+            for sub in ("abbreviation", "tricode", "teamTricode", "team_abbreviation"):
+                val = side_obj.get(sub)
+                if val and isinstance(val, str) and val.strip():
+                    return val.strip().upper()
+            name = side_obj.get("name") or side_obj.get("team_name") or ""
+            if name:
+                abbrev = _team_name_to_abbrev(name)
+                if abbrev:
+                    return abbrev.upper()
 
     return ""
 
@@ -559,18 +664,54 @@ def fetch_player_stats() -> list[dict]:
             players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
             if isinstance(players_raw, list):
                 players: list[dict] = []
+                has_real_stats = False
                 for p in players_raw:
                     if not isinstance(p, dict):
                         continue
                     stats = p.get("stats") or p.get("averages") or p  # allow flat or nested shape
+
+                    # ── Resolve player name ──
+                    # API-Basketball v1 may return firstname/lastname
+                    # instead of a single "name" field.
+                    name = _safe_str(p.get("name") or p.get("full_name"))
+                    if not name:
+                        first = _safe_str(p.get("firstname") or p.get("first_name"))
+                        last = _safe_str(p.get("lastname") or p.get("last_name"))
+                        name = f"{first} {last}".strip()
+
+                    # ── Resolve team abbreviation ──
+                    # API-Basketball v1 nests team as a dict:
+                    #   {"team": {"id": 145, "name": "Los Angeles Lakers"}}
+                    team_val = p.get("team") or p.get("team_abbreviation") or ""
+                    if isinstance(team_val, dict):
+                        team_abbrev = _safe_str(
+                            team_val.get("abbreviation")
+                            or team_val.get("tricode")
+                        )
+                        if not team_abbrev:
+                            team_abbrev = _team_name_to_abbrev(
+                                _safe_str(team_val.get("name"))
+                            )
+                    else:
+                        team_abbrev = _safe_str(team_val)
+
+                    pts = _safe_float(stats.get("points") or stats.get("pts", 0))
+                    if pts > 0:
+                        has_real_stats = True
+                    # If the team value is a plain string, the data is in
+                    # the processed/flat format (or test data), not the
+                    # metadata-only /players response from API-Basketball v1.
+                    if isinstance(team_val, str) and team_val:
+                        has_real_stats = True
+
                     players.append({
                         "player_id":     _safe_str(p.get("player_id") or p.get("id")),
-                        "name":          _safe_str(p.get("name") or p.get("full_name")),
-                        "team":          _safe_str(p.get("team") or p.get("team_abbreviation")),
+                        "name":          name,
+                        "team":          team_abbrev,
                         "position":      _safe_str(p.get("position") or p.get("pos")),
                         # Averages
                         "minutes_avg":   _safe_float(stats.get("minutes") or stats.get("min", 0)),
-                        "points_avg":    _safe_float(stats.get("points") or stats.get("pts", 0)),
+                        "points_avg":    pts,
                         "rebounds_avg":  _safe_float(stats.get("rebounds") or stats.get("reb", 0)),
                         "assists_avg":   _safe_float(stats.get("assists") or stats.get("ast", 0)),
                         "threes_avg":    _safe_float(stats.get("threes") or stats.get("three_pm") or stats.get("fg3m", 0)),
@@ -588,8 +729,16 @@ def fetch_player_stats() -> list[dict]:
                         "blocks_std":    _safe_float(stats.get("blocks_std", 0)),
                         "turnovers_std": _safe_float(stats.get("turnovers_std", 0)),
                     })
-                if players:
+                # Only return if we got real stat data (not just metadata-only
+                # responses from /players that have names but zero stats).
+                if players and has_real_stats:
                     return players
+                if players and not has_real_stats:
+                    _logger.info(
+                        "fetch_player_stats: API returned %d player(s) but no "
+                        "stat fields — treating as metadata-only response.",
+                        len(players),
+                    )
             else:
                 _logger.warning("fetch_player_stats: unexpected response shape from API-NBA")
     except Exception as exc:
@@ -632,9 +781,14 @@ def fetch_team_stats() -> list[dict]:
                         continue
                     stats = t.get("stats") or t.get("advanced") or t
                     record = t.get("record") or {}
+                    # Resolve abbreviation: try direct field, then from name
+                    abbrev = _safe_str(t.get("abbreviation") or t.get("team_abbreviation"))
+                    name = _safe_str(t.get("name") or t.get("team_name"))
+                    if not abbrev and name:
+                        abbrev = _team_name_to_abbrev(name)
                     teams.append({
-                        "team_abbreviation":  _safe_str(t.get("abbreviation") or t.get("team_abbreviation")),
-                        "team_name":          _safe_str(t.get("name") or t.get("team_name")),
+                        "team_abbreviation":  abbrev,
+                        "team_name":          name,
                         "pace":               _safe_float(stats.get("pace", 0)),
                         "offensive_rating":   _safe_float(stats.get("offensive_rating") or stats.get("off_rtg", 0)),
                         "defensive_rating":   _safe_float(stats.get("defensive_rating") or stats.get("def_rtg", 0)),
@@ -743,15 +897,44 @@ def fetch_live_scores() -> list[dict]:
         for g in scores_raw:
             if not isinstance(g, dict):
                 continue
+
+            # ── Resolve team abbreviations ────────────────────────
+            home_team = _extract_team_abbrev(g, "home")
+            away_team = _extract_team_abbrev(g, "away")
+
+            # ── Resolve scores ────────────────────────────────────
+            # API-Basketball v1: {"scores": {"home": {"total": 105}, "away": {"total": 99}}}
+            home_score = int(_safe_float(g.get("home_score", 0)))
+            away_score = int(_safe_float(g.get("away_score", 0)))
+            scores_obj = g.get("scores")
+            if isinstance(scores_obj, dict) and home_score == 0 and away_score == 0:
+                home_sc = scores_obj.get("home")
+                away_sc = scores_obj.get("away")
+                if isinstance(home_sc, dict):
+                    home_score = int(_safe_float(home_sc.get("total", 0)))
+                elif home_sc is not None:
+                    home_score = int(_safe_float(home_sc))
+                if isinstance(away_sc, dict):
+                    away_score = int(_safe_float(away_sc.get("total", 0)))
+                elif away_sc is not None:
+                    away_score = int(_safe_float(away_sc))
+
+            # ── Resolve status ────────────────────────────────────
+            status_val = g.get("status", "")
+            if isinstance(status_val, dict):
+                status_val = _safe_str(status_val.get("long") or status_val.get("short", ""))
+            else:
+                status_val = _safe_str(status_val)
+
             scores.append({
                 "game_id":    _safe_str(g.get("game_id") or g.get("id")),
-                "home_team":  _safe_str(g.get("home_team") or g.get("home_abbreviation")),
-                "away_team":  _safe_str(g.get("away_team") or g.get("away_abbreviation")),
-                "home_score": int(_safe_float(g.get("home_score", 0))),
-                "away_score": int(_safe_float(g.get("away_score", 0))),
+                "home_team":  home_team,
+                "away_team":  away_team,
+                "home_score": home_score,
+                "away_score": away_score,
                 "period":     _safe_str(g.get("period") or g.get("quarter", "")),
                 "game_clock": _safe_str(g.get("game_clock") or g.get("clock", "")),
-                "status":     _safe_str(g.get("status", "")),
+                "status":     status_val,
             })
         return scores
 
@@ -775,7 +958,11 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
 
     for abbrev in team_abbrevs:
         url = f"{_BASE_URL}/players"
-        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "team": abbrev}
+        # API-Basketball v1 requires numeric team IDs for the "team" param.
+        # Resolve abbreviation → numeric ID; fall back to abbreviation string
+        # so the call still works if the ID map cannot be built.
+        team_param = _get_team_id(abbrev) or abbrev
+        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "team": team_param}
 
         try:
             raw = _fetch_with_retry(url, params=params)
@@ -795,9 +982,14 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
                 if isinstance(player, str):
                     names.append(player)
                 elif isinstance(player, dict):
+                    # Try "name", then build from "firstname"/"lastname"
                     name = _safe_str(
                         player.get("name") or player.get("full_name") or player.get("player_name")
                     )
+                    if not name:
+                        first = _safe_str(player.get("firstname") or player.get("first_name"))
+                        last = _safe_str(player.get("lastname") or player.get("last_name"))
+                        name = f"{first} {last}".strip()
                     if name:
                         names.append(name)
 
@@ -922,22 +1114,6 @@ def fetch_standings() -> list[dict]:
     Returns a list of team standing entries including conference rank,
     win-loss record, home/away splits, last-10 record, and streak.
     Falls back to an empty list if the API is unavailable.
-
-    Returns:
-        list[dict]: Each entry has (at minimum):
-            {
-                "team_abbreviation": str,
-                "conference": "East"|"West",
-                "conference_rank": int,
-                "wins": int,
-                "losses": int,
-                "win_pct": float,
-                "home_wins": int, "home_losses": int,
-                "away_wins": int, "away_losses": int,
-                "last_10_wins": int, "last_10_losses": int,
-                "streak": str,          # e.g. "W3" or "L1"
-                "games_back": float,
-            }
     """
     api_key = _resolve_api_key()
     if not api_key:
@@ -964,27 +1140,64 @@ def fetch_standings() -> list[dict]:
             else (data.get("response") or data.get("standings") or data.get("data") or [])
         )
 
+        # ── Flatten nested groups (API-Basketball v1) ─────────────────
+        # /standings may return [[{team1}, ...], [{team3}, ...]] per conference
+        flat_rows: list = []
+        for item in rows_raw:
+            if isinstance(item, list):
+                flat_rows.extend(item)
+            elif isinstance(item, dict):
+                flat_rows.append(item)
+        if flat_rows:
+            rows_raw = flat_rows
+
         standings = []
         for row in rows_raw:
             if not isinstance(row, dict):
                 continue
+
+            # ── Resolve team abbreviation ─────────────────────────────
             abbrev = _safe_str(
                 row.get("teamAbbreviation", row.get("team_abbreviation",
-                row.get("abbreviation", row.get("team", ""))))
+                row.get("abbreviation", "")))
             ).upper().strip()
+
+            # API-Basketball v1: team info nested under "team" key
+            if not abbrev:
+                team_obj = row.get("team")
+                if isinstance(team_obj, dict):
+                    abbrev = _safe_str(
+                        team_obj.get("abbreviation") or team_obj.get("tricode")
+                    ).upper().strip()
+                    if not abbrev:
+                        abbrev = _team_name_to_abbrev(
+                            _safe_str(team_obj.get("name"))
+                        ).upper()
+                elif isinstance(team_obj, str):
+                    abbrev = team_obj.upper().strip()
 
             if not abbrev:
                 continue
 
             def _wl(field, default=0):
-                raw = row.get(field, default)
+                raw_val = row.get(field, default)
                 try:
-                    return int(float(str(raw))) if raw is not None else default
+                    return int(float(str(raw_val))) if raw_val is not None else default
                 except (ValueError, TypeError):
                     return default
 
-            w  = _wl("wins",  _wl("W", 0))
-            l  = _wl("losses", _wl("L", 0))
+            # ── Extract win/loss from flat or nested structures ────────
+            # API-Basketball v1 nests: {"games": {"win": {"total": N}, "lose": {"total": N}}}
+            games_obj = row.get("games")
+            if isinstance(games_obj, dict):
+                win_obj = games_obj.get("win") or {}
+                lose_obj = games_obj.get("lose") or {}
+                w = int(_safe_float(win_obj.get("total", 0)))
+                l = int(_safe_float(lose_obj.get("total", 0)))
+            else:
+                w  = _wl("wins",  _wl("W", 0))
+                l  = _wl("losses", _wl("L", 0))
+
             hw = _wl("homeWins",  _wl("home_wins", 0))
             hl = _wl("homeLosses", _wl("home_losses", 0))
             aw = _wl("awayWins",  _wl("away_wins", 0))
@@ -994,10 +1207,36 @@ def fetch_standings() -> list[dict]:
             total = w + l
             win_pct = round(w / total, 3) if total else 0.0
 
+            # ── Conference ────────────────────────────────────────────
+            conference = _safe_str(row.get("conference", row.get("conf", "")))
+            if not conference:
+                group_obj = row.get("group")
+                if isinstance(group_obj, dict):
+                    group_name = _safe_str(group_obj.get("name", "")).lower()
+                    if "east" in group_name:
+                        conference = "East"
+                    elif "west" in group_name:
+                        conference = "West"
+
+            # ── Streak / form ─────────────────────────────────────────
+            streak = _safe_str(row.get("streak", ""))
+            if not streak:
+                form = _safe_str(row.get("form", ""))
+                if form:
+                    # API-Basketball v1 "form" is e.g. "WWLWW" — derive streak
+                    last_char = form[-1] if form else ""
+                    run = 0
+                    for ch in reversed(form):
+                        if ch == last_char:
+                            run += 1
+                        else:
+                            break
+                    streak = f"{last_char}{run}" if last_char else ""
+
             standings.append({
                 "team_abbreviation": abbrev,
-                "conference": _safe_str(row.get("conference", row.get("conf", ""))),
-                "conference_rank": _wl("conferenceRank", _wl("rank", 0)),
+                "conference": conference,
+                "conference_rank": _wl("conferenceRank", _wl("rank", _wl("position", 0))),
                 "wins": w,
                 "losses": l,
                 "win_pct": win_pct,
@@ -1007,7 +1246,7 @@ def fetch_standings() -> list[dict]:
                 "away_losses": al,
                 "last_10_wins": l10w,
                 "last_10_losses": l10l,
-                "streak": _safe_str(row.get("streak", "")),
+                "streak": streak,
                 "games_back": _safe_float(row.get("gamesBack", row.get("games_back", 0.0))),
             })
 
