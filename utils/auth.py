@@ -32,6 +32,15 @@ import datetime
 
 _logger = logging.getLogger(__name__)
 
+# ── Startup Warning: Detect misconfigured production state ────
+# If STRIPE_SECRET_KEY is set but SMARTAI_PRODUCTION is not "true",
+# that means real Stripe keys are active but premium gates are disabled.
+if os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("SMARTAI_PRODUCTION", "").lower() not in ("true", "1", "yes"):
+    _logger.warning(
+        "⚠️  STRIPE_SECRET_KEY is set but SMARTAI_PRODUCTION is not 'true'. "
+        "Premium features are NOT gated. Set SMARTAI_PRODUCTION=true for live deployments."
+    )
+
 from utils.stripe_manager import (
     is_stripe_configured,
     verify_checkout_session,
@@ -297,6 +306,7 @@ def is_premium_user() -> bool:
 
     # ── Layer 1: Dev/demo mode — no Stripe configured ─────────
     if not is_stripe_configured():
+        _logger.debug("Premium gate: granted (Stripe not configured)")
         return True  # Everything is free when Stripe isn't set up
 
     # ── Layer 2: Fresh session state cache ────────────────────
@@ -331,6 +341,7 @@ def is_premium_user() -> bool:
                 return False
 
     # ── Layer 4: User is not premium ─────────────────────────
+    _logger.debug("Premium gate: denied (no active subscription found)")
     return False
 
 

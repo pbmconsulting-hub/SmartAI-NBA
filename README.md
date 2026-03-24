@@ -62,7 +62,7 @@ SmartAI-NBA/
 │   ├── 3_⚡_Quantum_Analysis_Matrix.py # Run Neural Analysis — main engine
 │   ├── 4_📋_Game_Report.py            # AI-powered game reports (SAFE Score™)
 │   ├── 5_💦_Live_Sweat.py             # Live AI Panic Room — in-game tracking
-│   ├── 5_🔮_Player_Simulator.py       # What-if player scenario simulator
+│   ├── 5b_🔮_Player_Simulator.py      # What-if player scenario simulator
 │   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
 │   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
 │   ├── 8_🛡️_Risk_Shield.py           # Flagged picks to avoid
@@ -166,7 +166,7 @@ The Live AI Panic Room — track your active bets in real-time during games.
 Features pace tracking, Joseph M. Smith live commentary, and sweat cards
 that show whether your bets are on track to cash.
 
-### 🔮 Page 5: Player Simulator
+### 🔮 Page 5b: Player Simulator
 What-if scenario simulator. Adjust minutes, pace, matchup factors and see
 how projected stats change in real-time.
 
@@ -364,8 +364,57 @@ All other functionality uses Python's standard library:
 
 ---
 
+## 🚀 Production Deployment
+
+### Streamlit Community Cloud
+
+1. **Push to GitHub** — fork or push this repo to your GitHub account.
+2. **Connect to Streamlit Cloud** — go to [share.streamlit.io](https://share.streamlit.io) and create a new app from your repo.
+3. **Set secrets** — in the Streamlit Cloud dashboard, go to **Settings → Secrets** and paste your secrets (see `.streamlit/secrets.toml.example` for the full list). Do **not** commit `secrets.toml` to Git.
+4. **Set `SMARTAI_PRODUCTION=true`** — this enforces Stripe subscription gates.
+5. **Set `APP_URL`** — your deployed app URL (e.g., `https://your-app.streamlit.app`).
+
+### Environment Variables Checklist
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `API_NBA_KEY` | For live data | API-Sports Basketball key |
+| `ODDS_API_KEY` | For live data | The Odds API key |
+| `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
+| `STRIPE_PUBLISHABLE_KEY` | For payments | Stripe publishable key |
+| `STRIPE_PRICE_ID` | For payments | Stripe product price ID |
+| `STRIPE_WEBHOOK_SECRET` | Recommended | Stripe webhook signing secret |
+| `SMARTAI_PRODUCTION` | For production | Must be `"true"` to enforce gates |
+| `APP_URL` | For Stripe redirects | Your deployed app URL |
+| `DB_PATH` | Optional | Override default SQLite path |
+| `LOG_LEVEL` | Optional | DEBUG, INFO, WARNING, ERROR |
+
+### Stripe Webhook Setup
+
+1. Deploy `webhook_server.py` to a hosting platform (Railway, Render, or Fly.io).
+2. In the Stripe Dashboard → Developers → Webhooks, register your webhook URL (e.g., `https://your-server.railway.app/webhook`).
+3. Select events: `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`.
+4. Copy the signing secret (`whsec_...`) and add it as `STRIPE_WEBHOOK_SECRET` to both the webhook server and the Streamlit app.
+
+### Pre-Launch Checklist
+
+- [ ] All environment variables set (see table above)
+- [ ] `SMARTAI_PRODUCTION=true` confirmed
+- [ ] Stripe keys are live keys (not test keys)
+- [ ] API-NBA and Odds API keys are active with sufficient credits
+- [ ] Run `scripts/verify_api_endpoints.py` to confirm API connectivity
+- [ ] Run `python -m pytest tests/` to confirm all tests pass
+- [ ] SQLite database initialized (first run auto-creates it)
+- [ ] Stripe webhook endpoint registered and tested with Stripe CLI
+
+---
+
 ## ⚠️ Disclaimer
 
 This app is for **personal entertainment and analysis** only.
 Always gamble responsibly. Past model performance does not guarantee future results.
 Prop betting involves risk. Never bet more than you can afford to lose.
+
+**Responsible Gambling:** If you or someone you know has a gambling problem, call
+the National Council on Problem Gambling helpline at **1-800-522-4700** or visit
+[www.ncpgambling.org](https://www.ncpgambling.org).

@@ -31,11 +31,17 @@ def _configure_root_logger():
     root = logging.getLogger("smartai_nba")
     root.setLevel(logging.DEBUG)
 
-    # Console handler — INFO and above
+    # Console handler — respect LOG_LEVEL env var (default: INFO)
     if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, RotatingFileHandler)
                for h in root.handlers):
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+        _resolved_level = getattr(logging, _log_level, None)
+        if _resolved_level is None:
+            _resolved_level = logging.INFO
+            import sys
+            print(f"[WARNING] Invalid LOG_LEVEL '{_log_level}', falling back to INFO", file=sys.stderr)
+        console_handler.setLevel(_resolved_level)
         console_handler.setFormatter(_FORMATTER)
         root.addHandler(console_handler)
 

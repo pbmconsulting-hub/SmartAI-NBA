@@ -502,7 +502,7 @@ class TestPlayerSimulatorGameContext(unittest.TestCase):
 
     def test_source_uses_safe_float_pattern(self):
         """_find_game_context must not use raw float() on game dict values."""
-        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5_🔮_Player_Simulator.py"
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5b_🔮_Player_Simulator.py"
         src = src_path.read_text(encoding="utf-8")
         idx = src.find("def _find_game_context(")
         self.assertGreater(idx, 0)
@@ -515,7 +515,7 @@ class TestPlayerSimulatorGameContext(unittest.TestCase):
 
     def test_source_uses_none_check(self):
         """_find_game_context must check for None before float conversion."""
-        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5_🔮_Player_Simulator.py"
+        src_path = pathlib.Path(__file__).parent.parent / "pages" / "5b_🔮_Player_Simulator.py"
         src = src_path.read_text(encoding="utf-8")
         idx = src.find("def _find_game_context(")
         self.assertGreater(idx, 0)

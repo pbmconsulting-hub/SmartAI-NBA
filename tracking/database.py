@@ -308,9 +308,22 @@ def initialize_database():
         # BEGINNER NOTE: sqlite3.connect() opens (or creates) the DB file
         # 'with' statement ensures the connection is properly closed
         # check_same_thread=False: required for Streamlit Server multi-session access
-        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False, timeout=30) as connection:
             # Enable WAL mode for safe concurrent read access
             connection.execute("PRAGMA journal_mode=WAL")
+            # Run integrity check on startup
+            try:
+                integrity_result = connection.execute("PRAGMA integrity_check").fetchone()
+                if integrity_result and integrity_result[0] != "ok":
+                    _logger.warning(
+                        "Database integrity check returned: %s. "
+                        "Consider restoring from backup or reinitializing the database.",
+                        integrity_result[0],
+                    )
+                else:
+                    _logger.debug("Database integrity check passed")
+            except Exception as _ic_err:
+                _logger.warning("Database integrity check failed: %s", _ic_err)
             cursor = connection.cursor()  # A cursor lets us run SQL commands
 
             # Create the tables
@@ -446,7 +459,7 @@ def get_database_connection():
     # BEGINNER NOTE: row_factory makes results easier to work with —
     # instead of tuples (24, 'LeBron') you get {'points': 24, 'name': 'LeBron'}
     # check_same_thread=False: required for Streamlit Server multi-session access
-    connection = sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False)
+    connection = sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False, timeout=30)
     # Enable WAL mode for safe concurrent read access
     connection.execute("PRAGMA journal_mode=WAL")
     connection.row_factory = sqlite3.Row  # Rows behave like dicts

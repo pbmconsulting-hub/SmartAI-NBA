@@ -13,9 +13,15 @@ import json       # For session state persistence
 import datetime   # For timestamp handling
 import unicodedata  # For normalizing unicode characters in names
 import re           # For regex-based suffix stripping
-import logging
 import warnings
 from pathlib import Path  # Modern file path handling
+
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
 
 import streamlit as st
 
@@ -849,7 +855,7 @@ def find_players_by_team(players_list, team_abbrev):
     try:
         matches.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
     except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
+        _logger.warning(f"[DataManager] Unexpected error: {_exc}")
     return matches
 
 
@@ -1164,7 +1170,7 @@ def filter_props_to_platform_players(
     if not platform_props:
         return generated_props
 
-    _logger_filter = logging.getLogger(__name__)
+    _logger_filter = _logger
 
     # Build a set of normalised player names present on any platform
     platform_player_names: set = set()
@@ -1511,7 +1517,7 @@ def clear_all_caches():
         load_props_data.clear()
         load_injury_status.clear()
     except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
+        _logger.warning(f"[DataManager] Unexpected error: {_exc}")
 
 
 def get_data_health_report():
@@ -1588,7 +1594,7 @@ def get_data_health_report():
             if is_stale:
                 warnings.append(f"Data is {days_old} day(s) old — consider refreshing")
         except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[DataManager] Unexpected error: {_exc}")
+            _logger.warning(f"[DataManager] Unexpected error: {_exc}")
 
     if players_count == 0:
         warnings.append("No players loaded — run Data Feed to populate")

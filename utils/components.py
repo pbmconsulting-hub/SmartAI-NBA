@@ -133,18 +133,44 @@ def render_global_settings():
 
         st.caption("Changes apply on next analysis run.")
 
+    # ── Responsible Gambling Disclaimer ───────────────────────────
+    render_sidebar_disclaimer()
+
 
 def inject_joseph_floating():
     """Render the Joseph M. Smith floating widget in the main content area.
 
     Delegates to :func:`utils.joseph_widget.render_joseph_floating_widget`
     so the widget appears on every page that calls this helper.
+    Also renders the responsible gambling disclaimer in the sidebar.
     """
     try:
         from utils.joseph_widget import render_joseph_floating_widget
         render_joseph_floating_widget()
     except Exception as exc:
         _components_logger.debug("inject_joseph_floating failed: %s", exc)
+    # Show the disclaimer on every page that calls this helper
+    render_sidebar_disclaimer()
+
+
+def render_sidebar_disclaimer():
+    """Render a collapsed responsible gambling disclaimer in the sidebar.
+
+    Uses a session-state flag to avoid rendering the same disclaimer
+    twice on pages that call both ``render_global_settings()`` and
+    ``inject_joseph_floating()``.
+    """
+    if st.session_state.get("_disclaimer_rendered"):
+        return
+    st.session_state["_disclaimer_rendered"] = True
+    with st.sidebar:
+        with st.expander("⚠️ Responsible Gambling", expanded=False):
+            st.caption(
+                "This app is for **personal entertainment and analysis** only. "
+                "Always gamble responsibly. Past model performance does not guarantee "
+                "future results. Prop betting involves risk. Never bet more than you "
+                "can afford to lose."
+            )
 
 
 # ── on_change callbacks ──────────────────────────────────────────

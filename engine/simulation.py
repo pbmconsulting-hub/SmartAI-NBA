@@ -11,6 +11,7 @@
 # Standard library imports only
 import random   # For randomizing game scenarios (minutes, pace)
 import math     # For mathematical rounding and calculations
+import time     # For simulation timing
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -425,6 +426,8 @@ def run_quantum_matrix_simulation(
     _running_sum = 0.0
     _running_sum_sq = 0.0
 
+    _sim_start_time = time.monotonic()
+
     # Run the simulation `number_of_simulations` times
     # BEGINNER NOTE: range(n) creates numbers 0 to n-1
     # We don't care about the index, just need to loop n times
@@ -657,6 +660,17 @@ def run_quantum_matrix_simulation(
             _logger.warning(
                 "DFS metrics skipped: engine.odds_engine not available"
             )
+
+    _sim_duration_ms = round((time.monotonic() - _sim_start_time) * 1000, 1)
+    _logger.info(
+        "simulation: num_simulations=%d, stat_type=%s, line=%.1f, "
+        "probability_over=%.4f, duration_ms=%.1f",
+        number_of_simulations,
+        stat_type or "unknown",
+        prop_line,
+        simulation_results.get("probability_over", 0.0),
+        _sim_duration_ms,
+    )
 
     return simulation_results
 

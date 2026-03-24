@@ -291,16 +291,30 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
 
     for attempt in range(MAX_API_RETRIES + 1):
         try:
+            _req_start = time.monotonic()
             resp = requests.get(
                 url,
                 headers=headers,
                 params=params,
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
+            _req_ms = round((time.monotonic() - _req_start) * 1000, 1)
 
             if resp.status_code == 429 or resp.status_code >= 500:
                 if attempt < MAX_API_RETRIES:
                     delay = min(RETRY_BASE_DELAY_SECONDS * (2 ** attempt), 10.0)
+                    # Honor Retry-After header when present (HTTP 429)
+                    if resp.status_code == 429:
+                        retry_after = resp.headers.get("Retry-After")
+                        if retry_after:
+                            try:
+                                delay = max(delay, min(float(retry_after), 60.0))
+                            except (ValueError, TypeError):
+                                pass
+                            _logger.warning(
+                                "HTTP 429 rate limited — Retry-After: %s, waiting %.1fs",
+                                retry_after, delay,
+                            )
                     _logger.warning(
                         "HTTP %d on attempt %d/%d for %s — retrying in %.1fs",
                         resp.status_code, attempt + 1, MAX_API_RETRIES + 1, url, delay,
@@ -333,6 +347,10 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
                 return None
 
             data = resp.json()
+            _logger.debug(
+                "API request: endpoint=%s, status=%d, duration_ms=%.1f",
+                url.replace(_BASE_URL, ""), resp.status_code, _req_ms,
+            )
             _cache_set(cache_key, data)
             return data
 
