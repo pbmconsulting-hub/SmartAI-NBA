@@ -100,9 +100,9 @@ class TestFetchSportsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.odds_client import get_sports
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "key": "basketball_nba",
                 "group": "Basketball",
@@ -135,7 +135,7 @@ class TestFetchSportsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry", return_value=None)
-    def test_returns_none_on_failure(self, mock_fetch, mock_key):
+    def test_returns_none_on_failure(self, mock_request, mock_key):
         from data.odds_client import get_sports
         result = get_sports()
         self.assertIsNone(result)
@@ -172,9 +172,9 @@ class TestFetchEventsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.odds_client import get_events
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "id": "abc123",
                 "sport_key": "basketball_nba",
@@ -197,7 +197,7 @@ class TestFetchEventsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.odds_client import get_events
         result = get_events()
         self.assertEqual(result, [])
@@ -249,9 +249,9 @@ class TestFetchEventOddsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry")
-    def test_returns_dict_on_success(self, mock_fetch, mock_key):
+    def test_returns_dict_on_success(self, mock_request, mock_key):
         from data.odds_client import get_event_odds
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "id": "abc123",
             "sport_key": "basketball_nba",
             "home_team": "Phoenix Suns",
@@ -285,20 +285,20 @@ class TestFetchEventOddsRuntime(unittest.TestCase):
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry", return_value=None)
-    def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
         from data.odds_client import get_event_odds
         result = get_event_odds("abc123")
         self.assertEqual(result, {})
 
     @patch("data.odds_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_client._request_with_retry")
-    def test_passes_custom_markets(self, mock_fetch, mock_key):
+    def test_passes_custom_markets(self, mock_request, mock_key):
         """Custom markets string should be passed to API params."""
         from data.odds_client import get_event_odds
-        mock_fetch.return_value = {"id": "x", "bookmakers": []}
+        mock_request.return_value = {"id": "x", "bookmakers": []}
         get_event_odds("x", markets="player_points,player_rebounds", regions="us2")
         # Verify the call args include our custom markets
-        call_args = mock_fetch.call_args
+        call_args = mock_request.call_args
         params = call_args[1].get("params") or call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("params")
         if params is None and len(call_args) >= 2:
             params = call_args[0][1]
@@ -404,11 +404,11 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
     @patch("data.odds_client._cache_get", return_value=None)
     @patch("data.odds_client._cache_set")
     @patch("data.odds_client._request_with_retry")
-    def test_spreads_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+    def test_spreads_use_point_not_price(self, mock_request, mock_cs, mock_cg, mock_key):
         """Spreads outcomes should map name → point (spread value), not price (juice)."""
         from data.odds_client import get_game_odds
 
-        mock_fetch.return_value = [{
+        mock_request.return_value = [{
             "id": "ev1",
             "home_team": "Los Angeles Lakers",
             "away_team": "Boston Celtics",
@@ -433,11 +433,11 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
     @patch("data.odds_client._cache_get", return_value=None)
     @patch("data.odds_client._cache_set")
     @patch("data.odds_client._request_with_retry")
-    def test_totals_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+    def test_totals_use_point_not_price(self, mock_request, mock_cs, mock_cg, mock_key):
         """Totals outcomes should map name → point (total value), not price (juice)."""
         from data.odds_client import get_game_odds
 
-        mock_fetch.return_value = [{
+        mock_request.return_value = [{
             "id": "ev1",
             "home_team": "Los Angeles Lakers",
             "away_team": "Boston Celtics",
@@ -462,11 +462,11 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
     @patch("data.odds_client._cache_get", return_value=None)
     @patch("data.odds_client._cache_set")
     @patch("data.odds_client._request_with_retry")
-    def test_h2h_uses_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
+    def test_h2h_uses_price(self, mock_request, mock_cs, mock_cg, mock_key):
         """h2h (moneyline) outcomes should map name → price (no point field)."""
         from data.odds_client import get_game_odds
 
-        mock_fetch.return_value = [{
+        mock_request.return_value = [{
             "id": "ev1",
             "home_team": "Los Angeles Lakers",
             "away_team": "Boston Celtics",

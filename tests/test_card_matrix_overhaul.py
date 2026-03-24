@@ -3,7 +3,7 @@
 # PURPOSE: Tests for the Infinite Card-Matrix Overhaul features:
 #          - utils/renderers.py compile_card_matrix()
 #          - engine/simulation.py generate_contextual_goblin_demon()
-#          - data/sportsbook_service.py async fetch + 500-cap
+#          - data/sportsbook_service.py async retrieval + 500-cap
 #          - styles/theme.py Quantum Card Matrix CSS
 #          - .streamlit/config.toml maxMessageSize
 # ============================================================
@@ -263,11 +263,11 @@ class TestQuantumCardMatrixCSS(unittest.TestCase):
 class TestPlatformFetcherCapAndAsync(unittest.TestCase):
     """Tests for data/sportsbook_service.py async features and alt-line enrichment."""
 
-    def test_no_intake_cap_in_sync_fetch(self):
+    def test_no_intake_cap_in_sync_get(self):
         """Verify get_all_sportsbook_props no longer enforces a hard intake cap.
 
         The 500-bet quota is now an *output* target enforced in the analysis
-        loop, not an input cap in the fetcher.
+        loop, not an input cap in the service.
         """
         import inspect
         from data.sportsbook_service import get_all_sportsbook_props
@@ -306,7 +306,7 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
         self.assertTrue("point" in source or "line" in source)
 
     def test_true_line_kill_switch_draftkings(self):
-        """Odds API client (replacing DraftKings fetcher) must discard invalid props."""
+        """Odds API client (replacing DraftKings getter) must discard invalid props."""
         import pathlib
         src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         source = src.read_text(encoding="utf-8")

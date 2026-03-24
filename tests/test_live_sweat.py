@@ -797,7 +797,7 @@ class TestLiveSweatPageFile(unittest.TestCase):
 
 
 # ============================================================
-# SECTION 6: data/live_game_tracker fetcher tests
+# SECTION 6: data/live_game_tracker retriever tests
 # ============================================================
 
 class TestFetchLiveBoxscoresImpl(unittest.TestCase):

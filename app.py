@@ -269,8 +269,8 @@ if "selected_picks" not in st.session_state:
     st.session_state["selected_picks"] = []
 if "session_props" not in st.session_state:
     st.session_state["session_props"] = []
-if "fetched_live_picks" not in st.session_state:
-    st.session_state["fetched_live_picks"] = []
+if "loaded_live_picks" not in st.session_state:
+    st.session_state["loaded_live_picks"] = []
 
 # ═══ Auto-populate API keys from st.secrets (.streamlit/secrets.toml) ═══
 # Keys loaded here are available immediately and persist for the session.

@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: tests/test_neural_trading_cards.py
 # PURPOSE: Tests for the Trading-Card grid, Player Spotlight
-#          modal, data grouper, NBA context fetcher,
+#          modal, data grouper, player profile service,
 #          glassmorphic theme CSS, and Platinum Lock function.
 # ============================================================
 

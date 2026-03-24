@@ -384,9 +384,9 @@ class TestFetchTeamsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_teams
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"id": 1, "name": "Los Angeles Lakers", "abbreviation": "LAL"},
             {"id": 2, "name": "Boston Celtics", "abbreviation": "BOS"},
         ]
@@ -396,16 +396,16 @@ class TestFetchTeamsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_teams
         result = get_teams()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+    def test_handles_wrapped_response(self, mock_request, mock_key):
         from data.nba_api_client import get_teams
-        mock_fetch.return_value = {"teams": [{"id": 1, "name": "Lakers"}]}
+        mock_request.return_value = {"teams": [{"id": 1, "name": "Lakers"}]}
         result = get_teams()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
@@ -416,25 +416,25 @@ class TestFetchGamesRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_games
-        mock_fetch.return_value = [{"game_id": "g1", "home_team": "LAL", "away_team": "BOS"}]
+        mock_request.return_value = [{"game_id": "g1", "home_team": "LAL", "away_team": "BOS"}]
         result = get_games(season=2024, date="2024-12-25", team_id=123)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_games
         result = get_games()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+    def test_handles_wrapped_response(self, mock_request, mock_key):
         from data.nba_api_client import get_games
-        mock_fetch.return_value = {"games": [{"game_id": "g1"}]}
+        mock_request.return_value = {"games": [{"game_id": "g1"}]}
         result = get_games()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
@@ -445,9 +445,9 @@ class TestFetchPlayersRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_players
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"id": 10, "name": "LeBron James", "team_id": 1},
         ]
         result = get_players(team_id=1)
@@ -456,16 +456,16 @@ class TestFetchPlayersRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_players
         result = get_players()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_handles_wrapped_response(self, mock_fetch, mock_key):
+    def test_handles_wrapped_response(self, mock_request, mock_key):
         from data.nba_api_client import get_players
-        mock_fetch.return_value = {"players": [{"id": 10, "name": "LeBron James"}]}
+        mock_request.return_value = {"players": [{"id": 10, "name": "LeBron James"}]}
         result = get_players()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
@@ -476,10 +476,10 @@ class TestApiKeyInfoRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_dict_on_success(self, mock_fetch, mock_key):
+    def test_returns_dict_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_info
         # API-Sports /status response format
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "response": {
                 "account": {
                     "firstname": "John",
@@ -505,7 +505,7 @@ class TestApiKeyInfoRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_info
         result = get_api_key_info()
         self.assertEqual(result, {})
@@ -516,10 +516,10 @@ class TestApiKeyUsageRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_usage
         # API-Sports /status response format
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "response": {
                 "requests": {"current": 15, "limit_day": 100},
             }
@@ -530,7 +530,7 @@ class TestApiKeyUsageRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_usage
         result = get_api_key_usage()
         self.assertEqual(result, [])
@@ -541,10 +541,10 @@ class TestApiKeyStatsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_dict_on_success(self, mock_fetch, mock_key):
+    def test_returns_dict_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_stats
         # API-Sports /status response format
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "response": {
                 "account": {"email": "user@example.com"},
                 "subscription": {"plan": "Free"},
@@ -561,7 +561,7 @@ class TestApiKeyStatsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_api_key_stats
         result = get_api_key_stats()
         self.assertEqual(result, {})
@@ -572,16 +572,16 @@ class TestTeamByIdRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_dict_on_success(self, mock_fetch, mock_key):
+    def test_returns_dict_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_team_by_id
-        mock_fetch.return_value = {"id": 123, "name": "Los Angeles Lakers", "abbreviation": "LAL"}
+        mock_request.return_value = {"id": 123, "name": "Los Angeles Lakers", "abbreviation": "LAL"}
         result = get_team_by_id(123)
         self.assertIsInstance(result, dict)
         self.assertEqual(result["abbreviation"], "LAL")
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_team_by_id
         result = get_team_by_id(999)
         self.assertEqual(result, {})
@@ -592,16 +592,16 @@ class TestGameOddsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_game_odds
-        mock_fetch.return_value = [{"game_id": "g1", "spread": -3.5}]
+        mock_request.return_value = [{"game_id": "g1", "spread": -3.5}]
         result = get_game_odds(game_id="g1")
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_game_odds
         result = get_game_odds()
         self.assertEqual(result, [])
@@ -612,16 +612,16 @@ class TestNbaTeamStatsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_nba_team_stats
-        mock_fetch.return_value = [{"team_id": 1, "wins": 30, "losses": 15}]
+        mock_request.return_value = [{"team_id": 1, "wins": 30, "losses": 15}]
         result = get_nba_team_stats(team_id=1, season=2024)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_nba_team_stats
         result = get_nba_team_stats()
         self.assertEqual(result, [])
@@ -632,16 +632,16 @@ class TestNbaPlayerStatsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_nba_player_stats
-        mock_fetch.return_value = [{"player_id": 10, "pts": 28.5}]
+        mock_request.return_value = [{"player_id": 10, "pts": 28.5}]
         result = get_nba_player_stats(player_id=10)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_nba_player_stats
         result = get_nba_player_stats()
         self.assertEqual(result, [])
@@ -652,9 +652,9 @@ class TestPredictionsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_returns_list_on_success(self, mock_fetch, mock_key):
+    def test_returns_list_on_success(self, mock_request, mock_key):
         from data.nba_api_client import get_predictions
-        mock_fetch.return_value = [{"game_id": "g1", "predicted_winner": "LAL", "confidence": 0.72}]
+        mock_request.return_value = [{"game_id": "g1", "predicted_winner": "LAL", "confidence": 0.72}]
         result = get_predictions(game_id="g1")
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
@@ -662,7 +662,7 @@ class TestPredictionsRuntime(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
         from data.nba_api_client import get_predictions
         result = get_predictions()
         self.assertEqual(result, [])

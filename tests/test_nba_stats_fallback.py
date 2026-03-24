@@ -136,11 +136,11 @@ class TestFetchTeamStatsFallback(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_returns_team_stats_on_success(self, mock_fetch):
+    def test_returns_team_stats_on_success(self, mock_request):
         from data.nba_stats_backup import get_team_stats_backup
 
         # Basic stats response
-        mock_fetch.side_effect = [
+        mock_request.side_effect = [
             {  # basic
                 "resultSets": [{
                     "headers": ["TEAM_ID", "TEAM_ABBREVIATION", "TEAM_NAME", "W", "L"],
@@ -168,7 +168,7 @@ class TestFetchTeamStatsFallback(unittest.TestCase):
         self.assertAlmostEqual(team["defensive_rating"], 108.7)
 
     @patch("data.nba_stats_backup._request_nba_stats", return_value=None)
-    def test_returns_empty_on_failure(self, mock_fetch):
+    def test_returns_empty_on_failure(self, mock_request):
         from data.nba_stats_backup import get_team_stats_backup
         result = get_team_stats_backup()
         self.assertEqual(result, [])
@@ -184,10 +184,10 @@ class TestFetchPlayersFallback(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_returns_players_on_success(self, mock_fetch):
+    def test_returns_players_on_success(self, mock_request):
         from data.nba_stats_backup import get_players_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": [
                     "PERSON_ID", "DISPLAY_FIRST_LAST", "DISPLAY_LAST_COMMA_FIRST",
@@ -208,10 +208,10 @@ class TestFetchPlayersFallback(unittest.TestCase):
         self.assertEqual(result[1]["team_abbreviation"], "BOS")
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_filters_by_team_id(self, mock_fetch):
+    def test_filters_by_team_id(self, mock_request):
         from data.nba_stats_backup import get_players_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": [
                     "PERSON_ID", "DISPLAY_FIRST_LAST", "DISPLAY_LAST_COMMA_FIRST",
@@ -229,7 +229,7 @@ class TestFetchPlayersFallback(unittest.TestCase):
         self.assertEqual(result[0]["name"], "LeBron James")
 
     @patch("data.nba_stats_backup._request_nba_stats", return_value=None)
-    def test_returns_empty_on_failure(self, mock_fetch):
+    def test_returns_empty_on_failure(self, mock_request):
         from data.nba_stats_backup import get_players_backup
         result = get_players_backup()
         self.assertEqual(result, [])
@@ -245,10 +245,10 @@ class TestFetchPlayerStatsFallback(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_returns_player_stats_on_success(self, mock_fetch):
+    def test_returns_player_stats_on_success(self, mock_request):
         from data.nba_stats_backup import get_player_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": [
                     "PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION",
@@ -278,7 +278,7 @@ class TestFetchPlayerStatsFallback(unittest.TestCase):
             self.assertEqual(p[std_field], 0.0, f"{std_field} should be 0.0")
 
     @patch("data.nba_stats_backup._request_nba_stats", return_value=None)
-    def test_returns_empty_on_failure(self, mock_fetch):
+    def test_returns_empty_on_failure(self, mock_request):
         from data.nba_stats_backup import get_player_stats_backup
         result = get_player_stats_backup()
         self.assertEqual(result, [])
@@ -294,10 +294,10 @@ class TestFetchNbaTeamStatsFallback(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_returns_team_stats_on_success(self, mock_fetch):
+    def test_returns_team_stats_on_success(self, mock_request):
         from data.nba_stats_backup import get_nba_team_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": ["TEAM_ID", "TEAM_NAME", "W", "L", "PTS"],
                 "rowSet": [[1, "Lakers", 30, 20, 115.5]],
@@ -310,10 +310,10 @@ class TestFetchNbaTeamStatsFallback(unittest.TestCase):
         self.assertEqual(result[0]["team_name"], "Lakers")
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_filters_by_team_id(self, mock_fetch):
+    def test_filters_by_team_id(self, mock_request):
         from data.nba_stats_backup import get_nba_team_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": ["TEAM_ID", "TEAM_NAME"],
                 "rowSet": [[1, "Lakers"], [2, "Celtics"]],
@@ -325,7 +325,7 @@ class TestFetchNbaTeamStatsFallback(unittest.TestCase):
         self.assertEqual(result[0]["team_name"], "Lakers")
 
     @patch("data.nba_stats_backup._request_nba_stats", return_value=None)
-    def test_returns_empty_on_failure(self, mock_fetch):
+    def test_returns_empty_on_failure(self, mock_request):
         from data.nba_stats_backup import get_nba_team_stats_backup
         result = get_nba_team_stats_backup()
         self.assertEqual(result, [])
@@ -341,10 +341,10 @@ class TestFetchNbaPlayerStatsFallback(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_returns_player_stats_on_success(self, mock_fetch):
+    def test_returns_player_stats_on_success(self, mock_request):
         from data.nba_stats_backup import get_nba_player_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": ["PLAYER_ID", "PLAYER_NAME", "PTS"],
                 "rowSet": [[10, "LeBron James", 28.5]],
@@ -357,10 +357,10 @@ class TestFetchNbaPlayerStatsFallback(unittest.TestCase):
         self.assertEqual(result[0]["player_name"], "LeBron James")
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_filters_by_player_id(self, mock_fetch):
+    def test_filters_by_player_id(self, mock_request):
         from data.nba_stats_backup import get_nba_player_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": ["PLAYER_ID", "PLAYER_NAME"],
                 "rowSet": [[10, "LeBron"], [20, "Tatum"]],
@@ -372,7 +372,7 @@ class TestFetchNbaPlayerStatsFallback(unittest.TestCase):
         self.assertEqual(result[0]["player_name"], "LeBron")
 
     @patch("data.nba_stats_backup._request_nba_stats", return_value=None)
-    def test_returns_empty_on_failure(self, mock_fetch):
+    def test_returns_empty_on_failure(self, mock_request):
         from data.nba_stats_backup import get_nba_player_stats_backup
         result = get_nba_player_stats_backup()
         self.assertEqual(result, [])
@@ -388,10 +388,10 @@ class TestFallbackCaching(unittest.TestCase):
         fb._cache.clear()
 
     @patch("data.nba_stats_backup._request_nba_stats")
-    def test_second_call_uses_cache(self, mock_fetch):
+    def test_second_call_uses_cache(self, mock_request):
         from data.nba_stats_backup import get_player_stats_backup
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "resultSets": [{
                 "headers": ["PLAYER_ID", "PLAYER_NAME", "TEAM_ABBREVIATION",
                             "MIN", "PTS", "REB", "AST", "FG3M",
@@ -405,11 +405,11 @@ class TestFallbackCaching(unittest.TestCase):
         self.assertEqual(len(result1), 1)
 
         # Second call should use cache — mock won't be called again
-        mock_fetch.reset_mock()
-        mock_fetch.return_value = None  # If called, would return empty
+        mock_request.reset_mock()
+        mock_request.return_value = None  # If called, would return empty
         result2 = get_player_stats_backup()
         self.assertEqual(len(result2), 1)
-        mock_fetch.assert_not_called()
+        mock_request.assert_not_called()
 
 
 # ── Section 9: ApiNba fallback integration ─────────────────────────────
@@ -420,7 +420,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_player_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_player_stats_falls_back(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_player_stats_falls_back(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_player_stats
         mock_fallback.return_value = [{"player_id": "10", "name": "LeBron", "team": "LAL"}]
         result = get_player_stats()
@@ -430,7 +430,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_team_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_team_stats_falls_back(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_team_stats_falls_back(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_team_stats
         mock_fallback.return_value = [{"team_abbreviation": "LAL", "wins": 30}]
         result = get_team_stats()
@@ -440,7 +440,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_players_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_players_falls_back(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_players_falls_back(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_players
         mock_fallback.return_value = [{"id": 10, "name": "LeBron"}]
         result = get_players()
@@ -450,7 +450,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_nba_team_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_nba_team_stats_falls_back(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_nba_team_stats_falls_back(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_nba_team_stats
         mock_fallback.return_value = [{"team_id": 1, "w": 30}]
         result = get_nba_team_stats()
@@ -460,7 +460,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_nba_team_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_nba_team_stats_forwards_season(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_nba_team_stats_forwards_season(self, mock_request, mock_key, mock_fallback):
         """Season parameter must be forwarded to fallback (not hardcoded None)."""
         from data.nba_api_client import get_nba_team_stats
         mock_fallback.return_value = [{"team_id": 1, "w": 30}]
@@ -470,7 +470,7 @@ class TestApiNbaFallbackIntegration(unittest.TestCase):
     @patch("data.nba_stats_backup.get_nba_player_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_nba_player_stats_falls_back(self, mock_fetch, mock_key, mock_fallback):
+    def test_get_nba_player_stats_falls_back(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_nba_player_stats
         mock_fallback.return_value = [{"player_id": 10, "pts": 28.5}]
         result = get_nba_player_stats()
@@ -486,9 +486,9 @@ class TestApiNbaPrimaryStillWorks(unittest.TestCase):
     @patch("data.nba_stats_backup.get_player_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_player_stats_uses_primary(self, mock_fetch, mock_key, mock_fallback):
+    def test_player_stats_uses_primary(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_player_stats
-        mock_fetch.return_value = [{"id": 10, "name": "LeBron", "team": "LAL"}]
+        mock_request.return_value = [{"id": 10, "name": "LeBron", "team": "LAL"}]
         result = get_player_stats()
         self.assertEqual(len(result), 1)
         mock_fallback.assert_not_called()
@@ -496,9 +496,9 @@ class TestApiNbaPrimaryStillWorks(unittest.TestCase):
     @patch("data.nba_stats_backup.get_team_stats_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_team_stats_uses_primary(self, mock_fetch, mock_key, mock_fallback):
+    def test_team_stats_uses_primary(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_team_stats
-        mock_fetch.return_value = [{"abbreviation": "LAL", "name": "Lakers", "wins": 30}]
+        mock_request.return_value = [{"abbreviation": "LAL", "name": "Lakers", "wins": 30}]
         result = get_team_stats()
         self.assertEqual(len(result), 1)
         mock_fallback.assert_not_called()
@@ -506,9 +506,9 @@ class TestApiNbaPrimaryStillWorks(unittest.TestCase):
     @patch("data.nba_stats_backup.get_players_backup")
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_players_uses_primary(self, mock_fetch, mock_key, mock_fallback):
+    def test_players_uses_primary(self, mock_request, mock_key, mock_fallback):
         from data.nba_api_client import get_players
-        mock_fetch.return_value = [{"id": 10, "name": "LeBron"}]
+        mock_request.return_value = [{"id": 10, "name": "LeBron"}]
         result = get_players()
         self.assertEqual(len(result), 1)
         mock_fallback.assert_not_called()

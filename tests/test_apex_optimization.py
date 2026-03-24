@@ -82,7 +82,7 @@ class TestTrueLineExtraction(unittest.TestCase):
 # ============================================================
 
 class TestAsyncBetResolver(unittest.TestCase):
-    """Verify bet resolver uses ThreadPoolExecutor for parallel fetching."""
+    """Verify bet resolver uses ThreadPoolExecutor for parallel retrieval."""
 
     def test_threadpoolexecutor_in_auto_resolve(self):
         """auto_resolve_bet_results should import ThreadPoolExecutor."""

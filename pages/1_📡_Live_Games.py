@@ -392,8 +392,8 @@ if auto_load_clicked:
             st.error(f"❌ Auto-load failed: {_exc}")
 
 if load_players_clicked:
-    todays_games_for_fetch = st.session_state.get("todays_games", [])
-    if not todays_games_for_fetch:
+    todays_games_to_load = st.session_state.get("todays_games", [])
+    if not todays_games_to_load:
         st.warning(
             "⚠️ No games loaded yet. Click **Auto-Load Tonight's Games** first, "
             "or add games manually below."
@@ -409,7 +409,7 @@ if load_players_clicked:
 
         with st.spinner("⚡ Loading current rosters and player stats..."):
             success = get_todays_players(
-                todays_games_for_fetch,
+                todays_games_to_load,
                 progress_callback=_on_players_progress,
             )
 

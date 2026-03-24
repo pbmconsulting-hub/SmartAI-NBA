@@ -141,11 +141,11 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_games_with_none_records(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_games_with_none_records(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with home_record: null should not cause AttributeError."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g1",
                 "home_team": "LAL",
@@ -168,11 +168,11 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_games_with_nested_records(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_games_with_nested_records(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with nested home_record dicts should parse correctly."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g2",
                 "home_team": "MIA",
@@ -195,11 +195,11 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_games_with_flat_wins_losses(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_games_with_flat_wins_losses(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with flat home_wins/home_losses fields should parse correctly."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g3",
                 "home_team": "GSW",
@@ -320,11 +320,11 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_skips_games_with_empty_teams(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_skips_games_with_empty_teams(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games missing team abbreviations should be skipped."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.5},
             {"game_id": "g2"},  # no team info at all
             {"game_id": "g3", "home_team": "MIA"},  # missing away_team
@@ -338,11 +338,11 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_alternate_field_names_work(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_alternate_field_names_work(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with alternate field names (tricode, nested) should parse."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_tricode": "LAL", "away_tricode": "BOS", "vegas_spread": -2.0},
         ]
 
@@ -355,7 +355,7 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_client_side_date_filter(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_client_side_date_filter(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """When API returns >20 games, client-side date filter should apply."""
         from data.nba_api_client import get_todays_games, _today_str
 
@@ -382,7 +382,7 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
             "game_date": today,
         })
 
-        mock_fetch.return_value = all_games
+        mock_request.return_value = all_games
         games = get_todays_games()
         self.assertEqual(len(games), 2)
 
@@ -390,11 +390,11 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_nested_team_objects(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_nested_team_objects(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with nested team objects should parse correctly."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g1",
                 "home": {"abbreviation": "CHI"},
@@ -839,60 +839,60 @@ class TestApiNbaExplicitNullCrashSafety(unittest.TestCase):
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_player_game_log_null_games_key(self, mock_fetch, mock_key):
+    def test_get_player_game_log_null_games_key(self, mock_request, mock_key):
         """get_player_game_log must not crash when API returns {"games": null}."""
         from data.nba_api_client import get_player_game_log
-        mock_fetch.return_value = {"games": None}
+        mock_request.return_value = {"games": None}
         result = get_player_game_log(player_id=123)
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_player_game_log_null_data_key(self, mock_fetch, mock_key):
+    def test_get_player_game_log_null_data_key(self, mock_request, mock_key):
         """get_player_game_log must not crash when API returns {"data": null}."""
         from data.nba_api_client import get_player_game_log
-        mock_fetch.return_value = {"data": None}
+        mock_request.return_value = {"data": None}
         result = get_player_game_log(player_id=123)
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_standings_null_standings_key(self, mock_fetch, mock_key):
+    def test_get_standings_null_standings_key(self, mock_request, mock_key):
         """get_standings must not crash when API returns {"standings": null}."""
         from data.nba_api_client import get_standings
-        mock_fetch.return_value = {"standings": None}
+        mock_request.return_value = {"standings": None}
         result = get_standings()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_standings_null_data_key(self, mock_fetch, mock_key):
+    def test_get_standings_null_data_key(self, mock_request, mock_key):
         """get_standings must not crash when API returns {"data": null}."""
         from data.nba_api_client import get_standings
-        mock_fetch.return_value = {"data": None}
+        mock_request.return_value = {"data": None}
         result = get_standings()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_news_null_news_key(self, mock_fetch, mock_key):
+    def test_get_news_null_news_key(self, mock_request, mock_key):
         """get_news must not crash when API returns {"news": null}."""
         from data.nba_api_client import get_news
-        mock_fetch.return_value = {"news": None}
+        mock_request.return_value = {"news": None}
         result = get_news()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
     @patch("data.nba_api_client._request_with_retry")
-    def test_get_news_null_articles_key(self, mock_fetch, mock_key):
+    def test_get_news_null_articles_key(self, mock_request, mock_key):
         """get_news must not crash when API returns {"articles": null}."""
         from data.nba_api_client import get_news
-        mock_fetch.return_value = {"articles": None}
+        mock_request.return_value = {"articles": None}
         result = get_news()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
@@ -973,11 +973,11 @@ class TestStandingsNonDictItemRuntime(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_skips_none_items_in_standings_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_skips_none_items_in_standings_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the standings list contains None items, they should be skipped."""
         from data.nba_api_client import get_standings
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "standings": [
                 None,
                 {"team": "LAL", "wins": 45, "losses": 20},
@@ -1001,11 +1001,11 @@ class TestNewsNonDictItemRuntime(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_skips_none_items_in_news_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_skips_none_items_in_news_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the news list contains None items, they should be skipped."""
         from data.nba_api_client import get_news
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "news": [
                 None,
                 {"title": "LeBron 40pts", "body": "Great game"},
@@ -1028,11 +1028,11 @@ class TestGameLogNonDictItemRuntime(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_skips_none_items_in_game_log_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_skips_none_items_in_game_log_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the game log list contains None items, they should be skipped."""
         from data.nba_api_client import get_player_game_log
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "games": [
                 None,
                 {"date": "2026-03-20", "pts": 28, "reb": 7, "ast": 10},
@@ -1083,11 +1083,11 @@ class TestNonNbaTeamFiltering(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_non_nba_teams_filtered(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_non_nba_teams_filtered(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with non-NBA teams like STARS, STRIPES, TBD, WORLD should be excluded."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "real_1", "home_team": "LAL", "away_team": "BOS"},
             {"game_id": "allstar", "home_team": "STARS", "away_team": "STRIPES"},
             {"game_id": "real_2", "home_team": "MIA", "away_team": "NYK"},
@@ -1105,11 +1105,11 @@ class TestNonNbaTeamFiltering(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_common_aliases_accepted(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_common_aliases_accepted(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Common NBA abbreviation aliases (GS, NY, SA, etc.) should be accepted."""
         from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_team": "GS", "away_team": "NY"},
             {"game_id": "g2", "home_team": "SA", "away_team": "NO"},
             {"game_id": "g3", "home_team": "UTAH", "away_team": "WSH"},
@@ -1126,7 +1126,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_gameDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_gameDate_field_matched(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """gameDate field should be recognized for date filtering."""
         from data.nba_api_client import get_todays_games, _today_str
 
@@ -1143,7 +1143,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
             "gameDate": today,
         })
 
-        mock_fetch.return_value = all_games
+        mock_request.return_value = all_games
         games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "MIA")
@@ -1152,7 +1152,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
     @patch("data.nba_api_client._cache_get", return_value=None)
     @patch("data.nba_api_client._cache_set")
     @patch("data.nba_api_client._request_with_retry")
-    def test_startDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    def test_startDate_field_matched(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """startDate field should be recognized for date filtering."""
         from data.nba_api_client import get_todays_games, _today_str
 
@@ -1169,7 +1169,7 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
             "startDate": today,
         })
 
-        mock_fetch.return_value = all_games
+        mock_request.return_value = all_games
         games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "PHX")

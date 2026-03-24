@@ -1945,7 +1945,7 @@ def get_player_card_html(result):
     """
     Build the complete styled analysis card HTML for one prop result.
 
-    The card header now includes a player headshot fetched from the NBA CDN
+    The card header now includes a player headshot loaded from the NBA CDN
     (``https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png``).
     An ``onerror`` handler falls back to a generic silhouette when the image
     is unavailable (e.g. sample / unknown player IDs).

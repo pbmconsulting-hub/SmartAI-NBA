@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: tests/test_phase1_retry_and_index.py
 # PURPOSE: Tests for Phase 1 improvements:
-#          1) Sync fetch functions use _request_with_retry (exponential backoff)
+#          1) Sync get functions use _request_with_retry (exponential backoff)
 #          2) Pre-indexed player lookup for O(1) fuzzy matching
 # ============================================================
 
@@ -25,7 +25,7 @@ def _ensure_streamlit_mock():
 # ============================================================
 
 class TestSyncFetchRetryIntegration(unittest.TestCase):
-    """Verify that synchronous platform fetch functions call _request_with_retry
+    """Verify that synchronous platform get functions call _request_with_retry
     instead of raw requests.get, ensuring exponential backoff on 429/5xx."""
 
     def setUp(self):

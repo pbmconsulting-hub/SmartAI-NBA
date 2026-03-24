@@ -643,7 +643,7 @@ def auto_resolve_bet_results(date_str=None):
 
     # ── Pre-validate bets and collect unique player names ─────
     _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
-    _names_to_fetch: set = set()
+    _names_to_load: set = set()
 
     for bet in pending_bets:
         bet_id      = bet.get("bet_id")
@@ -674,7 +674,7 @@ def auto_resolve_bet_results(date_str=None):
             errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
             continue
 
-        _names_to_fetch.add(player_name)
+        _names_to_load.add(player_name)
         _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
 
     if not _bet_prep:
@@ -683,7 +683,7 @@ def auto_resolve_bet_results(date_str=None):
     # ── Resolve player names → API-NBA player IDs ────────
     # get_player_id() checks: cache → API-NBA API → nba_api static (local)
     _name_to_pid: dict = {}
-    for pname in _names_to_fetch:
+    for pname in _names_to_load:
         if _lookup_pid is not None:
             pid = _lookup_pid(pname)
             # Also try normalized form (handles unicode/suffix differences)
@@ -698,7 +698,7 @@ def auto_resolve_bet_results(date_str=None):
     import time as _time
 
     # Group: player_name → player_id (or None)
-    _ids_to_fetch = {
+    _ids_to_load = {
         pid for pid in _name_to_pid.values() if pid
     }
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
@@ -717,7 +717,7 @@ def auto_resolve_bet_results(date_str=None):
                     return pid, []
         return pid, []
 
-    _unique_ids = list(_ids_to_fetch)
+    _unique_ids = list(_ids_to_load)
     with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids) or 1)) as executor:
         futures = {executor.submit(_get_player_log, pid): pid for pid in _unique_ids}
         for future in as_completed(futures):
@@ -900,7 +900,7 @@ def resolve_todays_bets():
 
     # ── Pre-validate bets and collect unique player names ─────
     _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
-    _names_to_fetch: set = set()
+    _names_to_load: set = set()
 
     for bet in todays_pending:
         bet_id      = bet.get("id") or bet.get("bet_id")
@@ -931,7 +931,7 @@ def resolve_todays_bets():
             summary["pending"] += 1
             continue
 
-        _names_to_fetch.add(player_name)
+        _names_to_load.add(player_name)
         _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
 
     if not _bet_prep:
@@ -939,7 +939,7 @@ def resolve_todays_bets():
 
     # ── Resolve player names → player IDs ────────────────────
     _name_to_pid: dict = {}
-    for pname in _names_to_fetch:
+    for pname in _names_to_load:
         pid = None
         if _lookup_pid is not None:
             pid = _lookup_pid(pname)
@@ -950,7 +950,7 @@ def resolve_todays_bets():
     # ── Retrieve game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    _ids_to_fetch = {pid for pid in _name_to_pid.values() if pid}
+    _ids_to_load = {pid for pid in _name_to_pid.values() if pid}
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _get_player_log(pid):
@@ -971,7 +971,7 @@ def resolve_todays_bets():
                     return pid, []
         return pid, []
 
-    _unique_ids = list(_ids_to_fetch)
+    _unique_ids = list(_ids_to_load)
     if _unique_ids:
         with ThreadPoolExecutor(max_workers=min(8, len(_unique_ids))) as executor:
             futures = {executor.submit(_get_player_log, pid): pid for pid in _unique_ids}

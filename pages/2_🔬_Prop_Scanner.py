@@ -149,9 +149,9 @@ try:
         load_platform_props_from_session,
         save_platform_props_to_csv,
     )
-    _PLATFORM_FETCHER_AVAILABLE = True
+    _SPORTSBOOK_SERVICE_AVAILABLE = True
 except ImportError:
-    _PLATFORM_FETCHER_AVAILABLE = False
+    _SPORTSBOOK_SERVICE_AVAILABLE = False
 
 # ============================================================
 # END SECTION: Load Available Data
@@ -176,7 +176,7 @@ if not _user_is_premium:
         'You can still enter up to 5 props manually below.</div>',
         unsafe_allow_html=True,
     )
-elif _PLATFORM_FETCHER_AVAILABLE:
+elif _SPORTSBOOK_SERVICE_AVAILABLE:
     _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 

@@ -90,7 +90,7 @@ API_DELAY_SECONDS = 1.5
 # Values are empirically derived from NBA stat distributions.
 #
 # NOTE (W10): The fixed ratios below are kept for backward compatibility.
-# The new _dynamic_cv_for_live_fetch() function uses tier-based CV
+# The new _dynamic_cv_for_live_retrieval() function uses tier-based CV
 # which is called at the point of fallback estimate computation.
 # ============================================================
 FALLBACK_POINTS_STD_RATIO = 0.3      # Points: ~30% CV is typical for scorers
@@ -1746,7 +1746,7 @@ def get_cached_roster(team_abbrev):
 # std deviation estimates when live game logs are unavailable.
 # ============================================================
 
-def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
+def _dynamic_cv_for_live_retrieval(stat_type, stat_avg):
     """
     Get a dynamic coefficient of variation for fallback std estimation. (W10)
 

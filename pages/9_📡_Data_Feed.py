@@ -384,7 +384,7 @@ with sn_col1:
         st.session_state["update_action"] = "standings_news"
 
 with sn_col2:
-    _last_sn = st.session_state.get("standings_news_last_fetched")
+    _last_sn = st.session_state.get("standings_news_last_loaded")
     if _last_sn:
         st.caption(f"Last retrieved: {_last_sn}")
     else:
@@ -941,7 +941,7 @@ if current_action:
                 st.warning(f"News retrieval failed: {_news_err}")
 
         _now_sn = _dt_sn.datetime.now().strftime("%Y-%m-%d %H:%M")
-        st.session_state["standings_news_last_fetched"] = _now_sn
+        st.session_state["standings_news_last_loaded"] = _now_sn
 
         if _standings_data:
             st.success(
@@ -1000,12 +1000,12 @@ try:
         load_platform_props_from_session,
         save_platform_props_to_csv,
     )
-    _PLATFORM_FETCHER_AVAILABLE = True
+    _SPORTSBOOK_SERVICE_AVAILABLE = True
 except ImportError as _pf_err:
-    _PLATFORM_FETCHER_AVAILABLE = False
+    _SPORTSBOOK_SERVICE_AVAILABLE = False
     st.warning(f"⚠️ Platform service not available: {_pf_err}")
 
-if _PLATFORM_FETCHER_AVAILABLE:
+if _SPORTSBOOK_SERVICE_AVAILABLE:
 
     # ── Read current settings ──────────────────────────────────
     _pp_on = False
@@ -1163,7 +1163,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
 # our player database to find gaps and potential injuries.
 # ============================================================
 
-if _PLATFORM_FETCHER_AVAILABLE:
+if _SPORTSBOOK_SERVICE_AVAILABLE:
     _roster_props = load_platform_props_from_session(st.session_state)
     if _roster_props:
         st.divider()

@@ -5,7 +5,7 @@ Tests for the odds and historical data endpoint wiring:
   1. _enrich_games_with_clearsports_odds fills missing odds from ApiNba
   2. _enrich_games_with_predictions adds ApiNba predictions to games
   3. get_todays_games calls new enrichment functions
-  4. refresh_historical_data_for_tonight fetches ApiNba player stats
+  4. refresh_historical_data_for_tonight retrieves ApiNba player stats
   5. get_all_todays_data stores ApiNba odds/predictions in session state
 """
 
@@ -222,7 +222,7 @@ class TestFetchTodaysGamesNewEnrichment(unittest.TestCase):
         mock_preds.assert_called_once()
 
 
-# ── Section 4: refresh_historical_data_for_tonight fetches CS player stats ───
+# ── Section 4: refresh_historical_data_for_tonight retrieves CS player stats ───
 
 class TestHistoricalDataRefresherWiring(unittest.TestCase):
     """Verify refresh_historical_data_for_tonight uses new endpoints."""
@@ -240,11 +240,11 @@ class TestHistoricalDataRefresherWiring(unittest.TestCase):
     @patch("data.data_manager.load_players_data", return_value=[
         {"name": "Test Player", "team": "LAL", "player_id": 1}
     ])
-    def test_fetches_cs_player_stats(
+    def test_retrieves_cs_player_stats(
         self, mock_load, mock_save, mock_batch, mock_clv,
         mock_cs_pstats, mock_scores
     ):
-        """Historical refresh should fetch ApiNba player stats."""
+        """Historical refresh should retrieve ApiNba player stats."""
         from data.nba_data_service import refresh_historical_data_for_tonight
         result = refresh_historical_data_for_tonight(
             games=[{"home_team": "LAL", "away_team": "BOS"}]
@@ -263,11 +263,11 @@ class TestHistoricalDataRefresherWiring(unittest.TestCase):
     @patch("data.data_manager.load_players_data", return_value=[
         {"name": "Test Player", "team": "LAL", "player_id": 1}
     ])
-    def test_fetches_recent_scores(
+    def test_retrieves_recent_scores(
         self, mock_load, mock_save, mock_batch, mock_clv,
         mock_cs_pstats, mock_scores
     ):
-        """Historical refresh should fetch Odds API recent scores."""
+        """Historical refresh should retrieve Odds API recent scores."""
         from data.nba_data_service import refresh_historical_data_for_tonight
         result = refresh_historical_data_for_tonight(
             games=[{"home_team": "LAL", "away_team": "BOS"}]
