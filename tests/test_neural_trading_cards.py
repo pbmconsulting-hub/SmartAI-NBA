@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ============================================================
 
 class TestNbaContextFetcher(unittest.TestCase):
-    """Tests for data.nba_context_fetcher module."""
+    """Tests for data.player_profile_service module."""
 
     def setUp(self):
         from data.player_profile_service import (

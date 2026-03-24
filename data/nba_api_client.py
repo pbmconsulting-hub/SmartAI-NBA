@@ -264,7 +264,7 @@ def _build_cache_key(url: str, params: dict | None = None) -> str:
     return f"{url}?{qs}"
 
 
-def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | None:
+def _request_with_retry(url: str, params: dict | None = None) -> dict | list | None:
     """
     GET *url* with exponential-backoff retry and response caching.
 
@@ -452,7 +452,7 @@ def get_teams() -> list[dict]:
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -494,7 +494,7 @@ def get_games(season=None, date=None, team_id=None) -> list[dict]:
         params["team"] = team_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -529,7 +529,7 @@ def get_players(team_id=None) -> list[dict]:
         params["team"] = team_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw:
             players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
             if isinstance(players_raw, list):
@@ -567,7 +567,7 @@ def get_todays_games() -> list[dict]:
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": today}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -681,7 +681,7 @@ def get_player_stats() -> list[dict]:
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw:
             players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
             if isinstance(players_raw, list):
@@ -773,7 +773,7 @@ def get_player_stats() -> list[dict]:
     try:
         stats_url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
         stats_params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
-        raw_stats = _fetch_with_retry(stats_url, params=stats_params)
+        raw_stats = _request_with_retry(stats_url, params=stats_params)
         if raw_stats:
             stats_list = (
                 raw_stats if isinstance(raw_stats, list)
@@ -879,7 +879,7 @@ def get_team_stats() -> list[dict]:
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw:
             teams_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("teams") or raw.get("data") or [])
             if isinstance(teams_raw, list):
@@ -991,7 +991,7 @@ def get_injury_report(team_id=None) -> dict:
         params["team"] = team_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return {}
 
@@ -1041,7 +1041,7 @@ def get_live_scores() -> list[dict]:
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": _today_str()}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -1122,7 +1122,7 @@ def get_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
         params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "team": team_param}
 
         try:
-            raw = _fetch_with_retry(url, params=params)
+            raw = _request_with_retry(url, params=params)
             if not raw:
                 continue
 
@@ -1223,7 +1223,7 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
     url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
     params = {"player": player_id, "league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
-    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
@@ -1231,7 +1231,7 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
         return cached
 
     try:
-        data = _fetch_with_retry(url, params=params)
+        data = _request_with_retry(url, params=params)
         if not data:
             _PLAYER_ID_CACHE[str(player_id)] = None
             return []
@@ -1280,7 +1280,7 @@ def get_standings() -> list[dict]:
     url = f"{_BASE_URL}{ENDPOINT_STANDINGS}"
     params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
-    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
@@ -1288,7 +1288,7 @@ def get_standings() -> list[dict]:
         return cached
 
     try:
-        data = _fetch_with_retry(url, params=params)
+        data = _request_with_retry(url, params=params)
         if not data:
             return []
 
@@ -1447,7 +1447,7 @@ def get_news(limit: int = 20) -> list[dict]:
     url = f"{_BASE_URL}{ENDPOINT_NEWS}"
     params = {"limit": limit}
     # Use _build_cache_key so the outer cache key matches the one
-    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
@@ -1455,7 +1455,7 @@ def get_news(limit: int = 20) -> list[dict]:
         return cached
 
     try:
-        data = _fetch_with_retry(url, params=params)
+        data = _request_with_retry(url, params=params)
         if not data:
             return []
 
@@ -1522,7 +1522,7 @@ def get_season_game_logs_batch(
         try:
             logs = get_player_game_log(player_id, last_n_games=last_n_games)
             result[player_name] = logs
-            # Small pause to respect rate limits (same as odds_api_client pattern)
+            # Small pause to respect rate limits (same as odds_client pattern)
             time.sleep(0.15)
         except Exception as exc:
             _logger.debug(
@@ -1554,7 +1554,7 @@ def get_api_key_info() -> dict:
     url = f"{_BASE_URL}{ENDPOINT_STATUS}"
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _request_with_retry(url)
         if not raw or not isinstance(raw, dict):
             return {}
 
@@ -1611,7 +1611,7 @@ def get_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
     url = f"{_BASE_URL}{ENDPOINT_STATUS}"
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _request_with_retry(url)
         if not raw or not isinstance(raw, dict):
             return []
 
@@ -1658,7 +1658,7 @@ def get_api_key_stats(
     url = f"{_BASE_URL}{ENDPOINT_STATUS}"
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _request_with_retry(url)
         if not raw or not isinstance(raw, dict):
             return {}
 
@@ -1701,7 +1701,7 @@ def get_team_by_id(team_id) -> dict:
     params = {"id": team_id}
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw or not isinstance(raw, dict):
             return {}
         # API-Sports wraps responses in "response" key
@@ -1736,7 +1736,7 @@ def get_game_odds(game_id=None) -> list[dict]:
         params["game"] = game_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -1774,7 +1774,7 @@ def get_nba_team_stats(team_id=None, season=None) -> list[dict]:
         params["season"] = season
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw:
             stats_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("stats") or raw.get("data") or [])
             if isinstance(stats_raw, list) and stats_raw:
@@ -1821,7 +1821,7 @@ def get_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
             params["player"] = player_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw:
             stats_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("stats") or raw.get("data") or [])
             if isinstance(stats_raw, list) and stats_raw:
@@ -1860,7 +1860,7 @@ def get_predictions(game_id=None) -> list[dict]:
         params["game"] = game_id
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -1875,27 +1875,27 @@ def get_predictions(game_id=None) -> list[dict]:
         return []
 
 
-# ── Backward-compatible aliases (deprecated) ──
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
 validate_api_key = validate_nba_api_key
-get_teams = get_teams
-get_games = get_games
-get_players = get_players
-get_todays_games = get_todays_games
-get_player_stats = get_player_stats
-get_team_stats = get_team_stats
-get_injury_report = get_injury_report
-get_live_scores = get_live_scores
-get_rosters = get_rosters
-get_player_id = get_player_id
-get_player_game_log = get_player_game_log
-get_standings = get_standings
-get_news = get_news
-get_season_game_logs_batch = get_season_game_logs_batch
-get_api_key_info = get_api_key_info
-get_api_key_usage = get_api_key_usage
-get_api_key_stats = get_api_key_stats
-get_team_by_id = get_team_by_id
-get_game_odds = get_game_odds
-get_nba_team_stats = get_nba_team_stats
-get_nba_player_stats = get_nba_player_stats
-get_predictions = get_predictions
+fetch_teams = get_teams
+fetch_games = get_games
+fetch_players = get_players
+fetch_games_today = get_todays_games
+fetch_player_stats = get_player_stats
+fetch_team_stats = get_team_stats
+fetch_injury_report = get_injury_report
+fetch_live_scores = get_live_scores
+fetch_rosters = get_rosters
+lookup_player_id = get_player_id
+fetch_player_game_log = get_player_game_log
+fetch_standings = get_standings
+fetch_news = get_news
+fetch_season_game_logs_batch = get_season_game_logs_batch
+fetch_api_key_info = get_api_key_info
+fetch_api_key_usage = get_api_key_usage
+fetch_api_key_stats = get_api_key_stats
+fetch_team_by_id = get_team_by_id
+fetch_game_odds = get_game_odds
+fetch_nba_team_stats = get_nba_team_stats
+fetch_nba_player_stats = get_nba_player_stats
+fetch_predictions = get_predictions

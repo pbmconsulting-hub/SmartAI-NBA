@@ -341,14 +341,14 @@ class TestOddsWiringSourceLevel(unittest.TestCase):
         """_enrich_games_with_predictions function must exist."""
         self.assertIn("def _enrich_games_with_predictions(", self.src)
 
-    def test_fetch_todays_games_calls_cs_odds(self):
+    def test_get_todays_games_calls_cs_odds(self):
         """get_todays_games must call _enrich_games_with_clearsports_odds."""
         idx = self.src.find("def get_todays_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 3000]
         self.assertIn("_enrich_games_with_clearsports_odds", snippet)
 
-    def test_fetch_todays_games_calls_predictions(self):
+    def test_get_todays_games_calls_predictions(self):
         """get_todays_games must call _enrich_games_with_predictions."""
         idx = self.src.find("def get_todays_games(")
         self.assertGreater(idx, 0)
@@ -369,14 +369,14 @@ class TestOddsWiringSourceLevel(unittest.TestCase):
         snippet = self.src[idx:idx + 7000]
         self.assertIn("get_recent_scores", snippet)
 
-    def test_fetch_all_stores_cs_odds(self):
+    def test_get_all_stores_cs_odds(self):
         """get_all_todays_data must reference get_game_odds from ApiNba."""
         idx = self.src.find("def get_all_todays_data(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 8000]
         self.assertIn("cs_game_odds", snippet)
 
-    def test_fetch_all_stores_cs_predictions(self):
+    def test_get_all_stores_cs_predictions(self):
         """get_all_todays_data must reference get_predictions."""
         idx = self.src.find("def get_all_todays_data(")
         self.assertGreater(idx, 0)

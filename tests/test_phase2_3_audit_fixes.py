@@ -99,21 +99,21 @@ class TestTimezoneAnchoring(unittest.TestCase):
             except Exception:
                 pass  # Best-effort cleanup
 
-    def test_platform_fetcher_now_str_utc(self):
+    def test_sportsbook_service_now_str_utc(self):
         """sportsbook_service._now_str() should return a UTC timestamp."""
         from data.sportsbook_service import _now_str
         ts = _now_str()
         # Should include UTC offset
         self.assertIn("+00:00", ts)
 
-    def test_platform_fetcher_today_str_format(self):
+    def test_sportsbook_service_today_str_format(self):
         """sportsbook_service._today_str() should return YYYY-MM-DD format."""
         from data.sportsbook_service import _today_str
         ts = _today_str()
         # Should be YYYY-MM-DD format
         self.assertRegex(ts, r"^\d{4}-\d{2}-\d{2}$")
 
-    def test_live_data_fetcher_nba_today_et(self):
+    def test_nba_data_service_nba_today_et(self):
         """nba_data_service._nba_today_et() should return a date object."""
         from data.nba_data_service import _nba_today_et
         result = _nba_today_et()

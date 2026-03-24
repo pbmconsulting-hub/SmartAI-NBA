@@ -2,7 +2,7 @@
 tests/test_vegas_vault.py
 -------------------------
 Tests for the Vegas Vault feature:
-  - calculate_implied_probability (appended to odds_api_client)
+  - calculate_implied_probability (appended to odds_client)
   - find_ev_discrepancies (engine/arbitrage_matcher)
   - joseph_vault_reaction (appended to joseph_brain)
   - pages/15_🎰_Vegas_Vault.py (file structure)

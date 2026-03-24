@@ -315,7 +315,7 @@ def _invalidate_data_caches():
 
     Called after writing fresh data to disk so the next Streamlit read
     picks up the new file content instead of a stale in-memory copy.
-    Imported lazily to avoid circular imports (live_data_fetcher is
+    Imported lazily to avoid circular imports (nba_data_service is
     loaded early in the Python import chain).
 
     BEGINNER NOTE: Streamlit's @st.cache_data caches function results
@@ -436,7 +436,7 @@ def _utc_to_et_display(game_time_utc):
 # Fetches which NBA games are being played today via API-NBA API.
 # ============================================================
 
-def _fetch_team_records():
+def _load_team_records():
     """
     Fetch team records (W-L) from API-NBA API team stats.
 
@@ -477,7 +477,7 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
         away_team_name (str): Full away team name.
         game_time_et (str): Game time display string (ET).
         arena_display (str): Arena name.
-        team_records (dict): Lookup dict from _fetch_team_records().
+        team_records (dict): Lookup dict from _load_team_records().
 
     Returns:
         dict: Standardised game dict.
@@ -1762,7 +1762,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
         float: Coefficient of variation to multiply against stat_avg.
     """
     # Import here to avoid a circular import at module load time.
-    # (live_data_fetcher is imported by data_manager which may be imported
+    # (nba_data_service is imported by data_manager which may be imported
     # before engine.projections, so this lazy import is intentional.)
     from engine.projections import _get_dynamic_cv
     return _get_dynamic_cv(stat_type, stat_avg)
@@ -2070,16 +2070,16 @@ def refresh_historical_data_for_tonight(
 # ============================================================
 
 
-# ── Backward-compatible aliases (deprecated) ──
-get_todays_games = get_todays_games
-get_todays_players = get_todays_players
-get_player_recent_form = get_player_recent_form
-get_player_stats = get_player_stats
-get_team_stats = get_team_stats
-get_defensive_ratings = get_defensive_ratings
-get_player_game_log = get_player_game_log
-get_all_data = get_all_data
-get_all_todays_data = get_all_todays_data
-get_active_rosters = get_active_rosters
-get_standings = get_standings
-get_player_news = get_player_news
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
+fetch_todays_games = get_todays_games
+fetch_todays_players_only = get_todays_players
+fetch_player_recent_form = get_player_recent_form
+fetch_player_stats = get_player_stats
+fetch_team_stats = get_team_stats
+fetch_defensive_ratings = get_defensive_ratings
+fetch_player_game_log = get_player_game_log
+fetch_all_data = get_all_data
+fetch_all_todays_data = get_all_todays_data
+fetch_active_rosters = get_active_rosters
+fetch_standings = get_standings
+fetch_player_news = get_player_news

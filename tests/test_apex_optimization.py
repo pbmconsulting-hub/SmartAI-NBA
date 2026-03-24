@@ -58,7 +58,7 @@ class TestTrueLineExtraction(unittest.TestCase):
         src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("get_player_props", content,
-                       "odds_api_client should define get_player_props()")
+                       "odds_client should define get_player_props()")
 
     def test_none_line_discards_silently(self):
         """If line value is None/missing, the prop should be silently discarded."""
@@ -106,11 +106,11 @@ class TestAsyncBetResolver(unittest.TestCase):
                        "Resolver should maintain a _game_log_cache for parallel fetch results")
 
     def test_parallel_fetch_helper_exists(self):
-        """A _fetch_player_log helper should exist for the ThreadPoolExecutor."""
+        """A _get_player_log helper should exist for the ThreadPoolExecutor."""
         src = pathlib.Path(__file__).parent.parent / "tracking" / "bet_tracker.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("def _fetch_player_log(", content,
-                       "_fetch_player_log helper should be defined for parallel fetching")
+        self.assertIn("def _get_player_log(", content,
+                       "_get_player_log helper should be defined for parallel fetching")
 
     def test_max_workers_capped(self):
         """ThreadPoolExecutor max_workers should be capped at 8."""

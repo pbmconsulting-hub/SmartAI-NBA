@@ -115,7 +115,7 @@ def _normalize_season(season) -> str:
         return s
 
 
-def _fetch_nba_stats(endpoint: str, params: dict) -> dict | None:
+def _request_nba_stats(endpoint: str, params: dict) -> dict | None:
     """
     GET an NBA stats endpoint and return the parsed JSON, or None on error.
 
@@ -171,7 +171,7 @@ def get_team_stats_backup(season: str | None = None) -> list[dict]:
         return cached
 
     season = _normalize_season(season)
-    basic_data = _fetch_nba_stats("leaguedashteamstats", {
+    basic_data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -179,7 +179,7 @@ def get_team_stats_backup(season: str | None = None) -> list[dict]:
         "LeagueID": "00",
     })
     # LeagueDashTeamStats with MeasureType=Advanced gives pace/ratings
-    adv_data = _fetch_nba_stats("leaguedashteamstats", {
+    adv_data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Advanced",
@@ -241,7 +241,7 @@ def get_players_backup(team_id=None, season: str | None = None) -> list[dict]:
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("commonallplayers", {
+    data = _request_nba_stats("commonallplayers", {
         "Season": season,
         "LeagueID": "00",
         "IsOnlyCurrentSeason": "1",
@@ -295,7 +295,7 @@ def get_player_stats_backup(season: str | None = None) -> list[dict]:
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashplayerstats", {
+    data = _request_nba_stats("leaguedashplayerstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -363,7 +363,7 @@ def get_nba_team_stats_backup(
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashteamstats", {
+    data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -407,7 +407,7 @@ def get_nba_player_stats_backup(
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashplayerstats", {
+    data = _request_nba_stats("leaguedashplayerstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -436,9 +436,9 @@ def get_nba_player_stats_backup(
     return rows
 
 
-# ── Backward-compatible aliases (deprecated) ──
-get_team_stats_backup = get_team_stats_backup
-get_players_backup = get_players_backup
-get_player_stats_backup = get_player_stats_backup
-get_nba_team_stats_backup = get_nba_team_stats_backup
-get_nba_player_stats_backup = get_nba_player_stats_backup
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
+fetch_team_stats_fallback = get_team_stats_backup
+fetch_players_fallback = get_players_backup
+fetch_player_stats_fallback = get_player_stats_backup
+fetch_nba_team_stats_fallback = get_nba_team_stats_backup
+fetch_nba_player_stats_fallback = get_nba_player_stats_backup

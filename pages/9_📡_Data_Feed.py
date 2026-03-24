@@ -924,8 +924,8 @@ if current_action:
 
         with st.spinner("Fetching NBA standings from API-NBA…"):
             try:
-                from data.nba_data_service import get_standings as _fetch_standings_ldf
-                _standings_data = _fetch_standings_ldf()
+                from data.nba_data_service import get_standings as _get_standings_svc
+                _standings_data = _get_standings_svc()
                 st.session_state["league_standings"] = _standings_data
             except Exception as _sn_err:
                 _standings_data = []
@@ -933,8 +933,8 @@ if current_action:
 
         with st.spinner("Fetching recent NBA news from API-NBA…"):
             try:
-                from data.nba_data_service import get_player_news as _fetch_news_ldf
-                _news_data = _fetch_news_ldf(limit=30)
+                from data.nba_data_service import get_player_news as _get_news_svc
+                _news_data = _get_news_svc(limit=30)
                 st.session_state["player_news"] = _news_data
             except Exception as _news_err:
                 _news_data = []
@@ -1010,7 +1010,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
     # ── Read current settings ──────────────────────────────────
     _pp_on = False
     _ud_on = False
-    _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
+    _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 
     # Show platform status badges
@@ -1039,20 +1039,20 @@ if _PLATFORM_FETCHER_AVAILABLE:
         )
 
     # ── Fetch buttons ─────────────────────────────────────────
-    _fetch_col1, _fetch_col2 = st.columns(2)
+    _load_col1, _load_col2 = st.columns(2)
 
-    _fetch_pp = False
-    _fetch_ud = False
+    _load_pp = False
+    _load_ud = False
 
-    with _fetch_col1:
-        _fetch_dk = st.button(
+    with _load_col1:
+        _load_dk = st.button(
             "🔵 Fetch Sportsbook Lines",
             disabled=not _dk_on,
             width="stretch",
             help="Fetch lines from all major sportsbooks.",
         )
-    with _fetch_col2:
-        _fetch_all = st.button(
+    with _load_col2:
+        _load_all = st.button(
             "🔄 Refresh All Props",
             type="primary",
             width="stretch",
@@ -1060,18 +1060,18 @@ if _PLATFORM_FETCHER_AVAILABLE:
         )
 
     # ── Execute fetches ────────────────────────────────────────
-    _fetch_triggered = False
-    _fetch_pp_only = False
-    _fetch_ud_only = False
-    _fetch_dk_only = False
+    _load_triggered = False
+    _load_pp_only = False
+    _load_ud_only = False
+    _load_dk_only = False
 
-    if _fetch_all:
-        _fetch_triggered = True
-    elif _fetch_dk:
-        _fetch_triggered = True
-        _fetch_dk_only = True
+    if _load_all:
+        _load_triggered = True
+    elif _load_dk:
+        _load_triggered = True
+        _load_dk_only = True
 
-    if _fetch_triggered:
+    if _load_triggered:
         _progress_bar = st.progress(0, text="Starting fetch...")
 
         def _progress_cb(current, total, message):
@@ -1082,7 +1082,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
             _new_props = get_all_sportsbook_props(
                 include_prizepicks=False,
                 include_underdog=False,
-                include_draftkings=_dk_on and (_fetch_all or _fetch_dk_only),
+                include_draftkings=_dk_on and (_load_all or _load_dk_only),
                 odds_api_key=_dk_key or None,
                 progress_callback=_progress_cb,
             )

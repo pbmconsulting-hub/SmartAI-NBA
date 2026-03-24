@@ -360,5 +360,5 @@ def enrich_player_data(
     }
 
 
-# ── Backward-compatible aliases (deprecated) ──
-get_player_id = get_player_id
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
+lookup_player_id = get_player_id

@@ -31,7 +31,7 @@ except ImportError:
 # ============================================================
 
 
-def _fetch_live_boxscores_impl() -> list[dict]:
+def _get_live_boxscores_impl() -> list[dict]:
     """
     Fetch live NBA box scores from API-NBA API.
 
@@ -46,7 +46,7 @@ def _fetch_live_boxscores_impl() -> list[dict]:
         from data.nba_api_client import get_live_scores as _cs_live
         raw_scores = _cs_live()
     except Exception as exc:
-        _logger.warning("live_tracker: API-NBA fetch failed: %s", exc)
+        _logger.warning("live_game_tracker: API-NBA fetch failed: %s", exc)
         raw_scores = []
 
     games: list[dict] = []
@@ -139,9 +139,9 @@ def get_live_boxscores() -> list[dict]:
         if not hasattr(get_live_boxscores, "_cached"):
             get_live_boxscores._cached = st.cache_data(
                 ttl=120, show_spinner=False
-            )(_fetch_live_boxscores_impl)
+            )(_get_live_boxscores_impl)
         return get_live_boxscores._cached()
-    return _fetch_live_boxscores_impl()
+    return _get_live_boxscores_impl()
 
 
 # ============================================================
@@ -299,5 +299,5 @@ def get_game_for_player(player_name: str,
     return None
 
 
-# ── Backward-compatible aliases (deprecated) ──
-get_live_boxscores = get_live_boxscores
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
+fetch_live_boxscores = get_live_boxscores

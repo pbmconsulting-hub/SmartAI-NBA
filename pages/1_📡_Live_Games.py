@@ -192,7 +192,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-auto_col, fetch_col, info_col = st.columns([1, 1, 2])
+auto_col, load_col, info_col = st.columns([1, 1, 2])
 
 with auto_col:
     auto_load_clicked = st.button(
@@ -202,8 +202,8 @@ with auto_col:
         help="ONE CLICK: fetch tonight's games + current rosters + player stats + team stats",
     )
 
-with fetch_col:
-    fetch_players_clicked = st.button(
+with load_col:
+    load_players_clicked = st.button(
         "⚡ Fetch Players Only",
         width="stretch",
         help="Re-fetch player stats for tonight's teams (games must already be loaded)",
@@ -233,7 +233,7 @@ st.markdown("""
 
 _include_pp = False
 _include_ud = False
-_dk_col, _fetch_btn_col = st.columns([1, 2])
+_dk_col, _load_btn_col = st.columns([1, 2])
 
 with _dk_col:
     _include_dk = st.checkbox("🔵 All Major Sportsbooks", value=True, key="platform_dk_checkbox")
@@ -296,7 +296,7 @@ with st.expander("⚙️ Platform Settings", expanded=False):
     )
     st.session_state["joseph_preferred_platform"] = _lg_platform
 
-with _fetch_btn_col:
+with _load_btn_col:
     _any_platform_selected = _include_pp or _include_ud or _include_dk
     platform_props_clicked = st.button(
         "📊 Fetch Live Props & Analyze",
@@ -391,7 +391,7 @@ if auto_load_clicked:
         else:
             st.error(f"❌ Auto-load failed: {_exc}")
 
-if fetch_players_clicked:
+if load_players_clicked:
     todays_games_for_fetch = st.session_state.get("todays_games", [])
     if not todays_games_for_fetch:
         st.warning(
@@ -402,7 +402,7 @@ if fetch_players_clicked:
         progress_bar2 = st.progress(0, text="Fetching player data for tonight's teams...")
         status_text2 = st.empty()
 
-        def _fetch_players_progress(current, total, message):
+        def _on_players_progress(current, total, message):
             frac = current / max(total, 1)
             progress_bar2.progress(frac, text=message)
             status_text2.caption(message)
@@ -410,7 +410,7 @@ if fetch_players_clicked:
         with st.spinner("⚡ Fetching current rosters and player stats..."):
             success = get_todays_players(
                 todays_games_for_fetch,
-                progress_callback=_fetch_players_progress,
+                progress_callback=_on_players_progress,
             )
 
         progress_bar2.empty()
@@ -453,8 +453,8 @@ if platform_props_clicked:
         if not _todays_games:
             pp_status.text("⏳ 0/5 — No games loaded. Auto-fetching tonight's schedule…")
             pp_bar.progress(2)
-            from data.nba_data_service import get_todays_games as _auto_fetch_games
-            _todays_games = _auto_fetch_games()
+            from data.nba_data_service import get_todays_games as _auto_get_games
+            _todays_games = _auto_get_games()
             if _todays_games:
                 st.session_state["todays_games"] = _todays_games
                 st.info(f"🏟️ Auto-loaded **{len(_todays_games)} game(s)** for tonight.")
@@ -467,8 +467,8 @@ if platform_props_clicked:
         if not _check_players and _todays_games:
             pp_status.text("⏳ 0/5 — No player data. Fetching rosters for tonight's teams…")
             pp_bar.progress(5)
-            from data.nba_data_service import get_todays_players as _auto_fetch_players
-            _auto_fetch_players(_todays_games)
+            from data.nba_data_service import get_todays_players as _auto_get_players
+            _auto_get_players(_todays_games)
 
         # ── Step 1: Fetch props from selected platforms ────────────────
         pp_status.text("⏳ 1/5 — Fetching props from selected platforms…")
@@ -982,10 +982,10 @@ if one_click_setup_clicked:
         _oc_status.text("⏳ Phase 1/3 — Auto-loading tonight's games, rosters & stats…")
         _oc_bar.progress(5)
         from data.nba_data_service import (
-            get_todays_games as _oc_fetch_games,
-            get_todays_players as _oc_fetch_players,
-            get_team_stats as _oc_fetch_teams,
-            get_standings as _oc_fetch_standings,
+            get_todays_games as _oc_get_games,
+            get_todays_players as _oc_get_players,
+            get_team_stats as _oc_get_teams,
+            get_standings as _oc_get_standings,
         )
         from data.data_manager import (
             load_players_data as _oc_load_players,
@@ -994,7 +994,7 @@ if one_click_setup_clicked:
             load_injury_status as _oc_load_inj,
         )
 
-        _oc_games = _oc_fetch_games()
+        _oc_games = _oc_get_games()
         if _oc_games:
             st.session_state["todays_games"] = _oc_games
         else:
@@ -1003,7 +1003,7 @@ if one_click_setup_clicked:
         _oc_bar.progress(25)
         _oc_status.text(f"⏳ Phase 1/3 — {len(_oc_games)} game(s) loaded. Fetching player data…")
 
-        _oc_players_ok = _oc_fetch_players(_oc_games) if _oc_games else False
+        _oc_players_ok = _oc_get_players(_oc_games) if _oc_games else False
         _oc_bar.progress(40)
 
         # Clear caches so freshly-written players.csv is read
@@ -1019,12 +1019,12 @@ if one_click_setup_clicked:
         _oc_bar.progress(50)
 
         try:
-            _oc_fetch_teams()
+            _oc_get_teams()
         except Exception as _oc_ts_err:
             _logger.debug(f"One-Click: team stats fetch failed (non-fatal): {_oc_ts_err}")
 
         try:
-            _oc_standings = _oc_fetch_standings()
+            _oc_standings = _oc_get_standings()
             if _oc_standings:
                 st.session_state["league_standings"] = _oc_standings
         except Exception as _oc_st_err:
@@ -1036,13 +1036,13 @@ if one_click_setup_clicked:
         _oc_status.text("⏳ Phase 3/3 — Fetching live prop lines from all platforms…")
 
         try:
-            from data.sportsbook_service import get_all_sportsbook_props as _oc_fetch_platform
+            from data.sportsbook_service import get_all_sportsbook_props as _oc_get_sportsbook_props
             from data.data_manager import (
                 save_platform_props_to_session as _oc_save_platform,
                 save_platform_props_to_csv as _oc_save_csv,
             )
             _oc_odds_key = st.session_state.get("odds_api_key") or ""
-            _oc_platform_props = _oc_fetch_platform(odds_api_key=_oc_odds_key or None)
+            _oc_platform_props = _oc_get_sportsbook_props(odds_api_key=_oc_odds_key or None)
             _oc_bar.progress(85)
             if _oc_platform_props:
                 _oc_save_props(_oc_platform_props, st.session_state)

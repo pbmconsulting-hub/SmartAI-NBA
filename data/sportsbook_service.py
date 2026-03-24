@@ -75,7 +75,7 @@ import time as _time
 # Import the rate limiter for polite API access with circuit breaker
 try:
     from utils.rate_limiter import RateLimiter as _RateLimiter
-    # Feature 10: 20 req/min, 200/hour — matches existing live_data_fetcher limits
+    # Feature 10: 20 req/min, 200/hour — matches existing nba_data_service limits
     _platform_rate_limiter = _RateLimiter(max_requests_per_minute=20, max_requests_per_hour=200)
     _RATE_LIMITER_AVAILABLE = True
 except ImportError:
@@ -150,7 +150,7 @@ RETRY_BASE_DELAY_SECONDS = 1.0  # Base delay: 1s, 2s, 4s (exponential backoff)
 # SECTION: Retry Helper
 # ============================================================
 
-def _fetch_with_retry(url, headers=None, params=None, timeout=None):
+def _request_with_retry(url, headers=None, params=None, timeout=None):
     """
     Perform an HTTP GET request with exponential backoff retry on failure.
 
@@ -1396,9 +1396,9 @@ def parse_alt_lines_from_platform_props(props):
 
 
 
-# ── Backward-compatible aliases (deprecated) ──
-get_prizepicks_props = get_prizepicks_props
-get_underdog_props = get_underdog_props
-get_draftkings_props = get_draftkings_props
-get_all_sportsbook_props = get_all_sportsbook_props
-get_all_sportsbooks_async = get_all_sportsbooks_async
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
+fetch_prizepicks_props = get_prizepicks_props
+fetch_underdog_props = get_underdog_props
+fetch_draftkings_props = get_draftkings_props
+fetch_all_platform_props = get_all_sportsbook_props
+fetch_all_platforms_async = get_all_sportsbooks_async

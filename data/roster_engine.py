@@ -306,7 +306,7 @@ class RosterEngine:
         merged: dict = {}
 
         # ── Source 1: API-NBA injury report ──────────────────
-        src1 = self._fetch_clearsports_injuries()
+        src1 = self._load_api_injuries()
         for k, v in src1.items():
             merged[k] = _merge_entry(merged.get(k, {}), v)
         _logger.info(f"  Source 1 (API-NBA injuries): {len(src1)} players")
@@ -315,7 +315,7 @@ class RosterEngine:
 
         # ── Source 2: API-NBA rosters ────────────────────────
         if team_abbrevs:
-            self._fetch_clearsports_rosters(team_abbrevs)
+            self._load_api_rosters(team_abbrevs)
 
         # Invalidate active-roster cache
         self._active_rosters = {}
@@ -330,7 +330,7 @@ class RosterEngine:
     # Source 1: API-NBA injury report
     # ----------------------------------------------------------
 
-    def _fetch_clearsports_injuries(self) -> dict:
+    def _load_api_injuries(self) -> dict:
         """
         Fetch today's injury report from API-NBA API.
 
@@ -358,9 +358,9 @@ class RosterEngine:
             _logger.warning(f"API-NBA injury fetch failed: {err}")
 
         # Fallback: NBA CDN public injury JSON
-        return self._fetch_nba_cdn_injuries()
+        return self._load_nba_cdn_injuries()
 
-    def _fetch_nba_cdn_injuries(self) -> dict:
+    def _load_nba_cdn_injuries(self) -> dict:
         """
         Fallback: fetch injury data from NBA's public CDN JSON feed.
         """
@@ -410,7 +410,7 @@ class RosterEngine:
     # Source 2: API-NBA rosters endpoint
     # ----------------------------------------------------------
 
-    def _fetch_clearsports_rosters(self, team_abbrevs: list):
+    def _load_api_rosters(self, team_abbrevs: list):
         """
         Fetch full rosters from API-NBA API, store in _full_rosters.
         """

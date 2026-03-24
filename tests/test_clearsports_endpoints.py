@@ -86,13 +86,13 @@ class TestInjuryEndpointPath(unittest.TestCase):
 # ── Section 3: 403 status code handling ──────────────────────────────────────
 
 class TestApiNba403Handling(unittest.TestCase):
-    """Verify that _fetch_with_retry handles HTTP 403 (credit exhaustion)."""
+    """Verify that _request_with_retry handles HTTP 403 (credit exhaustion)."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
     def test_403_status_code_handled(self):
-        """_fetch_with_retry should check for 403 status."""
+        """_request_with_retry should check for 403 status."""
         self.assertIn("status_code == 403", self.src,
                        "ApiNba must handle 403 status code")
 
@@ -113,54 +113,54 @@ class TestApiKeyManagementEndpoints(unittest.TestCase):
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
-    def test_fetch_api_key_info_exists(self):
+    def test_get_api_key_info_exists(self):
         """get_api_key_info function must exist."""
         self.assertIn("def get_api_key_info(", self.src)
 
-    def test_fetch_api_key_info_url(self):
+    def test_get_api_key_info_url(self):
         """get_api_key_info must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def get_api_key_info(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/status", snippet)
 
-    def test_fetch_api_key_usage_exists(self):
+    def test_get_api_key_usage_exists(self):
         """get_api_key_usage function must exist."""
         self.assertIn("def get_api_key_usage(", self.src)
 
-    def test_fetch_api_key_usage_url(self):
+    def test_get_api_key_usage_url(self):
         """get_api_key_usage must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def get_api_key_usage(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
         self.assertIn("/status", snippet)
 
-    def test_fetch_api_key_usage_has_limit_param(self):
+    def test_get_api_key_usage_has_limit_param(self):
         """get_api_key_usage must accept limit parameter."""
         idx = self.src.find("def get_api_key_usage(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("limit", snippet)
 
-    def test_fetch_api_key_usage_has_offset_param(self):
+    def test_get_api_key_usage_has_offset_param(self):
         """get_api_key_usage must accept offset parameter."""
         idx = self.src.find("def get_api_key_usage(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("offset", snippet)
 
-    def test_fetch_api_key_stats_exists(self):
+    def test_get_api_key_stats_exists(self):
         """get_api_key_stats function must exist."""
         self.assertIn("def get_api_key_stats(", self.src)
 
-    def test_fetch_api_key_stats_url(self):
+    def test_get_api_key_stats_url(self):
         """get_api_key_stats must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def get_api_key_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
         self.assertIn("/status", snippet)
 
-    def test_fetch_api_key_stats_has_date_params(self):
+    def test_get_api_key_stats_has_date_params(self):
         """get_api_key_stats must accept start_date and end_date parameters."""
         idx = self.src.find("def get_api_key_stats(")
         self.assertGreater(idx, 0)
@@ -188,11 +188,11 @@ class TestCoreNBAEndpoints(unittest.TestCase):
 
     # -- get_teams --
 
-    def test_fetch_teams_exists(self):
+    def test_get_teams_exists(self):
         """get_teams function must exist."""
         self.assertIn("def get_teams(", self.src)
 
-    def test_fetch_teams_url(self):
+    def test_get_teams_url(self):
         """get_teams must call /teams."""
         idx = self.src.find("def get_teams(")
         self.assertGreater(idx, 0)
@@ -201,18 +201,18 @@ class TestCoreNBAEndpoints(unittest.TestCase):
 
     # -- get_games --
 
-    def test_fetch_games_exists(self):
+    def test_get_games_exists(self):
         """get_games function must exist."""
         self.assertIn("def get_games(", self.src)
 
-    def test_fetch_games_url(self):
+    def test_get_games_url(self):
         """get_games must call /games."""
         idx = self.src.find("def get_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/games", snippet)
 
-    def test_fetch_games_has_params(self):
+    def test_get_games_has_params(self):
         """get_games must accept season, date, and team parameters."""
         idx = self.src.find("def get_games(")
         self.assertGreater(idx, 0)
@@ -223,18 +223,18 @@ class TestCoreNBAEndpoints(unittest.TestCase):
 
     # -- get_players --
 
-    def test_fetch_players_exists(self):
+    def test_get_players_exists(self):
         """get_players function must exist."""
         self.assertIn("def get_players(", self.src)
 
-    def test_fetch_players_url(self):
+    def test_get_players_url(self):
         """get_players must call /players."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/players", snippet)
 
-    def test_fetch_players_has_team_param(self):
+    def test_get_players_has_team_param(self):
         """get_players must pass team parameter."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
@@ -243,7 +243,7 @@ class TestCoreNBAEndpoints(unittest.TestCase):
 
     # -- get_injury_report team_id param --
 
-    def test_fetch_injury_report_has_team_param(self):
+    def test_get_injury_report_has_team_param(self):
         """get_injury_report must pass team parameter."""
         idx = self.src.find("def get_injury_report(")
         self.assertGreater(idx, 0)
@@ -268,11 +268,11 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
     # -- get_team_by_id --
 
-    def test_fetch_team_by_id_exists(self):
+    def test_get_team_by_id_exists(self):
         """get_team_by_id function must exist."""
         self.assertIn("def get_team_by_id(", self.src)
 
-    def test_fetch_team_by_id_url(self):
+    def test_get_team_by_id_url(self):
         """get_team_by_id must call /teams."""
         idx = self.src.find("def get_team_by_id(")
         self.assertGreater(idx, 0)
@@ -281,18 +281,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
     # -- get_game_odds --
 
-    def test_fetch_game_odds_exists(self):
+    def test_get_game_odds_exists(self):
         """get_game_odds function must exist."""
         self.assertIn("def get_game_odds(", self.src)
 
-    def test_fetch_game_odds_url(self):
+    def test_get_game_odds_url(self):
         """get_game_odds must call /odds."""
         idx = self.src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/odds", snippet)
 
-    def test_fetch_game_odds_has_game_param(self):
+    def test_get_game_odds_has_game_param(self):
         """get_game_odds must pass game parameter."""
         idx = self.src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
@@ -301,18 +301,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
     # -- get_nba_team_stats --
 
-    def test_fetch_nba_team_stats_exists(self):
+    def test_get_nba_team_stats_exists(self):
         """get_nba_team_stats function must exist."""
         self.assertIn("def get_nba_team_stats(", self.src)
 
-    def test_fetch_nba_team_stats_url(self):
+    def test_get_nba_team_stats_url(self):
         """get_nba_team_stats must call /games/statistics/teams."""
         idx = self.src.find("def get_nba_team_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/games/statistics/teams", snippet)
 
-    def test_fetch_nba_team_stats_has_params(self):
+    def test_get_nba_team_stats_has_params(self):
         """get_nba_team_stats must accept team and season parameters."""
         idx = self.src.find("def get_nba_team_stats(")
         self.assertGreater(idx, 0)
@@ -322,11 +322,11 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
     # -- get_nba_player_stats --
 
-    def test_fetch_nba_player_stats_exists(self):
+    def test_get_nba_player_stats_exists(self):
         """get_nba_player_stats function must exist."""
         self.assertIn("def get_nba_player_stats(", self.src)
 
-    def test_fetch_nba_player_stats_url(self):
+    def test_get_nba_player_stats_url(self):
         """get_nba_player_stats must call /games/statistics/players or /players/statistics."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
@@ -336,7 +336,7 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertTrue(has_game_stats or has_player_stats,
                         "get_nba_player_stats must use /games/statistics/players or /players/statistics")
 
-    def test_fetch_nba_player_stats_has_params(self):
+    def test_get_nba_player_stats_has_params(self):
         """get_nba_player_stats must accept player and game parameters."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
@@ -346,18 +346,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
 
     # -- get_predictions --
 
-    def test_fetch_predictions_exists(self):
+    def test_get_predictions_exists(self):
         """get_predictions function must exist."""
         self.assertIn("def get_predictions(", self.src)
 
-    def test_fetch_predictions_url(self):
+    def test_get_predictions_url(self):
         """get_predictions must call /predictions."""
         idx = self.src.find("def get_predictions(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/predictions", snippet)
 
-    def test_fetch_predictions_has_game_param(self):
+    def test_get_predictions_has_game_param(self):
         """get_predictions must pass game parameter."""
         idx = self.src.find("def get_predictions(")
         self.assertGreater(idx, 0)
@@ -383,7 +383,7 @@ class TestFetchTeamsRuntime(unittest.TestCase):
     """Runtime tests for get_teams."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_teams
         mock_fetch.return_value = [
@@ -395,14 +395,14 @@ class TestFetchTeamsRuntime(unittest.TestCase):
         self.assertEqual(len(result), 2)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_teams
         result = get_teams()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_handles_wrapped_response(self, mock_fetch, mock_key):
         from data.nba_api_client import get_teams
         mock_fetch.return_value = {"teams": [{"id": 1, "name": "Lakers"}]}
@@ -415,7 +415,7 @@ class TestFetchGamesRuntime(unittest.TestCase):
     """Runtime tests for get_games."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_games
         mock_fetch.return_value = [{"game_id": "g1", "home_team": "LAL", "away_team": "BOS"}]
@@ -424,14 +424,14 @@ class TestFetchGamesRuntime(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_games
         result = get_games()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_handles_wrapped_response(self, mock_fetch, mock_key):
         from data.nba_api_client import get_games
         mock_fetch.return_value = {"games": [{"game_id": "g1"}]}
@@ -444,7 +444,7 @@ class TestFetchPlayersRuntime(unittest.TestCase):
     """Runtime tests for get_players."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_players
         mock_fetch.return_value = [
@@ -455,14 +455,14 @@ class TestFetchPlayersRuntime(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_players
         result = get_players()
         self.assertEqual(result, [])
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_handles_wrapped_response(self, mock_fetch, mock_key):
         from data.nba_api_client import get_players
         mock_fetch.return_value = {"players": [{"id": 10, "name": "LeBron James"}]}
@@ -475,7 +475,7 @@ class TestApiKeyInfoRuntime(unittest.TestCase):
     """Runtime tests for get_api_key_info."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_info
         # API-Sports /status response format
@@ -504,7 +504,7 @@ class TestApiKeyInfoRuntime(unittest.TestCase):
         self.assertEqual(result["email"], "user@example.com")
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_info
         result = get_api_key_info()
@@ -515,7 +515,7 @@ class TestApiKeyUsageRuntime(unittest.TestCase):
     """Runtime tests for get_api_key_usage."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_usage
         # API-Sports /status response format
@@ -529,7 +529,7 @@ class TestApiKeyUsageRuntime(unittest.TestCase):
         self.assertGreaterEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_usage
         result = get_api_key_usage()
@@ -540,7 +540,7 @@ class TestApiKeyStatsRuntime(unittest.TestCase):
     """Runtime tests for get_api_key_stats."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_stats
         # API-Sports /status response format
@@ -560,7 +560,7 @@ class TestApiKeyStatsRuntime(unittest.TestCase):
         self.assertEqual(result["limit_day"], 100)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_api_key_stats
         result = get_api_key_stats()
@@ -571,7 +571,7 @@ class TestTeamByIdRuntime(unittest.TestCase):
     """Runtime tests for get_team_by_id."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_team_by_id
         mock_fetch.return_value = {"id": 123, "name": "Los Angeles Lakers", "abbreviation": "LAL"}
@@ -580,7 +580,7 @@ class TestTeamByIdRuntime(unittest.TestCase):
         self.assertEqual(result["abbreviation"], "LAL")
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_team_by_id
         result = get_team_by_id(999)
@@ -591,7 +591,7 @@ class TestGameOddsRuntime(unittest.TestCase):
     """Runtime tests for get_game_odds."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_game_odds
         mock_fetch.return_value = [{"game_id": "g1", "spread": -3.5}]
@@ -600,7 +600,7 @@ class TestGameOddsRuntime(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_game_odds
         result = get_game_odds()
@@ -611,7 +611,7 @@ class TestNbaTeamStatsRuntime(unittest.TestCase):
     """Runtime tests for get_nba_team_stats."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_nba_team_stats
         mock_fetch.return_value = [{"team_id": 1, "wins": 30, "losses": 15}]
@@ -620,7 +620,7 @@ class TestNbaTeamStatsRuntime(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_nba_team_stats
         result = get_nba_team_stats()
@@ -631,7 +631,7 @@ class TestNbaPlayerStatsRuntime(unittest.TestCase):
     """Runtime tests for get_nba_player_stats."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_nba_player_stats
         mock_fetch.return_value = [{"player_id": 10, "pts": 28.5}]
@@ -640,7 +640,7 @@ class TestNbaPlayerStatsRuntime(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_nba_player_stats
         result = get_nba_player_stats()
@@ -651,7 +651,7 @@ class TestPredictionsRuntime(unittest.TestCase):
     """Runtime tests for get_predictions."""
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry")
+    @patch("data.nba_api_client._request_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.nba_api_client import get_predictions
         mock_fetch.return_value = [{"game_id": "g1", "predicted_winner": "LAL", "confidence": 0.72}]
@@ -661,7 +661,7 @@ class TestPredictionsRuntime(unittest.TestCase):
         self.assertEqual(result[0]["confidence"], 0.72)
 
     @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._fetch_with_retry", return_value=None)
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
         from data.nba_api_client import get_predictions
         result = get_predictions()
@@ -677,12 +677,12 @@ class TestApiSportsAuthentication(unittest.TestCase):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
     def test_apisports_key_in_headers(self):
-        """_fetch_with_retry must use x-apisports-key header."""
+        """_request_with_retry must use x-apisports-key header."""
         self.assertIn('"x-apisports-key"', self.src,
                        "Must use x-apisports-key header for authentication")
 
     def test_no_bearer_token(self):
-        """_fetch_with_retry must not use Bearer token (old auth)."""
+        """_request_with_retry must not use Bearer token (old auth)."""
         self.assertNotIn('f"Bearer {api_key}"', self.src,
                          "Must not use old Bearer token authentication")
 

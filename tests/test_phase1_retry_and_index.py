@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: tests/test_phase1_retry_and_index.py
 # PURPOSE: Tests for Phase 1 improvements:
-#          1) Sync fetch functions use _fetch_with_retry (exponential backoff)
+#          1) Sync fetch functions use _request_with_retry (exponential backoff)
 #          2) Pre-indexed player lookup for O(1) fuzzy matching
 # ============================================================
 
@@ -21,11 +21,11 @@ def _ensure_streamlit_mock():
 
 
 # ============================================================
-# Section 1: Sync Fetch Functions Use _fetch_with_retry
+# Section 1: Sync Fetch Functions Use _request_with_retry
 # ============================================================
 
 class TestSyncFetchRetryIntegration(unittest.TestCase):
-    """Verify that synchronous platform fetch functions call _fetch_with_retry
+    """Verify that synchronous platform fetch functions call _request_with_retry
     instead of raw requests.get, ensuring exponential backoff on 429/5xx."""
 
     def setUp(self):
@@ -35,24 +35,24 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
         )
         self.content = self.src.read_text(encoding="utf-8")
 
-    def test_fetch_with_retry_function_exists(self):
-        """_fetch_with_retry helper must be defined in sportsbook_service.py."""
+    def test_request_with_retry_function_exists(self):
+        """_request_with_retry helper must be defined in sportsbook_service.py."""
         self.assertIn(
-            "def _fetch_with_retry(",
+            "def _request_with_retry(",
             self.content,
-            "_fetch_with_retry function should be defined",
+            "_request_with_retry function should be defined",
         )
 
-    def test_fetch_with_retry_has_exponential_backoff(self):
-        """_fetch_with_retry must implement exponential backoff (2 ** attempt)."""
+    def test_request_with_retry_has_exponential_backoff(self):
+        """_request_with_retry must implement exponential backoff (2 ** attempt)."""
         self.assertIn(
             "2 ** attempt",
             self.content,
-            "_fetch_with_retry should use exponential backoff",
+            "_request_with_retry should use exponential backoff",
         )
 
-    def test_fetch_with_retry_handles_429(self):
-        """_fetch_with_retry must handle HTTP 429 rate limit responses."""
+    def test_request_with_retry_handles_429(self):
+        """_request_with_retry must handle HTTP 429 rate limit responses."""
         self.assertIn("status_code == 429", self.content)
 
     def test_prizepicks_stub_exists(self):
@@ -71,7 +71,7 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
             "get_underdog_props should still be defined (backward compat stub)",
         )
 
-    def test_odds_api_client_delegated(self):
+    def test_odds_client_delegated(self):
         """get_all_sportsbook_props should delegate to odds_client."""
         fap_start = self.content.find("def get_all_sportsbook_props(")
         fap_end = self.content.find("\ndef ", fap_start + 1)
@@ -95,16 +95,16 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
             "get_draftkings_props should delegate to get_all_sportsbook_props",
         )
 
-    def test_fetch_with_retry_handles_none_response(self):
-        """_fetch_with_retry must handle None return (check in platform_fetcher)."""
-        # _fetch_with_retry returns None when all retries exhausted
-        retry_start = self.content.find("def _fetch_with_retry(")
+    def test_request_with_retry_handles_none_response(self):
+        """_request_with_retry must handle None return (check in sportsbook_service)."""
+        # _request_with_retry returns None when all retries exhausted
+        retry_start = self.content.find("def _request_with_retry(")
         retry_end = self.content.find("\ndef ", retry_start + 1)
         retry_section = self.content[retry_start:retry_end]
         self.assertIn(
             "None",
             retry_section,
-            "_fetch_with_retry should return None on complete failure",
+            "_request_with_retry should return None on complete failure",
         )
 
 

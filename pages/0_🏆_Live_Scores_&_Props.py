@@ -91,7 +91,7 @@ with col_interval:
 # SECTION: Fetch Live Scoreboard
 # ============================================================
 
-def _fetch_live_scores():
+def _get_live_scores():
     """
     Attempt to fetch live/today's game scores via API-NBA API.
 
@@ -120,7 +120,7 @@ def _status_badge(status_text):
 
 
 with st.spinner("🏆 Loading live scores..."):
-    live_games = _fetch_live_scores()
+    live_games = _get_live_scores()
 
 # ============================================================
 # END SECTION: Fetch Live Scoreboard
@@ -134,7 +134,7 @@ with st.spinner("🏆 Loading live scores..."):
 st.subheader("🏀 Live Scoreboard")
 
 
-def _fetch_quarter_scores(game_id: str) -> dict:
+def _get_quarter_scores(game_id: str) -> dict:
     """
     Attempt to fetch per-quarter (period) line score for a given game_id.
 
@@ -242,7 +242,7 @@ if live_games:
             game_id = game.get("game_id", "")
             quarter_html = ""
             if game_id:
-                qscores = _fetch_quarter_scores(game_id)
+                qscores = _get_quarter_scores(game_id)
                 away_q = qscores.get("away_q", [])
                 home_q = qscores.get("home_q", [])
                 if away_q or home_q:
@@ -539,10 +539,10 @@ else:
 with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
     st.caption("Completed NBA scores · data refreshes every 5 minutes")
     try:
-        from data.odds_client import get_recent_scores as _fetch_scores
+        from data.odds_client import get_recent_scores as _get_scores
         _recent_scores = []
         for _days_back in (1, 2, 3):
-            _scores = _fetch_scores(days_from=_days_back)
+            _scores = _get_scores(days_from=_days_back)
             for _g in _scores:
                 if _g.get("completed") and _g not in _recent_scores:
                     _recent_scores.append(_g)

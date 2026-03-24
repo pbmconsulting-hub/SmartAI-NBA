@@ -14,7 +14,7 @@ Provides:
 
   Player Props:
   - get_player_props(api_key=None) → list of prop dicts matching the
-                                       platform_fetcher prop format exactly
+                                       sportsbook_service prop format exactly
 
   Consensus / Scores:
   - get_consensus_odds(...)          → median consensus lines across bookmakers
@@ -217,7 +217,7 @@ def _resolve_api_key(explicit_key: str | None = None) -> str | None:
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
 
-def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | None:
+def _request_with_retry(url: str, params: dict | None = None) -> dict | list | None:
     """
     GET *url* with exponential-backoff retry and response caching.
 
@@ -359,16 +359,16 @@ def _today_str() -> str:
     return datetime.date.today().isoformat()
 
 
-def _fetch_events(api_key: str) -> list[dict]:
+def _request_events(api_key: str) -> list[dict]:
     """Return all upcoming NBA events from the Odds API (internal)."""
     url = f"{_BASE_URL}{ENDPOINT_EVENTS}"
     params = {
         "apiKey":     api_key,
         "dateFormat": "iso",
     }
-    raw = _fetch_with_retry(url, params=params)
+    raw = _request_with_retry(url, params=params)
     if not isinstance(raw, list):
-        _logger.debug("_fetch_events: no NBA events available (NBA may not be in season)")
+        _logger.debug("_request_events: no NBA events available (NBA may not be in season)")
         return []
     return raw
 
@@ -422,7 +422,7 @@ def get_sports(api_key: str | None = None) -> list[dict] | None:
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw is None:
             # API call failed (401, 403, network error, etc.)
             return None
@@ -458,7 +458,7 @@ def get_events(api_key: str | None = None) -> list[dict]:
     if not resolved_key:
         _logger.warning("get_events: no Odds API key found — returning []")
         return []
-    return _fetch_events(resolved_key)
+    return _request_events(resolved_key)
 
 
 def get_event_odds(
@@ -508,7 +508,7 @@ def get_event_odds(
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw or not isinstance(raw, dict):
             return {}
         return raw
@@ -547,7 +547,7 @@ def get_game_odds(api_key: str | None = None) -> list[dict]:
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not isinstance(raw, list):
             _logger.debug("get_game_odds: no NBA odds available (NBA may not be in season)")
             return []
@@ -601,9 +601,9 @@ def get_game_odds(api_key: str | None = None) -> list[dict]:
 def get_player_props(api_key: str | None = None) -> list[dict]:
     """
     Fetch NBA player prop lines from The Odds API and normalise them into
-    the same format used by platform_fetcher throughout the application.
+    the same format used by sportsbook_service throughout the application.
 
-    Each returned dict has these keys (matching platform_fetcher output):
+    Each returned dict has these keys (matching sportsbook_service output):
         player_name, team, stat_type, line, platform,
         game_date, fetched_at, over_odds, under_odds
 
@@ -625,7 +625,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
         return []
 
     try:
-        events = _fetch_events(resolved_key)
+        events = _request_events(resolved_key)
         if not events:
             _logger.debug("get_player_props: no NBA events returned from Odds API")
             return []
@@ -654,7 +654,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
             }
 
             try:
-                ev_data = _fetch_with_retry(url, params=params)
+                ev_data = _request_with_retry(url, params=params)
                 if not ev_data or not isinstance(ev_data, dict):
                     continue
 
@@ -914,7 +914,7 @@ def get_recent_scores(days_from: int = 1,
         "dateFormat": "iso",
     }
     # Use _build_cache_key so the outer cache key matches the one
-    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
@@ -922,7 +922,7 @@ def get_recent_scores(days_from: int = 1,
         return cached
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not isinstance(raw, list):
             _logger.debug("get_recent_scores: no scores available (NBA may not be in season)")
             return []
@@ -983,11 +983,11 @@ def calculate_implied_probability(american_odds: float) -> float:
     return american_odds_to_implied_probability(american_odds) * 100
 
 
-# ── Backward-compatible aliases (deprecated) ──
+# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
 validate_api_key = validate_odds_api_key
-get_sports = get_sports
-get_events = get_events
-get_event_odds = get_event_odds
-get_game_odds = get_game_odds
-get_player_props = get_player_props
-get_recent_scores = get_recent_scores
+fetch_sports = get_sports
+fetch_events = get_events
+fetch_event_odds = get_event_odds
+fetch_game_odds = get_game_odds
+fetch_player_props = get_player_props
+fetch_recent_scores = get_recent_scores

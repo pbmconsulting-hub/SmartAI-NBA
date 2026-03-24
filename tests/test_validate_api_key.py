@@ -140,11 +140,11 @@ class TestSettingsPageApiKeySection(unittest.TestCase):
         """Settings page must import validate_nba_api_key for key format checking."""
         self.assertIn("validate_nba_api_key", self.src)
 
-    def test_calls_fetch_api_key_info(self):
+    def test_calls_get_api_key_info(self):
         """Test Connection must call get_api_key_info for API-NBA."""
         self.assertIn("get_api_key_info", self.src)
 
-    def test_calls_fetch_sports(self):
+    def test_calls_get_sports(self):
         """Test Connection must call get_sports for Odds API (free endpoint)."""
         self.assertIn("get_sports", self.src)
 
