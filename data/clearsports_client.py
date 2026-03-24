@@ -656,7 +656,7 @@ def fetch_injury_report(team_id=None) -> dict:
     """
     Fetch the current NBA injury report.
 
-    Endpoint: GET /nba/injury-stats
+    Endpoint: GET /injuries
 
     Args:
         team_id: Optional team ID to filter by.
@@ -668,10 +668,10 @@ def fetch_injury_report(team_id=None) -> dict:
             return_date  – estimated return date string or ""
         Returns {} on failure.
     """
-    url = f"{_BASE_URL}/nba/injury-stats"
+    url = f"{_BASE_URL}/injuries"
     params: dict = {}
     if team_id is not None:
-        params["team_id"] = team_id
+        params["team"] = team_id
 
     try:
         raw = _fetch_with_retry(url, params=params if params else None)
@@ -687,13 +687,20 @@ def fetch_injury_report(team_id=None) -> dict:
         for entry in injuries_raw:
             if not isinstance(entry, dict):
                 continue
-            name = _safe_str(entry.get("player") or entry.get("player_name") or entry.get("name"))
+            # API-Sports v2 nests player info: {"player": {"id": N, "name": "..."}}
+            player = entry.get("player")
+            if isinstance(player, dict):
+                name = _safe_str(player.get("name"))
+            else:
+                name = _safe_str(player or entry.get("player_name") or entry.get("name"))
             if not name:
                 continue
             report[name.lower()] = {
                 "status":      _safe_str(entry.get("status", "Unknown")),
-                "injury_note": _safe_str(entry.get("injury") or entry.get("injury_note") or entry.get("description")),
-                "return_date": _safe_str(entry.get("return_date") or entry.get("expected_return", "")),
+                # API-Sports uses "type" for injury category (e.g. "Ankle")
+                # and "description" for detail (e.g. "Left ankle soreness")
+                "injury_note": _safe_str(entry.get("type") or entry.get("description") or entry.get("injury") or entry.get("injury_note")),
+                "return_date": _safe_str(entry.get("return_date") or entry.get("date") or entry.get("expected_return", "")),
             }
         return report
 
@@ -1034,7 +1041,7 @@ def fetch_news(limit: int = 20) -> list[dict]:
         _logger.debug("fetch_news: no API-NBA key — returning []")
         return []
 
-    url = f"{_BASE_URL}/nba/news"
+    url = f"{_BASE_URL}/news"
     params = {"limit": limit}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
@@ -1181,31 +1188,41 @@ def fetch_api_key_info() -> dict:
 
 def fetch_api_key_usage(limit: int = 50, offset: int = 0) -> list[dict]:
     """
-    Retrieve detailed usage history for the current API key.
+    Retrieve usage history for the current API key.
 
-    Endpoint: GET /api-keys/me/usage
+    API-Sports does not have a dedicated usage-history endpoint;
+    this fetches the ``/status`` response and returns a single-item
+    list with the current day's usage for callers that expect a list.
+
+    Endpoint: GET /status
 
     Args:
-        limit:  Number of records to return (default: 50).
-        offset: Pagination offset (default: 0).
+        limit:  Accepted for API compatibility (unused).
+        offset: Accepted for API compatibility (unused).
 
     Returns:
-        list[dict]: Usage history records.
+        list[dict]: A single-item list with keys:
+            endpoint, current, limit_day, timestamp
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/api-keys/me/usage"
-    params = {"limit": limit, "offset": offset}
+    url = f"{_BASE_URL}/status"
 
     try:
-        raw = _fetch_with_retry(url, params=params)
-        if not raw:
+        raw = _fetch_with_retry(url)
+        if not raw or not isinstance(raw, dict):
             return []
 
-        usage_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("usage") or raw.get("data") or [])
-        if not isinstance(usage_raw, list):
-            _logger.warning("fetch_api_key_usage: unexpected response shape, returning []")
-            return []
-        return usage_raw
+        response = raw.get("response") or raw
+        requests_info = response.get("requests") or {}
+        current = requests_info.get("current", 0)
+        limit_day = requests_info.get("limit_day", 0)
+
+        return [{
+            "endpoint":  "/status",
+            "current":   current,
+            "limit_day": limit_day,
+            "timestamp": _today_str(),
+        }]
 
     except Exception as exc:
         _logger.warning("fetch_api_key_usage failed: %s", exc)
@@ -1219,28 +1236,43 @@ def fetch_api_key_stats(
     """
     Get aggregated usage statistics for the current API key.
 
-    Endpoint: GET /api-keys/me/stats
+    API-Sports does not have a dedicated stats endpoint;
+    this fetches ``/status`` and returns the account/subscription/
+    requests information as a stats dict.
+
+    Endpoint: GET /status
 
     Args:
-        start_date: Start date for statistics (ISO 8601 format).
-        end_date:   End date for statistics (ISO 8601 format).
+        start_date: Accepted for API compatibility (unused).
+        end_date:   Accepted for API compatibility (unused).
 
     Returns:
-        dict: Aggregated usage statistics.
+        dict: Aggregated usage statistics with keys:
+            current, limit_day, plan, is_active, email,
+            start_date, end_date
         Returns {} on failure.
     """
-    url = f"{_BASE_URL}/api-keys/me/stats"
-    params: dict = {}
-    if start_date:
-        params["start_date"] = start_date
-    if end_date:
-        params["end_date"] = end_date
+    url = f"{_BASE_URL}/status"
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _fetch_with_retry(url)
         if not raw or not isinstance(raw, dict):
             return {}
-        return raw
+
+        response = raw.get("response") or raw
+        account = response.get("account") or {}
+        subscription = response.get("subscription") or {}
+        requests_info = response.get("requests") or {}
+
+        return {
+            "current":    requests_info.get("current", 0),
+            "limit_day":  requests_info.get("limit_day", 0),
+            "plan":       subscription.get("plan", ""),
+            "is_active":  bool(subscription.get("plan")),
+            "email":      account.get("email", ""),
+            "start_date": start_date or "",
+            "end_date":   end_date or "",
+        }
 
     except Exception as exc:
         _logger.warning("fetch_api_key_stats failed: %s", exc)
@@ -1406,7 +1438,7 @@ def fetch_predictions(game_id=None) -> list[dict]:
     """
     Retrieve AI-powered NBA game predictions.
 
-    Endpoint: GET /nba/predictions
+    Endpoint: GET /predictions
 
     Args:
         game_id: Optional game ID to filter predictions for a specific game.
@@ -1415,10 +1447,10 @@ def fetch_predictions(game_id=None) -> list[dict]:
         list[dict]: Prediction entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/nba/predictions"
+    url = f"{_BASE_URL}/predictions"
     params: dict = {}
     if game_id is not None:
-        params["game_id"] = game_id
+        params["game"] = game_id
 
     try:
         raw = _fetch_with_retry(url, params=params)

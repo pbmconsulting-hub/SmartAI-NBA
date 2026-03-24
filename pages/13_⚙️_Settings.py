@@ -286,7 +286,10 @@ with _api_btn_col3:
                         f"✅ **Odds API**: connected — {len(_sports)} sports available, {_nba_str}{_quota_str}"
                     )
                 else:
-                    _test_results.append("⚠️ **Odds API**: key is set but API returned no data")
+                    _test_results.append(
+                        "❌ **Odds API**: API key may be invalid or expired — "
+                        "check the key and try again (see logs for details)"
+                    )
             except Exception as _exc:
                 _test_results.append(f"❌ **Odds API**: connection error — {_exc}")
         else:

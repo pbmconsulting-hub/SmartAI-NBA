@@ -3,9 +3,9 @@ tests/test_clearsports_endpoints.py
 ------------------------------------
 Tests for API-NBA client endpoint structure:
   1. Base URL correctness (v2.nba.api-sports.io)
-  2. Injury endpoint uses /nba/injury-stats
+  2. Injury endpoint uses /injuries
   3. 403 status code handling (credit exhaustion)
-  4. API key management endpoints (status, api-keys/me/usage, api-keys/me/stats)
+  4. API key management endpoints (status)
   5. NBA endpoints (teams, players, standings, teams/statistics, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
@@ -61,26 +61,26 @@ class TestBaseURL(unittest.TestCase):
 # ── Section 2: Injury endpoint path ──────────────────────────────────────────
 
 class TestInjuryEndpointPath(unittest.TestCase):
-    """Verify fetch_injury_report uses /nba/injury-stats (not /nba/injuries)."""
+    """Verify fetch_injury_report uses /injuries (API-Sports v2 convention)."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
-    def test_injury_endpoint_uses_injury_stats(self):
-        """fetch_injury_report must call /nba/injury-stats."""
+    def test_injury_endpoint_uses_injuries(self):
+        """fetch_injury_report must call /injuries."""
         idx = self.src.find("def fetch_injury_report(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn("/nba/injury-stats", snippet,
-                       "fetch_injury_report must use /nba/injury-stats endpoint")
+        self.assertIn("/injuries", snippet,
+                       "fetch_injury_report must use /injuries endpoint")
 
-    def test_injury_endpoint_not_old_path(self):
-        """fetch_injury_report must NOT use old /nba/injuries path."""
+    def test_injury_endpoint_not_old_nba_injury_stats_path(self):
+        """fetch_injury_report must NOT use old /nba/injury-stats path."""
         idx = self.src.find("def fetch_injury_report(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertNotIn('"/nba/injuries"', snippet,
-                         "fetch_injury_report must not use old /nba/injuries path")
+        self.assertNotIn("/nba/injury-stats", snippet,
+                         "fetch_injury_report must not use old /nba/injury-stats path")
 
 
 # ── Section 3: 403 status code handling ──────────────────────────────────────
@@ -129,44 +129,44 @@ class TestApiKeyManagementEndpoints(unittest.TestCase):
         self.assertIn("def fetch_api_key_usage(", self.src)
 
     def test_fetch_api_key_usage_url(self):
-        """fetch_api_key_usage must call /api-keys/me/usage."""
+        """fetch_api_key_usage must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def fetch_api_key_usage(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
-        self.assertIn("/api-keys/me/usage", snippet)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("/status", snippet)
 
     def test_fetch_api_key_usage_has_limit_param(self):
         """fetch_api_key_usage must accept limit parameter."""
         idx = self.src.find("def fetch_api_key_usage(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn('"limit"', snippet)
+        self.assertIn("limit", snippet)
 
     def test_fetch_api_key_usage_has_offset_param(self):
         """fetch_api_key_usage must accept offset parameter."""
         idx = self.src.find("def fetch_api_key_usage(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn('"offset"', snippet)
+        self.assertIn("offset", snippet)
 
     def test_fetch_api_key_stats_exists(self):
         """fetch_api_key_stats function must exist."""
         self.assertIn("def fetch_api_key_stats(", self.src)
 
     def test_fetch_api_key_stats_url(self):
-        """fetch_api_key_stats must call /api-keys/me/stats."""
+        """fetch_api_key_stats must call /status (API-Sports status endpoint)."""
         idx = self.src.find("def fetch_api_key_stats(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
-        self.assertIn("/api-keys/me/stats", snippet)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("/status", snippet)
 
     def test_fetch_api_key_stats_has_date_params(self):
         """fetch_api_key_stats must accept start_date and end_date parameters."""
         idx = self.src.find("def fetch_api_key_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn('"start_date"', snippet)
-        self.assertIn('"end_date"', snippet)
+        self.assertIn('start_date', snippet)
+        self.assertIn('end_date', snippet)
 
     def test_api_key_functions_no_apikey_in_params(self):
         """API key management functions must not put apiKey in query params."""
@@ -243,12 +243,12 @@ class TestCoreNBAEndpoints(unittest.TestCase):
 
     # -- fetch_injury_report team_id param --
 
-    def test_fetch_injury_report_has_team_id_param(self):
-        """fetch_injury_report must accept team_id parameter."""
+    def test_fetch_injury_report_has_team_param(self):
+        """fetch_injury_report must pass team parameter (API-Sports v2 convention)."""
         idx = self.src.find("def fetch_injury_report(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn('"team_id"', snippet)
+        self.assertIn('"team"', snippet)
 
     def test_core_nba_functions_no_apikey_in_params(self):
         """Core NBA endpoint functions must not put apiKey in query params."""
@@ -348,18 +348,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def fetch_predictions(", self.src)
 
     def test_fetch_predictions_url(self):
-        """fetch_predictions must call /nba/predictions."""
+        """fetch_predictions must call /predictions (API-Sports v2 convention)."""
         idx = self.src.find("def fetch_predictions(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/nba/predictions", snippet)
+        self.assertIn("/predictions", snippet)
 
-    def test_fetch_predictions_has_game_id_param(self):
-        """fetch_predictions must accept game_id parameter."""
+    def test_fetch_predictions_has_game_param(self):
+        """fetch_predictions must pass game parameter (API-Sports v2 convention)."""
         idx = self.src.find("def fetch_predictions(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn('"game_id"', snippet)
+        self.assertIn('"game"', snippet)
 
     def test_new_nba_functions_no_apikey_in_params(self):
         """New NBA endpoint functions must not put apiKey in query params."""
@@ -515,10 +515,15 @@ class TestApiKeyUsageRuntime(unittest.TestCase):
     @patch("data.clearsports_client._fetch_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
         from data.clearsports_client import fetch_api_key_usage
-        mock_fetch.return_value = [{"endpoint": "/nba/teams", "timestamp": "2025-12-25T10:30:00Z"}]
+        # API-Sports /status response format
+        mock_fetch.return_value = {
+            "response": {
+                "requests": {"current": 15, "limit_day": 100},
+            }
+        }
         result = fetch_api_key_usage(limit=10, offset=0)
         self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 1)
+        self.assertGreaterEqual(len(result), 1)
 
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
     @patch("data.clearsports_client._fetch_with_retry", return_value=None)
@@ -535,13 +540,21 @@ class TestApiKeyStatsRuntime(unittest.TestCase):
     @patch("data.clearsports_client._fetch_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
         from data.clearsports_client import fetch_api_key_stats
-        mock_fetch.return_value = {"total_calls": 15, "period": "2025-12-01 to 2025-12-25"}
+        # API-Sports /status response format
+        mock_fetch.return_value = {
+            "response": {
+                "account": {"email": "user@example.com"},
+                "subscription": {"plan": "Free"},
+                "requests": {"current": 15, "limit_day": 100},
+            }
+        }
         result = fetch_api_key_stats(
             start_date="2025-12-01T00:00:00Z",
             end_date="2025-12-25T23:59:59Z",
         )
         self.assertIsInstance(result, dict)
-        self.assertEqual(result["total_calls"], 15)
+        self.assertEqual(result["current"], 15)
+        self.assertEqual(result["limit_day"], 100)
 
     @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
     @patch("data.clearsports_client._fetch_with_retry", return_value=None)

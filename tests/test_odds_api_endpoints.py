@@ -128,17 +128,17 @@ class TestFetchSportsRuntime(unittest.TestCase):
         self.assertTrue(nba_sport[0]["active"])
 
     @patch("data.odds_api_client._resolve_api_key", return_value=None)
-    def test_returns_empty_list_when_no_key(self, mock_key):
+    def test_returns_none_when_no_key(self, mock_key):
         from data.odds_api_client import fetch_sports
         result = fetch_sports()
-        self.assertEqual(result, [])
+        self.assertIsNone(result)
 
     @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
     @patch("data.odds_api_client._fetch_with_retry", return_value=None)
-    def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
+    def test_returns_none_on_failure(self, mock_fetch, mock_key):
         from data.odds_api_client import fetch_sports
         result = fetch_sports()
-        self.assertEqual(result, [])
+        self.assertIsNone(result)
 
 
 class TestFetchEventsEndpoint(unittest.TestCase):

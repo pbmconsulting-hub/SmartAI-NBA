@@ -191,21 +191,22 @@ def validate_api_key(key: str | None) -> tuple[bool, str]:
 def _resolve_api_key(explicit_key: str | None = None) -> str | None:
     """Return the Odds API key, trying: argument → session → secrets → env."""
     if explicit_key:
-        return explicit_key
+        return explicit_key.strip()
     if _ST_AVAILABLE:
         try:
             key = st.session_state.get("odds_api_key")
             if key:
-                return key
+                return str(key).strip()
         except Exception:
             pass
         try:
             key = st.secrets.get("ODDS_API_KEY")
             if key:
-                return key
+                return str(key).strip()
         except Exception:
             pass
-    return os.environ.get("ODDS_API_KEY")
+    val = os.environ.get("ODDS_API_KEY")
+    return val.strip() if val else None
 
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
@@ -361,7 +362,7 @@ def _fetch_events(api_key: str) -> list[dict]:
     }
     raw = _fetch_with_retry(url, params=params)
     if not isinstance(raw, list):
-        _logger.warning("_fetch_events: unexpected response shape")
+        _logger.debug("_fetch_events: no NBA events available (NBA may not be in season)")
         return []
     return raw
 
@@ -386,7 +387,7 @@ def _build_team_lookup(events: list[dict]) -> dict[str, str]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def fetch_sports(api_key: str | None = None) -> list[dict]:
+def fetch_sports(api_key: str | None = None) -> list[dict] | None:
     """
     Fetch all in-season sports from The Odds API.
 
@@ -401,12 +402,13 @@ def fetch_sports(api_key: str | None = None) -> list[dict]:
     Returns:
         list[dict]: Each dict has keys:
             key, group, title, description, active, has_outrights
-        Returns [] on failure or missing API key.
+        Returns ``None`` on API failure (auth error, network issue, etc.)
+        or when no API key is available.
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_sports: no Odds API key found — returning []")
-        return []
+        _logger.warning("fetch_sports: no Odds API key found")
+        return None
 
     url = f"{_BASE_URL}/sports"
     params = {
@@ -415,14 +417,17 @@ def fetch_sports(api_key: str | None = None) -> list[dict]:
 
     try:
         raw = _fetch_with_retry(url, params=params)
+        if raw is None:
+            # API call failed (401, 403, network error, etc.)
+            return None
         if not isinstance(raw, list):
             _logger.warning("fetch_sports: unexpected response shape")
-            return []
+            return None
         return raw
 
     except Exception as exc:
         _logger.warning("fetch_sports failed: %s", exc)
-        return []
+        return None
 
 
 def fetch_events(api_key: str | None = None) -> list[dict]:
@@ -538,7 +543,7 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
     try:
         raw = _fetch_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.warning("fetch_game_odds: unexpected response shape, returning []")
+            _logger.debug("fetch_game_odds: no NBA odds available (NBA may not be in season)")
             return []
 
         games: list[dict] = []
@@ -616,7 +621,7 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
     try:
         events = _fetch_events(resolved_key)
         if not events:
-            _logger.warning("fetch_player_props: no NBA events returned from Odds API")
+            _logger.debug("fetch_player_props: no NBA events returned from Odds API")
             return []
 
         team_lookup = _build_team_lookup(events)
@@ -913,7 +918,7 @@ def fetch_recent_scores(days_from: int = 1,
     try:
         raw = _fetch_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.warning("fetch_recent_scores: unexpected response shape")
+            _logger.debug("fetch_recent_scores: no scores available (NBA may not be in season)")
             return []
 
         scores: list[dict] = []
