@@ -306,6 +306,7 @@ def is_premium_user() -> bool:
 
     # ── Layer 1: Dev/demo mode — no Stripe configured ─────────
     if not is_stripe_configured():
+        _logger.debug("Premium gate: granted (Stripe not configured)")
         return True  # Everything is free when Stripe isn't set up
 
     # ── Layer 2: Fresh session state cache ────────────────────
@@ -340,6 +341,7 @@ def is_premium_user() -> bool:
                 return False
 
     # ── Layer 4: User is not premium ─────────────────────────
+    _logger.debug("Premium gate: denied (no active subscription found)")
     return False
 
 

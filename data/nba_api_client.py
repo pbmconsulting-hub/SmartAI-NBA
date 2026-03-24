@@ -291,12 +291,14 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
 
     for attempt in range(MAX_API_RETRIES + 1):
         try:
+            _req_start = time.monotonic()
             resp = requests.get(
                 url,
                 headers=headers,
                 params=params,
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
+            _req_ms = round((time.monotonic() - _req_start) * 1000, 1)
 
             if resp.status_code == 429 or resp.status_code >= 500:
                 if attempt < MAX_API_RETRIES:
@@ -345,6 +347,10 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
                 return None
 
             data = resp.json()
+            _logger.debug(
+                "API request: endpoint=%s, status=%d, duration_ms=%.1f",
+                url.replace(_BASE_URL, ""), resp.status_code, _req_ms,
+            )
             _cache_set(cache_key, data)
             return data
 

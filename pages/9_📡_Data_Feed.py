@@ -205,6 +205,24 @@ try:
 except Exception:
     pass
 
+# ── API credits warning ──────────────────────────────────────────
+# Warn users when API-NBA API credits are running low (< 10% remaining).
+try:
+    from data.nba_api_client import get_api_key_info
+    _key_info = get_api_key_info()
+    _credits_remaining = _key_info.get("credits_remaining")
+    _credits_total = _key_info.get("credits_total")
+    if _credits_remaining is not None and _credits_total and int(_credits_total) > 0:
+        _pct_remaining = int(_credits_remaining) / int(_credits_total) * 100
+        if _pct_remaining < 10:
+            st.warning(
+                f"⚠️ **API credits running low** — {int(_credits_remaining):,} of "
+                f"{int(_credits_total):,} daily credits remaining ({_pct_remaining:.0f}%). "
+                f"Consider limiting API calls to avoid exhausting your quota."
+            )
+except Exception:
+    pass  # Silently skip if API key is not configured or call fails
+
 st.divider()
 
 # ============================================================
