@@ -220,40 +220,50 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
             pct = int((current / max(total, 1)) * 100)
             _pb.progress(pct, text=msg)
 
-        with st.spinner("Loading live props..."):
-            _live_props = get_all_sportsbook_props(
-                include_prizepicks=False,
-                include_underdog=False,
-                include_draftkings=_dk_on and bool(_dk_key),
-                odds_api_key=_dk_key or None,
-                progress_callback=_scanner_progress,
-            )
-
-        _pb.progress(100, text="Done!")
-
-        if _live_props:
-            save_platform_props_to_session(_live_props, st.session_state)
-            save_platform_props_to_csv(_live_props)
-            save_props_to_session(_live_props, st.session_state)
-            _lsummary = summarize_props_by_platform(_live_props)
-            st.success(
-                f"✅ Loaded **{len(_live_props)} live props**: "
-                + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
-            )
-            # Warn if any props reference players not in our database
-            _missing = find_new_players_from_props(_live_props, players_data)
-            if _missing:
-                st.warning(
-                    f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
-                    f"local database: {', '.join(_missing[:5])}"
-                    + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
-                    + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+        try:
+            with st.spinner("Loading live props..."):
+                _live_props = get_all_sportsbook_props(
+                    include_prizepicks=False,
+                    include_underdog=False,
+                    include_draftkings=_dk_on and bool(_dk_key),
+                    odds_api_key=_dk_key or None,
+                    progress_callback=_scanner_progress,
                 )
-            st.rerun()  # Refresh so the current_props table shows the new data
-        else:
-            st.warning(
-                "⚠️ No live props retrieved. Check your internet connection."
-            )
+
+            _pb.progress(100, text="Done!")
+
+            if _live_props:
+                save_platform_props_to_session(_live_props, st.session_state)
+                save_platform_props_to_csv(_live_props)
+                save_props_to_session(_live_props, st.session_state)
+                _lsummary = summarize_props_by_platform(_live_props)
+                st.success(
+                    f"✅ Loaded **{len(_live_props)} live props**: "
+                    + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
+                )
+                # Warn if any props reference players not in our database
+                _missing = find_new_players_from_props(_live_props, players_data)
+                if _missing:
+                    st.warning(
+                        f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
+                        f"local database: {', '.join(_missing[:5])}"
+                        + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
+                        + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+                    )
+                st.rerun()  # Refresh so the current_props table shows the new data
+            else:
+                st.warning(
+                    "⚠️ No live props retrieved. Check your internet connection."
+                )
+        except Exception as _load_err:
+            _err_str = str(_load_err)
+            if "WebSocketClosedError" not in _err_str and "StreamClosedError" not in _err_str:
+                st.error(f"❌ Failed to load live props: {_load_err}")
+        finally:
+            try:
+                _pb.empty()
+            except Exception:
+                pass
 
     # ── Cross-Platform Comparison Table ───────────────────────────
     _platform_props = load_platform_props_from_session(st.session_state)

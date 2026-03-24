@@ -424,41 +424,51 @@ if current_action:
             progress_bar.progress(frac, text=message)
             status_text.caption(message)
 
-        with st.spinner("🏀 Loading games + rosters + player stats + team stats..."):
-            result = get_all_todays_data(progress_callback=one_click_progress)
+        try:
+            with st.spinner("🏀 Loading games + rosters + player stats + team stats..."):
+                result = get_all_todays_data(progress_callback=one_click_progress)
 
-        st.session_state["update_action"] = None
-        progress_bar.empty()
-        status_text.empty()
+            st.session_state["update_action"] = None
 
-        games = result.get("games", [])
-        players_ok = result.get("players_updated", False)
-        teams_ok = result.get("teams_updated", False)
+            games = result.get("games", [])
+            players_ok = result.get("players_updated", False)
+            teams_ok = result.get("teams_updated", False)
 
-        if games:
-            st.session_state["todays_games"] = games
-            from data.data_manager import load_players_data
-            updated_players = load_players_data()
-            st.success(
-                f"✅ One-Click Setup complete! "
-                f"**{len(games)} game(s)** loaded | "
-                f"**{len(updated_players)} players** retrieved | "
-                f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
-            )
+            if games:
+                st.session_state["todays_games"] = games
+                from data.data_manager import load_players_data
+                updated_players = load_players_data()
+                st.success(
+                    f"✅ One-Click Setup complete! "
+                    f"**{len(games)} game(s)** loaded | "
+                    f"**{len(updated_players)} players** retrieved | "
+                    f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
+                )
 
-            # Show bonus data enrichment status (standings, news, historical data)
-            _bonus_parts = []
-            if result.get("standings"):
-                _bonus_parts.append(f"📊 Standings loaded ({len(result['standings'])} teams)")
-            if result.get("news"):
-                _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
-            if _bonus_parts:
-                st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
-        else:
-            st.warning(
-                "⚠️ Could not retrieve tonight's games (no games tonight, or data unavailable). "
-                "Try again or load games manually on the 🏀 Today's Games page."
-            )
+                # Show bonus data enrichment status (standings, news, historical data)
+                _bonus_parts = []
+                if result.get("standings"):
+                    _bonus_parts.append(f"📊 Standings loaded ({len(result['standings'])} teams)")
+                if result.get("news"):
+                    _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
+                if _bonus_parts:
+                    st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
+            else:
+                st.warning(
+                    "⚠️ Could not retrieve tonight's games (no games tonight, or data unavailable). "
+                    "Try again or load games manually on the 🏀 Today's Games page."
+                )
+        except Exception as _oc_err:
+            st.session_state["update_action"] = None
+            _oc_err_str = str(_oc_err)
+            if "WebSocketClosedError" not in _oc_err_str and "StreamClosedError" not in _oc_err_str:
+                st.error(f"❌ One-Click Setup failed: {_oc_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Smart Update (today's teams only)
@@ -491,30 +501,40 @@ if current_action:
                 progress_bar.progress(frac, text=message)
                 status_text.caption(message)
 
-            with st.spinner("Loading today's team rosters and player stats..."):
-                success = get_todays_players(
-                    todays_games_for_smart,
-                    progress_callback=smart_progress
-                )
+            try:
+                with st.spinner("Loading today's team rosters and player stats..."):
+                    success = get_todays_players(
+                        todays_games_for_smart,
+                        progress_callback=smart_progress
+                    )
 
-            st.session_state["update_action"] = None
-            progress_bar.empty()
-            status_text.empty()
+                st.session_state["update_action"] = None
 
-            if success:
-                from data.data_manager import load_players_data
-                updated_players = load_players_data()
-                st.success(
-                    f"✅ Smart Update complete! Loaded **{len(updated_players)} players** "
-                    f"from today's {len(todays_games_for_smart)} game(s). "
-                    f"Only current roster players — no traded players!"
-                )
-                st.caption(f"Teams retrieved: {', '.join(sorted(teams_set))}")
-            else:
-                st.error(
-                    "❌ Smart Update failed. Check your internet connection or try again.\n"
-                    "You can still use the full 'Update Player Stats' button as a fallback."
-                )
+                if success:
+                    from data.data_manager import load_players_data
+                    updated_players = load_players_data()
+                    st.success(
+                        f"✅ Smart Update complete! Loaded **{len(updated_players)} players** "
+                        f"from today's {len(todays_games_for_smart)} game(s). "
+                        f"Only current roster players — no traded players!"
+                    )
+                    st.caption(f"Teams retrieved: {', '.join(sorted(teams_set))}")
+                else:
+                    st.error(
+                        "❌ Smart Update failed. Check your internet connection or try again.\n"
+                        "You can still use the full 'Update Player Stats' button as a fallback."
+                    )
+            except Exception as _smart_err:
+                st.session_state["update_action"] = None
+                _smart_err_str = str(_smart_err)
+                if "WebSocketClosedError" not in _smart_err_str and "StreamClosedError" not in _smart_err_str:
+                    st.error(f"❌ Smart Update failed: {_smart_err}")
+            finally:
+                try:
+                    progress_bar.empty()
+                    status_text.empty()
+                except Exception:
+                    pass
 
     # --------------------------------------------------------
     # Action: Get Tonight's Games
@@ -522,54 +542,51 @@ if current_action:
     elif current_action == "games":
         st.subheader("🏟️ Loading Tonight's Games...")
 
-        # Show a spinner while we load
-        # BEGINNER NOTE: st.spinner() shows a loading animation
-        # while the code inside the "with" block runs
-        with st.spinner("Loading game data…"):
-            # Call the data service function
-            todays_games = get_todays_games()
+        try:
+            # Show a spinner while we load
+            with st.spinner("Loading game data…"):
+                todays_games = get_todays_games()
 
-        # Check if we got any games
-        if todays_games:
-            # Save the games to session state so other pages can use them
-            st.session_state["todays_games"] = todays_games
-            st.session_state["update_action"] = None  # Clear the action
+            # Check if we got any games
+            if todays_games:
+                st.session_state["todays_games"] = todays_games
+                st.session_state["update_action"] = None
 
-            # Show success message
-            st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
-            st.info(
-                "💡 Vegas lines and totals are retrieved from consensus data. "
-                "You can also edit them on the **🏀 Today's Games** page."
-            )
+                st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
+                st.info(
+                    "💡 Vegas lines and totals are retrieved from consensus data. "
+                    "You can also edit them on the **🏀 Today's Games** page."
+                )
 
-            # Show the games in a table
-            st.markdown("**Tonight's Matchups:**")
+                st.markdown("**Tonight's Matchups:**")
 
-            # Build display data for the table
-            games_display = []
-            for game in todays_games:
-                games_display.append({
-                    "Away Team": game.get("away_team", ""),
-                    "Home Team": game.get("home_team", ""),
-                    "Game Date": game.get("game_date", ""),
-                    "Total (O/U)": game.get("consensus_total") or game.get("game_total", ""),
-                    "Spread": game.get("consensus_spread") or game.get("vegas_spread", ""),
-                })
+                games_display = []
+                for game in todays_games:
+                    games_display.append({
+                        "Away Team": game.get("away_team", ""),
+                        "Home Team": game.get("home_team", ""),
+                        "Game Date": game.get("game_date", ""),
+                        "Total (O/U)": game.get("consensus_total") or game.get("game_total", ""),
+                        "Spread": game.get("consensus_spread") or game.get("vegas_spread", ""),
+                    })
 
-            # Display as a clean table
-            st.dataframe(games_display, width="stretch", hide_index=True)
+                st.dataframe(games_display, width="stretch", hide_index=True)
 
-        else:
-            # No games found or data error
-            st.session_state["update_action"] = None  # Clear the action
+            else:
+                st.session_state["update_action"] = None
 
-            st.warning(
-                "⚠️ No games found for tonight, or there was a data error. "
-                "\n\nPossible reasons:\n"
-                "- No NBA games are scheduled today\n"
-                "- Check your internet connection\n\n"
-                "You can still enter games manually on the **🏀 Today's Games** page."
-            )
+                st.warning(
+                    "⚠️ No games found for tonight, or there was a data error. "
+                    "\n\nPossible reasons:\n"
+                    "- No NBA games are scheduled today\n"
+                    "- Check your internet connection\n\n"
+                    "You can still enter games manually on the **🏀 Today's Games** page."
+                )
+        except Exception as _games_err:
+            st.session_state["update_action"] = None
+            _games_err_str = str(_games_err)
+            if "WebSocketClosedError" not in _games_err_str and "StreamClosedError" not in _games_err_str:
+                st.error(f"❌ Failed to load games: {_games_err}")
 
     # --------------------------------------------------------
     # Action: Update Player Stats
@@ -583,65 +600,64 @@ if current_action:
             "Please be patient!"
         )
 
-        # Create a progress bar
-        # BEGINNER NOTE: st.progress() shows a loading bar (0.0 to 1.0)
-        # We update it as the retrieval progresses
-        progress_bar = st.progress(0)     # Start at 0%
-        status_text = st.empty()           # Placeholder for status messages
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-        # Create a callback function to update the progress bar
-        # BEGINNER NOTE: A callback is a function you pass to another function
-        # so it can "call back" to update the UI
         def update_player_progress(current, total, message):
             """Update the progress bar and status text."""
-            # Calculate fraction (0.0 to 1.0)
-            fraction = min(current / max(total, 1), 1.0)  # Clamp to [0, 1]
-            progress_bar.progress(fraction)     # Update the bar
-            status_text.text(f"⏳ {message}")   # Update the text
+            fraction = min(current / max(total, 1), 1.0)
+            progress_bar.progress(fraction)
+            status_text.text(f"⏳ {message}")
 
-        # Run the player stats retrieval with our progress callback
-        success = get_player_stats(progress_callback=update_player_progress)
+        try:
+            success = get_player_stats(progress_callback=update_player_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        if success:
-            # Update complete!
-            progress_bar.progress(1.0)  # Fill the bar to 100%
-            status_text.text("✅ Done!")
+            if success:
+                progress_bar.progress(1.0)
+                status_text.text("✅ Done!")
 
-            st.success("✅ **Player stats updated successfully!**")
+                st.success("✅ **Player stats updated successfully!**")
 
-            # Show the updated data
-            st.markdown("**Updated Player Data (first 20 rows):**")
-            updated_players = load_players_data()  # Reload from the new CSV
+                st.markdown("**Updated Player Data (first 20 rows):**")
+                updated_players = load_players_data()
 
-            if updated_players:
-                # Convert to display format (only show key columns)
-                players_display = []
-                for player in updated_players[:20]:  # Show first 20
-                    players_display.append({
-                        "Name": player.get("name", ""),
-                        "Team": player.get("team", ""),
-                        "Pos": player.get("position", ""),
-                        "MIN": player.get("minutes_avg", ""),
-                        "PTS": player.get("points_avg", ""),
-                        "REB": player.get("rebounds_avg", ""),
-                        "AST": player.get("assists_avg", ""),
-                        "3PM": player.get("threes_avg", ""),
-                    })
+                if updated_players:
+                    players_display = []
+                    for player in updated_players[:20]:
+                        players_display.append({
+                            "Name": player.get("name", ""),
+                            "Team": player.get("team", ""),
+                            "Pos": player.get("position", ""),
+                            "MIN": player.get("minutes_avg", ""),
+                            "PTS": player.get("points_avg", ""),
+                            "REB": player.get("rebounds_avg", ""),
+                            "AST": player.get("assists_avg", ""),
+                            "3PM": player.get("threes_avg", ""),
+                        })
 
-                st.dataframe(players_display, width="stretch", hide_index=True)
-                st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
-        else:
-            # Retrieval failed
-            st.error(
-                "❌ **Failed to update player stats.**\n\n"
-                "Possible reasons:\n"
-                "- No internet connection\n"
-                "- Try again in a few minutes\n\n"
-                "The app will continue to use the existing data until a successful update."
-            )
+                    st.dataframe(players_display, width="stretch", hide_index=True)
+                    st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
+            else:
+                st.error(
+                    "❌ **Failed to update player stats.**\n\n"
+                    "Possible reasons:\n"
+                    "- No internet connection\n"
+                    "- Try again in a few minutes\n\n"
+                    "The app will continue to use the existing data until a successful update."
+                )
+        except Exception as _player_err:
+            st.session_state["update_action"] = None
+            _player_err_str = str(_player_err)
+            if "WebSocketClosedError" not in _player_err_str and "StreamClosedError" not in _player_err_str:
+                st.error(f"❌ Player stats update failed: {_player_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Update Team Stats
@@ -649,54 +665,60 @@ if current_action:
     elif current_action == "teams":
         st.subheader("🏆 Updating Team Stats...")
 
-        # Create a progress bar for team stats
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Progress callback for teams
         def update_team_progress(current, total, message):
             """Update the progress bar for team stats."""
             fraction = min(current / max(total, 1), 1.0)
             progress_bar.progress(fraction)
             status_text.text(f"⏳ {message}")
 
-        # Run the team stats retrieval
-        with st.spinner("Loading team data..."):
-            success = get_team_stats(progress_callback=update_team_progress)
+        try:
+            with st.spinner("Loading team data..."):
+                success = get_team_stats(progress_callback=update_team_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        if success:
-            progress_bar.progress(1.0)
-            status_text.text("✅ Done!")
+            if success:
+                progress_bar.progress(1.0)
+                status_text.text("✅ Done!")
 
-            st.success("✅ **Team stats updated successfully!**")
+                st.success("✅ **Team stats updated successfully!**")
 
-            # Show the updated team data
-            st.markdown("**Updated Team Data:**")
-            updated_teams = load_teams_data()  # Reload from the new CSV
+                st.markdown("**Updated Team Data:**")
+                updated_teams = load_teams_data()
 
-            if updated_teams:
-                # Build display format
-                teams_display = []
-                for team in updated_teams:
-                    teams_display.append({
-                        "Team": team.get("team_name", ""),
-                        "Abbrev": team.get("abbreviation", ""),
-                        "Conf": team.get("conference", ""),
-                        "Pace": team.get("pace", ""),
-                        "ORTG": team.get("ortg", ""),
-                        "DRTG": team.get("drtg", ""),
-                    })
+                if updated_teams:
+                    teams_display = []
+                    for team in updated_teams:
+                        teams_display.append({
+                            "Team": team.get("team_name", ""),
+                            "Abbrev": team.get("abbreviation", ""),
+                            "Conf": team.get("conference", ""),
+                            "Pace": team.get("pace", ""),
+                            "ORTG": team.get("ortg", ""),
+                            "DRTG": team.get("drtg", ""),
+                        })
 
-                st.dataframe(teams_display, width="stretch", hide_index=True)
-                st.caption(f"All {len(updated_teams)} teams saved to teams.csv and defensive_ratings.csv")
-        else:
-            st.error(
-                "❌ **Failed to update team stats.**\n\n"
-                "Check your internet connection and try again."
-            )
+                    st.dataframe(teams_display, width="stretch", hide_index=True)
+                    st.caption(f"All {len(updated_teams)} teams saved to teams.csv and defensive_ratings.csv")
+            else:
+                st.error(
+                    "❌ **Failed to update team stats.**\n\n"
+                    "Check your internet connection and try again."
+                )
+        except Exception as _team_err:
+            st.session_state["update_action"] = None
+            _team_err_str = str(_team_err)
+            if "WebSocketClosedError" not in _team_err_str and "StreamClosedError" not in _team_err_str:
+                st.error(f"❌ Team stats update failed: {_team_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Update Everything
@@ -710,76 +732,78 @@ if current_action:
             "Please wait — don't close the tab!"
         )
 
-        # Progress bar for the full update
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Progress callback for full update
         def update_all_progress(current, total, message):
             """Update progress bar for full update."""
             fraction = min(current / max(total, 1), 1.0)
             progress_bar.progress(fraction)
             status_text.text(f"⏳ {message}")
 
-        # Run the full updater
-        results = get_all_data(progress_callback=update_all_progress)
+        try:
+            results = get_all_data(progress_callback=update_all_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        # Show results
-        progress_bar.progress(1.0)
-        status_text.text("✅ Update complete!")
+            progress_bar.progress(1.0)
+            status_text.text("✅ Update complete!")
 
-        # Check which parts succeeded
-        players_ok = results.get("players", False)
-        teams_ok = results.get("teams", False)
+            players_ok = results.get("players", False)
+            teams_ok = results.get("teams", False)
 
-        if players_ok and teams_ok:
-            st.success("✅ **All data updated successfully!**")
-        elif players_ok or teams_ok:
-            st.warning(
-                "⚠️ **Partial update completed.**\n"
-                f"Players: {'✅ Success' if players_ok else '❌ Failed'}\n"
-                f"Teams: {'✅ Success' if teams_ok else '❌ Failed'}"
-            )
-        else:
-            st.error(
-                "❌ **Update failed for all data types.**\n\n"
-                "Check your internet connection and try again."
-            )
+            if players_ok and teams_ok:
+                st.success("✅ **All data updated successfully!**")
+            elif players_ok or teams_ok:
+                st.warning(
+                    "⚠️ **Partial update completed.**\n"
+                    f"Players: {'✅ Success' if players_ok else '❌ Failed'}\n"
+                    f"Teams: {'✅ Success' if teams_ok else '❌ Failed'}"
+                )
+            else:
+                st.error(
+                    "❌ **Update failed for all data types.**\n\n"
+                    "Check your internet connection and try again."
+                )
 
-        # Show summary even on partial success
-        if players_ok:
-            # Show updated player count
-            updated_players = load_players_data()
-            st.metric(
-                label="👤 Players Updated",
-                value=len(updated_players),
-                help="Players now in players.csv"
-            )
+            if players_ok:
+                updated_players = load_players_data()
+                st.metric(
+                    label="👤 Players Updated",
+                    value=len(updated_players),
+                    help="Players now in players.csv"
+                )
 
-        if teams_ok:
-            # Show updated team count
-            updated_teams = load_teams_data()
-            st.metric(
-                label="🏆 Teams Updated",
-                value=len(updated_teams),
-                help="Teams now in teams.csv"
-            )
+            if teams_ok:
+                updated_teams = load_teams_data()
+                st.metric(
+                    label="🏆 Teams Updated",
+                    value=len(updated_teams),
+                    help="Teams now in teams.csv"
+                )
 
-        # Also try to retrieve tonight's games
-        st.markdown("---")
-        st.markdown("**Loading tonight's games...**")
+            st.markdown("---")
+            st.markdown("**Loading tonight's games...**")
 
-        with st.spinner("Loading tonight's games..."):
-            todays_games = get_todays_games()
+            with st.spinner("Loading tonight's games..."):
+                todays_games = get_todays_games()
 
-        if todays_games:
-            st.session_state["todays_games"] = todays_games
-            st.success(f"🏟️ Found **{len(todays_games)} game(s)** for tonight!")
-        else:
-            st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
+            if todays_games:
+                st.session_state["todays_games"] = todays_games
+                st.success(f"🏟️ Found **{len(todays_games)} game(s)** for tonight!")
+            else:
+                st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
+        except Exception as _all_err:
+            st.session_state["update_action"] = None
+            _all_err_str = str(_all_err)
+            if "WebSocketClosedError" not in _all_err_str and "StreamClosedError" not in _all_err_str:
+                st.error(f"❌ Full update failed: {_all_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Refresh Injury Report (API-NBA + NBA CDN fallback)

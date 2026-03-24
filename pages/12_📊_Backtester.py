@@ -262,16 +262,19 @@ if run_btn:
         st.error("Please select at least one stat type.")
         st.stop()
 
-    with st.spinner("Running backtest simulation…"):
-        result = run_backtest(
-            season=season,
-            stat_types=selected_stats,
-            min_edge=min_edge,
-            tier_filter=tier_filter_val,
-            game_logs_by_player=game_logs_by_player,
-        )
+    try:
+        with st.spinner("Running backtest simulation…"):
+            result = run_backtest(
+                season=season,
+                stat_types=selected_stats,
+                min_edge=min_edge,
+                tier_filter=tier_filter_val,
+                game_logs_by_player=game_logs_by_player,
+            )
 
-    st.session_state["backtest_result"] = result
+        st.session_state["backtest_result"] = result
+    except Exception as _bt_err:
+        st.error(f"❌ Backtest failed: {_bt_err}")
 
 # ── Display Results ───────────────────────────────────────────
 result = st.session_state.get("backtest_result")

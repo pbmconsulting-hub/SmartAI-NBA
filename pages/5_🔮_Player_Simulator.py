@@ -630,18 +630,24 @@ if run_sim and selected_names:
     _mode_label = " (Scenario)" if _scenario_mode else (" (Compare)" if _compare_mode else "")
     st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
 
-    with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
+    try:
+        with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
+            _all_sim_results = []
+            for pname in selected_names:
+                pdata = next((p for p in tonight_players if p.get("name") == pname), None)
+                if pdata is None:
+                    st.warning(f"⚠️ Could not find data for **{pname}**.")
+                    continue
+                sim_result = _simulate_player(
+                    pdata, sim_depth, todays_games,
+                    scenario_overrides=_scenario_overrides if _scenario_mode else None,
+                )
+                _all_sim_results.append(sim_result)
+    except Exception as _sim_err:
+        _sim_err_str = str(_sim_err)
+        if "WebSocketClosedError" not in _sim_err_str and "StreamClosedError" not in _sim_err_str:
+            st.error(f"❌ Simulation failed: {_sim_err}")
         _all_sim_results = []
-        for pname in selected_names:
-            pdata = next((p for p in tonight_players if p.get("name") == pname), None)
-            if pdata is None:
-                st.warning(f"⚠️ Could not find data for **{pname}**.")
-                continue
-            sim_result = _simulate_player(
-                pdata, sim_depth, todays_games,
-                scenario_overrides=_scenario_overrides if _scenario_mode else None,
-            )
-            _all_sim_results.append(sim_result)
 
     if _compare_mode and len(_all_sim_results) >= 2:
         # ── Compare Mode: side-by-side table for all selected players ──
@@ -819,35 +825,41 @@ if run_dark_horse:
         "(90th pct projection ÷ season average). Ratio ≥ 1.5 = Dark Horse."
     )
 
-    with st.spinner("🔮 Scanning all tonight's players for dark horses…"):
-        dark_horses = []
-        for pdata in tonight_players:
-            if not pdata.get("name"):
-                continue
-            sim_result = _simulate_player(pdata, min(sim_depth, 1000), todays_games)
-            stats = sim_result["stats"]
-            # Compute max upside ratio across all meaningful stats
-            best_ratio = max(
-                (s["upside_ratio"] for s in stats.values() if s["season_avg"] > 0.5),
-                default=1.0,
-            )
-            best_stat = max(
-                ((stat, s["upside_ratio"]) for stat, s in stats.items() if s["season_avg"] > 0.5),
-                key=lambda x: x[1],
-                default=("points", 1.0),
-            )
-            dark_horses.append({
-                "player": pdata,
-                "context": sim_result["context"],
-                "stats": stats,
-                "best_ratio": best_ratio,
-                "best_stat": best_stat[0],
-                "best_p90": stats.get(best_stat[0], {}).get("p90", 0),
-                "best_avg": stats.get(best_stat[0], {}).get("season_avg", 0),
-            })
+    try:
+        with st.spinner("🔮 Scanning all tonight's players for dark horses…"):
+            dark_horses = []
+            for pdata in tonight_players:
+                if not pdata.get("name"):
+                    continue
+                sim_result = _simulate_player(pdata, min(sim_depth, 1000), todays_games)
+                stats = sim_result["stats"]
+                # Compute max upside ratio across all meaningful stats
+                best_ratio = max(
+                    (s["upside_ratio"] for s in stats.values() if s["season_avg"] > 0.5),
+                    default=1.0,
+                )
+                best_stat = max(
+                    ((stat, s["upside_ratio"]) for stat, s in stats.items() if s["season_avg"] > 0.5),
+                    key=lambda x: x[1],
+                    default=("points", 1.0),
+                )
+                dark_horses.append({
+                    "player": pdata,
+                    "context": sim_result["context"],
+                    "stats": stats,
+                    "best_ratio": best_ratio,
+                    "best_stat": best_stat[0],
+                    "best_p90": stats.get(best_stat[0], {}).get("p90", 0),
+                    "best_avg": stats.get(best_stat[0], {}).get("season_avg", 0),
+                })
 
-        # Sort by upside ratio descending
-        dark_horses.sort(key=lambda x: x["best_ratio"], reverse=True)
+            # Sort by upside ratio descending
+            dark_horses.sort(key=lambda x: x["best_ratio"], reverse=True)
+    except Exception as _dh_err:
+        _dh_err_str = str(_dh_err)
+        if "WebSocketClosedError" not in _dh_err_str and "StreamClosedError" not in _dh_err_str:
+            st.error(f"❌ Dark Horse scan failed: {_dh_err}")
+        dark_horses = []
 
     # Show top 10 dark horses
     st.markdown(f"**Top Dark Horses Tonight (out of {len(dark_horses)} players):**")
