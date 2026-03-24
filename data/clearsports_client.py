@@ -698,11 +698,6 @@ def fetch_player_stats() -> list[dict]:
                     pts = _safe_float(stats.get("points") or stats.get("pts", 0))
                     if pts > 0:
                         has_real_stats = True
-                    # If the team value is a plain string, the data is in
-                    # the processed/flat format (or test data), not the
-                    # metadata-only /players response from API-Basketball v1.
-                    if isinstance(team_val, str) and team_val:
-                        has_real_stats = True
 
                     players.append({
                         "player_id":     _safe_str(p.get("player_id") or p.get("id")),
@@ -729,11 +724,17 @@ def fetch_player_stats() -> list[dict]:
                         "blocks_std":    _safe_float(stats.get("blocks_std", 0)),
                         "turnovers_std": _safe_float(stats.get("turnovers_std", 0)),
                     })
-                # Only return if we got real stat data (not just metadata-only
-                # responses from /players that have names but zero stats).
-                if players and has_real_stats:
+                # Return if we got real stat data, OR if the response is in a
+                # flat/processed format (team as string) — the latter indicates
+                # the data was already enriched or is from a different source.
+                is_metadata_only = (
+                    not has_real_stats
+                    and players
+                    and all(isinstance(p_raw.get("team"), dict) for p_raw in players_raw if isinstance(p_raw, dict))
+                )
+                if players and not is_metadata_only:
                     return players
-                if players and not has_real_stats:
+                if is_metadata_only:
                     _logger.info(
                         "fetch_player_stats: API returned %d player(s) but no "
                         "stat fields — treating as metadata-only response.",
@@ -1293,13 +1294,14 @@ def fetch_standings() -> list[dict]:
                 if form:
                     # API-Basketball v1 "form" is e.g. "WWLWW" — derive streak
                     last_char = form[-1] if form else ""
-                    run = 0
-                    for ch in reversed(form):
-                        if ch == last_char:
-                            run += 1
-                        else:
-                            break
-                    streak = f"{last_char}{run}" if last_char else ""
+                    if last_char in ("W", "L"):
+                        run = 0
+                        for ch in reversed(form):
+                            if ch == last_char:
+                                run += 1
+                            else:
+                                break
+                        streak = f"{last_char}{run}"
 
             standings.append({
                 "team_abbreviation": abbrev,
