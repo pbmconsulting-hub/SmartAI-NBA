@@ -407,23 +407,28 @@ if load_players_clicked:
             progress_bar2.progress(frac, text=message)
             status_text2.caption(message)
 
-        with st.spinner("⚡ Loading current rosters and player stats..."):
-            success = get_todays_players(
-                todays_games_to_load,
-                progress_callback=_on_players_progress,
-            )
+        try:
+            with st.spinner("⚡ Loading current rosters and player stats..."):
+                success = get_todays_players(
+                    todays_games_to_load,
+                    progress_callback=_on_players_progress,
+                )
 
-        progress_bar2.empty()
-        status_text2.empty()
-
-        if success:
-            st.success("✅ Player stats refreshed for tonight's teams!")
-            st.rerun()
-        else:
-            st.error(
-                "❌ Could not load player stats. Check your internet connection "
-                "or try the Update Data page."
-            )
+            if success:
+                st.success("✅ Player stats refreshed for tonight's teams!")
+                st.rerun()
+            else:
+                st.error(
+                    "❌ Could not load player stats. Check your internet connection "
+                    "or try the Update Data page."
+                )
+        except Exception as _lp_exc:
+            _lp_err = str(_lp_exc)
+            if "WebSocketClosedError" not in _lp_err and "StreamClosedError" not in _lp_err:
+                st.error(f"❌ Failed to load player data: {_lp_exc}")
+        finally:
+            progress_bar2.empty()
+            status_text2.empty()
 
 # ============================================================
 # SECTION: Platform Props & Analyze Button (INDEPENDENT PIPELINE)
