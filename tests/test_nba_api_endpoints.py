@@ -47,6 +47,14 @@ class TestBaseURL(unittest.TestCase):
             "_BASE_URL must be https://v1.basketball.api-sports.io",
         )
 
+    def test_players_base_url_has_v2_nba_domain(self):
+        """_PLAYERS_BASE_URL must use v2.nba.api-sports.io."""
+        self.assertIn(
+            'https://v2.nba.api-sports.io',
+            self.src,
+            "_PLAYERS_BASE_URL must be https://v2.nba.api-sports.io",
+        )
+
     def test_base_url_not_old_domain(self):
         """_BASE_URL must NOT use an old or deprecated domain."""
         for line in self.src.splitlines():
@@ -228,17 +236,19 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_players(", self.src)
 
     def test_get_players_url(self):
-        """get_players must call /players."""
+        """get_players must call /players via v2 NBA API."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/players", snippet)
+        self.assertIn("_PLAYERS_BASE_URL", snippet,
+                       "get_players must use _PLAYERS_BASE_URL (v2 NBA API)")
 
     def test_get_players_has_team_param(self):
         """get_players must pass team parameter."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
+        snippet = self.src[idx:idx + 600]
         self.assertIn('"team"', snippet)
 
     # -- get_injury_report team_id param --

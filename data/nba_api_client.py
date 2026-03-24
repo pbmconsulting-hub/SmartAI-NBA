@@ -64,8 +64,12 @@ except ImportError:
 
 _BASE_URL = "https://v1.basketball.api-sports.io"
 
+# v2 NBA API base URL — used exclusively for the /players endpoint.
+_PLAYERS_BASE_URL = "https://v2.nba.api-sports.io"
+
 # ── API Endpoints ─────────────────────────────────────────────────────────────
 # Centralized endpoint constants for the API-Basketball v1 API.
+# ENDPOINT_PLAYERS uses the v2 NBA API (_PLAYERS_BASE_URL) instead of v1.
 ENDPOINT_TEAMS = "/teams"
 ENDPOINT_GAMES = "/games"
 ENDPOINT_PLAYERS = "/players"
@@ -81,6 +85,9 @@ ENDPOINT_PREDICTIONS = "/predictions"
 
 # Current NBA season (API-Basketball v1 uses "YYYY-YYYY" format).
 _CURRENT_SEASON = "2025-2026"
+
+# Season year for v2 NBA API (uses single-year format, e.g. "2025").
+_CURRENT_SEASON_YEAR = _CURRENT_SEASON.split("-")[0]
 
 # NBA league ID in the API-Basketball v1 system.
 _NBA_LEAGUE_ID = "12"
@@ -349,7 +356,8 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
             data = resp.json()
             _logger.debug(
                 "API request: endpoint=%s, status=%d, duration_ms=%.1f",
-                url.replace(_BASE_URL, ""), resp.status_code, _req_ms,
+                url.replace(_BASE_URL, "").replace(_PLAYERS_BASE_URL, ""),
+                resp.status_code, _req_ms,
             )
             _cache_set(cache_key, data)
             return data
@@ -531,7 +539,7 @@ def get_players(team_id=None) -> list[dict]:
     """
     Retrieve NBA players.
 
-    Endpoint: GET /players
+    Endpoint: GET /players  (v2 NBA API — v2.nba.api-sports.io)
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
@@ -541,8 +549,8 @@ def get_players(team_id=None) -> list[dict]:
         list[dict]: Player entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_PLAYERS}"
-    params: dict = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
+    params: dict = {"season": _CURRENT_SEASON_YEAR}
     if team_id is not None:
         params["team"] = team_id
 
@@ -695,8 +703,8 @@ def get_player_stats() -> list[dict]:
             steals_std, blocks_std, turnovers_std
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_PLAYERS}"
-    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
+    params = {"season": _CURRENT_SEASON_YEAR}
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -739,11 +747,21 @@ def get_player_stats() -> list[dict]:
                     if pts > 0:
                         has_real_stats = True
 
+                    # ── Resolve position ──
+                    # v2 NBA API nests position under leagues.standard.pos
+                    pos = _safe_str(p.get("position") or p.get("pos"))
+                    if not pos:
+                        leagues = p.get("leagues")
+                        if isinstance(leagues, dict):
+                            std = leagues.get("standard")
+                            if isinstance(std, dict):
+                                pos = _safe_str(std.get("pos"))
+
                     players.append({
                         "player_id":     _safe_str(p.get("player_id") or p.get("id")),
                         "name":          name,
                         "team":          team_abbrev,
-                        "position":      _safe_str(p.get("position") or p.get("pos")),
+                        "position":      pos,
                         # Averages
                         "minutes_avg":   _safe_float(stats.get("minutes") or stats.get("min", 0)),
                         "points_avg":    pts,
@@ -1132,12 +1150,11 @@ def get_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
     rosters: dict[str, list[str]] = {}
 
     for abbrev in team_abbrevs:
-        url = f"{_BASE_URL}{ENDPOINT_PLAYERS}"
-        # API-Basketball v1 requires numeric team IDs for the "team" param.
-        # Resolve abbreviation → numeric ID; fall back to abbreviation string
-        # so the call still works if the ID map cannot be built.
+        url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
+        # Resolve abbreviation → numeric team ID; fall back to abbreviation
+        # string so the call still works if the ID map cannot be built.
         team_param = _get_team_id(abbrev) or abbrev
-        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "team": team_param}
+        params = {"season": _CURRENT_SEASON_YEAR, "team": team_param}
 
         try:
             raw = _request_with_retry(url, params=params)

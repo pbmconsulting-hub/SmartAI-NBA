@@ -38,9 +38,10 @@ except ImportError:
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-API_SPORTS_BASE = "https://v1.basketball.api-sports.io"
-ODDS_API_BASE   = "https://api.the-odds-api.com/v4"
-SPORT_KEY       = "basketball_nba"
+API_SPORTS_BASE     = "https://v1.basketball.api-sports.io"
+API_SPORTS_NBA_BASE = "https://v2.nba.api-sports.io"
+ODDS_API_BASE       = "https://api.the-odds-api.com/v4"
+SPORT_KEY           = "basketball_nba"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,9 +60,9 @@ def _record(name: str, ok: bool, detail: str = ""):
 
 
 def _test_api_sports(endpoint: str, headers: dict, params: dict | None = None,
-                     label: str = "") -> dict | None:
+                     label: str = "", base_url: str = "") -> dict | None:
     """Call an API-Sports endpoint and return the parsed response."""
-    url = f"{API_SPORTS_BASE}{endpoint}"
+    url = f"{base_url or API_SPORTS_BASE}{endpoint}"
     label = label or f"API-Sports {endpoint}"
     print(f"\n  Testing: {label}")
     print(f"    URL: {url}")
@@ -192,10 +193,11 @@ def test_api_sports(api_key: str):
                      label=f"[4/13] /games?league=12&date={today}")
     time.sleep(0.3)
 
-    # 5. /players (with team filter)
+    # 5. /players (v2 NBA API — with team filter)
     _test_api_sports("/players", headers,
-                     params={"league": "12", "season": "2025-2026", "team": "1"},
-                     label="[5/13] /players?league=12&season=2025-2026&team=1")
+                     params={"season": "2025", "team": "1"},
+                     label="[5/13] /players?season=2025&team=1 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
     # 6. /standings
