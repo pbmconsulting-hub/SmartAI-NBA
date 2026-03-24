@@ -535,24 +535,54 @@ def get_games(season=None, date=None, team_id=None) -> list[dict]:
         return []
 
 
-def get_players(team_id=None) -> list[dict]:
+def get_players(
+    team_id=None,
+    player_id=None,
+    name: str | None = None,
+    country: str | None = None,
+    search: str | None = None,
+    season: int | str | None = None,
+) -> list[dict]:
     """
     Retrieve NBA players.
 
     Endpoint: GET /players  (v2 NBA API — v2.nba.api-sports.io)
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
-    Args:
-        team_id: Optional team ID to filter by.
+    All query parameters supported by the v2 NBA API are accepted:
+        player_id: Unique player ID (persists across all seasons).
+        name:      Exact player name filter (e.g. ``name="James"``).
+        team_id:   Numeric team ID to filter by.
+        season:    4-digit season year (e.g. ``2025``).  Defaults to the
+                   current season unless *player_id* is given (IDs are
+                   unique across seasons, so season is optional then).
+        country:   Country filter (e.g. ``"USA"``).
+        search:    Partial name search (>= 3 characters, e.g. ``"Jame"``).
 
     Returns:
         list[dict]: Player entries.
         Returns [] on failure.
     """
     url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
-    params: dict = {"season": _CURRENT_SEASON_YEAR}
+    params: dict = {}
+
+    if player_id is not None:
+        params["id"] = int(player_id)
+    if name is not None:
+        params["name"] = name
     if team_id is not None:
-        params["team"] = team_id
+        params["team"] = int(team_id)
+    if country is not None:
+        params["country"] = country
+    if search is not None:
+        params["search"] = search
+
+    # Season defaults to current year unless a player_id lookup is
+    # requested (player IDs are unique across all seasons).
+    if season is not None:
+        params["season"] = int(season)
+    elif player_id is None:
+        params["season"] = int(_CURRENT_SEASON_YEAR)
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -1199,9 +1229,11 @@ def get_player_id(player_name: str) -> int | None:
 
     Lookup order:
       1. Module-level _PLAYER_ID_CACHE (name → id)
-      2. API-NBA /players endpoint (player_id field)
+      2. Targeted v2 NBA API ``/players?search=`` query (>= 3-char substring)
+      3. Broad ``get_player_stats()`` scan (full roster, last resort)
 
     The result (including None) is cached to avoid redundant API calls.
+    Player IDs are unique across all seasons.
     """
     if not player_name:
         return None
@@ -1212,24 +1244,52 @@ def get_player_id(player_name: str) -> int | None:
     if name_key in _PLAYER_ID_CACHE:
         return _PLAYER_ID_CACHE[name_key]
 
-    # 2. Try to resolve via API-NBA player data
+    # 2. Try a targeted search via the v2 NBA API /players?search= param
     player_id: int | None = None
     try:
-        players = get_player_stats()
-        for p in players:
-            candidate = _safe_str(p.get("name")).strip().lower()
-            raw_id = p.get("player_id")
-            if raw_id:
-                try:
-                    _PLAYER_ID_CACHE[candidate] = int(raw_id)
-                except (TypeError, ValueError):
-                    _PLAYER_ID_CACHE[candidate] = None
+        # Use the last name (or the full name if single-word) as the search
+        # term — the API requires >= 3 characters.
+        search_term = player_name.strip().split()[-1] if player_name.strip() else ""
+        if len(search_term) >= 3:
+            candidates = get_players(search=search_term)
+            for p in candidates:
+                first = _safe_str(p.get("firstname") or p.get("first_name") or "")
+                last = _safe_str(p.get("lastname") or p.get("last_name") or "")
+                full = f"{first} {last}".strip().lower()
+                # Also accept a pre-combined "name" field
+                alt = _safe_str(p.get("name") or p.get("full_name") or "").strip().lower()
+                raw_id = p.get("id") or p.get("player_id")
+                if raw_id is not None:
+                    try:
+                        int_id = int(raw_id)
+                    except (TypeError, ValueError):
+                        continue
+                    if full:
+                        _PLAYER_ID_CACHE[full] = int_id
+                    if alt:
+                        _PLAYER_ID_CACHE[alt] = int_id
 
-        # Retrieve the just-populated cache entry
-        player_id = _PLAYER_ID_CACHE.get(name_key)
-
+            player_id = _PLAYER_ID_CACHE.get(name_key)
     except Exception as exc:
-        _logger.warning("get_player_id failed for '%s': %s", player_name, exc)
+        _logger.warning("get_player_id targeted search failed for '%s': %s", player_name, exc)
+
+    # 3. Fall back to broad player-stats scan if targeted search missed
+    if player_id is None and name_key not in _PLAYER_ID_CACHE:
+        try:
+            players = get_player_stats()
+            for p in players:
+                candidate = _safe_str(p.get("name")).strip().lower()
+                raw_id = p.get("player_id")
+                if raw_id:
+                    try:
+                        _PLAYER_ID_CACHE[candidate] = int(raw_id)
+                    except (TypeError, ValueError):
+                        _PLAYER_ID_CACHE[candidate] = None
+
+            # Retrieve the just-populated cache entry
+            player_id = _PLAYER_ID_CACHE.get(name_key)
+        except Exception as exc:
+            _logger.warning("get_player_id fallback scan failed for '%s': %s", player_name, exc)
 
     # Cache the result (even if None) to prevent repeated failed lookups
     _PLAYER_ID_CACHE[name_key] = player_id

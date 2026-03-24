@@ -193,10 +193,24 @@ def test_api_sports(api_key: str):
                      label=f"[4/13] /games?league=12&date={today}")
     time.sleep(0.3)
 
-    # 5. /players (v2 NBA API — with team filter)
+    # 5a. /players (v2 NBA API — with team filter)
     _test_api_sports("/players", headers,
                      params={"season": "2025", "team": "1"},
-                     label="[5/13] /players?season=2025&team=1 (v2 NBA API)",
+                     label="[5a/13] /players?season=2025&team=1 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
+    time.sleep(0.3)
+
+    # 5b. /players (v2 NBA API — by player id; IDs are unique across seasons)
+    _test_api_sports("/players", headers,
+                     params={"id": "265"},
+                     label="[5b/13] /players?id=265 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
+    time.sleep(0.3)
+
+    # 5c. /players (v2 NBA API — search by partial name)
+    _test_api_sports("/players", headers,
+                     params={"search": "james", "season": "2025"},
+                     label="[5c/13] /players?search=james&season=2025 (v2 NBA API)",
                      base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 

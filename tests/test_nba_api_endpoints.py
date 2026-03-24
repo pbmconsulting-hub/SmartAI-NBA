@@ -239,17 +239,27 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         """get_players must call /players via v2 NBA API."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
+        snippet = self.src[idx:idx + 1200]
         self.assertIn("/players", snippet)
         self.assertIn("_PLAYERS_BASE_URL", snippet,
                        "get_players must use _PLAYERS_BASE_URL (v2 NBA API)")
 
-    def test_get_players_has_team_param(self):
-        """get_players must pass team parameter."""
+    def test_get_players_has_all_v2_params(self):
+        """get_players must wire all v2 NBA API query parameters."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 600]
-        self.assertIn('"team"', snippet)
+        snippet = self.src[idx:idx + 1800]
+        for param in ('"id"', '"name"', '"team"', '"season"', '"country"', '"search"'):
+            self.assertIn(param, snippet,
+                          f"get_players must wire the {param} query parameter")
+
+    def test_get_players_id_param_uses_player_id_arg(self):
+        """get_players must map player_id argument to 'id' query param."""
+        idx = self.src.find("def get_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1200]
+        self.assertIn("player_id", snippet,
+                       "get_players must accept player_id argument")
 
     # -- get_injury_report team_id param --
 
@@ -479,6 +489,76 @@ class TestFetchPlayersRuntime(unittest.TestCase):
         result = get_players()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_player_id_param_sent_as_id(self, mock_request, mock_key):
+        """player_id argument must be sent as 'id' query param."""
+        from data.nba_api_client import get_players, _PLAYERS_BASE_URL, ENDPOINT_PLAYERS
+        mock_request.return_value = {"response": [{"id": 265, "firstname": "LeBron", "lastname": "James"}]}
+        get_players(player_id=265)
+        mock_request.assert_called_once()
+        call_args = mock_request.call_args
+        url = call_args[0][0] if call_args[0] else call_args[1].get("url", "")
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(url, f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}")
+        self.assertEqual(params.get("id"), 265)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_search_param_wired(self, mock_request, mock_key):
+        """search argument must be sent as 'search' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(search="Jame")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("search"), "Jame")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_name_param_wired(self, mock_request, mock_key):
+        """name argument must be sent as 'name' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(name="James")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("name"), "James")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_country_param_wired(self, mock_request, mock_key):
+        """country argument must be sent as 'country' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(country="USA")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("country"), "USA")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_season_param_integer(self, mock_request, mock_key):
+        """season argument must be sent as integer."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(season=2024)
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("season"), 2024)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_player_id_skips_default_season(self, mock_request, mock_key):
+        """When player_id is given, season should NOT be sent by default."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": [{"id": 265}]}
+        get_players(player_id=265)
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertNotIn("season", params,
+                         "player_id lookup should not include default season (IDs are unique across seasons)")
 
 
 class TestApiKeyInfoRuntime(unittest.TestCase):
