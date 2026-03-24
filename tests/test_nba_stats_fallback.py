@@ -514,5 +514,103 @@ class TestApiNbaPrimaryStillWorks(unittest.TestCase):
         mock_fallback.assert_not_called()
 
 
+# ── Section 11: Retry logic in _request_nba_stats ───────────────────────
+
+class TestRequestNbaStatsRetry(unittest.TestCase):
+    """Verify that _request_nba_stats retries on timeout and 5xx errors."""
+
+    def setUp(self):
+        import data.nba_stats_backup as fb
+        fb._cache.clear()
+
+    @patch("data.nba_stats_backup.time.sleep")
+    @patch("data.nba_stats_backup.requests.get")
+    def test_retries_on_timeout(self, mock_get, mock_sleep):
+        """Should retry up to _MAX_RETRIES times on Timeout."""
+        import requests as _req
+        from data.nba_stats_backup import _request_nba_stats, _MAX_RETRIES
+
+        mock_get.side_effect = _req.exceptions.Timeout("read timed out")
+        result = _request_nba_stats("leaguedashteamstats", {"Season": "2025-26"})
+        self.assertIsNone(result)
+        self.assertEqual(mock_get.call_count, _MAX_RETRIES + 1)
+        # Verify sleep was called between retries
+        self.assertEqual(mock_sleep.call_count, _MAX_RETRIES)
+
+    @patch("data.nba_stats_backup.time.sleep")
+    @patch("data.nba_stats_backup.requests.get")
+    def test_retries_on_connection_error(self, mock_get, mock_sleep):
+        """Should retry on ConnectionError."""
+        import requests as _req
+        from data.nba_stats_backup import _request_nba_stats, _MAX_RETRIES
+
+        mock_get.side_effect = _req.exceptions.ConnectionError("connection reset")
+        result = _request_nba_stats("leaguedashteamstats", {})
+        self.assertIsNone(result)
+        self.assertEqual(mock_get.call_count, _MAX_RETRIES + 1)
+
+    @patch("data.nba_stats_backup.time.sleep")
+    @patch("data.nba_stats_backup.requests.get")
+    def test_retries_on_5xx(self, mock_get, mock_sleep):
+        """Should retry on HTTP 5xx status codes."""
+        from data.nba_stats_backup import _request_nba_stats, _MAX_RETRIES
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 503
+        mock_get.return_value = mock_resp
+        result = _request_nba_stats("leaguedashteamstats", {})
+        self.assertIsNone(result)
+        # First call + _MAX_RETRIES retries
+        self.assertEqual(mock_get.call_count, _MAX_RETRIES + 1)
+
+    @patch("data.nba_stats_backup.time.sleep")
+    @patch("data.nba_stats_backup.requests.get")
+    def test_succeeds_after_retry(self, mock_get, mock_sleep):
+        """Should return data if a retry succeeds."""
+        import requests as _req
+        from data.nba_stats_backup import _request_nba_stats
+
+        good_resp = MagicMock()
+        good_resp.status_code = 200
+        good_resp.json.return_value = {"resultSets": [{"headers": ["A"], "rowSet": [[1]]}]}
+
+        mock_get.side_effect = [
+            _req.exceptions.Timeout("timed out"),
+            good_resp,
+        ]
+        result = _request_nba_stats("leaguedashteamstats", {})
+        self.assertIsNotNone(result)
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("data.nba_stats_backup.requests.get")
+    def test_no_retry_on_4xx(self, mock_get):
+        """Should NOT retry on HTTP 4xx errors (client errors)."""
+        from data.nba_stats_backup import _request_nba_stats
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 403
+        mock_get.return_value = mock_resp
+        result = _request_nba_stats("leaguedashteamstats", {})
+        self.assertIsNone(result)
+        self.assertEqual(mock_get.call_count, 1)
+
+    def test_max_retries_constant_exists(self):
+        """_MAX_RETRIES must be at least 1."""
+        from data.nba_stats_backup import _MAX_RETRIES
+        self.assertGreaterEqual(_MAX_RETRIES, 1)
+
+    def test_headers_include_nba_stats_origin(self):
+        """Headers must include x-nba-stats-origin for stats.nba.com."""
+        from data.nba_stats_backup import _NBA_STATS_HEADERS
+        self.assertIn("x-nba-stats-origin", _NBA_STATS_HEADERS)
+        self.assertEqual(_NBA_STATS_HEADERS["x-nba-stats-origin"], "stats")
+
+    def test_headers_include_nba_stats_token(self):
+        """Headers must include x-nba-stats-token for stats.nba.com."""
+        from data.nba_stats_backup import _NBA_STATS_HEADERS
+        self.assertIn("x-nba-stats-token", _NBA_STATS_HEADERS)
+        self.assertEqual(_NBA_STATS_HEADERS["x-nba-stats-token"], "true")
+
+
 if __name__ == "__main__":
     unittest.main()
