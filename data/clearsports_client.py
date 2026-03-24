@@ -893,7 +893,7 @@ def fetch_team_stats() -> list[dict]:
                 # fallback chain so we get real pace / ratings / W-L data.
                 if teams and _has_real_team_stats(teams):
                     return teams
-                if teams:
+                elif teams:
                     _logger.info(
                         "fetch_team_stats: API returned %d team(s) but no "
                         "stat fields — treating as metadata-only response.",
@@ -932,7 +932,9 @@ def fetch_team_stats() -> list[dict]:
                     "away_wins":          int(_safe_float(s.get("away_wins", 0))),
                     "away_losses":        int(_safe_float(s.get("away_losses", 0))),
                 })
-            if teams_from_standings and _has_real_team_stats(teams_from_standings):
+            # Accept standings data if we got any teams — even at season
+            # start when all records are 0-0, standings entries are valid.
+            if teams_from_standings:
                 _logger.info(
                     "fetch_team_stats: using standings data for %d team(s) "
                     "(W-L records available, no pace/ratings).",
