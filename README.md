@@ -88,10 +88,14 @@ SmartAI-NBA/
 │
 ├── data/
 │   ├── data_manager.py                # Load/save CSV data + session state
-│   ├── live_data_fetcher.py           # API-NBA API integration
-│   ├── odds_api_client.py             # The Odds API — live sportsbook odds
-│   ├── platform_fetcher.py            # Multi-platform prop fetcher
-│   ├── live_tracker.py                # Live game score tracker
+│   ├── nba_data_service.py            # NBA data orchestration service
+│   ├── nba_api_client.py              # API-Basketball v1 NBA client
+│   ├── odds_client.py                 # The Odds API — live sportsbook odds
+│   ├── sportsbook_service.py          # Multi-platform prop fetcher
+│   ├── live_game_tracker.py           # Live game score tracker
+│   ├── nba_stats_backup.py            # Free NBA.com stats fallback
+│   ├── player_profile_service.py      # Player context & headshots
+│   ├── roster_engine.py               # Active roster & injury engine
 │   ├── teams.csv                      # All 30 NBA teams with pace/ratings
 │   └── defensive_ratings.csv          # Team defense by position
 │

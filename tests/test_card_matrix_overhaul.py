@@ -3,7 +3,7 @@
 # PURPOSE: Tests for the Infinite Card-Matrix Overhaul features:
 #          - utils/renderers.py compile_card_matrix()
 #          - engine/simulation.py generate_contextual_goblin_demon()
-#          - data/platform_fetcher.py async fetch + 500-cap
+#          - data/sportsbook_service.py async fetch + 500-cap
 #          - styles/theme.py Quantum Card Matrix CSS
 #          - .streamlit/config.toml maxMessageSize
 # ============================================================
@@ -261,46 +261,46 @@ class TestQuantumCardMatrixCSS(unittest.TestCase):
 
 
 class TestPlatformFetcherCapAndAsync(unittest.TestCase):
-    """Tests for data/platform_fetcher.py async features and alt-line enrichment."""
+    """Tests for data/sportsbook_service.py async features and alt-line enrichment."""
 
     def test_no_intake_cap_in_sync_fetch(self):
-        """Verify fetch_all_platform_props no longer enforces a hard intake cap.
+        """Verify get_all_sportsbook_props no longer enforces a hard intake cap.
 
         The 500-bet quota is now an *output* target enforced in the analysis
         loop, not an input cap in the fetcher.
         """
         import inspect
-        from data.platform_fetcher import fetch_all_platform_props
-        source = inspect.getsource(fetch_all_platform_props)
+        from data.sportsbook_service import get_all_sportsbook_props
+        source = inspect.getsource(get_all_sportsbook_props)
         # The function should still reference alt-line enrichment
         self.assertIn("parse_alt_lines_from_platform_props", source)
         # The function should NOT enforce an intake cap anymore
         self.assertNotIn("MAX_PROP_CAPACITY", source)
 
     def test_async_fetch_function_exists(self):
-        from data.platform_fetcher import fetch_all_platforms_async
+        from data.sportsbook_service import get_all_sportsbooks_async
         import asyncio
-        self.assertTrue(asyncio.iscoroutinefunction(fetch_all_platforms_async))
+        self.assertTrue(asyncio.iscoroutinefunction(get_all_sportsbooks_async))
 
     def test_async_semaphore_limit(self):
-        from data.platform_fetcher import _ASYNC_SEMAPHORE_LIMIT
+        from data.sportsbook_service import _ASYNC_SEMAPHORE_LIMIT
         self.assertEqual(_ASYNC_SEMAPHORE_LIMIT, 5)
 
     def test_aiohttp_available_flag(self):
-        from data.platform_fetcher import AIOHTTP_AVAILABLE
+        from data.sportsbook_service import AIOHTTP_AVAILABLE
         self.assertIsInstance(AIOHTTP_AVAILABLE, bool)
 
     def test_true_line_kill_switch_prizepicks(self):
         """Odds API client (replacing PrizePicks) must discard props with no valid line."""
         import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
 
     def test_true_line_kill_switch_underdog(self):
         """Odds API client (replacing Underdog) must discard props with no valid line."""
         import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
         self.assertTrue("point" in source or "line" in source)
@@ -308,7 +308,7 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
     def test_true_line_kill_switch_draftkings(self):
         """Odds API client (replacing DraftKings fetcher) must discard invalid props."""
         import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         source = src.read_text(encoding="utf-8")
         self.assertIn("continue", source)
         self.assertIn("point", source)

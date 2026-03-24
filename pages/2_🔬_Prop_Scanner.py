@@ -136,8 +136,8 @@ valid_platforms = [
 
 # ── Import platform fetcher (optional — app works without it) ──
 try:
-    from data.platform_fetcher import (
-        fetch_all_platform_props,
+    from data.sportsbook_service import (
+        get_all_sportsbook_props,
         build_cross_platform_comparison,
         recommend_best_platform,
         summarize_props_by_platform,
@@ -221,7 +221,7 @@ elif _PLATFORM_FETCHER_AVAILABLE:
             _pb.progress(pct, text=msg)
 
         with st.spinner("Fetching live props..."):
-            _live_props = fetch_all_platform_props(
+            _live_props = get_all_sportsbook_props(
                 include_prizepicks=False,
                 include_underdog=False,
                 include_draftkings=_dk_on and bool(_dk_key),

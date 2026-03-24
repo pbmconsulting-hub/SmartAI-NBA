@@ -13,7 +13,7 @@ import base64
 import logging
 
 from data.data_manager import load_players_data, load_props_data, load_teams_data
-from data.live_data_fetcher import load_last_updated
+from data.nba_data_service import load_last_updated
 from tracking.database import initialize_database
 from styles.theme import get_global_css
 
@@ -413,7 +413,7 @@ teams_data = load_teams_data()
 
 # ── Teams Data Staleness Check ─────────────────────────────────
 try:
-    from data.live_data_fetcher import load_last_updated as _load_lu
+    from data.nba_data_service import load_last_updated as _load_lu
     from data.data_manager import load_teams_data as _load_teams
     _last_updated = _load_lu() or {}
     _teams_ts = _last_updated.get("teams_stats")
@@ -460,7 +460,7 @@ except Exception as _exc:
 
 # ── Teams/Defensive Ratings Staleness Warning (Feature 11) ───────
 try:
-    from data.live_data_fetcher import get_teams_staleness_warning
+    from data.nba_data_service import get_teams_staleness_warning
     _staleness_warn = get_teams_staleness_warning()
     if _staleness_warn:
         st.sidebar.warning(_staleness_warn)
@@ -581,7 +581,7 @@ with left_column:
     if _home_one_click:
         with st.spinner("⚡ Running One-Click Setup…"):
             try:
-                from data.live_data_fetcher import fetch_todays_games as _hoc_fg, fetch_todays_players_only as _hoc_fp
+                from data.nba_data_service import get_todays_games as _hoc_fg, get_todays_players as _hoc_fp
                 from data.data_manager import (
                     clear_all_caches as _hoc_cc,
                     load_injury_status as _hoc_li,
@@ -598,7 +598,7 @@ with left_column:
                 except Exception:
                     pass
                 try:
-                    from data.platform_fetcher import fetch_all_platform_props as _hoc_fap
+                    from data.sportsbook_service import get_all_sportsbook_props as _hoc_fap
                     from data.data_manager import (
                         save_platform_props_to_session as _hoc_sps,
                         save_props_to_session as _hoc_sp,

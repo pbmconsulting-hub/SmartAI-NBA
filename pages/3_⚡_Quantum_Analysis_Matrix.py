@@ -116,7 +116,7 @@ from styles.theme import (
 )
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
-from data.platform_fetcher import smart_filter_props as _smart_filter_props
+from data.sportsbook_service import smart_filter_props as _smart_filter_props
 from utils.renderers import compile_card_matrix as _compile_card_matrix
 from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
@@ -295,7 +295,7 @@ todays_games   = st.session_state.get("todays_games", [])
 # line_category.  Re-enrich to stamp all props as "standard".
 if current_props and not any(p.get("line_category") for p in current_props):
     try:
-        from data.platform_fetcher import parse_alt_lines_from_platform_props
+        from data.sportsbook_service import parse_alt_lines_from_platform_props
         current_props = parse_alt_lines_from_platform_props(current_props)
     except ImportError:
         _logger.warning("parse_alt_lines_from_platform_props unavailable — line categories may be missing")
@@ -629,7 +629,7 @@ if run_analysis:
     # Full team name → abbreviation mapping for platform props that use
     # full names or nicknames instead of standard 3-letter codes.
     try:
-        from data.live_data_fetcher import TEAM_NAME_TO_ABBREVIATION as _TEAM_FULL_MAP
+        from data.nba_data_service import TEAM_NAME_TO_ABBREVIATION as _TEAM_FULL_MAP
     except ImportError:
         _TEAM_FULL_MAP = {}
 
@@ -775,7 +775,7 @@ if run_analysis:
 
     # ── Pre-Analysis Funnel: stat types only (no intake cap) ────
     # Apply the user's stat-type selection from the Market Filters expander
-    # via smart_filter_props() in data.platform_fetcher.  The pipeline
+    # via smart_filter_props() in data.sportsbook_service.  The pipeline
     # ingests ALL available props; the 500-bet quota is enforced at the
     # OUTPUT stage so that the engine processes enough to reach the target.
     _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
@@ -1732,7 +1732,7 @@ if run_analysis:
             f"({_unmatched_ratio*100:.0f}% of props). Triggering Smart Roster Update…"
         )
         try:
-            from data.live_data_fetcher import fetch_todays_players_only as _fetch_today
+            from data.nba_data_service import get_todays_players as _fetch_today
             _roster_result = _fetch_today(todays_games, progress_callback=None)
             if _roster_result:
                 # Re-run the full analysis now that players.csv is populated.

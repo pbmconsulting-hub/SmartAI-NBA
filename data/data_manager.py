@@ -36,12 +36,12 @@ TEAMS_CSV_PATH = DATA_DIRECTORY / "teams.csv"
 DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"
 
 # Path to the live data timestamp file
-# BEGINNER NOTE: This JSON file is created by live_data_fetcher.py
+# BEGINNER NOTE: This JSON file is created by nba_data_service.py
 # when real data is downloaded. Its existence tells us if live data is loaded.
 LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
 
 # Path to the persisted injury/availability status cache written by
-# fetch_todays_players_only() via RosterEngine in live_data_fetcher.py.
+# get_todays_players() via RosterEngine in nba_data_service.py.
 INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 
 # ============================================================
@@ -122,8 +122,8 @@ def load_injury_status():
     """
     Load the persisted player injury/availability status map from disk.
 
-    The status map is written by ``fetch_todays_players_only()`` via
-    RosterEngine in ``live_data_fetcher.py`` after each data-update cycle.
+    The status map is written by ``get_todays_players()`` via
+    RosterEngine in ``nba_data_service.py`` after each data-update cycle.
     This function provides a fast, no-API-call way for the Analysis and
     Prop Scanner pages to check player availability on startup.
 
@@ -687,7 +687,7 @@ def validate_props_against_roster(props_list, players_list):
     # Post-process matched/fuzzy_matched to flag any OUT/injured players.
     # Load injury status once for the whole batch.
     # NOTE: These status sets mirror INACTIVE_INJURY_STATUSES and
-    # GTD_INJURY_STATUSES defined in data/live_data_fetcher.py.
+    # GTD_INJURY_STATUSES defined in data/nba_data_service.py.
     # If those constants change, update these checks accordingly.
     _UNAVAILABLE = frozenset({"Out", "Doubtful", "Questionable", "Injured Reserve"})
     _GTD = frozenset({"GTD", "Day-to-Day"})
@@ -906,7 +906,7 @@ def get_player_status(player_name, status_map):
         player_name (str): Player name to look up
         status_map (dict): Map from normalize_player_name -> status_dict
                            (as returned by RosterEngine.get_injury_report() via
-                           fetch_todays_players_only).
+                           get_todays_players).
                            Pass an empty dict or None to auto-load from disk.
 
     Returns:
@@ -1121,7 +1121,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
 
     This function previously auto-generated prop entries using season averages
     as estimated lines. It now returns an empty list immediately. Use the
-    platform prop fetcher (data/platform_fetcher.py) to load real live lines.
+    platform prop fetcher (data/sportsbook_service.py) to load real live lines.
 
     Args:
         players_data: Unused.
@@ -1133,7 +1133,7 @@ def generate_props_for_todays_players(players_data, todays_games, platforms=None
     """
     warnings.warn(
         "generate_props_for_todays_players() is deprecated and returns []. "
-        "Use data.platform_fetcher.fetch_all_platform_props() for real live lines.",
+        "Use data.sportsbook_service.get_all_sportsbook_props() for real live lines.",
         DeprecationWarning,
         stacklevel=2,
     )
@@ -1307,7 +1307,7 @@ def save_platform_props_to_session(props_list, session_state):
     without overwriting manually entered props.
 
     Args:
-        props_list (list[dict]): Props from fetch_all_platform_props().
+        props_list (list[dict]): Props from get_all_sportsbook_props().
         session_state: Streamlit's st.session_state object.
     """
     session_state["platform_props"] = props_list
@@ -1335,7 +1335,7 @@ def save_platform_props_to_csv(props_list, file_path=None):
     should be replaced.
 
     Args:
-        props_list (list[dict]): Props from fetch_all_platform_props().
+        props_list (list[dict]): Props from get_all_sportsbook_props().
         file_path (Path, optional): Where to save. Defaults to
             data/live_props.csv.
 
@@ -1396,7 +1396,7 @@ def is_using_live_data():
     """
     Check whether the app has fetched live NBA data from real APIs.
 
-    Looks for the last_updated.json file created by live_data_fetcher.py.
+    Looks for the last_updated.json file created by nba_data_service.py.
     If the file exists and has the 'is_live' flag, we're using live data.
 
     Returns:
@@ -1462,7 +1462,7 @@ def save_last_updated_timestamp(data_type):
     """
     Save the current time as the last-updated timestamp for a data type.
 
-    This is called by live_data_fetcher.py after each successful fetch,
+    This is called by nba_data_service.py after each successful fetch,
     but can also be called manually if data is updated another way.
 
     Args:

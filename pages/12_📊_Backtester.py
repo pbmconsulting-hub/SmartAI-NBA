@@ -77,7 +77,7 @@ except ImportError:
     _CACHE_AVAILABLE = False
 
 try:
-    from data.live_data_fetcher import refresh_historical_data_for_tonight as _refresh_hist
+    from data.nba_data_service import refresh_historical_data_for_tonight as _refresh_hist
     _HIST_REFRESH_AVAILABLE = True
 except ImportError:
     _HIST_REFRESH_AVAILABLE = False

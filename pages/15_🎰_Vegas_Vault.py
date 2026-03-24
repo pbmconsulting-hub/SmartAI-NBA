@@ -5,7 +5,7 @@
 #          props, highlights God Mode Locks, and delivers
 #          Joseph M. Smith's sharp-money commentary.
 # CONNECTS TO: engine/arbitrage_matcher.py, engine/joseph_brain.py,
-#              data/odds_api_client.py, utils/auth.py
+#              data/odds_client.py, utils/auth.py
 # ============================================================
 
 import streamlit as st
@@ -52,15 +52,15 @@ except Exception:
 
 # ─── Engine / data imports ────────────────────────────────────
 try:
-    from data.odds_api_client import (
-        fetch_player_props,
+    from data.odds_client import (
+        get_player_props,
         calculate_implied_probability,
         get_odds_api_usage,
     )
     _ODDS_CLIENT_AVAILABLE = True
 except ImportError:
     _ODDS_CLIENT_AVAILABLE = False
-    fetch_player_props = None
+    get_player_props = None
     calculate_implied_probability = None
     get_odds_api_usage = None
 
@@ -460,9 +460,9 @@ with scan_col2:
 if scan_btn:
     with st.spinner("🎰 Scanning sportsbooks for EV discrepancies..."):
         try:
-            raw_props = fetch_player_props()
+            raw_props = get_player_props()
         except Exception as exc:
-            _logger.warning("Vegas Vault: fetch_player_props failed: %s", exc)
+            _logger.warning("Vegas Vault: get_player_props failed: %s", exc)
             raw_props = []
 
         if not raw_props:

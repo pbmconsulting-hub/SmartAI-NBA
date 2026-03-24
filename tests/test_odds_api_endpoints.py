@@ -4,8 +4,8 @@ tests/test_odds_api_endpoints.py
 Tests for Odds API client endpoint structure:
   1. Base URL correctness (/v4 prefix)
   2. 403 status code handling (quota exhaustion)
-  3. Public fetch_events() function
-  4. Public fetch_event_odds() function for any markets on a single event
+  3. Public get_events() function
+  4. Public get_event_odds() function for any markets on a single event
   5. Existing endpoints still correct (odds, scores)
   6. API key passed via query params (Odds API pattern, not Bearer header)
 """
@@ -28,7 +28,7 @@ sys.modules.setdefault("streamlit", _mock_st)
 sys.modules.setdefault("streamlit.components", MagicMock())
 sys.modules.setdefault("streamlit.components.v1", MagicMock())
 
-_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
 
 
 # ── Section 1: Base URL correctness ──────────────────────────────────────────
@@ -75,33 +75,33 @@ class TestOddsApi403Handling(unittest.TestCase):
                        "403 should return None immediately without retry")
 
 
-# ── Section 3: fetch_sports() and fetch_events() public functions ─────────────
+# ── Section 3: get_sports() and get_events() public functions ─────────────
 
 class TestFetchSportsEndpoint(unittest.TestCase):
-    """Verify fetch_sports() exists and uses the correct free endpoint."""
+    """Verify get_sports() exists and uses the correct free endpoint."""
 
     def setUp(self):
         self.src = _OA_SRC.read_text(encoding="utf-8")
 
     def test_fetch_sports_exists(self):
-        """fetch_sports function must exist as a public function."""
-        self.assertIn("def fetch_sports(", self.src)
+        """get_sports function must exist as a public function."""
+        self.assertIn("def get_sports(", self.src)
 
     def test_fetch_sports_url(self):
-        """fetch_sports must call /sports (free, no quota cost)."""
-        idx = self.src.find("def fetch_sports(")
+        """get_sports must call /sports (free, no quota cost)."""
+        idx = self.src.find("def get_sports(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 1500]
         self.assertIn("/sports", snippet)
 
 
 class TestFetchSportsRuntime(unittest.TestCase):
-    """Runtime tests for fetch_sports()."""
+    """Runtime tests for get_sports()."""
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_sports
+        from data.odds_client import get_sports
         mock_fetch.return_value = [
             {
                 "key": "basketball_nba",
@@ -120,40 +120,40 @@ class TestFetchSportsRuntime(unittest.TestCase):
                 "has_outrights": False,
             },
         ]
-        result = fetch_sports()
+        result = get_sports()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         nba_sport = [s for s in result if s["key"] == "basketball_nba"]
         self.assertEqual(len(nba_sport), 1)
         self.assertTrue(nba_sport[0]["active"])
 
-    @patch("data.odds_api_client._resolve_api_key", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value=None)
     def test_returns_none_when_no_key(self, mock_key):
-        from data.odds_api_client import fetch_sports
-        result = fetch_sports()
+        from data.odds_client import get_sports
+        result = get_sports()
         self.assertIsNone(result)
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry", return_value=None)
     def test_returns_none_on_failure(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_sports
-        result = fetch_sports()
+        from data.odds_client import get_sports
+        result = get_sports()
         self.assertIsNone(result)
 
 
 class TestFetchEventsEndpoint(unittest.TestCase):
-    """Verify fetch_events() exists and uses the correct endpoint."""
+    """Verify get_events() exists and uses the correct endpoint."""
 
     def setUp(self):
         self.src = _OA_SRC.read_text(encoding="utf-8")
 
     def test_fetch_events_exists(self):
-        """fetch_events function must exist as a public function."""
-        self.assertIn("def fetch_events(", self.src)
+        """get_events function must exist as a public function."""
+        self.assertIn("def get_events(", self.src)
 
     def test_fetch_events_url(self):
-        """fetch_events must call /sports/basketball_nba/events."""
-        idx = self.src.find("def fetch_events(")
+        """get_events must call /sports/basketball_nba/events."""
+        idx = self.src.find("def get_events(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
         # It delegates to _fetch_events which uses the events URL
@@ -164,16 +164,16 @@ class TestFetchEventsEndpoint(unittest.TestCase):
         idx = self.src.find("def _fetch_events(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/events", snippet)
+        self.assertIn("ENDPOINT_EVENTS", snippet)
 
 
 class TestFetchEventsRuntime(unittest.TestCase):
-    """Runtime tests for fetch_events()."""
+    """Runtime tests for get_events()."""
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry")
     def test_returns_list_on_success(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_events
+        from data.odds_client import get_events
         mock_fetch.return_value = [
             {
                 "id": "abc123",
@@ -184,73 +184,73 @@ class TestFetchEventsRuntime(unittest.TestCase):
                 "away_team": "Memphis Grizzlies",
             }
         ]
-        result = fetch_events()
+        result = get_events()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["home_team"], "Phoenix Suns")
 
-    @patch("data.odds_api_client._resolve_api_key", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value=None)
     def test_returns_empty_list_when_no_key(self, mock_key):
-        from data.odds_api_client import fetch_events
-        result = fetch_events()
+        from data.odds_client import get_events
+        result = get_events()
         self.assertEqual(result, [])
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry", return_value=None)
     def test_returns_empty_list_on_failure(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_events
-        result = fetch_events()
+        from data.odds_client import get_events
+        result = get_events()
         self.assertEqual(result, [])
 
 
-# ── Section 4: fetch_event_odds() function ───────────────────────────────────
+# ── Section 4: get_event_odds() function ───────────────────────────────────
 
 class TestFetchEventOddsEndpoint(unittest.TestCase):
-    """Verify fetch_event_odds() exists and uses the correct endpoint."""
+    """Verify get_event_odds() exists and uses the correct endpoint."""
 
     def setUp(self):
         self.src = _OA_SRC.read_text(encoding="utf-8")
 
     def test_fetch_event_odds_exists(self):
-        """fetch_event_odds function must exist."""
-        self.assertIn("def fetch_event_odds(", self.src)
+        """get_event_odds function must exist."""
+        self.assertIn("def get_event_odds(", self.src)
 
     def test_fetch_event_odds_url(self):
-        """fetch_event_odds must call /sports/{_SPORT}/events/{event_id}/odds."""
-        idx = self.src.find("def fetch_event_odds(")
+        """get_event_odds must call /sports/{_SPORT}/events/{event_id}/odds."""
+        idx = self.src.find("def get_event_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn("/events/{event_id}/odds", snippet)
 
     def test_fetch_event_odds_accepts_markets(self):
-        """fetch_event_odds must accept a markets parameter."""
-        idx = self.src.find("def fetch_event_odds(")
+        """get_event_odds must accept a markets parameter."""
+        idx = self.src.find("def get_event_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn('"markets"', snippet)
 
     def test_fetch_event_odds_accepts_regions(self):
-        """fetch_event_odds must accept a regions parameter."""
-        idx = self.src.find("def fetch_event_odds(")
+        """get_event_odds must accept a regions parameter."""
+        idx = self.src.find("def get_event_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn('"regions"', snippet)
 
     def test_fetch_event_odds_accepts_odds_format(self):
-        """fetch_event_odds must accept an oddsFormat parameter."""
-        idx = self.src.find("def fetch_event_odds(")
+        """get_event_odds must accept an oddsFormat parameter."""
+        idx = self.src.find("def get_event_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn('"oddsFormat"', snippet)
 
 
 class TestFetchEventOddsRuntime(unittest.TestCase):
-    """Runtime tests for fetch_event_odds()."""
+    """Runtime tests for get_event_odds()."""
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry")
     def test_returns_dict_on_success(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_event_odds
+        from data.odds_client import get_event_odds
         mock_fetch.return_value = {
             "id": "abc123",
             "sport_key": "basketball_nba",
@@ -272,31 +272,31 @@ class TestFetchEventOddsRuntime(unittest.TestCase):
                 }
             ]
         }
-        result = fetch_event_odds("abc123", markets="h2h_h1,player_points")
+        result = get_event_odds("abc123", markets="h2h_h1,player_points")
         self.assertIsInstance(result, dict)
         self.assertEqual(result["home_team"], "Phoenix Suns")
         self.assertIn("bookmakers", result)
 
-    @patch("data.odds_api_client._resolve_api_key", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value=None)
     def test_returns_empty_dict_when_no_key(self, mock_key):
-        from data.odds_api_client import fetch_event_odds
-        result = fetch_event_odds("abc123")
+        from data.odds_client import get_event_odds
+        result = get_event_odds("abc123")
         self.assertEqual(result, {})
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry", return_value=None)
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry", return_value=None)
     def test_returns_empty_dict_on_failure(self, mock_fetch, mock_key):
-        from data.odds_api_client import fetch_event_odds
-        result = fetch_event_odds("abc123")
+        from data.odds_client import get_event_odds
+        result = get_event_odds("abc123")
         self.assertEqual(result, {})
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._fetch_with_retry")
     def test_passes_custom_markets(self, mock_fetch, mock_key):
         """Custom markets string should be passed to API params."""
-        from data.odds_api_client import fetch_event_odds
+        from data.odds_client import get_event_odds
         mock_fetch.return_value = {"id": "x", "bookmakers": []}
-        fetch_event_odds("x", markets="player_points,player_rebounds", regions="us2")
+        get_event_odds("x", markets="player_points,player_rebounds", regions="us2")
         # Verify the call args include our custom markets
         call_args = mock_fetch.call_args
         params = call_args[1].get("params") or call_args[0][1] if len(call_args[0]) > 1 else call_args[1].get("params")
@@ -315,15 +315,15 @@ class TestExistingOddsEndpoints(unittest.TestCase):
         self.src = _OA_SRC.read_text(encoding="utf-8")
 
     def test_fetch_game_odds_url(self):
-        """fetch_game_odds must call /sports/{_SPORT}/odds."""
-        idx = self.src.find("def fetch_game_odds(")
+        """get_game_odds must call /sports/{_SPORT}/odds."""
+        idx = self.src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn("/odds", snippet)
+        self.assertIn("ENDPOINT_ODDS", snippet)
 
     def test_fetch_game_odds_featured_markets(self):
-        """fetch_game_odds must request h2h, spreads, and totals markets."""
-        idx = self.src.find("def fetch_game_odds(")
+        """get_game_odds must request h2h, spreads, and totals markets."""
+        idx = self.src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("h2h", snippet)
@@ -331,22 +331,22 @@ class TestExistingOddsEndpoints(unittest.TestCase):
         self.assertIn("totals", snippet)
 
     def test_fetch_recent_scores_url(self):
-        """fetch_recent_scores must call /sports/{_SPORT}/scores."""
-        idx = self.src.find("def fetch_recent_scores(")
+        """get_recent_scores must call /sports/{_SPORT}/scores."""
+        idx = self.src.find("def get_recent_scores(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
         self.assertIn("/scores", snippet)
 
     def test_fetch_recent_scores_has_days_from(self):
-        """fetch_recent_scores must use daysFrom parameter."""
-        idx = self.src.find("def fetch_recent_scores(")
+        """get_recent_scores must use daysFrom parameter."""
+        idx = self.src.find("def get_recent_scores(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn('"daysFrom"', snippet)
 
     def test_fetch_player_props_uses_event_odds(self):
-        """fetch_player_props must use the per-event /events/{id}/odds endpoint."""
-        idx = self.src.find("def fetch_player_props(")
+        """get_player_props must use the per-event /events/{id}/odds endpoint."""
+        idx = self.src.find("def get_player_props(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2000]
         self.assertIn("/events/{event_id}/odds", snippet)
@@ -374,8 +374,8 @@ class TestOddsApiKeyInParams(unittest.TestCase):
 
     def test_apikey_in_query_params(self):
         """Odds API functions must pass apiKey in query params."""
-        # fetch_game_odds should have "apiKey" in params
-        idx = self.src.find("def fetch_game_odds(")
+        # get_game_odds should have "apiKey" in params
+        idx = self.src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
         self.assertIn('"apiKey"', snippet)
@@ -398,15 +398,15 @@ class TestOddsApiKeyInParams(unittest.TestCase):
 # ── Section: Outcome parsing uses point for spreads/totals ────────────────────
 
 class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
-    """Verify fetch_game_odds uses point (not price) for spreads and totals."""
+    """Verify get_game_odds uses point (not price) for spreads and totals."""
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._cache_get", return_value=None)
-    @patch("data.odds_api_client._cache_set")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._cache_get", return_value=None)
+    @patch("data.odds_client._cache_set")
+    @patch("data.odds_client._fetch_with_retry")
     def test_spreads_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
         """Spreads outcomes should map name → point (spread value), not price (juice)."""
-        from data.odds_api_client import fetch_game_odds
+        from data.odds_client import get_game_odds
 
         mock_fetch.return_value = [{
             "id": "ev1",
@@ -424,18 +424,18 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
             }],
         }]
 
-        games = fetch_game_odds()
+        games = get_game_odds()
         spreads = games[0]["bookmakers"][0]["markets"]["spreads"]
         self.assertAlmostEqual(spreads["Los Angeles Lakers"], -3.5)
         self.assertAlmostEqual(spreads["Boston Celtics"], 3.5)
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._cache_get", return_value=None)
-    @patch("data.odds_api_client._cache_set")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._cache_get", return_value=None)
+    @patch("data.odds_client._cache_set")
+    @patch("data.odds_client._fetch_with_retry")
     def test_totals_use_point_not_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
         """Totals outcomes should map name → point (total value), not price (juice)."""
-        from data.odds_api_client import fetch_game_odds
+        from data.odds_client import get_game_odds
 
         mock_fetch.return_value = [{
             "id": "ev1",
@@ -453,18 +453,18 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
             }],
         }]
 
-        games = fetch_game_odds()
+        games = get_game_odds()
         totals = games[0]["bookmakers"][0]["markets"]["totals"]
         self.assertAlmostEqual(totals["Over"], 224.5)
         self.assertAlmostEqual(totals["Under"], 224.5)
 
-    @patch("data.odds_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.odds_api_client._cache_get", return_value=None)
-    @patch("data.odds_api_client._cache_set")
-    @patch("data.odds_api_client._fetch_with_retry")
+    @patch("data.odds_client._resolve_api_key", return_value="test-key")
+    @patch("data.odds_client._cache_get", return_value=None)
+    @patch("data.odds_client._cache_set")
+    @patch("data.odds_client._fetch_with_retry")
     def test_h2h_uses_price(self, mock_fetch, mock_cs, mock_cg, mock_key):
         """h2h (moneyline) outcomes should map name → price (no point field)."""
-        from data.odds_api_client import fetch_game_odds
+        from data.odds_client import get_game_odds
 
         mock_fetch.return_value = [{
             "id": "ev1",
@@ -482,21 +482,21 @@ class TestFetchGameOddsOutcomeParsing(unittest.TestCase):
             }],
         }]
 
-        games = fetch_game_odds()
+        games = get_game_odds()
         h2h = games[0]["bookmakers"][0]["markets"]["h2h"]
         self.assertEqual(h2h["Los Angeles Lakers"], -150)
         self.assertEqual(h2h["Boston Celtics"], 130)
 
 
 class TestPlayerPropsRegion(unittest.TestCase):
-    """Verify fetch_player_props uses the correct API region."""
+    """Verify get_player_props uses the correct API region."""
 
     def setUp(self):
         self.src = _OA_SRC.read_text(encoding="utf-8")
 
     def test_player_props_uses_us_region(self):
-        """fetch_player_props must use 'us' region for DraftKings/FanDuel coverage."""
-        idx = self.src.find("def fetch_player_props(")
+        """get_player_props must use 'us' region for DraftKings/FanDuel coverage."""
+        idx = self.src.find("def get_player_props(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 2500]
         # Must contain "us" region assignment

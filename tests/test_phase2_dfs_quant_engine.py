@@ -400,7 +400,7 @@ class TestIntegration(unittest.TestCase):
     def test_quarantine_to_sim_pipeline(self):
         """Quarantined prop_target_line flows into simulation correctly."""
         _ensure_streamlit_mock()
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         from engine.simulation import run_quantum_matrix_simulation
 
         # Create a prop set with one good line

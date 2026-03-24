@@ -12,7 +12,7 @@ import os
 import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
-from data.live_data_fetcher import fetch_todays_games, fetch_todays_players_only, fetch_all_todays_data
+from data.nba_data_service import get_todays_games, get_todays_players, get_all_todays_data
 
 try:
     from utils.logger import get_logger
@@ -316,7 +316,7 @@ if auto_load_clicked:
     try:
         status_text.text("⏳ Step 1/3 — Fetching tonight's games...")
         progress_bar.progress(5)
-        games = fetch_todays_games()
+        games = get_todays_games()
 
         if not games:
             progress_bar.empty()
@@ -333,9 +333,9 @@ if auto_load_clicked:
             status_text.text(f"⏳ Step 2/3 — Fetching rosters, stats & injuries for {len(games)} game(s)...")
             progress_bar.progress(25)
 
-            players_ok = fetch_todays_players_only(games)
+            players_ok = get_todays_players(games)
 
-            # Load the injury map written by fetch_todays_players_only
+            # Load the injury map written by get_todays_players
             injury_map = {}
             if players_ok:
                 try:
@@ -350,14 +350,14 @@ if auto_load_clicked:
             progress_bar.progress(65)
             teams_ok = False
             try:
-                from data.live_data_fetcher import fetch_team_stats as _ldf_team_stats
+                from data.nba_data_service import get_team_stats as _ldf_team_stats
                 teams_ok = _ldf_team_stats()
             except Exception as _ts_err:
                 _logger.warning(f"Auto-load: team stats fetch failed (non-fatal): {_ts_err}")
 
             # Pre-load standings into session state for other pages
             try:
-                from data.live_data_fetcher import fetch_standings as _ldf_standings
+                from data.nba_data_service import get_standings as _ldf_standings
                 _al_standings = _ldf_standings()
                 if _al_standings:
                     st.session_state["league_standings"] = _al_standings
@@ -408,7 +408,7 @@ if fetch_players_clicked:
             status_text2.caption(message)
 
         with st.spinner("⚡ Fetching current rosters and player stats..."):
-            success = fetch_todays_players_only(
+            success = get_todays_players(
                 todays_games_for_fetch,
                 progress_callback=_fetch_players_progress,
             )
@@ -453,7 +453,7 @@ if platform_props_clicked:
         if not _todays_games:
             pp_status.text("⏳ 0/5 — No games loaded. Auto-fetching tonight's schedule…")
             pp_bar.progress(2)
-            from data.live_data_fetcher import fetch_todays_games as _auto_fetch_games
+            from data.nba_data_service import get_todays_games as _auto_fetch_games
             _todays_games = _auto_fetch_games()
             if _todays_games:
                 st.session_state["todays_games"] = _todays_games
@@ -467,20 +467,20 @@ if platform_props_clicked:
         if not _check_players and _todays_games:
             pp_status.text("⏳ 0/5 — No player data. Fetching rosters for tonight's teams…")
             pp_bar.progress(5)
-            from data.live_data_fetcher import fetch_todays_players_only as _auto_fetch_players
+            from data.nba_data_service import get_todays_players as _auto_fetch_players
             _auto_fetch_players(_todays_games)
 
         # ── Step 1: Fetch props from selected platforms ────────────────
         pp_status.text("⏳ 1/5 — Fetching props from selected platforms…")
         pp_bar.progress(10)
 
-        from data.platform_fetcher import (
-            fetch_all_platform_props,
+        from data.sportsbook_service import (
+            get_all_sportsbook_props,
             smart_filter_props,
         )
 
         odds_api_key = st.session_state.get("odds_api_key") or ""
-        all_platform_props = fetch_all_platform_props(
+        all_platform_props = get_all_sportsbook_props(
             include_prizepicks=_include_pp,
             include_underdog=_include_ud,
             include_draftkings=_include_dk,
@@ -566,7 +566,7 @@ if platform_props_clicked:
         # Fix 7: Enrich platform names → CSV canonical names before analysis
         # (e.g. "Nic Claxton" → "Nicolas Claxton" so stats look-up succeeds)
         try:
-            from data.platform_fetcher import enrich_props_with_csv_names as _enrich
+            from data.sportsbook_service import enrich_props_with_csv_names as _enrich
             props_to_analyze = _enrich(props_to_analyze, players_data_for_analysis)
         except Exception as _enrich_err:
             try:
@@ -981,11 +981,11 @@ if one_click_setup_clicked:
         # ── Phase 1: Auto-Load Tonight's Games ────────────────────────
         _oc_status.text("⏳ Phase 1/3 — Auto-loading tonight's games, rosters & stats…")
         _oc_bar.progress(5)
-        from data.live_data_fetcher import (
-            fetch_todays_games as _oc_fetch_games,
-            fetch_todays_players_only as _oc_fetch_players,
-            fetch_team_stats as _oc_fetch_teams,
-            fetch_standings as _oc_fetch_standings,
+        from data.nba_data_service import (
+            get_todays_games as _oc_fetch_games,
+            get_todays_players as _oc_fetch_players,
+            get_team_stats as _oc_fetch_teams,
+            get_standings as _oc_fetch_standings,
         )
         from data.data_manager import (
             load_players_data as _oc_load_players,
@@ -1036,7 +1036,7 @@ if one_click_setup_clicked:
         _oc_status.text("⏳ Phase 3/3 — Fetching live prop lines from all platforms…")
 
         try:
-            from data.platform_fetcher import fetch_all_platform_props as _oc_fetch_platform
+            from data.sportsbook_service import get_all_sportsbook_props as _oc_fetch_platform
             from data.data_manager import (
                 save_platform_props_to_session as _oc_save_platform,
                 save_platform_props_to_csv as _oc_save_csv,

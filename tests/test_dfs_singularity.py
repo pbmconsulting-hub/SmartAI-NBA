@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # ============================================================
 
 class TestQuarantineProps:
-    """Tests for data/platform_fetcher.py quarantine_props()"""
+    """Tests for data/sportsbook_service.py quarantine_props()"""
 
     def _make_prop(self, player="Player A", stat="points", line=24.5,
                    over_odds=-110, under_odds=-110, platform="PrizePicks"):
@@ -32,14 +32,14 @@ class TestQuarantineProps:
         }
 
     def test_quarantine_empty_input(self):
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         result, summary = quarantine_props([])
         assert result == []
         assert summary["input_count"] == 0
 
     def test_quarantine_passes_normal_odds(self):
         """Props with standard -110 odds should survive quarantine."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [self._make_prop(over_odds=-110, under_odds=-110)]
         result, summary = quarantine_props(props)
         assert len(result) == 1
@@ -47,7 +47,7 @@ class TestQuarantineProps:
 
     def test_quarantine_drops_extreme_negative_odds(self):
         """Props with odds worse than -300 should be dropped."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [self._make_prop(over_odds=-400, under_odds=+200)]
         result, summary = quarantine_props(props)
         assert len(result) == 0
@@ -55,14 +55,14 @@ class TestQuarantineProps:
 
     def test_quarantine_drops_extreme_positive_odds(self):
         """Props with odds better than +250 should be dropped."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [self._make_prop(over_odds=+300, under_odds=-400)]
         result, summary = quarantine_props(props)
         assert len(result) == 0
 
     def test_quarantine_boundary_odds_pass(self):
         """Props exactly at -300 or +250 should survive."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [
             self._make_prop(over_odds=-300, under_odds=+250),
             self._make_prop(player="Player B", over_odds=+250, under_odds=-300),
@@ -72,7 +72,7 @@ class TestQuarantineProps:
 
     def test_quarantine_selects_main_line_closest_to_minus_110(self):
         """When multiple lines exist for same player+stat, pick closest to -110."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [
             self._make_prop(line=22.5, over_odds=-150, under_odds=+120),
             self._make_prop(line=24.5, over_odds=-110, under_odds=-110),
@@ -85,7 +85,7 @@ class TestQuarantineProps:
 
     def test_quarantine_silently_drops_player_with_no_valid_line(self):
         """If all lines for a player are extreme, player should be silently dropped."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [
             self._make_prop(over_odds=-400, under_odds=+300),
             self._make_prop(line=28.5, over_odds=-350, under_odds=+280),
@@ -96,14 +96,14 @@ class TestQuarantineProps:
 
     def test_quarantine_drops_zero_line(self):
         """Props with line <= 0 should be dropped."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [self._make_prop(line=0)]
         result, summary = quarantine_props(props)
         assert len(result) == 0
 
     def test_quarantine_multiple_players(self):
         """Each player+stat gets independent quarantine."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [
             self._make_prop(player="Alpha", stat="points", line=24.5, over_odds=-110),
             self._make_prop(player="Alpha", stat="rebounds", line=8.5, over_odds=-115),
@@ -114,7 +114,7 @@ class TestQuarantineProps:
 
     def test_quarantine_summary_counts(self):
         """Summary should accurately reflect step counts."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [
             self._make_prop(player="Good", over_odds=-110),
             self._make_prop(player="Bad", over_odds=-400),
@@ -126,7 +126,7 @@ class TestQuarantineProps:
 
     def test_quarantine_default_odds_for_missing(self):
         """Props without over_odds/under_odds should default to -110."""
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         props = [{"player_name": "NoOdds", "stat_type": "points", "line": 20.5}]
         result, summary = quarantine_props(props)
         assert len(result) == 1
@@ -137,7 +137,7 @@ class TestSmartFilterQuarantineIntegration:
     """Tests that smart_filter_props integrates quarantine step."""
 
     def test_smart_filter_includes_quarantine_in_summary(self):
-        from data.platform_fetcher import smart_filter_props
+        from data.sportsbook_service import smart_filter_props
         props = [
             {"player_name": "Player A", "stat_type": "points", "line": 24.5,
              "over_odds": -110, "under_odds": -110, "platform": "PrizePicks"},
@@ -146,7 +146,7 @@ class TestSmartFilterQuarantineIntegration:
         assert "after_quarantine" in summary
 
     def test_smart_filter_drops_extreme_odds(self):
-        from data.platform_fetcher import smart_filter_props
+        from data.sportsbook_service import smart_filter_props
         props = [
             {"player_name": "Extreme", "stat_type": "points", "line": 24.5,
              "over_odds": -500, "under_odds": +400, "platform": "DraftKings"},
@@ -307,7 +307,7 @@ class TestQuarantineConstants:
     """Tests that quarantine constants are properly defined."""
 
     def test_quarantine_constants_exist(self):
-        from data.platform_fetcher import (
+        from data.sportsbook_service import (
             QUARANTINE_ODDS_FLOOR,
             QUARANTINE_ODDS_CEILING,
             _EQUILIBRIUM_ODDS,
@@ -317,7 +317,7 @@ class TestQuarantineConstants:
         assert _EQUILIBRIUM_ODDS == -110
 
     def test_quarantine_is_importable(self):
-        from data.platform_fetcher import quarantine_props
+        from data.sportsbook_service import quarantine_props
         assert callable(quarantine_props)
 
 
@@ -329,7 +329,7 @@ class TestBackwardCompatibility:
     """Ensure existing functions still work after the upgrade."""
 
     def test_smart_filter_props_still_works(self):
-        from data.platform_fetcher import smart_filter_props
+        from data.sportsbook_service import smart_filter_props
         props = [
             {"player_name": "LeBron James", "stat_type": "points", "line": 24.5,
              "over_odds": -110, "under_odds": -110, "platform": "PrizePicks",

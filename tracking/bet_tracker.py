@@ -588,9 +588,9 @@ def auto_resolve_bet_results(date_str=None):
     For all pending bets on date_str (default: yesterday), fetch actual
     player stats from API-NBA API and automatically mark WIN/LOSS/PUSH.
 
-    Uses data.live_data_fetcher.fetch_player_game_log() to get actual stat
+    Uses data.nba_data_service.get_player_game_log() to get actual stat
     values from API-NBA. Falls back to game_log_cache if the API is
-    unavailable. Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
+    unavailable. Player IDs are resolved via data.player_profile_service.get_player_id().
 
     Args:
         date_str (str|None): ISO date string "YYYY-MM-DD".
@@ -634,7 +634,7 @@ def auto_resolve_bet_results(date_str=None):
 
     # Player ID lookup: API-NBA API → nba_api static list (local, no network)
     try:
-        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+        from data.player_profile_service import get_player_id as _lookup_pid
     except ImportError:
         _lookup_pid = None
 
@@ -681,7 +681,7 @@ def auto_resolve_bet_results(date_str=None):
         return resolved_count, errors_list
 
     # ── Resolve player names → API-NBA player IDs ────────
-    # lookup_player_id() checks: cache → API-NBA API → nba_api static (local)
+    # get_player_id() checks: cache → API-NBA API → nba_api static (local)
     _name_to_pid: dict = {}
     for pname in _names_to_fetch:
         if _lookup_pid is not None:
@@ -709,7 +709,7 @@ def auto_resolve_bet_results(date_str=None):
             try:
                 if _attempt > 0:
                     _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                from data.nba_data_service import get_player_game_log as _ldf_gl
                 logs = _ldf_gl(pid, last_n_games=5)
                 return pid, logs
             except Exception:
@@ -813,9 +813,9 @@ def resolve_todays_bets():
     """
     Resolve today's pending bets by checking live game status via API-NBA API.
 
-    Uses API-NBA fetch_live_scores() to detect finished games,
-    then fetches player game logs via data.live_data_fetcher.fetch_player_game_log().
-    Player IDs are resolved via data.nba_context_fetcher.lookup_player_id().
+    Uses API-NBA get_live_scores() to detect finished games,
+    then fetches player game logs via data.nba_data_service.get_player_game_log().
+    Player IDs are resolved via data.player_profile_service.get_player_id().
     Only resolves bets where the game has a FINAL status.
 
     Returns:
@@ -868,7 +868,7 @@ def resolve_todays_bets():
 
     # Player ID lookup via API-NBA → nba_api static list (local)
     try:
-        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+        from data.player_profile_service import get_player_id as _lookup_pid
     except ImportError:
         _lookup_pid = None
 
@@ -876,7 +876,7 @@ def resolve_todays_bets():
     _scoreboard_available = False
     has_final_games = False
     try:
-        from data.clearsports_client import fetch_live_scores as _cs_live
+        from data.nba_api_client import get_live_scores as _cs_live
         live_scores = _cs_live()
         if live_scores:
             _scoreboard_available = True
@@ -959,7 +959,7 @@ def resolve_todays_bets():
             try:
                 if _attempt > 0:
                     time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                from data.nba_data_service import get_player_game_log as _ldf_gl
                 logs = _ldf_gl(pid, last_n_games=5)
                 return pid, logs
             except Exception as _retry_exc:
@@ -1103,7 +1103,7 @@ def resolve_all_pending_bets():
 
     # Try importing required modules
     try:
-        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+        from data.player_profile_service import get_player_id as _lookup_pid
     except ImportError:
         _lookup_pid = None
 
@@ -1199,7 +1199,7 @@ def resolve_all_pending_bets():
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                        from data.nba_data_service import get_player_game_log as _ldf_gl
                         logs = _ldf_gl(player_id, last_n_games=10)
                         _log_cache[player_id] = logs or []
                         _api_exc = None
@@ -1333,7 +1333,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
     # ── Import dependencies ────────────────────────────────────────────
     try:
-        from data.nba_context_fetcher import lookup_player_id as _lookup_pid
+        from data.player_profile_service import get_player_id as _lookup_pid
     except ImportError:
         _lookup_pid = None
 
@@ -1451,7 +1451,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
+                        from data.nba_data_service import get_player_game_log as _ldf_gl
                         logs = _ldf_gl(player_id, last_n_games=10)
                         _log_cache[player_id] = logs or []
                         _api_exc = None
@@ -1560,7 +1560,7 @@ def get_live_bet_status(bets_list):
     # Fetch live box scores from API-NBA
     live_box: dict = {}  # player_name_lower → current stat totals
     try:
-        from data.clearsports_client import fetch_live_scores as _cs_live
+        from data.nba_api_client import get_live_scores as _cs_live
         live_scores = _cs_live()
         for g in (live_scores or []):
             status_text = str(g.get("status", "")).lower()

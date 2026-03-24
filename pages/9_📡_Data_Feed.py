@@ -4,7 +4,7 @@
 #          from the API-NBA API and The Odds API. Updates player
 #          stats, team stats, standings, and today's games with real,
 #          current data.
-# CONNECTS TO: data/live_data_fetcher.py, data/data_manager.py
+# CONNECTS TO: data/nba_data_service.py, data/data_manager.py
 # CONCEPTS COVERED: Progress bars, API calls, session state, error handling
 #
 # BEGINNER NOTE: This page is your "data refresh" control panel.
@@ -28,13 +28,13 @@ from data.data_manager import (
 # Import our live data fetcher functions
 # These functions call API-NBA API for roster/stats/injury data
 # and The Odds API for sportsbook lines.
-from data.live_data_fetcher import (
-    fetch_todays_games,          # Fetch tonight's NBA games
-    fetch_player_stats,          # Fetch all player season averages
-    fetch_team_stats,            # Fetch all team stats + defensive ratings
-    fetch_all_data,              # Fetch everything at once
-    fetch_todays_players_only,   # Targeted: only today's team rosters
-    fetch_all_todays_data,       # One-click: games + players + teams
+from data.nba_data_service import (
+    get_todays_games,          # Fetch tonight's NBA games
+    get_player_stats,          # Fetch all player season averages
+    get_team_stats,            # Fetch all team stats + defensive ratings
+    get_all_data,              # Fetch everything at once
+    get_todays_players,   # Targeted: only today's team rosters
+    get_all_todays_data,       # One-click: games + players + teams
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
@@ -198,7 +198,7 @@ for _ci, (_label, _ts, _warn_h, _desc) in enumerate(_data_sources):
 
 # ── Staleness warning ──────────────────────────────────────────
 try:
-    from data.live_data_fetcher import get_teams_staleness_warning
+    from data.nba_data_service import get_teams_staleness_warning
     _stale_warning = get_teams_staleness_warning()
     if _stale_warning:
         st.warning(f"⏰ {_stale_warning}")
@@ -425,7 +425,7 @@ if current_action:
             status_text.caption(message)
 
         with st.spinner("🏀 Fetching games + rosters + player stats + team stats..."):
-            result = fetch_all_todays_data(progress_callback=one_click_progress)
+            result = get_all_todays_data(progress_callback=one_click_progress)
 
         st.session_state["update_action"] = None
         progress_bar.empty()
@@ -492,7 +492,7 @@ if current_action:
                 status_text.caption(message)
 
             with st.spinner("Fetching today's team rosters and player stats..."):
-                success = fetch_todays_players_only(
+                success = get_todays_players(
                     todays_games_for_smart,
                     progress_callback=smart_progress
                 )
@@ -527,7 +527,7 @@ if current_action:
         # while the code inside the "with" block runs
         with st.spinner("Fetching game data…"):
             # Call the fetcher function
-            todays_games = fetch_todays_games()
+            todays_games = get_todays_games()
 
         # Check if we got any games
         if todays_games:
@@ -600,7 +600,7 @@ if current_action:
             status_text.text(f"⏳ {message}")   # Update the text
 
         # Run the player stats fetcher with our progress callback
-        success = fetch_player_stats(progress_callback=update_player_progress)
+        success = get_player_stats(progress_callback=update_player_progress)
 
         # Clear the action flag
         st.session_state["update_action"] = None
@@ -662,7 +662,7 @@ if current_action:
 
         # Run the team stats fetcher
         with st.spinner("Fetching team data..."):
-            success = fetch_team_stats(progress_callback=update_team_progress)
+            success = get_team_stats(progress_callback=update_team_progress)
 
         # Clear the action flag
         st.session_state["update_action"] = None
@@ -722,7 +722,7 @@ if current_action:
             status_text.text(f"⏳ {message}")
 
         # Run the full updater
-        results = fetch_all_data(progress_callback=update_all_progress)
+        results = get_all_data(progress_callback=update_all_progress)
 
         # Clear the action flag
         st.session_state["update_action"] = None
@@ -773,7 +773,7 @@ if current_action:
         st.markdown("**Fetching tonight's games...**")
 
         with st.spinner("Fetching tonight's games..."):
-            todays_games = fetch_todays_games()
+            todays_games = get_todays_games()
 
         if todays_games:
             st.session_state["todays_games"] = todays_games
@@ -924,7 +924,7 @@ if current_action:
 
         with st.spinner("Fetching NBA standings from API-NBA…"):
             try:
-                from data.live_data_fetcher import fetch_standings as _fetch_standings_ldf
+                from data.nba_data_service import get_standings as _fetch_standings_ldf
                 _standings_data = _fetch_standings_ldf()
                 st.session_state["league_standings"] = _standings_data
             except Exception as _sn_err:
@@ -933,7 +933,7 @@ if current_action:
 
         with st.spinner("Fetching recent NBA news from API-NBA…"):
             try:
-                from data.live_data_fetcher import fetch_player_news as _fetch_news_ldf
+                from data.nba_data_service import get_player_news as _fetch_news_ldf
                 _news_data = _fetch_news_ldf(limit=30)
                 st.session_state["player_news"] = _news_data
             except Exception as _news_err:
@@ -989,8 +989,8 @@ st.markdown(get_education_box_html(
 
 # ── Import platform fetcher ────────────────────────────────────
 try:
-    from data.platform_fetcher import (
-        fetch_all_platform_props,
+    from data.sportsbook_service import (
+        get_all_sportsbook_props,
         summarize_props_by_platform,
         find_new_players_from_props,
         build_cross_platform_comparison,
@@ -1079,7 +1079,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
             _progress_bar.progress(pct, text=message)
 
         with st.spinner("Fetching live props from betting platforms..."):
-            _new_props = fetch_all_platform_props(
+            _new_props = get_all_sportsbook_props(
                 include_prizepicks=False,
                 include_underdog=False,
                 include_draftkings=_dk_on and (_fetch_all or _fetch_dk_only),
@@ -1174,7 +1174,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
         )
 
         try:
-            from data.platform_fetcher import (
+            from data.sportsbook_service import (
                 extract_active_players_from_props,
                 cross_reference_with_player_data,
                 get_platform_confirmed_injuries,

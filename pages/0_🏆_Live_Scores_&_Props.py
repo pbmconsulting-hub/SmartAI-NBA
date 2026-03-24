@@ -99,7 +99,7 @@ def _fetch_live_scores():
         list of dict: Game score data, or empty list on failure.
     """
     try:
-        from data.clearsports_client import fetch_live_scores as _cs_live
+        from data.nba_api_client import get_live_scores as _cs_live
         scores = _cs_live()
         if scores:
             return scores
@@ -539,7 +539,7 @@ else:
 with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
     st.caption("Completed NBA scores · data refreshes every 5 minutes")
     try:
-        from data.odds_api_client import fetch_recent_scores as _fetch_scores
+        from data.odds_client import get_recent_scores as _fetch_scores
         _recent_scores = []
         for _days_back in (1, 2, 3):
             _scores = _fetch_scores(days_from=_days_back)

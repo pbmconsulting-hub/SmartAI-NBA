@@ -19,7 +19,7 @@ except ImportError:
     _logger = logging.getLogger(__name__)
 
 try:
-    from data.odds_api_client import calculate_implied_probability
+    from data.odds_client import calculate_implied_probability
 except ImportError:
     def calculate_implied_probability(american_odds: float) -> float:
         """Fallback: convert American odds to implied probability percentage."""
@@ -93,7 +93,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
     Parameters
     ----------
     sportsbook_props : list[dict]
-        Raw output of ``fetch_player_props()``.  Each dict has keys:
+        Raw output of ``get_player_props()``.  Each dict has keys:
         ``player_name``, ``stat_type``, ``line``, ``platform``,
         ``over_odds``, ``under_odds``.
 

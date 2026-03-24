@@ -274,8 +274,8 @@ if _fetch_logs_btn and selected_names:
         )
         if _gl_player_id:
             try:
-                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
-                from data.live_data_fetcher import fetch_player_recent_form as _ldf_form
+                from data.nba_data_service import get_player_game_log as _ldf_gl
+                from data.nba_data_service import get_player_recent_form as _ldf_form
                 from data.game_log_cache import save_game_logs_to_cache as _gl_save
                 _logs = _ldf_gl(_gl_player_id, last_n_games=20)
                 if _logs:

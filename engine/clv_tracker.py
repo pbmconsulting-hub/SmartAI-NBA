@@ -639,8 +639,8 @@ def auto_update_closing_lines(days_back: int = 1) -> dict:
         }
     """
     try:
-        from data.odds_api_client import fetch_recent_scores as _fetch_scores
-        from data.odds_api_client import fetch_player_props as _fetch_props
+        from data.odds_client import get_recent_scores as _fetch_scores
+        from data.odds_client import get_player_props as _fetch_props
     except ImportError:
         return {"updated": 0, "skipped": 0, "errors": 0}
 

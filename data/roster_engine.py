@@ -338,7 +338,7 @@ class RosterEngine:
         Returns an empty dict if all sources fail.
         """
         try:
-            from data.clearsports_client import fetch_injury_report as _cs_injuries
+            from data.nba_api_client import get_injury_report as _cs_injuries
             raw_injuries = _cs_injuries()
             if raw_injuries:
                 result = {}
@@ -415,7 +415,7 @@ class RosterEngine:
         Fetch full rosters from API-NBA API, store in _full_rosters.
         """
         try:
-            from data.clearsports_client import fetch_rosters as _cs_rosters
+            from data.nba_api_client import get_rosters as _cs_rosters
             rosters = _cs_rosters(list(team_abbrevs))
             for abbrev, players in rosters.items():
                 self._full_rosters[abbrev.upper()] = players

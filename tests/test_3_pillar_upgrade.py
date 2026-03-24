@@ -182,7 +182,7 @@ class TestSmartFilterPropsIntegration(unittest.TestCase):
 
     def setUp(self):
         _ensure_streamlit_mock()
-        from data.platform_fetcher import smart_filter_props
+        from data.sportsbook_service import smart_filter_props
         self.filter_fn = smart_filter_props
 
     def test_stat_type_filtering(self):

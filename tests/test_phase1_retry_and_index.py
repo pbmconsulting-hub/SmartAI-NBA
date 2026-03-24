@@ -31,12 +31,12 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
     def setUp(self):
         _ensure_streamlit_mock()
         self.src = (
-            pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+            pathlib.Path(__file__).parent.parent / "data" / "sportsbook_service.py"
         )
         self.content = self.src.read_text(encoding="utf-8")
 
     def test_fetch_with_retry_function_exists(self):
-        """_fetch_with_retry helper must be defined in platform_fetcher.py."""
+        """_fetch_with_retry helper must be defined in sportsbook_service.py."""
         self.assertIn(
             "def _fetch_with_retry(",
             self.content,
@@ -56,43 +56,43 @@ class TestSyncFetchRetryIntegration(unittest.TestCase):
         self.assertIn("status_code == 429", self.content)
 
     def test_prizepicks_stub_exists(self):
-        """fetch_prizepicks_props stub must still exist for backward compatibility."""
+        """get_prizepicks_props stub must still exist for backward compatibility."""
         self.assertIn(
-            "def fetch_prizepicks_props(",
+            "def get_prizepicks_props(",
             self.content,
-            "fetch_prizepicks_props should still be defined (backward compat stub)",
+            "get_prizepicks_props should still be defined (backward compat stub)",
         )
 
     def test_underdog_stub_exists(self):
-        """fetch_underdog_props stub must still exist for backward compatibility."""
+        """get_underdog_props stub must still exist for backward compatibility."""
         self.assertIn(
-            "def fetch_underdog_props(",
+            "def get_underdog_props(",
             self.content,
-            "fetch_underdog_props should still be defined (backward compat stub)",
+            "get_underdog_props should still be defined (backward compat stub)",
         )
 
     def test_odds_api_client_delegated(self):
-        """fetch_all_platform_props should delegate to odds_api_client."""
-        fap_start = self.content.find("def fetch_all_platform_props(")
+        """get_all_sportsbook_props should delegate to odds_client."""
+        fap_start = self.content.find("def get_all_sportsbook_props(")
         fap_end = self.content.find("\ndef ", fap_start + 1)
         fap_section = self.content[fap_start:fap_end]
 
         self.assertIn(
-            "odds_api_client",
+            "odds_client",
             fap_section,
-            "fetch_all_platform_props should delegate to odds_api_client",
+            "get_all_sportsbook_props should delegate to odds_client",
         )
 
     def test_draftkings_stub_delegates_to_master(self):
-        """fetch_draftkings_props should delegate to fetch_all_platform_props."""
-        dk_start = self.content.find("def fetch_draftkings_props(")
+        """get_draftkings_props should delegate to get_all_sportsbook_props."""
+        dk_start = self.content.find("def get_draftkings_props(")
         dk_next_func = self.content.find("\ndef ", dk_start + 1)
         dk_section = self.content[dk_start:dk_next_func]
 
         self.assertIn(
-            "fetch_all_platform_props",
+            "get_all_sportsbook_props",
             dk_section,
-            "fetch_draftkings_props should delegate to fetch_all_platform_props",
+            "get_draftkings_props should delegate to get_all_sportsbook_props",
         )
 
     def test_fetch_with_retry_handles_none_response(self):
