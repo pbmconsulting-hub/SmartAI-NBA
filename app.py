@@ -213,6 +213,26 @@ st.markdown("""
 
 initialize_database()
 
+# ── SQLite production warning ─────────────────────────────────
+# Warn if running in production mode with the default SQLite path.
+# SQLite is not ideal for multi-user cloud deployments.
+if os.environ.get("SMARTAI_PRODUCTION", "").lower() in ("true", "1", "yes"):
+    _db_path = os.environ.get("DB_PATH", "db/smartai_nba.db")
+    if os.path.basename(_db_path) == "smartai_nba.db":
+        logging.getLogger(__name__).warning(
+            "Running in production mode with SQLite (%s). "
+            "SQLite is not recommended for multi-user cloud deployments. "
+            "Consider PostgreSQL or persistent storage. See docs/database_migration.md",
+            _db_path,
+        )
+        if "sqlite_warning_shown" not in st.session_state:
+            st.session_state["sqlite_warning_shown"] = True
+            st.warning(
+                "⚠️ **SQLite in Production Mode** — This app is running with SQLite, "
+                "which may not persist data on ephemeral cloud platforms (e.g., Streamlit Cloud). "
+                "See `docs/database_migration.md` for migration options."
+            )
+
 # ── Premium Status — Check and display in sidebar ─────────────
 # This runs silently on app load.  is_premium_user() is cached in
 # session state so it won't make Stripe API calls on every rerun.

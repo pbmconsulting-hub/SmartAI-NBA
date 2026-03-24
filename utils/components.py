@@ -147,6 +147,18 @@ def inject_joseph_floating():
         _components_logger.debug("inject_joseph_floating failed: %s", exc)
 
 
+def render_sidebar_disclaimer():
+    """Render a collapsed responsible gambling disclaimer in the sidebar."""
+    with st.sidebar:
+        with st.expander("⚠️ Responsible Gambling", expanded=False):
+            st.caption(
+                "This app is for **personal entertainment and analysis** only. "
+                "Always gamble responsibly. Past model performance does not guarantee "
+                "future results. Prop betting involves risk. Never bet more than you "
+                "can afford to lose."
+            )
+
+
 # ── on_change callbacks ──────────────────────────────────────────
 # These propagate widget values into the canonical session-state keys
 # that the rest of the app reads (simulation_depth, minimum_edge_threshold,
