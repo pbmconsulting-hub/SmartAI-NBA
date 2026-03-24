@@ -1341,10 +1341,10 @@ class TestCategorizeAltLines(unittest.TestCase):
 
 
 class TestParseAltLinesFromPlatformProps(unittest.TestCase):
-    """Tests for parse_alt_lines_from_platform_props() in data/platform_fetcher.py."""
+    """Tests for parse_alt_lines_from_platform_props() in data/sportsbook_service.py."""
 
     def setUp(self):
-        from data.platform_fetcher import parse_alt_lines_from_platform_props
+        from data.sportsbook_service import parse_alt_lines_from_platform_props
         self.parse = parse_alt_lines_from_platform_props
 
     def _make_prop(self, player, stat, line, platform="PrizePicks"):

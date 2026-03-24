@@ -292,7 +292,7 @@ def verify_checkout_session(session_id: str) -> dict:
 
 def get_subscription_by_id(subscription_id: str) -> dict:
     """
-    Fetch the current status of a Stripe subscription by its ID.
+    Get the current status of a Stripe subscription by its ID.
 
     Use this to verify that a stored subscription is still active
     (not cancelled or past_due) before granting access to premium

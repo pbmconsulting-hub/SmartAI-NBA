@@ -203,8 +203,8 @@ with _api_col2:
 _api_btn_col1, _api_btn_col2, _api_btn_col3, _ = st.columns([1, 1, 1, 1])
 with _api_btn_col1:
     if st.button("💾 Save Keys", key="save_api_keys"):
-        from data.clearsports_client import validate_api_key as _validate_cs_key
-        from data.odds_api_client import validate_api_key as _validate_odds_key
+        from data.nba_api_client import validate_nba_api_key as _validate_cs_key
+        from data.odds_client import validate_odds_api_key as _validate_odds_key
 
         _changed = False
         _errors: list[str] = []
@@ -251,8 +251,8 @@ with _api_btn_col3:
         _cs_key = st.session_state.get("api_nba_key", "")
         if _cs_key:
             try:
-                from data.clearsports_client import fetch_api_key_info
-                _info = fetch_api_key_info()
+                from data.nba_api_client import get_api_key_info
+                _info = get_api_key_info()
                 if _info:
                     _credits = _info.get("credits_remaining", "?")
                     _active = _info.get("is_active", None)
@@ -270,8 +270,8 @@ with _api_btn_col3:
         _odds_key = st.session_state.get("odds_api_key", "")
         if _odds_key:
             try:
-                from data.odds_api_client import fetch_sports, get_odds_api_usage
-                _sports = fetch_sports()
+                from data.odds_client import get_sports, get_odds_api_usage
+                _sports = get_sports()
                 _usage = get_odds_api_usage()
                 _remaining = _usage.get("requests_remaining")
                 if _sports is not None:
@@ -445,7 +445,7 @@ st.subheader("🎰 Sportsbook Platforms")
 
 st.markdown(
     "Select which sportsbooks to include in analysis. "
-    "All odds are fetched from The Odds API."
+    "All odds are retrieved from The Odds API."
 )
 
 current_platforms = st.session_state.get("selected_platforms", list(_PRIMARY_PLATFORMS))

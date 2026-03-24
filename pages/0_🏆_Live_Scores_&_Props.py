@@ -88,18 +88,18 @@ with col_interval:
 
 
 # ============================================================
-# SECTION: Fetch Live Scoreboard
+# SECTION: Load Live Scoreboard
 # ============================================================
 
-def _fetch_live_scores():
+def _get_live_scores():
     """
-    Attempt to fetch live/today's game scores via API-NBA API.
+    Attempt to retrieve live/today's game scores via API-NBA API.
 
     Returns:
         list of dict: Game score data, or empty list on failure.
     """
     try:
-        from data.clearsports_client import fetch_live_scores as _cs_live
+        from data.nba_api_client import get_live_scores as _cs_live
         scores = _cs_live()
         if scores:
             return scores
@@ -120,10 +120,10 @@ def _status_badge(status_text):
 
 
 with st.spinner("🏆 Loading live scores..."):
-    live_games = _fetch_live_scores()
+    live_games = _get_live_scores()
 
 # ============================================================
-# END SECTION: Fetch Live Scoreboard
+# END SECTION: Load Live Scoreboard
 # ============================================================
 
 
@@ -134,9 +134,9 @@ with st.spinner("🏆 Loading live scores..."):
 st.subheader("🏀 Live Scoreboard")
 
 
-def _fetch_quarter_scores(game_id: str) -> dict:
+def _get_quarter_scores(game_id: str) -> dict:
     """
-    Attempt to fetch per-quarter (period) line score for a given game_id.
+    Attempt to retrieve per-quarter (period) line score for a given game_id.
 
     Returns dict with keys 'away_q' and 'home_q' each being a list of
     quarter scores (indices 0-3 = Q1-Q4, index 4 = OT if present).
@@ -238,11 +238,11 @@ if live_games:
             score_color_home = "#00ff9d" if h_pts > a_pts else "#c8d8f0"
             score_color_away = "#00ff9d" if a_pts > h_pts else "#c8d8f0"
 
-            # Fetch quarter-by-quarter scores if game_id available
+            # Retrieve quarter-by-quarter scores if game_id available
             game_id = game.get("game_id", "")
             quarter_html = ""
             if game_id:
-                qscores = _fetch_quarter_scores(game_id)
+                qscores = _get_quarter_scores(game_id)
                 away_q = qscores.get("away_q", [])
                 home_q = qscores.get("home_q", [])
                 if away_q or home_q:
@@ -539,10 +539,10 @@ else:
 with st.expander("📋 Recent Game Results (last 1-3 days)", expanded=False):
     st.caption("Completed NBA scores · data refreshes every 5 minutes")
     try:
-        from data.odds_api_client import fetch_recent_scores as _fetch_scores
+        from data.odds_client import get_recent_scores as _get_scores
         _recent_scores = []
         for _days_back in (1, 2, 3):
-            _scores = _fetch_scores(days_from=_days_back)
+            _scores = _get_scores(days_from=_days_back)
             for _g in _scores:
                 if _g.get("completed") and _g not in _recent_scores:
                     _recent_scores.append(_g)

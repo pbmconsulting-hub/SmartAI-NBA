@@ -28,58 +28,58 @@ sys.modules.setdefault("streamlit.components", MagicMock())
 sys.modules.setdefault("streamlit.components.v1", MagicMock())
 
 
-_CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "clearsports_client.py"
-_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+_CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "nba_api_client.py"
+_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
 
 
 # ── Section 1: ApiNba source-level checks ──────────────────────────────
 
 class TestApiNbaNoApiKeyInParams(unittest.TestCase):
-    """Verify that fetch_player_game_log, fetch_standings, and fetch_news
+    """Verify that get_player_game_log, get_standings, and get_news
     do NOT put the apiKey into the query params dict.  The Bearer header in
-    _fetch_with_retry already handles authentication."""
+    _request_with_retry already handles authentication."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
-    def test_fetch_player_game_log_no_apikey_in_params(self):
+    def test_get_player_game_log_no_apikey_in_params(self):
         """params dict for game_log must not contain 'apiKey'."""
-        idx = self.src.find("def fetch_player_game_log(")
+        idx = self.src.find("def get_player_game_log(")
         self.assertGreater(idx, 0)
         # Use a 1500-char window to reach past the docstring
         snippet = self.src[idx:idx + 1500]
         self.assertIn('"player"', snippet)
         self.assertNotIn('"apiKey"', snippet,
-                         "fetch_player_game_log params must not include apiKey")
+                         "get_player_game_log params must not include apiKey")
 
-    def test_fetch_standings_no_apikey_in_params(self):
+    def test_get_standings_no_apikey_in_params(self):
         """params dict for standings must not contain 'apiKey'."""
-        idx = self.src.find("def fetch_standings(")
+        idx = self.src.find("def get_standings(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 1500]
         self.assertNotIn('"apiKey"', snippet,
-                         "fetch_standings params must not include apiKey")
+                         "get_standings params must not include apiKey")
 
-    def test_fetch_news_no_apikey_in_params(self):
+    def test_get_news_no_apikey_in_params(self):
         """params dict for news must not contain 'apiKey'."""
-        idx = self.src.find("def fetch_news(")
+        idx = self.src.find("def get_news(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 1500]
         self.assertIn('"limit"', snippet)
         self.assertNotIn('"apiKey"', snippet,
-                         "fetch_news params must not include apiKey")
+                         "get_news params must not include apiKey")
 
 
 # ── Section 2: ApiNba 422 handling ──────────────────────────────────────
 
 class TestApiNba422Handling(unittest.TestCase):
-    """Verify that _fetch_with_retry in clearsports_client handles HTTP 422."""
+    """Verify that _request_with_retry in nba_api_client handles HTTP 422."""
 
     def setUp(self):
         self.src = _CS_SRC.read_text(encoding="utf-8")
 
     def test_422_status_code_handled(self):
-        """_fetch_with_retry should check for 422 status."""
+        """_request_with_retry should check for 422 status."""
         self.assertIn("status_code == 422", self.src,
                       "ApiNba must handle 422 status code")
 
@@ -99,14 +99,14 @@ class TestApiNba422Handling(unittest.TestCase):
 class TestEmptyResponseBodyHandling(unittest.TestCase):
     """Verify both API clients check for empty response bodies before .json()."""
 
-    def test_clearsports_checks_empty_body(self):
-        """ApiNba _fetch_with_retry must check resp.text before .json()."""
+    def test_nba_api_checks_empty_body(self):
+        """ApiNba _request_with_retry must check resp.text before .json()."""
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("not resp.text", src,
                       "ApiNba must check for empty resp.text")
 
     def test_odds_api_checks_empty_body(self):
-        """Odds API _fetch_with_retry must check resp.text before .json()."""
+        """Odds API _request_with_retry must check resp.text before .json()."""
         src = _OA_SRC.read_text(encoding="utf-8")
         self.assertIn("not resp.text", src,
                       "Odds API must check for empty resp.text")
@@ -115,7 +115,7 @@ class TestEmptyResponseBodyHandling(unittest.TestCase):
 # ── Section 4: Cascading .get() safety ───────────────────────────────────────
 
 class TestCascadingGetSafety(unittest.TestCase):
-    """Verify that nested .get() patterns in fetch_games_today use 'or {}' to
+    """Verify that nested .get() patterns in get_todays_games use 'or {}' to
     guard against None values (not just missing keys)."""
 
     def setUp(self):
@@ -135,17 +135,17 @@ class TestCascadingGetSafety(unittest.TestCase):
 # ── Section 5: Runtime test — ApiNba games parsing with None records ────
 
 class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
-    """Runtime tests for fetch_games_today parsing logic with edge-case data."""
+    """Runtime tests for get_todays_games parsing logic with edge-case data."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_games_with_none_records(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_games_with_none_records(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with home_record: null should not cause AttributeError."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g1",
                 "home_team": "LAL",
@@ -157,22 +157,22 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
             }
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_wins"], 0)
         self.assertEqual(games[0]["home_losses"], 0)
         self.assertEqual(games[0]["away_wins"], 0)
         self.assertEqual(games[0]["away_losses"], 0)
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_games_with_nested_records(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_games_with_nested_records(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with nested home_record dicts should parse correctly."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g2",
                 "home_team": "MIA",
@@ -184,22 +184,22 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
             }
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_wins"], 35)
         self.assertEqual(games[0]["home_losses"], 20)
         self.assertEqual(games[0]["away_wins"], 40)
         self.assertEqual(games[0]["away_losses"], 15)
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_games_with_flat_wins_losses(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_games_with_flat_wins_losses(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with flat home_wins/home_losses fields should parse correctly."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g3",
                 "home_team": "GSW",
@@ -213,7 +213,7 @@ class TestApiNbaGameParsingEdgeCases(unittest.TestCase):
             }
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_wins"], 42)
         self.assertEqual(games[0]["home_losses"], 18)
@@ -227,13 +227,13 @@ class TestCacheKeyIncludesParams(unittest.TestCase):
     """Verify that _build_cache_key builds unique keys for different params."""
 
     def test_build_cache_key_exists(self):
-        """_build_cache_key function must exist in clearsports_client source."""
+        """_build_cache_key function must exist in nba_api_client source."""
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("def _build_cache_key(", src)
 
     def test_build_cache_key_behavior(self):
         """Different params must produce different cache keys."""
-        from data.clearsports_client import _build_cache_key
+        from data.nba_api_client import _build_cache_key
 
         key1 = _build_cache_key("https://example.com/games", {"date": "2026-03-23"})
         key2 = _build_cache_key("https://example.com/games", {"date": "2026-03-24"})
@@ -244,7 +244,7 @@ class TestCacheKeyIncludesParams(unittest.TestCase):
 
     def test_build_cache_key_no_params(self):
         """No params should return the URL as-is."""
-        from data.clearsports_client import _build_cache_key
+        from data.nba_api_client import _build_cache_key
 
         self.assertEqual(_build_cache_key("https://example.com/games"), "https://example.com/games")
 
@@ -256,108 +256,108 @@ class TestExtractTeamAbbrev(unittest.TestCase):
 
     def test_direct_home_team_field(self):
         """home_team field should be extracted correctly."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"home_team": "LAL"}, "home")
         self.assertEqual(result, "LAL")
 
     def test_abbreviation_field(self):
         """home_abbreviation / away_abbreviation should work."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"away_abbreviation": "bos"}, "away")
         self.assertEqual(result, "BOS")
 
     def test_tricode_field(self):
         """home_tricode / away_tricode should work."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"home_tricode": "gsw"}, "home")
         self.assertEqual(result, "GSW")
 
     def test_team_abbreviation_field(self):
         """home_team_abbreviation / away_team_abbreviation should work."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"away_team_abbreviation": "MIA"}, "away")
         self.assertEqual(result, "MIA")
 
     def test_nested_dict(self):
         """Nested dict like home: {abbreviation: 'LAL'} should work."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"home": {"abbreviation": "LAL"}}, "home")
         self.assertEqual(result, "LAL")
 
     def test_nested_team_dict(self):
         """Nested dict like home_team: {tricode: 'BOS'} should work."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"home_team": {"tricode": "BOS"}}, "home")
         self.assertEqual(result, "BOS")
 
     def test_empty_on_missing_fields(self):
         """Should return empty string when no matching fields found."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"unrelated": "data"}, "home")
         self.assertEqual(result, "")
 
     def test_empty_string_field_returns_empty(self):
         """Empty string in team field should return empty."""
-        from data.clearsports_client import _extract_team_abbrev
+        from data.nba_api_client import _extract_team_abbrev
 
         result = _extract_team_abbrev({"home_team": ""}, "home")
         self.assertEqual(result, "")
 
 
-# ── Section 8: fetch_games_today skips empty-team entries ────────────────────
+# ── Section 8: get_todays_games skips empty-team entries ────────────────────
 
 class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
     """Verify that games with empty team abbreviations are skipped."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_skips_games_with_empty_teams(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_skips_games_with_empty_teams(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games missing team abbreviations should be skipped."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.5},
             {"game_id": "g2"},  # no team info at all
             {"game_id": "g3", "home_team": "MIA"},  # missing away_team
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "LAL")
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_alternate_field_names_work(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_alternate_field_names_work(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with alternate field names (tricode, nested) should parse."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_tricode": "LAL", "away_tricode": "BOS", "vegas_spread": -2.0},
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "LAL")
         self.assertEqual(games[0]["away_team"], "BOS")
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_client_side_date_filter(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_client_side_date_filter(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """When API returns >20 games, client-side date filter should apply."""
-        from data.clearsports_client import fetch_games_today, _today_str
+        from data.nba_api_client import get_todays_games, _today_str
 
         today = _today_str()
         # 25 games total, but only 2 match today's date
@@ -382,19 +382,19 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
             "game_date": today,
         })
 
-        mock_fetch.return_value = all_games
-        games = fetch_games_today()
+        mock_request.return_value = all_games
+        games = get_todays_games()
         self.assertEqual(len(games), 2)
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_nested_team_objects(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_nested_team_objects(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with nested team objects should parse correctly."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {
                 "game_id": "g1",
                 "home": {"abbreviation": "CHI"},
@@ -404,31 +404,31 @@ class TestFetchGamesTodaySkipsEmptyTeams(unittest.TestCase):
             }
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "CHI")
         self.assertEqual(games[0]["away_team"], "CLE")
 
 
-# ── Section 9: fetch_todays_games validates team names ───────────────────────
+# ── Section 9: get_todays_games validates team names ───────────────────────
 
 class TestFetchTodaysGamesValidation(unittest.TestCase):
-    """Verify fetch_todays_games validates games have team names."""
+    """Verify get_todays_games validates games have team names."""
 
-    @patch("data.live_data_fetcher._enrich_games_with_standings", side_effect=lambda g: g)
-    @patch("data.live_data_fetcher._enrich_games_with_predictions", side_effect=lambda g: g)
-    @patch("data.live_data_fetcher._enrich_games_with_clearsports_odds", side_effect=lambda g: g)
-    @patch("data.live_data_fetcher._enrich_games_with_odds_api", side_effect=lambda g: g)
-    @patch("data.live_data_fetcher._build_games_from_odds_api", return_value=[
+    @patch("data.nba_data_service._enrich_games_with_standings", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_predictions", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_nba_api_odds", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
+    @patch("data.nba_data_service._build_games_from_odds_api", return_value=[
         {"game_id": "fallback_1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.0, "game_total": 220}
     ])
-    @patch("data.clearsports_client.fetch_games_today")
+    @patch("data.nba_api_client.get_todays_games")
     def test_falls_back_when_all_teams_empty(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_cs,
         mock_enrich_pred, mock_enrich_stand,
     ):
         """When ApiNba returns games with empty teams, fallback should trigger."""
-        from data.live_data_fetcher import fetch_todays_games
+        from data.nba_data_service import get_todays_games
 
         # ApiNba returns games but all have empty team names
         mock_cs.return_value = [
@@ -436,7 +436,7 @@ class TestFetchTodaysGamesValidation(unittest.TestCase):
             {"game_id": "g2", "home_team": "", "away_team": ""},
         ]
 
-        games = fetch_todays_games()
+        games = get_todays_games()
         # Should use fallback since ApiNba games had no valid teams
         mock_build.assert_called_once()
         self.assertEqual(len(games), 1)
@@ -449,13 +449,13 @@ class TestOddsApiCacheKeyIncludesParams(unittest.TestCase):
     """Verify that the Odds API client builds cache keys including params."""
 
     def test_build_cache_key_exists(self):
-        """_build_cache_key function must exist in odds_api_client source."""
+        """_build_cache_key function must exist in odds_client source."""
         src = _OA_SRC.read_text(encoding="utf-8")
         self.assertIn("def _build_cache_key(", src)
 
     def test_build_cache_key_behavior(self):
         """Different params must produce different cache keys."""
-        from data.odds_api_client import _build_cache_key
+        from data.odds_client import _build_cache_key
 
         key1 = _build_cache_key("https://api.example.com/odds", {"markets": "h2h", "regions": "us"})
         key2 = _build_cache_key("https://api.example.com/odds", {"markets": "player_points", "regions": "us2"})
@@ -466,7 +466,7 @@ class TestOddsApiCacheKeyIncludesParams(unittest.TestCase):
 
     def test_build_cache_key_excludes_api_key(self):
         """apiKey must NOT appear in the cache key (different users = same data)."""
-        from data.odds_api_client import _build_cache_key
+        from data.odds_client import _build_cache_key
 
         key_a = _build_cache_key("https://api.example.com/odds", {"apiKey": "key1", "markets": "h2h"})
         key_b = _build_cache_key("https://api.example.com/odds", {"apiKey": "key2", "markets": "h2h"})
@@ -476,23 +476,23 @@ class TestOddsApiCacheKeyIncludesParams(unittest.TestCase):
 
     def test_build_cache_key_no_params(self):
         """No params should return the URL as-is."""
-        from data.odds_api_client import _build_cache_key
+        from data.odds_client import _build_cache_key
 
         self.assertEqual(
             _build_cache_key("https://api.example.com/odds"),
             "https://api.example.com/odds",
         )
 
-    def test_fetch_with_retry_uses_cache_key(self):
-        """_fetch_with_retry must use _build_cache_key, not raw url for caching."""
+    def test_request_with_retry_uses_cache_key(self):
+        """_request_with_retry must use _build_cache_key, not raw url for caching."""
         src = _OA_SRC.read_text(encoding="utf-8")
-        idx = src.find("def _fetch_with_retry(")
+        idx = src.find("def _request_with_retry(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 1200]
         self.assertIn("_build_cache_key(", snippet,
-                       "_fetch_with_retry must call _build_cache_key for cache keying")
+                       "_request_with_retry must call _build_cache_key for cache keying")
         self.assertIn("cache_key", snippet,
-                       "_fetch_with_retry must use cache_key variable")
+                       "_request_with_retry must use cache_key variable")
 
 
 # ── Section 11: Player Simulator safe float handling ─────────────────────────
@@ -568,7 +568,7 @@ class TestOddsApiNullSafeGet(unittest.TestCase):
 
     def test_markets_list_uses_or_pattern(self):
         """markets list access in for-loops must use 'or []' for null safety."""
-        # In fetch_game_odds and fetch_player_props, markets are iterated
+        # In get_game_odds and get_player_props, markets are iterated
         self.assertNotIn('bm.get("markets", [])', self.src,
                          "markets list access must use (x or []) pattern")
 
@@ -599,13 +599,13 @@ class TestOddsApiNullSafeGet(unittest.TestCase):
 
 
 class TestOddsApiOutcomeTypeCheck(unittest.TestCase):
-    """Verify that outcome dict comprehensions in fetch_game_odds guard
+    """Verify that outcome dict comprehensions in get_game_odds guard
     against non-dict elements in the outcomes list."""
 
-    def test_fetch_game_odds_checks_outcome_type(self):
-        """fetch_game_odds outcome comprehension must check isinstance(o, dict)."""
+    def test_get_game_odds_checks_outcome_type(self):
+        """get_game_odds outcome comprehension must check isinstance(o, dict)."""
         src = _OA_SRC.read_text(encoding="utf-8")
-        idx = src.find("def fetch_game_odds(")
+        idx = src.find("def get_game_odds(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 2500]
         self.assertIn("isinstance(o, dict)", snippet,
@@ -618,81 +618,81 @@ class TestDoubleCachingEliminated(unittest.TestCase):
     """Verify that functions with manual cache keys use _build_cache_key
     consistently so inner/outer cache keys match."""
 
-    def test_fetch_recent_scores_uses_build_cache_key(self):
-        """fetch_recent_scores must use _build_cache_key for its cache key."""
+    def test_get_recent_scores_uses_build_cache_key(self):
+        """get_recent_scores must use _build_cache_key for its cache key."""
         src = _OA_SRC.read_text(encoding="utf-8")
-        idx = src.find("def fetch_recent_scores(")
+        idx = src.find("def get_recent_scores(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 2000]
         self.assertIn("_build_cache_key(", snippet,
-                       "fetch_recent_scores must use _build_cache_key")
+                       "get_recent_scores must use _build_cache_key")
         # Must NOT contain a manually-built cache_key string
         self.assertNotIn('f"{url}?daysFrom=', snippet,
-                          "fetch_recent_scores must not use manual cache key string")
+                          "get_recent_scores must not use manual cache key string")
 
-    def test_fetch_standings_uses_build_cache_key(self):
-        """fetch_standings must use _build_cache_key for its cache key."""
+    def test_get_standings_uses_build_cache_key(self):
+        """get_standings must use _build_cache_key for its cache key."""
         src = _CS_SRC.read_text(encoding="utf-8")
-        idx = src.find("def fetch_standings(")
+        idx = src.find("def get_standings(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 1500]
         self.assertIn("_build_cache_key(", snippet,
-                       "fetch_standings must use _build_cache_key")
+                       "get_standings must use _build_cache_key")
         self.assertNotIn('f"{url}?season=', snippet,
-                          "fetch_standings must not use manual cache key string")
+                          "get_standings must not use manual cache key string")
 
-    def test_fetch_player_game_log_uses_build_cache_key(self):
-        """fetch_player_game_log must use _build_cache_key for its cache key."""
+    def test_get_player_game_log_uses_build_cache_key(self):
+        """get_player_game_log must use _build_cache_key for its cache key."""
         src = _CS_SRC.read_text(encoding="utf-8")
-        idx = src.find("def fetch_player_game_log(")
+        idx = src.find("def get_player_game_log(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 1500]
         self.assertIn("_build_cache_key(", snippet,
-                       "fetch_player_game_log must use _build_cache_key")
+                       "get_player_game_log must use _build_cache_key")
         self.assertNotIn('f"{url}?player_id=', snippet,
-                          "fetch_player_game_log must not use manual cache key string")
+                          "get_player_game_log must not use manual cache key string")
 
-    def test_fetch_news_uses_build_cache_key(self):
-        """fetch_news must use _build_cache_key for its cache key."""
+    def test_get_news_uses_build_cache_key(self):
+        """get_news must use _build_cache_key for its cache key."""
         src = _CS_SRC.read_text(encoding="utf-8")
-        idx = src.find("def fetch_news(")
+        idx = src.find("def get_news(")
         self.assertGreater(idx, 0)
         snippet = src[idx:idx + 1500]
         self.assertIn("_build_cache_key(", snippet,
-                       "fetch_news must use _build_cache_key")
+                       "get_news must use _build_cache_key")
         self.assertNotIn('f"{url}?limit=', snippet,
-                          "fetch_news must not use manual cache key string")
+                          "get_news must not use manual cache key string")
 
 
-# ── Section 15: platform_fetcher dead code removed ───────────────────────────
+# ── Section 15: sportsbook_service dead code removed ───────────────────────────
 
 class TestPlatformFetcherDeadCodeRemoved(unittest.TestCase):
     """Verify that unused _cache_get / _cache_set dead code has been
-    removed from platform_fetcher.py."""
+    removed from sportsbook_service.py."""
 
     def setUp(self):
-        self.src_path = pathlib.Path(__file__).parent.parent / "data" / "platform_fetcher.py"
+        self.src_path = pathlib.Path(__file__).parent.parent / "data" / "sportsbook_service.py"
         self.src = self.src_path.read_text(encoding="utf-8")
 
     def test_no_cache_get_function(self):
-        """platform_fetcher must not define _cache_get (dead code removed)."""
+        """sportsbook_service must not define _cache_get (dead code removed)."""
         self.assertNotIn("def _cache_get(", self.src,
-                          "_cache_get should be removed from platform_fetcher")
+                          "_cache_get should be removed from sportsbook_service")
 
     def test_no_cache_set_function(self):
-        """platform_fetcher must not define _cache_set (dead code removed)."""
+        """sportsbook_service must not define _cache_set (dead code removed)."""
         self.assertNotIn("def _cache_set(", self.src,
-                          "_cache_set should be removed from platform_fetcher")
+                          "_cache_set should be removed from sportsbook_service")
 
     def test_no_api_cache_dict(self):
-        """platform_fetcher must not have unused _API_CACHE dict."""
+        """sportsbook_service must not have unused _API_CACHE dict."""
         self.assertNotIn("_API_CACHE:", self.src,
-                          "_API_CACHE should be removed from platform_fetcher")
+                          "_API_CACHE should be removed from sportsbook_service")
 
     def test_no_api_cache_ttl(self):
-        """platform_fetcher must not have unused _API_CACHE_TTL."""
+        """sportsbook_service must not have unused _API_CACHE_TTL."""
         self.assertNotIn("_API_CACHE_TTL", self.src,
-                          "_API_CACHE_TTL should be removed from platform_fetcher")
+                          "_API_CACHE_TTL should be removed from sportsbook_service")
 
 
 # ── Section 16: get_consensus_odds bookmaker type check ──────────────────────
@@ -741,87 +741,87 @@ class TestApiNbaNullSafeOrChainPatterns(unittest.TestCase):
             f"{func_name} still uses unsafe nested .get() for response envelope extraction"
         )
 
-    def test_fetch_games_today_uses_or_chain(self):
+    def test_get_todays_games_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_games_today",
+            "get_todays_games",
             'raw.get("games", raw.get("data"',
         )
 
-    def test_fetch_player_stats_uses_or_chain(self):
+    def test_get_player_stats_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_player_stats",
+            "get_player_stats",
             'raw.get("players", raw.get("data"',
         )
 
-    def test_fetch_team_stats_uses_or_chain(self):
+    def test_get_team_stats_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_team_stats",
+            "get_team_stats",
             'raw.get("teams", raw.get("data"',
         )
 
-    def test_fetch_injury_report_uses_or_chain(self):
+    def test_get_injury_report_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_injury_report",
+            "get_injury_report",
             'raw.get("injuries", raw.get("data"',
         )
 
-    def test_fetch_live_scores_uses_or_chain(self):
+    def test_get_live_scores_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_live_scores",
+            "get_live_scores",
             'raw.get("scores", raw.get("games"',
         )
 
-    def test_fetch_rosters_uses_or_chain(self):
+    def test_get_rosters_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_rosters",
+            "get_rosters",
             'raw.get("roster", raw.get("players"',
         )
 
-    def test_fetch_player_game_log_uses_or_chain(self):
+    def test_get_player_game_log_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_player_game_log",
+            "get_player_game_log",
             'data.get("games", data.get("data"',
         )
 
-    def test_fetch_standings_uses_or_chain(self):
+    def test_get_standings_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_standings",
+            "get_standings",
             'data.get("standings", data.get("data"',
         )
 
-    def test_fetch_news_uses_or_chain(self):
+    def test_get_news_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_news",
+            "get_news",
             'data.get("news", data.get("articles"',
         )
 
-    def test_fetch_api_key_usage_uses_or_chain(self):
+    def test_get_api_key_usage_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_api_key_usage",
+            "get_api_key_usage",
             'raw.get("usage", raw.get("data"',
         )
 
-    def test_fetch_game_odds_uses_or_chain(self):
+    def test_get_game_odds_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_game_odds",
+            "get_game_odds",
             'raw.get("odds", raw.get("data"',
         )
 
-    def test_fetch_nba_team_stats_uses_or_chain(self):
+    def test_get_nba_team_stats_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_nba_team_stats",
+            "get_nba_team_stats",
             'raw.get("stats", raw.get("data"',
         )
 
-    def test_fetch_nba_player_stats_uses_or_chain(self):
+    def test_get_nba_player_stats_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_nba_player_stats",
+            "get_nba_player_stats",
             'raw.get("stats", raw.get("data"',
         )
 
-    def test_fetch_predictions_uses_or_chain(self):
+    def test_get_predictions_uses_or_chain(self):
         self._assert_no_envelope_nested_get(
-            "fetch_predictions",
+            "get_predictions",
             'raw.get("predictions", raw.get("data"',
         )
 
@@ -829,71 +829,71 @@ class TestApiNbaNullSafeOrChainPatterns(unittest.TestCase):
 # ── Section 18: Runtime crash-safety with explicit null values ───────────────
 
 class TestApiNbaExplicitNullCrashSafety(unittest.TestCase):
-    """Runtime tests proving that fetch_player_game_log, fetch_standings,
-    and fetch_news do NOT crash when the API returns an explicit null for
+    """Runtime tests proving that get_player_game_log, get_standings,
+    and get_news do NOT crash when the API returns an explicit null for
     the expected data key (e.g. {"games": null}).
 
     These three functions previously lacked the isinstance(list) guard that
     other endpoints had, making them vulnerable to TypeError crashes.
     """
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_player_game_log_null_games_key(self, mock_fetch, mock_key):
-        """fetch_player_game_log must not crash when API returns {"games": null}."""
-        from data.clearsports_client import fetch_player_game_log
-        mock_fetch.return_value = {"games": None}
-        result = fetch_player_game_log(player_id=123)
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_player_game_log_null_games_key(self, mock_request, mock_key):
+        """get_player_game_log must not crash when API returns {"games": null}."""
+        from data.nba_api_client import get_player_game_log
+        mock_request.return_value = {"games": None}
+        result = get_player_game_log(player_id=123)
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_player_game_log_null_data_key(self, mock_fetch, mock_key):
-        """fetch_player_game_log must not crash when API returns {"data": null}."""
-        from data.clearsports_client import fetch_player_game_log
-        mock_fetch.return_value = {"data": None}
-        result = fetch_player_game_log(player_id=123)
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_player_game_log_null_data_key(self, mock_request, mock_key):
+        """get_player_game_log must not crash when API returns {"data": null}."""
+        from data.nba_api_client import get_player_game_log
+        mock_request.return_value = {"data": None}
+        result = get_player_game_log(player_id=123)
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_standings_null_standings_key(self, mock_fetch, mock_key):
-        """fetch_standings must not crash when API returns {"standings": null}."""
-        from data.clearsports_client import fetch_standings
-        mock_fetch.return_value = {"standings": None}
-        result = fetch_standings()
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_standings_null_standings_key(self, mock_request, mock_key):
+        """get_standings must not crash when API returns {"standings": null}."""
+        from data.nba_api_client import get_standings
+        mock_request.return_value = {"standings": None}
+        result = get_standings()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_standings_null_data_key(self, mock_fetch, mock_key):
-        """fetch_standings must not crash when API returns {"data": null}."""
-        from data.clearsports_client import fetch_standings
-        mock_fetch.return_value = {"data": None}
-        result = fetch_standings()
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_standings_null_data_key(self, mock_request, mock_key):
+        """get_standings must not crash when API returns {"data": null}."""
+        from data.nba_api_client import get_standings
+        mock_request.return_value = {"data": None}
+        result = get_standings()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_news_null_news_key(self, mock_fetch, mock_key):
-        """fetch_news must not crash when API returns {"news": null}."""
-        from data.clearsports_client import fetch_news
-        mock_fetch.return_value = {"news": None}
-        result = fetch_news()
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_news_null_news_key(self, mock_request, mock_key):
+        """get_news must not crash when API returns {"news": null}."""
+        from data.nba_api_client import get_news
+        mock_request.return_value = {"news": None}
+        result = get_news()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_fetch_news_null_articles_key(self, mock_fetch, mock_key):
-        """fetch_news must not crash when API returns {"articles": null}."""
-        from data.clearsports_client import fetch_news
-        mock_fetch.return_value = {"articles": None}
-        result = fetch_news()
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_get_news_null_articles_key(self, mock_request, mock_key):
+        """get_news must not crash when API returns {"articles": null}."""
+        from data.nba_api_client import get_news
+        mock_request.return_value = {"articles": None}
+        result = get_news()
         self.assertIsInstance(result, list)
         self.assertEqual(result, [])
 
@@ -917,7 +917,7 @@ class TestApiNbaCacheParamNaming(unittest.TestCase):
 
 # ── Section 16: isinstance(dict) guard in iteration loops ─────────────────────
 
-_LDF_SRC = pathlib.Path(__file__).parent.parent / "data" / "live_data_fetcher.py"
+_LDF_SRC = pathlib.Path(__file__).parent.parent / "data" / "nba_data_service.py"
 
 
 class TestIsinstanceDictGuardsSource(unittest.TestCase):
@@ -933,29 +933,29 @@ class TestIsinstanceDictGuardsSource(unittest.TestCase):
         self.cs_src = _CS_SRC.read_text(encoding="utf-8")
         self.ldf_src = _LDF_SRC.read_text(encoding="utf-8")
 
-    def test_fetch_standings_has_isinstance_guard(self):
-        """fetch_standings must check isinstance(row, dict) before row.get()."""
-        idx = self.cs_src.find("def fetch_standings(")
+    def test_get_standings_has_isinstance_guard(self):
+        """get_standings must check isinstance(row, dict) before row.get()."""
+        idx = self.cs_src.find("def get_standings(")
         self.assertGreater(idx, 0)
         snippet = self.cs_src[idx:idx + 2000]
         self.assertIn("isinstance(row, dict)", snippet,
-                      "fetch_standings must guard iteration with isinstance(row, dict)")
+                      "get_standings must guard iteration with isinstance(row, dict)")
 
-    def test_fetch_news_has_isinstance_guard(self):
-        """fetch_news must check isinstance(item, dict) before item.get()."""
-        idx = self.cs_src.find("def fetch_news(")
+    def test_get_news_has_isinstance_guard(self):
+        """get_news must check isinstance(item, dict) before item.get()."""
+        idx = self.cs_src.find("def get_news(")
         self.assertGreater(idx, 0)
         snippet = self.cs_src[idx:idx + 2000]
         self.assertIn("isinstance(item, dict)", snippet,
-                      "fetch_news must guard iteration with isinstance(item, dict)")
+                      "get_news must guard iteration with isinstance(item, dict)")
 
-    def test_fetch_player_game_log_has_isinstance_guard(self):
-        """fetch_player_game_log must check isinstance(g, dict) before g.get()."""
-        idx = self.cs_src.find("def fetch_player_game_log(")
+    def test_get_player_game_log_has_isinstance_guard(self):
+        """get_player_game_log must check isinstance(g, dict) before g.get()."""
+        idx = self.cs_src.find("def get_player_game_log(")
         self.assertGreater(idx, 0)
         snippet = self.cs_src[idx:idx + 2000]
         self.assertIn("isinstance(g, dict)", snippet,
-                      "fetch_player_game_log must guard iteration with isinstance(g, dict)")
+                      "get_player_game_log must guard iteration with isinstance(g, dict)")
 
     def test_enrich_standings_has_isinstance_guard(self):
         """_enrich_games_with_standings dict comprehension must guard with isinstance(s, dict)."""
@@ -967,17 +967,17 @@ class TestIsinstanceDictGuardsSource(unittest.TestCase):
 
 
 class TestStandingsNonDictItemRuntime(unittest.TestCase):
-    """Runtime test: fetch_standings must skip non-dict items without crashing."""
+    """Runtime test: get_standings must skip non-dict items without crashing."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_skips_none_items_in_standings_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_skips_none_items_in_standings_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the standings list contains None items, they should be skipped."""
-        from data.clearsports_client import fetch_standings
+        from data.nba_api_client import get_standings
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "standings": [
                 None,
                 {"team": "LAL", "wins": 45, "losses": 20},
@@ -986,7 +986,7 @@ class TestStandingsNonDictItemRuntime(unittest.TestCase):
             ]
         }
 
-        result = fetch_standings()
+        result = get_standings()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         abbrevs = {s["team_abbreviation"] for s in result}
@@ -995,17 +995,17 @@ class TestStandingsNonDictItemRuntime(unittest.TestCase):
 
 
 class TestNewsNonDictItemRuntime(unittest.TestCase):
-    """Runtime test: fetch_news must skip non-dict items without crashing."""
+    """Runtime test: get_news must skip non-dict items without crashing."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_skips_none_items_in_news_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_skips_none_items_in_news_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the news list contains None items, they should be skipped."""
-        from data.clearsports_client import fetch_news
+        from data.nba_api_client import get_news
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "news": [
                 None,
                 {"title": "LeBron 40pts", "body": "Great game"},
@@ -1014,7 +1014,7 @@ class TestNewsNonDictItemRuntime(unittest.TestCase):
             ]
         }
 
-        result = fetch_news(limit=10)
+        result = get_news(limit=10)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["title"], "LeBron 40pts")
@@ -1022,17 +1022,17 @@ class TestNewsNonDictItemRuntime(unittest.TestCase):
 
 
 class TestGameLogNonDictItemRuntime(unittest.TestCase):
-    """Runtime test: fetch_player_game_log must skip non-dict items without crashing."""
+    """Runtime test: get_player_game_log must skip non-dict items without crashing."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_skips_none_items_in_game_log_list(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_skips_none_items_in_game_log_list(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """If the game log list contains None items, they should be skipped."""
-        from data.clearsports_client import fetch_player_game_log
+        from data.nba_api_client import get_player_game_log
 
-        mock_fetch.return_value = {
+        mock_request.return_value = {
             "games": [
                 None,
                 {"date": "2026-03-20", "pts": 28, "reb": 7, "ast": 10},
@@ -1041,7 +1041,7 @@ class TestGameLogNonDictItemRuntime(unittest.TestCase):
             ]
         }
 
-        result = fetch_player_game_log(player_id=12345, last_n_games=10)
+        result = get_player_game_log(player_id=12345, last_n_games=10)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         self.assertAlmostEqual(result[0]["pts"], 28.0)
@@ -1051,10 +1051,10 @@ class TestGameLogNonDictItemRuntime(unittest.TestCase):
 class TestEnrichStandingsNonDictItemRuntime(unittest.TestCase):
     """Runtime test: _enrich_games_with_standings must skip non-dict standings."""
 
-    @patch("data.clearsports_client.fetch_standings")
+    @patch("data.nba_api_client.get_standings")
     def test_skips_non_dict_standings_entries(self, mock_standings):
         """If standings list contains non-dict items, they should be skipped."""
-        from data.live_data_fetcher import _enrich_games_with_standings
+        from data.nba_data_service import _enrich_games_with_standings
 
         mock_standings.return_value = [
             None,
@@ -1074,20 +1074,20 @@ class TestEnrichStandingsNonDictItemRuntime(unittest.TestCase):
         self.assertEqual(result[0]["away_wins"], 50)
 
 
-# ── Section: Non-NBA team filtering in fetch_games_today ──────────────────────
+# ── Section: Non-NBA team filtering in get_todays_games ──────────────────────
 
 class TestNonNbaTeamFiltering(unittest.TestCase):
     """Verify that non-NBA teams (All-Star, Rising Stars, TBD) are filtered out."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_non_nba_teams_filtered(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_non_nba_teams_filtered(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Games with non-NBA teams like STARS, STRIPES, TBD, WORLD should be excluded."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "real_1", "home_team": "LAL", "away_team": "BOS"},
             {"game_id": "allstar", "home_team": "STARS", "away_team": "STRIPES"},
             {"game_id": "real_2", "home_team": "MIA", "away_team": "NYK"},
@@ -1095,40 +1095,40 @@ class TestNonNbaTeamFiltering(unittest.TestCase):
             {"game_id": "rising", "home_team": "WORLD", "away_team": "USA"},
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         team_pairs = {(g["home_team"], g["away_team"]) for g in games}
         self.assertEqual(len(games), 2)
         self.assertIn(("LAL", "BOS"), team_pairs)
         self.assertIn(("MIA", "NYK"), team_pairs)
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_common_aliases_accepted(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_common_aliases_accepted(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """Common NBA abbreviation aliases (GS, NY, SA, etc.) should be accepted."""
-        from data.clearsports_client import fetch_games_today
+        from data.nba_api_client import get_todays_games
 
-        mock_fetch.return_value = [
+        mock_request.return_value = [
             {"game_id": "g1", "home_team": "GS", "away_team": "NY"},
             {"game_id": "g2", "home_team": "SA", "away_team": "NO"},
             {"game_id": "g3", "home_team": "UTAH", "away_team": "WSH"},
         ]
 
-        games = fetch_games_today()
+        games = get_todays_games()
         self.assertEqual(len(games), 3)
 
 
 class TestExpandedDateFieldMatching(unittest.TestCase):
     """Verify that the date filter tries additional date field names."""
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_gameDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_gameDate_field_matched(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """gameDate field should be recognized for date filtering."""
-        from data.clearsports_client import fetch_games_today, _today_str
+        from data.nba_api_client import get_todays_games, _today_str
 
         today = _today_str()
         all_games = []
@@ -1143,18 +1143,18 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
             "gameDate": today,
         })
 
-        mock_fetch.return_value = all_games
-        games = fetch_games_today()
+        mock_request.return_value = all_games
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "MIA")
 
-    @patch("data.clearsports_client._resolve_api_key", return_value="test-key")
-    @patch("data.clearsports_client._cache_get", return_value=None)
-    @patch("data.clearsports_client._cache_set")
-    @patch("data.clearsports_client._fetch_with_retry")
-    def test_startDate_field_matched(self, mock_fetch, mock_cache_set, mock_cache_get, mock_key):
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._cache_get", return_value=None)
+    @patch("data.nba_api_client._cache_set")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_startDate_field_matched(self, mock_request, mock_cache_set, mock_cache_get, mock_key):
         """startDate field should be recognized for date filtering."""
-        from data.clearsports_client import fetch_games_today, _today_str
+        from data.nba_api_client import get_todays_games, _today_str
 
         today = _today_str()
         all_games = []
@@ -1169,8 +1169,8 @@ class TestExpandedDateFieldMatching(unittest.TestCase):
             "startDate": today,
         })
 
-        mock_fetch.return_value = all_games
-        games = fetch_games_today()
+        mock_request.return_value = all_games
+        games = get_todays_games()
         self.assertEqual(len(games), 1)
         self.assertEqual(games[0]["home_team"], "PHX")
 
@@ -1179,7 +1179,7 @@ class TestValidNbaAbbrevs(unittest.TestCase):
     """Verify the _VALID_NBA_ABBREVS set covers all 30 teams and aliases."""
 
     def test_contains_all_30_canonical(self):
-        from data.clearsports_client import _VALID_NBA_ABBREVS
+        from data.nba_api_client import _VALID_NBA_ABBREVS
         canonical = {
             "ATL", "BOS", "BKN", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW",
             "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", "MIN", "NOP", "NYK",
@@ -1188,12 +1188,12 @@ class TestValidNbaAbbrevs(unittest.TestCase):
         self.assertTrue(canonical.issubset(_VALID_NBA_ABBREVS))
 
     def test_excludes_non_nba(self):
-        from data.clearsports_client import _VALID_NBA_ABBREVS
+        from data.nba_api_client import _VALID_NBA_ABBREVS
         for fake in ("STARS", "STRIPES", "TBD", "WORLD", "USA", "TEAM"):
             self.assertNotIn(fake, _VALID_NBA_ABBREVS)
 
     def test_includes_common_aliases(self):
-        from data.clearsports_client import _VALID_NBA_ABBREVS
+        from data.nba_api_client import _VALID_NBA_ABBREVS
         for alias in ("GS", "NY", "NO", "SA", "UTAH", "WSH"):
             self.assertIn(alias, _VALID_NBA_ABBREVS)
 
@@ -1202,7 +1202,7 @@ class TestNbaStatsFallbackTimeout(unittest.TestCase):
     """Verify that the NBA stats fallback timeout is reasonable."""
 
     def test_timeout_at_least_30(self):
-        from data.nba_stats_fallback import _REQUEST_TIMEOUT
+        from data.nba_stats_backup import _REQUEST_TIMEOUT
         self.assertGreaterEqual(_REQUEST_TIMEOUT, 30)
 
 

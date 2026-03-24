@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: tests/test_live_sweat.py
 # PURPOSE: Unit tests for the Live Sweat dashboard modules:
-#          data/live_tracker.py, engine/live_math.py,
+#          data/live_game_tracker.py, engine/live_math.py,
 #          styles/live_theme.py, agent/live_persona.py
 # ============================================================
 
@@ -242,14 +242,14 @@ class TestParsePeriod(unittest.TestCase):
 
 
 # ============================================================
-# SECTION 2: data/live_tracker entity matcher tests
+# SECTION 2: data/live_game_tracker entity matcher tests
 # ============================================================
 
 class TestMatchLivePlayer(unittest.TestCase):
     """Tests for match_live_player()."""
 
     def setUp(self):
-        from data.live_tracker import match_live_player
+        from data.live_game_tracker import match_live_player
         self.match = match_live_player
         self.players = [
             {"name": "Shai Gilgeous-Alexander", "pts": 30},
@@ -349,7 +349,7 @@ class TestMatchLivePlayer(unittest.TestCase):
 class TestGetAllLivePlayers(unittest.TestCase):
 
     def test_flattens_players(self):
-        from data.live_tracker import get_all_live_players
+        from data.live_game_tracker import get_all_live_players
         games = [
             {
                 "home_players": [{"name": "A", "pts": 1}],
@@ -739,8 +739,8 @@ class TestLiveSweatPageFile(unittest.TestCase):
     def test_page_config_present(self):
         self.assertIn("set_page_config", self.source)
 
-    def test_imports_live_tracker(self):
-        self.assertIn("from data.live_tracker import", self.source)
+    def test_imports_live_game_tracker(self):
+        self.assertIn("from data.live_game_tracker import", self.source)
 
     def test_imports_live_math(self):
         self.assertIn("from engine.live_math import", self.source)
@@ -797,21 +797,21 @@ class TestLiveSweatPageFile(unittest.TestCase):
 
 
 # ============================================================
-# SECTION 6: data/live_tracker fetcher tests
+# SECTION 6: data/live_game_tracker retriever tests
 # ============================================================
 
 class TestFetchLiveBoxscoresImpl(unittest.TestCase):
-    """Test _fetch_live_boxscores_impl with mocked ApiNba data."""
+    """Test _get_live_boxscores_impl with mocked ApiNba data."""
 
     def test_returns_list(self):
-        from data.live_tracker import _fetch_live_boxscores_impl
+        from data.live_game_tracker import _get_live_boxscores_impl
         # Should return list even when API is unreachable
-        result = _fetch_live_boxscores_impl()
+        result = _get_live_boxscores_impl()
         self.assertIsInstance(result, list)
 
     def test_player_extraction(self):
         """Ensure player stats are parsed from game dicts."""
-        from data import live_tracker
+        from data import live_game_tracker
         from unittest.mock import patch
 
         mock_data = [{
@@ -846,14 +846,14 @@ class TestFetchLiveBoxscoresImpl(unittest.TestCase):
         }]
 
         with patch.object(
-            live_tracker, "_fetch_live_boxscores_impl",
-            wraps=live_tracker._fetch_live_boxscores_impl,
+            live_game_tracker, "_get_live_boxscores_impl",
+            wraps=live_game_tracker._get_live_boxscores_impl,
         ):
             with patch(
-                "data.clearsports_client.fetch_live_scores",
+                "data.nba_api_client.get_live_scores",
                 return_value=mock_data,
             ):
-                games = live_tracker._fetch_live_boxscores_impl()
+                games = live_game_tracker._get_live_boxscores_impl()
 
         self.assertEqual(len(games), 1)
         home = games[0]["home_players"]

@@ -2,7 +2,7 @@
 tests/test_vegas_vault.py
 -------------------------
 Tests for the Vegas Vault feature:
-  - calculate_implied_probability (appended to odds_api_client)
+  - calculate_implied_probability (appended to odds_client)
   - find_ev_discrepancies (engine/arbitrage_matcher)
   - joseph_vault_reaction (appended to joseph_brain)
   - pages/15_🎰_Vegas_Vault.py (file structure)
@@ -22,7 +22,7 @@ class TestCalculateImpliedProbability(unittest.TestCase):
     """Tests for the calculate_implied_probability helper."""
 
     def setUp(self):
-        from data.odds_api_client import calculate_implied_probability
+        from data.odds_client import calculate_implied_probability
         self.calc = calculate_implied_probability
 
     def test_negative_odds(self):
@@ -350,7 +350,7 @@ class TestImpliedProbToAmericanOdds(unittest.TestCase):
 
     def test_roundtrip(self):
         """Converting probability back to odds should be inverse of odds→prob."""
-        from data.odds_api_client import calculate_implied_probability
+        from data.odds_client import calculate_implied_probability
         original_odds = -145
         prob = calculate_implied_probability(original_odds) / 100.0
         recovered_odds = self.convert(prob)
@@ -393,7 +393,7 @@ class TestVegasVaultPageFile(unittest.TestCase):
     def test_imports_required_modules(self):
         with open(self._PAGE_PATH, "r") as f:
             source = f.read()
-        self.assertIn("fetch_player_props", source)
+        self.assertIn("get_player_props", source)
         self.assertIn("find_ev_discrepancies", source)
         self.assertIn("joseph_vault_reaction", source)
         self.assertIn("calculate_implied_probability", source)

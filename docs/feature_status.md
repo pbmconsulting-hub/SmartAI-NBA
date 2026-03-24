@@ -11,7 +11,7 @@ This document tracks which features are complete, in-progress, or planned.
 | `engine/edge_detection.py` | Directional force analysis, Goblin / 50_50 / Demon three-tier classification (line-position-based) | Complete |
 | `engine/correlation.py` | Correlation-adjusted Kelly + parlay correlation | Complete |
 | `engine/projections.py` | Player stat projections with injury/rest adjustments | Complete |
-| `data/platform_fetcher.py` | PrizePicks, Underdog, DraftKings live prop fetching | Complete |
+| `data/sportsbook_service.py` | PrizePicks, Underdog, DraftKings live prop fetching | Complete |
 | `data/data_manager.py` | Props generation + platform player filtering | Complete |
 | `tracking/bet_tracker.py` | Bet logging, auto-resolve, Goblin / 50_50 / Demon / Normal tier tracking | Complete |
 | `engine/backtester.py` | Historical backtest engine | Complete |
@@ -29,6 +29,6 @@ This document tracks which features are complete, in-progress, or planned.
 
 | Feature | Target Module | Priority |
 |---------|--------------|---------|
-| Background API refresh | `data/platform_fetcher.py` | Medium |
+| Background API refresh | `data/sportsbook_service.py` | Medium |
 | Real-time line movement alerts | `engine/market_movement.py` | Low |
 | Full rotation tracker integration | `engine/rotation_tracker.py` | Medium |

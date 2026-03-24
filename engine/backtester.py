@@ -97,7 +97,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
         dict: BacktestResult with full metrics
     """
     if not game_logs_by_player:
-        return _empty_result("No game log data provided. Fetch player data first.")
+        return _empty_result("No game log data provided. Get player data first.")
 
     if run_quantum_matrix_simulation is None:
         return _empty_result("Simulation engine not available.")

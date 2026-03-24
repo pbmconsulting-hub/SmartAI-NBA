@@ -519,7 +519,7 @@ with col_compare:
       <td><span class="check-yes">✓</span></td>
     </tr>
     <tr>
-      <td>🔬 Prop Scanner — Live Platform Fetch</td>
+      <td>🔬 Prop Scanner — Live Platform Retrieval</td>
       <td><span class="check-no">✗</span></td>
       <td><span class="check-yes">✓</span></td>
     </tr>

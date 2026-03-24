@@ -1,6 +1,6 @@
 # ============================================================
-# FILE: data/platform_fetcher.py
-# PURPOSE: Fetch live player prop lines from all major sportsbooks
+# FILE: data/sportsbook_service.py
+# PURPOSE: Get live player prop lines from all major sportsbooks
 #          via The Odds API (DraftKings, FanDuel, BetMGM, Caesars, etc.).
 #          Also provides cross-platform comparison logic and best-platform
 #          recommendation.
@@ -9,8 +9,8 @@
 #   - The Odds API  : unified source for all sportsbook props (API key required)
 #
 # USAGE:
-#   from data.platform_fetcher import fetch_all_platform_props
-#   props = fetch_all_platform_props()
+#   from data.sportsbook_service import get_all_sportsbook_props
+#   props = get_all_sportsbook_props()
 #
 # RETURN FORMAT for every prop dict:
 #   {
@@ -20,7 +20,7 @@
 #       "line":        24.5,
 #       "platform":    "DraftKings",
 #       "game_date":   "2026-03-10",
-#       "fetched_at":  "2026-03-10T01:00:00",
+#       "retrieved_at":  "2026-03-10T01:00:00",
 #       "over_odds":   -115,
 #       "under_odds":  -105,
 #   }
@@ -33,9 +33,9 @@
 
 # Standard library imports (built into Python — no install needed)
 import time       # For delays between API calls (rate limiting)
-import datetime   # For timestamps on fetched props
+import datetime   # For timestamps on retrieved props
 import os         # For reading environment variables (API keys)
-import asyncio    # For concurrent fetching across platforms
+import asyncio    # For concurrent retrieval across platforms
 
 # Third-party HTTP library — must be installed (pip install requests)
 # 'requests' is used by roster_engine.py already and listed in requirements.
@@ -45,7 +45,7 @@ try:
 except ImportError:
     REQUESTS_AVAILABLE = False
 
-# Async HTTP library for concurrent platform fetching (pip install aiohttp)
+# Async HTTP library for concurrent platform retrieving (pip install aiohttp)
 try:
     import aiohttp
     AIOHTTP_AVAILABLE = True
@@ -75,7 +75,7 @@ import time as _time
 # Import the rate limiter for polite API access with circuit breaker
 try:
     from utils.rate_limiter import RateLimiter as _RateLimiter
-    # Feature 10: 20 req/min, 200/hour — matches existing live_data_fetcher limits
+    # Feature 10: 20 req/min, 200/hour — matches existing nba_data_service limits
     _platform_rate_limiter = _RateLimiter(max_requests_per_minute=20, max_requests_per_hour=200)
     _RATE_LIMITER_AVAILABLE = True
 except ImportError:
@@ -88,7 +88,7 @@ except ImportError:
 
 # How long to wait between calls to the same platform (seconds).
 # BEGINNER NOTE: APIs block you if you call too fast. 1.5s is polite
-# and mirrors the pattern in live_data_fetcher.py.
+# and mirrors the pattern in nba_data_service.py.
 API_DELAY_SECONDS = 1.5
 
 # HTTP timeout for platform API requests (seconds).
@@ -115,7 +115,7 @@ _BASE_HEADERS = {
 PRIZEPICKS_URL = ""
 UNDERDOG_URL = ""
 
-# The Odds API base URL — used to fetch DraftKings player props
+# The Odds API base URL — used to retrieve DraftKings player props
 # Documentation: https://the-odds-api.com/liveapi/guides/v4/
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 
@@ -150,7 +150,7 @@ RETRY_BASE_DELAY_SECONDS = 1.0  # Base delay: 1s, 2s, 4s (exponential backoff)
 # SECTION: Retry Helper
 # ============================================================
 
-def _fetch_with_retry(url, headers=None, params=None, timeout=None):
+def _request_with_retry(url, headers=None, params=None, timeout=None):
     """
     Perform an HTTP GET request with exponential backoff retry on failure.
 
@@ -249,38 +249,38 @@ def _now_str():
 
 # ============================================================
 # ============================================================
-# SECTION: Deprecated Legacy Fetchers (backward compatibility stubs)
+# SECTION: Deprecated Legacy Getters (backward compatibility stubs)
 # These functions are kept as no-ops to avoid ImportError in any
 # code that may still reference them directly.
 # ============================================================
 
-def fetch_prizepicks_props(league="NBA"):
-    """Deprecated: PrizePicks fetcher removed. Returns empty list."""
-    _logger.info("[PrizePicks] Fetcher removed — use fetch_all_platform_props() instead.")
+def get_prizepicks_props(league="NBA"):
+    """Deprecated: PrizePicks getter removed. Returns empty list."""
+    _logger.info("[PrizePicks] Getter removed — use get_all_sportsbook_props() instead.")
     return []
 
 
-def fetch_underdog_props(league="NBA"):
-    """Deprecated: Underdog fetcher removed. Returns empty list."""
-    _logger.info("[Underdog] Fetcher removed — use fetch_all_platform_props() instead.")
+def get_underdog_props(league="NBA"):
+    """Deprecated: Underdog getter removed. Returns empty list."""
+    _logger.info("[Underdog] Getter removed — use get_all_sportsbook_props() instead.")
     return []
 
 
-def fetch_draftkings_props(api_key=None):
-    """Deprecated: Use fetch_all_platform_props() which now calls odds_api_client."""
-    return fetch_all_platform_props(odds_api_key=api_key)
+def get_draftkings_props(api_key=None):
+    """Deprecated: Use get_all_sportsbook_props() which now calls odds_client."""
+    return get_all_sportsbook_props(odds_api_key=api_key)
 
 
 # ============================================================
-# END SECTION: Deprecated Legacy Fetchers
+# END SECTION: Deprecated Legacy Getters
 # ============================================================
 
 
 # ============================================================
-# SECTION: Master Fetch Function
+# SECTION: Master Get Function
 # ============================================================
 
-def fetch_all_platform_props(
+def get_all_sportsbook_props(
     include_prizepicks=True,
     include_underdog=True,
     include_draftkings=True,
@@ -288,14 +288,14 @@ def fetch_all_platform_props(
     progress_callback=None,
 ):
     """
-    Fetch live prop lines from all major sportsbooks via The Odds API.
+    Get live prop lines from all major sportsbooks via The Odds API.
 
-    Unified fetcher for
+    Unified getter that makes
     a single unified call to The Odds API, which returns props from all
     US bookmakers (DraftKings, FanDuel, BetMGM, Caesars, etc.) in one place.
 
     The legacy include_* parameters are kept for backward compatibility but
-    are no longer used to gate individual fetchers — all props now come
+    are no longer used to gate individual getters — all props now come
     from The Odds API.
 
     Args:
@@ -308,23 +308,23 @@ def fetch_all_platform_props(
             progress_callback(current, total, message) to update a UI progress bar.
 
     Returns:
-        list[dict]: All fetched props from all sportsbooks,
-                    each with a "fetched_at" timestamp.
+        list[dict]: All retrieved props from all sportsbooks,
+                    each with a "retrieved_at" timestamp.
 
     Example:
-        props = fetch_all_platform_props()
+        props = get_all_sportsbook_props()
         # → 100+ props from DraftKings, FanDuel, BetMGM, etc. combined
     """
-    from data.odds_api_client import fetch_player_props as _fetch_props
+    from data.odds_client import get_player_props as _get_props
 
     if progress_callback:
         progress_callback(0, 3, "Connecting to The Odds API...")
 
     try:
-        all_props = _fetch_props(api_key=odds_api_key)
-        _logger.info(f"[Master] The Odds API: {len(all_props)} props fetched.")
+        all_props = _get_props(api_key=odds_api_key)
+        _logger.info(f"[Master] The Odds API: {len(all_props)} props retrieved.")
     except Exception as err:
-        _logger.error(f"[Master] The Odds API fetch failed: {err}")
+        _logger.error(f"[Master] The Odds API request failed: {err}")
         all_props = []
 
     if progress_callback:
@@ -341,22 +341,22 @@ def fetch_all_platform_props(
 
 
 # ============================================================
-# END SECTION: Master Fetch Function
+# END SECTION: Master Retrieve Function
 # ============================================================
 
 
 # ============================================================
-# SECTION: Asynchronous Multi-Platform Fetcher (delegated)
+# SECTION: Asynchronous Multi-Platform Service (delegated)
 # ============================================================
 
-async def fetch_all_platforms_async(
+async def get_all_sportsbooks_async(
     include_prizepicks=True,
     include_underdog=True,
     include_draftkings=True,
     odds_api_key=None,
 ):
     """
-    Async wrapper — delegates to the synchronous fetch_all_platform_props().
+    Async wrapper — delegates to the synchronous get_all_sportsbook_props().
 
     The Odds API client uses the requests library (synchronous) which is
     sufficient for the current use case. This async stub is kept for
@@ -369,13 +369,13 @@ async def fetch_all_platforms_async(
         odds_api_key (str, optional): The Odds API key.
 
     Returns:
-        list[dict]: All fetched props.
+        list[dict]: All retrieved props.
     """
     import asyncio as _asyncio
     loop = _asyncio.get_event_loop()
     return await loop.run_in_executor(
         None,
-        lambda: fetch_all_platform_props(
+        lambda: get_all_sportsbook_props(
             include_prizepicks=include_prizepicks,
             include_underdog=include_underdog,
             include_draftkings=include_draftkings,
@@ -385,7 +385,7 @@ async def fetch_all_platforms_async(
 
 
 # ============================================================
-# END SECTION: Asynchronous Multi-Platform Fetcher
+# END SECTION: Asynchronous Multi-Platform Service
 # ============================================================
 
 # Backward-compat constant — kept so existing imports don't break
@@ -404,7 +404,7 @@ def build_cross_platform_comparison(all_props):
     from each platform side-by-side so you can compare them at a glance.
 
     Args:
-        all_props (list[dict]): All fetched props (from fetch_all_platform_props).
+        all_props (list[dict]): All retrieved props (from get_all_sportsbook_props).
 
     Returns:
         dict: Keyed by (player_name, stat_type) tuples.
@@ -552,12 +552,12 @@ def match_platform_player_to_csv(platform_name, players_data):
 
 def enrich_props_with_csv_names(props, players_data):
     """
-    Enrich fetched props by matching platform player names to CSV canonical names.
+    Enrich retrieved props by matching platform player names to CSV canonical names.
 
     Also fills in team abbreviation from the CSV if the platform didn't return one.
 
     Args:
-        props (list[dict]): Props from fetch_all_platform_props().
+        props (list[dict]): Props from get_all_sportsbook_props().
         players_data (list[dict]): Player list from load_players_data().
 
     Returns:
@@ -599,10 +599,10 @@ def find_new_players_from_props(props, players_data):
 
     Since betting platforms only list active players who are playing tonight,
     any player on a platform but NOT in our CSV is either new, traded, or
-    a player we haven't fetched yet. These are flagged for a data update.
+    a player we haven't retrieved yet. These are flagged for a data update.
 
     Args:
-        props (list[dict]): Props from fetch_all_platform_props().
+        props (list[dict]): Props from get_all_sportsbook_props().
         players_data (list[dict]): Player list from load_players_data().
 
     Returns:
@@ -648,7 +648,7 @@ def extract_active_players_from_props(props):
       3. On an NBA roster
 
     Args:
-        props (list[dict]): Props from fetch_all_platform_props().
+        props (list[dict]): Props from get_all_sportsbook_props().
 
     Returns:
         dict: Keyed by lower-cased player name.
@@ -841,10 +841,10 @@ def get_platform_confirmed_injuries(platform_players, players_data, todays_games
 
 def summarize_props_by_platform(props):
     """
-    Count how many props were fetched per platform.
+    Count how many props were retrieved per platform.
 
     Args:
-        props (list[dict]): All fetched props.
+        props (list[dict]): All retrieved props.
 
     Returns:
         dict: Platform name → count of props.
@@ -1029,7 +1029,7 @@ def smart_filter_props(
       5. Cap props per player at max_props_per_player (if set).
 
     Args:
-        all_props (list[dict]): Full prop list from fetch_all_platform_props().
+        all_props (list[dict]): Full prop list from get_all_sportsbook_props().
         players_data (list[dict], optional): Player records from load_players_data().
             Used to validate players exist in the database.
         todays_games (list[dict], optional): Tonight's game schedule.
@@ -1271,7 +1271,7 @@ def parse_alt_lines_from_platform_props(props):
     are evaluated.
 
     Args:
-        props (list[dict]): Props as returned by ``fetch_all_platform_props()``.
+        props (list[dict]): Props as returned by ``get_all_sportsbook_props()``.
             Multiple entries for the same (player, stat, platform) tuple
             indicate that alternate lines are available.
 
@@ -1393,4 +1393,5 @@ def parse_alt_lines_from_platform_props(props):
 # ============================================================
 # END SECTION: Alternate Line Categorization
 # ============================================================
+
 

@@ -1,7 +1,7 @@
 # ============================================================
-# FILE: data/live_tracker.py
+# FILE: data/live_game_tracker.py
 # PURPOSE: API Firewall & Fuzzy Entity Matcher for Live Sweat
-#          dashboard.  All live data fetching is wrapped in
+#          dashboard.  All live data retrieving is wrapped in
 #          @st.cache_data(ttl=120) to restrict API calls to
 #          once every 2 minutes.
 # ============================================================
@@ -27,13 +27,13 @@ except ImportError:
     _FUZZ_AVAILABLE = False
 
 # ============================================================
-# SECTION: API Firewall — Cached Live Box-Score Fetcher
+# SECTION: API Firewall — Cached Live Box-Score Service
 # ============================================================
 
 
-def _fetch_live_boxscores_impl() -> list[dict]:
+def _get_live_boxscores_impl() -> list[dict]:
     """
-    Fetch live NBA box scores from API-NBA API.
+    Retrieve live NBA box scores from API-NBA API.
 
     Returns a list of game dicts, each containing:
         game_id, home_team, away_team, home_score, away_score,
@@ -43,10 +43,10 @@ def _fetch_live_boxscores_impl() -> list[dict]:
         name, pts, reb, ast, stl, blk, tov, fg3m, minutes, fouls
     """
     try:
-        from data.clearsports_client import fetch_live_scores as _cs_live
+        from data.nba_api_client import get_live_scores as _cs_live
         raw_scores = _cs_live()
     except Exception as exc:
-        _logger.warning("live_tracker: API-NBA fetch failed: %s", exc)
+        _logger.warning("live_game_tracker: API-NBA retrieval failed: %s", exc)
         raw_scores = []
 
     games: list[dict] = []
@@ -126,9 +126,9 @@ def _fetch_live_boxscores_impl() -> list[dict]:
     return games
 
 
-def fetch_live_boxscores() -> list[dict]:
+def get_live_boxscores() -> list[dict]:
     """
-    API-firewalled live box-score fetcher.
+    API-firewalled live box-score service.
 
     When Streamlit is available the result is cached for 120 seconds
     via ``@st.cache_data``.  Outside of Streamlit (e.g. tests) it
@@ -136,12 +136,12 @@ def fetch_live_boxscores() -> list[dict]:
     """
     if _ST_AVAILABLE:
         # Build a cached wrapper on first call and reuse it.
-        if not hasattr(fetch_live_boxscores, "_cached"):
-            fetch_live_boxscores._cached = st.cache_data(
+        if not hasattr(get_live_boxscores, "_cached"):
+            get_live_boxscores._cached = st.cache_data(
                 ttl=120, show_spinner=False
-            )(_fetch_live_boxscores_impl)
-        return fetch_live_boxscores._cached()
-    return _fetch_live_boxscores_impl()
+            )(_get_live_boxscores_impl)
+        return get_live_boxscores._cached()
+    return _get_live_boxscores_impl()
 
 
 # ============================================================
@@ -274,10 +274,10 @@ def get_all_live_players(games: list[dict] | None = None) -> list[dict]:
     """
     Flatten all player dicts from the live box-score games list.
 
-    If *games* is not provided, calls :func:`fetch_live_boxscores`.
+    If *games* is not provided, calls :func:`get_live_boxscores`.
     """
     if games is None:
-        games = fetch_live_boxscores()
+        games = get_live_boxscores()
     players: list[dict] = []
     for g in games:
         players.extend(g.get("home_players", []))
@@ -291,9 +291,10 @@ def get_game_for_player(player_name: str,
     Return the game dict that contains *player_name* (fuzzy-matched).
     """
     if games is None:
-        games = fetch_live_boxscores()
+        games = get_live_boxscores()
     for g in games:
         all_players = g.get("home_players", []) + g.get("away_players", [])
         if match_live_player(player_name, all_players) is not None:
             return g
     return None
+

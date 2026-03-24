@@ -1,0 +1,691 @@
+"""
+tests/test_nba_api_endpoints.py
+------------------------------------
+Tests for API-Basketball client endpoint structure:
+  1. Base URL correctness (v1.basketball.api-sports.io)
+  2. Injury endpoint uses /injuries
+  3. 403 status code handling (credit exhaustion)
+  4. API key management endpoints (status)
+  5. NBA endpoints (teams, players, standings, games/statistics/teams, games/statistics/players)
+  6. No apiKey leaking into query params for new functions
+"""
+
+import pathlib
+import sys
+import os
+import unittest
+from unittest.mock import MagicMock, patch
+
+# Add repo root to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Pre-mock streamlit before importing application modules
+_mock_st = MagicMock()
+_mock_st.session_state = {}
+_mock_st.cache_data = lambda *a, **kw: (lambda f: f)
+_mock_st.secrets = {}
+sys.modules.setdefault("streamlit", _mock_st)
+sys.modules.setdefault("streamlit.components", MagicMock())
+sys.modules.setdefault("streamlit.components.v1", MagicMock())
+
+_CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "nba_api_client.py"
+
+
+# ── Section 1: Base URL correctness ──────────────────────────────────────────
+
+class TestBaseURL(unittest.TestCase):
+    """Verify the API-Basketball base URL uses v1.basketball.api-sports.io."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_base_url_has_api_sports_domain(self):
+        """_BASE_URL must use v1.basketball.api-sports.io."""
+        self.assertIn(
+            'https://v1.basketball.api-sports.io',
+            self.src,
+            "_BASE_URL must be https://v1.basketball.api-sports.io",
+        )
+
+    def test_base_url_not_old_domain(self):
+        """_BASE_URL must NOT use an old or deprecated domain."""
+        for line in self.src.splitlines():
+            if line.strip().startswith("_BASE_URL"):
+                self.assertNotIn(
+                    'clearsportsapi.com',
+                    line,
+                    "_BASE_URL must not use old or deprecated domain",
+                )
+
+
+# ── Section 2: Injury endpoint path ──────────────────────────────────────────
+
+class TestInjuryEndpointPath(unittest.TestCase):
+    """Verify get_injury_report uses /injuries (API-Basketball convention)."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_injury_endpoint_uses_injuries(self):
+        """get_injury_report must call /injuries."""
+        idx = self.src.find("def get_injury_report(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("/injuries", snippet,
+                       "get_injury_report must use /injuries endpoint")
+
+    def test_injury_endpoint_not_old_nba_injury_stats_path(self):
+        """get_injury_report must NOT use old /nba/injury-stats path."""
+        idx = self.src.find("def get_injury_report(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertNotIn("/nba/injury-stats", snippet,
+                         "get_injury_report must not use old /nba/injury-stats path")
+
+
+# ── Section 3: 403 status code handling ──────────────────────────────────────
+
+class TestApiNba403Handling(unittest.TestCase):
+    """Verify that _request_with_retry handles HTTP 403 (credit exhaustion)."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_403_status_code_handled(self):
+        """_request_with_retry should check for 403 status."""
+        self.assertIn("status_code == 403", self.src,
+                       "ApiNba must handle 403 status code")
+
+    def test_403_returns_none_without_retry(self):
+        """403 handler should return None (not continue to retry)."""
+        idx = self.src.find("status_code == 403")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 200]
+        self.assertIn("return None", snippet,
+                       "403 should return None immediately without retry")
+
+
+# ── Section 4: API Key Management endpoint functions exist ────────────────────
+
+class TestApiKeyManagementEndpoints(unittest.TestCase):
+    """Verify API key management endpoint functions exist and use correct paths."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_get_api_key_info_exists(self):
+        """get_api_key_info function must exist."""
+        self.assertIn("def get_api_key_info(", self.src)
+
+    def test_get_api_key_info_url(self):
+        """get_api_key_info must call /status (API-Sports status endpoint)."""
+        idx = self.src.find("def get_api_key_info(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/status", snippet)
+
+    def test_get_api_key_usage_exists(self):
+        """get_api_key_usage function must exist."""
+        self.assertIn("def get_api_key_usage(", self.src)
+
+    def test_get_api_key_usage_url(self):
+        """get_api_key_usage must call /status (API-Sports status endpoint)."""
+        idx = self.src.find("def get_api_key_usage(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("/status", snippet)
+
+    def test_get_api_key_usage_has_limit_param(self):
+        """get_api_key_usage must accept limit parameter."""
+        idx = self.src.find("def get_api_key_usage(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("limit", snippet)
+
+    def test_get_api_key_usage_has_offset_param(self):
+        """get_api_key_usage must accept offset parameter."""
+        idx = self.src.find("def get_api_key_usage(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("offset", snippet)
+
+    def test_get_api_key_stats_exists(self):
+        """get_api_key_stats function must exist."""
+        self.assertIn("def get_api_key_stats(", self.src)
+
+    def test_get_api_key_stats_url(self):
+        """get_api_key_stats must call /status (API-Sports status endpoint)."""
+        idx = self.src.find("def get_api_key_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn("/status", snippet)
+
+    def test_get_api_key_stats_has_date_params(self):
+        """get_api_key_stats must accept start_date and end_date parameters."""
+        idx = self.src.find("def get_api_key_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('start_date', snippet)
+        self.assertIn('end_date', snippet)
+
+    def test_api_key_functions_no_apikey_in_params(self):
+        """API key management functions must not put apiKey in query params."""
+        for func_name in ("get_api_key_info", "get_api_key_usage", "get_api_key_stats"):
+            idx = self.src.find(f"def {func_name}(")
+            self.assertGreater(idx, 0, f"{func_name} not found")
+            snippet = self.src[idx:idx + 800]
+            self.assertNotIn('"apiKey"', snippet,
+                             f"{func_name} must not include apiKey in params")
+
+
+# ── Section 5: New NBA endpoint functions ─────────────────────────────────────
+
+class TestCoreNBAEndpoints(unittest.TestCase):
+    """Verify core NBA resource endpoint functions exist and use correct paths."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    # -- get_teams --
+
+    def test_get_teams_exists(self):
+        """get_teams function must exist."""
+        self.assertIn("def get_teams(", self.src)
+
+    def test_get_teams_url(self):
+        """get_teams must call /teams."""
+        idx = self.src.find("def get_teams(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/teams", snippet)
+
+    # -- get_games --
+
+    def test_get_games_exists(self):
+        """get_games function must exist."""
+        self.assertIn("def get_games(", self.src)
+
+    def test_get_games_url(self):
+        """get_games must call /games."""
+        idx = self.src.find("def get_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/games", snippet)
+
+    def test_get_games_has_params(self):
+        """get_games must accept season, date, and team parameters."""
+        idx = self.src.find("def get_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('"season"', snippet)
+        self.assertIn('"date"', snippet)
+        self.assertIn('"team"', snippet)
+
+    # -- get_players --
+
+    def test_get_players_exists(self):
+        """get_players function must exist."""
+        self.assertIn("def get_players(", self.src)
+
+    def test_get_players_url(self):
+        """get_players must call /players."""
+        idx = self.src.find("def get_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/players", snippet)
+
+    def test_get_players_has_team_param(self):
+        """get_players must pass team parameter."""
+        idx = self.src.find("def get_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn('"team"', snippet)
+
+    # -- get_injury_report team_id param --
+
+    def test_get_injury_report_has_team_param(self):
+        """get_injury_report must pass team parameter."""
+        idx = self.src.find("def get_injury_report(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('"team"', snippet)
+
+    def test_core_nba_functions_no_apikey_in_params(self):
+        """Core NBA endpoint functions must not put apiKey in query params."""
+        for func_name in ("get_teams", "get_games", "get_players"):
+            idx = self.src.find(f"def {func_name}(")
+            self.assertGreater(idx, 0, f"{func_name} not found")
+            snippet = self.src[idx:idx + 800]
+            self.assertNotIn('"apiKey"', snippet,
+                             f"{func_name} must not include apiKey in params")
+
+
+class TestNewNBAEndpoints(unittest.TestCase):
+    """Verify new NBA endpoint functions exist and use correct paths."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    # -- get_team_by_id --
+
+    def test_get_team_by_id_exists(self):
+        """get_team_by_id function must exist."""
+        self.assertIn("def get_team_by_id(", self.src)
+
+    def test_get_team_by_id_url(self):
+        """get_team_by_id must call /teams."""
+        idx = self.src.find("def get_team_by_id(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/teams", snippet)
+
+    # -- get_game_odds --
+
+    def test_get_game_odds_exists(self):
+        """get_game_odds function must exist."""
+        self.assertIn("def get_game_odds(", self.src)
+
+    def test_get_game_odds_url(self):
+        """get_game_odds must call /odds."""
+        idx = self.src.find("def get_game_odds(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/odds", snippet)
+
+    def test_get_game_odds_has_game_param(self):
+        """get_game_odds must pass game parameter."""
+        idx = self.src.find("def get_game_odds(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn('"game"', snippet)
+
+    # -- get_nba_team_stats --
+
+    def test_get_nba_team_stats_exists(self):
+        """get_nba_team_stats function must exist."""
+        self.assertIn("def get_nba_team_stats(", self.src)
+
+    def test_get_nba_team_stats_url(self):
+        """get_nba_team_stats must call /games/statistics/teams."""
+        idx = self.src.find("def get_nba_team_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/games/statistics/teams", snippet)
+
+    def test_get_nba_team_stats_has_params(self):
+        """get_nba_team_stats must accept team and season parameters."""
+        idx = self.src.find("def get_nba_team_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        self.assertIn('"team"', snippet)
+        self.assertIn('"season"', snippet)
+
+    # -- get_nba_player_stats --
+
+    def test_get_nba_player_stats_exists(self):
+        """get_nba_player_stats function must exist."""
+        self.assertIn("def get_nba_player_stats(", self.src)
+
+    def test_get_nba_player_stats_url(self):
+        """get_nba_player_stats must call /games/statistics/players or /players/statistics."""
+        idx = self.src.find("def get_nba_player_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 800]
+        has_game_stats = "/games/statistics/players" in snippet
+        has_player_stats = "/players/statistics" in snippet
+        self.assertTrue(has_game_stats or has_player_stats,
+                        "get_nba_player_stats must use /games/statistics/players or /players/statistics")
+
+    def test_get_nba_player_stats_has_params(self):
+        """get_nba_player_stats must accept player and game parameters."""
+        idx = self.src.find("def get_nba_player_stats(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1200]
+        self.assertIn('"player"', snippet)
+        self.assertIn('"game"', snippet)
+
+    # -- get_predictions --
+
+    def test_get_predictions_exists(self):
+        """get_predictions function must exist."""
+        self.assertIn("def get_predictions(", self.src)
+
+    def test_get_predictions_url(self):
+        """get_predictions must call /predictions."""
+        idx = self.src.find("def get_predictions(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn("/predictions", snippet)
+
+    def test_get_predictions_has_game_param(self):
+        """get_predictions must pass game parameter."""
+        idx = self.src.find("def get_predictions(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 500]
+        self.assertIn('"game"', snippet)
+
+    def test_new_nba_functions_no_apikey_in_params(self):
+        """New NBA endpoint functions must not put apiKey in query params."""
+        for func_name in (
+            "get_team_by_id", "get_game_odds", "get_nba_team_stats",
+            "get_nba_player_stats", "get_predictions",
+        ):
+            idx = self.src.find(f"def {func_name}(")
+            self.assertGreater(idx, 0, f"{func_name} not found")
+            snippet = self.src[idx:idx + 800]
+            self.assertNotIn('"apiKey"', snippet,
+                             f"{func_name} must not include apiKey in params")
+
+
+# ── Section 6: Runtime tests — new functions with mocked API ──────────────────
+
+class TestFetchTeamsRuntime(unittest.TestCase):
+    """Runtime tests for get_teams."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_teams
+        mock_request.return_value = [
+            {"id": 1, "name": "Los Angeles Lakers", "abbreviation": "LAL"},
+            {"id": 2, "name": "Boston Celtics", "abbreviation": "BOS"},
+        ]
+        result = get_teams()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_teams
+        result = get_teams()
+        self.assertEqual(result, [])
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_handles_wrapped_response(self, mock_request, mock_key):
+        from data.nba_api_client import get_teams
+        mock_request.return_value = {"teams": [{"id": 1, "name": "Lakers"}]}
+        result = get_teams()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+
+class TestFetchGamesRuntime(unittest.TestCase):
+    """Runtime tests for get_games."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_games
+        mock_request.return_value = [{"game_id": "g1", "home_team": "LAL", "away_team": "BOS"}]
+        result = get_games(season=2024, date="2024-12-25", team_id=123)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_games
+        result = get_games()
+        self.assertEqual(result, [])
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_handles_wrapped_response(self, mock_request, mock_key):
+        from data.nba_api_client import get_games
+        mock_request.return_value = {"games": [{"game_id": "g1"}]}
+        result = get_games()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+
+class TestFetchPlayersRuntime(unittest.TestCase):
+    """Runtime tests for get_players."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_players
+        mock_request.return_value = [
+            {"id": 10, "name": "LeBron James", "team_id": 1},
+        ]
+        result = get_players(team_id=1)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_players
+        result = get_players()
+        self.assertEqual(result, [])
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_handles_wrapped_response(self, mock_request, mock_key):
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"players": [{"id": 10, "name": "LeBron James"}]}
+        result = get_players()
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+
+class TestApiKeyInfoRuntime(unittest.TestCase):
+    """Runtime tests for get_api_key_info."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_dict_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_info
+        # API-Sports /status response format
+        mock_request.return_value = {
+            "response": {
+                "account": {
+                    "firstname": "John",
+                    "lastname": "Doe",
+                    "email": "user@example.com",
+                },
+                "subscription": {
+                    "plan": "Free",
+                    "end": "2026-12-31",
+                },
+                "requests": {
+                    "current": 15,
+                    "limit_day": 100,
+                },
+            }
+        }
+        result = get_api_key_info()
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["credits_remaining"], 85)
+        self.assertEqual(result["credits_total"], 100)
+        self.assertTrue(result["is_active"])
+        self.assertEqual(result["email"], "user@example.com")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_info
+        result = get_api_key_info()
+        self.assertEqual(result, {})
+
+
+class TestApiKeyUsageRuntime(unittest.TestCase):
+    """Runtime tests for get_api_key_usage."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_usage
+        # API-Sports /status response format
+        mock_request.return_value = {
+            "response": {
+                "requests": {"current": 15, "limit_day": 100},
+            }
+        }
+        result = get_api_key_usage(limit=10, offset=0)
+        self.assertIsInstance(result, list)
+        self.assertGreaterEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_usage
+        result = get_api_key_usage()
+        self.assertEqual(result, [])
+
+
+class TestApiKeyStatsRuntime(unittest.TestCase):
+    """Runtime tests for get_api_key_stats."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_dict_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_stats
+        # API-Sports /status response format
+        mock_request.return_value = {
+            "response": {
+                "account": {"email": "user@example.com"},
+                "subscription": {"plan": "Free"},
+                "requests": {"current": 15, "limit_day": 100},
+            }
+        }
+        result = get_api_key_stats(
+            start_date="2025-12-01T00:00:00Z",
+            end_date="2025-12-25T23:59:59Z",
+        )
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["current"], 15)
+        self.assertEqual(result["limit_day"], 100)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_api_key_stats
+        result = get_api_key_stats()
+        self.assertEqual(result, {})
+
+
+class TestTeamByIdRuntime(unittest.TestCase):
+    """Runtime tests for get_team_by_id."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_dict_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_team_by_id
+        mock_request.return_value = {"id": 123, "name": "Los Angeles Lakers", "abbreviation": "LAL"}
+        result = get_team_by_id(123)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["abbreviation"], "LAL")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_dict_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_team_by_id
+        result = get_team_by_id(999)
+        self.assertEqual(result, {})
+
+
+class TestGameOddsRuntime(unittest.TestCase):
+    """Runtime tests for get_game_odds."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_game_odds
+        mock_request.return_value = [{"game_id": "g1", "spread": -3.5}]
+        result = get_game_odds(game_id="g1")
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_game_odds
+        result = get_game_odds()
+        self.assertEqual(result, [])
+
+
+class TestNbaTeamStatsRuntime(unittest.TestCase):
+    """Runtime tests for get_nba_team_stats."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_nba_team_stats
+        mock_request.return_value = [{"team_id": 1, "wins": 30, "losses": 15}]
+        result = get_nba_team_stats(team_id=1, season=2024)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_nba_team_stats
+        result = get_nba_team_stats()
+        self.assertEqual(result, [])
+
+
+class TestNbaPlayerStatsRuntime(unittest.TestCase):
+    """Runtime tests for get_nba_player_stats."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_nba_player_stats
+        mock_request.return_value = [{"player_id": 10, "pts": 28.5}]
+        result = get_nba_player_stats(player_id=10)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_nba_player_stats
+        result = get_nba_player_stats()
+        self.assertEqual(result, [])
+
+
+class TestPredictionsRuntime(unittest.TestCase):
+    """Runtime tests for get_predictions."""
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_returns_list_on_success(self, mock_request, mock_key):
+        from data.nba_api_client import get_predictions
+        mock_request.return_value = [{"game_id": "g1", "predicted_winner": "LAL", "confidence": 0.72}]
+        result = get_predictions(game_id="g1")
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["confidence"], 0.72)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry", return_value=None)
+    def test_returns_empty_list_on_failure(self, mock_request, mock_key):
+        from data.nba_api_client import get_predictions
+        result = get_predictions()
+        self.assertEqual(result, [])
+
+
+# ── Section 7: Authentication structure ───────────────────────────────────────
+
+class TestApiSportsAuthentication(unittest.TestCase):
+    """Verify x-apisports-key header is used for authentication."""
+
+    def setUp(self):
+        self.src = _CS_SRC.read_text(encoding="utf-8")
+
+    def test_apisports_key_in_headers(self):
+        """_request_with_retry must use x-apisports-key header."""
+        self.assertIn('"x-apisports-key"', self.src,
+                       "Must use x-apisports-key header for authentication")
+
+    def test_no_bearer_token(self):
+        """_request_with_retry must not use Bearer token (old auth)."""
+        self.assertNotIn('f"Bearer {api_key}"', self.src,
+                         "Must not use old Bearer token authentication")
+
+
+if __name__ == "__main__":
+    unittest.main()

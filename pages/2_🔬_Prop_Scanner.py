@@ -74,7 +74,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🔬 Prop Scanner")
-st.markdown("Enter prop lines manually, upload a CSV, or **fetch live lines** directly from the platforms!")
+st.markdown("Enter prop lines manually, upload a CSV, or **load live lines** directly from the platforms!")
 
 with st.expander("📖 How to Use This Page", expanded=False):
     st.markdown("""
@@ -88,12 +88,12 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Download the template, fill in your props, upload the file
     - Best for bulk entry or importing from your own research
     
-    **Option 3: Fetch Live Platform Lines**
-    - Go to the **📡 Live Games** page and click **📊 Fetch Live Props & Analyze**
-    - Fetches real live lines from all major sportsbooks via The Odds API
+    **Option 3: Get Live Platform Lines**
+    - Go to the **📡 Live Games** page and click **📊 Get Live Props & Analyze**
+    - Retrieves real live lines from all major sportsbooks via The Odds API
     
     💡 **Pro Tips:**
-    - Fetch live lines for the most accurate analysis
+    - Load live lines for the most accurate analysis
     - Use the filter/sort options to focus on specific players or stat types
     """)
 
@@ -134,10 +134,10 @@ valid_platforms = [
     "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
 ]
 
-# ── Import platform fetcher (optional — app works without it) ──
+# ── Import platform service (optional — app works without it) ──
 try:
-    from data.platform_fetcher import (
-        fetch_all_platform_props,
+    from data.sportsbook_service import (
+        get_all_sportsbook_props,
         build_cross_platform_comparison,
         recommend_best_platform,
         summarize_props_by_platform,
@@ -149,35 +149,35 @@ try:
         load_platform_props_from_session,
         save_platform_props_to_csv,
     )
-    _PLATFORM_FETCHER_AVAILABLE = True
+    _SPORTSBOOK_SERVICE_AVAILABLE = True
 except ImportError:
-    _PLATFORM_FETCHER_AVAILABLE = False
+    _SPORTSBOOK_SERVICE_AVAILABLE = False
 
 # ============================================================
 # END SECTION: Load Available Data
 # ============================================================
 
 # ============================================================
-# SECTION: Fetch Live Props
+# SECTION: Get Live Props
 # One-click button to pull live lines from all major sportsbooks
 # (via The Odds API) and populate the prop list.
 # ============================================================
 
-st.subheader("🔄 Fetch Live Props")
+st.subheader("🔄 Get Live Props")
 
-# ── Free tier: disable live platform fetch ────────────────────
+# ── Free tier: disable live platform loading ──────────────────
 if not _user_is_premium:
     st.markdown(
         '<div style="background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
         'border-radius:10px;padding:12px 16px;margin-bottom:8px;">'
         '<span style="color:#ff9d00;font-weight:600;">🔒 Premium Feature</span>'
-        f' — Live platform fetching (all major sportsbooks) requires a '
+        f' — Live platform loading (all major sportsbooks) requires a '
         f'<a href="{_PREM_PATH}" style="color:#ff5e00;font-weight:700;">Premium subscription</a>. '
         'You can still enter up to 5 props manually below.</div>',
         unsafe_allow_html=True,
     )
-elif _PLATFORM_FETCHER_AVAILABLE:
-    _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
+elif _SPORTSBOOK_SERVICE_AVAILABLE:
+    _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 
     # Show which platforms are enabled
@@ -186,15 +186,15 @@ elif _PLATFORM_FETCHER_AVAILABLE:
         _enabled_names.extend(valid_platforms)
 
     st.markdown(
-        f"Fetch tonight's live prop lines from: **{', '.join(_enabled_names) if _enabled_names else 'no platforms enabled'}**. "
+        f"Get tonight's live prop lines from: **{', '.join(_enabled_names) if _enabled_names else 'no platforms enabled'}**. "
         "Configure platforms on the [⚙️ Settings](/Settings) page."
     )
 
     _live_col1, _live_col2 = st.columns([2, 3])
 
     with _live_col1:
-        _do_fetch = st.button(
-            "🔄 Fetch Live Props",
+        _do_load = st.button(
+            "🔄 Get Live Props",
             type="primary",
             width="stretch",
             help="Pull tonight's live prop lines from all enabled platforms.",
@@ -206,54 +206,64 @@ elif _PLATFORM_FETCHER_AVAILABLE:
         _cached = load_platform_props_from_session(st.session_state)
         if _cached:
             _cached_summary = summarize_props_by_platform(_cached)
-            _fetched_at = _cached[0].get("fetched_at", "unknown time") if _cached else ""
+            _retrieved_at = _cached[0].get("retrieved_at", "unknown time") if _cached else ""
             st.info(
                 f"📦 **{len(_cached)} props cached** "
                 f"({', '.join(f'{p}: {c}' for p, c in _cached_summary.items())}) "
-                f"— fetched at {_fetched_at[:16] if _fetched_at else 'unknown'}"
+                f"— retrieved at {_retrieved_at[:16] if _retrieved_at else 'unknown'}"
             )
 
-    if _do_fetch:
-        _pb = st.progress(0, text="Starting platform fetch...")
+    if _do_load:
+        _pb = st.progress(0, text="Starting platform load...")
 
         def _scanner_progress(current, total, msg):
             pct = int((current / max(total, 1)) * 100)
             _pb.progress(pct, text=msg)
 
-        with st.spinner("Fetching live props..."):
-            _live_props = fetch_all_platform_props(
-                include_prizepicks=False,
-                include_underdog=False,
-                include_draftkings=_dk_on and bool(_dk_key),
-                odds_api_key=_dk_key or None,
-                progress_callback=_scanner_progress,
-            )
-
-        _pb.progress(100, text="Done!")
-
-        if _live_props:
-            save_platform_props_to_session(_live_props, st.session_state)
-            save_platform_props_to_csv(_live_props)
-            save_props_to_session(_live_props, st.session_state)
-            _lsummary = summarize_props_by_platform(_live_props)
-            st.success(
-                f"✅ Loaded **{len(_live_props)} live props**: "
-                + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
-            )
-            # Warn if any props reference players not in our database
-            _missing = find_new_players_from_props(_live_props, players_data)
-            if _missing:
-                st.warning(
-                    f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
-                    f"local database: {', '.join(_missing[:5])}"
-                    + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
-                    + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+        try:
+            with st.spinner("Loading live props..."):
+                _live_props = get_all_sportsbook_props(
+                    include_prizepicks=False,
+                    include_underdog=False,
+                    include_draftkings=_dk_on and bool(_dk_key),
+                    odds_api_key=_dk_key or None,
+                    progress_callback=_scanner_progress,
                 )
-            st.rerun()  # Refresh so the current_props table shows the new data
-        else:
-            st.warning(
-                "⚠️ No live props fetched. Check your internet connection."
-            )
+
+            _pb.progress(100, text="Done!")
+
+            if _live_props:
+                save_platform_props_to_session(_live_props, st.session_state)
+                save_platform_props_to_csv(_live_props)
+                save_props_to_session(_live_props, st.session_state)
+                _lsummary = summarize_props_by_platform(_live_props)
+                st.success(
+                    f"✅ Loaded **{len(_live_props)} live props**: "
+                    + ", ".join(f"**{p}** ({c})" for p, c in _lsummary.items())
+                )
+                # Warn if any props reference players not in our database
+                _missing = find_new_players_from_props(_live_props, players_data)
+                if _missing:
+                    st.warning(
+                        f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
+                        f"local database: {', '.join(_missing[:5])}"
+                        + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
+                        + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+                    )
+                st.rerun()  # Refresh so the current_props table shows the new data
+            else:
+                st.warning(
+                    "⚠️ No live props retrieved. Check your internet connection."
+                )
+        except Exception as _load_err:
+            _err_str = str(_load_err)
+            if "WebSocketClosedError" not in _err_str and "StreamClosedError" not in _err_str:
+                st.error(f"❌ Failed to load live props: {_load_err}")
+        finally:
+            try:
+                _pb.empty()
+            except Exception:
+                pass
 
     # ── Cross-Platform Comparison Table ───────────────────────────
     _platform_props = load_platform_props_from_session(st.session_state)
@@ -314,14 +324,14 @@ elif _PLATFORM_FETCHER_AVAILABLE:
 
 else:
     st.info(
-        "ℹ️ Live prop fetching requires the `requests` library. "
+        "ℹ️ Live prop loading requires the `requests` library. "
         "Run `pip install requests` to enable this feature."
     )
 
 st.divider()
 
 # ============================================================
-# END SECTION: Fetch Live Props
+# END SECTION: Get Live Props
 # ============================================================
 
 # ============================================================
@@ -625,7 +635,7 @@ if _display_props_enriched:
                 save_props_to_session(saved_props, st.session_state)
                 st.success(f"Loaded {len(saved_props)} props from props.csv!")
             else:
-                st.info("No props found. Go to **📡 Data Feed** to fetch live data first.")
+                st.info("No props found. Go to **📡 Data Feed** to load live data first.")
             st.rerun()
 
     # Roster validation table
@@ -681,7 +691,7 @@ st.divider()
 
 st.info(
     "💡 **To get prop lines:** Use the **📡 Live Games** page — click "
-    "**📊 Fetch Live Props & Analyze** or **⚡ One-Click Setup** to fetch "
+    "**📊 Get Live Props & Analyze** or **⚡ One-Click Setup** to load "
     "real live lines from all major sportsbooks."
 )
 
@@ -948,7 +958,7 @@ _qa_props = load_props_from_session(st.session_state)
 
 if not _qa_props:
     st.info(
-        "No props loaded yet. Fetch live props above, add them manually, "
+        "No props loaded yet. Load live props above, add them manually, "
         "or upload a CSV to populate this panel."
     )
 else:

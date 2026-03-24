@@ -3,7 +3,7 @@
 # PURPOSE: Tests for Phase 3 Persistence & Cache Integrity:
 #   3A — database.py _execute_write() retry helper + 6 write functions
 #   3C — game_log_cache.py stale .tmp cleanup on load
-#   3D — live_data_fetcher.py safe_avg NaN/None filtering
+#   3D — nba_data_service.py safe_avg NaN/None filtering
 # ============================================================
 import datetime
 import math
@@ -319,7 +319,7 @@ class TestGameLogCacheTmpCleanup(unittest.TestCase):
 
 
 # ============================================================
-# 3D: live_data_fetcher.py — safe_avg NaN/None filtering
+# 3D: nba_data_service.py — safe_avg NaN/None filtering
 # ============================================================
 
 class TestSafeAvgNanFiltering(unittest.TestCase):

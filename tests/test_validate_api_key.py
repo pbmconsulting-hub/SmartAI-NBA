@@ -1,7 +1,7 @@
 """
 tests/test_validate_api_key.py
 ------------------------------
-Tests for validate_api_key() in both ApiNba and Odds API clients.
+Tests for validate_nba_api_key() in both ApiNba and Odds API clients.
 """
 
 import sys
@@ -17,30 +17,30 @@ if _PROJECT_ROOT not in sys.path:
 
 # ── Source-level tests: function existence ────────────────────────────────────
 
-_CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "clearsports_client.py"
-_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+_CS_SRC = pathlib.Path(__file__).parent.parent / "data" / "nba_api_client.py"
+_OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
 
 
 class TestValidateApiKeyFunctionExists(unittest.TestCase):
-    """validate_api_key must be defined in both API clients."""
+    """validate_nba_api_key must be defined in both API clients."""
 
-    def test_clearsports_has_validate_api_key(self):
+    def test_nba_api_client_has_validate_api_key(self):
         src = _CS_SRC.read_text(encoding="utf-8")
-        self.assertIn("def validate_api_key(", src)
+        self.assertIn("def validate_nba_api_key(", src)
 
     def test_odds_api_has_validate_api_key(self):
         src = _OA_SRC.read_text(encoding="utf-8")
-        self.assertIn("def validate_api_key(", src)
+        self.assertIn("def validate_odds_api_key(", src)
 
 
-# ── ApiNba validate_api_key runtime tests ───────────────────────────────
+# ── ApiNba validate_nba_api_key runtime tests ───────────────────────────────
 
 class TestApiNbaValidateApiKey(unittest.TestCase):
-    """Runtime tests for clearsports_client.validate_api_key."""
+    """Runtime tests for nba_api_client.validate_nba_api_key."""
 
     def setUp(self):
-        from data.clearsports_client import validate_api_key
-        self.validate = validate_api_key
+        from data.nba_api_client import validate_nba_api_key
+        self.validate = validate_nba_api_key
 
     def test_valid_key_returns_true(self):
         ok, msg = self.validate("sk_test_AAAAAAAAAA-BBBBBBBB-fake-key-000")
@@ -75,14 +75,14 @@ class TestApiNbaValidateApiKey(unittest.TestCase):
         self.assertFalse(ok)
 
 
-# ── Odds API validate_api_key runtime tests ───────────────────────────────────
+# ── Odds API validate_nba_api_key runtime tests ───────────────────────────────────
 
 class TestOddsApiValidateApiKey(unittest.TestCase):
-    """Runtime tests for odds_api_client.validate_api_key."""
+    """Runtime tests for odds_client.validate_nba_api_key."""
 
     def setUp(self):
-        from data.odds_api_client import validate_api_key
-        self.validate = validate_api_key
+        from data.odds_client import validate_odds_api_key
+        self.validate = validate_odds_api_key
 
     def test_valid_key_returns_true(self):
         ok, msg = self.validate("00000000aaaa1111bbbb2222cccc3333")
@@ -137,16 +137,16 @@ class TestSettingsPageApiKeySection(unittest.TestCase):
         self.assertIn("Clear Keys", self.src)
 
     def test_imports_validate_api_key(self):
-        """Settings page must import validate_api_key for key format checking."""
-        self.assertIn("validate_api_key", self.src)
+        """Settings page must import validate_nba_api_key for key format checking."""
+        self.assertIn("validate_nba_api_key", self.src)
 
-    def test_calls_fetch_api_key_info(self):
-        """Test Connection must call fetch_api_key_info for API-NBA."""
-        self.assertIn("fetch_api_key_info", self.src)
+    def test_calls_get_api_key_info(self):
+        """Test Connection must call get_api_key_info for API-NBA."""
+        self.assertIn("get_api_key_info", self.src)
 
-    def test_calls_fetch_sports(self):
-        """Test Connection must call fetch_sports for Odds API (free endpoint)."""
-        self.assertIn("fetch_sports", self.src)
+    def test_calls_get_sports(self):
+        """Test Connection must call get_sports for Odds API (free endpoint)."""
+        self.assertIn("get_sports", self.src)
 
     def test_uses_api_nba_key_session_state(self):
         """Settings page must use api_nba_key in session state."""

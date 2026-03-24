@@ -1,24 +1,24 @@
 """
-data/odds_api_client.py
+data/odds_client.py
 -----------------------
 Unified client for The Odds API (https://the-odds-api.com).
 
 Provides:
   Featured Markets:
-  - fetch_game_odds(api_key=None)   → list of game-level odds dicts
+  - get_game_odds(api_key=None)   → list of game-level odds dicts
                                       (h2h, spreads, totals for all live/upcoming games)
 
   Event-level:
-  - fetch_events(api_key=None)      → list of upcoming NBA event dicts
-  - fetch_event_odds(event_id, ...) → odds for any supported markets on a single event
+  - get_events(api_key=None)      → list of upcoming NBA event dicts
+  - get_event_odds(event_id, ...) → odds for any supported markets on a single event
 
   Player Props:
-  - fetch_player_props(api_key=None) → list of prop dicts matching the
-                                       platform_fetcher prop format exactly
+  - get_player_props(api_key=None) → list of prop dicts matching the
+                                       sportsbook_service prop format exactly
 
   Consensus / Scores:
   - get_consensus_odds(...)          → median consensus lines across bookmakers
-  - fetch_recent_scores(days_from)   → completed game scores (1-3 days back)
+  - get_recent_scores(days_from)   → completed game scores (1-3 days back)
 
   Usage / Utility:
   - get_odds_api_usage()             → latest quota snapshot from response headers
@@ -30,7 +30,7 @@ API key resolution (first match wins):
   3. st.secrets["ODDS_API_KEY"]  (via .streamlit/secrets.toml)
   4. ODDS_API_KEY environment variable
 
-Caching uses the same TTL-based pattern as platform_fetcher.py.
+Caching uses the same TTL-based pattern as sportsbook_service.py.
 Retry logic applies exponential backoff (1 s → 2 s → 4 s, capped at 10 s).
 All public functions degrade gracefully: they return empty lists on failure
 and log a warning rather than raising.
@@ -66,6 +66,12 @@ except ImportError:
 
 _BASE_URL = "https://api.the-odds-api.com/v4"
 _SPORT    = "basketball_nba"
+
+# ── API Endpoints ─────────────────────────────────────────────────────────────
+ENDPOINT_SPORTS = "/sports"
+ENDPOINT_EVENTS = f"/sports/{_SPORT}/events"
+ENDPOINT_ODDS = f"/sports/{_SPORT}/odds"
+ENDPOINT_SCORES = f"/sports/{_SPORT}/scores"
 
 MAX_API_RETRIES          = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
@@ -120,7 +126,7 @@ _ODDS_API_STAT_MAP: dict[str, str] = {
 # Player prop markets to request from the Odds API
 _PROP_MARKETS: list[str] = list(_ODDS_API_STAT_MAP.keys())
 
-# ── Time-based response cache (mirrors platform_fetcher._API_CACHE) ───────────
+# ── Time-based response cache (mirrors sportsbook_service._API_CACHE) ───────────
 
 _API_CACHE: dict = {}
 _API_CACHE_TTL: int = int(os.environ.get("API_CACHE_TTL_SECONDS", "300"))
@@ -171,7 +177,7 @@ def _build_cache_key(url: str, params: dict | None = None) -> str:
 
 # ── API key resolution ────────────────────────────────────────────────────────
 
-def validate_api_key(key: str | None) -> tuple[bool, str]:
+def validate_odds_api_key(key: str | None) -> tuple[bool, str]:
     """Check whether *key* looks like a valid Odds API key.
 
     Returns:
@@ -211,7 +217,7 @@ def _resolve_api_key(explicit_key: str | None = None) -> str | None:
 
 # ── HTTP helper with retry / caching ─────────────────────────────────────────
 
-def _fetch_with_retry(url: str, params: dict | None = None) -> dict | list | None:
+def _request_with_retry(url: str, params: dict | None = None) -> dict | list | None:
     """
     GET *url* with exponential-backoff retry and response caching.
 
@@ -353,16 +359,16 @@ def _today_str() -> str:
     return datetime.date.today().isoformat()
 
 
-def _fetch_events(api_key: str) -> list[dict]:
+def _request_events(api_key: str) -> list[dict]:
     """Return all upcoming NBA events from the Odds API (internal)."""
-    url = f"{_BASE_URL}/sports/{_SPORT}/events"
+    url = f"{_BASE_URL}{ENDPOINT_EVENTS}"
     params = {
         "apiKey":     api_key,
         "dateFormat": "iso",
     }
-    raw = _fetch_with_retry(url, params=params)
+    raw = _request_with_retry(url, params=params)
     if not isinstance(raw, list):
-        _logger.debug("_fetch_events: no NBA events available (NBA may not be in season)")
+        _logger.debug("_request_events: no NBA events available (NBA may not be in season)")
         return []
     return raw
 
@@ -387,9 +393,9 @@ def _build_team_lookup(events: list[dict]) -> dict[str, str]:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def fetch_sports(api_key: str | None = None) -> list[dict] | None:
+def get_sports(api_key: str | None = None) -> list[dict] | None:
     """
-    Fetch all in-season sports from The Odds API.
+    Get all in-season sports from The Odds API.
 
     Endpoint: GET /v4/sports/?apiKey={apiKey}
 
@@ -407,37 +413,37 @@ def fetch_sports(api_key: str | None = None) -> list[dict] | None:
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_sports: no Odds API key found")
+        _logger.warning("get_sports: no Odds API key found")
         return None
 
-    url = f"{_BASE_URL}/sports"
+    url = f"{_BASE_URL}{ENDPOINT_SPORTS}"
     params = {
         "apiKey": resolved_key,
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if raw is None:
             # API call failed (401, 403, network error, etc.)
             return None
         if not isinstance(raw, list):
-            _logger.warning("fetch_sports: unexpected response shape")
+            _logger.warning("get_sports: unexpected response shape")
             return None
         return raw
 
     except Exception as exc:
-        _logger.warning("fetch_sports failed: %s", exc)
+        _logger.warning("get_sports failed: %s", exc)
         return None
 
 
-def fetch_events(api_key: str | None = None) -> list[dict]:
+def get_events(api_key: str | None = None) -> list[dict]:
     """
-    Fetch all live and upcoming NBA events from The Odds API.
+    Get all live and upcoming NBA events from The Odds API.
 
     Endpoint: GET /v4/sports/basketball_nba/events
 
     Each event includes an ``id`` that can be used with
-    :func:`fetch_event_odds` to query any supported market.
+    :func:`get_event_odds` to query any supported market.
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -450,12 +456,12 @@ def fetch_events(api_key: str | None = None) -> list[dict]:
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_events: no Odds API key found — returning []")
+        _logger.warning("get_events: no Odds API key found — returning []")
         return []
-    return _fetch_events(resolved_key)
+    return _request_events(resolved_key)
 
 
-def fetch_event_odds(
+def get_event_odds(
     event_id: str,
     markets: str = "h2h",
     regions: str = "us",
@@ -463,7 +469,7 @@ def fetch_event_odds(
     api_key: str | None = None,
 ) -> dict:
     """
-    Fetch odds for any supported markets on a single NBA event.
+    Get odds for any supported markets on a single NBA event.
 
     Endpoint: GET /v4/sports/basketball_nba/events/{eventId}/odds
 
@@ -474,7 +480,7 @@ def fetch_event_odds(
     Usage cost: ``[number of markets] × [number of regions]`` credits.
 
     Args:
-        event_id:    The unique event ID (from :func:`fetch_events`).
+        event_id:    The unique event ID (from :func:`get_events`).
         markets:     Comma-separated market keys, e.g.
                      ``"h2h,spreads,totals"`` or ``"player_points,player_rebounds"``.
         regions:     Bookmaker regions, e.g. ``"us"`` or ``"us,us2"``.
@@ -489,7 +495,7 @@ def fetch_event_odds(
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_event_odds: no Odds API key found — returning {}")
+        _logger.warning("get_event_odds: no Odds API key found — returning {}")
         return {}
 
     url = f"{_BASE_URL}/sports/{_SPORT}/events/{event_id}/odds"
@@ -502,19 +508,19 @@ def fetch_event_odds(
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not raw or not isinstance(raw, dict):
             return {}
         return raw
 
     except Exception as exc:
-        _logger.warning("fetch_event_odds failed for event %s: %s", event_id, exc)
+        _logger.warning("get_event_odds failed for event %s: %s", event_id, exc)
         return {}
 
 
-def fetch_game_odds(api_key: str | None = None) -> list[dict]:
+def get_game_odds(api_key: str | None = None) -> list[dict]:
     """
-    Fetch NBA game-level odds (moneyline, spread, totals) from The Odds API.
+    Get NBA game-level odds (moneyline, spread, totals) from The Odds API.
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -528,10 +534,10 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_game_odds: no Odds API key found — returning []")
+        _logger.warning("get_game_odds: no Odds API key found — returning []")
         return []
 
-    url = f"{_BASE_URL}/sports/{_SPORT}/odds"
+    url = f"{_BASE_URL}{ENDPOINT_ODDS}"
     params = {
         "apiKey":     resolved_key,
         "regions":    "us",
@@ -541,9 +547,9 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
     }
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.debug("fetch_game_odds: no NBA odds available (NBA may not be in season)")
+            _logger.debug("get_game_odds: no NBA odds available (NBA may not be in season)")
             return []
 
         games: list[dict] = []
@@ -588,18 +594,18 @@ def fetch_game_odds(api_key: str | None = None) -> list[dict]:
         return games
 
     except Exception as exc:
-        _logger.warning("fetch_game_odds failed: %s", exc)
+        _logger.warning("get_game_odds failed: %s", exc)
         return []
 
 
-def fetch_player_props(api_key: str | None = None) -> list[dict]:
+def get_player_props(api_key: str | None = None) -> list[dict]:
     """
-    Fetch NBA player prop lines from The Odds API and normalise them into
-    the same format used by platform_fetcher throughout the application.
+    Get NBA player prop lines from The Odds API and normalise them into
+    the same format used by sportsbook_service throughout the application.
 
-    Each returned dict has these keys (matching platform_fetcher output):
+    Each returned dict has these keys (matching sportsbook_service output):
         player_name, team, stat_type, line, platform,
-        game_date, fetched_at, over_odds, under_odds
+        game_date, retrieved_at, over_odds, under_odds
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -615,18 +621,18 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.warning("fetch_player_props: no Odds API key found — returning []")
+        _logger.warning("get_player_props: no Odds API key found — returning []")
         return []
 
     try:
-        events = _fetch_events(resolved_key)
+        events = _request_events(resolved_key)
         if not events:
-            _logger.debug("fetch_player_props: no NBA events returned from Odds API")
+            _logger.debug("get_player_props: no NBA events returned from Odds API")
             return []
 
         team_lookup = _build_team_lookup(events)
         markets_param = ",".join(_PROP_MARKETS)
-        fetched_at = datetime.datetime.utcnow().isoformat()
+        retrieved_at = datetime.datetime.utcnow().isoformat()
         game_date  = _today_str()
 
         all_props: list[dict] = []
@@ -648,7 +654,7 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
             }
 
             try:
-                ev_data = _fetch_with_retry(url, params=params)
+                ev_data = _request_with_retry(url, params=params)
                 if not ev_data or not isinstance(ev_data, dict):
                     continue
 
@@ -717,27 +723,27 @@ def fetch_player_props(api_key: str | None = None) -> list[dict]:
                                 "line":        line if line is not None else 0.0,
                                 "platform":    platform_name,
                                 "game_date":   game_date,
-                                "fetched_at":  fetched_at,
+                                "retrieved_at":  retrieved_at,
                                 "over_odds":   over_odds,
                                 "under_odds":  under_odds,
                             })
 
             except Exception as ev_exc:
                 _logger.warning(
-                    "fetch_player_props: error processing event %s: %s", event_id, ev_exc
+                    "get_player_props: error processing event %s: %s", event_id, ev_exc
                 )
 
             # Respect Odds API rate limits between per-event calls
             time.sleep(_INTER_REQUEST_DELAY_SECONDS)
 
         _logger.info(
-            "fetch_player_props: collected %d props across %d events",
+            "get_player_props: collected %d props across %d events",
             len(all_props), len(events),
         )
         return all_props
 
     except Exception as exc:
-        _logger.warning("fetch_player_props failed: %s", exc)
+        _logger.warning("get_player_props failed: %s", exc)
         return []
 
 
@@ -765,9 +771,9 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
     *and* by each team abbreviation for easy lookup.
 
     Args:
-        games_odds: Output of fetch_game_odds(). If None, calls
-                    fetch_game_odds() internally.
-        api_key:    Passed through to fetch_game_odds() if called internally.
+        games_odds: Output of get_game_odds(). If None, calls
+                    get_game_odds() internally.
+        api_key:    Passed through to get_game_odds() if called internally.
 
     Returns:
         dict: Keyed by ``"HOME_TEAM"`` or ``"AWAY_TEAM"`` abbreviation
@@ -786,7 +792,7 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
             }
     """
     if games_odds is None:
-        games_odds = fetch_game_odds(api_key=api_key)
+        games_odds = get_game_odds(api_key=api_key)
 
     if not games_odds:
         return {}
@@ -864,10 +870,10 @@ def get_consensus_odds(games_odds: list[dict] | None = None,
 
 # ── Historical scores ─────────────────────────────────────────────────────────
 
-def fetch_recent_scores(days_from: int = 1,
+def get_recent_scores(days_from: int = 1,
                         api_key: str | None = None) -> list[dict]:
     """
-    Fetch recently completed NBA game scores from The Odds API.
+    Get recently completed NBA game scores from The Odds API.
 
     The Odds API ``/scores`` endpoint returns the results of games that
     finished within the last *days_from* calendar days (1–3 days max on
@@ -878,7 +884,7 @@ def fetch_recent_scores(days_from: int = 1,
     * Cross-reference injury / rest-day impact on final scores
 
     Args:
-        days_from: How many days back to fetch (1 = yesterday, 2 = 2 days
+        days_from: How many days back to retrieve (1 = yesterday, 2 = 2 days
                    ago, up to 3 on the free tier).
         api_key:   Optional explicit key; falls back to session state / env.
 
@@ -897,18 +903,18 @@ def fetch_recent_scores(days_from: int = 1,
     """
     resolved_key = _resolve_api_key(api_key)
     if not resolved_key:
-        _logger.debug("fetch_recent_scores: no Odds API key — returning []")
+        _logger.debug("get_recent_scores: no Odds API key — returning []")
         return []
 
     days_from = max(1, min(int(days_from), 3))  # clamp to free-tier range
-    url = f"{_BASE_URL}/sports/{_SPORT}/scores"
+    url = f"{_BASE_URL}{ENDPOINT_SCORES}"
     params = {
         "apiKey":    resolved_key,
         "daysFrom":  days_from,
         "dateFormat": "iso",
     }
     # Use _build_cache_key so the outer cache key matches the one
-    # _fetch_with_retry uses internally — avoids duplicate cache entries.
+    # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
 
     cached = _cache_get(cache_key)
@@ -916,9 +922,9 @@ def fetch_recent_scores(days_from: int = 1,
         return cached
 
     try:
-        raw = _fetch_with_retry(url, params=params)
+        raw = _request_with_retry(url, params=params)
         if not isinstance(raw, list):
-            _logger.debug("fetch_recent_scores: no scores available (NBA may not be in season)")
+            _logger.debug("get_recent_scores: no scores available (NBA may not be in season)")
             return []
 
         scores: list[dict] = []
@@ -958,11 +964,11 @@ def fetch_recent_scores(days_from: int = 1,
 
         # Cache for 5 minutes (scores don't change once posted)
         _cache_set(cache_key, scores)
-        _logger.info("fetch_recent_scores: %d game(s) returned.", len(scores))
+        _logger.info("get_recent_scores: %d game(s) returned.", len(scores))
         return scores
 
     except Exception as exc:
-        _logger.warning("fetch_recent_scores failed: %s", exc)
+        _logger.warning("get_recent_scores failed: %s", exc)
         return []
 
 
@@ -975,3 +981,4 @@ def calculate_implied_probability(american_odds: float) -> float:
     Returns a float between 0.0 and 100.0.
     """
     return american_odds_to_implied_probability(american_odds) * 100
+

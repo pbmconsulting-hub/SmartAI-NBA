@@ -1,5 +1,5 @@
 """
-data/nba_stats_fallback.py
+data/nba_stats_backup.py
 --------------------------
 Free NBA stats fallback — supplements API-NBA when its
 team-stats, players, and player-stats endpoints are unavailable.
@@ -115,7 +115,7 @@ def _normalize_season(season) -> str:
         return s
 
 
-def _fetch_nba_stats(endpoint: str, params: dict) -> dict | None:
+def _request_nba_stats(endpoint: str, params: dict) -> dict | None:
     """
     GET an NBA stats endpoint and return the parsed JSON, or None on error.
 
@@ -157,11 +157,11 @@ def _rows_to_dicts(result_set: dict) -> list[dict]:
 
 # ── Public fallback functions ─────────────────────────────────────────────────
 
-def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
+def get_team_stats_backup(season: str | None = None) -> list[dict]:
     """
-    Fetch team stats from the free NBA.com stats endpoint.
+    Retrieve team stats from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as API-NBA ``fetch_team_stats()``:
+    Returns data in the same schema as API-NBA ``get_team_stats()``:
         team_abbreviation, team_name, pace, offensive_rating,
         defensive_rating, wins, losses
     """
@@ -171,7 +171,7 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
         return cached
 
     season = _normalize_season(season)
-    basic_data = _fetch_nba_stats("leaguedashteamstats", {
+    basic_data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -179,7 +179,7 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
         "LeagueID": "00",
     })
     # LeagueDashTeamStats with MeasureType=Advanced gives pace/ratings
-    adv_data = _fetch_nba_stats("leaguedashteamstats", {
+    adv_data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Advanced",
@@ -188,13 +188,13 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
     })
 
     if not basic_data:
-        _logger.warning("fetch_team_stats_fallback: no data from NBA stats")
+        _logger.warning("get_team_stats_backup: no data from NBA stats")
         return []
 
     try:
         basic_rows = _rows_to_dicts(basic_data["resultSets"][0])
     except (KeyError, IndexError, TypeError):
-        _logger.warning("fetch_team_stats_fallback: unexpected basic response shape")
+        _logger.warning("get_team_stats_backup: unexpected basic response shape")
         return []
 
     # Build advanced lookup by team_id
@@ -223,15 +223,15 @@ def fetch_team_stats_fallback(season: str | None = None) -> list[dict]:
         })
 
     _cache_set(cache_key, teams)
-    _logger.info("fetch_team_stats_fallback: got %d teams from NBA.com stats", len(teams))
+    _logger.info("get_team_stats_backup: got %d teams from NBA.com stats", len(teams))
     return teams
 
 
-def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict]:
+def get_players_backup(team_id=None, season: str | None = None) -> list[dict]:
     """
-    Fetch NBA players from the free NBA.com stats endpoint.
+    Retrieve NBA players from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as API-NBA ``fetch_players()``:
+    Returns data in the same schema as API-NBA ``get_players()``:
         id, name, team_id (optional filtering)
     """
     cache_key = f"fallback:players:{team_id}"
@@ -241,20 +241,20 @@ def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("commonallplayers", {
+    data = _request_nba_stats("commonallplayers", {
         "Season": season,
         "LeagueID": "00",
         "IsOnlyCurrentSeason": "1",
     })
 
     if not data:
-        _logger.warning("fetch_players_fallback: no data from NBA stats")
+        _logger.warning("get_players_backup: no data from NBA stats")
         return []
 
     try:
         rows = _rows_to_dicts(data["resultSets"][0])
     except (KeyError, IndexError, TypeError):
-        _logger.warning("fetch_players_fallback: unexpected response shape")
+        _logger.warning("get_players_backup: unexpected response shape")
         return []
 
     players: list[dict] = []
@@ -272,15 +272,15 @@ def fetch_players_fallback(team_id=None, season: str | None = None) -> list[dict
         })
 
     _cache_set(cache_key, players)
-    _logger.info("fetch_players_fallback: got %d players from NBA.com stats", len(players))
+    _logger.info("get_players_backup: got %d players from NBA.com stats", len(players))
     return players
 
 
-def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
+def get_player_stats_backup(season: str | None = None) -> list[dict]:
     """
-    Fetch player season averages from the free NBA.com stats endpoint.
+    Retrieve player season averages from the free NBA.com stats endpoint.
 
-    Returns data in the same schema as API-NBA ``fetch_player_stats()``:
+    Returns data in the same schema as API-NBA ``get_player_stats()``:
         player_id, name, team, position,
         minutes_avg, points_avg, rebounds_avg, assists_avg,
         threes_avg, steals_avg, blocks_avg, turnovers_avg,
@@ -295,7 +295,7 @@ def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashplayerstats", {
+    data = _request_nba_stats("leaguedashplayerstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -304,13 +304,13 @@ def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
     })
 
     if not data:
-        _logger.warning("fetch_player_stats_fallback: no data from NBA stats")
+        _logger.warning("get_player_stats_backup: no data from NBA stats")
         return []
 
     try:
         rows = _rows_to_dicts(data["resultSets"][0])
     except (KeyError, IndexError, TypeError):
-        _logger.warning("fetch_player_stats_fallback: unexpected response shape")
+        _logger.warning("get_player_stats_backup: unexpected response shape")
         return []
 
     players: list[dict] = []
@@ -342,19 +342,19 @@ def fetch_player_stats_fallback(season: str | None = None) -> list[dict]:
 
     _cache_set(cache_key, players)
     _logger.info(
-        "fetch_player_stats_fallback: got %d player stat rows from NBA.com stats",
+        "get_player_stats_backup: got %d player stat rows from NBA.com stats",
         len(players),
     )
     return players
 
 
-def fetch_nba_team_stats_fallback(
+def get_nba_team_stats_backup(
     team_id=None, season: str | None = None
 ) -> list[dict]:
     """
-    Fetch per-team statistics from the free NBA.com stats endpoint.
+    Retrieve per-team statistics from the free NBA.com stats endpoint.
 
-    Returns raw stat rows (same schema as API-NBA ``fetch_nba_team_stats()``).
+    Returns raw stat rows (same schema as API-NBA ``get_nba_team_stats()``).
     """
     cache_key = f"fallback:nba_team_stats:{team_id}:{season}"
     cached = _cache_get(cache_key)
@@ -363,7 +363,7 @@ def fetch_nba_team_stats_fallback(
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashteamstats", {
+    data = _request_nba_stats("leaguedashteamstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -372,13 +372,13 @@ def fetch_nba_team_stats_fallback(
     })
 
     if not data:
-        _logger.warning("fetch_nba_team_stats_fallback: no data from NBA stats")
+        _logger.warning("get_nba_team_stats_backup: no data from NBA stats")
         return []
 
     try:
         rows = _rows_to_dicts(data["resultSets"][0])
     except (KeyError, IndexError, TypeError):
-        _logger.warning("fetch_nba_team_stats_fallback: unexpected response shape")
+        _logger.warning("get_nba_team_stats_backup: unexpected response shape")
         return []
 
     if team_id is not None:
@@ -386,19 +386,19 @@ def fetch_nba_team_stats_fallback(
 
     _cache_set(cache_key, rows)
     _logger.info(
-        "fetch_nba_team_stats_fallback: got %d team stat rows from NBA.com stats",
+        "get_nba_team_stats_backup: got %d team stat rows from NBA.com stats",
         len(rows),
     )
     return rows
 
 
-def fetch_nba_player_stats_fallback(
+def get_nba_player_stats_backup(
     player_id=None, game_id=None, season: str | None = None
 ) -> list[dict]:
     """
-    Fetch per-player statistics from the free NBA.com stats endpoint.
+    Retrieve per-player statistics from the free NBA.com stats endpoint.
 
-    Returns raw stat rows (same schema as API-NBA ``fetch_nba_player_stats()``).
+    Returns raw stat rows (same schema as API-NBA ``get_nba_player_stats()``).
     """
     cache_key = f"fallback:nba_player_stats:{player_id}:{game_id}:{season}"
     cached = _cache_get(cache_key)
@@ -407,7 +407,7 @@ def fetch_nba_player_stats_fallback(
 
     season = _normalize_season(season)
 
-    data = _fetch_nba_stats("leaguedashplayerstats", {
+    data = _request_nba_stats("leaguedashplayerstats", {
         "Season": season,
         "SeasonType": "Regular Season",
         "MeasureType": "Base",
@@ -416,13 +416,13 @@ def fetch_nba_player_stats_fallback(
     })
 
     if not data:
-        _logger.warning("fetch_nba_player_stats_fallback: no data from NBA stats")
+        _logger.warning("get_nba_player_stats_backup: no data from NBA stats")
         return []
 
     try:
         rows = _rows_to_dicts(data["resultSets"][0])
     except (KeyError, IndexError, TypeError):
-        _logger.warning("fetch_nba_player_stats_fallback: unexpected response shape")
+        _logger.warning("get_nba_player_stats_backup: unexpected response shape")
         return []
 
     if player_id is not None:
@@ -430,7 +430,8 @@ def fetch_nba_player_stats_fallback(
 
     _cache_set(cache_key, rows)
     _logger.info(
-        "fetch_nba_player_stats_fallback: got %d player stat rows from NBA.com stats",
+        "get_nba_player_stats_backup: got %d player stat rows from NBA.com stats",
         len(rows),
     )
     return rows
+

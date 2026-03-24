@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: tests/test_neural_trading_cards.py
 # PURPOSE: Tests for the Trading-Card grid, Player Spotlight
-#          modal, data grouper, NBA context fetcher,
+#          modal, data grouper, player profile service,
 #          glassmorphic theme CSS, and Platinum Lock function.
 # ============================================================
 
@@ -15,14 +15,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 # ============================================================
-# Test: data/nba_context_fetcher.py
+# Test: data/player_profile_service.py
 # ============================================================
 
 class TestNbaContextFetcher(unittest.TestCase):
-    """Tests for data.nba_context_fetcher module."""
+    """Tests for data.player_profile_service module."""
 
     def setUp(self):
-        from data.nba_context_fetcher import (
+        from data.player_profile_service import (
             enrich_player_data,
             get_headshot_url,
             get_team_logo_url,
@@ -807,7 +807,7 @@ class TestTeamNormalizationLogic(unittest.TestCase):
     def setUp(self):
         """Replicate the normalization logic from the Neural Analysis page."""
         try:
-            from data.live_data_fetcher import TEAM_NAME_TO_ABBREVIATION
+            from data.nba_data_service import TEAM_NAME_TO_ABBREVIATION
         except ImportError:
             TEAM_NAME_TO_ABBREVIATION = {
                 "Los Angeles Lakers": "LAL",

@@ -77,7 +77,7 @@ except ImportError:
     _CACHE_AVAILABLE = False
 
 try:
-    from data.live_data_fetcher import refresh_historical_data_for_tonight as _refresh_hist
+    from data.nba_data_service import refresh_historical_data_for_tonight as _refresh_hist
     _HIST_REFRESH_AVAILABLE = True
 except ImportError:
     _HIST_REFRESH_AVAILABLE = False
@@ -117,14 +117,14 @@ with st.sidebar:
     # ── Historical data refresh ───────────────────────────────
     st.subheader("📡 Historical Data")
     st.caption(
-        "Auto-fetch game logs for tonight's players "
+        "Auto-load game logs for tonight's players "
         "and update CLV closing lines."
     )
     refresh_hist_btn = st.button(
         "🔄 Refresh Historical Data",
         use_container_width=True,
         disabled=not _HIST_REFRESH_AVAILABLE,
-        help="Fetches the last 30 games per player for all teams playing tonight.",
+        help="Retrieves the last 30 games per player for all teams playing tonight.",
     )
 
 # ── Info if backtester not available ─────────────────────────
@@ -134,11 +134,11 @@ if not _BACKTESTER_AVAILABLE:
 
 # ── Historical Data Refresh Handler ──────────────────────────
 if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
-    _prog = st.progress(0, text="Fetching historical game logs…")
+    _prog = st.progress(0, text="Loading historical game logs…")
     def _prog_cb(current, total, msg):
         _prog.progress(min(current / max(total, 1), 1.0), text=msg)
 
-    with st.spinner("Fetching historical game logs from API-NBA…"):
+    with st.spinner("Loading historical game logs from API-NBA…"):
         todays_games = st.session_state.get("todays_games", [])
         hist_result = _refresh_hist(games=todays_games, last_n_games=30, progress_callback=_prog_cb)
 
@@ -160,7 +160,7 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
         )
     else:
         st.info(
-            "ℹ️ No game logs fetched. This typically means the data feed is "
+            "ℹ️ No game logs retrieved. This typically means the data feed is "
             "temporarily unavailable, or players don't have IDs in the loaded data."
         )
 
@@ -262,16 +262,19 @@ if run_btn:
         st.error("Please select at least one stat type.")
         st.stop()
 
-    with st.spinner("Running backtest simulation…"):
-        result = run_backtest(
-            season=season,
-            stat_types=selected_stats,
-            min_edge=min_edge,
-            tier_filter=tier_filter_val,
-            game_logs_by_player=game_logs_by_player,
-        )
+    try:
+        with st.spinner("Running backtest simulation…"):
+            result = run_backtest(
+                season=season,
+                stat_types=selected_stats,
+                min_edge=min_edge,
+                tier_filter=tier_filter_val,
+                game_logs_by_player=game_logs_by_player,
+            )
 
-    st.session_state["backtest_result"] = result
+        st.session_state["backtest_result"] = result
+    except Exception as _bt_err:
+        st.error(f"❌ Backtest failed: {_bt_err}")
 
 # ── Display Results ───────────────────────────────────────────
 result = st.session_state.get("backtest_result")

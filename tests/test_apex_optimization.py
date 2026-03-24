@@ -31,8 +31,8 @@ class TestTrueLineExtraction(unittest.TestCase):
         _ensure_streamlit_mock()
 
     def test_prizepicks_uses_true_line_variable(self):
-        """odds_api_client.py should reference true_line or equivalent line extraction."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        """odds_client.py should reference true_line or equivalent line extraction."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertTrue(
             "point" in content or "line" in content,
@@ -41,35 +41,35 @@ class TestTrueLineExtraction(unittest.TestCase):
 
     def test_prizepicks_catches_keyerror(self):
         """Odds API client should have try/except for crash prevention."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("except", content,
                        "Odds API client should have exception handling")
 
     def test_underdog_uses_true_line_variable(self):
         """Odds API client should use 'line' field in prop dict."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn('"line"', content,
                        "Odds API client should include 'line' in prop dicts")
 
     def test_draftkings_uses_true_line_variable(self):
-        """fetch_player_props should populate 'line' in returned prop dicts."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        """get_player_props should populate 'line' in returned prop dicts."""
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("fetch_player_props", content,
-                       "odds_api_client should define fetch_player_props()")
+        self.assertIn("get_player_props", content,
+                       "odds_client should define get_player_props()")
 
     def test_none_line_discards_silently(self):
         """If line value is None/missing, the prop should be silently discarded."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("continue", content,
                        "Odds API client should skip props with missing lines")
 
     def test_stat_projection_fallback(self):
         """Odds API client should normalize stat types using a mapping dict."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_api_client.py"
+        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
         content = src.read_text(encoding="utf-8")
         self.assertTrue(
             "player_points" in content or "_ODDS_API_STAT_MAP" in content,
@@ -82,7 +82,7 @@ class TestTrueLineExtraction(unittest.TestCase):
 # ============================================================
 
 class TestAsyncBetResolver(unittest.TestCase):
-    """Verify bet resolver uses ThreadPoolExecutor for parallel fetching."""
+    """Verify bet resolver uses ThreadPoolExecutor for parallel retrieval."""
 
     def test_threadpoolexecutor_in_auto_resolve(self):
         """auto_resolve_bet_results should import ThreadPoolExecutor."""
@@ -103,14 +103,14 @@ class TestAsyncBetResolver(unittest.TestCase):
         src = pathlib.Path(__file__).parent.parent / "tracking" / "bet_tracker.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("_game_log_cache", content,
-                       "Resolver should maintain a _game_log_cache for parallel fetch results")
+                       "Resolver should maintain a _game_log_cache for parallel get results")
 
-    def test_parallel_fetch_helper_exists(self):
-        """A _fetch_player_log helper should exist for the ThreadPoolExecutor."""
+    def test_parallel_get_helper_exists(self):
+        """A _get_player_log helper should exist for the ThreadPoolExecutor."""
         src = pathlib.Path(__file__).parent.parent / "tracking" / "bet_tracker.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("def _fetch_player_log(", content,
-                       "_fetch_player_log helper should be defined for parallel fetching")
+        self.assertIn("def _get_player_log(", content,
+                       "_get_player_log helper should be defined for parallel retrieval")
 
     def test_max_workers_capped(self):
         """ThreadPoolExecutor max_workers should be capped at 8."""

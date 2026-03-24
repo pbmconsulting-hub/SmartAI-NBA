@@ -25,7 +25,7 @@ def group_props_by_player(
 
     Each player key maps to a dict containing:
     - ``vitals``: enriched player data from
-      :func:`data.nba_context_fetcher.enrich_player_data`
+      :func:`data.player_profile_service.enrich_player_data`
     - ``props``: list of every prop/analysis-result dict for that player
 
     Parameters
@@ -47,7 +47,7 @@ def group_props_by_player(
         return {}
 
     try:
-        from data.nba_context_fetcher import enrich_player_data
+        from data.player_profile_service import enrich_player_data
     except ImportError:
         def enrich_player_data(name, *_a, **_kw):
             return {

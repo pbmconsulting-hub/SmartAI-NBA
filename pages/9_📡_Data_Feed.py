@@ -1,10 +1,10 @@
 # ============================================================
 # FILE: pages/9_📡_Data_Feed.py
-# PURPOSE: Streamlit page that lets the user fetch live NBA data
+# PURPOSE: Streamlit page that lets the user retrieve live NBA data
 #          from the API-NBA API and The Odds API. Updates player
 #          stats, team stats, standings, and today's games with real,
 #          current data.
-# CONNECTS TO: data/live_data_fetcher.py, data/data_manager.py
+# CONNECTS TO: data/nba_data_service.py, data/data_manager.py
 # CONCEPTS COVERED: Progress bars, API calls, session state, error handling
 #
 # BEGINNER NOTE: This page is your "data refresh" control panel.
@@ -19,22 +19,22 @@ import streamlit as st
 import datetime  # For formatting timestamps
 import json      # For reading the last_updated.json file
 
-# Import our data loading function (to preview data after fetching)
+# Import our data loading function (to preview data after loading)
 from data.data_manager import (
     load_players_data,     # Load player stats from CSV
     load_teams_data,       # Load team stats from CSV
 )
 
-# Import our live data fetcher functions
+# Import our live data service functions
 # These functions call API-NBA API for roster/stats/injury data
 # and The Odds API for sportsbook lines.
-from data.live_data_fetcher import (
-    fetch_todays_games,          # Fetch tonight's NBA games
-    fetch_player_stats,          # Fetch all player season averages
-    fetch_team_stats,            # Fetch all team stats + defensive ratings
-    fetch_all_data,              # Fetch everything at once
-    fetch_todays_players_only,   # Targeted: only today's team rosters
-    fetch_all_todays_data,       # One-click: games + players + teams
+from data.nba_data_service import (
+    get_todays_games,          # Retrieve tonight's NBA games
+    get_player_stats,          # Retrieve all player season averages
+    get_team_stats,            # Retrieve all team stats + defensive ratings
+    get_all_data,              # Retrieve everything at once
+    get_todays_players,   # Targeted: only today's team rosters
+    get_all_todays_data,       # One-click: games + players + teams
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
@@ -76,9 +76,9 @@ with st.expander("📖 How to Use This Page", expanded=False):
     The Data Feed connects to **live NBA data sources** to keep your analysis accurate and current.
     
     **Recommended Daily Workflow**
-    1. **Smart Update**: Click this before each betting session — fetches stats for tonight's teams only
+    1. **Smart Update**: Click this before each betting session — retrieves stats for tonight's teams only
     2. **Full Update**: Run once a day or once a week to refresh all 450+ NBA player stats
-    3. **Fetch Props**: After updating stats, fetch live prop lines from sportsbooks
+    3. **Get Props**: After updating stats, load live prop lines from sportsbooks
     
     **Data Sources**
     - Real-time NBA player stats, team metrics, and game logs
@@ -95,12 +95,12 @@ st.divider()
 st.markdown(get_education_box_html(
     "📖 How Data Updates Work",
     """
-    <strong>Smart Update (Recommended)</strong>: Only fetches players on tonight's teams. 
+    <strong>Smart Update (Recommended)</strong>: Only retrieves players on tonight's teams. 
     Fast and efficient — use this before each session.<br><br>
-    <strong>Full Update</strong>: Fetches all NBA player season stats. 
+    <strong>Full Update</strong>: Retrieves all NBA player season stats. 
     Use this once a day or week to keep averages current.<br><br>
     <strong>Live data</strong>: Real current season stats,
-    saved to players.csv and teams.csv. Fetch before each session for accurate predictions.<br><br>
+    saved to players.csv and teams.csv. Load before each session for accurate predictions.<br><br>
     <strong>Prop lines</strong>: Covers DraftKings, 
     FanDuel, BetMGM, Caesars, and 15+ other US sportsbooks in one call.
     """
@@ -198,7 +198,7 @@ for _ci, (_label, _ts, _warn_h, _desc) in enumerate(_data_sources):
 
 # ── Staleness warning ──────────────────────────────────────────
 try:
-    from data.live_data_fetcher import get_teams_staleness_warning
+    from data.nba_data_service import get_teams_staleness_warning
     _stale_warning = get_teams_staleness_warning()
     if _stale_warning:
         st.warning(f"⏰ {_stale_warning}")
@@ -224,7 +224,7 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#0f3460,#533483); border:2px solid #e94560; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.1rem; font-weight:700; color:#ffffff;">🏀 One-Click Full Setup (Best Choice)</div>
   <div style="color:rgba(255,255,255,0.8); font-size:0.9rem; margin-top:4px;">
-    Fetches tonight's games → current rosters for those teams → player stats → team stats.
+    Retrieves tonight's games → current rosters for those teams → player stats → team stats.
     <strong>Everything in one click.</strong> Same as clicking Auto-Load on the Today's Games page.
   </div>
 </div>
@@ -243,7 +243,7 @@ with one_click_col1:
 with one_click_col2:
     st.caption(
         "Best for first-time setup each day. "
-        "Fetches games first, then only the players on tonight's teams (~1-3 min total)."
+        "Retrieves games first, then only the players on tonight's teams (~1-3 min total)."
     )
 
 st.markdown("---")
@@ -253,7 +253,7 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#1a1a2e,#16213e); border:1px solid #0f3460; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">⚡ Smart Update — Today's Teams Only</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches team rosters using <code>CommonTeamRoster</code> (current, post-trade) 
+    Retrieves team rosters using <code>CommonTeamRoster</code> (current, post-trade) 
     then game logs for only those players. Requires games to already be loaded.
     Takes <strong>1–2 minutes</strong> instead of 10–15.
   </div>
@@ -265,7 +265,7 @@ with smart_col1:
     if st.button(
         "⚡ Smart Update (Today's Teams Only)",
         width="stretch",
-        help="Fastest: fetches only players on teams playing tonight using current rosters",
+        help="Fastest: retrieves only players on teams playing tonight using current rosters",
     ):
         st.session_state["update_action"] = "smart"
 
@@ -291,7 +291,7 @@ if "update_action" not in st.session_state:
 
 with btn_col1:
     if st.button(
-        "🏟️ Fetch Tonight's Games",
+        "🏟️ Get Tonight's Games",
         width="stretch",
         help="Pull tonight's real NBA matchups automatically",
     ):
@@ -328,7 +328,7 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#1a0a2e,#0f1a2e); border:1px solid #c800ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">🏥 Real-Time Injury Report</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches live injury designations 
+    Retrieves live injury designations 
     with NBA CDN feed as fallback —
     real-time GTD/Out/Doubtful status, specific injury details, and expected return dates.
   </div>
@@ -341,17 +341,17 @@ with injury_btn_col1:
     if st.button(
         "🔄 Refresh Injury Report",
         width="stretch",
-        help="Fetch live GTD/Out/injury data with NBA CDN as fallback",
+        help="Load live GTD/Out/injury data with NBA CDN as fallback",
         disabled=_injury_btn_disabled,
     ):
         st.session_state["update_action"] = "injury_report"
 
 with injury_btn_col2:
     if _roster_engine_available:
-        # Show last-fetched timestamp if available
+        # Show last-retrieved timestamp if available
         _last_scraped = st.session_state.get("injury_report_last_scraped")
         if _last_scraped:
-            st.caption(f"Last fetched: {_last_scraped}")
+            st.caption(f"Last retrieved: {_last_scraped}")
         else:
             st.caption("Click to pull real-time injury designations.")
     else:
@@ -367,7 +367,7 @@ st.markdown("""
 <div style="background:linear-gradient(135deg,#0a1628,#0f2040); border:1px solid #00c9ff; border-radius:10px; padding:16px 20px; margin-bottom:16px;">
   <div style="font-size:1.05rem; font-weight:700; color:#e2e8f0;">📊 NBA Standings & Player News</div>
   <div style="color:#a0aec0; font-size:0.9rem; margin-top:4px;">
-    Fetches current NBA standings and recent player/team news —
+    Retrieves current NBA standings and recent player/team news —
     conference ranks, W-L records,
     streaks, injury news, and trade updates.
   </div>
@@ -379,17 +379,17 @@ with sn_col1:
     if st.button(
         "📊 Refresh Standings & News",
         use_container_width=True,
-        help="Fetch NBA standings and recent news",
+        help="Load NBA standings and recent news",
     ):
         st.session_state["update_action"] = "standings_news"
 
 with sn_col2:
-    _last_sn = st.session_state.get("standings_news_last_fetched")
+    _last_sn = st.session_state.get("standings_news_last_loaded")
     if _last_sn:
-        st.caption(f"Last fetched: {_last_sn}")
+        st.caption(f"Last retrieved: {_last_sn}")
     else:
         st.caption(
-            "Fetches conference standings (rank, W-L, home/away splits, last-10, streak) "
+            "Retrieves conference standings (rank, W-L, home/away splits, last-10, streak) "
             "and recent player/team news."
         )
 
@@ -400,7 +400,7 @@ with sn_col2:
 
 # ============================================================
 # SECTION: Execute the Selected Action
-# Based on which button was clicked, run the appropriate fetcher.
+# Based on which button was clicked, run the appropriate service.
 # ============================================================
 
 # Get the current action (set by button clicks above)
@@ -424,41 +424,51 @@ if current_action:
             progress_bar.progress(frac, text=message)
             status_text.caption(message)
 
-        with st.spinner("🏀 Fetching games + rosters + player stats + team stats..."):
-            result = fetch_all_todays_data(progress_callback=one_click_progress)
+        try:
+            with st.spinner("🏀 Loading games + rosters + player stats + team stats..."):
+                result = get_all_todays_data(progress_callback=one_click_progress)
 
-        st.session_state["update_action"] = None
-        progress_bar.empty()
-        status_text.empty()
+            st.session_state["update_action"] = None
 
-        games = result.get("games", [])
-        players_ok = result.get("players_updated", False)
-        teams_ok = result.get("teams_updated", False)
+            games = result.get("games", [])
+            players_ok = result.get("players_updated", False)
+            teams_ok = result.get("teams_updated", False)
 
-        if games:
-            st.session_state["todays_games"] = games
-            from data.data_manager import load_players_data
-            updated_players = load_players_data()
-            st.success(
-                f"✅ One-Click Setup complete! "
-                f"**{len(games)} game(s)** loaded | "
-                f"**{len(updated_players)} players** fetched | "
-                f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
-            )
+            if games:
+                st.session_state["todays_games"] = games
+                from data.data_manager import load_players_data
+                updated_players = load_players_data()
+                st.success(
+                    f"✅ One-Click Setup complete! "
+                    f"**{len(games)} game(s)** loaded | "
+                    f"**{len(updated_players)} players** retrieved | "
+                    f"Teams: {'✅' if teams_ok else '⚠️ failed'}"
+                )
 
-            # Show bonus data enrichment status (standings, news, historical data)
-            _bonus_parts = []
-            if result.get("standings"):
-                _bonus_parts.append(f"📊 Standings loaded ({len(result['standings'])} teams)")
-            if result.get("news"):
-                _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
-            if _bonus_parts:
-                st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
-        else:
-            st.warning(
-                "⚠️ Could not fetch tonight's games (no games tonight, or data unavailable). "
-                "Try again or load games manually on the 🏀 Today's Games page."
-            )
+                # Show bonus data enrichment status (standings, news, historical data)
+                _bonus_parts = []
+                if result.get("standings"):
+                    _bonus_parts.append(f"📊 Standings loaded ({len(result['standings'])} teams)")
+                if result.get("news"):
+                    _bonus_parts.append(f"📰 News loaded ({len(result['news'])} items)")
+                if _bonus_parts:
+                    st.caption("**Bonus data auto-enriched:** " + " · ".join(_bonus_parts))
+            else:
+                st.warning(
+                    "⚠️ Could not retrieve tonight's games (no games tonight, or data unavailable). "
+                    "Try again or load games manually on the 🏀 Today's Games page."
+                )
+        except Exception as _oc_err:
+            st.session_state["update_action"] = None
+            _oc_err_str = str(_oc_err)
+            if "WebSocketClosedError" not in _oc_err_str and "StreamClosedError" not in _oc_err_str:
+                st.error(f"❌ One-Click Setup failed: {_oc_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Smart Update (today's teams only)
@@ -475,13 +485,13 @@ if current_action:
             )
             st.session_state["update_action"] = None
         else:
-            # Show which teams we'll fetch
+            # Show which teams we'll retrieve
             teams_set = set()
             for g in todays_games_for_smart:
                 teams_set.add(g.get("home_team", ""))
                 teams_set.add(g.get("away_team", ""))
             teams_set.discard("")
-            st.info(f"Fetching current rosters for: **{', '.join(sorted(teams_set))}**")
+            st.info(f"Loading current rosters for: **{', '.join(sorted(teams_set))}**")
 
             progress_bar = st.progress(0, text="Starting smart update...")
             status_text = st.empty()
@@ -491,85 +501,92 @@ if current_action:
                 progress_bar.progress(frac, text=message)
                 status_text.caption(message)
 
-            with st.spinner("Fetching today's team rosters and player stats..."):
-                success = fetch_todays_players_only(
-                    todays_games_for_smart,
-                    progress_callback=smart_progress
-                )
+            try:
+                with st.spinner("Loading today's team rosters and player stats..."):
+                    success = get_todays_players(
+                        todays_games_for_smart,
+                        progress_callback=smart_progress
+                    )
 
-            st.session_state["update_action"] = None
-            progress_bar.empty()
-            status_text.empty()
+                st.session_state["update_action"] = None
 
-            if success:
-                from data.data_manager import load_players_data
-                updated_players = load_players_data()
-                st.success(
-                    f"✅ Smart Update complete! Loaded **{len(updated_players)} players** "
-                    f"from today's {len(todays_games_for_smart)} game(s). "
-                    f"Only current roster players — no traded players!"
-                )
-                st.caption(f"Teams fetched: {', '.join(sorted(teams_set))}")
-            else:
-                st.error(
-                    "❌ Smart Update failed. Check your internet connection or try again.\n"
-                    "You can still use the full 'Update Player Stats' button as a fallback."
-                )
+                if success:
+                    from data.data_manager import load_players_data
+                    updated_players = load_players_data()
+                    st.success(
+                        f"✅ Smart Update complete! Loaded **{len(updated_players)} players** "
+                        f"from today's {len(todays_games_for_smart)} game(s). "
+                        f"Only current roster players — no traded players!"
+                    )
+                    st.caption(f"Teams retrieved: {', '.join(sorted(teams_set))}")
+                else:
+                    st.error(
+                        "❌ Smart Update failed. Check your internet connection or try again.\n"
+                        "You can still use the full 'Update Player Stats' button as a fallback."
+                    )
+            except Exception as _smart_err:
+                st.session_state["update_action"] = None
+                _smart_err_str = str(_smart_err)
+                if "WebSocketClosedError" not in _smart_err_str and "StreamClosedError" not in _smart_err_str:
+                    st.error(f"❌ Smart Update failed: {_smart_err}")
+            finally:
+                try:
+                    progress_bar.empty()
+                    status_text.empty()
+                except Exception:
+                    pass
 
     # --------------------------------------------------------
-    # Action: Fetch Tonight's Games
+    # Action: Get Tonight's Games
     # --------------------------------------------------------
     elif current_action == "games":
-        st.subheader("🏟️ Fetching Tonight's Games...")
+        st.subheader("🏟️ Loading Tonight's Games...")
 
-        # Show a spinner while we fetch
-        # BEGINNER NOTE: st.spinner() shows a loading animation
-        # while the code inside the "with" block runs
-        with st.spinner("Fetching game data…"):
-            # Call the fetcher function
-            todays_games = fetch_todays_games()
+        try:
+            # Show a spinner while we load
+            with st.spinner("Loading game data…"):
+                todays_games = get_todays_games()
 
-        # Check if we got any games
-        if todays_games:
-            # Save the games to session state so other pages can use them
-            st.session_state["todays_games"] = todays_games
-            st.session_state["update_action"] = None  # Clear the action
+            # Check if we got any games
+            if todays_games:
+                st.session_state["todays_games"] = todays_games
+                st.session_state["update_action"] = None
 
-            # Show success message
-            st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
-            st.info(
-                "💡 Vegas lines and totals are fetched from consensus data. "
-                "You can also edit them on the **🏀 Today's Games** page."
-            )
+                st.success(f"✅ Found **{len(todays_games)} game(s)** for tonight!")
+                st.info(
+                    "💡 Vegas lines and totals are retrieved from consensus data. "
+                    "You can also edit them on the **🏀 Today's Games** page."
+                )
 
-            # Show the games in a table
-            st.markdown("**Tonight's Matchups:**")
+                st.markdown("**Tonight's Matchups:**")
 
-            # Build display data for the table
-            games_display = []
-            for game in todays_games:
-                games_display.append({
-                    "Away Team": game.get("away_team", ""),
-                    "Home Team": game.get("home_team", ""),
-                    "Game Date": game.get("game_date", ""),
-                    "Total (O/U)": game.get("consensus_total") or game.get("game_total", ""),
-                    "Spread": game.get("consensus_spread") or game.get("vegas_spread", ""),
-                })
+                games_display = []
+                for game in todays_games:
+                    games_display.append({
+                        "Away Team": game.get("away_team", ""),
+                        "Home Team": game.get("home_team", ""),
+                        "Game Date": game.get("game_date", ""),
+                        "Total (O/U)": game.get("consensus_total") or game.get("game_total", ""),
+                        "Spread": game.get("consensus_spread") or game.get("vegas_spread", ""),
+                    })
 
-            # Display as a clean table
-            st.dataframe(games_display, width="stretch", hide_index=True)
+                st.dataframe(games_display, width="stretch", hide_index=True)
 
-        else:
-            # No games found or data error
-            st.session_state["update_action"] = None  # Clear the action
+            else:
+                st.session_state["update_action"] = None
 
-            st.warning(
-                "⚠️ No games found for tonight, or there was a data error. "
-                "\n\nPossible reasons:\n"
-                "- No NBA games are scheduled today\n"
-                "- Check your internet connection\n\n"
-                "You can still enter games manually on the **🏀 Today's Games** page."
-            )
+                st.warning(
+                    "⚠️ No games found for tonight, or there was a data error. "
+                    "\n\nPossible reasons:\n"
+                    "- No NBA games are scheduled today\n"
+                    "- Check your internet connection\n\n"
+                    "You can still enter games manually on the **🏀 Today's Games** page."
+                )
+        except Exception as _games_err:
+            st.session_state["update_action"] = None
+            _games_err_str = str(_games_err)
+            if "WebSocketClosedError" not in _games_err_str and "StreamClosedError" not in _games_err_str:
+                st.error(f"❌ Failed to load games: {_games_err}")
 
     # --------------------------------------------------------
     # Action: Update Player Stats
@@ -578,70 +595,69 @@ if current_action:
         st.subheader("👤 Updating Player Stats...")
 
         st.info(
-            "⏳ **This takes a few minutes.** We fetch stats for every player "
+            "⏳ **This takes a few minutes.** We retrieve stats for every player "
             "and then download game logs to calculate standard deviations. "
             "Please be patient!"
         )
 
-        # Create a progress bar
-        # BEGINNER NOTE: st.progress() shows a loading bar (0.0 to 1.0)
-        # We update it as the fetch progresses
-        progress_bar = st.progress(0)     # Start at 0%
-        status_text = st.empty()           # Placeholder for status messages
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-        # Create a callback function to update the progress bar
-        # BEGINNER NOTE: A callback is a function you pass to another function
-        # so it can "call back" to update the UI
         def update_player_progress(current, total, message):
             """Update the progress bar and status text."""
-            # Calculate fraction (0.0 to 1.0)
-            fraction = min(current / max(total, 1), 1.0)  # Clamp to [0, 1]
-            progress_bar.progress(fraction)     # Update the bar
-            status_text.text(f"⏳ {message}")   # Update the text
+            fraction = min(current / max(total, 1), 1.0)
+            progress_bar.progress(fraction)
+            status_text.text(f"⏳ {message}")
 
-        # Run the player stats fetcher with our progress callback
-        success = fetch_player_stats(progress_callback=update_player_progress)
+        try:
+            success = get_player_stats(progress_callback=update_player_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        if success:
-            # Update complete!
-            progress_bar.progress(1.0)  # Fill the bar to 100%
-            status_text.text("✅ Done!")
+            if success:
+                progress_bar.progress(1.0)
+                status_text.text("✅ Done!")
 
-            st.success("✅ **Player stats updated successfully!**")
+                st.success("✅ **Player stats updated successfully!**")
 
-            # Show the updated data
-            st.markdown("**Updated Player Data (first 20 rows):**")
-            updated_players = load_players_data()  # Reload from the new CSV
+                st.markdown("**Updated Player Data (first 20 rows):**")
+                updated_players = load_players_data()
 
-            if updated_players:
-                # Convert to display format (only show key columns)
-                players_display = []
-                for player in updated_players[:20]:  # Show first 20
-                    players_display.append({
-                        "Name": player.get("name", ""),
-                        "Team": player.get("team", ""),
-                        "Pos": player.get("position", ""),
-                        "MIN": player.get("minutes_avg", ""),
-                        "PTS": player.get("points_avg", ""),
-                        "REB": player.get("rebounds_avg", ""),
-                        "AST": player.get("assists_avg", ""),
-                        "3PM": player.get("threes_avg", ""),
-                    })
+                if updated_players:
+                    players_display = []
+                    for player in updated_players[:20]:
+                        players_display.append({
+                            "Name": player.get("name", ""),
+                            "Team": player.get("team", ""),
+                            "Pos": player.get("position", ""),
+                            "MIN": player.get("minutes_avg", ""),
+                            "PTS": player.get("points_avg", ""),
+                            "REB": player.get("rebounds_avg", ""),
+                            "AST": player.get("assists_avg", ""),
+                            "3PM": player.get("threes_avg", ""),
+                        })
 
-                st.dataframe(players_display, width="stretch", hide_index=True)
-                st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
-        else:
-            # Fetch failed
-            st.error(
-                "❌ **Failed to update player stats.**\n\n"
-                "Possible reasons:\n"
-                "- No internet connection\n"
-                "- Try again in a few minutes\n\n"
-                "The app will continue to use the existing data until a successful update."
-            )
+                    st.dataframe(players_display, width="stretch", hide_index=True)
+                    st.caption(f"Showing 20 of {len(updated_players)} players. Full data saved to players.csv")
+            else:
+                st.error(
+                    "❌ **Failed to update player stats.**\n\n"
+                    "Possible reasons:\n"
+                    "- No internet connection\n"
+                    "- Try again in a few minutes\n\n"
+                    "The app will continue to use the existing data until a successful update."
+                )
+        except Exception as _player_err:
+            st.session_state["update_action"] = None
+            _player_err_str = str(_player_err)
+            if "WebSocketClosedError" not in _player_err_str and "StreamClosedError" not in _player_err_str:
+                st.error(f"❌ Player stats update failed: {_player_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Update Team Stats
@@ -649,54 +665,60 @@ if current_action:
     elif current_action == "teams":
         st.subheader("🏆 Updating Team Stats...")
 
-        # Create a progress bar for team stats
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Progress callback for teams
         def update_team_progress(current, total, message):
             """Update the progress bar for team stats."""
             fraction = min(current / max(total, 1), 1.0)
             progress_bar.progress(fraction)
             status_text.text(f"⏳ {message}")
 
-        # Run the team stats fetcher
-        with st.spinner("Fetching team data..."):
-            success = fetch_team_stats(progress_callback=update_team_progress)
+        try:
+            with st.spinner("Loading team data..."):
+                success = get_team_stats(progress_callback=update_team_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        if success:
-            progress_bar.progress(1.0)
-            status_text.text("✅ Done!")
+            if success:
+                progress_bar.progress(1.0)
+                status_text.text("✅ Done!")
 
-            st.success("✅ **Team stats updated successfully!**")
+                st.success("✅ **Team stats updated successfully!**")
 
-            # Show the updated team data
-            st.markdown("**Updated Team Data:**")
-            updated_teams = load_teams_data()  # Reload from the new CSV
+                st.markdown("**Updated Team Data:**")
+                updated_teams = load_teams_data()
 
-            if updated_teams:
-                # Build display format
-                teams_display = []
-                for team in updated_teams:
-                    teams_display.append({
-                        "Team": team.get("team_name", ""),
-                        "Abbrev": team.get("abbreviation", ""),
-                        "Conf": team.get("conference", ""),
-                        "Pace": team.get("pace", ""),
-                        "ORTG": team.get("ortg", ""),
-                        "DRTG": team.get("drtg", ""),
-                    })
+                if updated_teams:
+                    teams_display = []
+                    for team in updated_teams:
+                        teams_display.append({
+                            "Team": team.get("team_name", ""),
+                            "Abbrev": team.get("abbreviation", ""),
+                            "Conf": team.get("conference", ""),
+                            "Pace": team.get("pace", ""),
+                            "ORTG": team.get("ortg", ""),
+                            "DRTG": team.get("drtg", ""),
+                        })
 
-                st.dataframe(teams_display, width="stretch", hide_index=True)
-                st.caption(f"All {len(updated_teams)} teams saved to teams.csv and defensive_ratings.csv")
-        else:
-            st.error(
-                "❌ **Failed to update team stats.**\n\n"
-                "Check your internet connection and try again."
-            )
+                    st.dataframe(teams_display, width="stretch", hide_index=True)
+                    st.caption(f"All {len(updated_teams)} teams saved to teams.csv and defensive_ratings.csv")
+            else:
+                st.error(
+                    "❌ **Failed to update team stats.**\n\n"
+                    "Check your internet connection and try again."
+                )
+        except Exception as _team_err:
+            st.session_state["update_action"] = None
+            _team_err_str = str(_team_err)
+            if "WebSocketClosedError" not in _team_err_str and "StreamClosedError" not in _team_err_str:
+                st.error(f"❌ Team stats update failed: {_team_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Update Everything
@@ -705,81 +727,83 @@ if current_action:
         st.subheader("🔄 Updating All Data...")
 
         st.info(
-            "⏳ **This may take several minutes.** We're fetching player stats, "
+            "⏳ **This may take several minutes.** We're retrieving player stats, "
             "team stats, and game logs for standard deviation calculations. "
             "Please wait — don't close the tab!"
         )
 
-        # Progress bar for the full update
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Progress callback for full update
         def update_all_progress(current, total, message):
             """Update progress bar for full update."""
             fraction = min(current / max(total, 1), 1.0)
             progress_bar.progress(fraction)
             status_text.text(f"⏳ {message}")
 
-        # Run the full updater
-        results = fetch_all_data(progress_callback=update_all_progress)
+        try:
+            results = get_all_data(progress_callback=update_all_progress)
 
-        # Clear the action flag
-        st.session_state["update_action"] = None
+            st.session_state["update_action"] = None
 
-        # Show results
-        progress_bar.progress(1.0)
-        status_text.text("✅ Update complete!")
+            progress_bar.progress(1.0)
+            status_text.text("✅ Update complete!")
 
-        # Check which parts succeeded
-        players_ok = results.get("players", False)
-        teams_ok = results.get("teams", False)
+            players_ok = results.get("players", False)
+            teams_ok = results.get("teams", False)
 
-        if players_ok and teams_ok:
-            st.success("✅ **All data updated successfully!**")
-        elif players_ok or teams_ok:
-            st.warning(
-                "⚠️ **Partial update completed.**\n"
-                f"Players: {'✅ Success' if players_ok else '❌ Failed'}\n"
-                f"Teams: {'✅ Success' if teams_ok else '❌ Failed'}"
-            )
-        else:
-            st.error(
-                "❌ **Update failed for all data types.**\n\n"
-                "Check your internet connection and try again."
-            )
+            if players_ok and teams_ok:
+                st.success("✅ **All data updated successfully!**")
+            elif players_ok or teams_ok:
+                st.warning(
+                    "⚠️ **Partial update completed.**\n"
+                    f"Players: {'✅ Success' if players_ok else '❌ Failed'}\n"
+                    f"Teams: {'✅ Success' if teams_ok else '❌ Failed'}"
+                )
+            else:
+                st.error(
+                    "❌ **Update failed for all data types.**\n\n"
+                    "Check your internet connection and try again."
+                )
 
-        # Show summary even on partial success
-        if players_ok:
-            # Show updated player count
-            updated_players = load_players_data()
-            st.metric(
-                label="👤 Players Updated",
-                value=len(updated_players),
-                help="Players now in players.csv"
-            )
+            if players_ok:
+                updated_players = load_players_data()
+                st.metric(
+                    label="👤 Players Updated",
+                    value=len(updated_players),
+                    help="Players now in players.csv"
+                )
 
-        if teams_ok:
-            # Show updated team count
-            updated_teams = load_teams_data()
-            st.metric(
-                label="🏆 Teams Updated",
-                value=len(updated_teams),
-                help="Teams now in teams.csv"
-            )
+            if teams_ok:
+                updated_teams = load_teams_data()
+                st.metric(
+                    label="🏆 Teams Updated",
+                    value=len(updated_teams),
+                    help="Teams now in teams.csv"
+                )
 
-        # Also try to fetch tonight's games
-        st.markdown("---")
-        st.markdown("**Fetching tonight's games...**")
+            st.markdown("---")
+            st.markdown("**Loading tonight's games...**")
 
-        with st.spinner("Fetching tonight's games..."):
-            todays_games = fetch_todays_games()
+            with st.spinner("Loading tonight's games..."):
+                todays_games = get_todays_games()
 
-        if todays_games:
-            st.session_state["todays_games"] = todays_games
-            st.success(f"🏟️ Found **{len(todays_games)} game(s)** for tonight!")
-        else:
-            st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
+            if todays_games:
+                st.session_state["todays_games"] = todays_games
+                st.success(f"🏟️ Found **{len(todays_games)} game(s)** for tonight!")
+            else:
+                st.info("No games found for tonight (or no games scheduled). Enter games manually on the 🏀 Today's Games page.")
+        except Exception as _all_err:
+            st.session_state["update_action"] = None
+            _all_err_str = str(_all_err)
+            if "WebSocketClosedError" not in _all_err_str and "StreamClosedError" not in _all_err_str:
+                st.error(f"❌ Full update failed: {_all_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
 
     # --------------------------------------------------------
     # Action: Refresh Injury Report (API-NBA + NBA CDN fallback)
@@ -788,7 +812,7 @@ if current_action:
         st.subheader("🏥 Refreshing Injury Report…")
 
         st.info(
-            "Fetching real-time injury data "
+            "Loading real-time injury data "
             "with NBA CDN feed as fallback. "
             "This typically takes 5–15 seconds."
         )
@@ -796,7 +820,7 @@ if current_action:
         # Clear the action flag immediately so a page reload doesn't re-run it
         st.session_state["update_action"] = None
 
-        with st.spinner("Fetching injury data from API-NBA…"):
+        with st.spinner("Loading injury data from API-NBA…"):
             try:
                 from data.roster_engine import RosterEngine as _RE
                 _re = _RE()
@@ -804,7 +828,7 @@ if current_action:
                 scraped_data = _re.get_injury_report()
             except Exception as scrape_exc:
                 scraped_data = {}
-                st.error(f"❌ **Fetch failed:** {scrape_exc}")
+                st.error(f"❌ **Retrieval failed:** {scrape_exc}")
 
         if scraped_data:
             # Record the timestamp
@@ -922,26 +946,26 @@ if current_action:
 
         import datetime as _dt_sn
 
-        with st.spinner("Fetching NBA standings from API-NBA…"):
+        with st.spinner("Loading NBA standings from API-NBA…"):
             try:
-                from data.live_data_fetcher import fetch_standings as _fetch_standings_ldf
-                _standings_data = _fetch_standings_ldf()
+                from data.nba_data_service import get_standings as _get_standings_svc
+                _standings_data = _get_standings_svc()
                 st.session_state["league_standings"] = _standings_data
             except Exception as _sn_err:
                 _standings_data = []
-                st.warning(f"Standings fetch failed: {_sn_err}")
+                st.warning(f"Standings retrieval failed: {_sn_err}")
 
-        with st.spinner("Fetching recent NBA news from API-NBA…"):
+        with st.spinner("Loading recent NBA news from API-NBA…"):
             try:
-                from data.live_data_fetcher import fetch_player_news as _fetch_news_ldf
-                _news_data = _fetch_news_ldf(limit=30)
+                from data.nba_data_service import get_player_news as _get_news_svc
+                _news_data = _get_news_svc(limit=30)
                 st.session_state["player_news"] = _news_data
             except Exception as _news_err:
                 _news_data = []
-                st.warning(f"News fetch failed: {_news_err}")
+                st.warning(f"News retrieval failed: {_news_err}")
 
         _now_sn = _dt_sn.datetime.now().strftime("%Y-%m-%d %H:%M")
-        st.session_state["standings_news_last_fetched"] = _now_sn
+        st.session_state["standings_news_last_loaded"] = _now_sn
 
         if _standings_data:
             st.success(
@@ -959,7 +983,7 @@ if current_action:
 
 
 # ============================================================
-# SECTION: Fetch Platform Props
+# SECTION: Get Platform Props
 # Pull live prop lines from all major sportsbooks
 # (via The Odds API) without needing
 # the nba_api at all. Platforms only list players who are
@@ -968,7 +992,7 @@ if current_action:
 # ============================================================
 
 st.divider()
-st.subheader("📊 Fetch Platform Props")
+st.subheader("📊 Get Platform Props")
 
 st.markdown(
     "Pull **live prop lines** directly from the betting platforms. "
@@ -977,20 +1001,20 @@ st.markdown(
 )
 
 st.markdown(get_education_box_html(
-    "📖 How Platform Prop Fetching Works",
+    "📖 How Platform Prop Loading Works",
     """
-    <strong>Sportsbook Lines</strong>: Fetches tonight's NBA prop lines from all major 
+    <strong>Sportsbook Lines</strong>: Retrieves tonight's NBA prop lines from all major 
     sportsbooks (FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, 
     Hard Rock Bet, BetRivers) in one call.<br><br>
-    <strong>Cross-platform comparison</strong>: After fetching, the app shows all lines 
+    <strong>Cross-platform comparison</strong>: After loading, the app shows all lines 
     side-by-side so you can see which sportsbook has the best line for each pick.
     """
 ), unsafe_allow_html=True)
 
-# ── Import platform fetcher ────────────────────────────────────
+# ── Import platform service ────────────────────────────────────
 try:
-    from data.platform_fetcher import (
-        fetch_all_platform_props,
+    from data.sportsbook_service import (
+        get_all_sportsbook_props,
         summarize_props_by_platform,
         find_new_players_from_props,
         build_cross_platform_comparison,
@@ -1000,17 +1024,17 @@ try:
         load_platform_props_from_session,
         save_platform_props_to_csv,
     )
-    _PLATFORM_FETCHER_AVAILABLE = True
+    _SPORTSBOOK_SERVICE_AVAILABLE = True
 except ImportError as _pf_err:
-    _PLATFORM_FETCHER_AVAILABLE = False
-    st.warning(f"⚠️ Platform fetcher not available: {_pf_err}")
+    _SPORTSBOOK_SERVICE_AVAILABLE = False
+    st.warning(f"⚠️ Platform service not available: {_pf_err}")
 
-if _PLATFORM_FETCHER_AVAILABLE:
+if _SPORTSBOOK_SERVICE_AVAILABLE:
 
     # ── Read current settings ──────────────────────────────────
     _pp_on = False
     _ud_on = False
-    _dk_on = st.session_state.get("fetch_draftkings_enabled", True)
+    _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 
     # Show platform status badges
@@ -1028,116 +1052,126 @@ if _PLATFORM_FETCHER_AVAILABLE:
     )
     st.caption("Enable/disable platforms on the ⚙️ Settings page.")
 
-    # ── Check for already-fetched props in session ─────────────
+    # ── Check for already-loaded props in session ─────────────
     _cached_platform_props = load_platform_props_from_session(st.session_state)
     if _cached_platform_props:
         _cached_summary = summarize_props_by_platform(_cached_platform_props)
         _total_cached = sum(_cached_summary.values())
         st.info(
-            f"📦 **{_total_cached} props cached** from last fetch: "
+            f"📦 **{_total_cached} props cached** from last load: "
             + " | ".join(f"{plat}: {cnt}" for plat, cnt in _cached_summary.items())
         )
 
-    # ── Fetch buttons ─────────────────────────────────────────
-    _fetch_col1, _fetch_col2 = st.columns(2)
+    # ── Load buttons ─────────────────────────────────────────
+    _load_col1, _load_col2 = st.columns(2)
 
-    _fetch_pp = False
-    _fetch_ud = False
+    _load_pp = False
+    _load_ud = False
 
-    with _fetch_col1:
-        _fetch_dk = st.button(
-            "🔵 Fetch Sportsbook Lines",
+    with _load_col1:
+        _load_dk = st.button(
+            "🔵 Get Sportsbook Lines",
             disabled=not _dk_on,
             width="stretch",
-            help="Fetch lines from all major sportsbooks.",
+            help="Load lines from all major sportsbooks.",
         )
-    with _fetch_col2:
-        _fetch_all = st.button(
+    with _load_col2:
+        _load_all = st.button(
             "🔄 Refresh All Props",
             type="primary",
             width="stretch",
-            help="Fetch from all enabled platforms at once.",
+            help="Load from all enabled platforms at once.",
         )
 
-    # ── Execute fetches ────────────────────────────────────────
-    _fetch_triggered = False
-    _fetch_pp_only = False
-    _fetch_ud_only = False
-    _fetch_dk_only = False
+    # ── Execute loads ────────────────────────────────────────
+    _load_triggered = False
+    _load_pp_only = False
+    _load_ud_only = False
+    _load_dk_only = False
 
-    if _fetch_all:
-        _fetch_triggered = True
-    elif _fetch_dk:
-        _fetch_triggered = True
-        _fetch_dk_only = True
+    if _load_all:
+        _load_triggered = True
+    elif _load_dk:
+        _load_triggered = True
+        _load_dk_only = True
 
-    if _fetch_triggered:
-        _progress_bar = st.progress(0, text="Starting fetch...")
+    if _load_triggered:
+        _progress_bar = st.progress(0, text="Starting load...")
 
         def _progress_cb(current, total, message):
             pct = int((current / max(total, 1)) * 100)
             _progress_bar.progress(pct, text=message)
 
-        with st.spinner("Fetching live props from betting platforms..."):
-            _new_props = fetch_all_platform_props(
-                include_prizepicks=False,
-                include_underdog=False,
-                include_draftkings=_dk_on and (_fetch_all or _fetch_dk_only),
-                odds_api_key=_dk_key or None,
-                progress_callback=_progress_cb,
-            )
+        try:
+            with st.spinner("Loading live props from betting platforms..."):
+                _new_props = get_all_sportsbook_props(
+                    include_prizepicks=False,
+                    include_underdog=False,
+                    include_draftkings=_dk_on and (_load_all or _load_dk_only),
+                    odds_api_key=_dk_key or None,
+                    progress_callback=_progress_cb,
+                )
 
-        _progress_bar.progress(100, text="Done!")
+            _progress_bar.progress(100, text="Done!")
 
-        if _new_props:
-            # Save to session state so Prop Scanner and Analysis pages can use it
-            save_platform_props_to_session(_new_props, st.session_state)
+            if _new_props:
+                # Save to session state so Prop Scanner and Analysis pages can use it
+                save_platform_props_to_session(_new_props, st.session_state)
 
-            # Also save props to session as current_props so they're immediately
-            # available on the Prop Scanner page
-            from data.data_manager import save_props_to_session
-            save_props_to_session(_new_props, st.session_state)
+                # Also save props to session as current_props so they're immediately
+                # available on the Prop Scanner page
+                from data.data_manager import save_props_to_session
+                save_props_to_session(_new_props, st.session_state)
 
-            # Auto-save to disk so data persists across page navigations
-            _saved_ok = save_platform_props_to_csv(_new_props)
+                # Auto-save to disk so data persists across page navigations
+                _saved_ok = save_platform_props_to_csv(_new_props)
 
-            # Show per-platform summary
-            _new_summary = summarize_props_by_platform(_new_props)
-            st.success(
-                f"✅ Fetched **{len(_new_props)} props** from "
-                + ", ".join(f"**{plat}** ({cnt})" for plat, cnt in _new_summary.items())
-                + (". Saved to `data/live_props.csv`." if _saved_ok else ".")
-            )
+                # Show per-platform summary
+                _new_summary = summarize_props_by_platform(_new_props)
+                st.success(
+                    f"✅ Retrieved **{len(_new_props)} props** from "
+                    + ", ".join(f"**{plat}** ({cnt})" for plat, cnt in _new_summary.items())
+                    + (". Saved to `data/live_props.csv`." if _saved_ok else ".")
+                )
 
-            # Warn about new players not in our database
-            _players_data_for_check = load_players_data()
-            _new_players = find_new_players_from_props(_new_props, _players_data_for_check)
-            if _new_players:
-                with st.expander(
-                    f"⚠️ {len(_new_players)} players from platforms not in local database",
-                    expanded=False,
-                ):
-                    st.markdown(
-                        "These players appear on betting platforms but are not in your "
-                        "local player database. Consider running a **Smart Update** above "
-                        "to fetch their season stats."
-                    )
-                    for _np in _new_players[:20]:
-                        st.markdown(f"- {_np}")
-                    if len(_new_players) > 20:
-                        st.caption(f"... and {len(_new_players) - 20} more")
+                # Warn about new players not in our database
+                _players_data_for_check = load_players_data()
+                _new_players = find_new_players_from_props(_new_props, _players_data_for_check)
+                if _new_players:
+                    with st.expander(
+                        f"⚠️ {len(_new_players)} players from platforms not in local database",
+                        expanded=False,
+                    ):
+                        st.markdown(
+                            "These players appear on betting platforms but are not in your "
+                            "local player database. Consider running a **Smart Update** above "
+                            "to retrieve their season stats."
+                        )
+                        for _np in _new_players[:20]:
+                            st.markdown(f"- {_np}")
+                        if len(_new_players) > 20:
+                            st.caption(f"... and {len(_new_players) - 20} more")
 
-        else:
-            st.warning(
-                "⚠️ No props were returned. "
-                "Check your internet connection and try again."
-            )
+            else:
+                st.warning(
+                    "⚠️ No props were returned. "
+                    "Check your internet connection and try again."
+                )
+        except Exception as _platform_err:
+            _plat_err_str = str(_platform_err)
+            if "WebSocketClosedError" not in _plat_err_str and "StreamClosedError" not in _plat_err_str:
+                st.error(f"❌ Platform load failed: {_platform_err}")
+        finally:
+            try:
+                _progress_bar.empty()
+            except Exception:
+                pass
 
     # ── Show cached props preview ──────────────────────────────
     _display_props = load_platform_props_from_session(st.session_state)
     if _display_props:
         with st.expander(
-            f"📋 Preview Fetched Props ({len(_display_props)} total)",
+            f"📋 Preview Retrieved Props ({len(_display_props)} total)",
             expanded=False,
         ):
             _preview_rows = []
@@ -1153,7 +1187,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
             st.dataframe(_preview_rows, width="stretch", hide_index=True)
 
 # ============================================================
-# END SECTION: Fetch Platform Props
+# END SECTION: Get Platform Props
 # ============================================================
 
 
@@ -1163,7 +1197,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
 # our player database to find gaps and potential injuries.
 # ============================================================
 
-if _PLATFORM_FETCHER_AVAILABLE:
+if _SPORTSBOOK_SERVICE_AVAILABLE:
     _roster_props = load_platform_props_from_session(st.session_state)
     if _roster_props:
         st.divider()
@@ -1174,7 +1208,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
         )
 
         try:
-            from data.platform_fetcher import (
+            from data.sportsbook_service import (
                 extract_active_players_from_props,
                 cross_reference_with_player_data,
                 get_platform_confirmed_injuries,
@@ -1214,7 +1248,7 @@ if _PLATFORM_FETCHER_AVAILABLE:
                     st.markdown(
                         "These players have active props on betting platforms but their stats "
                         "are **not in your local database**. Run a **Smart Update** above to "
-                        "fetch their season stats before analyzing their props."
+                        "retrieve their season stats before analyzing their props."
                     )
                     for _mp in _ri_xref["missing_from_csv"][:25]:
                         st.markdown(f"- {_mp}")
@@ -1380,7 +1414,7 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: Why does the update take so long?**
     A: We add a 1.5-second delay between each data request to avoid being blocked
-    by the servers. With 500+ players, fetching game logs takes time.
+    by the servers. With 500+ players, retrieving game logs takes time.
     This is normal and necessary!
 
     BEGINNER NOTE: "Rate limiting" means a website limits how many requests
@@ -1397,7 +1431,7 @@ with st.expander("💡 Tips & FAQ", expanded=False):
 
     **Q: Where does the data come from?**
     A: Player stats, team stats, rosters, injuries, standings, and live scores
-    are fetched from professional sports data providers.
+    are retrieved from professional sports data providers.
     Prop lines come from all major sportsbooks.
 
     ---
@@ -1415,12 +1449,12 @@ with st.expander("💡 Tips & FAQ", expanded=False):
     ---
 
     **Q: How do I get DraftKings props?**
-    A: Enable DraftKings on the ⚙️ Settings page, then click "Fetch DraftKings" or "Refresh All Props".
+    A: Enable DraftKings on the ⚙️ Settings page, then click "Get DraftKings" or "Refresh All Props".
 
     ---
 
     **Q: How do I get NBA Standings and News?**
-    A: Click **📊 Refresh Standings & News** (above). This fetches current conference
+    A: Click **📊 Refresh Standings & News** (above). This retrieves current conference
     standings and recent player/team news. Standings are also
     auto-loaded whenever you run **One-Click Full Setup** or **🏀 Auto-Load Tonight's Games**.
     """)

@@ -7,7 +7,7 @@
 #   1. 📊 Model Health  — Overall metrics + win rate by tier/platform/stat
 #   2. 📊 AI Picks      — Auto-logged picks from Neural Analysis
 #   3. 📋 All Picks     — Every pick the app outputs (complete performance record)
-#   4. 🤖 Auto-Resolve  — Fetch actual stats and mark results
+#   4. 🤖 Auto-Resolve  — Get actual stats and mark results
 #   5. 📋 My Bets       — Full bets as styled cards
 #   6. ➕ Log a Bet     — Manual / analysis-prefilled bet entry
 #   7. 🔮 Predictor     — Forward-looking bankroll / ROI forecasts
@@ -164,7 +164,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     
     **Auto-Resolve:**
     - Click "Check Results Now" to automatically resolve today's bets
-    - The system fetches actual game stats and marks bets as Won/Lost
+    - The system retrieves actual game stats and marks bets as Won/Lost
     - Player name matching uses fuzzy logic to handle name variations
     
     **Reading Stats:**
@@ -670,7 +670,7 @@ with tab_ai_picks:
     if not ai_bets:
         st.info(
             "📭 No AI-auto-logged picks yet. "
-            "Run **⚡ Neural Analysis** or click **📊 Fetch Platform Props & Analyze** on the Live Games page."
+            "Run **⚡ Neural Analysis** or click **📊 Get Platform Props & Analyze** on the Live Games page."
         )
     else:
         ai_resolved = [b for b in ai_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
@@ -747,7 +747,7 @@ with tab_all_picks:
             "🔄 Resolve All Picks",
             key="resolve_all_picks_btn",
             type="primary",
-            help="Fetch actual NBA stats and auto-resolve ALL unresolved picks (manual and AI-logged).",
+            help="Retrieve actual NBA stats and auto-resolve ALL unresolved picks (manual and AI-logged).",
         )
     with _rap_col2:
         st.caption("Auto-resolves every pending pick using live NBA stats — includes both manual and AI-logged picks.")
@@ -876,11 +876,11 @@ with tab_all_picks:
                 f"🔄 Resolve / Re-check {_rbd_selected}",
                 key="rbd_resolve_btn",
                 type="primary",
-                help=f"Fetch actual NBA stats for {_rbd_selected} and update WIN/LOSS/PUSH for all picks on that night.",
+                help=f"Retrieve actual NBA stats for {_rbd_selected} and update WIN/LOSS/PUSH for all picks on that night.",
             )
 
             if _rbd_resolve_btn:
-                with st.spinner(f"Fetching NBA stats and resolving picks for {_rbd_selected}…"):
+                with st.spinner(f"Retrieving NBA stats and resolving picks for {_rbd_selected}…"):
                     try:
                         # Resolve all_analysis_picks for this date (re-checks even resolved rows)
                         _rbd_picks_res  = resolve_all_analysis_picks(date_str=_rbd_selected)
@@ -1296,9 +1296,9 @@ with tab_all_picks:
 # ============================================================
 
 with tab_auto_resolve:
-    st.subheader("🤖 Auto-Resolve — Fetch Actual Stats & Mark Results")
+    st.subheader("🤖 Auto-Resolve — Get Actual Stats & Mark Results")
     st.markdown(
-        "Automatically fetch actual player stats and mark pending bets "
+        "Automatically retrieve actual player stats and mark pending bets "
         "as WIN / LOSS / PUSH. Use **⚡ Resolve Now** to resolve today's completed games instantly."
     )
 
@@ -1309,7 +1309,7 @@ with tab_auto_resolve:
     resolve_today_btn = st.button(
         "⚡ Resolve Now",
         type="primary",
-        help="Fetch live game status and resolve today's bets where games are Final",
+        help="Get live game status and resolve today's bets where games are Final",
     )
 
     if resolve_today_btn:
@@ -1435,13 +1435,13 @@ with tab_auto_resolve:
     with col_btn:
         st.markdown("<br>", unsafe_allow_html=True)
         resolve_btn = st.button(
-            "🔄 Fetch Actual Stats & Auto-Resolve",
+            "🔄 Get Actual Stats & Auto-Resolve",
             type="primary",
             width="stretch",
         )
 
     if resolve_btn:
-        with st.spinner("Fetching actual stats…"):
+        with st.spinner("Retrieving actual stats…"):
             resolved, errors = auto_resolve_bet_results(date_str=resolve_date.isoformat())
 
         if resolved > 0:
@@ -1468,36 +1468,41 @@ with tab_auto_resolve:
     resolve_all_btn = st.button(
         "🔄 Resolve All Pending Bets",
         type="primary",
-        help="Fetch actual NBA stats for every pending bet regardless of date.",
+        help="Retrieve actual NBA stats for every pending bet regardless of date.",
     )
 
     if resolve_all_btn:
-        with st.spinner("Resolving all pending bets — this may take a moment…"):
-            _all_result = resolve_all_pending_bets()
+        try:
+            with st.spinner("Resolving all pending bets — this may take a moment…"):
+                _all_result = resolve_all_pending_bets()
 
-        _all_resolved = _all_result.get("resolved", 0)
-        _all_errors   = _all_result.get("errors", [])
-        _by_date      = _all_result.get("by_date", {})
-        if _all_resolved > 0:
-            st.success(
-                f"✅ Resolved **{_all_resolved}** bet(s) — "
-                f"{_all_result.get('wins', 0)} W / "
-                f"{_all_result.get('losses', 0)} L / "
-                f"{_all_result.get('pushes', 0)} Push"
-            )
-            if _by_date:
-                for _d, _cnt in sorted(_by_date.items()):
-                    st.markdown(f"  • **{_d}**: {_cnt} resolved")
-            st.rerun()
-        else:
-            st.info("No pending bets found to resolve, or all bets are already resolved.")
+            _all_resolved = _all_result.get("resolved", 0)
+            _all_errors   = _all_result.get("errors", [])
+            _by_date      = _all_result.get("by_date", {})
+            if _all_resolved > 0:
+                st.success(
+                    f"✅ Resolved **{_all_resolved}** bet(s) — "
+                    f"{_all_result.get('wins', 0)} W / "
+                    f"{_all_result.get('losses', 0)} L / "
+                    f"{_all_result.get('pushes', 0)} Push"
+                )
+                if _by_date:
+                    for _d, _cnt in sorted(_by_date.items()):
+                        st.markdown(f"  • **{_d}**: {_cnt} resolved")
+                st.rerun()
+            else:
+                st.info("No pending bets found to resolve, or all bets are already resolved.")
 
-        if _all_errors:
-            st.warning("⚠️ " + " | ".join(_all_errors[:3]))
-            if len(_all_errors) > 3:
-                with st.expander(f"See all {len(_all_errors)} error(s) during resolve-all"):
-                    for err in _all_errors:
-                        st.markdown(f"- {err}")
+            if _all_errors:
+                st.warning("⚠️ " + " | ".join(_all_errors[:3]))
+                if len(_all_errors) > 3:
+                    with st.expander(f"See all {len(_all_errors)} error(s) during resolve-all"):
+                        for err in _all_errors:
+                            st.markdown(f"- {err}")
+        except Exception as _resolve_all_err:
+            _resolve_err_str = str(_resolve_all_err)
+            if "WebSocketClosedError" not in _resolve_err_str and "StreamClosedError" not in _resolve_err_str:
+                st.error(f"❌ Resolve all failed: {_resolve_all_err}")
 
 # ============================================================
 # END SECTION: Auto-Resolve Tab
@@ -1741,7 +1746,7 @@ with tab_log:
                             st.caption(_e)
     else:
         st.info(
-            "💡 No platform props loaded yet. Fetch live props from the "
+            "💡 No platform props loaded yet. Load live props from the "
             "**📡 Live Games** page and then return here to bulk-add them."
         )
 

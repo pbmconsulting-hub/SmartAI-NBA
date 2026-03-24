@@ -65,7 +65,7 @@ def get_logger(module_name):
     Usage:
         from utils.logger import get_logger
         logger = get_logger(__name__)
-        logger.info("Fetching player stats...")
+        logger.info("Loading player stats...")
         logger.warning("Rate limit approaching")
         logger.error("API call failed: %s", error)
 

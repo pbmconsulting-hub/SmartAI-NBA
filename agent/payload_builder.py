@@ -5,7 +5,7 @@
 #          Smith persona engine.  Includes a short-term "grudge"
 #          memory buffer (last 3 rants) so the LLM never repeats.
 # CONNECTS TO: engine/live_math.py (pacing data),
-#              data/live_tracker.py (live box-score data),
+#              data/live_game_tracker.py (live box-score data),
 #              agent/live_persona.py (prompt consumption)
 # ============================================================
 

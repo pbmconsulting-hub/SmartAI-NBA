@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: data/nba_context_fetcher.py
+# FILE: data/player_profile_service.py
 # PURPOSE: Enrich betting data with real NBA player context
 #          and season stats.  Returns headshot URLs, position,
 #          team logo URLs, next opponent, and season averages
@@ -7,7 +7,7 @@
 #          Spotlight modal and Trading-Card grid.
 #
 # USAGE:
-#   from data.nba_context_fetcher import enrich_player_data
+#   from data.player_profile_service import enrich_player_data
 #   vitals = enrich_player_data("LeBron James", players_data, todays_games)
 # ============================================================
 
@@ -18,7 +18,7 @@ _logger = _logging.getLogger(__name__)
 
 # ── Player ID lookup cache ───────────────────────────────────
 # Maps player_name.lower() → NBA player ID (int).
-# Populated on first call to get_headshot_url() / lookup_player_id(),
+# Populated on first call to get_headshot_url() / get_player_id(),
 # and pre-seeded with marquee players for test compatibility and performance.
 _PLAYER_ID_CACHE: dict = {}
 
@@ -104,7 +104,7 @@ def _build_nba_static_lookup() -> dict:
         return {}
 
 
-def lookup_player_id(player_name: str) -> int | None:
+def get_player_id(player_name: str) -> int | None:
     """
     Return the NBA player ID (int) for headshot URL construction.
 
@@ -135,7 +135,7 @@ def lookup_player_id(player_name: str) -> int | None:
 
     # 2. API-NBA API
     try:
-        from data.clearsports_client import lookup_player_id as _cs_lookup
+        from data.nba_api_client import get_player_id as _cs_lookup
         pid = _cs_lookup(player_name)
     except Exception:
         pass
@@ -179,7 +179,7 @@ def get_headshot_url(player_name: str) -> str:
     str
         URL string pointing to a player headshot image.
     """
-    pid = lookup_player_id(player_name)
+    pid = get_player_id(player_name)
     if pid:
         return (
             f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
@@ -358,3 +358,4 @@ def enrich_player_data(
         "next_opponent": _find_next_opponent(team, todays_games or []),
         "season_stats": _extract_season_stats(player_row),
     }
+

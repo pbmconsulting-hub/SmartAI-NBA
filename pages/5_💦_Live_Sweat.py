@@ -57,8 +57,8 @@ except ImportError:
 # SECTION: Imports — Pacing Engine, Tracker, Persona
 # ============================================================
 
-from data.live_tracker import (
-    fetch_live_boxscores,
+from data.live_game_tracker import (
+    get_live_boxscores,
     get_all_live_players,
     get_game_for_player,
     match_live_player,
@@ -224,7 +224,7 @@ def _get_active_bets() -> list[dict]:
 
 
 # ============================================================
-# SECTION: Fetch Live Data & Render Cards
+# SECTION: Load Live Data & Render Cards
 # ============================================================
 
 active_bets = _get_active_bets()
@@ -237,8 +237,8 @@ if not active_bets:
     )
     st.stop()
 
-# Fetch live box scores (API-firewalled: cached 120 s)
-live_games = fetch_live_boxscores()
+# Load live box scores (API-firewalled: cached 120 s)
+live_games = get_live_boxscores()
 all_live_players = get_all_live_players(live_games)
 
 # ── Last Refresh Timestamp ────────────────────────────────────

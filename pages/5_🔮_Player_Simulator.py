@@ -251,17 +251,17 @@ with _sim_btn_col1:
         disabled=not selected_names,
     )
 with _sim_btn_col2:
-    _fetch_logs_btn = st.button(
-        "🔄 Fetch Game Logs",
+    _load_logs_btn = st.button(
+        "🔄 Get Game Logs",
         use_container_width=True,
         help="Load the last 20 games per player for more accurate simulation",
         disabled=not selected_names,
     )
 
-# ── On-demand API-NBA game log fetch ──────────────────────
-if _fetch_logs_btn and selected_names:
-    _gl_progress = st.progress(0, text="Fetching game logs from API-NBA…")
-    _gl_fetched = 0
+# ── On-demand API-NBA game log retrieval ──────────────────────
+if _load_logs_btn and selected_names:
+    _gl_progress = st.progress(0, text="Getting game logs from API-NBA…")
+    _gl_loaded = 0
     _gl_errors  = 0
     for _gl_idx, _gl_pname in enumerate(selected_names):
         _gl_pdata = next(
@@ -270,18 +270,18 @@ if _fetch_logs_btn and selected_names:
         _gl_player_id = _gl_pdata.get("player_id", "") if _gl_pdata else ""
         _gl_progress.progress(
             (_gl_idx + 1) / len(selected_names),
-            text=f"Fetching logs for {_gl_pname}…",
+            text=f"Getting logs for {_gl_pname}…",
         )
         if _gl_player_id:
             try:
-                from data.live_data_fetcher import fetch_player_game_log as _ldf_gl
-                from data.live_data_fetcher import fetch_player_recent_form as _ldf_form
+                from data.nba_data_service import get_player_game_log as _ldf_gl
+                from data.nba_data_service import get_player_recent_form as _ldf_form
                 from data.game_log_cache import save_game_logs_to_cache as _gl_save
                 _logs = _ldf_gl(_gl_player_id, last_n_games=20)
                 if _logs:
                     _gl_save(_gl_pname, _logs)
-                    _gl_fetched += 1
-                # Also fetch recent form trend for the player
+                    _gl_loaded += 1
+                # Also get recent form trend for the player
                 try:
                     _form = _ldf_form(_gl_player_id, last_n_games=10)
                     if _form and _gl_pdata:
@@ -289,21 +289,21 @@ if _fetch_logs_btn and selected_names:
                         _gl_pdata["recent_trend"] = _form.get("trend", "neutral")
                         _gl_pdata["recent_trend_emoji"] = _form.get("trend_emoji", "➡️")
                 except Exception as _form_exc:
-                    _logger.warning("Recent form fetch failed for %s: %s", _gl_pname, _form_exc)
+                    _logger.warning("Recent form request failed for %s: %s", _gl_pname, _form_exc)
             except Exception as _gl_exc:
-                _logger.warning("Game log fetch failed for %s: %s", _gl_pname, _gl_exc)
+                _logger.warning("Game log request failed for %s: %s", _gl_pname, _gl_exc)
                 _gl_errors += 1
         else:
             _gl_errors += 1
     _gl_progress.empty()
-    if _gl_fetched:
+    if _gl_loaded:
         st.success(
-            f"✅ Game logs fetched for **{_gl_fetched}** player(s). "
+            f"✅ Game logs loaded for **{_gl_loaded}** player(s). "
             "Re-run simulation to use the fresh data."
         )
     if _gl_errors:
         st.warning(
-            f"⚠️ Could not fetch logs for {_gl_errors} player(s) — "
+            f"⚠️ Could not load logs for {_gl_errors} player(s) — "
             "player IDs may be missing. Run a Smart Update on the Data Feed page first."
         )
 
@@ -630,18 +630,24 @@ if run_sim and selected_names:
     _mode_label = " (Scenario)" if _scenario_mode else (" (Compare)" if _compare_mode else "")
     st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
 
-    with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
+    try:
+        with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
+            _all_sim_results = []
+            for pname in selected_names:
+                pdata = next((p for p in tonight_players if p.get("name") == pname), None)
+                if pdata is None:
+                    st.warning(f"⚠️ Could not find data for **{pname}**.")
+                    continue
+                sim_result = _simulate_player(
+                    pdata, sim_depth, todays_games,
+                    scenario_overrides=_scenario_overrides if _scenario_mode else None,
+                )
+                _all_sim_results.append(sim_result)
+    except Exception as _sim_err:
+        _sim_err_str = str(_sim_err)
+        if "WebSocketClosedError" not in _sim_err_str and "StreamClosedError" not in _sim_err_str:
+            st.error(f"❌ Simulation failed: {_sim_err}")
         _all_sim_results = []
-        for pname in selected_names:
-            pdata = next((p for p in tonight_players if p.get("name") == pname), None)
-            if pdata is None:
-                st.warning(f"⚠️ Could not find data for **{pname}**.")
-                continue
-            sim_result = _simulate_player(
-                pdata, sim_depth, todays_games,
-                scenario_overrides=_scenario_overrides if _scenario_mode else None,
-            )
-            _all_sim_results.append(sim_result)
 
     if _compare_mode and len(_all_sim_results) >= 2:
         # ── Compare Mode: side-by-side table for all selected players ──
@@ -819,35 +825,41 @@ if run_dark_horse:
         "(90th pct projection ÷ season average). Ratio ≥ 1.5 = Dark Horse."
     )
 
-    with st.spinner("🔮 Scanning all tonight's players for dark horses…"):
-        dark_horses = []
-        for pdata in tonight_players:
-            if not pdata.get("name"):
-                continue
-            sim_result = _simulate_player(pdata, min(sim_depth, 1000), todays_games)
-            stats = sim_result["stats"]
-            # Compute max upside ratio across all meaningful stats
-            best_ratio = max(
-                (s["upside_ratio"] for s in stats.values() if s["season_avg"] > 0.5),
-                default=1.0,
-            )
-            best_stat = max(
-                ((stat, s["upside_ratio"]) for stat, s in stats.items() if s["season_avg"] > 0.5),
-                key=lambda x: x[1],
-                default=("points", 1.0),
-            )
-            dark_horses.append({
-                "player": pdata,
-                "context": sim_result["context"],
-                "stats": stats,
-                "best_ratio": best_ratio,
-                "best_stat": best_stat[0],
-                "best_p90": stats.get(best_stat[0], {}).get("p90", 0),
-                "best_avg": stats.get(best_stat[0], {}).get("season_avg", 0),
-            })
+    try:
+        with st.spinner("🔮 Scanning all tonight's players for dark horses…"):
+            dark_horses = []
+            for pdata in tonight_players:
+                if not pdata.get("name"):
+                    continue
+                sim_result = _simulate_player(pdata, min(sim_depth, 1000), todays_games)
+                stats = sim_result["stats"]
+                # Compute max upside ratio across all meaningful stats
+                best_ratio = max(
+                    (s["upside_ratio"] for s in stats.values() if s["season_avg"] > 0.5),
+                    default=1.0,
+                )
+                best_stat = max(
+                    ((stat, s["upside_ratio"]) for stat, s in stats.items() if s["season_avg"] > 0.5),
+                    key=lambda x: x[1],
+                    default=("points", 1.0),
+                )
+                dark_horses.append({
+                    "player": pdata,
+                    "context": sim_result["context"],
+                    "stats": stats,
+                    "best_ratio": best_ratio,
+                    "best_stat": best_stat[0],
+                    "best_p90": stats.get(best_stat[0], {}).get("p90", 0),
+                    "best_avg": stats.get(best_stat[0], {}).get("season_avg", 0),
+                })
 
-        # Sort by upside ratio descending
-        dark_horses.sort(key=lambda x: x["best_ratio"], reverse=True)
+            # Sort by upside ratio descending
+            dark_horses.sort(key=lambda x: x["best_ratio"], reverse=True)
+    except Exception as _dh_err:
+        _dh_err_str = str(_dh_err)
+        if "WebSocketClosedError" not in _dh_err_str and "StreamClosedError" not in _dh_err_str:
+            st.error(f"❌ Dark Horse scan failed: {_dh_err}")
+        dark_horses = []
 
     # Show top 10 dark horses
     st.markdown(f"**Top Dark Horses Tonight (out of {len(dark_horses)} players):**")
