@@ -1102,60 +1102,70 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
             pct = int((current / max(total, 1)) * 100)
             _progress_bar.progress(pct, text=message)
 
-        with st.spinner("Loading live props from betting platforms..."):
-            _new_props = get_all_sportsbook_props(
-                include_prizepicks=False,
-                include_underdog=False,
-                include_draftkings=_dk_on and (_load_all or _load_dk_only),
-                odds_api_key=_dk_key or None,
-                progress_callback=_progress_cb,
-            )
+        try:
+            with st.spinner("Loading live props from betting platforms..."):
+                _new_props = get_all_sportsbook_props(
+                    include_prizepicks=False,
+                    include_underdog=False,
+                    include_draftkings=_dk_on and (_load_all or _load_dk_only),
+                    odds_api_key=_dk_key or None,
+                    progress_callback=_progress_cb,
+                )
 
-        _progress_bar.progress(100, text="Done!")
+            _progress_bar.progress(100, text="Done!")
 
-        if _new_props:
-            # Save to session state so Prop Scanner and Analysis pages can use it
-            save_platform_props_to_session(_new_props, st.session_state)
+            if _new_props:
+                # Save to session state so Prop Scanner and Analysis pages can use it
+                save_platform_props_to_session(_new_props, st.session_state)
 
-            # Also save props to session as current_props so they're immediately
-            # available on the Prop Scanner page
-            from data.data_manager import save_props_to_session
-            save_props_to_session(_new_props, st.session_state)
+                # Also save props to session as current_props so they're immediately
+                # available on the Prop Scanner page
+                from data.data_manager import save_props_to_session
+                save_props_to_session(_new_props, st.session_state)
 
-            # Auto-save to disk so data persists across page navigations
-            _saved_ok = save_platform_props_to_csv(_new_props)
+                # Auto-save to disk so data persists across page navigations
+                _saved_ok = save_platform_props_to_csv(_new_props)
 
-            # Show per-platform summary
-            _new_summary = summarize_props_by_platform(_new_props)
-            st.success(
-                f"✅ Retrieved **{len(_new_props)} props** from "
-                + ", ".join(f"**{plat}** ({cnt})" for plat, cnt in _new_summary.items())
-                + (". Saved to `data/live_props.csv`." if _saved_ok else ".")
-            )
+                # Show per-platform summary
+                _new_summary = summarize_props_by_platform(_new_props)
+                st.success(
+                    f"✅ Retrieved **{len(_new_props)} props** from "
+                    + ", ".join(f"**{plat}** ({cnt})" for plat, cnt in _new_summary.items())
+                    + (". Saved to `data/live_props.csv`." if _saved_ok else ".")
+                )
 
-            # Warn about new players not in our database
-            _players_data_for_check = load_players_data()
-            _new_players = find_new_players_from_props(_new_props, _players_data_for_check)
-            if _new_players:
-                with st.expander(
-                    f"⚠️ {len(_new_players)} players from platforms not in local database",
-                    expanded=False,
-                ):
-                    st.markdown(
-                        "These players appear on betting platforms but are not in your "
-                        "local player database. Consider running a **Smart Update** above "
-                        "to retrieve their season stats."
-                    )
-                    for _np in _new_players[:20]:
-                        st.markdown(f"- {_np}")
-                    if len(_new_players) > 20:
-                        st.caption(f"... and {len(_new_players) - 20} more")
+                # Warn about new players not in our database
+                _players_data_for_check = load_players_data()
+                _new_players = find_new_players_from_props(_new_props, _players_data_for_check)
+                if _new_players:
+                    with st.expander(
+                        f"⚠️ {len(_new_players)} players from platforms not in local database",
+                        expanded=False,
+                    ):
+                        st.markdown(
+                            "These players appear on betting platforms but are not in your "
+                            "local player database. Consider running a **Smart Update** above "
+                            "to retrieve their season stats."
+                        )
+                        for _np in _new_players[:20]:
+                            st.markdown(f"- {_np}")
+                        if len(_new_players) > 20:
+                            st.caption(f"... and {len(_new_players) - 20} more")
 
-        else:
-            st.warning(
-                "⚠️ No props were returned. "
-                "Check your internet connection and try again."
-            )
+            else:
+                st.warning(
+                    "⚠️ No props were returned. "
+                    "Check your internet connection and try again."
+                )
+        except Exception as _platform_err:
+            _plat_err_str = str(_platform_err)
+            if "WebSocketClosedError" not in _plat_err_str and "StreamClosedError" not in _plat_err_str:
+                st.error(f"❌ Platform load failed: {_platform_err}")
+        finally:
+            try:
+                _progress_bar.empty()
+            except Exception:
+                pass
 
     # ── Show cached props preview ──────────────────────────────
     _display_props = load_platform_props_from_session(st.session_state)

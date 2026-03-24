@@ -1472,32 +1472,37 @@ with tab_auto_resolve:
     )
 
     if resolve_all_btn:
-        with st.spinner("Resolving all pending bets — this may take a moment…"):
-            _all_result = resolve_all_pending_bets()
+        try:
+            with st.spinner("Resolving all pending bets — this may take a moment…"):
+                _all_result = resolve_all_pending_bets()
 
-        _all_resolved = _all_result.get("resolved", 0)
-        _all_errors   = _all_result.get("errors", [])
-        _by_date      = _all_result.get("by_date", {})
-        if _all_resolved > 0:
-            st.success(
-                f"✅ Resolved **{_all_resolved}** bet(s) — "
-                f"{_all_result.get('wins', 0)} W / "
-                f"{_all_result.get('losses', 0)} L / "
-                f"{_all_result.get('pushes', 0)} Push"
-            )
-            if _by_date:
-                for _d, _cnt in sorted(_by_date.items()):
-                    st.markdown(f"  • **{_d}**: {_cnt} resolved")
-            st.rerun()
-        else:
-            st.info("No pending bets found to resolve, or all bets are already resolved.")
+            _all_resolved = _all_result.get("resolved", 0)
+            _all_errors   = _all_result.get("errors", [])
+            _by_date      = _all_result.get("by_date", {})
+            if _all_resolved > 0:
+                st.success(
+                    f"✅ Resolved **{_all_resolved}** bet(s) — "
+                    f"{_all_result.get('wins', 0)} W / "
+                    f"{_all_result.get('losses', 0)} L / "
+                    f"{_all_result.get('pushes', 0)} Push"
+                )
+                if _by_date:
+                    for _d, _cnt in sorted(_by_date.items()):
+                        st.markdown(f"  • **{_d}**: {_cnt} resolved")
+                st.rerun()
+            else:
+                st.info("No pending bets found to resolve, or all bets are already resolved.")
 
-        if _all_errors:
-            st.warning("⚠️ " + " | ".join(_all_errors[:3]))
-            if len(_all_errors) > 3:
-                with st.expander(f"See all {len(_all_errors)} error(s) during resolve-all"):
-                    for err in _all_errors:
-                        st.markdown(f"- {err}")
+            if _all_errors:
+                st.warning("⚠️ " + " | ".join(_all_errors[:3]))
+                if len(_all_errors) > 3:
+                    with st.expander(f"See all {len(_all_errors)} error(s) during resolve-all"):
+                        for err in _all_errors:
+                            st.markdown(f"- {err}")
+        except Exception as _resolve_all_err:
+            _resolve_err_str = str(_resolve_all_err)
+            if "WebSocketClosedError" not in _resolve_err_str and "StreamClosedError" not in _resolve_err_str:
+                st.error(f"❌ Resolve all failed: {_resolve_all_err}")
 
 # ============================================================
 # END SECTION: Auto-Resolve Tab
