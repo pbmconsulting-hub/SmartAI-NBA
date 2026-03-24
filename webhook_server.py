@@ -22,6 +22,7 @@ Environment variables (set in .env or host config):
     DB_PATH                 — SQLite database path (default: db/smartai_nba.db)
 """
 
+import datetime
 import os
 import logging
 import sqlite3
@@ -120,8 +121,9 @@ def stripe_webhook():
         email = data_object.get("customer_email", "")
         period_end = data_object.get("current_period_end", "")
         if isinstance(period_end, int):
-            import datetime
-            period_end = datetime.datetime.fromtimestamp(period_end).isoformat()
+            period_end = datetime.datetime.fromtimestamp(
+                period_end, tz=datetime.timezone.utc
+            ).isoformat()
         _update_subscription(sub_id, status, email, period_end)
         _logger.info("Subscription updated: %s → %s", sub_id, status)
 
