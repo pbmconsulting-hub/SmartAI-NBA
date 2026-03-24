@@ -4,7 +4,7 @@ scripts/verify_api_endpoints.py
 -------------------------------
 Production-ready API endpoint verification script.
 
-Tests all API-Sports NBA v2 and The Odds API v4 endpoints using real API keys.
+Tests all API-Basketball v1 and The Odds API v4 endpoints using real API keys.
 Intended to be run manually to confirm the app can pull data before deployment.
 
 Usage:
@@ -38,7 +38,7 @@ except ImportError:
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-API_SPORTS_BASE = "https://v2.nba.api-sports.io"
+API_SPORTS_BASE = "https://v1.basketball.api-sports.io"
 ODDS_API_BASE   = "https://api.the-odds-api.com/v4"
 SPORT_KEY       = "basketball_nba"
 
@@ -157,9 +157,9 @@ def _test_odds_api(endpoint: str, api_key: str, params: dict | None = None,
 # ── Main test functions ───────────────────────────────────────────────────────
 
 def test_api_sports(api_key: str):
-    """Test all API-Sports NBA v2 endpoints."""
+    """Test all API-Basketball v1 endpoints."""
     print("\n" + "=" * 70)
-    print("  API-SPORTS NBA v2 ENDPOINT VERIFICATION")
+    print("  API-BASKETBALL v1 ENDPOINT VERIFICATION")
     print("=" * 70)
 
     headers = {"x-apisports-key": api_key}
@@ -173,44 +173,53 @@ def test_api_sports(api_key: str):
     time.sleep(0.3)
 
     # 2. /teams
-    _test_api_sports("/teams", headers, label="[2/10] /teams")
+    _test_api_sports("/teams", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[2/10] /teams?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 3. /games (with season)
-    _test_api_sports("/games", headers, params={"season": "2024"},
-                     label="[3/10] /games?season=2024")
+    _test_api_sports("/games", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[3/10] /games?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 4. /games (today)
     from datetime import date
     today = date.today().isoformat()
-    _test_api_sports("/games", headers, params={"date": today},
-                     label=f"[4/10] /games?date={today}")
+    _test_api_sports("/games", headers,
+                     params={"league": "12", "season": "2025-2026", "date": today},
+                     label=f"[4/10] /games?league=12&date={today}")
     time.sleep(0.3)
 
     # 5. /players (with team filter)
-    _test_api_sports("/players", headers, params={"team": "1", "season": "2024"},
-                     label="[5/10] /players?team=1&season=2024")
+    _test_api_sports("/players", headers,
+                     params={"league": "12", "season": "2025-2026", "team": "1"},
+                     label="[5/10] /players?league=12&season=2025-2026&team=1")
     time.sleep(0.3)
 
     # 6. /standings
     _test_api_sports("/standings", headers,
-                     params={"league": "standard", "season": "2024"},
-                     label="[6/10] /standings?league=standard&season=2024")
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[6/10] /standings?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 7. /injuries
-    _test_api_sports("/injuries", headers, label="[7/10] /injuries")
+    _test_api_sports("/injuries", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[7/10] /injuries?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 8. /players/statistics (need season + player)
+    # 8. /players/statistics (need season + league + player)
     _test_api_sports("/players/statistics", headers,
-                     params={"season": "2024", "id": "236"},
-                     label="[8/10] /players/statistics?season=2024&id=236")
+                     params={"league": "12", "season": "2025-2026", "player": "236"},
+                     label="[8/10] /players/statistics?league=12&season=2025-2026&player=236")
     time.sleep(0.3)
 
     # 9. /odds
-    _test_api_sports("/odds", headers, label="[9/10] /odds")
+    _test_api_sports("/odds", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[9/10] /odds?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 10. /predictions

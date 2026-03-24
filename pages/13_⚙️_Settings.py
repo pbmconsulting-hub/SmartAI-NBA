@@ -179,7 +179,7 @@ with _api_col1:
         value=_current_cs_key,
         type="password",
         placeholder="Enter your API-NBA key",
-        help="Get your key at https://v2.nba.api-sports.io/",
+        help="Get your key at https://v1.basketball.api-sports.io/",
     )
     if st.session_state.get("api_nba_key"):
         st.caption("✅ API-NBA key is set")
