@@ -62,10 +62,13 @@ except ImportError:
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-_BASE_URL = "https://v2.nba.api-sports.io"
+_BASE_URL = "https://v1.basketball.api-sports.io"
 
-# Current NBA season year (API-Sports uses the starting year: "2025" = 2025-26 season).
-_CURRENT_SEASON = "2025"
+# Current NBA season (API-Basketball v1 uses "YYYY-YYYY" format).
+_CURRENT_SEASON = "2025-2026"
+
+# NBA league ID in the API-Basketball v1 system.
+_NBA_LEAGUE_ID = "12"
 
 MAX_API_RETRIES = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
@@ -319,9 +322,10 @@ def fetch_teams() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/teams"
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
-        raw = _fetch_with_retry(url)
+        raw = _fetch_with_retry(url, params=params)
         if not raw:
             return []
 
@@ -352,9 +356,11 @@ def fetch_games(season=None, date=None, team_id=None) -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/games"
-    params: dict = {}
+    params: dict = {"league": _NBA_LEAGUE_ID}
     if season is not None:
         params["season"] = season
+    else:
+        params["season"] = _CURRENT_SEASON
     if date is not None:
         params["date"] = date
     if team_id is not None:
@@ -391,7 +397,7 @@ def fetch_players(team_id=None) -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/players"
-    params: dict = {}
+    params: dict = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     if team_id is not None:
         params["team"] = team_id
 
@@ -431,7 +437,7 @@ def fetch_games_today() -> list[dict]:
     """
     url = f"{_BASE_URL}/games"
     today = _today_str()
-    params = {"date": today}
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": today}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -545,7 +551,7 @@ def fetch_player_stats() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/players"
-    params = {"season": _CURRENT_SEASON}
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -613,7 +619,7 @@ def fetch_team_stats() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/teams"
-    params = {"season": _CURRENT_SEASON}
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -669,12 +675,12 @@ def fetch_injury_report(team_id=None) -> dict:
         Returns {} on failure.
     """
     url = f"{_BASE_URL}/injuries"
-    params: dict = {}
+    params: dict = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     if team_id is not None:
         params["team"] = team_id
 
     try:
-        raw = _fetch_with_retry(url, params=params if params else None)
+        raw = _fetch_with_retry(url, params=params)
         if not raw:
             return {}
 
@@ -721,7 +727,7 @@ def fetch_live_scores() -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/games"
-    params = {"date": _today_str()}
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": _today_str()}
 
     try:
         raw = _fetch_with_retry(url, params=params)
@@ -769,7 +775,7 @@ def fetch_rosters(team_abbrevs: list[str]) -> dict[str, list[str]]:
 
     for abbrev in team_abbrevs:
         url = f"{_BASE_URL}/players"
-        params = {"team": abbrev}
+        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "team": abbrev}
 
         try:
             raw = _fetch_with_retry(url, params=params)
@@ -866,7 +872,7 @@ def fetch_player_game_log(player_id, last_n_games: int = 20) -> list:
         return []
 
     url = f"{_BASE_URL}/players/statistics"
-    params = {"id": player_id, "season": _CURRENT_SEASON}
+    params = {"player": player_id, "league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -939,7 +945,7 @@ def fetch_standings() -> list[dict]:
         return []
 
     url = f"{_BASE_URL}/standings"
-    params = {"league": "standard", "season": _CURRENT_SEASON}
+    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     # Use _build_cache_key so the outer cache key matches the one
     # _fetch_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -1328,7 +1334,7 @@ def fetch_game_odds(game_id=None) -> list[dict]:
         Returns [] on failure.
     """
     url = f"{_BASE_URL}/odds"
-    params: dict = {}
+    params: dict = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
     if game_id is not None:
         params["game"] = game_id
 
@@ -1352,7 +1358,7 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
     """
     Retrieve team statistics for NBA games.
 
-    Endpoint: GET /teams/statistics
+    Endpoint: GET /games/statistics/teams
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
@@ -1363,10 +1369,10 @@ def fetch_nba_team_stats(team_id=None, season=None) -> list[dict]:
         list[dict]: Team statistics entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/teams/statistics"
+    url = f"{_BASE_URL}/games/statistics/teams"
     params: dict = {}
     if team_id is not None:
-        params["id"] = team_id
+        params["team"] = team_id
     if season is not None:
         params["season"] = season
 
@@ -1395,7 +1401,9 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
     """
     Retrieve player statistics for NBA games.
 
-    Endpoint: GET /players/statistics
+    When *game_id* is provided, uses GET /games/statistics/players to fetch
+    in-game player stats.  When only *player_id* is given, uses
+    GET /players/statistics for season-level stats.
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
@@ -1406,12 +1414,14 @@ def fetch_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
         list[dict]: Player statistics entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}/players/statistics"
-    params: dict = {}
-    if player_id is not None:
-        params["id"] = player_id
     if game_id is not None:
-        params["game"] = game_id
+        url = f"{_BASE_URL}/games/statistics/players"
+        params: dict = {"game": game_id}
+    else:
+        url = f"{_BASE_URL}/players/statistics"
+        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
+        if player_id is not None:
+            params["player"] = player_id
 
     try:
         raw = _fetch_with_retry(url, params=params)
