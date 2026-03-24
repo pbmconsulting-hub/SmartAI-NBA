@@ -458,8 +458,9 @@ class RosterEngine:
                     injury_col = row.get("injury_indicator") or ""
                     if not injury_col:
                         continue
-                    pname = str(row.get("player_first_name", "") or "") + " " + str(row.get("player_last_name", "") or "")
-                    pname = pname.strip()
+                    first = str(row.get("player_first_name", "") or "")
+                    last = str(row.get("player_last_name", "") or "")
+                    pname = f"{first} {last}".strip()
                     if not pname:
                         continue
                     norm_key = _normalize_name(pname)

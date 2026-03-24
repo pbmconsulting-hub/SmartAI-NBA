@@ -17,6 +17,8 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests as _requests_lib  # for exception classes in retry tests
+
 # Add repo root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -527,10 +529,9 @@ class TestRequestNbaStatsRetry(unittest.TestCase):
     @patch("data.nba_stats_backup.requests.get")
     def test_retries_on_timeout(self, mock_get, mock_sleep):
         """Should retry up to _MAX_RETRIES times on Timeout."""
-        import requests as _req
         from data.nba_stats_backup import _request_nba_stats, _MAX_RETRIES
 
-        mock_get.side_effect = _req.exceptions.Timeout("read timed out")
+        mock_get.side_effect = _requests_lib.exceptions.Timeout("read timed out")
         result = _request_nba_stats("leaguedashteamstats", {"Season": "2025-26"})
         self.assertIsNone(result)
         self.assertEqual(mock_get.call_count, _MAX_RETRIES + 1)
@@ -541,10 +542,9 @@ class TestRequestNbaStatsRetry(unittest.TestCase):
     @patch("data.nba_stats_backup.requests.get")
     def test_retries_on_connection_error(self, mock_get, mock_sleep):
         """Should retry on ConnectionError."""
-        import requests as _req
         from data.nba_stats_backup import _request_nba_stats, _MAX_RETRIES
 
-        mock_get.side_effect = _req.exceptions.ConnectionError("connection reset")
+        mock_get.side_effect = _requests_lib.exceptions.ConnectionError("connection reset")
         result = _request_nba_stats("leaguedashteamstats", {})
         self.assertIsNone(result)
         self.assertEqual(mock_get.call_count, _MAX_RETRIES + 1)
@@ -567,7 +567,6 @@ class TestRequestNbaStatsRetry(unittest.TestCase):
     @patch("data.nba_stats_backup.requests.get")
     def test_succeeds_after_retry(self, mock_get, mock_sleep):
         """Should return data if a retry succeeds."""
-        import requests as _req
         from data.nba_stats_backup import _request_nba_stats
 
         good_resp = MagicMock()
@@ -575,7 +574,7 @@ class TestRequestNbaStatsRetry(unittest.TestCase):
         good_resp.json.return_value = {"resultSets": [{"headers": ["A"], "rowSet": [[1]]}]}
 
         mock_get.side_effect = [
-            _req.exceptions.Timeout("timed out"),
+            _requests_lib.exceptions.Timeout("timed out"),
             good_resp,
         ]
         result = _request_nba_stats("leaguedashteamstats", {})
