@@ -32,19 +32,27 @@ except ImportError:
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 _NBA_STATS_BASE = "https://stats.nba.com/stats"
-_REQUEST_TIMEOUT = 30
+_REQUEST_TIMEOUT = 45
+_MAX_RETRIES = 2
 
 # Headers required by stats.nba.com to accept non-browser requests.
+# stats.nba.com is strict about headers; missing or stale values cause
+# timeouts or 403 responses.  The set below mimics a modern Chrome browser.
 _NBA_STATS_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/130.0.0.0 Safari/537.36"
+        "Chrome/131.0.0.0 Safari/537.36"
     ),
     "Referer": "https://www.nba.com/",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Origin": "https://www.nba.com",
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token": "true",
+    "Connection": "keep-alive",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Host": "stats.nba.com",
 }
 
 # Cache to avoid hammering the free endpoints.
@@ -121,28 +129,56 @@ def _request_nba_stats(endpoint: str, params: dict) -> dict | None:
 
     The response shape from stats.nba.com is:
       {"resultSets": [{"headers": [...], "rowSet": [[...], ...]}, ...]}
+
+    Retries up to ``_MAX_RETRIES`` times on timeout or 5xx errors with
+    exponential back-off (2 s → 4 s).
     """
     if not _REQUESTS_AVAILABLE:
         _logger.debug("requests library unavailable — cannot call NBA stats fallback")
         return None
 
     url = f"{_NBA_STATS_BASE}/{endpoint}"
-    try:
-        resp = requests.get(
-            url,
-            headers=_NBA_STATS_HEADERS,
-            params=params,
-            timeout=_REQUEST_TIMEOUT,
-        )
-        if resp.status_code != 200:
-            _logger.warning(
-                "NBA stats fallback: HTTP %d from %s", resp.status_code, endpoint
+    last_exc: Exception | None = None
+
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = requests.get(
+                url,
+                headers=_NBA_STATS_HEADERS,
+                params=params,
+                timeout=_REQUEST_TIMEOUT,
             )
+            if resp.status_code >= 500 and attempt < _MAX_RETRIES:
+                delay = 2 ** (attempt + 1)
+                _logger.warning(
+                    "NBA stats fallback: HTTP %d from %s — retrying in %ds (attempt %d/%d)",
+                    resp.status_code, endpoint, delay, attempt + 1, _MAX_RETRIES + 1,
+                )
+                time.sleep(delay)
+                continue
+
+            if resp.status_code != 200:
+                _logger.warning(
+                    "NBA stats fallback: HTTP %d from %s", resp.status_code, endpoint
+                )
+                return None
+            return resp.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+            last_exc = exc
+            if attempt < _MAX_RETRIES:
+                delay = 2 ** (attempt + 1)
+                _logger.warning(
+                    "NBA stats fallback: %s request attempt %d/%d failed — %s — retrying in %ds",
+                    endpoint, attempt + 1, _MAX_RETRIES + 1, exc, delay,
+                )
+                time.sleep(delay)
+                continue
+        except Exception as exc:
+            _logger.warning("NBA stats fallback: %s request failed — %s", endpoint, exc)
             return None
-        return resp.json()
-    except Exception as exc:
-        _logger.warning("NBA stats fallback: %s request failed — %s", endpoint, exc)
-        return None
+
+    _logger.warning("NBA stats fallback: %s request failed — %s", endpoint, last_exc)
+    return None
 
 
 def _rows_to_dicts(result_set: dict) -> list[dict]:

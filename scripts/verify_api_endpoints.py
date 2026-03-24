@@ -165,7 +165,7 @@ def test_api_sports(api_key: str):
     headers = {"x-apisports-key": api_key}
 
     # 1. /status — Free, verifies key
-    data = _test_api_sports("/status", headers, label="[1/10] /status (key check)")
+    data = _test_api_sports("/status", headers, label="[1/13] /status (key check)")
     if data:
         resp = data.get("response") or data
         reqs = (resp if isinstance(resp, dict) else {}).get("requests", {})
@@ -175,13 +175,13 @@ def test_api_sports(api_key: str):
     # 2. /teams
     _test_api_sports("/teams", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[2/10] /teams?league=12&season=2025-2026")
+                     label="[2/13] /teams?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 3. /games (with season)
     _test_api_sports("/games", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[3/10] /games?league=12&season=2025-2026")
+                     label="[3/13] /games?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 4. /games (today)
@@ -189,41 +189,59 @@ def test_api_sports(api_key: str):
     today = date.today().isoformat()
     _test_api_sports("/games", headers,
                      params={"league": "12", "season": "2025-2026", "date": today},
-                     label=f"[4/10] /games?league=12&date={today}")
+                     label=f"[4/13] /games?league=12&date={today}")
     time.sleep(0.3)
 
     # 5. /players (with team filter)
     _test_api_sports("/players", headers,
                      params={"league": "12", "season": "2025-2026", "team": "1"},
-                     label="[5/10] /players?league=12&season=2025-2026&team=1")
+                     label="[5/13] /players?league=12&season=2025-2026&team=1")
     time.sleep(0.3)
 
     # 6. /standings
     _test_api_sports("/standings", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[6/10] /standings?league=12&season=2025-2026")
+                     label="[6/13] /standings?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 7. /injuries
     _test_api_sports("/injuries", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[7/10] /injuries?league=12&season=2025-2026")
+                     label="[7/13] /injuries?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 8. /players/statistics (need season + league + player)
     _test_api_sports("/players/statistics", headers,
                      params={"league": "12", "season": "2025-2026", "player": "236"},
-                     label="[8/10] /players/statistics?league=12&season=2025-2026&player=236")
+                     label="[8/13] /players/statistics?league=12&season=2025-2026&player=236")
     time.sleep(0.3)
 
-    # 9. /odds
+    # 9. /games/statistics/teams
+    _test_api_sports("/games/statistics/teams", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[9/13] /games/statistics/teams?league=12&season=2025-2026")
+    time.sleep(0.3)
+
+    # 10. /games/statistics/players
+    _test_api_sports("/games/statistics/players", headers,
+                     params={"league": "12", "season": "2025-2026"},
+                     label="[10/13] /games/statistics/players?league=12&season=2025-2026")
+    time.sleep(0.3)
+
+    # 11. /odds
     _test_api_sports("/odds", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[9/10] /odds?league=12&season=2025-2026")
+                     label="[11/13] /odds?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 10. /predictions
-    _test_api_sports("/predictions", headers, label="[10/10] /predictions")
+    # 12. /news
+    _test_api_sports("/news", headers,
+                     params={"league": "12"},
+                     label="[12/13] /news?league=12")
+    time.sleep(0.3)
+
+    # 13. /predictions (requires a game_id for full results)
+    _test_api_sports("/predictions", headers, label="[13/13] /predictions")
 
 
 def test_odds_api(api_key: str):
@@ -278,6 +296,165 @@ def test_odds_api(api_key: str):
     _test_odds_api(f"/sports/{SPORT_KEY}/scores", api_key,
                    params={"daysFrom": "1", "dateFormat": "iso"},
                    label="[5/5] /scores (recent results)")
+
+
+def _test_free_endpoint(url: str, headers: dict | None = None,
+                        params: dict | None = None,
+                        label: str = "") -> bool:
+    """Test a free (no-API-key) HTTP endpoint and return True on success."""
+    label = label or f"Free endpoint {url}"
+    print(f"\n  Testing: {label}")
+    print(f"    URL: {url}")
+
+    try:
+        resp = requests.get(url, headers=headers or {}, params=params, timeout=30)
+    except Exception as exc:
+        print(f"    ❌ Network error: {exc}")
+        _record(label, False, f"Network error: {exc}")
+        return False
+
+    if resp.status_code == 403:
+        print(f"    ⚠️  HTTP 403 (access denied — may need updated headers)")
+        _record(label, False, f"HTTP 403")
+        return False
+    if resp.status_code != 200:
+        print(f"    ❌ HTTP {resp.status_code}")
+        _record(label, False, f"HTTP {resp.status_code}")
+        return False
+
+    try:
+        data = resp.json()
+        if isinstance(data, dict) and data.get("resultSets"):
+            rows = data["resultSets"][0].get("rowSet", [])
+            print(f"    ✅ {len(rows)} row(s) returned")
+            _record(label, True, f"{len(rows)} rows")
+        elif isinstance(data, dict):
+            print(f"    ✅ JSON dict with keys: {list(data.keys())[:5]}")
+            _record(label, True, f"Dict: {list(data.keys())[:5]}")
+        elif isinstance(data, list):
+            print(f"    ✅ {len(data)} item(s)")
+            _record(label, True, f"{len(data)} items")
+        else:
+            print(f"    ✅ Response OK (type: {type(data).__name__})")
+            _record(label, True, "OK")
+    except Exception:
+        # Non-JSON response — still OK if status was 200
+        print(f"    ✅ HTTP 200 (non-JSON response, {len(resp.content)} bytes)")
+        _record(label, True, "HTTP 200 non-JSON")
+
+    return True
+
+
+def test_nba_stats_fallback():
+    """Test the free stats.nba.com fallback endpoints (no API key needed)."""
+    print("\n" + "=" * 70)
+    print("  NBA.COM STATS FALLBACK ENDPOINT VERIFICATION")
+    print("=" * 70)
+
+    nba_stats_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://www.nba.com/",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Origin": "https://www.nba.com",
+        "x-nba-stats-origin": "stats",
+        "x-nba-stats-token": "true",
+        "Connection": "keep-alive",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Host": "stats.nba.com",
+    }
+
+    # Determine current season
+    import datetime as _dt
+    now = _dt.date.today()
+    year = now.year if now.month >= 10 else now.year - 1
+    season = f"{year}-{str(year + 1)[-2:]}"
+
+    # 1. leaguedashteamstats (Base)
+    _test_free_endpoint(
+        "https://stats.nba.com/stats/leaguedashteamstats",
+        headers=nba_stats_headers,
+        params={
+            "Season": season, "SeasonType": "Regular Season",
+            "MeasureType": "Base", "PerMode": "PerGame", "LeagueID": "00",
+        },
+        label=f"[1/4] stats.nba.com leaguedashteamstats (Base, {season})",
+    )
+    time.sleep(1.0)
+
+    # 2. leaguedashteamstats (Advanced)
+    _test_free_endpoint(
+        "https://stats.nba.com/stats/leaguedashteamstats",
+        headers=nba_stats_headers,
+        params={
+            "Season": season, "SeasonType": "Regular Season",
+            "MeasureType": "Advanced", "PerMode": "PerGame", "LeagueID": "00",
+        },
+        label=f"[2/4] stats.nba.com leaguedashteamstats (Advanced, {season})",
+    )
+    time.sleep(1.0)
+
+    # 3. leaguedashplayerstats
+    _test_free_endpoint(
+        "https://stats.nba.com/stats/leaguedashplayerstats",
+        headers=nba_stats_headers,
+        params={
+            "Season": season, "SeasonType": "Regular Season",
+            "MeasureType": "Base", "PerMode": "PerGame", "LeagueID": "00",
+        },
+        label=f"[3/4] stats.nba.com leaguedashplayerstats ({season})",
+    )
+    time.sleep(1.0)
+
+    # 4. commonallplayers
+    _test_free_endpoint(
+        "https://stats.nba.com/stats/commonallplayers",
+        headers=nba_stats_headers,
+        params={
+            "Season": season, "LeagueID": "00", "IsOnlyCurrentSeason": "1",
+        },
+        label=f"[4/4] stats.nba.com commonallplayers ({season})",
+    )
+
+
+def test_nba_cdn_injuries():
+    """Test the NBA CDN injury data endpoints (no API key needed)."""
+    print("\n" + "=" * 70)
+    print("  NBA CDN INJURY ENDPOINT VERIFICATION")
+    print("=" * 70)
+
+    cdn_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.nba.com/",
+        "Origin": "https://www.nba.com",
+        "Connection": "keep-alive",
+        "Accept-Encoding": "gzip, deflate, br",
+    }
+
+    # 1. Primary CDN injury JSON
+    _test_free_endpoint(
+        "https://cdn.nba.com/static/json/staticData/injuries.json",
+        headers=cdn_headers,
+        label="[1/2] cdn.nba.com injuries.json",
+    )
+    time.sleep(0.5)
+
+    # 2. Headline injuries JSON
+    _test_free_endpoint(
+        "https://cdn.nba.com/static/json/staticData/headlineinjuries.json",
+        headers=cdn_headers,
+        label="[2/2] cdn.nba.com headlineinjuries.json",
+    )
 
 
 def print_summary():
@@ -355,6 +532,8 @@ Examples:
 
     test_api_sports(api_nba_key)
     test_odds_api(odds_api_key)
+    test_nba_stats_fallback()
+    test_nba_cdn_injuries()
     print_summary()
 
     sys.exit(1 if _FAIL > 0 else 0)

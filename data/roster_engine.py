@@ -363,46 +363,121 @@ class RosterEngine:
     def _load_nba_cdn_injuries(self) -> dict:
         """
         Fallback: retrieve injury data from NBA's public CDN JSON feed.
+
+        Tries two CDN URLs — the static-data path and the headlineinjuries
+        path — in case one is blocked.  Falls back to the stats.nba.com
+        ``playerindex`` endpoint as a last resort.
         """
         import requests as _requests
 
         _NBA_HEADERS = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            ),
             "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
             "Referer": "https://www.nba.com/",
             "Origin": "https://www.nba.com",
+            "Connection": "keep-alive",
+            "Accept-Encoding": "gzip, deflate, br",
         }
 
         result = {}
+
+        # ── Attempt 1: primary CDN static-data URL ────────────────────────
+        cdn_urls = [
+            "https://cdn.nba.com/static/json/staticData/injuries.json",
+            "https://cdn.nba.com/static/json/staticData/headlineinjuries.json",
+        ]
+        for cdn_url in cdn_urls:
+            try:
+                resp = _requests.get(cdn_url, headers=_NBA_HEADERS, timeout=15)
+                resp.raise_for_status()
+                data = resp.json()
+
+                injuries = (
+                    data.get("data", {}).get("PlayerInjuries", [])
+                    or data.get("data", {}).get("injuries", [])
+                    or []
+                )
+                for player in injuries:
+                    player_name = str(player.get("playerName", "") or "").strip()
+                    status_raw = str(player.get("injuryStatus", "") or "").strip()
+                    injury_note = str(player.get("injuryText", "") or "").strip()
+                    team = str(player.get("teamTricode", "") or "").strip().upper()
+
+                    if not player_name:
+                        continue
+
+                    norm_key = _normalize_name(player_name)
+                    status = _normalize_status(status_raw)
+
+                    result[norm_key] = {
+                        "status": status,
+                        "injury": injury_note,
+                        "team": team,
+                        "return_date": "",
+                        "source": "NBA CDN",
+                    }
+
+                if result:
+                    _logger.info(f"  NBA CDN injuries: {len(result)} players")
+                    return result
+            except Exception as cdn_err:
+                _logger.warning(f"NBA CDN injury URL failed ({cdn_url}): {cdn_err}")
+
+        # ── Attempt 2: stats.nba.com playerindex (more reliable) ──────────
         try:
-            cdn_url = "https://cdn.nba.com/static/json/staticData/injuries.json"
-            resp = _requests.get(cdn_url, headers=_NBA_HEADERS, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
+            _stats_headers = dict(_NBA_HEADERS)
+            _stats_headers.update({
+                "x-nba-stats-origin": "stats",
+                "x-nba-stats-token": "true",
+                "Host": "stats.nba.com",
+            })
+            from data.nba_stats_backup import _current_season_str
+            season = _current_season_str()
+            resp = _requests.get(
+                "https://stats.nba.com/stats/playerindex",
+                headers=_stats_headers,
+                params={
+                    "Season": season,
+                    "LeagueID": "00",
+                    "IsOnlyCurrentSeason": "1",
+                },
+                timeout=45,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                rs = data.get("resultSets", [{}])[0]
+                headers_list = [h.lower() for h in (rs.get("headers") or [])]
+                for row_vals in (rs.get("rowSet") or []):
+                    row = dict(zip(headers_list, row_vals))
+                    # Only include players that have an injury indicator
+                    injury_col = row.get("injury_indicator") or ""
+                    if not injury_col:
+                        continue
+                    first = str(row.get("player_first_name", "") or "")
+                    last = str(row.get("player_last_name", "") or "")
+                    pname = f"{first} {last}".strip()
+                    if not pname:
+                        continue
+                    norm_key = _normalize_name(pname)
+                    result[norm_key] = {
+                        "status": _normalize_status(injury_col),
+                        "injury": "",
+                        "team": str(row.get("team_abbreviation", "") or "").upper(),
+                        "return_date": "",
+                        "source": "NBA stats",
+                    }
+                if result:
+                    _logger.info(f"  NBA stats.nba.com playerindex injuries: {len(result)} players")
+        except Exception as stats_err:
+            _logger.warning(f"stats.nba.com playerindex injury fallback failed: {stats_err}")
 
-            for player in (data.get("data", {}).get("PlayerInjuries", []) or []):
-                player_name = str(player.get("playerName", "") or "").strip()
-                status_raw = str(player.get("injuryStatus", "") or "").strip()
-                injury_note = str(player.get("injuryText", "") or "").strip()
-                team = str(player.get("teamTricode", "") or "").strip().upper()
-
-                if not player_name:
-                    continue
-
-                norm_key = _normalize_name(player_name)
-                status = _normalize_status(status_raw)
-
-                result[norm_key] = {
-                    "status": status,
-                    "injury": injury_note,
-                    "team": team,
-                    "return_date": "",
-                    "source": "NBA CDN",
-                }
-
-            _logger.info(f"  NBA CDN injuries: {len(result)} players")
-        except Exception as cdn_err:
-            _logger.warning(f"NBA CDN injury fallback failed: {cdn_err}")
+        if not result:
+            _logger.warning("All NBA CDN/stats injury fallbacks returned 0 players")
 
         return result
 
