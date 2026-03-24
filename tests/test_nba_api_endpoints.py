@@ -2,11 +2,11 @@
 tests/test_nba_api_endpoints.py
 ------------------------------------
 Tests for API-Basketball client endpoint structure:
-  1. Base URL correctness (v1.basketball.api-sports.io)
+  1. Base URL correctness (v1.basketball.api-sports.io, v2.nba.api-sports.io)
   2. Injury endpoint uses /injuries
   3. 403 status code handling (credit exhaustion)
   4. API key management endpoints (status)
-  5. NBA endpoints (teams, players, standings, games/statistics/teams, games/statistics/players)
+  5. NBA endpoints (teams, players, standings, games/statistics/teams, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
 
@@ -347,21 +347,20 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_nba_player_stats(", self.src)
 
     def test_get_nba_player_stats_url(self):
-        """get_nba_player_stats must call /games/statistics/players or /players/statistics."""
+        """get_nba_player_stats must call /players/statistics."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        has_game_stats = "/games/statistics/players" in snippet
         has_player_stats = "/players/statistics" in snippet
-        self.assertTrue(has_game_stats or has_player_stats,
-                        "get_nba_player_stats must use /games/statistics/players or /players/statistics")
+        self.assertTrue(has_player_stats,
+                        "get_nba_player_stats must use /players/statistics")
 
     def test_get_nba_player_stats_has_params(self):
-        """get_nba_player_stats must accept player and game parameters."""
+        """get_nba_player_stats must accept player id and game parameters."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 1200]
-        self.assertIn('"player"', snippet)
+        self.assertIn('"id"', snippet)
         self.assertIn('"game"', snippet)
 
     # -- get_predictions --

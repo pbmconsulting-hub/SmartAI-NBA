@@ -64,7 +64,7 @@ except ImportError:
 
 _BASE_URL = "https://v1.basketball.api-sports.io"
 
-# v2 NBA API base URL — used exclusively for the /players endpoint.
+# v2 NBA API base URL — used for /players and /players/statistics endpoints.
 _PLAYERS_BASE_URL = "https://v2.nba.api-sports.io"
 
 # ── API Endpoints ─────────────────────────────────────────────────────────────
@@ -75,7 +75,6 @@ ENDPOINT_GAMES = "/games"
 ENDPOINT_PLAYERS = "/players"
 ENDPOINT_PLAYER_STATS = "/players/statistics"
 ENDPOINT_TEAM_GAME_STATS = "/games/statistics/teams"
-ENDPOINT_PLAYER_GAME_STATS = "/games/statistics/players"
 ENDPOINT_INJURIES = "/injuries"
 ENDPOINT_STANDINGS = "/standings"
 ENDPOINT_ODDS = "/odds"
@@ -377,6 +376,22 @@ def _request_with_retry(url: str, params: dict | None = None) -> dict | list | N
 
 
 # ── Private data-extraction helpers ──────────────────────────────────────────
+
+def _parse_minutes(value, default: float = 0.0) -> float:
+    """Parse a minutes value that may be in ``"MM:SS"`` format.
+
+    The v2 NBA API returns minutes as strings like ``"21:56"`` (21 min 56 sec).
+    This helper converts to a decimal float (e.g. 21.93).  Plain numeric
+    values are passed through via :func:`_safe_float`.
+    """
+    if isinstance(value, str) and ":" in value:
+        try:
+            parts = value.split(":")
+            return float(parts[0]) + float(parts[1]) / 60.0
+        except (ValueError, IndexError):
+            return default
+    return _safe_float(value, default)
+
 
 def _safe_float(value, default: float = 0.0) -> float:
     """Coerce *value* to float, returning *default* on failure."""
@@ -721,7 +736,12 @@ def get_player_stats() -> list[dict]:
     """
     Get current-season player averages and standard deviations.
 
+    Endpoint: GET /players/statistics  (v2 NBA API — v2.nba.api-sports.io)
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
+
+    The v2 endpoint returns per-game stat rows.  When multiple games are
+    returned for the same player we aggregate them into averages and
+    standard deviations.
 
     Returns:
         list[dict]: Each dict has keys:
@@ -733,175 +753,23 @@ def get_player_stats() -> list[dict]:
             steals_std, blocks_std, turnovers_std
         Returns [] on failure.
     """
-    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}"
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYER_STATS}"
     params = {"season": int(_CURRENT_SEASON_YEAR)}
 
     try:
         raw = _request_with_retry(url, params=params)
         if raw:
-            players_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("players") or raw.get("data") or [])
-            if isinstance(players_raw, list):
-                players: list[dict] = []
-                has_real_stats = False
-                for p in players_raw:
-                    if not isinstance(p, dict):
-                        continue
-                    stats = p.get("stats") or p.get("averages") or p  # allow flat or nested shape
-
-                    # ── Resolve player name ──
-                    # API-Basketball v1 may return firstname/lastname
-                    # instead of a single "name" field.
-                    name = _safe_str(p.get("name") or p.get("full_name"))
-                    if not name:
-                        first = _safe_str(p.get("firstname") or p.get("first_name"))
-                        last = _safe_str(p.get("lastname") or p.get("last_name"))
-                        name = f"{first} {last}".strip()
-
-                    # ── Resolve team abbreviation ──
-                    # API-Basketball v1 nests team as a dict:
-                    #   {"team": {"id": 145, "name": "Los Angeles Lakers"}}
-                    team_val = p.get("team") or p.get("team_abbreviation") or ""
-                    if isinstance(team_val, dict):
-                        team_abbrev = _safe_str(
-                            team_val.get("abbreviation")
-                            or team_val.get("tricode")
-                        )
-                        if not team_abbrev:
-                            team_abbrev = _team_name_to_abbrev(
-                                _safe_str(team_val.get("name"))
-                            )
-                    else:
-                        team_abbrev = _safe_str(team_val)
-
-                    pts = _safe_float(stats.get("points") or stats.get("pts", 0))
-                    if pts > 0:
-                        has_real_stats = True
-
-                    # ── Resolve position ──
-                    # v2 NBA API nests position under leagues.standard.pos
-                    pos = _safe_str(p.get("position") or p.get("pos"))
-                    if not pos:
-                        leagues = p.get("leagues")
-                        if isinstance(leagues, dict):
-                            std = leagues.get("standard")
-                            if isinstance(std, dict):
-                                pos = _safe_str(std.get("pos"))
-
-                    players.append({
-                        "player_id":     _safe_str(p.get("player_id") or p.get("id")),
-                        "name":          name,
-                        "team":          team_abbrev,
-                        "position":      pos,
-                        # Averages
-                        "minutes_avg":   _safe_float(stats.get("minutes") or stats.get("min", 0)),
-                        "points_avg":    pts,
-                        "rebounds_avg":  _safe_float(stats.get("rebounds") or stats.get("reb", 0)),
-                        "assists_avg":   _safe_float(stats.get("assists") or stats.get("ast", 0)),
-                        "threes_avg":    _safe_float(stats.get("threes") or stats.get("three_pm") or stats.get("fg3m", 0)),
-                        "steals_avg":    _safe_float(stats.get("steals") or stats.get("stl", 0)),
-                        "blocks_avg":    _safe_float(stats.get("blocks") or stats.get("blk", 0)),
-                        "turnovers_avg": _safe_float(stats.get("turnovers") or stats.get("tov", 0)),
-                        "ft_pct":        _safe_float(stats.get("ft_pct") or stats.get("ftm_pct", 0)),
-                        "usage_rate":    _safe_float(stats.get("usage_rate") or stats.get("usg_pct", 0)),
-                        # Standard deviations (may not be present in all responses)
-                        "points_std":    _safe_float(stats.get("points_std", 0)),
-                        "rebounds_std":  _safe_float(stats.get("rebounds_std", 0)),
-                        "assists_std":   _safe_float(stats.get("assists_std", 0)),
-                        "threes_std":    _safe_float(stats.get("threes_std", 0)),
-                        "steals_std":    _safe_float(stats.get("steals_std", 0)),
-                        "blocks_std":    _safe_float(stats.get("blocks_std", 0)),
-                        "turnovers_std": _safe_float(stats.get("turnovers_std", 0)),
-                    })
-                # Return if we got real stat data, OR if the response is in a
-                # flat/processed format (team as string) — the latter indicates
-                # the data was already enriched or is from a different source.
-                is_metadata_only = (
-                    not has_real_stats
-                    and players
-                    and all(isinstance(p_raw.get("team"), dict) for p_raw in players_raw if isinstance(p_raw, dict))
-                )
-                if players and not is_metadata_only:
-                    return players
-                if is_metadata_only:
-                    _logger.info(
-                        "get_player_stats: API returned %d player(s) but no "
-                        "stat fields — treating as metadata-only response.",
-                        len(players),
-                    )
-            else:
+            stats_raw = raw if isinstance(raw, list) else (raw.get("response") or raw.get("data") or [])
+            if isinstance(stats_raw, list) and stats_raw:
+                result = _aggregate_player_stats(stats_raw)
+                if result:
+                    return result
+            elif not isinstance(stats_raw, list):
                 _logger.warning("get_player_stats: unexpected response shape from API-NBA")
     except Exception as exc:
         _logger.warning("get_player_stats API-NBA failed: %s", exc)
 
-    # ── Fallback 1: API-Basketball v1 /players/statistics ─────────────────
-    # The /players endpoint may only return metadata; /players/statistics
-    # (without a player= filter) can return season-level stat rows.
-    try:
-        stats_url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
-        stats_params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
-        raw_stats = _request_with_retry(stats_url, params=stats_params)
-        if raw_stats:
-            stats_list = (
-                raw_stats if isinstance(raw_stats, list)
-                else (raw_stats.get("response") or raw_stats.get("data") or [])
-            )
-            if isinstance(stats_list, list) and stats_list:
-                players_from_stats: list[dict] = []
-                for entry in stats_list:
-                    if not isinstance(entry, dict):
-                        continue
-
-                    # Resolve player info (may be nested)
-                    player_obj = entry.get("player")
-                    if isinstance(player_obj, dict):
-                        pid = _safe_str(player_obj.get("id"))
-                        name = _safe_str(player_obj.get("name"))
-                        if not name:
-                            name = f"{_safe_str(player_obj.get('firstname'))} {_safe_str(player_obj.get('lastname'))}".strip()
-                    else:
-                        pid = _safe_str(entry.get("player_id") or entry.get("id"))
-                        name = _safe_str(entry.get("name") or entry.get("player_name"))
-
-                    # Resolve team
-                    team_obj = entry.get("team")
-                    if isinstance(team_obj, dict):
-                        team_abbrev = _team_name_to_abbrev(_safe_str(team_obj.get("name")))
-                    else:
-                        team_abbrev = _safe_str(team_obj)
-
-                    players_from_stats.append({
-                        "player_id":     pid,
-                        "name":          name,
-                        "team":          team_abbrev,
-                        "position":      _safe_str(entry.get("position") or entry.get("pos")),
-                        "minutes_avg":   _safe_float(entry.get("minutes") or entry.get("min", 0)),
-                        "points_avg":    _safe_float(entry.get("points") or entry.get("pts", 0)),
-                        "rebounds_avg":  _safe_float(entry.get("rebounds") or entry.get("reb", 0)),
-                        "assists_avg":   _safe_float(entry.get("assists") or entry.get("ast", 0)),
-                        "threes_avg":    _safe_float(entry.get("threes") or entry.get("fg3m", 0)),
-                        "steals_avg":    _safe_float(entry.get("steals") or entry.get("stl", 0)),
-                        "blocks_avg":    _safe_float(entry.get("blocks") or entry.get("blk", 0)),
-                        "turnovers_avg": _safe_float(entry.get("turnovers") or entry.get("tov", 0)),
-                        "ft_pct":        _safe_float(entry.get("ft_pct") or entry.get("ftm_pct", 0)),
-                        "usage_rate":    0.0,
-                        "points_std":    0.0,
-                        "rebounds_std":  0.0,
-                        "assists_std":   0.0,
-                        "threes_std":    0.0,
-                        "steals_std":    0.0,
-                        "blocks_std":    0.0,
-                        "turnovers_std": 0.0,
-                    })
-                if players_from_stats:
-                    _logger.info(
-                        "get_player_stats: got %d player(s) from /players/statistics",
-                        len(players_from_stats),
-                    )
-                    return players_from_stats
-    except Exception as exc:
-        _logger.warning("get_player_stats /players/statistics fallback failed: %s", exc)
-
-    # ── Fallback 2: free NBA.com stats ────────────────────────────────────
+    # ── Fallback: free NBA.com stats ──────────────────────────────────────
     try:
         from data.nba_stats_backup import get_player_stats_backup
         _logger.info("get_player_stats: falling back to free NBA.com stats endpoint")
@@ -909,6 +777,117 @@ def get_player_stats() -> list[dict]:
     except Exception as exc:
         _logger.warning("get_player_stats fallback also failed: %s", exc)
         return []
+
+
+def _aggregate_player_stats(stats_raw: list) -> list[dict]:
+    """Aggregate per-game v2 stat rows into per-player averages/std.
+
+    If the data is already one-row-per-player (no ``game`` field) the
+    rows are mapped directly without aggregation.
+    """
+    import statistics as _stats_mod
+
+    # ── Stat keys we track (v2 field name → output field) ─────────────
+    _STAT_FIELDS = {
+        "points":    "points",
+        "totReb":    "rebounds",
+        "assists":   "assists",
+        "tpm":       "threes",
+        "steals":    "steals",
+        "blocks":    "blocks",
+        "turnovers": "turnovers",
+    }
+
+    # Collect per-player game rows
+    per_player: dict[str, dict] = {}   # pid → {"meta": {...}, "games": [...]}
+    for entry in stats_raw:
+        if not isinstance(entry, dict):
+            continue
+
+        # ── Resolve player info ───────────────────────────────────
+        player_obj = entry.get("player")
+        if isinstance(player_obj, dict):
+            pid = _safe_str(player_obj.get("id"))
+            name = _safe_str(player_obj.get("name"))
+            if not name:
+                name = f"{_safe_str(player_obj.get('firstname'))} {_safe_str(player_obj.get('lastname'))}".strip()
+        else:
+            pid = _safe_str(entry.get("player_id") or entry.get("id"))
+            name = _safe_str(entry.get("name") or entry.get("player_name"))
+
+        if not pid:
+            continue
+
+        # ── Resolve team abbreviation ─────────────────────────────
+        team_obj = entry.get("team")
+        if isinstance(team_obj, dict):
+            team_abbrev = _safe_str(
+                team_obj.get("code")
+                or team_obj.get("abbreviation")
+                or team_obj.get("tricode")
+            )
+            if not team_abbrev:
+                team_abbrev = _team_name_to_abbrev(_safe_str(team_obj.get("name")))
+        else:
+            team_abbrev = _safe_str(team_obj)
+
+        # ── Resolve position ──────────────────────────────────────
+        pos = _safe_str(entry.get("pos") or entry.get("position"))
+
+        # ── Collect stat values ───────────────────────────────────
+        game_row: dict[str, float] = {}
+        game_row["minutes"] = _parse_minutes(entry.get("min") or entry.get("minutes", 0))
+        for v2_key, out_key in _STAT_FIELDS.items():
+            game_row[out_key] = _safe_float(
+                entry.get(v2_key)
+                or entry.get(out_key)
+                or entry.get({"rebounds": "reb", "threes": "fg3m", "turnovers": "tov"}.get(out_key, ""), 0)
+            )
+        game_row["ft_pct"] = _safe_float(entry.get("ftp") or entry.get("ft_pct") or entry.get("ftm_pct", 0))
+        game_row["usage_rate"] = _safe_float(entry.get("usage_rate") or entry.get("usg_pct", 0))
+
+        if pid not in per_player:
+            per_player[pid] = {"meta": {"pid": pid, "name": name, "team": team_abbrev, "pos": pos}, "games": []}
+        per_player[pid]["games"].append(game_row)
+
+    # ── Build aggregated output ───────────────────────────────────────
+    players: list[dict] = []
+    _avg_keys = ["minutes", "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers"]
+    for pid, info in per_player.items():
+        meta = info["meta"]
+        games = info["games"]
+        n = len(games)
+
+        row: dict = {
+            "player_id": meta["pid"],
+            "name":      meta["name"],
+            "team":      meta["team"],
+            "position":  meta["pos"],
+        }
+
+        for key in _avg_keys:
+            vals = [g[key] for g in games]
+            avg = sum(vals) / n if n else 0.0
+            row[f"{key}_avg"] = round(avg, 2)
+            if n >= 2:
+                row[f"{key}_std"] = round(_stats_mod.stdev(vals), 2) if key != "minutes" else 0.0
+            else:
+                row[f"{key}_std"] = 0.0 if key != "minutes" else 0.0
+
+        # ft_pct and usage_rate are not std-tracked
+        ft_vals = [g["ft_pct"] for g in games]
+        row["ft_pct"] = round(sum(ft_vals) / n, 2) if n else 0.0
+        usage_vals = [g["usage_rate"] for g in games]
+        row["usage_rate"] = round(sum(usage_vals) / n, 2) if n else 0.0
+
+        # Remove minutes_std (not part of schema)
+        row.pop("minutes_std", None)
+
+        players.append(row)
+
+    if players:
+        _logger.info("get_player_stats: aggregated %d player(s) from v2 /players/statistics", len(players))
+    return players
 
 
 def _has_real_team_stats(teams: list[dict]) -> bool:
@@ -1315,8 +1294,8 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
         _logger.warning("API-NBA key not configured — cannot retrieve player game log.")
         return []
 
-    url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
-    params = {"player": player_id, "league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYER_STATS}"
+    params = {"id": player_id, "season": int(_CURRENT_SEASON_YEAR)}
     # Use _build_cache_key so the outer cache key matches the one
     # _request_with_retry uses internally — avoids duplicate cache entries.
     cache_key = _build_cache_key(url, params)
@@ -1339,15 +1318,15 @@ def get_player_game_log(player_id, last_n_games: int = 20) -> list:
                 "game_date": _safe_str(g.get("date", g.get("game_date", ""))),
                 "matchup": _safe_str(g.get("matchup", g.get("opponent", ""))),
                 "win_loss": _safe_str(g.get("result", g.get("win_loss", g.get("wl", "")))),
-                "minutes": _safe_float(g.get("minutes", g.get("min", 0))),
+                "minutes": _parse_minutes(g.get("min") or g.get("minutes", 0)),
                 "pts": _safe_float(g.get("points", g.get("pts", 0))),
-                "reb": _safe_float(g.get("rebounds", g.get("reb", 0))),
+                "reb": _safe_float(g.get("totReb") or g.get("rebounds", g.get("reb", 0))),
                 "ast": _safe_float(g.get("assists", g.get("ast", 0))),
                 "stl": _safe_float(g.get("steals", g.get("stl", 0))),
                 "blk": _safe_float(g.get("blocks", g.get("blk", 0))),
                 "tov": _safe_float(g.get("turnovers", g.get("tov", 0))),
-                "fg3m": _safe_float(g.get("threes_made", g.get("fg3m", 0))),
-                "ft_pct": _safe_float(g.get("ft_pct", g.get("free_throw_pct", 0))),
+                "fg3m": _safe_float(g.get("tpm") or g.get("threes_made", g.get("fg3m", 0))),
+                "ft_pct": _safe_float(g.get("ftp") or g.get("ft_pct", g.get("free_throw_pct", 0))),
             })
 
         result = games[:last_n_games]
@@ -1893,9 +1872,10 @@ def get_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
     """
     Retrieve player statistics for NBA games.
 
-    When *game_id* is provided, uses GET /games/statistics/players to retrieve
-    in-game player stats.  When only *player_id* is given, uses
-    GET /players/statistics for season-level stats.
+    Endpoint: GET /players/statistics  (v2 NBA API — v2.nba.api-sports.io)
+
+    When *game_id* is provided, filters for that specific game.
+    When only *player_id* is given, returns season-level per-game stats.
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
@@ -1906,14 +1886,14 @@ def get_nba_player_stats(player_id=None, game_id=None) -> list[dict]:
         list[dict]: Player statistics entries.
         Returns [] on failure.
     """
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYER_STATS}"
+    params: dict = {}
     if game_id is not None:
-        url = f"{_BASE_URL}{ENDPOINT_PLAYER_GAME_STATS}"
-        params: dict = {"game": game_id}
-    else:
-        url = f"{_BASE_URL}{ENDPOINT_PLAYER_STATS}"
-        params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON}
-        if player_id is not None:
-            params["player"] = player_id
+        params["game"] = game_id
+    if player_id is not None:
+        params["id"] = player_id
+    if game_id is None:
+        params["season"] = int(_CURRENT_SEASON_YEAR)
 
     try:
         raw = _request_with_retry(url, params=params)
