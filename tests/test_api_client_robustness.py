@@ -99,7 +99,7 @@ class TestApiNba422Handling(unittest.TestCase):
 class TestEmptyResponseBodyHandling(unittest.TestCase):
     """Verify both API clients check for empty response bodies before .json()."""
 
-    def test_clearsports_checks_empty_body(self):
+    def test_nba_api_checks_empty_body(self):
         """ApiNba _request_with_retry must check resp.text before .json()."""
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("not resp.text", src,
@@ -417,7 +417,7 @@ class TestFetchTodaysGamesValidation(unittest.TestCase):
 
     @patch("data.nba_data_service._enrich_games_with_standings", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_predictions", side_effect=lambda g: g)
-    @patch("data.nba_data_service._enrich_games_with_clearsports_odds", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_nba_api_odds", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
     @patch("data.nba_data_service._build_games_from_odds_api", return_value=[
         {"game_id": "fallback_1", "home_team": "LAL", "away_team": "BOS", "vegas_spread": -3.0, "game_total": 220}

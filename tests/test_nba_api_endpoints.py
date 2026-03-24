@@ -1,5 +1,5 @@
 """
-tests/test_clearsports_endpoints.py
+tests/test_nba_api_endpoints.py
 ------------------------------------
 Tests for API-Basketball client endpoint structure:
   1. Base URL correctness (v1.basketball.api-sports.io)
@@ -47,14 +47,14 @@ class TestBaseURL(unittest.TestCase):
             "_BASE_URL must be https://v1.basketball.api-sports.io",
         )
 
-    def test_base_url_not_old_clearsports(self):
-        """_BASE_URL must NOT use the old clearsportsapi.com domain."""
+    def test_base_url_not_old_domain(self):
+        """_BASE_URL must NOT use an old or deprecated domain."""
         for line in self.src.splitlines():
             if line.strip().startswith("_BASE_URL"):
                 self.assertNotIn(
                     'clearsportsapi.com',
                     line,
-                    "_BASE_URL must not use old clearsportsapi.com domain",
+                    "_BASE_URL must not use old or deprecated domain",
                 )
 
 

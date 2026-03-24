@@ -2,7 +2,7 @@
 tests/test_odds_historical_wiring.py
 -------------------------------------
 Tests for the odds and historical data endpoint wiring:
-  1. _enrich_games_with_clearsports_odds fills missing odds from ApiNba
+  1. _enrich_games_with_nba_api_odds fills missing odds from NBA API
   2. _enrich_games_with_predictions adds ApiNba predictions to games
   3. get_todays_games calls new enrichment functions
   4. refresh_historical_data_for_tonight retrieves ApiNba player stats
@@ -79,14 +79,14 @@ SAMPLE_CS_PREDICTIONS = [
 ]
 
 
-# ── Section 1: _enrich_games_with_clearsports_odds ───────────────────────────
+# ── Section 1: _enrich_games_with_nba_api_odds ───────────────────────────
 
 class TestEnrichWithApiNbaOdds(unittest.TestCase):
     """Test that ApiNba odds fill in missing game-level odds."""
 
     def setUp(self):
-        from data.nba_data_service import _enrich_games_with_clearsports_odds
-        self.fn = _enrich_games_with_clearsports_odds
+        from data.nba_data_service import _enrich_games_with_nba_api_odds
+        self.fn = _enrich_games_with_nba_api_odds
 
     @patch("data.nba_api_client.get_game_odds", return_value=SAMPLE_CS_ODDS)
     def test_fills_missing_spread_and_total(self, mock_cs_odds):
@@ -197,20 +197,20 @@ class TestFetchTodaysGamesNewEnrichment(unittest.TestCase):
 
     @patch("data.nba_data_service._enrich_games_with_standings", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_predictions", side_effect=lambda g: g)
-    @patch("data.nba_data_service._enrich_games_with_clearsports_odds", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_nba_api_odds", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
     @patch("data.nba_api_client.get_todays_games")
-    def test_calls_clearsports_odds_enrichment(
+    def test_calls_nba_api_odds_enrichment(
         self, mock_cs, mock_odds, mock_cs_odds, mock_preds, mock_standings
     ):
-        """get_todays_games should call _enrich_games_with_clearsports_odds."""
+        """get_todays_games should call _enrich_games_with_nba_api_odds."""
         mock_cs.return_value = SAMPLE_GAMES
         self.fn()
         mock_cs_odds.assert_called_once()
 
     @patch("data.nba_data_service._enrich_games_with_standings", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_predictions", side_effect=lambda g: g)
-    @patch("data.nba_data_service._enrich_games_with_clearsports_odds", side_effect=lambda g: g)
+    @patch("data.nba_data_service._enrich_games_with_nba_api_odds", side_effect=lambda g: g)
     @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
     @patch("data.nba_api_client.get_todays_games")
     def test_calls_predictions_enrichment(
@@ -333,20 +333,20 @@ class TestOddsWiringSourceLevel(unittest.TestCase):
             pathlib.Path(__file__).parent.parent / "data" / "nba_data_service.py"
         ).read_text(encoding="utf-8")
 
-    def test_clearsports_odds_enrichment_exists(self):
-        """_enrich_games_with_clearsports_odds function must exist."""
-        self.assertIn("def _enrich_games_with_clearsports_odds(", self.src)
+    def test_nba_api_odds_enrichment_exists(self):
+        """_enrich_games_with_nba_api_odds function must exist."""
+        self.assertIn("def _enrich_games_with_nba_api_odds(", self.src)
 
     def test_predictions_enrichment_exists(self):
         """_enrich_games_with_predictions function must exist."""
         self.assertIn("def _enrich_games_with_predictions(", self.src)
 
     def test_get_todays_games_calls_cs_odds(self):
-        """get_todays_games must call _enrich_games_with_clearsports_odds."""
+        """get_todays_games must call _enrich_games_with_nba_api_odds."""
         idx = self.src.find("def get_todays_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 3000]
-        self.assertIn("_enrich_games_with_clearsports_odds", snippet)
+        self.assertIn("_enrich_games_with_nba_api_odds", snippet)
 
     def test_get_todays_games_calls_predictions(self):
         """get_todays_games must call _enrich_games_with_predictions."""

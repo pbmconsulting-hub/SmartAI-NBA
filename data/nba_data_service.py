@@ -679,7 +679,7 @@ def _enrich_games_with_odds_api(games: list) -> list:
     return games
 
 
-def _enrich_games_with_clearsports_odds(games: list) -> list:
+def _enrich_games_with_nba_api_odds(games: list) -> list:
     """
     Supplement game odds with API-NBA ``get_game_odds`` data.
 
@@ -709,7 +709,7 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
         if not cs_odds_list:
             return games
     except Exception as exc:
-        _logger.debug("_enrich_games_with_clearsports_odds: API-NBA game-odds unavailable — %s", exc)
+        _logger.debug("_enrich_games_with_nba_api_odds: API-NBA game-odds unavailable — %s", exc)
         return games
 
     # Build lookup by game_id for direct matching
@@ -750,7 +750,7 @@ def _enrich_games_with_clearsports_odds(games: list) -> list:
 
     if filled:
         _logger.info(
-            "_enrich_games_with_clearsports_odds: filled %d odds field(s) from API-NBA.", filled
+            "_enrich_games_with_nba_api_odds: filled %d odds field(s) from API-NBA.", filled
         )
     return games
 
@@ -931,7 +931,7 @@ def get_todays_games():
     games = _enrich_games_with_odds_api(games)
 
     # Supplement with API-NBA game-level odds (fills gaps the Odds API missed)
-    games = _enrich_games_with_clearsports_odds(games)
+    games = _enrich_games_with_nba_api_odds(games)
 
     # Enrich with API-NBA AI predictions (predicted winner, spread, total)
     games = _enrich_games_with_predictions(games)

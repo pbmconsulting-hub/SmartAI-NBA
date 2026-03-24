@@ -102,7 +102,7 @@ class TestBuildGamesFromOddsApi(unittest.TestCase):
         self.assertIn("bookmaker_count", game)
 
     @patch("data.odds_client.get_game_odds", return_value=SAMPLE_ODDS_API_GAMES)
-    def test_game_format_matches_clearsports(self, mock_odds):
+    def test_game_format_matches_nba_api(self, mock_odds):
         """Game dicts must have all keys that ApiNba would provide."""
         games = self.fn()
         required_keys = [
@@ -161,7 +161,7 @@ class TestFetchTodaysGamesFallback(unittest.TestCase):
     @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
     @patch("data.nba_data_service._build_games_from_odds_api")
     @patch("data.nba_api_client.get_todays_games", return_value=[])
-    def test_fallback_called_when_clearsports_empty(
+    def test_fallback_called_when_nba_api_empty(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_standings
     ):
         """When ApiNba returns [], the Odds API fallback should be invoked."""
@@ -179,7 +179,7 @@ class TestFetchTodaysGamesFallback(unittest.TestCase):
     @patch("data.nba_data_service._enrich_games_with_odds_api", side_effect=lambda g: g)
     @patch("data.nba_data_service._build_games_from_odds_api")
     @patch("data.nba_api_client.get_todays_games")
-    def test_fallback_not_called_when_clearsports_succeeds(
+    def test_fallback_not_called_when_nba_api_succeeds(
         self, mock_cs, mock_build, mock_enrich_odds, mock_enrich_standings
     ):
         """When ApiNba returns games, Odds API fallback should NOT be called."""

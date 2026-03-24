@@ -24,7 +24,7 @@ _OA_SRC = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
 class TestValidateApiKeyFunctionExists(unittest.TestCase):
     """validate_nba_api_key must be defined in both API clients."""
 
-    def test_clearsports_has_validate_api_key(self):
+    def test_nba_api_client_has_validate_api_key(self):
         src = _CS_SRC.read_text(encoding="utf-8")
         self.assertIn("def validate_nba_api_key(", src)
 

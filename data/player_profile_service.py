@@ -359,6 +359,3 @@ def enrich_player_data(
         "season_stats": _extract_season_stats(player_row),
     }
 
-
-# ── Backward-compatible aliases (deprecated — use get_* names instead) ──
-lookup_player_id = get_player_id
