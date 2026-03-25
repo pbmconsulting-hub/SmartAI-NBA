@@ -866,7 +866,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
         team_lookup = _build_team_lookup(events)
         markets_param = ",".join(_PROP_MARKETS)
         bookmakers_param = ",".join(US_BOOKMAKER_KEYS)
-        retrieved_at = datetime.datetime.utcnow().isoformat()
+        retrieved_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         game_date  = _today_str()
 
         target_books = set(US_BOOKMAKER_KEYS)
