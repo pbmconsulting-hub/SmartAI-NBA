@@ -785,8 +785,8 @@ def fetch_draftkings_props(api_key=None):
         events = events_resp.json()
 
     except requests.exceptions.HTTPError as err:
-        # HTTPError is raised by raise_for_status() — events_resp is guaranteed to exist
-        status_code = events_resp.status_code
+        # err.response is the Response object that raise_for_status() raised from
+        status_code = err.response.status_code if err.response is not None else 0
         if status_code == 429:
             _logger.warning("[DraftKings] Rate limited (429). Backing off.")
             if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
@@ -883,8 +883,8 @@ def fetch_draftkings_props(api_key=None):
                 _cache_set(props_url, event_data)
 
             except requests.exceptions.HTTPError as err:
-                # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
-                if props_resp.status_code == 422:
+                # err.response is the Response object that raise_for_status() raised from
+                if err.response is not None and err.response.status_code == 422:
                     _logger.warning("[DraftKings] API quota exceeded. Stopping early.")
                     break
                 _logger.error(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
