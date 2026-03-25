@@ -278,8 +278,7 @@ if "kelly_multiplier" not in st.session_state:
     st.session_state["kelly_multiplier"] = 0.25
 if "selected_platforms" not in st.session_state:
     st.session_state["selected_platforms"] = [
-        "FanDuel", "DraftKings", "BetMGM", "Caesars",
-        "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+        "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
     ]
 if "todays_games" not in st.session_state:
     st.session_state["todays_games"] = []

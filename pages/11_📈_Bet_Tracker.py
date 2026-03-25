@@ -227,7 +227,7 @@ st.divider()
 
 platform_filter = st.radio(
     "Filter by Platform",
-    ["🏠 All Sportsbooks", "🔵 FanDuel", "🟢 DraftKings", "🟣 BetMGM", "🔴 Caesars"],
+    ["🏠 All Platforms", "🟢 PrizePicks", "🟣 Underdog Fantasy", "🔵 DraftKings Pick6"],
     horizontal=True,
     label_visibility="collapsed",
 )
@@ -236,16 +236,14 @@ platform_filter = st.radio(
 def _platform_filter_fn(bet):
     """Return True if this bet matches the selected platform filter."""
     plat = str(bet.get("platform") or "").lower()
-    if platform_filter == "🏠 All Sportsbooks":
+    if platform_filter == "🏠 All Platforms":
         return True
-    elif platform_filter == "🔵 FanDuel":
-        return "fanduel" in plat or plat == "fd"
-    elif platform_filter == "🟢 DraftKings":
-        return "draftkings" in plat or plat == "dk"
-    elif platform_filter == "🟣 BetMGM":
-        return "betmgm" in plat or plat == "mgm"
-    elif platform_filter == "🔴 Caesars":
-        return "caesars" in plat or plat == "czr"
+    elif platform_filter == "🟢 PrizePicks":
+        return "prizepicks" in plat
+    elif platform_filter == "🟣 Underdog Fantasy":
+        return "underdog" in plat
+    elif platform_filter == "🔵 DraftKings Pick6":
+        return "draftkings" in plat or "pick6" in plat or plat == "dk"
     return True
 
 st.divider()
@@ -572,8 +570,7 @@ with tab_ai_picks:
     all_bets_for_ai = load_all_bets()
     ai_bets_raw = [
         b for b in all_bets_for_ai
-        if b.get("platform", "") in ("SmartAI-Auto", "FanDuel", "DraftKings", "BetMGM",
-                                      "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers")
+        if b.get("platform", "") in ("SmartAI-Auto", "PrizePicks", "Underdog Fantasy", "DraftKings Pick6")
         or str(b.get("notes", "")).startswith("Auto-logged")
         or int(b.get("auto_logged", 0) or 0) == 1
     ]
@@ -1689,7 +1686,7 @@ with tab_log:
             direction  = st.radio("Direction", ["OVER", "UNDER"], horizontal=True)
 
         with col2:
-            platform   = st.selectbox("Platform", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"])
+            platform   = st.selectbox("Platform", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"])
             tier       = st.selectbox("Tier", ["Platinum", "Gold", "Silver", "Bronze"])
             entry_fee  = st.number_input("Entry Fee ($)", min_value=0.0, max_value=10000.0, value=10.0, step=5.0)
             team       = st.text_input("Team (optional)", placeholder="e.g., LAL")

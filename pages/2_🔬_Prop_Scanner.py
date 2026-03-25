@@ -107,7 +107,7 @@ st.markdown(get_education_box_html(
     Example: "LeBron James Points OVER 24.5" — you win if LeBron scores 25 or more points.<br><br>
     <strong>How to read a prop line</strong>: The number (24.5) is the threshold. 
     Always bet OVER or UNDER — never equal (that's a push/tie).<br><br>
-    <strong>Platforms</strong>: FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, Hard Rock Bet, BetRivers — each platform may have different line values.
+    <strong>Platforms</strong>: PrizePicks, Underdog Fantasy, DraftKings Pick6 — each platform may have different line values.
     """
 ), unsafe_allow_html=True)
 
@@ -130,8 +130,7 @@ valid_stat_types = (
     + ["double_double", "triple_double"]
 )
 valid_platforms = [
-    "FanDuel", "DraftKings", "BetMGM", "Caesars",
-    "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+    "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
 ]
 
 # ── Import platform service (optional — app works without it) ──
@@ -840,8 +839,8 @@ else:
     st.markdown("**Required CSV format:**")
     st.code(
         "player_name,team,stat_type,line,platform,game_date\n"
-        "LeBron James,LAL,points,24.5,FanDuel,2026-03-05\n"
-        "Stephen Curry,GSW,threes,3.5,DraftKings,2026-03-05",
+        "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05\n"
+        "Stephen Curry,GSW,threes,3.5,DraftKings Pick6,2026-03-05",
         language="csv",
     )
 
@@ -934,7 +933,7 @@ st.markdown("Paste prop lines directly as CSV text:")
 
 quick_add_text = st.text_area(
     "Paste CSV data here",
-    placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,FanDuel\nStephen Curry,GSW,threes,3.5,DraftKings",
+    placeholder="player_name,team,stat_type,line,platform\nLeBron James,LAL,points,24.5,PrizePicks\nStephen Curry,GSW,threes,3.5,DraftKings Pick6",
     height=150,
 )
 

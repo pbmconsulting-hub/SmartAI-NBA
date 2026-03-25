@@ -740,7 +740,7 @@ AMBIENT_POOLS = {
         "Build that entry and let's put together a MASTERPIECE!",
         "Parlay construction is an ART. And I'm the artist!",
         "Stack those correlated picks for MAXIMUM value!",
-        "FanDuel, DraftKings, BetMGM — I build for them ALL!",
+        "PrizePicks, Underdog Fantasy, DraftKings Pick6 — I build for them ALL!",
         "The entry builder optimizes your slip AUTOMATICALLY!",
         "Don't just pick random props. BUILD a smart entry!",
         "Correlation is KEY when building entries. I handle that!",

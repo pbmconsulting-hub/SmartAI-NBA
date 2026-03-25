@@ -65,7 +65,7 @@ inject_joseph_floating()
 st.title("📡 Data Feed")
 st.markdown(
     "Pull real, up-to-date NBA stats and player prop lines "
-    "from DraftKings, FanDuel, BetMGM, and more. "
+    "from PrizePicks, Underdog Fantasy, and DraftKings Pick6. "
     "Update before each betting session for the most accurate predictions!"
 )
 
@@ -82,7 +82,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     
     **Data Sources**
     - Real-time NBA player stats, team metrics, and game logs
-    - Live odds from DraftKings, FanDuel, BetMGM, and 15+ sportsbooks
+    - Live odds from PrizePicks, Underdog Fantasy, and DraftKings Pick6
     
     💡 **Pro Tips:**
     - Always update data BEFORE running analysis — stale data leads to bad predictions
@@ -101,8 +101,8 @@ st.markdown(get_education_box_html(
     Use this once a day or week to keep averages current.<br><br>
     <strong>Live data</strong>: Real current season stats,
     saved to players.csv and teams.csv. Load before each session for accurate predictions.<br><br>
-    <strong>Prop lines</strong>: Covers DraftKings, 
-    FanDuel, BetMGM, Caesars, and 15+ other US sportsbooks in one call.
+    <strong>Prop lines</strong>: Covers PrizePicks, 
+    Underdog Fantasy, and DraftKings Pick6.
     """
 ), unsafe_allow_html=True)
 
@@ -1003,11 +1003,10 @@ st.markdown(
 st.markdown(get_education_box_html(
     "📖 How Platform Prop Loading Works",
     """
-    <strong>Sportsbook Lines</strong>: Retrieves tonight's NBA prop lines from all major 
-    sportsbooks (FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, 
-    Hard Rock Bet, BetRivers) in one call.<br><br>
+    <strong>Sportsbook Lines</strong>: Retrieves tonight's NBA prop lines from 
+    PrizePicks, Underdog Fantasy, and DraftKings Pick6.<br><br>
     <strong>Cross-platform comparison</strong>: After loading, the app shows all lines 
-    side-by-side so you can see which sportsbook has the best line for each pick.
+    side-by-side so you can see which platform has the best line for each pick.
     """
 ), unsafe_allow_html=True)
 

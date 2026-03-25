@@ -710,13 +710,12 @@ def generate_pick_explanation(
 
     # 14. Platform notes
     platform_notes_map = {
-        "FanDuel": "FanDuel offers standard sportsbook parlays. All legs must hit for the full payout.",
-        "DraftKings": "DraftKings offers standard sportsbook parlays with same-game parlay options.",
-        "BetMGM": "BetMGM offers standard sportsbook parlays with one-game parlay insurance options.",
-        "Caesars": "Caesars offers standard sportsbook parlays. All legs must hit for the full payout.",
-        # Backward-compat DFS entries
-        "PrizePicks": "PrizePicks uses a 2-4 pick entry format. This pick can be parlayed with others for multiplied payouts.",
+        "PrizePicks": "PrizePicks uses a 2-6 pick entry format. Flex Play and Power Play options available.",
+        "Underdog Fantasy": "Underdog Fantasy uses a 2-6 pick entry. Higher entry counts yield higher multipliers.",
+        "DraftKings Pick6": "DraftKings Pick6 uses a 6-pick entry format with tiered payout structure.",
+        # Backward-compat aliases
         "Underdog": "Underdog Fantasy uses a 2-6 pick entry. Higher entry counts yield higher multipliers.",
+        "DraftKings": "DraftKings Pick6 uses a 6-pick entry format with tiered payout structure.",
     }
     platform_notes = platform_notes_map.get(platform, f"{platform} — check platform rules for payout structure.")
 

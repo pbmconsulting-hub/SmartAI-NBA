@@ -45,10 +45,7 @@ VALID_RESULTS = {"WIN", "LOSS", "PUSH"}
 
 # Valid platforms
 VALID_PLATFORMS = {
-    "FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics",
-    "ESPN Bet", "Hard Rock Bet", "BetRivers",
-    # Legacy DFS platforms (backward compat)
-    "PrizePicks", "Underdog",
+    "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
 }
 
 # Valid tier names
@@ -1643,7 +1640,7 @@ def save_top_picks_from_analysis(analysis_results):
 
         direction = str(result.get("direction", "OVER")).upper()
         prop_line = float(result.get("line", 0) or 0)
-        platform = str(result.get("platform", "FanDuel"))
+        platform = str(result.get("platform", "PrizePicks"))
         edge = float(result.get("edge_percentage", result.get("edge", 0)) or 0)
         confidence = float(result.get("confidence_score", 0) or 0)
         bet_type = str(result.get("bet_type", "normal"))
@@ -1781,7 +1778,7 @@ def log_props_to_tracker(props_list, direction="OVER"):
         if bet_direction not in VALID_DIRECTIONS:
             bet_direction = direction.upper()
 
-        platform = str(prop.get("platform", "FanDuel"))
+        platform = str(prop.get("platform", "PrizePicks"))
         team = str(prop.get("team", prop.get("player_team", "")))
         game_date = str(prop.get("game_date", today_str))
 

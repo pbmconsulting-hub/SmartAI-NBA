@@ -471,28 +471,27 @@ _SPORTSBOOK_PARLAY_PAYOUTS = {
 }
 
 DFS_PAYOUT_TABLES = {
-    # Sportsbook standard parlays
-    "FanDuel": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "DraftKings": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "BetMGM": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "Caesars": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "Fanatics": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "ESPN Bet": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "Hard Rock Bet": _SPORTSBOOK_PARLAY_PAYOUTS,
-    "BetRivers": _SPORTSBOOK_PARLAY_PAYOUTS,
-    # Backward-compat DFS entries
     "PrizePicks": {
         3: {3: 2.25, 2: 1.25, 1: 0.0, 0: 0.0},
         4: {4: 5.0, 3: 1.50, 2: 0.40, 1: 0.0, 0: 0.0},
         5: {5: 10.0, 4: 2.0, 3: 0.40, 2: 0.0, 1: 0.0, 0: 0.0},
         6: {6: 25.0, 5: 2.0, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
     },
+    "Underdog Fantasy": {
+        3: {3: 2.25, 2: 1.20, 1: 0.0, 0: 0.0},
+        4: {4: 5.0, 3: 1.50, 2: 0.0, 1: 0.0, 0: 0.0},
+        5: {5: 10.0, 4: 2.0, 3: 0.50, 2: 0.0, 1: 0.0, 0: 0.0},
+        6: {6: 25.0, 5: 2.5, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
+    },
+    "DraftKings Pick6": _SPORTSBOOK_PARLAY_PAYOUTS,
+    # Backward-compat aliases
     "Underdog": {
         3: {3: 2.25, 2: 1.20, 1: 0.0, 0: 0.0},
         4: {4: 5.0, 3: 1.50, 2: 0.0, 1: 0.0, 0: 0.0},
         5: {5: 10.0, 4: 2.0, 3: 0.50, 2: 0.0, 1: 0.0, 0: 0.0},
         6: {6: 25.0, 5: 2.5, 4: 0.40, 3: 0.0, 2: 0.0, 1: 0.0, 0: 0.0},
     },
+    "DraftKings": _SPORTSBOOK_PARLAY_PAYOUTS,
 }
 
 

@@ -466,7 +466,7 @@ with status_col:
 with settings_col:
     st.caption(f"⚙️ Simulations: **{simulation_depth:,}**")
     st.caption(f"⚙️ Min Edge: **{minimum_edge}%**")
-    _shown_platforms = st.session_state.get("selected_platforms", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"])
+    _shown_platforms = st.session_state.get("selected_platforms", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"])
     st.caption(f"⚙️ Platforms: **{', '.join(_shown_platforms)}**")
     st.caption("Change on the ⚙️ Settings page")
 
@@ -745,7 +745,7 @@ if run_analysis:
 
         # ── Filter to selected platforms (from ⚙️ Settings) ──────────────
         _selected_platforms = st.session_state.get(
-            "selected_platforms", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"]
+            "selected_platforms", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
         )
         if _selected_platforms:
             before_plat = len(props_to_analyze)
@@ -806,15 +806,7 @@ if run_analysis:
             progress_bar.empty()
             st.stop()
 
-        # ── Free tier: cap analysis at _FREE_ANALYSIS_LIMIT props ────
-        if not _user_is_premium and total_props_count > _FREE_ANALYSIS_LIMIT:
-            st.warning(
-                f"⚠️ **Free plan** is limited to **{_FREE_ANALYSIS_LIMIT} props** per analysis run. "
-                f"Analyzing the first {_FREE_ANALYSIS_LIMIT} props. "
-                f"[**Upgrade to Premium**]({_PREM_PATH}) for unlimited analysis. 💎"
-            )
-            props_to_analyze  = props_to_analyze[:_FREE_ANALYSIS_LIMIT]
-            total_props_count = _FREE_ANALYSIS_LIMIT
+        # ── Analysis proceeds with all available props (no cap) ────
 
         for prop_index, prop in enumerate(props_to_analyze):
             progress_fraction = (prop_index + 1) / total_props_count

@@ -88,14 +88,13 @@ POSITION_CORRELATION_ADJUSTMENTS = {
 # Platform-specific default implied probabilities
 # BEGINNER NOTE: These are the breakeven win rates for each platform's payout structure
 PLATFORM_IMPLIED_PROB = {
-    "FanDuel":    0.5238,
-    "DraftKings": 0.5238,
-    "BetMGM":     0.5238,
-    "Caesars":    0.5238,
-    # Backward-compat
-    "PrizePicks": 0.526,
-    "Underdog":   0.500,
-    "default":    0.5238,   # Standard -110 breakeven
+    "PrizePicks":        0.526,
+    "Underdog Fantasy":  0.500,
+    "DraftKings Pick6":  0.5238,
+    # Backward-compat aliases
+    "Underdog":          0.500,
+    "DraftKings":        0.5238,
+    "default":           0.5238,
 }
 
 

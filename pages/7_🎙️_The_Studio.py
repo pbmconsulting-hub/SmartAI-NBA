@@ -359,7 +359,7 @@ with st.expander("📖 How to Use The Studio", expanded=False):
     - See the Dawg Board — his highest-confidence plays
     
     💡 **Pro Tips:**
-    - Select your betting platform (FanDuel, DraftKings, BetMGM, Caesars, and more) for tailored advice
+    - Select your betting platform (PrizePicks, Underdog Fantasy, DraftKings Pick6) for tailored advice
     - Use the Regenerate button to get fresh takes with different narrative angles
     - The Dawg Board at the bottom shows Joseph's strongest picks across all games
     """)
@@ -384,9 +384,9 @@ mode = st.radio(
 # ── Joseph's Platform Preference ──────────────────────────────
 # Joseph asks what betting platform the user is using.
 # Persists in session state so it's remembered across interactions.
-_PLATFORM_OPTIONS = ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"]
+_PLATFORM_OPTIONS = ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
 if "joseph_preferred_platform" not in st.session_state:
-    st.session_state["joseph_preferred_platform"] = "FanDuel"
+    st.session_state["joseph_preferred_platform"] = "PrizePicks"
 
 _platform_fallback_icon = '<span style="font-size:16px">🎙️</span>'
 avatar_b64 = get_joseph_avatar_b64()
