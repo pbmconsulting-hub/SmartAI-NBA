@@ -18,8 +18,43 @@
 # ============================================================
 
 import html as _html
+import os as _os
+import base64 as _base64
 
 from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
+
+try:
+    from data.player_profile_service import get_headshot_url as _get_headshot_url
+except ImportError:  # pragma: no cover
+    def _get_headshot_url(name):  # type: ignore[misc]
+        return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
+
+
+# ── Joseph M Smith avatar (cached base64) ────────────────────
+_JOSEPH_AVATAR_B64: str | None = None
+
+
+def _get_joseph_avatar_b64() -> str:
+    """Return base64-encoded Joseph M Smith avatar, cached after first load."""
+    global _JOSEPH_AVATAR_B64
+    if _JOSEPH_AVATAR_B64 is not None:
+        return _JOSEPH_AVATAR_B64
+    _candidates = [
+        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "Joseph M Smith Avatar.png"),
+        _os.path.join(_os.getcwd(), "Joseph M Smith Avatar.png"),
+        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "assets", "Joseph M Smith Avatar.png"),
+    ]
+    for path in _candidates:
+        norm = _os.path.normpath(path)
+        if _os.path.isfile(norm):
+            try:
+                with open(norm, "rb") as fh:
+                    _JOSEPH_AVATAR_B64 = _base64.b64encode(fh.read()).decode("utf-8")
+                    return _JOSEPH_AVATAR_B64
+            except Exception:
+                pass
+    _JOSEPH_AVATAR_B64 = ""
+    return _JOSEPH_AVATAR_B64
 
 
 # Fallback silhouette SVG for missing headshots
@@ -221,6 +256,11 @@ def _build_single_card_html(result, index=0):
     player_id = result.get("player_id", "") or ""
     if player_id:
         headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+    else:
+        # Fallback: resolve headshot from player name via profile service
+        _raw_name = result.get("player_name", "")
+        headshot_url = _get_headshot_url(_raw_name) if _raw_name else ""
+    if headshot_url:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
             f'src="{headshot_url}" '
@@ -591,6 +631,10 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     player_id = result.get("player_id", "") or ""
     if player_id:
         headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+    else:
+        _raw_name = result.get("player_name", "")
+        headshot_url = _get_headshot_url(_raw_name) if _raw_name else ""
+    if headshot_url:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
             f'src="{headshot_url}" '
@@ -738,7 +782,7 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
 
     # Build the full horizontal card
     return (
-        f'<div class="qcm-h-card" style="border-left-color:{accent_color};">'
+        f'<div class="qcm-h-card" data-tier="{_escape(tier)}" style="border-left-color:{accent_color};">'
         # ── TOP ROW: Identity + True Line + Metrics ──────────────
         f'<div class="qcm-h-top">'
         # Left: headshot + name + prop
@@ -887,7 +931,8 @@ def build_unified_player_card_html(player_name, vitals, props):
 
     The card displays a compact identity header (headshot, name, team,
     season stats) and expands on click to reveal all prop analysis cards
-    for this player.
+    for this player.  Each expanded card includes the Joseph M Smith
+    avatar with an "Ask Joseph M Smith" prompt.
 
     Args:
         player_name (str): Display name.
@@ -901,11 +946,25 @@ def build_unified_player_card_html(player_name, vitals, props):
     prop_count = len(props)
     prop_label = f"{prop_count} prop{'s' if prop_count != 1 else ''}"
 
+    # Joseph M Smith avatar footer for expanded cards
+    _j_b64 = _get_joseph_avatar_b64()
+    if _j_b64:
+        joseph_html = (
+            '<div class="upc-joseph-row">'
+            f'<img class="upc-joseph-avatar" '
+            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            '<span class="upc-joseph-label">Ask Joseph M Smith</span>'
+            '</div>'
+        )
+    else:
+        joseph_html = ""
+
     # Build individual prop cards inside the body
     card_strings = [_build_single_card_html(p, i) for i, p in enumerate(props)]
     body_html = (
         f'<div class="upc-body">'
         f'<div class="qcm-grid">{"".join(card_strings)}</div>'
+        f'{joseph_html}'
         f'</div>'
     )
 
