@@ -10,6 +10,8 @@ Provides:
 
   Event-level:
   - get_events(api_key=None)      → list of upcoming NBA event dicts
+  - get_nba_events(start, end)    → events filtered by date/time range
+  - get_event_markets(event_id)   → discover available player-prop markets per bookmaker
   - get_event_odds(event_id, ...) → odds for any supported markets on a single event
 
   Player Props:
@@ -23,6 +25,10 @@ Provides:
   Usage / Utility:
   - get_odds_api_usage()             → latest quota snapshot from response headers
   - calculate_implied_probability()  → american odds → implied probability %
+
+  Configuration Constants:
+  - US_BOOKMAKER_KEYS              → list of main US-facing bookmaker keys
+  - PLAYER_PROP_MARKETS            → list of all player prop market keys (standard + alternate)
 
 API key resolution (first match wins):
   1. explicit *api_key* argument
@@ -68,10 +74,11 @@ _BASE_URL = "https://api.the-odds-api.com/v4"
 _SPORT    = "basketball_nba"
 
 # ── API Endpoints ─────────────────────────────────────────────────────────────
-ENDPOINT_SPORTS = "/sports"
-ENDPOINT_EVENTS = f"/sports/{_SPORT}/events"
-ENDPOINT_ODDS = f"/sports/{_SPORT}/odds"
-ENDPOINT_SCORES = f"/sports/{_SPORT}/scores"
+ENDPOINT_SPORTS        = "/sports"
+ENDPOINT_EVENTS        = f"/sports/{_SPORT}/events"
+ENDPOINT_EVENT_MARKETS = f"/sports/{_SPORT}/events"  # + /{eventId}/markets
+ENDPOINT_ODDS          = f"/sports/{_SPORT}/odds"
+ENDPOINT_SCORES        = f"/sports/{_SPORT}/scores"
 
 MAX_API_RETRIES          = 3
 RETRY_BASE_DELAY_SECONDS = 1.0
@@ -107,6 +114,61 @@ _BOOKMAKER_DISPLAY: dict[str, str] = {
     "fanatics":        "Fanatics",
 }
 
+# ── Main US bookmaker keys ────────────────────────────────────────────────────
+# These are the primary US-facing bookmaker keys on The Odds API.
+# Used as defaults when filtering player-prop and event-odds requests.
+
+US_BOOKMAKER_KEYS: list[str] = [
+    "betonlineag",
+    "betmgm",
+    "betrivers",
+    "betus",
+    "bovada",
+    "williamhill_us",
+    "draftkings",
+    "fanatics",
+    "fanduel",
+    "lowvig",
+    "mybookieag",
+]
+
+# ── Player prop market keys ───────────────────────────────────────────────────
+# Standard + alternate player prop markets (NO quarter props).
+# Always request the full list; the API returns only what is actually available.
+
+PLAYER_PROP_MARKETS: list[str] = [
+    # Standard
+    "player_points",
+    "player_rebounds",
+    "player_assists",
+    "player_threes",
+    "player_blocks",
+    "player_steals",
+    "player_blocks_steals",
+    "player_turnovers",
+    "player_points_rebounds_assists",
+    "player_points_rebounds",
+    "player_points_assists",
+    "player_rebounds_assists",
+    "player_field_goals",
+    "player_frees_made",
+    "player_frees_attempts",
+    "player_fantasy_points",
+    # Alternate
+    "player_points_alternate",
+    "player_rebounds_alternate",
+    "player_assists_alternate",
+    "player_blocks_alternate",
+    "player_steals_alternate",
+    "player_turnovers_alternate",
+    "player_threes_alternate",
+    "player_points_assists_alternate",
+    "player_points_rebounds_alternate",
+    "player_rebounds_assists_alternate",
+    "player_points_rebounds_assists_alternate",
+    "player_fantasy_points_alternate",
+]
+
 # ── Odds API market key → internal stat key ───────────────────────────────────
 
 _ODDS_API_STAT_MAP: dict[str, str] = {
@@ -116,15 +178,33 @@ _ODDS_API_STAT_MAP: dict[str, str] = {
     "player_threes":                  "threes",
     "player_blocks":                  "blocks",
     "player_steals":                  "steals",
+    "player_blocks_steals":           "blocks_steals",
     "player_turnovers":               "turnovers",
     "player_points_rebounds_assists": "points_rebounds_assists",
     "player_points_rebounds":         "points_rebounds",
     "player_points_assists":          "points_assists",
     "player_rebounds_assists":        "rebounds_assists",
+    "player_field_goals":             "field_goals",
+    "player_frees_made":              "frees_made",
+    "player_frees_attempts":          "frees_attempts",
+    "player_fantasy_points":          "fantasy_points",
+    # Alternate markets map to the same internal stat keys
+    "player_points_alternate":                  "points",
+    "player_rebounds_alternate":                "rebounds",
+    "player_assists_alternate":                 "assists",
+    "player_blocks_alternate":                  "blocks",
+    "player_steals_alternate":                  "steals",
+    "player_turnovers_alternate":               "turnovers",
+    "player_threes_alternate":                  "threes",
+    "player_points_assists_alternate":          "points_assists",
+    "player_points_rebounds_alternate":         "points_rebounds",
+    "player_rebounds_assists_alternate":        "rebounds_assists",
+    "player_points_rebounds_assists_alternate": "points_rebounds_assists",
+    "player_fantasy_points_alternate":          "fantasy_points",
 }
 
 # Player prop markets to request from the Odds API
-_PROP_MARKETS: list[str] = list(_ODDS_API_STAT_MAP.keys())
+_PROP_MARKETS: list[str] = list(PLAYER_PROP_MARKETS)
 
 # ── Time-based response cache (mirrors sportsbook_service._API_CACHE) ───────────
 
@@ -461,11 +541,152 @@ def get_events(api_key: str | None = None) -> list[dict]:
     return _request_events(resolved_key)
 
 
+def get_nba_events(
+    start_datetime: str | None = None,
+    end_datetime: str | None = None,
+    api_key: str | None = None,
+) -> list[dict]:
+    """
+    Get NBA events optionally filtered by a date/time range.
+
+    Endpoint: GET /v4/sports/basketball_nba/events
+
+    This extends :func:`get_events` by accepting ISO-8601 start/end
+    boundaries so callers can retrieve games for a specific date or
+    date range.
+
+    Args:
+        start_datetime: ISO-8601 timestamp for the earliest commence_time
+                        to include, e.g. ``"2025-03-25T00:00:00Z"``.
+                        If *None*, no lower bound is applied.
+        end_datetime:   ISO-8601 timestamp for the latest commence_time
+                        to include.  If *None*, no upper bound is applied.
+        api_key:        Optional explicit API key; falls back to session
+                        state / env.
+
+    Returns:
+        list[dict]: Event dicts matching the requested window (each has
+        ``id``, ``sport_key``, ``commence_time``, ``home_team``,
+        ``away_team``).  Returns ``[]`` on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.warning("get_nba_events: no Odds API key found — returning []")
+        return []
+
+    url = f"{_BASE_URL}{ENDPOINT_EVENTS}"
+    params: dict[str, str] = {
+        "apiKey":     resolved_key,
+        "dateFormat": "iso",
+    }
+    if start_datetime:
+        params["commenceTimeFrom"] = start_datetime
+    if end_datetime:
+        params["commenceTimeTo"] = end_datetime
+
+    try:
+        raw = _request_with_retry(url, params=params)
+        if not isinstance(raw, list):
+            _logger.debug("get_nba_events: no events in requested window")
+            return []
+        return raw
+    except Exception as exc:
+        _logger.warning("get_nba_events failed: %s", exc)
+        return []
+
+
+def get_event_markets(
+    event_id: str,
+    api_key: str | None = None,
+) -> list[dict]:
+    """
+    Discover which player-prop markets each bookmaker offers for one event.
+
+    Endpoint: GET /v4/sports/basketball_nba/events/{eventId}/odds
+
+    Queries the event with all configured :data:`PLAYER_PROP_MARKETS` and
+    ``regions=us``.  Returns a list of dicts — one per bookmaker that has
+    at least one player-prop market for this event — with the market keys
+    they actually offer.
+
+    This is the "Step 2" discovery call: you learn *what is available*
+    before making targeted odds requests.
+
+    Args:
+        event_id: The unique event ID (from :func:`get_events` /
+                  :func:`get_nba_events`).
+        api_key:  Optional explicit API key; falls back to session state / env.
+
+    Returns:
+        list[dict]: Each dict has:
+            {
+                "bookmaker_key":   str,
+                "bookmaker_title": str,
+                "markets":         list[str],   # market keys offered
+            }
+        Only bookmakers in :data:`US_BOOKMAKER_KEYS` and markets in
+        :data:`PLAYER_PROP_MARKETS` are included.
+        Returns ``[]`` on failure or missing API key.
+    """
+    resolved_key = _resolve_api_key(api_key)
+    if not resolved_key:
+        _logger.warning("get_event_markets: no Odds API key found — returning []")
+        return []
+
+    url = f"{_BASE_URL}{ENDPOINT_EVENT_MARKETS}/{event_id}/odds"
+    markets_param = ",".join(PLAYER_PROP_MARKETS)
+    params = {
+        "apiKey":     resolved_key,
+        "regions":    "us",
+        "markets":    markets_param,
+        "oddsFormat": "american",
+        "dateFormat": "iso",
+    }
+
+    try:
+        raw = _request_with_retry(url, params=params)
+        if not raw or not isinstance(raw, dict):
+            return []
+
+        target_books = set(US_BOOKMAKER_KEYS)
+        target_markets = set(PLAYER_PROP_MARKETS)
+        result: list[dict] = []
+
+        for bm in raw.get("bookmakers") or []:
+            if not isinstance(bm, dict):
+                continue
+            bm_key = bm.get("key", "")
+            if bm_key not in target_books:
+                continue
+
+            offered: list[str] = []
+            for mkt in bm.get("markets") or []:
+                if not isinstance(mkt, dict):
+                    continue
+                mkt_key = mkt.get("key", "")
+                if mkt_key in target_markets:
+                    offered.append(mkt_key)
+
+            if offered:
+                result.append({
+                    "bookmaker_key":   bm_key,
+                    "bookmaker_title": _bookmaker_display_name(bm_key),
+                    "markets":         offered,
+                })
+
+        return result
+
+    except Exception as exc:
+        _logger.warning("get_event_markets failed for event %s: %s", event_id, exc)
+        return []
+
+
 def get_event_odds(
     event_id: str,
     markets: str = "h2h",
     regions: str = "us",
     odds_format: str = "american",
+    bookmakers: str | None = None,
     api_key: str | None = None,
 ) -> dict:
     """
@@ -485,6 +706,9 @@ def get_event_odds(
                      ``"h2h,spreads,totals"`` or ``"player_points,player_rebounds"``.
         regions:     Bookmaker regions, e.g. ``"us"`` or ``"us,us2"``.
         odds_format: ``"american"`` (default) or ``"decimal"``.
+        bookmakers:  Comma-separated bookmaker keys to filter, e.g.
+                     ``"draftkings,fanduel"``.  If *None*, all bookmakers
+                     in the region are returned.
         api_key:     Optional explicit API key; falls back to session state / env.
 
     Returns:
@@ -499,13 +723,20 @@ def get_event_odds(
         return {}
 
     url = f"{_BASE_URL}/sports/{_SPORT}/events/{event_id}/odds"
-    params = {
-        "apiKey":     resolved_key,
-        "markets":    markets,
-        "regions":    regions,
-        "oddsFormat": odds_format,
-        "dateFormat": "iso",
+    params: dict[str, str] = {
+        "apiKey":                resolved_key,
+        "markets":               markets,
+        "regions":               regions,
+        "oddsFormat":            odds_format,
+        "dateFormat":            "iso",
+        "includeLinks":          "true",
+        "includeSids":           "true",
+        "includeBetLimits":      "true",
+        "includeMultipliers":    "true",
+        "includeRotationNumbers": "true",
     }
+    if bookmakers:
+        params["bookmakers"] = bookmakers
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -604,8 +835,10 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
     the same format used by sportsbook_service throughout the application.
 
     Each returned dict has these keys (matching sportsbook_service output):
-        player_name, team, stat_type, line, platform,
+        player_name, team, stat_type, line, platform, market_key,
         game_date, retrieved_at, over_odds, under_odds
+
+    Only bookmakers in :data:`US_BOOKMAKER_KEYS` are included.
 
     Args:
         api_key: Optional explicit API key; falls back to session state / env.
@@ -632,9 +865,11 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
 
         team_lookup = _build_team_lookup(events)
         markets_param = ",".join(_PROP_MARKETS)
-        retrieved_at = datetime.datetime.utcnow().isoformat()
+        bookmakers_param = ",".join(US_BOOKMAKER_KEYS)
+        retrieved_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
         game_date  = _today_str()
 
+        target_books = set(US_BOOKMAKER_KEYS)
         all_props: list[dict] = []
 
         for ev in events:
@@ -643,14 +878,13 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
             away_team = ev.get("away_team", "")
 
             url = f"{_BASE_URL}/sports/{_SPORT}/events/{event_id}/odds"
-            params = {
+            params: dict[str, str] = {
                 "apiKey":     resolved_key,
                 "markets":    markets_param,
-                # "us" covers DraftKings / FanDuel — the primary sources
-                # for NBA player-prop markets.
                 "regions":    "us",
                 "oddsFormat": "american",
                 "dateFormat": "iso",
+                "bookmakers": bookmakers_param,
             }
 
             try:
@@ -664,6 +898,8 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
                         continue
 
                     bm_key          = bm.get("key", "")
+                    if bm_key not in target_books:
+                        continue
                     platform_name   = _bookmaker_display_name(bm_key)
 
                     for mkt in bm.get("markets") or []:
@@ -720,6 +956,7 @@ def get_player_props(api_key: str | None = None) -> list[dict]:
                                 "player_name": player_name,
                                 "team":        "",        # enriched downstream if needed
                                 "stat_type":   stat_type,
+                                "market_key":  market_key,
                                 "line":        line if line is not None else 0.0,
                                 "platform":    platform_name,
                                 "game_date":   game_date,

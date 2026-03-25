@@ -17,8 +17,27 @@ sys.modules.setdefault("streamlit", _mock_st)
 sys.modules.setdefault("streamlit.components", MagicMock())
 sys.modules.setdefault("streamlit.components.v1", MagicMock())
 
-# Always use the actual mock from sys.modules (in case another test set it first)
-_mock_st = sys.modules["streamlit"]
+# _mock_st stays as the MagicMock defined above — required for
+# reset_mock(), assert_called(), call_args_list, etc.
+# We patch it into utils.joseph_widget.st in setUpModule so that
+# widget functions route their st.* calls through our MagicMock.
+
+_original_jw_st = None
+
+
+def setUpModule():
+    """Patch utils.joseph_widget.st with our MagicMock for call tracking."""
+    global _original_jw_st
+    import utils.joseph_widget as _jwm
+    _original_jw_st = getattr(_jwm, "st", None)
+    _jwm.st = _mock_st
+
+
+def tearDownModule():
+    """Restore original st reference to avoid affecting subsequent test files."""
+    import utils.joseph_widget as _jwm
+    if _original_jw_st is not None:
+        _jwm.st = _original_jw_st
 
 
 # ============================================================

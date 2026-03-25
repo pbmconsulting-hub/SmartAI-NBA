@@ -265,7 +265,7 @@ def test_odds_api(api_key: str):
     print("=" * 70)
 
     # 1. /sports — Free endpoint
-    data = _test_odds_api("/sports", api_key, label="[1/5] /sports (free, key check)")
+    data = _test_odds_api("/sports", api_key, label="[1/6] /sports (free, key check)")
     nba_active = False
     if isinstance(data, list):
         nba = [s for s in data if s.get("key") == SPORT_KEY]
@@ -279,7 +279,7 @@ def test_odds_api(api_key: str):
     # 2. /events
     data = _test_odds_api(f"/sports/{SPORT_KEY}/events", api_key,
                           params={"dateFormat": "iso"},
-                          label="[2/5] /events (upcoming NBA games)")
+                          label="[2/6] /events (upcoming NBA games)")
     event_id = None
     if isinstance(data, list) and data:
         event_id = data[0].get("id")
@@ -292,7 +292,7 @@ def test_odds_api(api_key: str):
     _test_odds_api(f"/sports/{SPORT_KEY}/odds", api_key,
                    params={"regions": "us", "markets": "h2h,spreads,totals",
                            "dateFormat": "iso", "oddsFormat": "american"},
-                   label="[3/5] /odds (h2h+spreads+totals)")
+                   label="[3/6] /odds (h2h+spreads+totals)")
     time.sleep(0.3)
 
     # 4. /events/{id}/odds (per-event, if we have one)
@@ -300,16 +300,27 @@ def test_odds_api(api_key: str):
         _test_odds_api(f"/sports/{SPORT_KEY}/events/{event_id}/odds", api_key,
                        params={"regions": "us", "markets": "h2h",
                                "dateFormat": "iso", "oddsFormat": "american"},
-                       label=f"[4/5] /events/{{id}}/odds (event={event_id[:12]}..)")
+                       label=f"[4/6] /events/{{id}}/odds (event={event_id[:12]}..)")
     else:
-        print("\n  ⏭️  Skipping [4/5] event odds (no upcoming events)")
-        _record("[4/5] /events/{id}/odds", True, "Skipped — no events")
+        print("\n  ⏭️  Skipping [4/6] event odds (no upcoming events)")
+        _record("[4/6] /events/{id}/odds", True, "Skipped — no events")
     time.sleep(0.3)
 
-    # 5. /scores
+    # 5. /events/{id}/odds for market discovery (player props)
+    if event_id:
+        _test_odds_api(f"/sports/{SPORT_KEY}/events/{event_id}/odds", api_key,
+                       params={"regions": "us", "markets": "player_points",
+                               "dateFormat": "iso", "oddsFormat": "american"},
+                       label=f"[5/6] /events/{{id}}/markets (player_points discovery)")
+    else:
+        print("\n  ⏭️  Skipping [5/6] event markets (no upcoming events)")
+        _record("[5/6] /events/{id}/markets", True, "Skipped — no events")
+    time.sleep(0.3)
+
+    # 6. /scores
     _test_odds_api(f"/sports/{SPORT_KEY}/scores", api_key,
                    params={"daysFrom": "1", "dateFormat": "iso"},
-                   label="[5/5] /scores (recent results)")
+                   label="[6/6] /scores (recent results)")
 
 
 def _test_free_endpoint(url: str, headers: dict | None = None,

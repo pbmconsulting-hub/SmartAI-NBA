@@ -14,6 +14,7 @@ data/injury_status.json
 data/game_logs_cache.json
 data/game_logs/
 tracking/clv_log.json
+tracking/line_movement.json
 
 # Log files — generated at runtime, don't commit
 logs/

@@ -18,6 +18,39 @@ if _PROJECT_ROOT not in sys.path:
 
 # ── Mock streamlit before any app code imports it ────────────────
 # This prevents Streamlit from starting a server during tests.
+#
+# NOTE: types.SimpleNamespace does NOT support the context-manager
+# protocol (Python looks up __enter__/__exit__ on the *type*, not
+# the instance).  We use a proper class for anything that may appear
+# in a ``with`` statement.
+
+
+class _MockCtxManager:
+    """Minimal mock that supports the context manager protocol."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+
+class _MockSidebar(_MockCtxManager):
+    """Mock for ``st.sidebar`` — supports attribute access and ``with`` protocol."""
+
+    @staticmethod
+    def markdown(*a, **kw):
+        return None
+
+    @staticmethod
+    def expander(*a, **kw):
+        return _MockCtxManager()
+
+    @staticmethod
+    def caption(*a, **kw):
+        return None
+
+
 _mock_st = types.ModuleType("streamlit")
 _mock_st.cache_data = lambda *a, **kw: (lambda f: f) if not a else a[0]
 _mock_st.cache_resource = lambda *a, **kw: (lambda f: f) if not a else a[0]
@@ -30,16 +63,13 @@ _mock_st.warning = lambda *a, **kw: None
 _mock_st.error = lambda *a, **kw: None
 _mock_st.info = lambda *a, **kw: None
 _mock_st.success = lambda *a, **kw: None
-_mock_st.spinner = lambda *a, **kw: types.SimpleNamespace(__enter__=lambda s: None, __exit__=lambda s, *a: None)
-_mock_st.expander = lambda *a, **kw: types.SimpleNamespace(__enter__=lambda s: None, __exit__=lambda s, *a: None)
-_mock_st.sidebar = types.SimpleNamespace(
-    markdown=lambda *a, **kw: None,
-    expander=lambda *a, **kw: types.SimpleNamespace(__enter__=lambda s: None, __exit__=lambda s, *a: None),
-)
+_mock_st.spinner = lambda *a, **kw: _MockCtxManager()
+_mock_st.expander = lambda *a, **kw: _MockCtxManager()
+_mock_st.sidebar = _MockSidebar()
 _mock_st.query_params = {}
 _mock_st.rerun = lambda: None
-_mock_st.columns = lambda *a, **kw: [types.SimpleNamespace(__enter__=lambda s: s, __exit__=lambda s, *a: None)]
-_mock_st.popover = lambda *a, **kw: types.SimpleNamespace(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+_mock_st.columns = lambda *a, **kw: [_MockCtxManager()]
+_mock_st.popover = lambda *a, **kw: _MockCtxManager()
 _mock_st.number_input = lambda *a, **kw: 0
 _mock_st.slider = lambda *a, **kw: 0
 _mock_st.caption = lambda *a, **kw: None
