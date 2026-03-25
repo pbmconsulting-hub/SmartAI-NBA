@@ -434,6 +434,44 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already renamed or doesn't exist
 
+            # ── Performance indexes ─────────────────────────────────
+            # These accelerate the most frequent query patterns used
+            # by the Bet Tracker, calibration engine, and game-log
+            # cache.  CREATE INDEX IF NOT EXISTS is safe to run
+            # repeatedly on an existing database.
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_bets_date "
+                "ON bets(bet_date DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_bets_created "
+                "ON bets(created_at DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pred_date "
+                "ON prediction_history(prediction_date DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_pred_stat_correct "
+                "ON prediction_history(stat_type, was_correct)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_picks_date_conf "
+                "ON all_analysis_picks(pick_date DESC, confidence_score DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_picks_result "
+                "ON all_analysis_picks(result)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_snapshots_date "
+                "ON daily_snapshots(snapshot_date DESC)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_game_logs_player_date "
+                "ON player_game_logs(player_id, game_date DESC)"
+            )
+
             # Save the changes
             connection.commit()
 

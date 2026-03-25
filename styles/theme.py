@@ -107,6 +107,21 @@ GLOSSARY = {
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
     ),
+    "Goblin Bet": (
+        "A More/Less prop where the line is set lower than the standard line — easier "
+        "to hit More on. Goblin lines are favorable to bettors but typically come with "
+        "reduced payouts or tougher parlay multipliers."
+    ),
+    "Demon Bet": (
+        "A More/Less prop where the line is set higher than the standard line — harder "
+        "to hit More on. Demon lines offer better payouts but carry more risk. Use edge "
+        "and confidence data to decide if the extra difficulty is worth it."
+    ),
+    "50/50 Bet": (
+        "A More/Less prop at the standard line — the closest to a coin-flip the "
+        "platform offers. These are the baseline lines with standard payouts. Our "
+        "model's edge calculations are most reliable at standard lines."
+    ),
 }
 
 
