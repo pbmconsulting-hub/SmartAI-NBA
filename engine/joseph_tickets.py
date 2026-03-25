@@ -213,6 +213,7 @@ def build_joseph_ticket(leg_count: int, joseph_results: list,
                     full["player_team"] = r.get("player_team", r.get("team", ""))
                     analyzed.append(full)
                 except Exception:
+                    logger.debug("build_joseph_ticket analysis enrichment failed for a pick")
                     analyzed.append(r)
 
         # Filter by verdict rules based on leg count
@@ -433,7 +434,7 @@ def generate_ticket_pitch(ticket: dict, leg_count: int) -> str:
             closer = _select_fragment(CLOSER_POOL, closer_used)
             pitch = f"{pitch} {closer['text']}"
         except Exception:
-            pass
+            logger.debug("generate_ticket_pitch closer fragment selection failed")
 
         return pitch
     except Exception as exc:
@@ -601,6 +602,7 @@ def _find_best_combo(candidates: list, leg_count: int) -> list:
 
         return best_combo or candidates[:leg_count]
     except Exception:
+        logger.debug("_find_best_combo failed, returning first candidates")
         return candidates[:leg_count] if candidates else []
 
 
@@ -623,6 +625,7 @@ def _calc_combined_probability(legs: list) -> float:
 
         return max(0.001, min(0.99, combined))
     except Exception:
+        logger.debug("_calc_combined_probability failed, returning default 0.01")
         return 0.01
 
 
@@ -635,6 +638,7 @@ def _calc_expected_value(legs: list, leg_count: int,
         if ev != 0.0:
             return ev
     except Exception:
+        logger.debug("_calc_expected_value primary calculation failed")
         pass
 
     # Simple EV fallback
@@ -643,6 +647,7 @@ def _calc_expected_value(legs: list, leg_count: int,
         entry_fee = 10.0
         return round(payout_mult * entry_fee * combined_prob - entry_fee, 2)
     except Exception:
+        logger.debug("_calc_expected_value fallback calculation failed, returning 0.0")
         return 0.0
 
 

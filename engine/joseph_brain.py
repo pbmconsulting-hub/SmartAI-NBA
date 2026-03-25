@@ -1299,6 +1299,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             confidence = _safe_float(conf_result.get("confidence_score", 50.0))
             tier = conf_result.get("tier", "Bronze")
         except Exception:
+            logger.debug("joseph_analyze_pick confidence calculation failed, using fallback")
             confidence = 50.0
             tier = "Bronze"
 
@@ -1306,6 +1307,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         try:
             grade_result = joseph_grade_player(player_data, game_context)
         except Exception:
+            logger.debug("joseph_analyze_pick grading failed, using fallback")
             grade_result = {"grade": "C", "archetype": "Unknown"}
         grade = grade_result.get("grade", "C")
         archetype = grade_result.get("archetype", "Unknown")
@@ -1319,6 +1321,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             if home_team and away_team:
                 strategy = analyze_game_strategy(home_team, away_team, game_context, teams_data)
         except Exception:
+            logger.debug("joseph_analyze_pick strategy analysis failed, using empty fallback")
             strategy = {}
 
         # --- Verdict ---
@@ -1348,6 +1351,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
                 player_data, prop_line, stat_type, game_context, sim_result
             )
         except Exception:
+            logger.debug("joseph_analyze_pick explanation generation failed, using fallback")
             explanation = {"summary": f"Projected {round(sim_mean, 1)} vs line {prop_line}"}
 
         return {
@@ -1672,6 +1676,7 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
 
         return " ".join(p for p in parts if p)
     except Exception:
+        logger.debug("build_joseph_rant failed, returning simple fallback")
         return f"Joseph M. Smith likes {player}. {verdict}!"
 
 
@@ -1751,6 +1756,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         try:
             narrative_tags = detect_narrative_tags(player, game, teams_data)
         except Exception:
+            logger.debug("joseph_full_analysis narrative tag detection failed")
             narrative_tags = []
         if not narrative_tags:
             narrative_tags = []
@@ -1770,6 +1776,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         try:
             player_grade = joseph_grade_player(player, game)
         except Exception:
+            logger.debug("joseph_full_analysis player grading failed")
             player_grade = {"grade": "C", "archetype": "Unknown", "score": 50.0,
                             "gravity": 50.0, "switchability": 50.0}
         archetype = player_grade.get("archetype", "Unknown")
@@ -1792,6 +1799,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         try:
             game_strategy = analyze_game_strategy(_home_team, _away_team, game, teams_data)
         except Exception:
+            logger.debug("joseph_full_analysis game strategy analysis failed")
             game_strategy = {"scheme": "unknown", "strategy": "unknown",
                              "scheme_match": 0.0, "mismatch_tags": [],
                              "regime_adjustment": 0.0}
@@ -2048,6 +2056,7 @@ def joseph_analyze_game(game: dict, teams_data: dict,
         try:
             strategy = analyze_game_strategy(home, away, game, teams_data)
         except Exception:
+            logger.debug("joseph_analyze_game strategy analysis failed")
             strategy = {"scheme": "unknown", "strategy": "unknown",
                         "scheme_match": 0.0, "mismatch_tags": []}
 
@@ -2232,6 +2241,7 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         try:
             grade_result = joseph_grade_player(player, tonight_game)
         except Exception:
+            logger.debug("joseph_analyze_player grading failed")
             grade_result = {"grade": "C", "archetype": "Unknown", "score": 50.0,
                             "gravity": 50.0, "switchability": 50.0}
 
@@ -2257,12 +2267,14 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             try:
                 best_analysis = joseph_full_analysis(best_prop, player, tonight_game, teams_data)
             except Exception:
+                logger.debug("joseph_analyze_player full analysis failed for best prop")
                 best_analysis = None
 
         # Detect narrative tags
         try:
             narrative_tags = detect_narrative_tags(player, tonight_game, teams_data)
         except Exception:
+            logger.debug("joseph_analyze_player narrative tag detection failed")
             narrative_tags = []
         if not narrative_tags:
             narrative_tags = []
@@ -2445,6 +2457,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
                         else:
                             analyzed.append(r)
                 except Exception:
+                    logger.debug("joseph_generate_best_bets analysis enrichment failed for a pick")
                     analyzed.append(r)
 
         # Filter by verdict rules based on leg count
@@ -2524,13 +2537,14 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             if correlation_adj > 0:
                 combined_prob = correlation_adj
         except Exception:
-            pass
+            logger.debug("joseph_generate_best_bets correlation adjustment failed")
 
         # Calculate expected value
         try:
             ev_result = calculate_entry_expected_value(best_combo, leg_count)
             total_ev = _safe_float(ev_result.get("expected_value_dollars", 0.0))
         except Exception:
+            logger.debug("joseph_generate_best_bets EV calculation failed, using simple fallback")
             # Simple EV fallback: payout * prob - entry_fee
             payout_mult = {2: 3.0, 3: 5.0, 4: 10.0, 5: 20.0, 6: 40.0}.get(leg_count, 3.0)
             entry_fee = 10.0
@@ -2707,6 +2721,7 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
 
         return f"{opener} {middle1} {middle2} {closer}"
     except Exception:
+        logger.debug("joseph_quick_take failed, returning default line")
         return "Joseph M. Smith is ready for tonight's slate."
 
 
@@ -2742,7 +2757,7 @@ def joseph_get_ambient_context(session_state: dict) -> tuple:
             if not is_premium_user() and random.random() < 0.3:
                 return ("premium_pitch", {})
         except Exception:
-            pass
+            logger.debug("joseph_get_ambient_context premium user check failed")
 
         # Entry just built (transient — consumes the flag)
         if session_state.get("joseph_entry_just_built"):
@@ -2785,6 +2800,7 @@ def joseph_get_ambient_context(session_state: dict) -> tuple:
         # Default: idle
         return ("idle", {})
     except Exception:
+        logger.debug("joseph_get_ambient_context failed, returning idle")
         return ("idle", {})
 
 
@@ -2820,6 +2836,7 @@ def joseph_ambient_line(context: str, **kwargs) -> str:
         except (KeyError, IndexError):
             return line
     except Exception:
+        logger.debug("joseph_ambient_line failed, returning idle fallback")
         lines = AMBIENT_POOLS.get("idle", [])
         return lines[0] if lines else ""
 
@@ -2880,6 +2897,7 @@ def joseph_commentary(results: list, context_type: str) -> str:
 
         return f"{opener} {body1}{body2}{closer}"
     except Exception:
+        logger.debug("joseph_commentary failed, returning default line")
         return "Joseph M. Smith has thoughts on this."
 
 
@@ -2996,6 +3014,7 @@ def joseph_platinum_lock(props: list, season_stats: dict) -> dict:
         opener = _select_fragment(OPENER_POOL, _used_fragments.setdefault("rant", set()))
         opener_text = opener.get("text", "I've been waiting ALL DAY to say this.")
     except Exception:
+        logger.debug("build_joseph_rant opener fragment selection failed, using fallback")
         opener_text = "I've been waiting ALL DAY to say this."
 
     # Lock justification
@@ -3038,6 +3057,7 @@ def joseph_platinum_lock(props: list, season_stats: dict) -> dict:
         closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
         closer_text = closer.get("text", "And I say that with GREAT conviction!")
     except Exception:
+        logger.debug("build_joseph_rant closer fragment selection failed, using fallback")
         closer_text = "And I say that with GREAT conviction!"
 
     full_rant = f"{opener_text} {lock_just}{teardown_text} {closer_text}"

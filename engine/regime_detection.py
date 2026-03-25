@@ -14,8 +14,11 @@
 #                   shift analysis
 # ============================================================
 
+import logging
 import math
 import statistics
+
+_logger = logging.getLogger(__name__)
 
 
 def _safe_float(value, fallback=0.0):
@@ -141,6 +144,7 @@ def detect_regime_change(
             "detection_method": "cusum_z_score",
         }
     except Exception:
+        _logger.debug("detect_regime_change failed, returning stable fallback")
         return {
             "regime_changed": False,
             "direction": "stable",
@@ -214,6 +218,7 @@ def bayesian_update_probability(
             "update_magnitude": round(_safe_float(update_magnitude), 4),
         }
     except Exception:
+        _logger.debug("bayesian_update_probability failed, returning prior as posterior")
         return {
             "posterior": _safe_float(prior, 0.5),
             "prior": _safe_float(prior, 0.5),
@@ -368,6 +373,7 @@ def detect_player_structural_shift(
             "recommendations": recommendations,
         }
     except Exception:
+        _logger.debug("detect_player_structural_shift failed, returning no-shift fallback")
         return {
             "has_structural_shift": False,
             "shift_dimensions": [],
@@ -473,6 +479,7 @@ def detect_team_regime_change(
             "affected_stats": affected,
         }
     except Exception:
+        _logger.debug("detect_team_regime_change failed, returning error fallback")
         return {
             "regime_changed": False,
             "regime_type": "error_fallback",
@@ -526,9 +533,8 @@ def calculate_adaptive_weight(
         weight = BAYESIAN_PRIOR_WEIGHT_DEFAULT * sample_factor * recency_factor
         return round(max(0.0, min(1.0, _safe_float(weight))), 4)
     except Exception:
+        _logger.debug("calculate_adaptive_weight failed, returning 0.0")
         return 0.0
-
-
 # ============================================================
 # SECTION: Full Bayesian Player Update Pipeline
 # ============================================================
@@ -690,6 +696,7 @@ def run_bayesian_player_update(
             "explanation": explanation,
         }
     except Exception:
+        _logger.debug("run_bayesian_player_update failed, returning zero-estimate fallback")
         return {
             "prior_estimate": 0.0,
             "posterior_estimate": 0.0,

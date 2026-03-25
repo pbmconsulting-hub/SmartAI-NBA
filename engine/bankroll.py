@@ -19,7 +19,10 @@
 #                   risk of ruin, expected value, sizing
 # ============================================================
 
+import logging
 import math
+
+_logger = logging.getLogger(__name__)
 
 
 def _safe_float(value, fallback=0.0):
@@ -116,8 +119,8 @@ def calculate_kelly_fraction(win_probability, payout_multiplier, kelly_fraction_
         return _safe_float(round(min(fractional_kelly, MAX_PER_ENTRY_FRACTION), 6), 0.0)
 
     except Exception:
+        _logger.debug("calculate_kelly_fraction failed, returning 0.0")
         return 0.0
-
 
 # ============================================================
 # END SECTION: Core Kelly Calculation
@@ -204,6 +207,7 @@ def get_bankroll_allocation(entries, bankroll, kelly_fraction_mode='quarter'):
         return result
 
     except Exception:
+        _logger.debug("get_bankroll_allocation failed, returning original entries")
         return entries
 
 
@@ -299,6 +303,7 @@ def get_session_risk_summary(entries, bankroll):
         }
 
     except Exception:
+        _logger.debug("get_session_risk_summary failed, returning empty risk summary")
         return {
             'total_at_risk': 0.0,
             'total_at_risk_pct': 0.0,

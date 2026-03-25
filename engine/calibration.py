@@ -15,7 +15,10 @@
 #                   reliability diagrams, calibration offset
 # ============================================================
 
+import logging
 import math
+
+_logger = logging.getLogger(__name__)
 
 
 def _safe_float(value, fallback=0.0):
@@ -161,6 +164,7 @@ def _load_historical_predictions(days=90, stat_type=None):
 
         return weighted_records
     except Exception:
+        _logger.debug("_load_historical_predictions failed, returning empty list")
         return []
 
 
@@ -411,6 +415,7 @@ def isotonic_calibrate(raw_probability, historical_records):
         return round(prob, 6)
 
     except Exception:
+        _logger.debug("isotonic_calibrate failed, returning raw probability")
         return round(float(raw_probability), 6)
 
 
@@ -477,6 +482,7 @@ def get_isotonic_calibration_curve(days=90):
         }
 
     except Exception:
+        _logger.debug("get_isotonic_calibration_curve failed, returning empty result")
         return {"has_data": False, "curve": [], "is_isotonic": False, "total_records": 0}
 
 
@@ -572,6 +578,7 @@ def get_calibration_adjustment(raw_probability, days=90, stat_type=None):
         return _safe_float(round(adjustment, 2), 0.0)
 
     except Exception:
+        _logger.debug("get_calibration_adjustment failed, returning 0.0")
         return 0.0  # Always safe to return 0 on any error
 
 
@@ -616,6 +623,7 @@ def get_calibration_summary(days=90):
             "overconfidence_buckets": overconfident,
         }
     except Exception:
+        _logger.debug("get_calibration_summary failed, returning empty summary")
         return {"has_data": False, "total_bets": 0, "calibration_curve": {},
                 "overall_accuracy": None, "overconfidence_buckets": []}
 

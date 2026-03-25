@@ -25,6 +25,8 @@ import os
 import logging
 from pathlib import Path
 
+_logger = logging.getLogger(__name__)
+
 
 # ============================================================
 # SECTION: Module-Level Constants
@@ -232,8 +234,8 @@ def get_clv_summary(days=90, min_records=5):
             "interpretation": interpretation,
         }
     except Exception:
+        _logger.debug("get_clv_summary failed, returning empty CLV summary")
         return {
-            "has_data": False, "total_records": 0, "records_with_clv": 0,
             "avg_clv": None, "positive_clv_rate": None, "clv_by_tier": {},
             "interpretation": "Error loading CLV data",
         }
@@ -395,6 +397,7 @@ def validate_model_edge(days=90):
         }
 
     except Exception:
+        _logger.debug("validate_model_edge failed, returning empty result")
         return empty_result
 
 
@@ -447,6 +450,7 @@ def get_stat_type_clv_penalties(days=90):
         return penalties
 
     except Exception:
+        _logger.debug("get_stat_type_clv_penalties failed, returning empty dict")
         return {}
 
 
@@ -562,6 +566,7 @@ def get_tier_accuracy_report(days=90):
         }
 
     except Exception:
+        _logger.debug("get_tier_accuracy_report failed, returning empty result")
         return empty_result
 
 # ============================================================
