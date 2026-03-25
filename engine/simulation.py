@@ -1945,8 +1945,7 @@ def enrich_simulation_with_advanced_stats(
     def _sf(v):
         try:
             f = float(v)
-            import math as _m
-            return f if _m.isfinite(f) else 0.0
+            return f if math.isfinite(f) else 0.0
         except (TypeError, ValueError):
             return 0.0
 

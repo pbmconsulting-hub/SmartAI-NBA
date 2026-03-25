@@ -154,7 +154,9 @@ def get_all_players(active_only: bool = True) -> list[dict]:
             {
                 "id": int(r.get("PERSON_ID", 0)),
                 "full_name": str(r.get("DISPLAY_FIRST_LAST", "")),
-                "first_name": str(r.get("DISPLAY_FIRST_LAST", "")).split()[0] if r.get("DISPLAY_FIRST_LAST") else "",
+                "first_name": (lambda parts: parts[0] if parts else "")(
+                    str(r.get("DISPLAY_FIRST_LAST", "")).split()
+                ),
                 "last_name": str(r.get("DISPLAY_LAST_COMMA_FIRST", "")).split(",")[0].strip() if r.get("DISPLAY_LAST_COMMA_FIRST") else "",
                 "is_active": bool(r.get("ROSTERSTATUS", 0)),
                 "team_id": r.get("TEAM_ID"),

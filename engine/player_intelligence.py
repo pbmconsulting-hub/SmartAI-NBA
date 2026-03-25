@@ -738,7 +738,7 @@ def get_player_matchup_grade(
     team_ratings: dict[str, float] = {}
     for r in cat_rows:
         abbrev = str(r.get("TEAM_ABBREVIATION", "")).upper()
-        pts_allowed = _safe_float(r.get("D_PTS", r.get("PLAYER_PTS", 0)), 0.0)
+        pts_allowed = _safe_float(r.get("D_PTS", 0), 0.0)
         if abbrev:
             team_ratings[abbrev] = pts_allowed
 

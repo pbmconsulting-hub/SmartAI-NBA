@@ -47,21 +47,50 @@ class TestModuleStructure(unittest.TestCase):
         self.assertIsNotNone(fn, f"{name} not found")
         self.assertTrue(callable(fn), f"{name} is not callable")
 
-    def test_get_all_players(self):        self._assert_callable("get_all_players")
-    def test_get_player_info(self):        self._assert_callable("get_player_info")
-    def test_get_player_game_logs(self):   self._assert_callable("get_player_game_logs")
-    def test_get_player_career_stats(self): self._assert_callable("get_player_career_stats")
-    def test_get_player_splits(self):      self._assert_callable("get_player_splits")
-    def test_get_advanced_box_score(self): self._assert_callable("get_advanced_box_score")
-    def test_get_player_tracking(self):    self._assert_callable("get_player_tracking_box_score")
-    def test_get_hustle_box_score(self):   self._assert_callable("get_hustle_box_score")
-    def test_get_defensive_matchup(self):  self._assert_callable("get_defensive_matchup_data")
-    def test_get_shot_chart(self):         self._assert_callable("get_shot_chart")
-    def test_get_lineup_stats(self):       self._assert_callable("get_lineup_stats")
-    def test_get_league_standings(self):   self._assert_callable("get_league_standings")
-    def test_find_games(self):             self._assert_callable("find_games")
-    def test_get_play_by_play(self):       self._assert_callable("get_play_by_play")
-    def test_get_team_roster(self):        self._assert_callable("get_team_roster")
+    def test_get_all_players(self):
+        self._assert_callable("get_all_players")
+
+    def test_get_player_info(self):
+        self._assert_callable("get_player_info")
+
+    def test_get_player_game_logs(self):
+        self._assert_callable("get_player_game_logs")
+
+    def test_get_player_career_stats(self):
+        self._assert_callable("get_player_career_stats")
+
+    def test_get_player_splits(self):
+        self._assert_callable("get_player_splits")
+
+    def test_get_advanced_box_score(self):
+        self._assert_callable("get_advanced_box_score")
+
+    def test_get_player_tracking(self):
+        self._assert_callable("get_player_tracking_box_score")
+
+    def test_get_hustle_box_score(self):
+        self._assert_callable("get_hustle_box_score")
+
+    def test_get_defensive_matchup(self):
+        self._assert_callable("get_defensive_matchup_data")
+
+    def test_get_shot_chart(self):
+        self._assert_callable("get_shot_chart")
+
+    def test_get_lineup_stats(self):
+        self._assert_callable("get_lineup_stats")
+
+    def test_get_league_standings(self):
+        self._assert_callable("get_league_standings")
+
+    def test_find_games(self):
+        self._assert_callable("find_games")
+
+    def test_get_play_by_play(self):
+        self._assert_callable("get_play_by_play")
+
+    def test_get_team_roster(self):
+        self._assert_callable("get_team_roster")
 
     def test_live_ttl_exists(self):
         from data.nba_stats_service import LIVE_TTL
