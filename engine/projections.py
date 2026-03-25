@@ -381,6 +381,14 @@ def build_player_projection(
     player_position = player_data.get("position", "SF")  # Default to SF if missing
     games_played = int(player_data.get("games_played", player_data.get("gp", 82)) or 82)
     season_minutes_average = float(player_data.get("minutes_avg", player_data.get("min", 30.0)) or 30.0)
+    # Extended stat averages
+    season_ftm_average                = float(player_data.get("ftm_avg", 0))
+    season_fta_average                = float(player_data.get("fta_avg", 0))
+    season_fga_average                = float(player_data.get("fga_avg", 0))
+    season_fgm_average                = float(player_data.get("fgm_avg", 0))
+    season_offensive_rebounds_average = float(player_data.get("offensive_rebounds_avg", 0))
+    season_defensive_rebounds_average = float(player_data.get("defensive_rebounds_avg", 0))
+    season_personal_fouls_average     = float(player_data.get("personal_fouls_avg", 0))
 
     # ============================================================
     # END SECTION: Extract Player's Season Averages
@@ -766,6 +774,19 @@ def build_player_projection(
     )
     projected_turnovers = season_turnovers_average * pace_factor  # Turnovers up with pace
 
+    # Extended stats — scale with pace, rest, and minutes adjustment.
+    # FTM/FTA scale with offensive pace (more possessions → more FT opportunities).
+    # FGA/FGM scale similarly. Rebounds split by type. Personal fouls are roughly
+    # pace-independent but scale with minutes played.
+    _base_mult = pace_factor * rest_factor * minutes_adjustment_factor
+    projected_ftm                = season_ftm_average                * _base_mult
+    projected_fta                = season_fta_average                * _base_mult
+    projected_fga                = season_fga_average                * _base_mult
+    projected_fgm                = season_fgm_average                * _base_mult
+    projected_offensive_rebounds = season_offensive_rebounds_average * _base_mult
+    projected_defensive_rebounds = season_defensive_rebounds_average * _base_mult
+    projected_personal_fouls     = season_personal_fouls_average     * (rest_factor * minutes_adjustment_factor)
+
     # Keep single offensive_stat_multiplier for backward compatibility in return dict
     offensive_stat_multiplier = _off_mult("points")
 
@@ -780,6 +801,14 @@ def build_player_projection(
         "projected_steals": _safe_float(round(projected_steals, 1)),
         "projected_blocks": _safe_float(round(projected_blocks, 1)),
         "projected_turnovers": _safe_float(round(projected_turnovers, 1)),
+        # Extended stat projections
+        "projected_ftm":                _safe_float(round(projected_ftm,                1)),
+        "projected_fta":                _safe_float(round(projected_fta,                1)),
+        "projected_fga":                _safe_float(round(projected_fga,                1)),
+        "projected_fgm":                _safe_float(round(projected_fgm,                1)),
+        "projected_offensive_rebounds": _safe_float(round(projected_offensive_rebounds, 1)),
+        "projected_defensive_rebounds": _safe_float(round(projected_defensive_rebounds, 1)),
+        "projected_personal_fouls":     _safe_float(round(projected_personal_fouls,     1)),
         # C1: Projected minutes for tonight (used by C8 minutes-first sim)
         "projected_minutes": _safe_float(projected_minutes),
         # Store all factors for transparency (shown in app)

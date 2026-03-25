@@ -29,6 +29,12 @@ from data.platform_mappings import (
     COMBO_STATS,
     FANTASY_SCORING,
 )
+try:
+    from engine import SIMPLE_STAT_TYPES as _SIMPLE_STAT_TYPES
+except ImportError:
+    _SIMPLE_STAT_TYPES = frozenset({
+        "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+    })
 
 # ============================================================
 # SECTION: Page Setup
@@ -124,7 +130,7 @@ all_player_names = get_all_player_names(players_data)
 
 # Simple stats + combo + fantasy stat types
 valid_stat_types = (
-    ["points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers"]
+    sorted(_SIMPLE_STAT_TYPES)
     + sorted(COMBO_STATS.keys())
     + sorted(FANTASY_SCORING.keys())
     + ["double_double", "triple_double"]

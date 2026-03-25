@@ -2258,6 +2258,10 @@ _DEFAULT_STAT_TYPES = frozenset({
     "steals", "blocks", "turnovers",
     "points_rebounds_assists", "points_rebounds",
     "points_assists", "rebounds_assists",
+    # Extended NBA stat types from mirror
+    "ftm", "fga", "fgm", "fta",
+    "minutes", "personal_fouls",
+    "offensive_rebounds", "defensive_rebounds",
 })
 
 
