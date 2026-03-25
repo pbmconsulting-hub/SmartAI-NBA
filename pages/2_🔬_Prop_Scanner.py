@@ -180,10 +180,25 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
     _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
 
+    # Platform checkboxes
+    _ps_pp_col, _ps_ud_col, _ps_dk_col = st.columns(3)
+    with _ps_pp_col:
+        _pp_on = st.checkbox("🟢 PrizePicks", value=True, key="scanner_pp_checkbox")
+    with _ps_ud_col:
+        _ud_on = st.checkbox("🟡 Underdog Fantasy", value=True, key="scanner_ud_checkbox")
+    with _ps_dk_col:
+        _dk_cb_on = st.checkbox("🔵 DraftKings Pick6", value=_dk_on and bool(_dk_key), key="scanner_dk_checkbox",
+                                disabled=not (_dk_on and bool(_dk_key)),
+                                help="Requires Odds API key — configure on ⚙️ Settings page." if not (_dk_on and bool(_dk_key)) else "")
+
     # Show which platforms are enabled
     _enabled_names = []
-    if _dk_on and _dk_key:
-        _enabled_names.extend(valid_platforms)
+    if _pp_on:
+        _enabled_names.append("PrizePicks")
+    if _ud_on:
+        _enabled_names.append("Underdog Fantasy")
+    if _dk_cb_on:
+        _enabled_names.append("DraftKings Pick6")
 
     st.markdown(
         f"Get tonight's live prop lines from: **{', '.join(_enabled_names) if _enabled_names else 'no platforms enabled'}**. "
@@ -223,9 +238,9 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
         try:
             with st.spinner("Loading live props..."):
                 _live_props = get_all_sportsbook_props(
-                    include_prizepicks=False,
-                    include_underdog=False,
-                    include_draftkings=_dk_on and bool(_dk_key),
+                    include_prizepicks=_pp_on,
+                    include_underdog=_ud_on,
+                    include_draftkings=_dk_cb_on,
                     odds_api_key=_dk_key or None,
                     progress_callback=_scanner_progress,
                 )

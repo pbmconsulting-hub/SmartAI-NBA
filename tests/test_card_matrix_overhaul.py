@@ -264,14 +264,14 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
     """Tests for data/sportsbook_service.py async features and alt-line enrichment."""
 
     def test_no_intake_cap_in_sync_get(self):
-        """Verify get_all_sportsbook_props no longer enforces a hard intake cap.
+        """Verify fetch_all_platform_props no longer enforces a hard intake cap.
 
         The 500-bet quota is now an *output* target enforced in the analysis
         loop, not an input cap in the service.
         """
         import inspect
-        from data.sportsbook_service import get_all_sportsbook_props
-        source = inspect.getsource(get_all_sportsbook_props)
+        from data.platform_fetcher import fetch_all_platform_props
+        source = inspect.getsource(fetch_all_platform_props)
         # The function should still reference alt-line enrichment
         self.assertIn("parse_alt_lines_from_platform_props", source)
         # The function should NOT enforce an intake cap anymore
