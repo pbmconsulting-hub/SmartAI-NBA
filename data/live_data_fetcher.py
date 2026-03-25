@@ -96,6 +96,13 @@ FALLBACK_THREES_STD_RATIO = 0.55     # 3-pointers: ~55% CV — streaky (minimum)
 FALLBACK_STEALS_STD_RATIO = 0.5      # Steals: ~50% CV
 FALLBACK_BLOCKS_STD_RATIO = 0.6      # Blocks: ~60% CV
 FALLBACK_TURNOVERS_STD_RATIO = 0.4   # Turnovers: ~40% CV
+FALLBACK_FTM_STD_RATIO = 0.45        # Free throws made: ~45% CV
+FALLBACK_FTA_STD_RATIO = 0.45        # Free throws attempted: ~45% CV
+FALLBACK_FGA_STD_RATIO = 0.35        # FG attempts: ~35% CV
+FALLBACK_FGM_STD_RATIO = 0.38        # FG made: ~38% CV
+FALLBACK_OREB_STD_RATIO = 0.52       # Offensive rebounds: ~52% CV
+FALLBACK_DREB_STD_RATIO = 0.42       # Defensive rebounds: ~42% CV
+FALLBACK_PF_STD_RATIO = 0.50         # Personal fouls: ~50% CV
 
 # Minimum minutes threshold to include a player's stats.
 # Players below this threshold are considered inactive/garbage-time only.
@@ -1094,6 +1101,14 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             ft_pct        = float(row.get("FT_PCT", 0) or 0)
             minutes_avg   = float(row.get("MIN",    0) or 0)
             usage_rate    = min(35.0, max(10.0, minutes_avg * 0.8))
+            # Extended stat averages (from nba_api LeagueDashPlayerStats)
+            ftm_avg                = float(row.get("FTM",  0) or 0)
+            fta_avg                = float(row.get("FTA",  0) or 0)
+            fga_avg                = float(row.get("FGA",  0) or 0)
+            fgm_avg                = float(row.get("FGM",  0) or 0)
+            offensive_rebounds_avg = float(row.get("OREB", 0) or 0)
+            defensive_rebounds_avg = float(row.get("DREB", 0) or 0)
+            personal_fouls_avg     = float(row.get("PF",   0) or 0)
 
             # Skip bench / DNP players (< MIN_MINUTES_THRESHOLD)
             if minutes_avg < MIN_MINUTES_THRESHOLD:
@@ -1107,6 +1122,15 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             steals_std    = max(0.1, steals_avg    * FALLBACK_STEALS_STD_RATIO)
             blocks_std    = max(0.1, blocks_avg    * FALLBACK_BLOCKS_STD_RATIO)
             turnovers_std = max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO)
+            ftm_std                = max(0.1, ftm_avg                * FALLBACK_FTM_STD_RATIO)
+            fta_std                = max(0.1, fta_avg                * FALLBACK_FTA_STD_RATIO)
+            # FGA/FGM use a 0.5 absolute floor (higher than other stats) because
+            # field goal attempts/makes are high-volume (10-20+/game).
+            fga_std                = max(0.5, fga_avg                * FALLBACK_FGA_STD_RATIO)
+            fgm_std                = max(0.5, fgm_avg                * FALLBACK_FGM_STD_RATIO)
+            offensive_rebounds_std = max(0.1, offensive_rebounds_avg * FALLBACK_OREB_STD_RATIO)
+            defensive_rebounds_std = max(0.3, defensive_rebounds_avg * FALLBACK_DREB_STD_RATIO)
+            personal_fouls_std     = max(0.1, personal_fouls_avg     * FALLBACK_PF_STD_RATIO)
 
             formatted_players.append({
                 "player_id":    player_id if player_id else "",
@@ -1130,6 +1154,21 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                 "steals_std":   round(steals_std,    2),
                 "blocks_std":   round(blocks_std,    2),
                 "turnovers_std":round(turnovers_std, 2),
+                # Extended stat averages
+                "ftm_avg":                  round(ftm_avg,                1),
+                "fta_avg":                  round(fta_avg,                1),
+                "fga_avg":                  round(fga_avg,                1),
+                "fgm_avg":                  round(fgm_avg,                1),
+                "offensive_rebounds_avg":   round(offensive_rebounds_avg, 1),
+                "defensive_rebounds_avg":   round(defensive_rebounds_avg, 1),
+                "personal_fouls_avg":       round(personal_fouls_avg,     1),
+                "ftm_std":                  round(ftm_std,                2),
+                "fta_std":                  round(fta_std,                2),
+                "fga_std":                  round(fga_std,                2),
+                "fgm_std":                  round(fgm_std,                2),
+                "offensive_rebounds_std":   round(offensive_rebounds_std, 2),
+                "defensive_rebounds_std":   round(defensive_rebounds_std, 2),
+                "personal_fouls_std":       round(personal_fouls_std,     2),
             })
 
         # Sort by points average (stars appear first)

@@ -13,6 +13,12 @@ try:
 except ImportError:
     run_quantum_matrix_simulation = None
 
+try:
+    from data.platform_fetcher import fetch_archived_nba_props
+    _ARCHIVE_AVAILABLE = True
+except ImportError:
+    _ARCHIVE_AVAILABLE = False
+
 _logger = logging.getLogger(__name__)
 
 # Implied probability for -110 odds (standard breakeven for edge calculation)
@@ -59,6 +65,39 @@ def _round_to_half(value):
     return round(value * 2) / 2
 
 
+def _get_archived_line(player_name, stat_type, date_str, _archive_cache):
+    """
+    Try to get the actual PrizePicks line from the mirror archive.
+
+    Props for each date are indexed by (player_name_lower, stat_type_lower)
+    on first access so that repeated lookups within the same date are O(1).
+
+    Returns:
+        tuple: (line_float, True) if found, (None, False) if not.
+    """
+    if not _ARCHIVE_AVAILABLE:
+        return None, False
+
+    if date_str not in _archive_cache:
+        raw_props = fetch_archived_nba_props(date_str)
+        # Build an index: (player_lower, stat_lower) → line for O(1) lookup
+        index = {}
+        for prop in raw_props:
+            key = (
+                prop.get("player_name", "").lower().strip(),
+                prop.get("stat_type", "").lower().strip(),
+            )
+            if key not in index:
+                index[key] = prop.get("line")
+        _archive_cache[date_str] = index
+
+    key = (player_name.lower().strip(), stat_type.lower().strip())
+    line = _archive_cache[date_str].get(key)
+    if line is not None:
+        return line, True
+    return None, False
+
+
 STAT_KEY_MAP = {
     "points": "PTS",
     "rebounds": "REB",
@@ -67,6 +106,15 @@ STAT_KEY_MAP = {
     "blocks": "BLK",
     "threes": "FG3M",
     "turnovers": "TOV",
+    # Extended stats
+    "ftm": "FTM",
+    "fta": "FTA",
+    "fga": "FGA",
+    "fgm": "FGM",
+    "minutes": "MIN",
+    "personal_fouls": "PF",
+    "offensive_rebounds": "OREB",
+    "defensive_rebounds": "DREB",
 }
 
 EDGE_BUCKETS = [
@@ -117,6 +165,8 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
 
     pick_log = []
 
+    _archive_cache = {}
+
     for player_name, game_logs in game_logs_by_player.items():
         if not game_logs:
             continue
@@ -137,7 +187,13 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                 season_avg = _season_avg_up_to_date(sorted_logs, stat_key, game_date)
                 if season_avg is None or season_avg <= 0:
                     continue
-                prop_line = _round_to_half(season_avg)
+                archived_line, found = _get_archived_line(
+                    player_name, stat_type, game_date, _archive_cache
+                )
+                if found and archived_line > 0:
+                    prop_line = archived_line
+                else:
+                    prop_line = _round_to_half(season_avg)
 
                 # Estimate standard deviation from prior game logs
                 season_std = _season_std_up_to_date(sorted_logs, stat_key, game_date)

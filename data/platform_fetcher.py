@@ -149,6 +149,40 @@ PRIZEPICKS_MIRROR_TOMORROW_URL = (
     "/main/data/prizepicks-nba-tomorrow.json"
 )
 
+# Normalized hierarchy — standard-only props with game/player/team metadata
+PRIZEPICKS_HIERARCHY_PROPS_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/current_day/props.json"
+)
+PRIZEPICKS_HIERARCHY_GAMES_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/current_day/games.json"
+)
+PRIZEPICKS_HIERARCHY_PLAYERS_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/current_day/players.json"
+)
+PRIZEPICKS_HIERARCHY_TEAMS_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/current_day/teams.json"
+)
+PRIZEPICKS_HIERARCHY_SLATES_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/current_day/slates.json"
+)
+
+# Per-team NBA props base URL (append {team-slug}.json)
+PRIZEPICKS_MIRROR_TEAM_BASE_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/nba-today"
+)
+
+# Historical archive template — real PrizePicks lines from past dates
+PRIZEPICKS_ARCHIVE_URL_TEMPLATE = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/hierarchy/archive/{date}/props.json"
+)
+
 # Underdog Fantasy public over/under lines endpoint (no API key required)
 UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
 
@@ -400,6 +434,284 @@ def fetch_prizepicks_props_from_mirror(include_tomorrow=False):
         )
 
     return all_props
+
+
+def _parse_hierarchy_props(props_list, players_lookup, today, fetched_at):
+    """
+    Parse the normalized hierarchy props.json from the mirror.
+
+    The hierarchy format uses propId, playerId, stat, line, teamCode,
+    opponentCode — different from the flat per-sport JSON files.
+    Only standard-odds props appear in the hierarchy (no goblin/demon).
+
+    Args:
+        props_list (list): Raw props from hierarchy/current_day/props.json.
+        players_lookup (dict): playerId → player info dict.
+        today (str): "YYYY-MM-DD" fallback date.
+        fetched_at (str): ISO timestamp.
+
+    Returns:
+        list[dict]: Props in the standard internal format.
+    """
+    result = []
+    for p in props_list:
+        player_id = p.get("playerId", "")
+        player_info = players_lookup.get(player_id, {})
+        player_name = player_info.get("playerName", "").strip()
+
+        if not player_name:
+            player_name = p.get("player", "").strip()
+        if not player_name:
+            continue
+
+        raw_stat = p.get("stat", "")
+        stat_type = normalize_stat_type(raw_stat, "PrizePicks")
+
+        try:
+            line = float(p.get("line", 0))
+        except (ValueError, TypeError):
+            continue
+        if line <= 0:
+            continue
+
+        team = p.get("teamCode", "").upper().replace("-", " ")
+        opponent = p.get("opponentCode", "").upper().replace("-", " ")
+        game_date = p.get("startDateCST", today)
+        start_time = p.get("startTime", "")
+
+        result.append({
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": line,
+            "platform": "PrizePicks",
+            "game_date": game_date,
+            "fetched_at": fetched_at,
+            "over_odds": _DEFAULT_AMERICAN_ODDS,
+            "under_odds": _DEFAULT_AMERICAN_ODDS,
+            "odds_type": "standard",
+            "opponent": opponent,
+            "game_id": p.get("gameId", ""),
+            "start_time": start_time,
+            "source": "hierarchy",
+        })
+    return result
+
+
+def fetch_prizepicks_hierarchy_data():
+    """
+    Fetch the full normalized NBA hierarchy from the mirror:
+    games, teams, players, props, slates.
+
+    Returns standard-only props (no goblin/demon) with rich metadata
+    including game IDs, opponent, start time, and slate classification.
+
+    Returns:
+        dict: {
+            "games": [...],
+            "teams": [...],
+            "players": {...},
+            "props": [...],
+            "slates": [...],
+            "raw_props": [...],
+        }
+    """
+    if not REQUESTS_AVAILABLE:
+        return {}
+
+    today = _today_str()
+    fetched_at = _now_str()
+    result = {}
+
+    endpoints = {
+        "games": PRIZEPICKS_HIERARCHY_GAMES_URL,
+        "teams": PRIZEPICKS_HIERARCHY_TEAMS_URL,
+        "players": PRIZEPICKS_HIERARCHY_PLAYERS_URL,
+        "raw_props": PRIZEPICKS_HIERARCHY_PROPS_URL,
+        "slates": PRIZEPICKS_HIERARCHY_SLATES_URL,
+    }
+
+    for key, url in endpoints.items():
+        cached = _cache_get(url)
+        if cached is not None:
+            result[key] = cached
+        else:
+            response = _fetch_with_retry(url, headers=_BASE_HEADERS)
+            if response is None:
+                result[key] = [] if key != "players" else {}
+                continue
+            try:
+                response.raise_for_status()
+                data = response.json()
+                _cache_set(url, data)
+                result[key] = data
+            except Exception as err:
+                _logger.warning(f"[Hierarchy] Error fetching {key}: {err}")
+                result[key] = [] if key != "players" else {}
+
+    # Build players lookup
+    players_lookup = {}
+    players_data = result.get("players", [])
+    if isinstance(players_data, list):
+        for p in players_data:
+            pid = p.get("playerId", "")
+            if pid:
+                players_lookup[pid] = p
+    elif isinstance(players_data, dict):
+        players_lookup = players_data
+
+    raw_props = result.get("raw_props", [])
+    if isinstance(raw_props, list):
+        result["props"] = _parse_hierarchy_props(
+            raw_props, players_lookup, today, fetched_at
+        )
+    else:
+        result["props"] = []
+
+    _logger.info(
+        f"[Hierarchy] Loaded {len(result.get('games', []))} games, "
+        f"{len(result['props'])} props, "
+        f"{len(players_lookup)} players."
+    )
+
+    return result
+
+
+NBA_TEAM_SLUGS = {
+    "ATL": "atlanta-hawks",      "BOS": "boston-celtics",
+    "BKN": "brooklyn-nets",      "CHA": "charlotte-hornets",
+    "CHI": "chicago-bulls",      "CLE": "cleveland-cavaliers",
+    "DAL": "dallas-mavericks",   "DEN": "denver-nuggets",
+    "DET": "detroit-pistons",    "GSW": "golden-state-warriors",
+    "HOU": "houston-rockets",    "IND": "indiana-pacers",
+    "LAC": "la-clippers",        "LAL": "los-angeles-lakers",
+    "MEM": "memphis-grizzlies",  "MIA": "miami-heat",
+    "MIL": "milwaukee-bucks",    "MIN": "minnesota-timberwolves",
+    "NOP": "new-orleans-pelicans", "NYK": "new-york-knicks",
+    "OKC": "oklahoma-city-thunder", "ORL": "orlando-magic",
+    "PHI": "philadelphia-76ers",    "PHX": "phoenix-suns",
+    "POR": "portland-trail-blazers", "SAC": "sacramento-kings",
+    "SAS": "san-antonio-spurs",     "TOR": "toronto-raptors",
+    "UTA": "utah-jazz",             "WAS": "washington-wizards",
+}
+
+
+def fetch_team_props_from_mirror(team_abbrev):
+    """
+    Fetch all PrizePicks NBA props for a specific team.
+
+    Args:
+        team_abbrev (str): Standard 3-letter abbreviation, e.g. "LAL".
+
+    Returns:
+        list[dict]: Props in standard internal format, or [].
+    """
+    slug = NBA_TEAM_SLUGS.get(team_abbrev.upper())
+    if not slug:
+        _logger.warning(f"[Team Mirror] Unknown team abbreviation: {team_abbrev}")
+        return []
+
+    url = f"{PRIZEPICKS_MIRROR_TEAM_BASE_URL}/{slug}.json"
+
+    cached = _cache_get(url)
+    if cached is not None:
+        data = cached
+    else:
+        response = _fetch_with_retry(url, headers=_BASE_HEADERS)
+        if response is None:
+            return []
+        try:
+            response.raise_for_status()
+            data = response.json()
+            _cache_set(url, data)
+        except Exception:
+            return []
+
+    today = _today_str()
+    fetched_at = _now_str()
+    return _parse_prizepicks_mirror_props(data, today, fetched_at)
+
+
+def fetch_archived_nba_props(date_str):
+    """
+    Fetch historical PrizePicks NBA props for a past date.
+
+    Uses the mirror's archive at hierarchy/archive/YYYY-MM-DD/props.json.
+
+    Args:
+        date_str (str): "YYYY-MM-DD" format.
+
+    Returns:
+        list[dict]: Props in standard internal format, or [].
+    """
+    url = PRIZEPICKS_ARCHIVE_URL_TEMPLATE.format(date=date_str)
+
+    cached = _cache_get(url)
+    if cached is not None:
+        data = cached
+    else:
+        response = _fetch_with_retry(url, headers=_BASE_HEADERS, timeout=10)
+        if response is None:
+            return []
+        try:
+            response.raise_for_status()
+            data = response.json()
+            _cache_set(url, data)
+        except Exception:
+            return []
+
+    today = date_str
+    fetched_at = _now_str()
+
+    if isinstance(data, list):
+        return _parse_hierarchy_props(data, {}, today, fetched_at)
+    elif isinstance(data, dict) and "props" in data:
+        return _parse_prizepicks_mirror_props(data, today, fetched_at)
+    return []
+
+
+def get_slate_grouped_props():
+    """
+    Fetch NBA props and group by slate (Early / Late).
+
+    Returns:
+        dict: {"Early": [prop_dicts], "Late": [prop_dicts]}
+    """
+    hierarchy = fetch_prizepicks_hierarchy_data()
+    games = hierarchy.get("games", [])
+    props = hierarchy.get("props", [])
+
+    game_slate_map = {}
+    for g in games:
+        gid = g.get("gameId", "")
+        slate = g.get("slate", "Late")
+        game_slate_map[gid] = slate
+
+    slates = {"Early": [], "Late": []}
+    for p in props:
+        game_id = p.get("game_id", "")
+        slate = game_slate_map.get(game_id, "Late")
+        slates[slate].append(p)
+
+    return slates
+
+
+def get_same_game_prop_groups():
+    """
+    Group all NBA props by gameId for same-game correlation analysis.
+
+    Returns:
+        dict: gameId → list[prop_dicts]
+    """
+    hierarchy = fetch_prizepicks_hierarchy_data()
+    props = hierarchy.get("props", [])
+
+    by_game = {}
+    for p in props:
+        gid = p.get("game_id", "unknown")
+        by_game.setdefault(gid, []).append(p)
+
+    return by_game
 
 
 # ============================================================
@@ -1946,6 +2258,10 @@ _DEFAULT_STAT_TYPES = frozenset({
     "steals", "blocks", "turnovers",
     "points_rebounds_assists", "points_rebounds",
     "points_assists", "rebounds_assists",
+    # Extended NBA stat types from mirror
+    "ftm", "fga", "fgm", "fta",
+    "minutes", "personal_fouls",
+    "offensive_rebounds", "defensive_rebounds",
 })
 
 

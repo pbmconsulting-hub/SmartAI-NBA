@@ -32,6 +32,26 @@ PRIZEPICKS_STAT_MAP = {
     "Pts+Rebs+Asts": "points_rebounds_assists",
     "Fantasy Score": "fantasy_score_pp",
     "Blks+Stls": "blocks_steals",
+    "Free Throws Made": "ftm",
+    "FG Attempted": "fga",
+    "Field Goals Attempted": "fga",    # full-word form from some API versions
+    "FG Made": "fgm",
+    "Field Goals Made": "fgm",         # full-word form from some API versions
+    "FT Attempted": "fta",
+    "Free Throws Attempted": "fta",    # full-word form from some API versions
+    "Double Double": "double_double",
+    "Triple Double": "triple_double",
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
+    # Space-separated combo variants (PrizePicks sometimes emits spaces around +)
+    "Pts + Rebs": "points_rebounds",
+    "Pts + Asts": "points_assists",
+    "Rebs + Asts": "rebounds_assists",
+    "Blks + Stls": "blocks_steals",
+    # Singular abbreviation for PRA
+    "Pts+Reb+Ast": "points_rebounds_assists",
 }
 
 # DraftKings Pick6 stat type mappings (also used for standard sportsbooks)
@@ -51,6 +71,21 @@ DRAFTKINGS_STAT_MAP = {
     "Double Double": "double_double",
     "Triple Double": "triple_double",
     "Fantasy Points": "fantasy_score_dk",
+    "Free Throws Made": "ftm",
+    "FTM": "ftm",
+    "FG Attempted": "fga",
+    "Field Goals Attempted": "fga",    # full-word form from some API versions
+    "FGA": "fga",
+    "FG Made": "fgm",
+    "Field Goals Made": "fgm",         # full-word form from some API versions
+    "FGM": "fgm",
+    "FT Attempted": "fta",
+    "Free Throws Attempted": "fta",    # full-word form from some API versions
+    "FTA": "fta",
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
 }
 
 # Legacy Underdog Fantasy stat type mappings (backward compat)
@@ -67,6 +102,17 @@ UNDERDOG_STAT_MAP = {
     "Rebounds + Assists": "rebounds_assists",
     "Pts + Rebs + Asts": "points_rebounds_assists",
     "Fantasy Points": "fantasy_score_ud",
+    "Free Throws Made": "ftm",
+    "FG Attempted": "fga",
+    "Field Goals Attempted": "fga",    # full-word form from some API versions
+    "FG Made": "fgm",
+    "Field Goals Made": "fgm",         # full-word form from some API versions
+    "FT Attempted": "fta",
+    "Free Throws Attempted": "fta",    # full-word form from some API versions
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
 }
 
 # Combined reverse-lookup: all platform names → internal key
