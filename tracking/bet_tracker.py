@@ -504,18 +504,17 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
         if tier not in AUTO_LOG_TIERS:
             continue
         # Apply tier-specific minimum edge thresholds
-        if True:
-            if tier == "Silver":
-                min_required_edge = SILVER_MIN_EDGE
-            elif tier == "Bronze":
-                # Bronze needs high edge AND high confidence to qualify
-                if edge < BRONZE_MIN_EDGE or confidence < BRONZE_MIN_CONFIDENCE:
-                    continue
-                min_required_edge = BRONZE_MIN_EDGE
-            else:
-                min_required_edge = minimum_edge
-            if edge < min_required_edge:
+        if tier == "Silver":
+            min_required_edge = SILVER_MIN_EDGE
+        elif tier == "Bronze":
+            # Bronze needs high edge AND high confidence to qualify
+            if edge < BRONZE_MIN_EDGE or confidence < BRONZE_MIN_CONFIDENCE:
                 continue
+            min_required_edge = BRONZE_MIN_EDGE
+        else:
+            min_required_edge = minimum_edge
+        if edge < min_required_edge:
+            continue
         if res.get("player_is_out", False):
             continue
 

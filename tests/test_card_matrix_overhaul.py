@@ -60,7 +60,7 @@ class TestCompileCardMatrix(unittest.TestCase):
         self.assertIn("Platinum", html)
         self.assertIn("qcm-tier-platinum", html)
 
-    def test_auto_generates_goblin_prediction_when_missing(self):
+    def test_no_goblin_css_class_in_card(self):
         html = self.compile([self._sample_result(
             bet_type="standard",
             prediction="",  # No prediction provided
@@ -69,7 +69,7 @@ class TestCompileCardMatrix(unittest.TestCase):
         # Goblin/Demon prediction CSS classes not used
         self.assertNotIn('class="qcm-prediction qcm-prediction-goblin"', html)
 
-    def test_auto_generates_demon_prediction_when_missing(self):
+    def test_no_demon_css_class_in_card(self):
         html = self.compile([self._sample_result(
             bet_type="standard",
             prediction="",
