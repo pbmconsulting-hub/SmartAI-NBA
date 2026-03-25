@@ -144,11 +144,25 @@ def show_player_spotlight(player_name: str, grouped_entry: dict) -> None:
                     "rant": f"Joseph encountered an issue: {_html.escape(str(exc))}",
                 }
 
+        # ── Load Joseph avatar ────────────────────────────────
+        avatar_html = ""
+        try:
+            from pages.helpers.joseph_live_desk import get_joseph_avatar_b64
+            avatar_b64 = get_joseph_avatar_b64()
+            if avatar_b64:
+                avatar_html = (
+                    f'<img src="data:image/png;base64,{avatar_b64}" '
+                    f'class="gm-joseph-avatar" alt="Joseph M. Smith" />'
+                )
+        except Exception:
+            _logger.debug("Failed to load Joseph avatar for player modal")
+
         lock_stat = _html.escape(str(result.get("platinum_lock_stat", "N/A")))
         rant = _html.escape(str(result.get("rant", "")))
 
         st.markdown(
             f'<div class="gm-joseph-response">'
+            f'{avatar_html}'
             f'<div class="gm-joseph-lock">💎 PLATINUM LOCK: {lock_stat}</div>'
             f'<div class="gm-joseph-rant">{rant}</div>'
             f'</div>',
