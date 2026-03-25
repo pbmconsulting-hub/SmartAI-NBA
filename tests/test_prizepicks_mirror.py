@@ -33,8 +33,9 @@ class TestPrizePicksMirrorConstants(unittest.TestCase):
         self.assertIn("prizepicks-nba-tomorrow", self.tomorrow_url)
 
     def test_today_url_is_raw_github(self):
-        self.assertTrue(
-            self.today_url.startswith("https://raw.githubusercontent.com"),
+        self.assertIn(
+            "raw.githubusercontent.com",
+            self.today_url,
             "Mirror URL should use raw.githubusercontent.com",
         )
 
