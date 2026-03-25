@@ -524,13 +524,13 @@ class TestNeuralAnalysisPageIntegration(unittest.TestCase):
         self.assertIn("_get_gm_css()", self.source)
 
     def test_has_trading_card_grid_section(self):
-        self.assertIn("Player Spotlight Cards", self.source)
+        self.assertIn("Quantum Analysis Matrix", self.source)
 
-    def test_has_dialog_decorator(self):
-        self.assertIn("@st.dialog", self.source)
+    def test_has_unified_card_import(self):
+        self.assertIn("compile_unified_card_matrix", self.source)
 
-    def test_has_spotlight_button(self):
-        self.assertIn("spotlight_", self.source)
+    def test_has_expandable_player_cards(self):
+        self.assertIn("_compile_unified_matrix", self.source)
 
 
 # ============================================================

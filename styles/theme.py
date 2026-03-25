@@ -5662,6 +5662,186 @@ def get_quantum_card_matrix_css():
 
 
 # ============================================================
+# SECTION: Unified Expandable Player Card CSS
+# PURPOSE: Combines the trading card header with all prop
+#          analysis cards into one expandable <details> element.
+# ============================================================
+
+UNIFIED_PLAYER_CARD_CSS = """
+/* ═══════════════════════════════════════════════════════════
+   UNIFIED PLAYER CARD — Expandable per-player card
+   Combines identity header with grouped prop analysis cards
+   ═══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+.upc-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 8px 0;
+    width: 100%;
+}
+
+/* ── Expandable wrapper (<details>) ─────────────────────── */
+.upc-card {
+    background: rgba(11, 14, 26, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 240, 255, 0.04);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    font-family: 'Inter', sans-serif;
+    color: #e0eeff;
+    overflow: hidden;
+}
+.upc-card[open] {
+    border-color: rgba(0, 240, 255, 0.22);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
+}
+
+/* ── Summary (always-visible header) ────────────────────── */
+.upc-card > summary {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    transition: background 0.18s ease;
+}
+.upc-card > summary::-webkit-details-marker { display: none; }
+.upc-card > summary::marker { display: none; content: ''; }
+.upc-card > summary:hover {
+    background: rgba(0, 240, 255, 0.04);
+}
+
+/* Headshot */
+.upc-headshot {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 198, 255, 0.35);
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+/* Identity block */
+.upc-identity {
+    flex: 1;
+    min-width: 0;
+}
+.upc-player-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.upc-team-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+    color: #fff;
+}
+.upc-subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #94A3B8;
+    margin-top: 2px;
+}
+
+/* Stat pills row */
+.upc-stats {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+.upc-stat-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.66rem;
+    font-variant-numeric: tabular-nums;
+    color: #00C6FF;
+    background: rgba(0, 198, 255, 0.08);
+    border: 1px solid rgba(0, 198, 255, 0.18);
+    border-radius: 6px;
+    padding: 2px 7px;
+}
+
+/* Right-side summary info */
+.upc-summary-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+.upc-prop-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #00f0ff;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.20);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-weight: 600;
+}
+.upc-chevron {
+    font-size: 1.1rem;
+    color: #64748b;
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+}
+.upc-card[open] .upc-chevron {
+    transform: rotate(180deg);
+    color: #00f0ff;
+}
+
+/* ── Expanded body ──────────────────────────────────────── */
+.upc-body {
+    padding: 0 20px 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.upc-body .qcm-grid {
+    padding-top: 14px;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .upc-card > summary {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 14px;
+    }
+    .upc-headshot {
+        width: 44px;
+        height: 44px;
+    }
+    .upc-summary-right {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+"""
+
+
+def get_unified_player_card_css():
+    """Return the Unified Player Card CSS for injection via st.markdown."""
+    return f"<style>{UNIFIED_PLAYER_CARD_CSS}</style>"
+
+
+# ============================================================
+# END SECTION: Unified Expandable Player Card CSS
+# ============================================================
+
+
+# ============================================================
 # SECTION: Glassmorphic Dark Theme — Trading Card & Modal CSS
 # PURPOSE: Obsidian/Deep Space backgrounds, neon accents,
 #          Inter + JetBrains Mono typography, and glassmorphic

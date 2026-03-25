@@ -117,6 +117,7 @@ from styles.theme import (
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 from data.sportsbook_service import smart_filter_props as _smart_filter_props
 from utils.renderers import compile_card_matrix as _compile_card_matrix
+from utils.renderers import compile_unified_card_matrix as _compile_unified_matrix
 from utils.renderers import build_horizontal_card_html as _build_h_card
 from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
@@ -2534,127 +2535,37 @@ if analysis_results:
 
     st.divider()
 
-    # ── Player Trading-Card Grid ─────────────────────────────────
-    # Group analysis results by player and render a clickable
-    # "Trading Card" for each player.  Clicking opens the Jumbo
-    # Card Player Spotlight modal.
+    # ── Unified Expandable Player Cards ──────────────────────────
+    # Each player gets one expandable card combining their identity
+    # (headshot, name, team, season stats) with all their prop
+    # analysis cards.  Click a card to expand and see full analysis.
     _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
     _grouped = _group_props(_active_results, players_data, todays_games)
 
     if _grouped:
         st.markdown(
             '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
-            'margin-bottom:8px;">🃏 Player Spotlight Cards</h3>'
+            'margin-bottom:8px;">🃏 Quantum Analysis Matrix</h3>'
             '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
-            'Click any card to open the full Player Spotlight analysis.</p>',
+            'Click any player card to expand and view their full prop analysis.</p>',
             unsafe_allow_html=True,
         )
 
-        # CSS to make the button visually merge with the card above it,
-        # creating a single clickable card unit.
-        st.markdown("""<style>
-        .card-btn-wrapper .stButton button {
-            margin-top: -12px !important;
-            border-top-left-radius: 0 !important;
-            border-top-right-radius: 0 !important;
-            border-bottom-left-radius: 12px !important;
-            border-bottom-right-radius: 12px !important;
-            background: var(--gm-bg-card, rgba(10,15,30,0.85)) !important;
-            border: 1px solid var(--gm-border, rgba(0,198,255,0.12)) !important;
-            border-top: none !important;
-            color: #00C6FF !important;
-            font-weight: 600 !important;
-            padding: 10px 8px !important;
-            font-size: 0.82rem !important;
-        }
-        .card-btn-wrapper .stButton button:hover {
-            border-color: var(--gm-accent-blue, #00C6FF) !important;
-            box-shadow: 0 0 18px rgba(0, 198, 255, 0.25) !important;
-            background: rgba(0,198,255,0.08) !important;
-        }
-        .card-btn-wrapper .gm-player-card {
-            margin-bottom: 0 !important;
-            border-bottom-left-radius: 0 !important;
-            border-bottom-right-radius: 0 !important;
-            cursor: pointer;
-        }
-        .card-btn-wrapper {
-            position: relative;
-        }
-        .card-btn-wrapper .stButton {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            z-index: 10;
-        }
-        .card-btn-wrapper .stButton button {
-            width: 100% !important;
-            height: 100% !important;
-            opacity: 0 !important;
-            cursor: pointer !important;
-        }
-        </style>""", unsafe_allow_html=True)
+        _unified_html = _compile_unified_matrix(_grouped)
+        st.markdown(_unified_html, unsafe_allow_html=True)
 
-        # Render each player's trading card as a clickable element.
-        # The card itself is the click target — no separate button below.
-        _player_names = list(_grouped.keys())
-        _cols_per_row = 5
-        for _row_start in range(0, len(_player_names), _cols_per_row):
-            _row_names = _player_names[_row_start:_row_start + _cols_per_row]
-            _btn_cols = st.columns(len(_row_names))
-            for _ci, _cn in enumerate(_row_names):
-                with _btn_cols[_ci]:
-                    _pdata = _grouped[_cn]
-                    _v = _pdata.get("vitals", {})
-                    _card_html = _get_trading_card_html(
-                        player_name=_cn,
-                        headshot_url=_v.get("headshot_url", ""),
-                        position=_v.get("position", "N/A"),
-                        team=_v.get("team", "N/A"),
-                        opponent=_v.get("next_opponent", "TBD"),
-                        season_stats=_v.get("season_stats"),
-                        prop_count=len(_pdata.get("props", [])),
-                    )
-                    with st.container():
-                        st.markdown('<div class="card-btn-wrapper">', unsafe_allow_html=True)
-                        st.markdown(_card_html, unsafe_allow_html=True)
-                        if st.button(f"🔍 {_cn}", key=f"spotlight_{_cn}", use_container_width=True):
-                            st.session_state["_spotlight_player"] = _cn
-                        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Open the spotlight modal if a player was selected
-        _spot_player = st.session_state.get("_spotlight_player")
-        if _spot_player and _spot_player in _grouped:
-            @st.dialog("Player Spotlight", width="large")
-            def _open_spotlight():
-                _show_spotlight(_spot_player, _grouped[_spot_player])
-
-            _open_spotlight()
-            st.session_state["_spotlight_player"] = None
-
-    st.divider()
-
-    # ── Prop Cards — Single-Shot HTML Card Matrix Renderer ────────
-    # Uses compile_card_matrix() to build a single HTML string with
-    # CSS Grid layout.  All props rendered (no cap).
-    _non_out_display = [r for r in displayed_results if not r.get("player_is_out", False)]
+    # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
-
-    # Single-shot card matrix injection for active (non-OUT) props
-    _card_matrix_html = _compile_card_matrix(_non_out_display)
-    st.markdown(_card_matrix_html, unsafe_allow_html=True)
-
-    # Show OUT players at the bottom
     if _out_display:
-        st.markdown(
-            '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
-            '⚠️ OUT / Inactive Players</div>',
-            unsafe_allow_html=True,
-        )
-        _out_matrix_html = _compile_card_matrix(_out_display)
-        st.markdown(_out_matrix_html, unsafe_allow_html=True)
+        _out_grouped = _group_props(_out_display, players_data, todays_games)
+        if _out_grouped:
+            st.markdown(
+                '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
+                '⚠️ OUT / Inactive Players</div>',
+                unsafe_allow_html=True,
+            )
+            _out_unified_html = _compile_unified_matrix(_out_grouped)
+            st.markdown(_out_unified_html, unsafe_allow_html=True)
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()

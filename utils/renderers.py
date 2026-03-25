@@ -19,7 +19,7 @@
 
 import html as _html
 
-from styles.theme import QUANTUM_CARD_MATRIX_CSS, get_team_colors
+from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
 
 
 # Fallback silhouette SVG for missing headshots
@@ -828,4 +828,131 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
         f'</div>'
         f'</div>'
         f'</div>'
+    )
+
+
+# =====================================================================
+# Unified Expandable Player Cards
+# =====================================================================
+
+_FALLBACK_HEADSHOT = (
+    "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
+)
+
+
+def _build_unified_player_header(player_name, vitals):
+    """Build the always-visible summary header for a unified player card.
+
+    Args:
+        player_name (str): Display name.
+        vitals (dict): ``{"headshot_url", "position", "team",
+            "next_opponent", "season_stats": {"ppg","rpg","apg"}}``.
+
+    Returns:
+        str: HTML for the ``<summary>`` content (not the tag itself).
+    """
+    safe_name = _escape(player_name)
+    headshot = _escape(vitals.get("headshot_url", "") or "")
+    position = _escape(vitals.get("position", "N/A"))
+    team = _escape(vitals.get("team", "N/A"))
+    opponent = _escape(vitals.get("next_opponent", "TBD"))
+    stats = vitals.get("season_stats") or {}
+    ppg = stats.get("ppg", 0.0)
+    rpg = stats.get("rpg", 0.0)
+    apg = stats.get("apg", 0.0)
+
+    team_primary, _ = get_team_colors(team)
+    team_badge = (
+        f'<span class="upc-team-badge" style="background:{team_primary};">'
+        f'{team}</span>'
+    ) if team and team != "N/A" else ""
+
+    return (
+        f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}" '
+        f'onerror="this.onerror=null;this.src=\'{_FALLBACK_HEADSHOT}\'">'
+        f'<div class="upc-identity">'
+        f'<div class="upc-player-name">{safe_name}{team_badge}</div>'
+        f'<div class="upc-subtitle">{position} · {team} vs {opponent}</div>'
+        f'<div class="upc-stats">'
+        f'<span class="upc-stat-pill">{ppg} PPG</span>'
+        f'<span class="upc-stat-pill">{rpg} RPG</span>'
+        f'<span class="upc-stat-pill">{apg} APG</span>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def build_unified_player_card_html(player_name, vitals, props):
+    """Build a single expandable unified player card.
+
+    The card displays a compact identity header (headshot, name, team,
+    season stats) and expands on click to reveal all prop analysis cards
+    for this player.
+
+    Args:
+        player_name (str): Display name.
+        vitals (dict): Player vitals from ``group_props_by_player``.
+        props (list[dict]): Prop analysis results for this player.
+
+    Returns:
+        str: HTML ``<details>`` element for one player.
+    """
+    header_html = _build_unified_player_header(player_name, vitals)
+    prop_count = len(props)
+    prop_label = f"{prop_count} prop{'s' if prop_count != 1 else ''}"
+
+    # Build individual prop cards inside the body
+    card_strings = [_build_single_card_html(p, i) for i, p in enumerate(props)]
+    body_html = (
+        f'<div class="upc-body">'
+        f'<div class="qcm-grid">{"".join(card_strings)}</div>'
+        f'</div>'
+    )
+
+    return (
+        f'<details class="upc-card">'
+        f'<summary>'
+        f'{header_html}'
+        f'<div class="upc-summary-right">'
+        f'<span class="upc-prop-count">{prop_label}</span>'
+        f'<span class="upc-chevron">▼</span>'
+        f'</div>'
+        f'</summary>'
+        f'{body_html}'
+        f'</details>'
+    )
+
+
+def compile_unified_card_matrix(grouped_players):
+    """Compile all players into a unified expandable card matrix.
+
+    Each player gets one expandable card containing their identity header
+    and all associated prop analysis cards.
+
+    Args:
+        grouped_players (dict): Mapping of ``player_name`` →
+            ``{"vitals": dict, "props": list[dict]}`` from
+            :func:`utils.data_grouper.group_props_by_player`.
+
+    Returns:
+        str: A single HTML string with all unified player cards,
+             preceded by both the QCM and Unified Player Card CSS.
+    """
+    if not grouped_players:
+        return (
+            f"<style>{QUANTUM_CARD_MATRIX_CSS}{UNIFIED_PLAYER_CARD_CSS}</style>"
+            '<div style="text-align:center;color:#64748b;padding:40px;">'
+            "No analysis results to display.</div>"
+        )
+
+    cards = []
+    for name, data in grouped_players.items():
+        vitals = data.get("vitals", {})
+        props = data.get("props", [])
+        if props:
+            cards.append(build_unified_player_card_html(name, vitals, props))
+
+    return (
+        f"<style>{QUANTUM_CARD_MATRIX_CSS}{UNIFIED_PLAYER_CARD_CSS}</style>"
+        f'<div class="upc-grid">{"".join(cards)}</div>'
     )
