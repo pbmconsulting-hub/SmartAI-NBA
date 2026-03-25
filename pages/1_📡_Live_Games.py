@@ -277,11 +277,10 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
 # ── Platform Preference ──────────────────────────────────────
 with st.expander("⚙️ Platform Settings", expanded=False):
     _PLATFORM_OPTIONS = [
-        "FanDuel", "DraftKings", "BetMGM", "Caesars",
-        "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+        "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
     ]
     if "joseph_preferred_platform" not in st.session_state:
-        st.session_state["joseph_preferred_platform"] = "FanDuel"
+        st.session_state["joseph_preferred_platform"] = "PrizePicks"
 
     st.markdown(
         '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
@@ -910,8 +909,7 @@ if platform_props_clicked:
 
             # Group by platform
             platforms_order = [
-                "FanDuel", "DraftKings", "BetMGM", "Caesars",
-                "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+                "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
             ]
             all_platforms = sorted({p["platform"] for p in analyzed_props})
             # Show known platforms first, then any others

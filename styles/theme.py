@@ -1962,13 +1962,12 @@ def get_player_card_html(result):
     dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
     platform_colors = {
-        "FanDuel": "rgba(20,90,200,0.9)",
-        "DraftKings": "rgba(43,108,176,0.9)",
-        "BetMGM": "rgba(180,155,60,0.9)",
-        "Caesars": "rgba(0,100,60,0.9)",
-        # Legacy DFS entries (backward compat)
         "PrizePicks": "rgba(39,103,73,0.9)",
+        "Underdog Fantasy": "rgba(85,60,154,0.9)",
+        "DraftKings Pick6": "rgba(43,108,176,0.9)",
+        # Backward-compat aliases
         "Underdog": "rgba(85,60,154,0.9)",
+        "DraftKings": "rgba(43,108,176,0.9)",
     }
     plat_color = platform_colors.get(platform, "rgba(45,55,72,0.9)")
 
@@ -2301,24 +2300,21 @@ def get_platform_badge_html(platform):
         str: HTML span with platform-specific gradient and styling
     """
     platform_styles = {
-        "FanDuel": (
-            "background:linear-gradient(135deg,#1456c8,#4a8bf5);color:#d4e6ff;"
-        ),
-        "DraftKings": (
-            "background:linear-gradient(135deg,#1a202c,#2b6cb0);color:#bee3f8;"
-        ),
-        "BetMGM": (
-            "background:linear-gradient(135deg,#8b7520,#c4a930);color:#fff8e0;"
-        ),
-        "Caesars": (
-            "background:linear-gradient(135deg,#006440,#00a060);color:#d0ffe0;"
-        ),
-        # Legacy DFS entries (backward compat)
         "PrizePicks": (
             "background:linear-gradient(135deg,#276749,#48bb78);color:#f0fff4;"
         ),
+        "Underdog Fantasy": (
+            "background:linear-gradient(135deg,#44337a,#805ad5);color:#e9d8fd;"
+        ),
+        "DraftKings Pick6": (
+            "background:linear-gradient(135deg,#1a202c,#2b6cb0);color:#bee3f8;"
+        ),
+        # Backward-compat aliases
         "Underdog": (
             "background:linear-gradient(135deg,#44337a,#805ad5);color:#e9d8fd;"
+        ),
+        "DraftKings": (
+            "background:linear-gradient(135deg,#1a202c,#2b6cb0);color:#bee3f8;"
         ),
     }
     style = platform_styles.get(
@@ -2443,13 +2439,12 @@ def get_player_analysis_card_html(result, show_add_button=True):
     dir_class = "dir-over" if direction == "OVER" else "dir-under"
 
     platform_colors = {
-        "FanDuel": "rgba(20,90,200,0.85)",
-        "DraftKings": "rgba(43,108,176,0.85)",
-        "BetMGM": "rgba(180,155,60,0.85)",
-        "Caesars": "rgba(0,100,60,0.85)",
-        # Legacy DFS entries (backward compat)
         "PrizePicks": "rgba(0,120,70,0.85)",
+        "Underdog Fantasy": "rgba(85,60,154,0.85)",
+        "DraftKings Pick6": "rgba(43,108,176,0.85)",
+        # Backward-compat aliases
         "Underdog": "rgba(85,60,154,0.85)",
+        "DraftKings": "rgba(43,108,176,0.85)",
     }
     plat_color = platform_colors.get(platform, "rgba(30,40,60,0.85)")
     fill_class = "prob-gauge-fill-over" if direction == "OVER" else "prob-gauge-fill-under"
@@ -4537,14 +4532,12 @@ def get_bet_card_html(bet, show_live_status=False):
     # PENDING keeps the platform color
 
     # Platform badge
-    if "fanduel" in plat_lower or "fd" in plat_lower:
-        plat_html = f'<span class="platform-badge-fd">🔵 FanDuel</span>'
-    elif "draftkings" in plat_lower or "dk" in plat_lower:
-        plat_html = f'<span class="platform-badge-dk">🔵 DraftKings</span>'
-    elif "betmgm" in plat_lower or "mgm" in plat_lower:
-        plat_html = f'<span class="platform-badge-mgm">🟡 BetMGM</span>'
-    elif "caesars" in plat_lower:
-        plat_html = f'<span class="platform-badge-caesars">🟢 Caesars</span>'
+    if "prizepicks" in plat_lower:
+        plat_html = f'<span class="platform-badge-fd">🟢 PrizePicks</span>'
+    elif "underdog" in plat_lower:
+        plat_html = f'<span class="platform-badge-dk">🟣 Underdog Fantasy</span>'
+    elif "draftkings" in plat_lower or "pick6" in plat_lower or "dk" in plat_lower:
+        plat_html = f'<span class="platform-badge-dk">🔵 DraftKings Pick6</span>'
     else:
         safe_plat = _h.escape(platform)
         plat_html = f'<span class="platform-badge">{safe_plat}</span>'

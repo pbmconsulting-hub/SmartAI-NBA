@@ -140,16 +140,13 @@ STREAK_MAX_ADJUSTMENT   = 10.0  # Maximum absolute adjustment (±10)
 # Standard sportsbooks: +3 (traditional vig makes each leg harder to beat).
 # PrizePicks Power: +5 (all-or-nothing structure is harder).
 PLATFORM_TIER_PREMIUMS = {
-    # Sportsbook-standard adjustments
-    "FanDuel":           3,
-    "DraftKings":        3,
-    "BetMGM":            3,
-    "Caesars":           3,
-    # Backward-compat DFS entries (tests may reference)
     "PrizePicks":        0,
     "PrizePicks Power":  5,
-    "Underdog":          0,
     "Underdog Fantasy":  0,
+    "DraftKings Pick6":  3,
+    # Backward-compat aliases
+    "Underdog":          0,
+    "DraftKings":        3,
 }
 
 # ============================================================

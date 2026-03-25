@@ -65,17 +65,10 @@ st.markdown(
 )
 
 _PRIMARY_PLATFORMS = [
-    "FanDuel", "DraftKings", "BetMGM", "Caesars",
-    "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers",
+    "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
 ]
 
-_SECONDARY_PLATFORMS = [
-    "William Hill", "Unibet", "BetUS", "Bovada", "MyBookie",
-    "BetOnline", "LowVig", "Pinnacle", "SuperBook", "WynnBet",
-    "TwinSpires", "BetFred", "Fliff",
-]
-
-_ALL_PLATFORMS = _PRIMARY_PLATFORMS + _SECONDARY_PLATFORMS
+_ALL_PLATFORMS = list(_PRIMARY_PLATFORMS)
 
 _PROFILES = {
     "🛡️ Conservative": {
@@ -83,7 +76,7 @@ _PROFILES = {
         "simulation_depth": 2000,
         "minimum_edge_threshold": 8.0,
         "entry_fee": 10.0,
-        "selected_platforms": _PRIMARY_PLATFORMS[:4],
+        "selected_platforms": list(_PRIMARY_PLATFORMS),
         "home_court_boost": 0.02,
         "blowout_sensitivity": 1.5,
         "fatigue_sensitivity": 1.5,
@@ -301,32 +294,21 @@ st.subheader("🎰 Sportsbook Platforms")
 
 st.markdown(
     "Select which sportsbooks to include in analysis. "
-    "All odds are retrieved from The Odds API."
+    "Props are fetched from PrizePicks, Underdog Fantasy, and DraftKings Pick6."
 )
 
 current_platforms = st.session_state.get("selected_platforms", list(_PRIMARY_PLATFORMS))
 
-st.markdown("**Primary Sportsbooks**")
 new_platforms = st.multiselect(
-    "Primary Sportsbooks",
+    "Sportsbook Platforms",
     options=_PRIMARY_PLATFORMS,
     default=[p for p in current_platforms if p in _PRIMARY_PLATFORMS],
-    help="Major US sportsbooks — FanDuel, DraftKings, BetMGM, Caesars, Fanatics, ESPN Bet, Hard Rock Bet, BetRivers",
+    help="Supported platforms — PrizePicks, Underdog Fantasy, DraftKings Pick6",
     label_visibility="collapsed",
 )
 
-with st.expander("📋 Secondary Sportsbooks", expanded=False):
-    secondary_selection = st.multiselect(
-        "Secondary Sportsbooks",
-        options=_SECONDARY_PLATFORMS,
-        default=[p for p in current_platforms if p in _SECONDARY_PLATFORMS],
-        help="Additional sportsbooks for broader market coverage",
-        label_visibility="collapsed",
-    )
-
-combined = new_platforms + secondary_selection
-if combined:
-    st.session_state["selected_platforms"] = combined
+if new_platforms:
+    st.session_state["selected_platforms"] = new_platforms
 st.caption(f"Active: **{', '.join(st.session_state.get('selected_platforms', []))}**")
 
 # ============================================================

@@ -96,7 +96,7 @@ def load_props_data():
     Returns:
         list of dict: Prop rows, e.g.:
             [{'player_name': 'LeBron James', 'stat_type': 'points',
-              'line': '24.5', 'platform': 'FanDuel', ...}, ...]
+              'line': '24.5', 'platform': 'PrizePicks', ...}, ...]
     """
     return _load_csv_file(PROPS_CSV_PATH)
 
@@ -1215,7 +1215,7 @@ def parse_props_from_csv_text(csv_text):
         tuple: (list of valid prop dicts, list of error messages)
 
     Example:
-        text = "LeBron James,LAL,points,24.5,FanDuel"
+        text = "LeBron James,LAL,points,24.5,PrizePicks"
         props, errors = parse_props_from_csv_text(text)
     """
     parsed_props = []   # Successfully parsed props
@@ -1256,7 +1256,7 @@ def parse_props_from_csv_text(csv_text):
                 "team": row_lower.get("team", ""),
                 "stat_type": row_lower.get("stat_type", "points").lower(),
                 "line": line_value,
-                "platform": row_lower.get("platform", "FanDuel"),
+                "platform": row_lower.get("platform", "PrizePicks"),
                 "game_date": row_lower.get("game_date", ""),
             }
             parsed_props.append(prop)
@@ -1277,8 +1277,8 @@ def get_csv_template():
     # Template with headers and one example row
     template_lines = [
         "player_name,team,stat_type,line,platform,game_date",
-        "LeBron James,LAL,points,24.5,FanDuel,2026-03-05",
-        "Stephen Curry,GSW,threes,3.5,BetMGM,2026-03-05",
+        "LeBron James,LAL,points,24.5,PrizePicks,2026-03-05",
+        "Stephen Curry,GSW,threes,3.5,DraftKings Pick6,2026-03-05",
     ]
     return "\n".join(template_lines)
 

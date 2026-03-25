@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: engine/entry_optimizer.py
 # PURPOSE: Build optimal parlay entries for major sportsbooks
-#          (FanDuel, DraftKings, BetMGM, etc.).
+#          (PrizePicks, Underdog Fantasy, DraftKings Pick6).
 #          Calculates exact EV (expected value) for each entry.
 # CONNECTS TO: edge_detection.py (picks), math_helpers.py (math)
 # CONCEPTS COVERED: Combinatorics, expected value, parlay math
@@ -85,17 +85,12 @@ SPORTSBOOK_PARLAY_TABLE = {
 
 # Map platform names to their payout tables
 PLATFORM_FLEX_TABLES = {
-    "FanDuel": SPORTSBOOK_PARLAY_TABLE,
-    "DraftKings": SPORTSBOOK_PARLAY_TABLE,
-    "BetMGM": SPORTSBOOK_PARLAY_TABLE,
-    "Caesars": SPORTSBOOK_PARLAY_TABLE,
-    "Fanatics": SPORTSBOOK_PARLAY_TABLE,
-    "ESPN Bet": SPORTSBOOK_PARLAY_TABLE,
-    "Hard Rock Bet": SPORTSBOOK_PARLAY_TABLE,
-    "BetRivers": SPORTSBOOK_PARLAY_TABLE,
-    # Backward-compat aliases for internal/test use
     "PrizePicks": PRIZEPICKS_FLEX_PAYOUT_TABLE,
+    "Underdog Fantasy": UNDERDOG_FLEX_PAYOUT_TABLE,
+    "DraftKings Pick6": SPORTSBOOK_PARLAY_TABLE,
+    # Backward-compat aliases
     "Underdog": UNDERDOG_FLEX_PAYOUT_TABLE,
+    "DraftKings": SPORTSBOOK_PARLAY_TABLE,
 }
 
 # ============================================================

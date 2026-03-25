@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: pages/6_🧬_Entry_Builder.py
-# PURPOSE: Build optimal parlay entries for major sportsbooks
-#          (FanDuel, DraftKings, BetMGM, etc.). Calculates EV.
+# PURPOSE: Build optimal parlay entries for sportsbook platforms
+#          (PrizePicks, Underdog Fantasy, DraftKings Pick6). Calculates EV.
 # CONNECTS TO: entry_optimizer.py, analysis results in session
 # CONCEPTS COVERED: Parlays, EV, combinatorics, entry building
 # ============================================================
@@ -217,8 +217,7 @@ settings_col1, settings_col2, settings_col3, settings_col4, settings_col5 = st.c
 with settings_col1:
     selected_platform = st.selectbox(
         "Platform",
-        options=["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"],
-        help="Which platform are you building entries for?",
+        options=["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"],
     )
 
 with settings_col2:
@@ -411,7 +410,7 @@ if selected_picks:
         st.divider()
         st.subheader("💰 Quick EV Calculation for Selected Picks")
         
-        quick_platform = st.selectbox("Platform for EV calc:", ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"], key="quick_platform")
+        quick_platform = st.selectbox("Platform for EV calc:", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"], key="quick_platform")
         quick_fee = st.number_input("Entry Fee ($):", min_value=1.0, value=10.0, key="quick_fee")
         
         selected_probs = [
@@ -842,7 +841,7 @@ _opt_c1, _opt_c2 = st.columns(2)
 with _opt_c1:
     _opt_platform = st.selectbox(
         "Platform",
-        options=["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "ESPN Bet", "Hard Rock Bet", "BetRivers"],
+        options=["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"],
         index=0,
         key="auto_slip_platform",
     )

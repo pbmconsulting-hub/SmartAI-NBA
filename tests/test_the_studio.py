@@ -96,9 +96,9 @@ class TestStudioFileStructure(unittest.TestCase):
         self.assertIn("THE FULL SEND", self.source)
 
     def test_platform_selector(self):
-        self.assertIn("FanDuel", self.source)
-        self.assertIn("DraftKings", self.source)
-        self.assertIn("BetMGM", self.source)
+        self.assertIn("PrizePicks", self.source)
+        self.assertIn("Underdog Fantasy", self.source)
+        self.assertIn("DraftKings Pick6", self.source)
 
     def test_dawg_board_section(self):
         self.assertIn("DAWG BOARD", self.source)
@@ -329,9 +329,9 @@ class TestStudioPlatformPreference(unittest.TestCase):
 
     def test_platform_options_all_three(self):
         """Primary sportsbook platforms should be available."""
-        self.assertIn("FanDuel", self.source)
-        self.assertIn("DraftKings", self.source)
-        self.assertIn("BetMGM", self.source)
+        self.assertIn("PrizePicks", self.source)
+        self.assertIn("Underdog Fantasy", self.source)
+        self.assertIn("DraftKings Pick6", self.source)
 
     def test_platform_radio_key(self):
         """Platform radio should have a unique key."""

@@ -2,7 +2,7 @@
 # FILE: engine/platform_line_compare.py
 # PURPOSE: Platform Line Comparison Engine
 #          When the same prop is available on multiple platforms
-#          (FanDuel, DraftKings, BetMGM, etc.), lines may differ.
+#          (PrizePicks, Underdog Fantasy, DraftKings Pick6), lines may differ.
 #          This module finds the platform with the BEST line for
 #          our recommended direction, maximizing edge via line
 #          shopping — a free source of EV with zero model risk.
