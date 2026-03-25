@@ -370,8 +370,8 @@ if auto_load_clicked:
             try:
                 from data.data_manager import clear_all_caches as _al_clear_caches
                 _al_clear_caches()
-            except Exception:
-                pass
+            except Exception as _cache_err:
+                _logger.debug(f"Auto-load: cache clear failed (non-fatal): {_cache_err}")
 
             status_text.text("⏳ Finalizing…")
             progress_bar.progress(90)
