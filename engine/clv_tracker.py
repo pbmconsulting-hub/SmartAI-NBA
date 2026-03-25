@@ -236,6 +236,7 @@ def get_clv_summary(days=90, min_records=5):
     except Exception:
         _logger.debug("get_clv_summary failed, returning empty CLV summary")
         return {
+            "has_data": False, "total_records": 0, "records_with_clv": 0,
             "avg_clv": None, "positive_clv_rate": None, "clv_by_tier": {},
             "interpretation": "Error loading CLV data",
         }

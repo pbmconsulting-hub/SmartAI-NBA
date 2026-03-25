@@ -6,6 +6,9 @@
 import json
 import os
 import datetime
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 _CACHE_FILE = os.path.join(os.path.dirname(__file__), "game_logs_cache.json")
@@ -37,6 +40,7 @@ def save_game_logs_to_cache(player_name, game_logs):
         _write_cache_file(cache)
         return True
     except Exception:
+        _logger.debug("save_game_logs_to_cache failed for %s", player_name)
         return False
 
 
@@ -81,6 +85,7 @@ def load_game_logs_from_cache(player_name):
         return game_logs, is_stale
 
     except Exception:
+        _logger.debug("load_game_logs_from_cache failed for %s", player_name)
         return [], True
 
 
@@ -95,6 +100,7 @@ def get_all_cached_players():
         cache = _load_cache_file()
         return [entry.get("player_name", key) for key, entry in cache.items()]
     except Exception:
+        _logger.debug("get_all_cached_players failed")
         return []
 
 

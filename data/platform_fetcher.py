@@ -71,8 +71,6 @@ except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
 
-import time as _time
-
 # ── Simple time-based API response cache ─────────────────────────────────────
 _API_CACHE: dict = {}
 # TTL is configurable via API_CACHE_TTL_SECONDS env var; default 5 minutes.
@@ -85,7 +83,7 @@ def _cache_get(url: str):
     if entry is None:
         return None
     payload, ts = entry
-    if _time.time() - ts > _API_CACHE_TTL:
+    if time.time() - ts > _API_CACHE_TTL:
         del _API_CACHE[url]
         return None
     return payload
@@ -93,7 +91,7 @@ def _cache_get(url: str):
 
 def _cache_set(url: str, payload) -> None:
     """Store *payload* in the cache keyed by *url*."""
-    _API_CACHE[url] = (payload, _time.time())
+    _API_CACHE[url] = (payload, time.time())
 
 # Import the rate limiter for polite API access with circuit breaker
 try:
