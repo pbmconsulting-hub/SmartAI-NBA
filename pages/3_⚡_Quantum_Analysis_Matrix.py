@@ -134,6 +134,62 @@ _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ass
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
+# ── Iframe card renderer ─────────────────────────────────────────────────────
+# Renders the unified card matrix inside a self-resizing <iframe> via
+# streamlit.components.v1.html() instead of st.markdown(unsafe_allow_html=True).
+#
+# Why this is more resilient than inline st.markdown:
+#   1. Atomic delivery — the iframe either loads fully or not at all; a
+#      mid-render WebSocket closure does not crash the page.
+#   2. CSS isolation — card styles cannot leak into (or be affected by) the
+#      main Streamlit page.
+#   3. Self-resizing — a ResizeObserver + toggle listener adjusts the iframe
+#      height when <details> cards are expanded / collapsed, so no fixed
+#      height or scroll-bar is needed.
+# ---------------------------------------------------------------------------
+
+_IFRAME_RESIZE_JS = (
+    "<script>"
+    "(function(){"
+    "var t;"
+    "function h(){clearTimeout(t);t=setTimeout(function(){"
+    "window.parent.postMessage({type:'streamlit:setFrameHeight',"
+    "height:document.body.scrollHeight},'*')},50)}"
+    "h();new ResizeObserver(h).observe(document.body);"
+    "document.addEventListener('toggle',h,true);"
+    "window.addEventListener('load',h)"
+    "})()"
+    "</script>"
+)
+
+
+def _render_card_iframe(card_html, player_count):
+    """Render *card_html* inside a self-resizing iframe.
+
+    Parameters
+    ----------
+    card_html : str
+        Complete HTML (including ``<style>`` blocks) returned by
+        :func:`utils.renderers.compile_unified_card_matrix`.
+    player_count : int
+        Number of player groups — used to estimate the initial iframe
+        height before the ``ResizeObserver`` adjusts it.
+    """
+    _est_h = max(400, min(player_count * 200, 3000))
+    _doc = (
+        "<!DOCTYPE html><html><head>"
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<style>html{overflow:hidden}"
+        "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
+        "</head><body>"
+        f"{card_html}"
+        f"{_IFRAME_RESIZE_JS}"
+        "</body></html>"
+    )
+    _components.html(_doc, height=_est_h, scrolling=False)
+
+
 st.set_page_config(
     page_title="Neural Analysis — SmartBetPro NBA",
     page_icon="⚡",
@@ -2449,39 +2505,38 @@ if analysis_results:
     # Each player gets one expandable card combining their identity
     # (headshot, name, team, season stats) with all their prop
     # analysis cards.  Click a card to expand and see full analysis.
-    try:
-        _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-        _grouped = _group_props(_active_results, players_data, todays_games)
+    #
+    # Rendered inside a self-resizing <iframe> via _render_card_iframe()
+    # rather than inline st.markdown(). This eliminates the WebSocket-
+    # ClosedError crash that occurred when large HTML payloads were sent
+    # over the Tornado WebSocket mid-rerun.
+    _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
+    _grouped = _group_props(_active_results, players_data, todays_games)
 
-        if _grouped:
+    if _grouped:
+        st.markdown(
+            '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
+            'margin-bottom:8px;">🃏 Quantum Analysis Matrix</h3>'
+            '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
+            'Click any player card to expand and view their full prop analysis.</p>',
+            unsafe_allow_html=True,
+        )
+
+        _unified_html = _compile_unified_matrix(_grouped)
+        _render_card_iframe(_unified_html, len(_grouped))
+
+    # Show OUT players in a separate collapsed section
+    _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
+    if _out_display:
+        _out_grouped = _group_props(_out_display, players_data, todays_games)
+        if _out_grouped:
             st.markdown(
-                '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
-                'margin-bottom:8px;">🃏 Quantum Analysis Matrix</h3>'
-                '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
-                'Click any player card to expand and view their full prop analysis.</p>',
+                '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
+                '⚠️ OUT / Inactive Players</div>',
                 unsafe_allow_html=True,
             )
-
-            _unified_html = _compile_unified_matrix(_grouped)
-            st.markdown(_unified_html, unsafe_allow_html=True)
-
-        # Show OUT players in a separate collapsed section
-        _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
-        if _out_display:
-            _out_grouped = _group_props(_out_display, players_data, todays_games)
-            if _out_grouped:
-                st.markdown(
-                    '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
-                    '⚠️ OUT / Inactive Players</div>',
-                    unsafe_allow_html=True,
-                )
-                _out_unified_html = _compile_unified_matrix(_out_grouped)
-                st.markdown(_out_unified_html, unsafe_allow_html=True)
-    except Exception as _card_render_err:
-        _err_msg = str(_card_render_err)
-        if "WebSocketClosedError" not in _err_msg and "StreamClosedError" not in _err_msg:
-            _logger.warning("Card matrix render error: %s", _card_render_err)
-            st.warning("⚠️ Player cards could not be rendered. Please refresh the page.")
+            _out_unified_html = _compile_unified_matrix(_out_grouped)
+            _render_card_iframe(_out_unified_html, len(_out_grouped))
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
