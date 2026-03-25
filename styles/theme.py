@@ -5388,12 +5388,260 @@ QUANTUM_CARD_MATRIX_CSS = """
     transition: width 0.3s ease;
 }
 
+/* ── Player Identity Row (headshot + name + SAFE Score) ──── */
+.qcm-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.qcm-headshot {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid rgba(0, 240, 255, 0.30);
+}
+.qcm-headshot-gold { border-color: #FFD700; }
+.qcm-headshot-platinum { border-color: #00f0ff; }
+.qcm-headshot-silver { border-color: #C0C0C0; }
+.qcm-headshot-bronze { border-color: #CD7F32; }
+.qcm-identity-info {
+    flex: 1;
+    min-width: 0;
+}
+.qcm-identity-name {
+    font-size: 1.0rem;
+    font-weight: 700;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.qcm-team-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.64rem;
+    font-weight: 700;
+    margin-left: 6px;
+    vertical-align: middle;
+    color: #fff;
+}
+.qcm-identity-prop {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #00f0ff;
+    margin-top: 2px;
+}
+.qcm-safe-score {
+    text-align: center;
+    flex-shrink: 0;
+    padding: 4px 8px;
+}
+.qcm-safe-score-label {
+    font-size: 0.55rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-safe-score-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #00f0ff;
+    font-family: 'JetBrains Mono', monospace;
+    text-shadow: 0 0 8px rgba(0,240,255,0.35);
+    line-height: 1.1;
+}
+.qcm-safe-score-value span {
+    font-size: 0.72rem;
+    color: #64748b;
+}
+
+/* ── Confidence Bar ─────────────────────────────────────── */
+.qcm-conf-bar-wrap {
+    margin: 4px 0 10px;
+}
+.qcm-conf-bar-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: #64748b;
+    margin-bottom: 3px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qcm-conf-bar-pct {
+    font-weight: 700;
+}
+.qcm-conf-bar-track {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.qcm-conf-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+/* ── Context Metrics Grid (Situational / Matchup / Form / Edge) ── */
+.qcm-context-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.qcm-context-card {
+    background: rgba(10, 16, 31, 0.70);
+    border-radius: 6px;
+    padding: 7px 8px;
+    border: 1px solid rgba(0, 240, 255, 0.08);
+}
+.qcm-context-label {
+    font-size: 0.58rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+.qcm-context-value {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #e0eeff;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Bonus Factors ──────────────────────────────────────── */
+.qcm-bonus {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.qcm-bonus-title {
+    font-size: 0.58rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+.qcm-bonus-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    font-size: 0.68rem;
+    color: #c0d0e8;
+    margin-bottom: 2px;
+    line-height: 1.35;
+}
+.qcm-bonus-icon {
+    color: #00ff88;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HORIZONTAL CARD — Best Single Bets wide layout
+   ═══════════════════════════════════════════════════════════ */
+.qcm-h-card {
+    background: rgba(11, 14, 26, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    padding: 16px 20px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 240, 255, 0.04);
+    margin-bottom: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #e0eeff;
+    border-left: 4px solid #00f0ff;
+    animation: qcm-fade-in-up 0.4s ease both;
+}
+.qcm-h-card:hover {
+    border-color: rgba(0, 240, 255, 0.25);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
+}
+
+/* Top section: identity + metrics side by side */
+.qcm-h-top {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+.qcm-h-left {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+}
+.qcm-h-center {
+    flex: 1;
+    min-width: 0;
+}
+.qcm-h-right {
+    flex: 0 0 auto;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+/* Horizontal metrics strip */
+.qcm-h-metrics-strip {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.qcm-h-metric {
+    text-align: center;
+    padding: 4px 8px;
+    background: rgba(15, 23, 42, 0.50);
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    min-width: 50px;
+}
+
+/* Horizontal bottom section: 3-column layout */
+.qcm-h-bottom {
+    display: flex;
+    gap: 12px;
+}
+.qcm-h-col {
+    flex: 1;
+    min-width: 0;
+}
+.qcm-h-col-narrow {
+    flex: 0 0 200px;
+}
+
 /* Responsive stacking */
+@media (max-width: 900px) {
+    .qcm-h-top {
+        flex-direction: column;
+    }
+    .qcm-h-bottom {
+        flex-direction: column;
+    }
+    .qcm-h-col-narrow {
+        flex: 1;
+    }
+}
 @media (max-width: 640px) {
     .qcm-grid {
         grid-template-columns: 1fr;
     }
     .qcm-forces {
+        flex-direction: column;
+    }
+    .qcm-h-top {
+        flex-direction: column;
+    }
+    .qcm-h-bottom {
         flex-direction: column;
     }
 }

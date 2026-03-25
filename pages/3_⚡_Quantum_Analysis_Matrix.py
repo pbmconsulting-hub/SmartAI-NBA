@@ -117,6 +117,7 @@ from styles.theme import (
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 from data.sportsbook_service import smart_filter_props as _smart_filter_props
 from utils.renderers import compile_card_matrix as _compile_card_matrix
+from utils.renderers import build_horizontal_card_html as _build_h_card
 from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
 # ── Glassmorphic Trading-Card imports ────────────────────────────────────────
@@ -2371,63 +2372,13 @@ if analysis_results:
             unsafe_allow_html=True,
         )
         _TIER_COLORS = {"Platinum": "#c800ff", "Gold": "#ff5e00", "Silver": "#b0c0d8"}
+        # Inject the shared QCM CSS once for horizontal cards
+        st.markdown(_get_qcm_css(), unsafe_allow_html=True)
         for _sb in _single_bet_pool:
             _sb_tier = _sb.get("tier", "Bronze")
             _sb_color = _TIER_COLORS.get(_sb_tier, "#b0c0d8")
-            _sb_name  = _html.escape(str(_sb.get("player_name", "")))
-            _sb_stat  = _html.escape(str(_sb.get("stat_type", "")).title())
-            _sb_dir   = _html.escape(str(_sb.get("direction", "OVER")))
-            _sb_line  = _sb.get("line", _sb.get("prop_line", ""))
-            _sb_conf  = _sb.get("confidence_score", 0)
-            _sb_edge  = _sb.get("edge_percentage", 0)
-            _sb_emoji = _sb.get("tier_emoji", "🥈")
-            _sb_prob  = _sb.get("probability_over", 0.5)
-            _sb_prob_dir = _sb_prob if _sb_dir == "OVER" else (1.0 - _sb_prob)
-            _sb_proj  = _sb.get("adjusted_projection", 0)
-            _sb_platform = _html.escape(str(_sb.get("platform", "")))
-            _sb_team  = _html.escape(str(_sb.get("player_team", _sb.get("team", ""))))
-            _sb_bet_type = _sb.get("bet_type", "normal")
-            _sb_bet_icon = ""  # Bet-type icons removed from UI
-            _sb_breakdown_html = _render_inline_breakdown(_sb, accent_color=_sb_color)
-            st.markdown(
-                f'<div style="background:#14192b;border-radius:10px;padding:14px 18px;'
-                f'margin-bottom:12px;border-left:4px solid {_sb_color};'
-                f'border:1px solid rgba(255,255,255,0.08);">'
-                # ── Header row: name + stat + badges ──────────────────
-                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-                f'<div>'
-                f'<span style="color:{_sb_color};font-weight:700;font-size:1.05rem;">'
-                f'{_sb_emoji} {_sb_name}</span>'
-                f'<span style="color:#64748b;font-size:0.72rem;margin-left:6px;">{_sb_team}</span>'
-                + (f'<span style="margin-left:6px;">{_sb_bet_icon}</span>' if _sb_bet_icon else "")
-                + f'</div>'
-                f'<div style="text-align:right;">'
-                f'<span style="background:{_sb_color};color:#0a0f1a;padding:2px 8px;border-radius:4px;'
-                f'font-size:0.78rem;font-weight:700;">SAFE {_sb_conf:.0f}/100</span>'
-                f'</div>'
-                f'</div>'
-                # ── Prop line row ─────────────────────────────────────
-                f'<div style="display:flex;justify-content:space-between;align-items:center;'
-                f'padding:8px 10px;background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.10);'
-                f'border-radius:6px;margin-bottom:4px;">'
-                f'<span style="color:#94A3B8;font-size:0.78rem;font-family:\'JetBrains Mono\',monospace;'
-                f'text-transform:uppercase;letter-spacing:0.06em;">'
-                f'{_sb_dir} {_sb_line} {_sb_stat}'
-                + (f' · {_sb_platform}' if _sb_platform else "")
-                + f'</span>'
-                f'<span style="font-family:\'JetBrains Mono\',monospace;">'
-                f'<span style="color:#00f0ff;font-size:0.78rem;font-weight:600;">Edge {_sb_edge:+.1f}%</span>'
-                f'<span style="color:#94A3B8;font-size:0.72rem;margin-left:8px;">'
-                f'P({_sb_dir.title()}): {_sb_prob_dir*100:.0f}%</span>'
-                f'<span style="color:#ff5e00;font-size:0.72rem;margin-left:8px;">'
-                f'Proj: {_sb_proj:.1f}</span>'
-                f'</span>'
-                f'</div>'
-                # ── Full breakdown: distribution + forces + scores ────
-                + _sb_breakdown_html
-                + f'</div>',
-                unsafe_allow_html=True,
-            )
+            _h_card_html = _build_h_card(_sb, accent_color=_sb_color)
+            st.markdown(_h_card_html, unsafe_allow_html=True)
 
     st.divider()
 

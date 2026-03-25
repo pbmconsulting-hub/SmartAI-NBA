@@ -19,7 +19,18 @@
 
 import html as _html
 
-from styles.theme import QUANTUM_CARD_MATRIX_CSS
+from styles.theme import QUANTUM_CARD_MATRIX_CSS, get_team_colors
+
+
+# Fallback silhouette SVG for missing headshots
+_FALLBACK_SVG = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
+    "width='48' height='48' viewBox='0 0 48 48'%3E"
+    "%3Ccircle cx='24' cy='24' r='24' fill='%23141a2d'/%3E"
+    "%3Ccircle cx='24' cy='18' r='8' fill='%23475569'/%3E"
+    "%3Cellipse cx='24' cy='40' rx='13' ry='10' fill='%23475569'/%3E"
+    "%3C/svg%3E"
+)
 
 
 def _escape(value):
@@ -29,13 +40,93 @@ def _escape(value):
     return _html.escape(str(value))
 
 
+def _build_context_metrics(result):
+    """Build 4-item context metrics (Situational, Matchup, Form, Edge)."""
+    stat_type = (result.get("stat_type", "points") or "points").lower()
+    avg_map = {
+        "points": "season_pts_avg", "rebounds": "season_reb_avg",
+        "assists": "season_ast_avg", "threes": "season_threes_avg",
+    }
+    season_avg = float(result.get(avg_map.get(stat_type, ""), 0) or 0)
+    line = float(result.get("line", result.get("prop_line", 0)) or 0)
+    edge_pct = float(result.get("edge_percentage", 0) or 0)
+    defense_f = float(result.get("overall_adjustment", 1.0) or 1.0)
+    form_ratio = result.get("recent_form_ratio")
+
+    # Situational: season avg vs line
+    line_diff = round(line - season_avg, 1)
+    sit_val = (
+        f"Avg {season_avg:.1f} / Line {line:g} "
+        f"({'▲' if line_diff > 0 else '▼'}{abs(line_diff):.1f})"
+    ) if season_avg > 0 else f"Line {line:g}"
+
+    # Archetype matchup
+    matchup_val = (
+        f"{'Favorable' if defense_f < 1.0 else 'Tough'} "
+        f"({defense_f:.2f}x)"
+    )
+
+    # Form
+    if form_ratio is not None:
+        try:
+            fr = float(form_ratio)
+            form_label = "Hot 🔥" if fr > 1.05 else ("Cold 🧊" if fr < 0.95 else "Neutral")
+            form_val = f"{fr:.2f}x ({form_label})"
+        except (ValueError, TypeError):
+            form_val = "N/A"
+    else:
+        form_val = "N/A"
+
+    # Edge vs line
+    edge_sign = "+" if edge_pct >= 0 else ""
+    edge_val = f"{edge_sign}{edge_pct:.1f}%"
+
+    return [
+        ("📊 Situational", sit_val),
+        ("🛡️ Matchup", matchup_val),
+        ("🔥 Form", form_val),
+        ("⚡ Edge", edge_val),
+    ]
+
+
+def _build_bonus_factors(result):
+    """Build bonus factor strings from forces, traps, and notes."""
+    bonus = []
+    direction = (result.get("direction", "OVER") or "OVER").upper()
+    forces = result.get("forces", {}) or {}
+    forces_to_show = (forces.get("over_forces", []) if direction == "OVER"
+                      else forces.get("under_forces", [])) or []
+    for f in forces_to_show[:4]:
+        if not isinstance(f, dict):
+            continue
+        lbl = f.get("name", f.get("label", f.get("factor", "")))
+        desc = f.get("description", f.get("detail", ""))
+        if lbl:
+            bonus.append(f"{lbl}" + (f" — {desc}" if desc else ""))
+
+    trap = result.get("trap_line_result", {}) or {}
+    if trap.get("is_trap"):
+        bonus.append(f"⚠️ {trap.get('warning_message', 'Possible trap line')}")
+
+    ls_force = result.get("line_sharpness_force")
+    if ls_force:
+        bonus.append(f"📐 Sharp line: {ls_force.get('description', '')}")
+
+    for note in (result.get("teammate_out_notes", []) or [])[:2]:
+        bonus.append(f"👥 {note}")
+
+    return bonus[:6]
+
+
 def _build_single_card_html(result, index=0):
     """
     Build a single Quantum Card HTML string from an analysis result dict.
 
-    Renders the **Full Breakdown** view: distribution percentiles, expected
-    value, standard deviation, individual directional forces, score
-    breakdown bars.
+    Renders the **Combined** view merging the QDS prop card and the matrix
+    card into one unified display:  identity row (headshot + name + SAFE
+    Score), True Line, confidence bar, primary metrics, distribution
+    percentiles, context metrics grid, directional forces, score
+    breakdown bars, and bonus factors.
 
     Args:
         result (dict): A single prop analysis result from the engine.
@@ -126,6 +217,67 @@ def _build_single_card_html(result, index=0):
             direction = "OVER"
     direction_escaped = _escape(direction.upper())
 
+    # ── Player headshot ──────────────────────────────────────────
+    player_id = result.get("player_id", "") or ""
+    if player_id:
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+        img_html = (
+            f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
+            f'src="{headshot_url}" '
+            f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
+            f'alt="{player_name}">'
+        )
+    else:
+        img_html = (
+            f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
+            f'src="{_FALLBACK_SVG}" alt="{player_name}">'
+        )
+
+    # ── Team badge ────────────────────────────────────────────────
+    team_primary, _ = get_team_colors(team)
+    team_badge_html = (
+        f'<span class="qcm-team-badge" '
+        f'style="background:{team_primary};">{team}</span>'
+    ) if team else ""
+
+    # ── SAFE Score (X.X / 10) ─────────────────────────────────────
+    safe_score = round(min(10.0, confidence / 10.0), 1)
+    safe_score_str = f"{safe_score:.1f}"
+
+    # ── Prop description ──────────────────────────────────────────
+    _stat_emoji = {
+        "points": "🏀", "rebounds": "📊", "assists": "🎯",
+        "threes": "🎯", "steals": "⚡", "blocks": "🛡️", "turnovers": "❌",
+    }
+    stat_lower = (result.get("stat_type", "") or "").lower()
+    dir_label = "More" if direction.upper() == "OVER" else "Less"
+    stat_emoji = _stat_emoji.get(stat_lower, "🏀")
+    prop_text = f"{stat_emoji} {dir_label} {true_line_display} {_escape(stat_type.replace('_', ' ').title())}"
+
+    # ── Confidence bar ─────────────────────────────────────────────
+    conf_pct = max(0.0, min(100.0, confidence))
+    if conf_pct >= 80:
+        conf_color = "#00f0ff"
+    elif conf_pct >= 65:
+        conf_color = "#FFD700"
+    elif conf_pct >= 50:
+        conf_color = "#00b4ff"
+    else:
+        conf_color = "#94A3B8"
+
+    conf_bar_html = (
+        f'<div class="qcm-conf-bar-wrap">'
+        f'<div class="qcm-conf-bar-header">'
+        f'<span>Confidence</span>'
+        f'<span class="qcm-conf-bar-pct" style="color:{conf_color};">{conf_pct:.0f}%</span>'
+        f'</div>'
+        f'<div class="qcm-conf-bar-track">'
+        f'<div class="qcm-conf-bar-fill" style="width:{conf_pct}%;'
+        f'background:linear-gradient(90deg,{conf_color},{conf_color}dd);"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
     # ── Forces HTML (individual force lists) ─────────────────────
     forces = result.get("forces", {}) or {}
     over_forces = forces.get("over_forces", []) or []
@@ -213,21 +365,61 @@ def _build_single_card_html(result, index=0):
     except Exception:
         pass
 
+    # ── Context metrics grid (Situational / Matchup / Form / Edge) ─
+    context_metrics = _build_context_metrics(result)
+    ctx_cards = ""
+    for ctx_label, ctx_value in context_metrics:
+        safe_label = _escape(ctx_label)
+        safe_value = _escape(str(ctx_value))
+        ctx_cards += (
+            f'<div class="qcm-context-card">'
+            f'<div class="qcm-context-label">{safe_label}</div>'
+            f'<div class="qcm-context-value">{safe_value}</div>'
+            f'</div>'
+        )
+    context_grid_html = f'<div class="qcm-context-grid">{ctx_cards}</div>'
+
+    # ── Bonus factors ─────────────────────────────────────────────
+    bonus_factors = _build_bonus_factors(result)
+    bonus_html = ""
+    if bonus_factors:
+        items = ""
+        for bf in bonus_factors:
+            items += (
+                f'<div class="qcm-bonus-item">'
+                f'<span class="qcm-bonus-icon">✓</span>'
+                f'<span>{_escape(bf)}</span>'
+                f'</div>'
+            )
+        bonus_html = (
+            f'<div class="qcm-bonus">'
+            f'<div class="qcm-bonus-title">Key Factors</div>'
+            f'{items}'
+            f'</div>'
+        )
+
     return f"""<div class="qcm-card" style="animation-delay:{delay_ms}ms;">
   <div class="qcm-card-header">
-    <span class="qcm-player-name">{player_name}</span>
+    <span class="qcm-stat-type">{_escape(stat_type.replace('_', ' '))} <span class="qcm-team">· {team}</span> <span class="qcm-platform">· {platform}</span></span>
     <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
   </div>
-  <div class="qcm-stat-type">
-    {_escape(stat_type.replace('_', ' '))}
-    <span class="qcm-team">· {team}</span>
-    <span class="qcm-platform">· {platform}</span>
+  <div class="qcm-identity">
+    {img_html}
+    <div class="qcm-identity-info">
+      <div class="qcm-identity-name">{player_name}{team_badge_html}</div>
+      <div class="qcm-identity-prop">{prop_text}</div>
+    </div>
+    <div class="qcm-safe-score">
+      <div class="qcm-safe-score-label">SAFE Score™</div>
+      <div class="qcm-safe-score-value">{safe_score_str}<span>/10</span></div>
+    </div>
   </div>
   <div class="qcm-true-line-row">
     <span class="qcm-true-line-label">True Line ({direction_escaped})</span>
     <span class="qcm-true-line-value">{true_line_display}</span>
   </div>
   {prediction_html}
+  {conf_bar_html}
   <div class="qcm-metrics">
     <div class="qcm-metric">
       <div class="qcm-metric-val">{prob_pct}</div>
@@ -250,8 +442,10 @@ def _build_single_card_html(result, index=0):
     <div class="qcm-dist-cell"><div class="qcm-dist-val">{std_d}</div><div class="qcm-dist-lbl">σ</div></div>
     <div class="qcm-dist-cell qcm-dist-proj"><div class="qcm-dist-val">{proj_d}</div><div class="qcm-dist-lbl">Proj</div></div>
   </div>
+  {context_grid_html}
   {forces_html}
   {breakdown_html}
+  {bonus_html}
 </div>"""
 
 
@@ -314,3 +508,315 @@ def compile_card_matrix(results, max_cards=None):
         )
 
     return master_html
+
+
+def build_horizontal_card_html(result, accent_color="#00f0ff"):
+    """
+    Build a horizontal (wide) version of the combined Quantum Card.
+
+    This is the wide-layout variant used in sections like Best Single Bets,
+    50/50 picks, and Uncertain Props.  It displays the same information as
+    the vertical card but arranged in a horizontal flow: identity + metrics
+    on top, distribution + forces + breakdown + context side-by-side below.
+
+    Args:
+        result (dict): A single prop analysis result from the engine.
+        accent_color (str): Primary accent CSS colour for the left border.
+
+    Returns:
+        str: The HTML string for this horizontal card.
+    """
+    player_name = _escape(result.get("player_name", "Unknown"))
+    stat_type = _escape(result.get("stat_type", ""))
+    team = _escape(result.get("player_team", result.get("team", "")))
+    platform = _escape(result.get("platform", ""))
+    tier = result.get("tier", "Bronze")
+    tier_lower = tier.lower() if tier else "bronze"
+
+    # Prop line
+    prop_line = result.get("prop_line", result.get("line", 0))
+    try:
+        true_line = float(prop_line)
+        true_line_display = f"{true_line:g}"
+    except (ValueError, TypeError):
+        true_line = 0
+        true_line_display = "—"
+
+    # Confidence / probability / edge
+    confidence = result.get("confidence_score", 0)
+    try:
+        confidence = float(confidence)
+    except (ValueError, TypeError):
+        confidence = 0
+    prob_over = result.get("probability_over", 0)
+    try:
+        prob_pct = f"{float(prob_over) * 100:.1f}%"
+    except (ValueError, TypeError):
+        prob_pct = "—"
+    edge = result.get("edge_percentage", result.get("edge", 0))
+    try:
+        edge_val = float(edge)
+        edge_display = f"{edge_val:+.1f}%"
+    except (ValueError, TypeError):
+        edge_val = 0
+        edge_display = "—"
+
+    # Direction
+    direction = result.get("direction", "")
+    if not direction:
+        try:
+            direction = "OVER" if prob_over and float(prob_over) >= 0.5 else "UNDER"
+        except (ValueError, TypeError):
+            direction = "OVER"
+    direction_escaped = _escape(direction.upper())
+
+    # SAFE Score
+    safe_score = round(min(10.0, confidence / 10.0), 1)
+    safe_score_str = f"{safe_score:.1f}"
+
+    # Prob for direction
+    try:
+        prob_dir = float(prob_over) if direction.upper() == "OVER" else (1.0 - float(prob_over))
+    except (ValueError, TypeError):
+        prob_dir = 0.5
+
+    # Projection
+    adj_proj = result.get("adjusted_projection", 0) or 0
+    try:
+        proj_d = f"{float(adj_proj):.1f}"
+    except (ValueError, TypeError):
+        proj_d = "—"
+
+    # Headshot
+    player_id = result.get("player_id", "") or ""
+    if player_id:
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+        img_html = (
+            f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
+            f'src="{headshot_url}" '
+            f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
+            f'alt="{player_name}">'
+        )
+    else:
+        img_html = (
+            f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
+            f'src="{_FALLBACK_SVG}" alt="{player_name}">'
+        )
+
+    # Team badge
+    team_primary, _ = get_team_colors(team)
+    team_badge_html = (
+        f'<span class="qcm-team-badge" '
+        f'style="background:{team_primary};">{team}</span>'
+    ) if team else ""
+
+    # Prop description
+    _stat_emoji = {
+        "points": "🏀", "rebounds": "📊", "assists": "🎯",
+        "threes": "🎯", "steals": "⚡", "blocks": "🛡️", "turnovers": "❌",
+    }
+    stat_lower = (result.get("stat_type", "") or "").lower()
+    dir_label = "More" if direction.upper() == "OVER" else "Less"
+    stat_emoji = _stat_emoji.get(stat_lower, "🏀")
+    prop_text = f"{stat_emoji} {dir_label} {true_line_display} {_escape(stat_type.replace('_', ' ').title())}"
+
+    # Confidence bar
+    conf_pct = max(0.0, min(100.0, confidence))
+    if conf_pct >= 80:
+        conf_color = "#00f0ff"
+    elif conf_pct >= 65:
+        conf_color = "#FFD700"
+    elif conf_pct >= 50:
+        conf_color = "#00b4ff"
+    else:
+        conf_color = "#94A3B8"
+
+    # Distribution
+    p10 = result.get("percentile_10", 0) or 0
+    p50 = result.get("percentile_50", 0) or 0
+    p90 = result.get("percentile_90", 0) or 0
+    std_dev = result.get("simulated_std", result.get("std_dev", 0)) or 0
+    _fmt = lambda v: f"{float(v):.1f}" if v else "—"
+    p10_d, p50_d, p90_d, std_d = _fmt(p10), _fmt(p50), _fmt(p90), _fmt(std_dev)
+
+    # Forces
+    forces = result.get("forces", {}) or {}
+    over_forces = forces.get("over_forces", []) or []
+    under_forces = forces.get("under_forces", []) or []
+
+    def _force_items(force_list):
+        if not force_list:
+            return '<span class="qcm-force-none">None</span>'
+        parts = []
+        for f in force_list:
+            if not isinstance(f, dict):
+                continue
+            strength = max(1, min(5, round(float(f.get("strength", 1)))))
+            stars = "⭐" * strength
+            name = _escape(str(f.get("name", "") or ""))
+            parts.append(f'<div class="qcm-force-item">{stars} {name}</div>')
+        return "".join(parts) if parts else '<span class="qcm-force-none">None</span>'
+
+    # Breakdown bars
+    breakdown = result.get("score_breakdown", {}) or {}
+    bars_html = ""
+    if breakdown:
+        bars = []
+        for factor, score in breakdown.items():
+            try:
+                score_f = float(score or 0)
+            except (ValueError, TypeError):
+                continue
+            label = _escape(factor.replace("_score", "").replace("_", " ").title())
+            bar_w = min(100, max(0, score_f))
+            bar_c = "#00f0ff" if bar_w >= 70 else ("#ff5e00" if bar_w >= 40 else "#ff4444")
+            bars.append(
+                f'<div class="qcm-breakdown-row">'
+                f'<span class="qcm-breakdown-label">{label}</span>'
+                f'<span class="qcm-breakdown-score">{score_f:.0f}</span>'
+                f'<div class="qcm-breakdown-track">'
+                f'<div class="qcm-breakdown-fill" style="width:{bar_w:.1f}%;background:{bar_c};"></div>'
+                f'</div></div>'
+            )
+        bars_html = '<div class="qcm-breakdown">' + "".join(bars) + '</div>'
+
+    # Context metrics
+    context_metrics = _build_context_metrics(result)
+    ctx_cards = ""
+    for ctx_label, ctx_value in context_metrics:
+        ctx_cards += (
+            f'<div class="qcm-context-card">'
+            f'<div class="qcm-context-label">{_escape(ctx_label)}</div>'
+            f'<div class="qcm-context-value">{_escape(str(ctx_value))}</div>'
+            f'</div>'
+        )
+
+    # Bonus factors
+    bonus_factors = _build_bonus_factors(result)
+    bonus_items = ""
+    for bf in bonus_factors:
+        bonus_items += (
+            f'<div class="qcm-bonus-item">'
+            f'<span class="qcm-bonus-icon">✓</span>'
+            f'<span>{_escape(bf)}</span>'
+            f'</div>'
+        )
+
+    # Kelly wager
+    wager_html = ""
+    try:
+        import streamlit as _st_mod
+        from engine.odds_engine import calculate_fractional_kelly
+        _dir = direction.upper() if direction else "OVER"
+        _odds = (result.get("over_odds", -110)
+                 if _dir == "OVER"
+                 else result.get("under_odds", -110))
+        _prob = prob_dir
+        _bk = float(_st_mod.session_state.get("total_bankroll", 1000.0))
+        _km = float(_st_mod.session_state.get("kelly_multiplier", 0.25))
+        _kr = calculate_fractional_kelly(_prob, _odds, _km)
+        _wager = round(_kr["fractional_kelly"] * _bk, 2)
+        if _wager > 0:
+            wager_html = (
+                f'<div class="qcm-h-metric">'
+                f'<div class="qcm-metric-val" style="color:#00C6FF;">${_wager:,.0f}</div>'
+                f'<div class="qcm-metric-lbl">Wager</div>'
+                f'</div>'
+            )
+    except Exception:
+        pass
+
+    # Build the full horizontal card
+    return (
+        f'<div class="qcm-h-card" style="border-left-color:{accent_color};">'
+        # ── TOP ROW: Identity + True Line + Metrics ──────────────
+        f'<div class="qcm-h-top">'
+        # Left: headshot + name + prop
+        f'<div class="qcm-h-left">'
+        f'{img_html}'
+        f'<div>'
+        f'<div class="qcm-identity-name">{player_name}{team_badge_html} '
+        f'<span class="qcm-tier-badge qcm-tier-{tier_lower}" style="font-size:0.60rem;">{_escape(tier)}</span></div>'
+        f'<div class="qcm-identity-prop">{prop_text}</div>'
+        f'<div style="font-size:0.68rem;color:#64748b;margin-top:2px;">'
+        f'{_escape(stat_type.replace("_", " "))} · {team}'
+        + (f' · {platform}' if platform else '') +
+        f'</div>'
+        f'</div>'
+        f'</div>'
+        # Center: True Line + confidence bar
+        f'<div class="qcm-h-center">'
+        f'<div class="qcm-true-line-row" style="margin-bottom:6px;">'
+        f'<span class="qcm-true-line-label">True Line ({direction_escaped})</span>'
+        f'<span class="qcm-true-line-value">{true_line_display}</span>'
+        f'</div>'
+        f'<div class="qcm-conf-bar-wrap" style="margin-bottom:6px;">'
+        f'<div class="qcm-conf-bar-header">'
+        f'<span>Confidence</span>'
+        f'<span class="qcm-conf-bar-pct" style="color:{conf_color};">{conf_pct:.0f}%</span>'
+        f'</div>'
+        f'<div class="qcm-conf-bar-track">'
+        f'<div class="qcm-conf-bar-fill" style="width:{conf_pct}%;'
+        f'background:linear-gradient(90deg,{conf_color},{conf_color}dd);"></div>'
+        f'</div></div>'
+        # Metrics strip
+        f'<div class="qcm-h-metrics-strip">'
+        f'<div class="qcm-h-metric"><div class="qcm-metric-val">{prob_pct}</div><div class="qcm-metric-lbl">Prob</div></div>'
+        f'<div class="qcm-h-metric"><div class="qcm-metric-val">{confidence:.0f}</div><div class="qcm-metric-lbl">SAFE</div></div>'
+        f'<div class="qcm-h-metric"><div class="qcm-metric-val">{edge_display}</div><div class="qcm-metric-lbl">Edge</div></div>'
+        f'<div class="qcm-h-metric"><div class="qcm-metric-val">{proj_d}</div><div class="qcm-metric-lbl">Proj</div></div>'
+        + wager_html +
+        f'</div>'
+        f'</div>'
+        # Right: SAFE Score
+        f'<div class="qcm-h-right">'
+        f'<div class="qcm-safe-score">'
+        f'<div class="qcm-safe-score-label">SAFE Score™</div>'
+        f'<div class="qcm-safe-score-value">{safe_score_str}<span>/10</span></div>'
+        f'</div>'
+        f'<div style="background:{accent_color};color:#0a0f1a;padding:2px 8px;'
+        f'border-radius:4px;font-size:0.68rem;font-weight:700;'
+        f"font-family:'JetBrains Mono',monospace;\">P({direction_escaped.title()}): {prob_dir*100:.0f}%</div>"
+        f'</div>'
+        f'</div>'
+        # ── BOTTOM ROW: 3-column detail ─────────────────────────
+        f'<div class="qcm-h-bottom">'
+        # Col 1: Distribution + Context Grid
+        f'<div class="qcm-h-col">'
+        f'<div class="qcm-dist-row" style="margin-bottom:6px;">'
+        f'<div class="qcm-dist-cell"><div class="qcm-dist-val">{p10_d}</div><div class="qcm-dist-lbl">P10</div></div>'
+        f'<div class="qcm-dist-cell qcm-dist-median"><div class="qcm-dist-val">{p50_d}</div><div class="qcm-dist-lbl">MED</div></div>'
+        f'<div class="qcm-dist-cell"><div class="qcm-dist-val">{p90_d}</div><div class="qcm-dist-lbl">P90</div></div>'
+        f'<div class="qcm-dist-cell"><div class="qcm-dist-val">{std_d}</div><div class="qcm-dist-lbl">σ</div></div>'
+        f'<div class="qcm-dist-cell qcm-dist-proj"><div class="qcm-dist-val">{proj_d}</div><div class="qcm-dist-lbl">Proj</div></div>'
+        f'</div>'
+        f'<div class="qcm-context-grid">{ctx_cards}</div>'
+        f'</div>'
+        # Col 2: Forces
+        f'<div class="qcm-h-col">'
+        f'<div class="qcm-forces" style="margin-bottom:6px;">'
+        f'<div class="qcm-forces-col qcm-forces-over">'
+        f'<div class="qcm-forces-label">▲ OVER</div>'
+        f'{_force_items(over_forces)}'
+        f'</div>'
+        f'<div class="qcm-forces-col qcm-forces-under">'
+        f'<div class="qcm-forces-label">▼ UNDER</div>'
+        f'{_force_items(under_forces)}'
+        f'</div>'
+        f'</div>'
+        # Bonus factors
+        + (
+            f'<div class="qcm-bonus">'
+            f'<div class="qcm-bonus-title">Key Factors</div>'
+            f'{bonus_items}'
+            f'</div>'
+            if bonus_items else ''
+        ) +
+        f'</div>'
+        # Col 3: Breakdown bars
+        f'<div class="qcm-h-col-narrow">'
+        f'{bars_html}'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
