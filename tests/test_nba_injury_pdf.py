@@ -13,7 +13,12 @@ import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
-import pandas as pd
+try:
+    import pandas as pd  # noqa: F811
+    _HAS_PANDAS = True
+except ModuleNotFoundError:
+    pd = None
+    _HAS_PANDAS = False
 
 # ── Ensure repo root is on sys.path ──────────────────────────────────────────
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -31,6 +36,7 @@ if "streamlit" not in sys.modules:
 # Section 1: URL generation
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestURLGeneration(unittest.TestCase):
     """Tests for data/nba_injury_pdf/_url.py generate_report_url()."""
 
@@ -77,6 +83,7 @@ class TestURLGeneration(unittest.TestCase):
 # Section 2: DataFrame cleaning
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestCleaner(unittest.TestCase):
     """Tests for data/nba_injury_pdf/_cleaner.py clean_injury_report()."""
 
@@ -191,6 +198,7 @@ class TestCleaner(unittest.TestCase):
 # Section 3: Column validation
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestColumnValidation(unittest.TestCase):
     """Tests for data/nba_injury_pdf/_parser.py validate_columns()."""
 
@@ -218,6 +226,7 @@ class TestColumnValidation(unittest.TestCase):
 # Section 4: RosterEngine._fetch_official_pdf_injuries()
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestRosterEnginePdfSource(unittest.TestCase):
     """Integration tests for RosterEngine._fetch_official_pdf_injuries()."""
 
@@ -291,6 +300,7 @@ class TestRosterEnginePdfSource(unittest.TestCase):
 # Section 5: RosterEngine.refresh() calls Source 0
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestRosterEngineRefreshSource0(unittest.TestCase):
     """Verify that refresh() calls _fetch_official_pdf_injuries and uses results."""
 
@@ -327,6 +337,7 @@ class TestRosterEngineRefreshSource0(unittest.TestCase):
 # Section 6: check_report_available
 # =============================================================================
 
+@unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
 class TestCheckReportAvailable(unittest.TestCase):
     """Tests for data/nba_injury_pdf/report.py check_report_available()."""
 

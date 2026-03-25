@@ -32,6 +32,20 @@ sys.modules.setdefault("streamlit", _mock_st)
 sys.modules.setdefault("streamlit.components", MagicMock())
 sys.modules.setdefault("streamlit.components.v1", MagicMock())
 
+# Check whether nba_api and pandas are available. Tests that patch live
+# nba_api endpoints cannot function without the real package installed.
+try:
+    import nba_api  # noqa: F401
+    _HAS_NBA_API = True
+except ModuleNotFoundError:
+    _HAS_NBA_API = False
+
+try:
+    import pandas  # noqa: F401
+    _HAS_PANDAS = True
+except ModuleNotFoundError:
+    _HAS_PANDAS = False
+
 
 # ── Section 1: Module structure ───────────────────────────────────────────────
 
@@ -158,6 +172,7 @@ class TestCacheHelpers(unittest.TestCase):
 
 # ── Section 4: get_all_players ────────────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestGetAllPlayers(unittest.TestCase):
 
     def setUp(self):
@@ -252,6 +267,7 @@ class TestGetAllPlayers(unittest.TestCase):
 
 # ── Section 5: get_player_info ────────────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestGetPlayerInfo(unittest.TestCase):
 
     def setUp(self):
@@ -318,6 +334,7 @@ class TestGetPlayerInfo(unittest.TestCase):
 
 # ── Section 6: get_player_game_logs ──────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API and _HAS_PANDAS, "nba_api or pandas not installed")
 class TestGetPlayerGameLogs(unittest.TestCase):
 
     def setUp(self):
@@ -362,6 +379,7 @@ class TestGetPlayerGameLogs(unittest.TestCase):
 
 # ── Section 7: get_league_standings ──────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API and _HAS_PANDAS, "nba_api or pandas not installed")
 class TestGetLeagueStandings(unittest.TestCase):
 
     def setUp(self):
@@ -417,6 +435,7 @@ class TestGetLeagueStandings(unittest.TestCase):
 
 # ── Section 8: get_advanced_box_score ────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestGetAdvancedBoxScore(unittest.TestCase):
 
     def setUp(self):
@@ -461,6 +480,7 @@ class TestGetAdvancedBoxScore(unittest.TestCase):
 
 # ── Section 9: get_team_roster ────────────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestGetTeamRoster(unittest.TestCase):
 
     def setUp(self):
@@ -505,6 +525,7 @@ class TestGetTeamRoster(unittest.TestCase):
 
 # ── Section 10: get_defensive_matchup_data ────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestGetDefensiveMatchupData(unittest.TestCase):
 
     def setUp(self):
@@ -733,6 +754,7 @@ class TestPlayerProfileServiceEnrichment(unittest.TestCase):
 
 # ── Section 15: find_games and play_by_play ───────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestFindGamesAndPlayByPlay(unittest.TestCase):
 
     def setUp(self):
@@ -870,6 +892,7 @@ class TestDynamicNbaApiAbbrevMap(unittest.TestCase):
                 f"{abbrev} should map to itself",
             )
 
+    @unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
     def test_build_nba_abbrev_map_falls_back_on_error(self):
         """When nba_api.stats.static.teams is unavailable, fallback is used."""
         from data.live_data_fetcher import _build_nba_abbrev_map, _NBA_API_ABBREV_TO_OURS_FALLBACK
@@ -877,6 +900,7 @@ class TestDynamicNbaApiAbbrevMap(unittest.TestCase):
             result = _build_nba_abbrev_map()
         self.assertEqual(result, _NBA_API_ABBREV_TO_OURS_FALLBACK)
 
+    @unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
     def test_build_nba_abbrev_map_includes_all_teams(self):
         """Dynamic build includes identity entries for all nba_api static teams."""
         mock_teams = [
