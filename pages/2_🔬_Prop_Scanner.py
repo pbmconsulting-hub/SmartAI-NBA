@@ -479,6 +479,10 @@ if _display_props_enriched:
                     "Player": _sn,
                     "Stat": _st_t,
                     "Line": _ln,
+                    "Line Type": {
+                        "goblin": "🟢 Goblin",
+                        "demon":  "🔴 Demon",
+                    }.get(_sp.get("odds_type", "standard"), "⚪ Standard"),
                     "Season Avg": round(_avg, 1) if _avg else "—",
                     "Line vs Avg": _vs,
                     "Platform": _sp.get("platform", ""),
@@ -574,6 +578,10 @@ if _display_props_enriched:
             "Team": team,
             "Stat": stat,
             "Line": line,
+            "Line Type": {
+                "goblin": "🟢 Goblin",
+                "demon":  "🔴 Demon",
+            }.get(prop.get("odds_type", "standard"), "⚪ Standard"),
             "Season Avg": round(season_avg, 1) if season_avg else "—",
             "Line Context": line_ctx if season_avg else "—",
             "Value Signal": (

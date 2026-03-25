@@ -137,6 +137,18 @@ _BASE_HEADERS = {
 # PrizePicks public projections endpoint (no API key required)
 PRIZEPICKS_URL = "https://api.prizepicks.com/projections"
 
+# PrizePicks data mirror (https://github.com/enkday/prizepicks-data-mirror)
+# Published as raw JSON on GitHub — no rate limiting or API key required.
+# Includes today's and tomorrow's NBA props with goblin/demon/standard oddsType.
+PRIZEPICKS_MIRROR_TODAY_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/prizepicks-nba-today.json"
+)
+PRIZEPICKS_MIRROR_TOMORROW_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/prizepicks-nba-tomorrow.json"
+)
+
 # Underdog Fantasy public over/under lines endpoint (no API key required)
 UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
 
@@ -273,6 +285,129 @@ def _now_str():
 
 
 # ============================================================
+# SECTION: PrizePicks Data Mirror Fetcher
+# ============================================================
+
+def _parse_prizepicks_mirror_props(data, today, fetched_at):
+    """
+    Parse the flat-array format from the enkday/prizepicks-data-mirror.
+
+    The mirror publishes a simpler structure than the PrizePicks live API:
+    ``{"props": [{"player": "...", "stat": "...", "line": 20.5,
+                  "oddsType": "standard"|"goblin"|"demon",
+                  "teamCode": "LAL", "startDateCST": "2026-03-24", ...}, ...]}``
+
+    PrizePicks goblin/demon line types:
+      - "goblin"   : lower line (easier to hit, favorable to bettors)
+      - "demon"    : higher line (harder to hit, unfavorable to bettors)
+      - "standard" : the main board line
+
+    Args:
+        data (dict): Parsed JSON from the mirror endpoint.
+        today (str): Today's date string ("YYYY-MM-DD"), used as fallback.
+        fetched_at (str): ISO timestamp for when the data was fetched.
+
+    Returns:
+        list[dict]: Props in the standard internal format (see module header).
+    """
+    props = []
+    for item in data.get("props", []):
+        player_name = item.get("player", "").strip()
+        if not player_name:
+            continue
+
+        raw_stat = item.get("stat", "")
+        stat_type = normalize_stat_type(raw_stat, "PrizePicks")
+
+        try:
+            true_line = float(item.get("line", 0))
+        except (ValueError, TypeError):
+            continue
+        if true_line <= 0:
+            continue
+
+        team = item.get("teamCode", item.get("Team", "")).strip().upper()
+        game_date = item.get("startDateCST", today)
+
+        # oddsType identifies goblin / demon / standard lines
+        odds_type = str(item.get("oddsType", "standard")).lower()
+
+        props.append({
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": true_line,
+            "platform": "PrizePicks",
+            "game_date": game_date,
+            "fetched_at": fetched_at,
+            "over_odds": _DEFAULT_AMERICAN_ODDS,
+            "under_odds": _DEFAULT_AMERICAN_ODDS,
+            "odds_type": odds_type,
+        })
+    return props
+
+
+def fetch_prizepicks_props_from_mirror(include_tomorrow=False):
+    """
+    Fetch NBA props from the enkday/prizepicks-data-mirror GitHub repository.
+
+    The mirror publishes today's (and optionally tomorrow's) PrizePicks NBA
+    props as raw JSON hosted on GitHub.  It includes goblin and demon line
+    variants alongside standard lines.  Because it is served via GitHub's
+    CDN, it is highly available and never rate-limited.
+
+    Args:
+        include_tomorrow (bool): Also fetch tomorrow's props. Default False.
+
+    Returns:
+        list[dict]: Props in the standard format (see module header), or []
+                    if the mirror is unavailable.
+    """
+    if not REQUESTS_AVAILABLE:
+        return []
+
+    today = _today_str()
+    fetched_at = _now_str()
+    all_props = []
+
+    urls = [PRIZEPICKS_MIRROR_TODAY_URL]
+    if include_tomorrow:
+        urls.append(PRIZEPICKS_MIRROR_TOMORROW_URL)
+
+    for url in urls:
+        cached = _cache_get(url)
+        if cached is not None:
+            data = cached
+        else:
+            response = _fetch_with_retry(url, headers=_BASE_HEADERS)
+            if response is None:
+                _logger.warning(f"[PrizePicks Mirror] Could not fetch {url}.")
+                continue
+            try:
+                response.raise_for_status()
+                data = response.json()
+                _cache_set(url, data)
+            except Exception as err:
+                _logger.warning(f"[PrizePicks Mirror] Error reading {url}: {err}")
+                continue
+
+        parsed = _parse_prizepicks_mirror_props(data, today, fetched_at)
+        all_props.extend(parsed)
+        _logger.info(
+            f"[PrizePicks Mirror] {url.split('/')[-1]}: {len(parsed)} props "
+            f"({sum(1 for p in parsed if p.get('odds_type') == 'goblin')} goblin, "
+            f"{sum(1 for p in parsed if p.get('odds_type') == 'demon')} demon)."
+        )
+
+    return all_props
+
+
+# ============================================================
+# END SECTION: PrizePicks Data Mirror Fetcher
+# ============================================================
+
+
+# ============================================================
 # SECTION: PrizePicks Fetcher
 # ============================================================
 
@@ -280,30 +415,43 @@ def fetch_prizepicks_props(league="NBA"):
     """
     Fetch live player prop lines from PrizePicks.
 
-    Uses PrizePicks' public JSON API — no API key required.
-    Filters to NBA only and normalizes stat types to our internal keys.
+    Tries the enkday/prizepicks-data-mirror (GitHub CDN, no rate-limiting)
+    first.  Falls back to the PrizePicks live API if the mirror is
+    unavailable or returns no data.  Both sources populate the ``odds_type``
+    field so callers can distinguish goblin / demon / standard lines.
 
     Args:
         league (str): Sport league filter. Default "NBA".
 
     Returns:
         list[dict]: List of prop dicts (see module header for format).
+                    Includes ``odds_type`` key: "goblin", "demon", or "standard".
                     Returns [] on any error.
 
     Example:
         props = fetch_prizepicks_props()
         # → [{"player_name": "LeBron James", "stat_type": "points",
-        #      "line": 24.5, "platform": "PrizePicks", ...}, ...]
+        #      "line": 24.5, "odds_type": "standard",
+        #      "platform": "PrizePicks", ...}, ...]
     """
     if not REQUESTS_AVAILABLE:
         _logger.warning("Warning: 'requests' library not installed. Cannot fetch PrizePicks props.")
         return []
 
+    # ── 1. Try the data mirror first ─────────────────────────────────────────
+    # The mirror is a GitHub-hosted JSON file that is updated periodically.
+    # It is more reliable (CDN, no rate limits) and includes goblin/demon lines.
+    mirror_props = fetch_prizepicks_props_from_mirror()
+    if mirror_props:
+        _logger.info(f"[PrizePicks] Using mirror data: {len(mirror_props)} props.")
+        return mirror_props
+
+    # ── 2. Fall back to the PrizePicks live API ──────────────────────────────
+    _logger.info(f"[PrizePicks] Mirror unavailable — fetching from live API {PRIZEPICKS_URL} ...")
+
     # PrizePicks requires Referer header in addition to the base headers
     headers = dict(_BASE_HEADERS)
     headers["Referer"] = "https://app.prizepicks.com/"
-
-    _logger.info(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
 
     _cached = _cache_get(PRIZEPICKS_URL)
     if _cached is not None:
@@ -407,6 +555,10 @@ def fetch_prizepicks_props(league="NBA"):
         if true_line <= 0:
             continue  # Skip invalid lines
 
+        # Capture the PrizePicks odds_type: "standard", "goblin", or "demon"
+        # Goblin = lower/easier line; Demon = higher/harder line.
+        odds_type = str(attrs.get("odds_type", "standard")).lower()
+
         props.append({
             "player_name": player_name,
             "team": team,
@@ -417,9 +569,10 @@ def fetch_prizepicks_props(league="NBA"):
             "fetched_at": fetched_at,
             "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
             "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
+            "odds_type": odds_type,
         })
 
-    _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props.")
+    _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props from live API.")
     return props
 
 # ============================================================
