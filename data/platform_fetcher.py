@@ -1148,7 +1148,25 @@ async def _async_fetch_json(session, url, headers=None, params=None):
 
 
 async def _async_fetch_prizepicks(session, semaphore):
-    """Fetch PrizePicks props asynchronously."""
+    """Fetch PrizePicks props asynchronously.
+
+    Mirrors the sync ``fetch_prizepicks_props()`` strategy:
+    1. Try the enkday/prizepicks-data-mirror (GitHub CDN, includes goblin/demon).
+    2. Fall back to the PrizePicks live API if the mirror returns nothing.
+
+    Both paths populate the ``odds_type`` field on every returned prop.
+    The mirror fetch runs in a thread executor so the sync ``requests``
+    call does not block the event loop.
+    """
+    # ── 1. Try mirror first (run sync requests call off the event loop) ──────
+    mirror_props = await asyncio.get_event_loop().run_in_executor(
+        None, fetch_prizepicks_props_from_mirror
+    )
+    if mirror_props:
+        _logger.info(f"[Async-PrizePicks] Using mirror data: {len(mirror_props)} props.")
+        return mirror_props
+
+    # ── 2. Fall back to the PrizePicks live API via aiohttp ──────────────────
     async with semaphore:
         headers = dict(_BASE_HEADERS)
         headers["Referer"] = "https://app.prizepicks.com/"
@@ -1202,6 +1220,8 @@ async def _async_fetch_prizepicks(session, semaphore):
                 continue  # KILL SWITCH: invalid line → discard
             if true_line <= 0:
                 continue  # KILL SWITCH: non-positive line → discard
+            # Capture the PrizePicks odds_type: "standard", "goblin", or "demon"
+            odds_type = str(attrs.get("odds_type", "standard")).lower()
             props.append({
                 "player_name": player_name, "team": team,
                 "stat_type": stat_type, "line": true_line,
@@ -1209,8 +1229,9 @@ async def _async_fetch_prizepicks(session, semaphore):
                 "fetched_at": fetched_at,
                 "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
                 "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
+                "odds_type": odds_type,
             })
-        _logger.info(f"[Async-PrizePicks] Fetched {len(props)} NBA props.")
+        _logger.info(f"[Async-PrizePicks] Fetched {len(props)} NBA props from live API.")
         return props
 
 
@@ -1384,7 +1405,8 @@ async def fetch_all_platforms_async(
     using aiohttp and asyncio.
 
     Uses a Semaphore(5) to prevent IP rate-limiting while maintaining
-    maximum speed. Enforces a hard cap of 500 props.
+    maximum speed. PrizePicks data comes from the enkday data mirror
+    (includes goblin/demon lines) with live API as fallback.
 
     Args:
         include_prizepicks (bool): Fetch from PrizePicks. Default True.
@@ -1393,7 +1415,7 @@ async def fetch_all_platforms_async(
         odds_api_key (str, optional): The Odds API key for DraftKings.
 
     Returns:
-        list[dict]: All fetched props, capped at 500.
+        list[dict]: All fetched props from enabled platforms.
     """
     if not AIOHTTP_AVAILABLE:
         _logger.warning(

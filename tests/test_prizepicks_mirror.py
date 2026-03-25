@@ -400,5 +400,127 @@ class TestFetchPrizePicksPropsOddsType(unittest.TestCase):
         self.assertEqual(result[0]["odds_type"], "standard")
 
 
+class TestAsyncFetchPrizePicks(unittest.TestCase):
+    """Tests that the async PrizePicks fetcher mirrors the sync strategy:
+    mirror first, then live API fallback, with odds_type populated."""
+
+    def setUp(self):
+        try:
+            from data import platform_fetcher
+            self._module = platform_fetcher
+        except ImportError as exc:
+            self.skipTest(f"platform_fetcher not importable: {exc}")
+
+    def _run(self, coro):
+        """Run a coroutine synchronously for testing."""
+        import asyncio
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+    def test_async_uses_mirror_when_available(self):
+        """_async_fetch_prizepicks returns mirror data (with odds_type) when available."""
+        mirror_props = [
+            {"player_name": "Mirror Player", "stat_type": "points",
+             "line": 20.0, "odds_type": "goblin", "platform": "PrizePicks",
+             "team": "MIA", "game_date": "2026-03-25",
+             "fetched_at": "2026-03-25T00:00:00+00:00",
+             "over_odds": -110, "under_odds": -110},
+        ]
+        with patch.object(self._module, "fetch_prizepicks_props_from_mirror",
+                          return_value=mirror_props):
+            coro = self._module._async_fetch_prizepicks(MagicMock(), MagicMock())
+            result = self._run(coro)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["odds_type"], "goblin")
+        self.assertEqual(result[0]["player_name"], "Mirror Player")
+
+    def test_async_includes_odds_type_in_live_api_fallback(self):
+        """_async_fetch_prizepicks populates odds_type from live API when mirror is empty."""
+        proj = {
+            "type": "projection",
+            "id": "proj1",
+            "attributes": {
+                "stat_type": "Points",
+                "line_score": 25.5,
+                "odds_type": "demon",
+                "league": "NBA",
+            },
+            "relationships": {
+                "new_player": {"data": {"id": "p1"}}
+            },
+        }
+        player = {
+            "type": "new_player",
+            "id": "p1",
+            "attributes": {"name": "Nikola Jokic", "team": "DEN"},
+        }
+
+        mock_resp_data = {"data": [proj], "included": [player]}
+
+        async def fake_fetch_json(session, url, headers=None, params=None):
+            return mock_resp_data
+
+        import asyncio
+
+        async def run():
+            semaphore = asyncio.Semaphore(1)
+            with patch.object(self._module, "fetch_prizepicks_props_from_mirror",
+                               return_value=[]), \
+                 patch.object(self._module, "_async_fetch_json",
+                               side_effect=fake_fetch_json):
+                return await self._module._async_fetch_prizepicks(MagicMock(), semaphore)
+
+        result = self._run(run())
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["odds_type"], "demon")
+        self.assertEqual(result[0]["player_name"], "Nikola Jokic")
+
+    def test_async_returns_empty_when_mirror_empty_and_api_fails(self):
+        """_async_fetch_prizepicks returns [] when both mirror and live API fail."""
+        async def fake_fetch_json(session, url, headers=None, params=None):
+            return None
+
+        import asyncio
+
+        async def run():
+            semaphore = asyncio.Semaphore(1)
+            with patch.object(self._module, "fetch_prizepicks_props_from_mirror",
+                               return_value=[]), \
+                 patch.object(self._module, "_async_fetch_json",
+                               side_effect=fake_fetch_json):
+                return await self._module._async_fetch_prizepicks(MagicMock(), semaphore)
+
+        result = self._run(run())
+        self.assertEqual(result, [])
+
+    def test_async_goblin_from_mirror(self):
+        """_async_fetch_prizepicks passes through goblin lines from mirror."""
+        mirror_props = [
+            {"player_name": "Stephen Curry", "stat_type": "threes",
+             "line": 3.5, "odds_type": "goblin", "platform": "PrizePicks",
+             "team": "GSW", "game_date": "2026-03-25",
+             "fetched_at": "2026-03-25T00:00:00+00:00",
+             "over_odds": -110, "under_odds": -110},
+            {"player_name": "Stephen Curry", "stat_type": "threes",
+             "line": 5.5, "odds_type": "demon", "platform": "PrizePicks",
+             "team": "GSW", "game_date": "2026-03-25",
+             "fetched_at": "2026-03-25T00:00:00+00:00",
+             "over_odds": -110, "under_odds": -110},
+        ]
+        with patch.object(self._module, "fetch_prizepicks_props_from_mirror",
+                          return_value=mirror_props):
+            coro = self._module._async_fetch_prizepicks(MagicMock(), MagicMock())
+            result = self._run(coro)
+
+        self.assertEqual(len(result), 2)
+        types = {p["odds_type"] for p in result}
+        self.assertIn("goblin", types)
+        self.assertIn("demon", types)
+
+
 if __name__ == "__main__":
     unittest.main()
