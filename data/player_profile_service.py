@@ -104,6 +104,25 @@ def _build_nba_static_lookup() -> dict:
         return {}
 
 
+def _build_dynamic_player_lookup() -> dict:
+    """
+    Build a name→id lookup from nba_stats_service.get_all_players().
+
+    This uses the CommonAllPlayers endpoint (with caching) to return
+    a fully up-to-date active-player list.  Falls back to {} on failure
+    so callers can transparently fall through to the static lookup.
+
+    Returns:
+        dict: {player_name.lower(): player_id (int)}  or {} on failure.
+    """
+    try:
+        from data.nba_stats_service import get_all_players
+        players = get_all_players(active_only=True)
+        return {p["full_name"].lower(): int(p["id"]) for p in players if p.get("id")}
+    except Exception:
+        return {}
+
+
 def get_player_id(player_name: str) -> int | None:
     """
     Return the NBA player ID (int) for headshot URL construction.
@@ -133,14 +152,31 @@ def get_player_id(player_name: str) -> int | None:
 
     pid = None
 
-    # 2. API-NBA API
-    try:
-        from data.nba_api_client import get_player_id as _cs_lookup
-        pid = _cs_lookup(player_name)
-    except Exception:
-        pass
+    # 2. Dynamic lookup via nba_stats_service (CommonAllPlayers — cached)
+    if not pid:
+        try:
+            dynamic_lookup = _build_dynamic_player_lookup()
+            pid = dynamic_lookup.get(key)
+            if not pid:
+                parts = key.split()
+                if len(parts) >= 2:
+                    pid = next(
+                        (v for k, v in dynamic_lookup.items()
+                         if parts[0] in k and parts[-1] in k),
+                        None,
+                    )
+        except Exception:
+            pass
 
-    # 3. nba_api local static list (no network call)
+    # 3. API-NBA API
+    if not pid:
+        try:
+            from data.nba_api_client import get_player_id as _cs_lookup
+            pid = _cs_lookup(player_name)
+        except Exception:
+            pass
+
+    # 4. nba_api local static list (no network call, covers all-time players)
     if not pid:
         try:
             static_lookup = _build_nba_static_lookup()
@@ -301,6 +337,49 @@ def _extract_season_stats(player_data: dict) -> dict:
         or player_data.get("minutes", 0)
     )
     return {"ppg": ppg, "rpg": rpg, "apg": apg, "avg_minutes": avg_min}
+
+
+def get_player_bio(player_name: str) -> dict:
+    """Enrich a player's profile with bio/draft data from nba_stats_service.
+
+    Resolves the player's NBA ID and then calls
+    ``nba_stats_service.get_player_info()`` for height, weight, draft info,
+    country, school, and jersey number.
+
+    Parameters
+    ----------
+    player_name : str
+        Full player name (case-insensitive).
+
+    Returns
+    -------
+    dict
+        Keys: position, height, weight, country, birthdate,
+        draft_year, draft_round, draft_number, school, jersey.
+        Returns {} if the player ID cannot be resolved or the
+        nba_stats_service call fails.
+    """
+    pid = get_player_id(player_name)
+    if not pid:
+        return {}
+
+    try:
+        from data.nba_stats_service import get_player_info
+        info = get_player_info(pid)
+        return {
+            "position": info.get("position", ""),
+            "height": info.get("height", ""),
+            "weight": info.get("weight", ""),
+            "country": info.get("country", ""),
+            "birthdate": info.get("birthdate", ""),
+            "draft_year": info.get("draft_year"),
+            "draft_round": info.get("draft_round"),
+            "draft_number": info.get("draft_number"),
+            "school": info.get("school", ""),
+            "jersey": info.get("jersey", ""),
+        }
+    except Exception:
+        return {}
 
 
 def enrich_player_data(

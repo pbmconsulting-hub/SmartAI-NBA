@@ -89,12 +89,36 @@ def get_recent_form_vs_line(
     stat_type: str,
     prop_line: float,
     window: int = _STREAK_WINDOW,
+    player_id: int | None = None,
+    season: str | None = None,
 ) -> dict[str, Any]:
     """Return hit-rate and per-game results for *stat_type* vs *prop_line*.
 
     Each game log entry is expected to have nba_api field names (e.g. "PTS",
     "REB", "AST", "FG3M", "STL", "BLK", "TOV").  Combo stats (e.g.
     "points_rebounds") are summed from their component columns.
+
+    If *game_logs* is empty and *player_id* is provided, this function will
+    attempt to fetch logs automatically via
+    ``nba_stats_service.get_player_game_logs()``.  This is transparent to the
+    caller — if the fetch fails, the function returns the normal empty result.
+
+    Parameters
+    ----------
+    game_logs : list[dict]
+        Pre-fetched game logs.  Pass an empty list (or None-equivalent) to
+        trigger automatic fetching when *player_id* is supplied.
+    stat_type : str
+        Stat type to analyse (e.g. ``"points"``, ``"rebounds"``).
+    prop_line : float
+        The betting line to compare each game against.
+    window : int
+        Number of most-recent games to analyse.
+    player_id : int | None
+        NBA player ID.  When provided and *game_logs* is empty, logs are
+        fetched from ``nba_stats_service`` automatically.
+    season : str | None
+        Season string passed to ``get_player_game_logs()`` when auto-fetching.
 
     Returns::
 
@@ -111,6 +135,10 @@ def get_recent_form_vs_line(
             "sufficient_data": bool,    # False when window < 3 usable games
         }
     """
+    # Auto-fetch logs via nba_stats_service when none are provided
+    if not game_logs and player_id is not None:
+        game_logs = get_player_game_logs_from_service(player_id, season=season)
+
     if not game_logs or prop_line <= 0:
         return _empty_form_result(window, prop_line)
 
@@ -633,3 +661,189 @@ def _sum_combo_avg(stat_type: str, player_data: dict) -> float:
         except (TypeError, ValueError):
             pass
     return round(total, 2)
+
+
+# ============================================================
+# SECTION: nba_stats_service integrations
+# ============================================================
+
+def get_player_game_logs_from_service(
+    player_id: int,
+    season: str | None = None,
+) -> list[dict]:
+    """
+    Fetch game logs via nba_stats_service.get_player_game_logs().
+
+    Intended as a convenient fallback when the caller does not have
+    pre-fetched game logs.  Returns [] if the service is unavailable
+    or the call fails.
+
+    Parameters
+    ----------
+    player_id : int
+        NBA player ID.
+    season : str | None
+        Season in "YYYY-YY" format; defaults to current season.
+
+    Returns
+    -------
+    list[dict]
+        Per-game stat dicts with nba_api column names (PTS, REB, …).
+    """
+    try:
+        from data.nba_stats_service import get_player_game_logs
+        return get_player_game_logs(player_id, season=season)
+    except Exception as exc:
+        logger.warning("get_player_game_logs_from_service(%s) failed: %s", player_id, exc)
+        return []
+
+
+def get_player_matchup_grade(
+    player_id: int,
+    opponent_team_abbrev: str,
+    stat_type: str,
+    season: str | None = None,
+) -> dict[str, Any]:
+    """
+    Grade a player's upcoming matchup using nba_stats_service defensive data.
+
+    Fetches league-wide defensive-matchup data and grades the opponent's
+    defence for *stat_type* on an A–F scale.
+
+    Parameters
+    ----------
+    player_id : int
+        NBA player ID (used for future per-player extension; not used now).
+    opponent_team_abbrev : str
+        Three-letter abbreviation of the opponent team (e.g. ``"BOS"``).
+    stat_type : str
+        Prop stat type (e.g. ``"points"``, ``"rebounds"``, ``"assists"``).
+    season : str | None
+        Season string; defaults to current season.
+
+    Returns
+    -------
+    dict
+        Keys: grade (A/B/C/D/F), label, percentile, color_class,
+        source (str).
+        Returns a default N/A grade dict if data is unavailable.
+    """
+    _default = {
+        "grade": "N/A",
+        "label": "No Data",
+        "percentile": 0.5,
+        "color_class": "grade-na",
+        "source": "nba_stats_service",
+    }
+
+    try:
+        from data.nba_stats_service import get_defensive_matchup_data
+        rows = get_defensive_matchup_data(season=season)
+    except Exception as exc:
+        logger.warning("get_player_matchup_grade: service call failed: %s", exc)
+        return _default
+
+    if not rows:
+        return _default
+
+    # Map stat_type → DEFENSE_CATEGORY field values used by LeagueDashPtDefend
+    _stat_to_defense_cat: dict[str, str] = {
+        "points": "Overall",
+        "threes": "3 Pointers",
+        "midrange": "Mid-Range",
+        "at_rim": "Less Than 6Ft",
+        "rebounds": "Overall",
+        "assists": "Overall",
+    }
+    defense_cat = _stat_to_defense_cat.get(stat_type.lower(), "Overall")
+
+    # Filter rows to the relevant defense category
+    cat_rows = [r for r in rows if str(r.get("DEFENSE_CATEGORY", "")).strip() == defense_cat]
+    if not cat_rows:
+        cat_rows = rows  # fall back to all rows if no category match
+
+    # Build opponent rating (points allowed per game) for each team
+    team_ratings: dict[str, float] = {}
+    for r in cat_rows:
+        abbrev = str(r.get("TEAM_ABBREVIATION", "")).upper()
+        pts_allowed = _safe_float(r.get("D_PTS", 0), 0.0)
+        if abbrev:
+            team_ratings[abbrev] = pts_allowed
+
+    all_ratings = list(team_ratings.values())
+    opponent_rating = team_ratings.get(opponent_team_abbrev.upper())
+
+    if opponent_rating is None or not all_ratings:
+        return _default
+
+    # Reuse grade_matchup to compute the grade
+    grade_result = grade_matchup(stat_type, opponent_rating, all_ratings)
+    grade_result["source"] = "nba_stats_service"
+    return grade_result
+
+
+def get_player_home_away_splits(
+    player_id: int,
+    season: str | None = None,
+) -> dict[str, Any]:
+    """
+    Return pre-computed home/away and last-5/last-10 averages from nba_api.
+
+    Wraps nba_stats_service.get_player_splits() and normalises the result
+    into a flat dict of averages suitable for direct use in analysis cards.
+
+    Parameters
+    ----------
+    player_id : int
+        NBA player ID.
+    season : str | None
+        Season string; defaults to current season.
+
+    Returns
+    -------
+    dict
+        Keys: home_pts, home_reb, home_ast, away_pts, away_reb, away_ast,
+        last5_pts, last5_reb, last5_ast, last10_pts, last10_reb, last10_ast.
+        Returns all-zero dict if data is unavailable.
+    """
+    _empty: dict[str, Any] = {
+        "home_pts": 0.0, "home_reb": 0.0, "home_ast": 0.0,
+        "away_pts": 0.0, "away_reb": 0.0, "away_ast": 0.0,
+        "last5_pts": 0.0, "last5_reb": 0.0, "last5_ast": 0.0,
+        "last10_pts": 0.0, "last10_reb": 0.0, "last10_ast": 0.0,
+    }
+
+    try:
+        from data.nba_stats_service import get_player_splits
+        splits = get_player_splits(player_id, season=season)
+    except Exception as exc:
+        logger.warning("get_player_home_away_splits(%s) failed: %s", player_id, exc)
+        return _empty
+
+    if not splits:
+        return _empty
+
+    def _avg(rows: list[dict], key: str) -> float:
+        if not rows:
+            return 0.0
+        return _safe_float(rows[0].get(key, 0), 0.0)
+
+    home_rows = splits.get("home", [])
+    away_rows = splits.get("away", [])
+    last5_rows = splits.get("last_5_games", [])
+    last10_rows = splits.get("last_10_games", [])
+
+    return {
+        "home_pts": _avg(home_rows, "PTS"),
+        "home_reb": _avg(home_rows, "REB"),
+        "home_ast": _avg(home_rows, "AST"),
+        "away_pts": _avg(away_rows, "PTS"),
+        "away_reb": _avg(away_rows, "REB"),
+        "away_ast": _avg(away_rows, "AST"),
+        "last5_pts": _avg(last5_rows, "PTS"),
+        "last5_reb": _avg(last5_rows, "REB"),
+        "last5_ast": _avg(last5_rows, "AST"),
+        "last10_pts": _avg(last10_rows, "PTS"),
+        "last10_reb": _avg(last10_rows, "REB"),
+        "last10_ast": _avg(last10_rows, "AST"),
+    }

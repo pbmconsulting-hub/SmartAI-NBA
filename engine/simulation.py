@@ -1868,3 +1868,106 @@ def run_sensitivity_analysis(
 # ============================================================
 # END SECTION: Sensitivity Analysis
 # ============================================================
+
+
+# ============================================================
+# SECTION: Advanced Stats Integration (nba_stats_service)
+# ============================================================
+
+def enrich_simulation_with_advanced_stats(
+    game_id: str,
+    player_name: str,
+    stat_type: str | None = None,
+) -> dict:
+    """
+    Fetch advanced box-score stats for *player_name* in *game_id* and
+    return a dict of enriched simulation parameters.
+
+    Uses ``nba_stats_service.get_advanced_box_score()`` to pull
+    eFG%, TS%, usage%, and pace.  These can be passed to
+    ``run_quantum_matrix_simulation()`` / ``run_enhanced_simulation()``
+    as optional overrides.
+
+    This is **entirely optional** — if the service call fails or the
+    player is not found in the box score, the returned dict contains
+    only default/fallback values so the caller can proceed unchanged.
+
+    Parameters
+    ----------
+    game_id : str
+        NBA game ID (e.g. "0022401234").
+    player_name : str
+        Full player name (case-insensitive).
+    stat_type : str | None
+        Stat type hint (not currently used, reserved for future logic).
+
+    Returns
+    -------
+    dict
+        Keys (all optional overrides for the simulation):
+            efg_pct      : float  — effective field-goal percentage
+            ts_pct       : float  — true-shooting percentage
+            usage_pct    : float  — usage rate
+            pace_factor  : float  — game pace adjustment (centred at 1.0)
+            available    : bool   — True if data was successfully fetched
+    """
+    _default = {
+        "efg_pct": 0.0,
+        "ts_pct": 0.0,
+        "usage_pct": 0.0,
+        "pace_factor": 1.0,
+        "available": False,
+    }
+
+    try:
+        from data.nba_stats_service import get_advanced_box_score
+        box = get_advanced_box_score(game_id)
+    except Exception as exc:
+        _logger.debug("enrich_simulation_with_advanced_stats: service unavailable: %s", exc)
+        return _default
+
+    if not box:
+        return _default
+
+    player_stats = box.get("player_stats", [])
+    target = player_name.strip().lower()
+
+    player_row: dict = {}
+    for row in player_stats:
+        name_field = str(row.get("PLAYER_NAME", row.get("playerName", ""))).lower()
+        if name_field == target or target in name_field:
+            player_row = row
+            break
+
+    if not player_row:
+        return _default
+
+    def _sf(v):
+        try:
+            f = float(v)
+            return f if math.isfinite(f) else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    efg = _sf(player_row.get("EFG_PCT", player_row.get("efgPct", 0)))
+    ts = _sf(player_row.get("TS_PCT", player_row.get("tsPct", 0)))
+    usage = _sf(player_row.get("USG_PCT", player_row.get("usgPct", 0)))
+
+    # Derive a pace factor from team stats if available
+    pace_factor = 1.0
+    team_stats = box.get("team_stats", [])
+    if team_stats:
+        paces = [_sf(t.get("PACE", t.get("pace", 0))) for t in team_stats]
+        paces = [p for p in paces if p > 0]
+        if paces:
+            avg_pace = sum(paces) / len(paces)
+            # Normalise to a ~1.0 multiplier (league avg pace ≈ 100)
+            pace_factor = max(0.85, min(1.15, avg_pace / 100.0))
+
+    return {
+        "efg_pct": efg,
+        "ts_pct": ts,
+        "usage_pct": usage,
+        "pace_factor": pace_factor,
+        "available": True,
+    }

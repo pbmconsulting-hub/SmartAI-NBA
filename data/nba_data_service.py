@@ -224,6 +224,70 @@ def get_player_news(player_name=None, limit=20) -> list:
     return []
 
 
+def get_standings_from_nba_api(season: str | None = None) -> list:
+    """
+    Retrieve NBA standings via nba_stats_service.get_league_standings().
+
+    Intended as a secondary fallback when the primary nba_api
+    LeagueStandingsV3 call inside ``get_standings()`` fails.  If this
+    also fails, returns an empty list.
+
+    Parameters
+    ----------
+    season : str | None
+        Season string (e.g. "2024-25").  Defaults to current season.
+
+    Returns
+    -------
+    list[dict]
+        Standings rows with keys: team_abbreviation, team_name,
+        conference, conference_rank, wins, losses, win_pct, streak,
+        last_10.
+    """
+    try:
+        from data.nba_stats_service import get_league_standings
+        return get_league_standings(season=season)
+    except Exception as exc:
+        _logger.warning("get_standings_from_nba_api failed: %s", exc)
+    return []
+
+
+def get_game_logs_from_nba_api(
+    player_name: str,
+    season: str | None = None,
+) -> list:
+    """
+    Resolve *player_name* to a player ID and fetch game logs via
+    nba_stats_service.
+
+    Parameters
+    ----------
+    player_name : str
+        Full player name (case-insensitive).
+    season : str | None
+        Season string (e.g. "2024-25").  Defaults to current season.
+
+    Returns
+    -------
+    list[dict]
+        Per-game stat dicts with nba_api column names (PTS, REB, …).
+        Returns [] if the player cannot be found or the call fails.
+    """
+    try:
+        from data.player_profile_service import get_player_id
+        from data.nba_stats_service import get_player_game_logs
+
+        player_id = get_player_id(player_name)
+        if not player_id:
+            _logger.debug("get_game_logs_from_nba_api: no player ID for %r", player_name)
+            return []
+
+        return get_player_game_logs(player_id, season=season)
+    except Exception as exc:
+        _logger.warning("get_game_logs_from_nba_api(%r) failed: %s", player_name, exc)
+    return []
+
+
 def refresh_historical_data_for_tonight(
     games=None,
     last_n_games=30,
