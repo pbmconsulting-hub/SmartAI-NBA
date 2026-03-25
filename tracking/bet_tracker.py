@@ -474,6 +474,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
             for row in _rows
         }
     except Exception:
+        _logger.debug("Dedup query for existing bet keys failed")
         pass  # If query fails, log without dedup (safe — unique constraint absent)
 
     logged = 0
@@ -697,6 +698,7 @@ def auto_resolve_bet_results(date_str=None):
                 logs = _ldf_gl(pid, last_n_games=5)
                 return pid, logs
             except Exception:
+                _logger.debug("Failed to fetch player game log for pid=%s on attempt %s", pid, _attempt)
                 if _attempt == RESOLVE_MAX_RETRIES - 1:
                     return pid, []
         return pid, []
@@ -710,6 +712,7 @@ def auto_resolve_bet_results(date_str=None):
                 _, logs_result = future.result()
                 _game_log_cache[pid] = logs_result or []
             except Exception:
+                _logger.debug("Player log future raised for pid=%s", pid)
                 _game_log_cache[pid] = []
 
     # ── Resolve bets from cached game logs ────────────────────
@@ -781,6 +784,7 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(f"#{bet_id} {player_name}: DB update failed — {msg}")
 
         except Exception as exc:
+            _logger.debug("Error resolving bet #%s for %s: %s", bet_id, player_name, exc)
             errors_list.append(f"#{bet_id} {player_name}: {exc}")
 
     return resolved_count, errors_list
@@ -829,6 +833,7 @@ def resolve_todays_bets():
             if b.get("bet_date") == today_str and not b.get("result")
         ]
     except Exception as exc:
+        _logger.debug("Failed to load bets for resolve_todays_bets: %s", exc)
         summary["errors"].append(f"Failed to load bets: {exc}")
         return summary
 
@@ -954,6 +959,7 @@ def resolve_todays_bets():
                     _, log_data = future.result()
                     _game_log_cache[pid] = log_data or []
                 except Exception:
+                    _logger.debug("Player log future raised for pid=%s in resolve_todays_bets", pid)
                     _game_log_cache[pid] = []
 
     # ── Resolve bets from cached game logs ────────────────────
@@ -1024,6 +1030,7 @@ def resolve_todays_bets():
                 summary["pushes"] += 1
 
         except Exception as exc:
+            _logger.debug("Error resolving today's bet for %s: %s", player_name, exc)
             summary["errors"].append(f"{player_name}: {exc}")
             summary["pending"] += 1
 
@@ -1097,6 +1104,7 @@ def resolve_all_pending_bets():
     try:
         all_bets = load_all_bets(limit=2000)
     except Exception as exc:
+        _logger.debug("Failed to load bets for resolve_all_pending_bets: %s", exc)
         summary["errors"].append(f"Failed to load bets: {exc}")
         return summary
 
@@ -1178,6 +1186,7 @@ def resolve_all_pending_bets():
                         _api_exc = None
                         break
                     except Exception as exc:
+                        _logger.debug("API retry error fetching game log for bet #%s %s: %s", bet_id, player_name, exc)
                         _api_exc = exc
                         continue
                 if _api_exc is not None:
@@ -1244,6 +1253,7 @@ def resolve_all_pending_bets():
                     summary["errors"].append(f"#{bet_id} {player_name}: DB update failed — {msg}")
                     summary["pending"] += 1
             except Exception as exc:
+                _logger.debug("Error resolving historical bet #%s for %s: %s", bet_id, player_name, exc)
                 summary["errors"].append(f"#{bet_id} {player_name}: {exc}")
                 summary["pending"] += 1
 
@@ -1336,6 +1346,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
         else:
             pending_picks = load_pending_analysis_picks(limit=2000)
     except Exception as exc:
+        _logger.debug("Failed to load pending picks for resolve_analysis_picks: %s", exc)
         summary["errors"].append(f"Failed to load pending picks: {exc}")
         return summary
 
@@ -1430,6 +1441,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                         _api_exc = None
                         break
                     except Exception as exc:
+                        _logger.debug("API retry error fetching game log for pick #%s %s: %s", pick_id, player_name, exc)
                         _api_exc = exc
                         continue
                 if _api_exc is not None:
@@ -1506,6 +1518,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                     summary["pending"] += 1
 
             except Exception as exc:
+                _logger.debug("Error resolving pick #%s for %s: %s", pick_id, player_name, exc)
                 summary["errors"].append(f"#{pick_id} {player_name}: {exc}")
                 summary["pending"] += 1
 

@@ -1021,6 +1021,7 @@ def save_daily_snapshot(date_str=None):
             if conn is not None:
                 conn.close()
         except Exception:
+            _logger.debug("Failed to close database connection in save_daily_snapshot")
             pass
 
     try:
@@ -1171,11 +1172,13 @@ def load_daily_snapshots(days=14):
                 try:
                     s[field] = json.loads(s.get(field) or "{}")
                 except Exception:
+                    _logger.debug("Failed to parse JSON for snapshot field %s", field)
                     s[field] = {}
             for field in ("best_pick", "worst_pick"):
                 try:
                     s[field] = json.loads(s.get(field) or "{}")
                 except Exception:
+                    _logger.debug("Failed to parse JSON for snapshot field %s", field)
                     s[field] = {}
             snapshots.append(s)
         return snapshots
@@ -1187,6 +1190,7 @@ def load_daily_snapshots(days=14):
             if conn is not None:
                 conn.close()
         except Exception:
+            _logger.debug("Failed to close database connection in load_daily_snapshots")
             pass
 
 
@@ -1218,6 +1222,7 @@ def purge_old_snapshots(days=30):
             if conn is not None:
                 conn.close()
         except Exception:
+            _logger.debug("Failed to close database connection in purge_old_snapshots")
             pass
 
 
@@ -1584,14 +1589,17 @@ def load_latest_analysis_session():
             try:
                 row_dict["analysis_results"] = json.loads(row_dict.get("analysis_results_json") or "[]")
             except Exception:
+                _logger.debug("Failed to parse analysis_results JSON")
                 row_dict["analysis_results"] = []
             try:
                 row_dict["todays_games"] = json.loads(row_dict.get("todays_games_json") or "[]")
             except Exception:
+                _logger.debug("Failed to parse todays_games JSON")
                 row_dict["todays_games"] = []
             try:
                 row_dict["selected_picks"] = json.loads(row_dict.get("selected_picks_json") or "[]")
             except Exception:
+                _logger.debug("Failed to parse selected_picks JSON")
                 row_dict["selected_picks"] = []
             return row_dict
     except Exception as _err:
@@ -1890,6 +1898,7 @@ def is_game_log_cache_stale(player_id, max_age_hours=24):
             age_hours = (now_utc - latest_ts).total_seconds() / 3600.0
             return age_hours > max_age_hours
     except Exception:
+        _logger.debug("Failed to check player game log staleness")
         return True  # If we can't check, assume stale and re-retrieve
 
 
