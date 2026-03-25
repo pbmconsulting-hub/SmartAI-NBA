@@ -115,6 +115,14 @@ class TestThresholdsBackwardCompat(unittest.TestCase):
         self.assertGreater(UNCERTAIN_CONFLICT_RATIO_THRESHOLD, 0)
         self.assertIsInstance(UNCERTAIN_HIGH_VAR_STATS, set)
 
+    def test_goblin_demon_logo_paths_importable(self):
+        """GOBLIN_LOGO_PATH and DEMON_LOGO_PATH must be importable and non-empty."""
+        from styles.theme import GOBLIN_LOGO_PATH, DEMON_LOGO_PATH
+        self.assertTrue(bool(GOBLIN_LOGO_PATH), "GOBLIN_LOGO_PATH must not be empty")
+        self.assertTrue(bool(DEMON_LOGO_PATH),  "DEMON_LOGO_PATH must not be empty")
+        self.assertIn("Goblin", GOBLIN_LOGO_PATH)
+        self.assertIn("Demon",  DEMON_LOGO_PATH)
+
 
 class TestEdgeDetectionBackwardCompat(unittest.TestCase):
     """Edge detection classify_bet_type must still work with old signatures."""

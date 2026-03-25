@@ -23,6 +23,8 @@ import os as _os
 _logger_theme = _logging.getLogger(__name__)
 
 # ── Centralised logo paths ──────────────────────────────────────
+GOBLIN_LOGO_PATH = _os.path.join("assets", "New_Goblin_Logo.png")
+DEMON_LOGO_PATH  = _os.path.join("assets", "New_Demon_Logo.png")
 GOLD_LOGO_PATH   = _os.path.join("assets", "NewGold_Logo.png")
 
 
@@ -4640,6 +4642,26 @@ def get_bet_card_html(bet, show_live_status=False):
     team_display = f'<span class="bet-card-team">· {team}</span>' if team else ""
     date_display = f'<span style="font-size:0.74rem;color:#5a6880;">{bet_date}</span>' if bet_date else ""
 
+    # Bet-type badge — show logo for historical goblin/demon bets
+    bet_type = str(bet.get("bet_type") or "").lower()
+    bet_type_badge_html = ""
+    if bet_type == "goblin" and _os.path.exists(GOBLIN_LOGO_PATH):
+        goblin_img = get_logo_img_tag(GOBLIN_LOGO_PATH, width=18, alt="Goblin")
+        bet_type_badge_html = (
+            f'<span style="display:inline-flex;align-items:center;gap:4px;'
+            f'background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.25);'
+            f'border-radius:5px;padding:2px 7px;font-size:0.75rem;color:#00ff9d;">'
+            f'{goblin_img} Goblin</span>'
+        )
+    elif bet_type == "demon" and _os.path.exists(DEMON_LOGO_PATH):
+        demon_img = get_logo_img_tag(DEMON_LOGO_PATH, width=18, alt="Demon")
+        bet_type_badge_html = (
+            f'<span style="display:inline-flex;align-items:center;gap:4px;'
+            f'background:rgba(255,94,0,0.08);border:1px solid rgba(255,94,0,0.25);'
+            f'border-radius:5px;padding:2px 7px;font-size:0.75rem;color:#ff5e00;">'
+            f'{demon_img} Demon</span>'
+        )
+
     return (
         f'<div class="{card_class}" style="border-left-color:{platform_border_color};">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
@@ -4662,7 +4684,8 @@ def get_bet_card_html(bet, show_live_status=False):
         f'{conf_bar}'
         f'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">'
         f'{plat_html} &nbsp; {tier_html}'
-        f'</div>'
+        + (f' &nbsp; {bet_type_badge_html}' if bet_type_badge_html else '')
+        + f'</div>'
         f'{actual_html}'
         f'{live_html}'
         f'</div>'
@@ -4732,8 +4755,10 @@ def get_styled_stats_table_html(rows, columns, title=""):
     }
 
     _BET_TYPE_ICON = {
+        "goblin":   get_logo_img_tag(GOBLIN_LOGO_PATH, width=16, alt="Goblin"),
+        "demon":    get_logo_img_tag(DEMON_LOGO_PATH,  width=16, alt="Demon"),
         "standard": "",
-        "normal": "",
+        "normal":   "",
     }
 
     def _apply_icon(icon, text):

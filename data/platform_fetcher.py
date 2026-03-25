@@ -929,8 +929,8 @@ def fetch_all_platform_props(
     # downstream in the analysis loop so that the engine processes as
     # many raw props as necessary until the target is reached.
 
-    # ── Enrich with alt-line categories ──────────────────────────
-    # Stamp each prop with line_category ("standard") and standard_line.
+    # ── Enrich with standard_line ─────────────────────────────────
+    # Stamp each prop with the standard_line (median line for its group).
     all_props = parse_alt_lines_from_platform_props(all_props)
 
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")
