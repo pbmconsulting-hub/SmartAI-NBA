@@ -76,7 +76,7 @@ import time as _time
 # ── Simple time-based API response cache ─────────────────────────────────────
 _API_CACHE: dict = {}
 # TTL is configurable via API_CACHE_TTL_SECONDS env var; default 5 minutes.
-_API_CACHE_TTL: int = int(__import__("os").environ.get("API_CACHE_TTL_SECONDS", "300"))
+_API_CACHE_TTL: int = int(os.environ.get("API_CACHE_TTL_SECONDS", "300"))
 
 
 def _cache_get(url: str):

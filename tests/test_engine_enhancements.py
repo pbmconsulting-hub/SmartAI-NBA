@@ -1429,7 +1429,8 @@ class TestParseAltLinesFromPlatformProps(unittest.TestCase):
             self._make_prop("SGA", "points", 30.0, "Underdog"),
         ]
         result = self.parse(props)
-        # PrizePicks group median = 31.5; Underdog group is single-entry.
+        # Per-platform grouping: PrizePicks median = 31.5 (3 entries);
+        # Underdog has single entry (30.0).
         pp = [p for p in result if p["platform"] == "PrizePicks"]
         ud = [p for p in result if p["platform"] == "Underdog"]
         # Underdog 30.0 is the only line → 50_50 (single-entry group)
