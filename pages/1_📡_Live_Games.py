@@ -261,7 +261,7 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
         _all_stat_types = [
             "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
             "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
-            "fantasy_score", "double_double", "triple_double",
+            "blocks_steals", "fantasy_score", "double_double", "triple_double",
         ]
         _selected_stats = st.multiselect(
             "Stat types to include",
@@ -269,6 +269,7 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
             default=[
                 "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
                 "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
+                "blocks_steals", "fantasy_score",
             ],
             key="smart_filter_stat_types",
             help="Only analyze these stat types. Deselect to include all.",
@@ -364,6 +365,13 @@ if auto_load_clicked:
                     st.session_state["league_standings"] = _al_standings
             except Exception as _st_err:
                 _logger.debug(f"Auto-load: standings pre-load skipped: {_st_err}")
+
+            # Clear cached CSV loaders so freshly-written data is picked up
+            try:
+                from data.data_manager import clear_all_caches as _al_clear_caches
+                _al_clear_caches()
+            except Exception as _cache_err:
+                _logger.debug(f"Auto-load: cache clear failed (non-fatal): {_cache_err}")
 
             status_text.text("⏳ Finalizing…")
             progress_bar.progress(90)

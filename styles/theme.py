@@ -107,6 +107,21 @@ GLOSSARY = {
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
     ),
+    "Goblin Bet": (
+        "A PrizePicks More/Less prop with boosted payout odds — typically a harder "
+        "line to hit but with a higher reward. The model evaluates Goblin lines the "
+        "same way as standard props so you can see the true probability."
+    ),
+    "Demon Bet": (
+        "A PrizePicks More/Less prop at reduced payout odds — usually an easier "
+        "line but with a lower reward. Our analysis still applies full simulation "
+        "so you know whether the edge justifies the smaller payout."
+    ),
+    "50/50 Bet": (
+        "A PrizePicks More/Less prop where the platform treats both sides as equally "
+        "likely. Our model often finds an edge even on 50/50 lines because our "
+        "simulation uses real matchup data rather than symmetric pricing."
+    ),
 }
 
 

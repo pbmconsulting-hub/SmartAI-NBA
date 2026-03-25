@@ -134,6 +134,70 @@ _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ass
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
+# ── Iframe card renderer ─────────────────────────────────────────────────────
+# Renders the unified card matrix inside a self-resizing <iframe> via
+# streamlit.components.v1.html() instead of st.markdown(unsafe_allow_html=True).
+#
+# Why this is more resilient than inline st.markdown:
+#   1. Atomic delivery — the iframe either loads fully or not at all; a
+#      mid-render WebSocket closure does not crash the page.
+#   2. CSS isolation — card styles cannot leak into (or be affected by) the
+#      main Streamlit page.
+#   3. Self-resizing — a ResizeObserver + toggle listener adjusts the iframe
+#      height when <details> cards are expanded / collapsed, so no fixed
+#      height or scroll-bar is needed.
+# ---------------------------------------------------------------------------
+
+_MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
+_HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
+_MAX_IFRAME_HEIGHT = 3000      # px — cap before ResizeObserver takes over
+_RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
+
+# Auto-resize JavaScript injected into every card-matrix iframe.
+# Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
+# the iframe height whenever the content changes (e.g. <details> toggle).
+_IFRAME_RESIZE_JS = (
+    "<script>"
+    "(function(){"
+    "var timer;"
+    "function sendHeight(){clearTimeout(timer);timer=setTimeout(function(){"
+    "window.parent.postMessage({type:'streamlit:setFrameHeight',"
+    f"height:document.body.scrollHeight}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
+    "document.addEventListener('toggle',sendHeight,true);"
+    "window.addEventListener('load',sendHeight)"
+    "})()"
+    "</script>"
+)
+
+
+def _render_card_iframe(card_html, player_count):
+    """Render *card_html* inside a self-resizing iframe.
+
+    Parameters
+    ----------
+    card_html : str
+        Complete HTML (including ``<style>`` blocks) returned by
+        :func:`utils.renderers.compile_unified_card_matrix`.
+    player_count : int
+        Number of player groups — used to estimate the initial iframe
+        height before the ``ResizeObserver`` adjusts it.
+    """
+    _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
+    _doc = (
+        "<!DOCTYPE html><html><head>"
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<style>html{overflow:hidden}"
+        "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
+        "</head><body>"
+        f"{card_html}"
+        f"{_IFRAME_RESIZE_JS}"
+        "</body></html>"
+    )
+    _components.html(_doc, height=_est_h, scrolling=False)
+
+
 st.set_page_config(
     page_title="Neural Analysis — SmartBetPro NBA",
     page_icon="⚡",
@@ -2449,6 +2513,11 @@ if analysis_results:
     # Each player gets one expandable card combining their identity
     # (headshot, name, team, season stats) with all their prop
     # analysis cards.  Click a card to expand and see full analysis.
+    #
+    # Rendered inside a self-resizing <iframe> via _render_card_iframe()
+    # rather than inline st.markdown(). This eliminates the WebSocket-
+    # ClosedError crash that occurred when large HTML payloads were sent
+    # over the Tornado WebSocket mid-rerun.
     _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
     _grouped = _group_props(_active_results, players_data, todays_games)
 
@@ -2462,7 +2531,7 @@ if analysis_results:
         )
 
         _unified_html = _compile_unified_matrix(_grouped)
-        st.markdown(_unified_html, unsafe_allow_html=True)
+        _render_card_iframe(_unified_html, len(_grouped))
 
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
@@ -2475,7 +2544,7 @@ if analysis_results:
                 unsafe_allow_html=True,
             )
             _out_unified_html = _compile_unified_matrix(_out_grouped)
-            st.markdown(_out_unified_html, unsafe_allow_html=True)
+            _render_card_iframe(_out_unified_html, len(_out_grouped))
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
