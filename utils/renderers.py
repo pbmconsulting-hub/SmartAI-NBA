@@ -636,8 +636,18 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     p50 = result.get("percentile_50", 0) or 0
     p90 = result.get("percentile_90", 0) or 0
     std_dev = result.get("simulated_std", result.get("std_dev", 0)) or 0
-    _fmt = lambda v: f"{float(v):.1f}" if v else "—"
-    p10_d, p50_d, p90_d, std_d = _fmt(p10), _fmt(p50), _fmt(p90), _fmt(std_dev)
+
+    def _format_dist(v):
+        """Format a distribution value as '%.1f' or '—' when falsy."""
+        try:
+            return f"{float(v):.1f}" if v else "—"
+        except (ValueError, TypeError):
+            return "—"
+
+    p10_d, p50_d, p90_d, std_d = (
+        _format_dist(p10), _format_dist(p50),
+        _format_dist(p90), _format_dist(std_dev),
+    )
 
     # Forces
     forces = result.get("forces", {}) or {}
@@ -774,9 +784,8 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
         f'<div class="qcm-safe-score-label">SAFE Score™</div>'
         f'<div class="qcm-safe-score-value">{safe_score_str}<span>/10</span></div>'
         f'</div>'
-        f'<div style="background:{accent_color};color:#0a0f1a;padding:2px 8px;'
-        f'border-radius:4px;font-size:0.68rem;font-weight:700;'
-        f"font-family:'JetBrains Mono',monospace;\">P({direction_escaped.title()}): {prob_dir*100:.0f}%</div>"
+        f'<div class="qcm-prob-pill" style="background:{accent_color};">'
+        f'P({direction_escaped.title()}): {prob_dir*100:.0f}%</div>'
         f'</div>'
         f'</div>'
         # ── BOTTOM ROW: 3-column detail ─────────────────────────

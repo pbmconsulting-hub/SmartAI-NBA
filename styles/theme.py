@@ -5606,6 +5606,16 @@ QUANTUM_CARD_MATRIX_CSS = """
     min-width: 50px;
 }
 
+/* Probability pill badge */
+.qcm-prob-pill {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: #0a0f1a;
+}
+
 /* Horizontal bottom section: 3-column layout */
 .qcm-h-bottom {
     display: flex;
@@ -5636,12 +5646,6 @@ QUANTUM_CARD_MATRIX_CSS = """
         grid-template-columns: 1fr;
     }
     .qcm-forces {
-        flex-direction: column;
-    }
-    .qcm-h-top {
-        flex-direction: column;
-    }
-    .qcm-h-bottom {
         flex-direction: column;
     }
 }
