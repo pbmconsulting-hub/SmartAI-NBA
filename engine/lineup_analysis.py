@@ -158,6 +158,7 @@ def _get_archetype(player: dict) -> str:
     try:
         return classify_player_archetype(player)
     except Exception:
+        _logger.debug("classify_player_archetype fallback for %s", player.get("player_name", "?"))
         return "Role Player"
 
 

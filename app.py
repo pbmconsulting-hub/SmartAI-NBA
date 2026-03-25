@@ -12,6 +12,8 @@ import os
 import base64
 import logging
 
+_logger = logging.getLogger(__name__)
+
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.nba_data_service import load_last_updated
 from tracking.database import initialize_database
@@ -46,6 +48,7 @@ def _load_logo_b64(path: str) -> str:
         with open(path, "rb") as _f:
             return base64.b64encode(_f.read()).decode()
     except Exception:
+        _logger.debug("Logo file read failed for %s", path)
         return ""
 
 # ─── Quantum Edge Theme CSS — page-level overrides ───────────
@@ -243,6 +246,7 @@ try:
     _handle_checkout()
     _user_is_premium = _is_premium()
 except Exception:
+    _logger.debug("Premium check import/call failed — failing open")
     _user_is_premium = True  # Fail open — don't block the home page
     _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 
@@ -544,6 +548,7 @@ if is_using_live_data:
             dt = datetime.datetime.fromisoformat(ts_string)
             return dt.strftime("%b %d at %I:%M %p")
         except Exception:
+            _logger.debug("Timestamp parse failed for %s", ts_string)
             return "unknown"
 
     st.success(
@@ -597,6 +602,7 @@ with left_column:
                 try:
                     st.session_state["injury_status_map"] = _hoc_li()
                 except Exception:
+                    _logger.debug("Injury status map load failed")
                     pass
                 try:
                     from data.sportsbook_service import get_all_sportsbook_props as _hoc_fap
@@ -617,6 +623,7 @@ with left_column:
                     else:
                         st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Neural Analysis.")
                 except Exception as _hoc_plat_err:
+                    _logger.debug("Platform props fetch failed: %s", _hoc_plat_err)
                     _hoc_err_str = str(_hoc_plat_err)
                     if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
                         pass

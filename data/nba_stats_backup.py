@@ -16,6 +16,8 @@ of the data source.
 import logging
 import time
 
+from engine.math_helpers import _safe_float
+
 try:
     import requests
     _REQUESTS_AVAILABLE = True
@@ -61,13 +63,6 @@ _CACHE_TTL = 600  # 10 minutes
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-
-def _safe_float(value, default: float = 0.0) -> float:
-    """Coerce *value* to float, returning *default* on failure."""
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def _safe_str(value, default: str = "") -> str:

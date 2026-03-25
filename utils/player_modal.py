@@ -15,14 +15,9 @@
 import html as _html
 import logging as _logging
 
+from engine.math_helpers import _safe_float
+
 _logger = _logging.getLogger(__name__)
-
-
-def _safe_float(val, default=0.0):
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return default
 
 
 def show_player_spotlight(player_name: str, grouped_entry: dict) -> None:

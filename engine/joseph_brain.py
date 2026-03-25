@@ -2902,6 +2902,7 @@ def joseph_auto_log_bets(joseph_results: list, session_state: dict = None) -> tu
     except ImportError:
         return (0, "Joseph bets module not installed yet")
     except Exception as exc:
+        logger.debug("Joseph auto-log error: %s", exc)
         return (0, f"Joseph auto-log error: {exc}")
 
 
