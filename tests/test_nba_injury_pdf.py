@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 try:
-    import pandas as pd  # noqa: F811
+    import pandas as pd
     _HAS_PANDAS = True
 except ModuleNotFoundError:
     pd = None
