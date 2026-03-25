@@ -310,8 +310,8 @@ def run_quantum_matrix_simulation(
             probability evaluation and DFS metrics are computed STRICTLY
             against this line instead of ``prop_line``.  This prevents the
             engine from evaluating extreme alternate lines.
-        platform (str, optional): Sportsbook name (``"FanDuel"``,
-            ``"DraftKings"``, ``"BetMGM"``, etc.).  When provided alongside
+        platform (str, optional): Sportsbook name (``"PrizePicks"``,
+            ``"DraftKings"``, ``"DraftKings Pick6"``, etc.).  When provided alongside
             ``prop_target_line``, DFS-specific flex breakeven thresholds
             and parlay EV metrics are embedded in the output dict.
 

@@ -509,7 +509,7 @@ def calculate_dfs_breakeven_probability(platform="DraftKings", pick_count=3):
     payout across all hit counts.
 
     Args:
-        platform (str): Sportsbook name (e.g., ``"FanDuel"``, ``"DraftKings"``).
+        platform (str): Sportsbook name (e.g., ``"PrizePicks"``, ``"DraftKings"``).
         pick_count (int): Number of picks in the entry (3–6).
 
     Returns:
@@ -577,7 +577,7 @@ def calculate_dfs_ev(leg_probabilities, platform="DraftKings", pick_count=None, 
     Args:
         leg_probabilities (list[float]): Per-leg model probabilities
             (each 0.0–1.0), e.g. ``[0.62, 0.58, 0.71]`` for a 3-pick.
-        platform (str): Sportsbook name (e.g., ``"FanDuel"``, ``"DraftKings"``).
+        platform (str): Sportsbook name (e.g., ``"PrizePicks"``, ``"DraftKings"``).
         pick_count (int or None): Override the number of picks (defaults to
             ``len(leg_probabilities)``).
         entry_fee (float): Dollar amount of the entry (default $1.00).
@@ -758,7 +758,7 @@ def generate_optimal_slip(filtered_props_list, platform="DraftKings"):
                 - ``opponent`` (str, optional)
                 - ``confidence_score`` (float, optional)
                 - ``edge_percentage`` (float, optional)
-        platform (str): Sportsbook name (e.g., ``"FanDuel"``,
+        platform (str): Sportsbook name (e.g., ``"PrizePicks"``,
             ``"DraftKings"``).  Default ``"DraftKings"``.
 
     Returns:

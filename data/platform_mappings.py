@@ -168,7 +168,7 @@ def normalize_stat_type(raw_stat_name, platform=None):
         raw_stat_name (str): Stat name as it appears on the platform,
             e.g., "Pts+Rebs", "3PM", "Fantasy Points"
         platform (str, optional): Platform name for preferential lookup.
-            e.g., "FanDuel", "DraftKings", "BetMGM".
+            e.g., "PrizePicks", "Underdog Fantasy", "DraftKings Pick6".
 
     Returns:
         str: Internal stat key (e.g., "points_rebounds"), or the
@@ -208,7 +208,7 @@ def detect_platform_from_stat_names(stat_names):
         stat_names (list of str): Raw stat names from a prop upload.
 
     Returns:
-        str or None: Platform name (e.g., "FanDuel", "DraftKings"), or
+        str or None: Platform name (e.g., "PrizePicks", "DraftKings Pick6"), or
                      None if no platform matches confidently.
 
     Example:
