@@ -69,6 +69,9 @@ def _get_archived_line(player_name, stat_type, date_str, _archive_cache):
     """
     Try to get the actual PrizePicks line from the mirror archive.
 
+    Props for each date are indexed by (player_name_lower, stat_type_lower)
+    on first access so that repeated lookups within the same date are O(1).
+
     Returns:
         tuple: (line_float, True) if found, (None, False) if not.
     """
@@ -76,16 +79,22 @@ def _get_archived_line(player_name, stat_type, date_str, _archive_cache):
         return None, False
 
     if date_str not in _archive_cache:
-        _archive_cache[date_str] = fetch_archived_nba_props(date_str)
+        raw_props = fetch_archived_nba_props(date_str)
+        # Build an index: (player_lower, stat_lower) → line for O(1) lookup
+        index = {}
+        for prop in raw_props:
+            key = (
+                prop.get("player_name", "").lower().strip(),
+                prop.get("stat_type", "").lower().strip(),
+            )
+            if key not in index:
+                index[key] = prop.get("line")
+        _archive_cache[date_str] = index
 
-    player_lower = player_name.lower().strip()
-    stat_lower = stat_type.lower().strip()
-
-    for prop in _archive_cache[date_str]:
-        if (prop.get("player_name", "").lower().strip() == player_lower and
-                prop.get("stat_type", "").lower().strip() == stat_lower):
-            return prop.get("line"), True
-
+    key = (player_name.lower().strip(), stat_type.lower().strip())
+    line = _archive_cache[date_str].get(key)
+    if line is not None:
+        return line, True
     return None, False
 
 

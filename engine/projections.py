@@ -785,7 +785,7 @@ def build_player_projection(
     projected_fgm                = season_fgm_average                * _base_mult
     projected_offensive_rebounds = season_offensive_rebounds_average * _base_mult
     projected_defensive_rebounds = season_defensive_rebounds_average * _base_mult
-    projected_personal_fouls     = season_personal_fouls_average     * (rest_factor * minutes_adjustment_factor)
+    projected_personal_fouls     = season_personal_fouls_average     * (pace_factor * rest_factor * minutes_adjustment_factor)
 
     # Keep single offensive_stat_multiplier for backward compatibility in return dict
     offensive_stat_multiplier = _off_mult("points")
