@@ -1743,7 +1743,11 @@ async def fetch_all_platforms_async(
     semaphore = asyncio.Semaphore(_ASYNC_SEMAPHORE_LIMIT)
     tasks = []
 
-    async with aiohttp.ClientSession() as session:
+    # ── Async Buffer: TCPConnector with limit_per_host=10 ──────────
+    # Prevents API timeouts during high-volume 500-prop fetches by
+    # capping concurrent connections to any single host at 10.
+    connector = aiohttp.TCPConnector(limit_per_host=10)
+    async with aiohttp.ClientSession(connector=connector) as session:
         if include_prizepicks:
             tasks.append(_async_fetch_prizepicks(session, semaphore))
         if include_underdog:
@@ -1891,6 +1895,190 @@ def recommend_best_platform(comparison, projected_value, direction):
 
 # ============================================================
 # END SECTION: Cross-Platform Comparison
+# ============================================================
+
+
+# ============================================================
+# SECTION: Stale Data Kill Switch
+# ============================================================
+
+# Maximum age (seconds) for a prop's fetched_at / last_updated timestamp.
+# Props older than this are discarded as "Stale Data."
+_STALE_THRESHOLD_SECONDS = 120
+
+
+def discard_stale_props(props, max_age_seconds=_STALE_THRESHOLD_SECONDS):
+    """
+    Remove props whose timestamp is older than *max_age_seconds*.
+
+    Checks the ``last_updated`` field first; if absent, falls back to
+    ``fetched_at``.  Props without any parseable timestamp are kept
+    (benefit of the doubt — they were just fetched).
+
+    Args:
+        props (list[dict]): Raw prop dicts, each optionally containing
+            ``last_updated`` or ``fetched_at`` ISO-8601 strings.
+        max_age_seconds (int): Maximum allowed age in seconds.
+            Default ``120`` (2 minutes).
+
+    Returns:
+        tuple: (fresh_props, stale_summary)
+            fresh_props (list[dict]): Props that pass the freshness check.
+            stale_summary (dict): ``{"input": int, "fresh": int, "stale": int}``.
+    """
+    now = datetime.datetime.now(datetime.timezone.utc)
+    fresh: list = []
+    stale_count = 0
+
+    for prop in props:
+        ts_str = prop.get("last_updated") or prop.get("fetched_at")
+        if not ts_str:
+            # No timestamp → assume it was just fetched
+            fresh.append(prop)
+            continue
+
+        try:
+            ts = datetime.datetime.fromisoformat(str(ts_str))
+            # Ensure timezone-aware for comparison — assume UTC if naive
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=datetime.timezone.utc)
+        except (ValueError, TypeError):
+            # Unparseable timestamp → keep prop (defensive)
+            fresh.append(prop)
+            continue
+
+        age_seconds = (now - ts).total_seconds()
+        if age_seconds > max_age_seconds:
+            stale_count += 1
+            _logger.debug(
+                f"[StaleKill] Discarding {prop.get('player_name', '?')} "
+                f"{prop.get('stat_type', '?')} — age {age_seconds:.0f}s "
+                f"> {max_age_seconds}s threshold"
+            )
+        else:
+            fresh.append(prop)
+
+    summary = {
+        "input": len(props),
+        "fresh": len(fresh),
+        "stale": stale_count,
+    }
+    _logger.info(
+        f"[StaleKill] {summary['fresh']} fresh, {summary['stale']} stale "
+        f"of {summary['input']} props (threshold={max_age_seconds}s)"
+    )
+    return fresh, summary
+
+
+# ============================================================
+# END SECTION: Stale Data Kill Switch
+# ============================================================
+
+
+# ============================================================
+# SECTION: Validation Engine — Source Triangulation
+# ============================================================
+
+# If two platforms disagree by more than this many points on the same
+# (player, stat_type) line, the prop is flagged for manual review.
+_LINE_DIVERGENCE_THRESHOLD = 2.0
+
+
+def validate_cross_platform_lines(
+    all_props,
+    divergence_threshold=_LINE_DIVERGENCE_THRESHOLD,
+):
+    """
+    Compare lines from PrizePicks and Underdog for the same (player,
+    stat_type).  If the lines differ by more than *divergence_threshold*
+    or a line is offered on only one platform, flag the prop for manual
+    review instead of blindly trusting a potentially wrong number.
+
+    Flagged props receive ``validation_status = "REVIEW"`` and a
+    human-readable ``validation_note``.  Clean props get
+    ``validation_status = "VALIDATED"``.
+
+    Args:
+        all_props (list[dict]): All fetched props from every platform.
+        divergence_threshold (float): Maximum allowed absolute difference
+            between platform lines before flagging.  Default 2.0.
+
+    Returns:
+        tuple: (validated_props, validation_summary)
+            validated_props (list[dict]): Props enriched with
+                ``validation_status`` and optional ``validation_note``.
+            validation_summary (dict): Breakdown counts.
+    """
+    # Build lookup: (player_lower, stat_lower) → {platform: line}
+    platform_lines: dict = {}
+    for prop in all_props:
+        player = str(prop.get("player_name", "")).lower().strip()
+        stat = str(prop.get("stat_type", "")).lower().strip()
+        plat = str(prop.get("platform", "")).strip()
+        line = prop.get("line")
+        if not player or not stat or not plat or line is None:
+            continue
+        key = (player, stat)
+        platform_lines.setdefault(key, {})[plat] = float(line)
+
+    validated: list = []
+    counts = {"validated": 0, "review_divergence": 0, "review_single_source": 0}
+
+    for prop in all_props:
+        enriched = dict(prop)
+        player = str(prop.get("player_name", "")).lower().strip()
+        stat = str(prop.get("stat_type", "")).lower().strip()
+        key = (player, stat)
+
+        lines = platform_lines.get(key, {})
+        pp_line = lines.get("PrizePicks")
+        ud_line = lines.get("Underdog")
+
+        if pp_line is not None and ud_line is not None:
+            # Both platforms offer this prop — compare lines
+            diff = abs(pp_line - ud_line)
+            if diff > divergence_threshold:
+                enriched["validation_status"] = "REVIEW"
+                enriched["validation_note"] = (
+                    f"Line divergence {diff:.1f} "
+                    f"(PP={pp_line}, UD={ud_line}) "
+                    f"> threshold {divergence_threshold}"
+                )
+                counts["review_divergence"] += 1
+            else:
+                enriched["validation_status"] = "VALIDATED"
+                counts["validated"] += 1
+        elif len(lines) >= 2:
+            # Two or more platforms but not the PP+UD pair → still validated
+            enriched["validation_status"] = "VALIDATED"
+            counts["validated"] += 1
+        else:
+            # Single-source prop — flag for review
+            enriched["validation_status"] = "REVIEW"
+            enriched["validation_note"] = (
+                f"Single-source only ({list(lines.keys())})"
+            )
+            counts["review_single_source"] += 1
+
+        validated.append(enriched)
+
+    summary = {
+        "input": len(all_props),
+        "validated": counts["validated"],
+        "review_divergence": counts["review_divergence"],
+        "review_single_source": counts["review_single_source"],
+    }
+    _logger.info(
+        f"[Validation] {summary['validated']} validated, "
+        f"{summary['review_divergence']} divergence flags, "
+        f"{summary['review_single_source']} single-source flags "
+        f"of {summary['input']} props"
+    )
+    return validated, summary
+
+
+# ============================================================
+# END SECTION: Validation Engine — Source Triangulation
 # ============================================================
 
 
@@ -2466,6 +2654,8 @@ def smart_filter_props(
     original_count = len(all_props)
     summary: dict = {
         "original_count": original_count,
+        "after_stale_check": original_count,
+        "after_validation": original_count,
         "after_quarantine": original_count,
         "after_team_filter": original_count,
         "after_injury_filter": original_count,
@@ -2479,8 +2669,17 @@ def smart_filter_props(
     if not all_props:
         return [], summary
 
-    # ── Step 0: Data Quarantine — hard-drop extreme odds + lock main line ─
-    quarantined, q_summary = quarantine_props(all_props)
+    # ── Step 0a: Stale Data Kill Switch — discard props > 120 s old ──
+    fresh_props, stale_summary = discard_stale_props(all_props)
+    summary["after_stale_check"] = len(fresh_props)
+
+    # ── Step 0b: Source Triangulation — flag divergent / single-source ──
+    validated_props, val_summary = validate_cross_platform_lines(fresh_props)
+    summary["after_validation"] = len(validated_props)
+    summary["validation_detail"] = val_summary
+
+    # ── Step 0c: Data Quarantine — hard-drop extreme odds + lock main line ─
+    quarantined, q_summary = quarantine_props(validated_props)
     summary["after_quarantine"] = len(quarantined)
 
     # ── Step 1: Filter to tonight's teams ───────────────────────────────
