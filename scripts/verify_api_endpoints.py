@@ -4,7 +4,7 @@ scripts/verify_api_endpoints.py
 -------------------------------
 Production-ready API endpoint verification script.
 
-Tests all API-Basketball v1 and The Odds API v4 endpoints using real API keys.
+Tests all API-Basketball v1/v2 and The Odds API v4 endpoints using real API keys.
 Intended to be run manually to confirm the app can pull data before deployment.
 
 Usage:
@@ -158,9 +158,9 @@ def _test_odds_api(endpoint: str, api_key: str, params: dict | None = None,
 # ── Main test functions ───────────────────────────────────────────────────────
 
 def test_api_sports(api_key: str):
-    """Test all API-Basketball v1 endpoints."""
+    """Test all API-Basketball v1 and v2 NBA API endpoints."""
     print("\n" + "=" * 70)
-    print("  API-BASKETBALL v1 ENDPOINT VERIFICATION")
+    print("  API-BASKETBALL v1 / v2 NBA API ENDPOINT VERIFICATION")
     print("=" * 70)
 
     headers = {"x-apisports-key": api_key}
@@ -179,18 +179,20 @@ def test_api_sports(api_key: str):
                      label="[2/12] /teams?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 3. /games (with season)
+    # 3. /games (v2 NBA API — with season)
     _test_api_sports("/games", headers,
-                     params={"league": "12", "season": "2025-2026"},
-                     label="[3/12] /games?league=12&season=2025-2026")
+                     params={"season": "2025"},
+                     label="[3/12] /games?season=2025 (v2)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
-    # 4. /games (today)
+    # 4. /games (v2 NBA API — today)
     from datetime import date
     today = date.today().isoformat()
     _test_api_sports("/games", headers,
-                     params={"league": "12", "season": "2025-2026", "date": today},
-                     label=f"[4/12] /games?league=12&date={today}")
+                     params={"season": "2025", "date": today},
+                     label=f"[4/12] /games?season=2025&date={today} (v2)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
     # 5a. /players (v2 NBA API — with team filter)

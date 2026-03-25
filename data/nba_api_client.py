@@ -6,7 +6,7 @@ API-NBA client for NBA data (via API-Sports).
 Provides:
   NBA Data:
   - get_teams()                     → all NBA teams
-  - get_games(season=None, date=None, team_id=None) → NBA games with optional filters
+  - get_games(season, date, team_id, game_id, live, league, h2h) → NBA games with optional filters
   - get_players(team_id=None)            → NBA players with optional team filter
   - get_todays_games()               → today's scheduled games with lines
   - get_player_stats()              → season-average player stats with std-dev fields
@@ -64,13 +64,15 @@ except ImportError:
 
 _BASE_URL = "https://v1.basketball.api-sports.io"
 
-# v2 NBA API base URL — used for /players, /players/statistics, and
-# /teams/statistics endpoints.
+# v2 NBA API base URL — used for /games, /players, /players/statistics,
+# and /teams/statistics endpoints.
 _PLAYERS_BASE_URL = "https://v2.nba.api-sports.io"
 
 # ── API Endpoints ─────────────────────────────────────────────────────────────
-# Centralized endpoint constants for the API-Basketball v1 API.
-# ENDPOINT_PLAYERS uses the v2 NBA API (_PLAYERS_BASE_URL) instead of v1.
+# Centralized endpoint constants.
+# ENDPOINT_GAMES, ENDPOINT_PLAYERS, ENDPOINT_PLAYER_STATS, and
+# ENDPOINT_TEAM_STATS use the v2 NBA API (_PLAYERS_BASE_URL).
+# The remaining endpoints use the v1 API-Basketball API (_BASE_URL).
 ENDPOINT_TEAMS = "/teams"
 ENDPOINT_GAMES = "/games"
 ENDPOINT_PLAYERS = "/players"
@@ -509,31 +511,44 @@ def get_teams() -> list[dict]:
         return []
 
 
-def get_games(season=None, date=None, team_id=None) -> list[dict]:
+def get_games(season=None, date=None, team_id=None, game_id=None,
+              live=None, league=None, h2h=None) -> list[dict]:
     """
     Retrieve NBA games.
 
-    Endpoint: GET /games
+    Endpoint: GET /games  (v2 NBA API — v2.nba.api-sports.io)
 
     Args:
-        season:  Optional season year (e.g. 2024).
+        season:  Optional season year as int YYYY (e.g. 2024).
         date:    Optional game date in YYYY-MM-DD format (e.g. "2024-12-25").
         team_id: Optional team ID to filter by.
+        game_id: Optional game ID to fetch a single game.
+        live:    Optional "all" to get only live games.
+        league:  Optional league name (e.g. "standard").
+        h2h:     Optional head-to-head string (e.g. "1-4").
 
     Returns:
         list[dict]: Game entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_GAMES}"
-    params: dict = {"league": _NBA_LEAGUE_ID}
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_GAMES}"
+    params: dict = {}
+    if game_id is not None:
+        params["id"] = game_id
     if season is not None:
         params["season"] = season
     else:
-        params["season"] = _CURRENT_SEASON
+        params["season"] = int(_CURRENT_SEASON_YEAR)
     if date is not None:
         params["date"] = date
     if team_id is not None:
         params["team"] = team_id
+    if live is not None:
+        params["live"] = live
+    if league is not None:
+        params["league"] = league
+    if h2h is not None:
+        params["h2h"] = h2h
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -627,6 +642,8 @@ def get_todays_games() -> list[dict]:
     """
     Get today's NBA games with team records and betting lines.
 
+    Endpoint: GET /games  (v2 NBA API — v2.nba.api-sports.io)
+
     Returns:
         list[dict]: Each dict has keys:
             home_team, away_team, game_id,
@@ -634,9 +651,9 @@ def get_todays_games() -> list[dict]:
             vegas_spread, game_total
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_GAMES}"
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_GAMES}"
     today = _today_str()
-    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": today}
+    params = {"season": int(_CURRENT_SEASON_YEAR), "date": today}
 
     try:
         raw = _request_with_retry(url, params=params)
@@ -1076,6 +1093,8 @@ def get_live_scores() -> list[dict]:
     """
     Get live / recently completed NBA game scores.
 
+    Endpoint: GET /games  (v2 NBA API — v2.nba.api-sports.io)
+
     Returns:
         list[dict]: Each dict has keys:
             game_id, home_team, away_team,
@@ -1083,8 +1102,8 @@ def get_live_scores() -> list[dict]:
             period, game_clock, status
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_GAMES}"
-    params = {"league": _NBA_LEAGUE_ID, "season": _CURRENT_SEASON, "date": _today_str()}
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_GAMES}"
+    params = {"season": int(_CURRENT_SEASON_YEAR), "date": _today_str()}
 
     try:
         raw = _request_with_retry(url, params=params)

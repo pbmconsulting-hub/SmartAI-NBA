@@ -6,7 +6,7 @@ Tests for API-Basketball client endpoint structure:
   2. Injury endpoint uses /injuries
   3. 403 status code handling (credit exhaustion)
   4. API key management endpoints (status)
-  5. NBA endpoints (teams, players, standings, teams/statistics, players/statistics)
+  5. NBA endpoints (teams, games, players, standings, teams/statistics, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
 
@@ -214,20 +214,25 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_games(", self.src)
 
     def test_get_games_url(self):
-        """get_games must call /games."""
-        idx = self.src.find("def get_games(")
-        self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
-        self.assertIn("/games", snippet)
-
-    def test_get_games_has_params(self):
-        """get_games must accept season, date, and team parameters."""
+        """get_games must call /games via v2 NBA API."""
         idx = self.src.find("def get_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
+        self.assertIn("/games", snippet)
+        self.assertIn("_PLAYERS_BASE_URL", snippet,
+                       "get_games must use _PLAYERS_BASE_URL (v2 NBA API)")
+
+    def test_get_games_has_params(self):
+        """get_games must accept season, date, team, id, live, and h2h parameters."""
+        idx = self.src.find("def get_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1500]
         self.assertIn('"season"', snippet)
         self.assertIn('"date"', snippet)
         self.assertIn('"team"', snippet)
+        self.assertIn('"id"', snippet)
+        self.assertIn('"live"', snippet)
+        self.assertIn('"h2h"', snippet)
 
     # -- get_players --
 
