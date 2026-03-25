@@ -13,6 +13,15 @@ SIMPLE_STAT_TYPES = frozenset({
     "steals",
     "blocks",
     "turnovers",
+    # Extended NBA stat types from mirror
+    "ftm",
+    "fga",
+    "fgm",
+    "fta",
+    "minutes",
+    "personal_fouls",
+    "offensive_rebounds",
+    "defensive_rebounds",
 })
 
 # Combo stat types (sum of 2+ simple stats).

@@ -94,7 +94,11 @@ with st.sidebar:
 
     season = st.selectbox("Season", ["2024-25", "2023-24", "2022-23"], index=0)
 
-    stat_options = ["points", "rebounds", "assists", "steals", "blocks", "threes", "turnovers"]
+    stat_options = [
+        "points", "rebounds", "assists", "steals", "blocks", "threes", "turnovers",
+        "ftm", "fta", "fgm", "fga", "minutes", "personal_fouls",
+        "offensive_rebounds", "defensive_rebounds",
+    ]
     selected_stats = st.multiselect(
         "Stat Types",
         stat_options,
@@ -109,6 +113,14 @@ with st.sidebar:
         index=0,
     )
     tier_filter_val = None if tier_filter == "All Tiers" else tier_filter
+
+    use_real_lines = st.checkbox(
+        "📦 Use Real PrizePicks Lines (archive)",
+        value=True,
+        help="When available, use actual PrizePicks prop lines from the "
+             "mirror archive instead of synthetic season-average lines. "
+             "Only available for dates the archive has captured.",
+    )
 
     run_btn = st.button("▶ Run Backtest", type="primary", use_container_width=True)
 

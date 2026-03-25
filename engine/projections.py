@@ -1285,6 +1285,21 @@ def _get_dynamic_cv(stat_type, stat_avg):
         else:
             cv = 0.50
 
+    elif stat_type in ("ftm", "fta"):
+        cv = 0.50 if stat_avg < 3.0 else 0.40
+
+    elif stat_type in ("fga", "fgm"):
+        cv = 0.35 if stat_avg >= 10.0 else 0.45
+
+    elif stat_type == "minutes":
+        cv = 0.20  # Minutes are relatively stable game-to-game
+
+    elif stat_type == "personal_fouls":
+        cv = 0.55  # High variance
+
+    elif stat_type in ("offensive_rebounds", "defensive_rebounds"):
+        cv = 0.50 if stat_avg < 2.0 else 0.42
+
     else:
         cv = 0.40  # Default for unknown stat types
 

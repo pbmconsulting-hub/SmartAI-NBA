@@ -32,6 +32,16 @@ PRIZEPICKS_STAT_MAP = {
     "Pts+Rebs+Asts": "points_rebounds_assists",
     "Fantasy Score": "fantasy_score_pp",
     "Blks+Stls": "blocks_steals",
+    "Free Throws Made": "ftm",
+    "FG Attempted": "fga",
+    "FG Made": "fgm",
+    "FT Attempted": "fta",
+    "Double Double": "double_double",
+    "Triple Double": "triple_double",
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
 }
 
 # DraftKings Pick6 stat type mappings (also used for standard sportsbooks)
@@ -51,6 +61,18 @@ DRAFTKINGS_STAT_MAP = {
     "Double Double": "double_double",
     "Triple Double": "triple_double",
     "Fantasy Points": "fantasy_score_dk",
+    "Free Throws Made": "ftm",
+    "FTM": "ftm",
+    "FG Attempted": "fga",
+    "FGA": "fga",
+    "FG Made": "fgm",
+    "FGM": "fgm",
+    "FT Attempted": "fta",
+    "FTA": "fta",
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
 }
 
 # Legacy Underdog Fantasy stat type mappings (backward compat)
@@ -67,6 +89,14 @@ UNDERDOG_STAT_MAP = {
     "Rebounds + Assists": "rebounds_assists",
     "Pts + Rebs + Asts": "points_rebounds_assists",
     "Fantasy Points": "fantasy_score_ud",
+    "Free Throws Made": "ftm",
+    "FG Attempted": "fga",
+    "FG Made": "fgm",
+    "FT Attempted": "fta",
+    "Minutes": "minutes",
+    "Personal Fouls": "personal_fouls",
+    "Offensive Rebounds": "offensive_rebounds",
+    "Defensive Rebounds": "defensive_rebounds",
 }
 
 # Combined reverse-lookup: all platform names → internal key

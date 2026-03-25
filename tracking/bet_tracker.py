@@ -121,6 +121,12 @@ _STAT_COL = {
     "blocked shots":    "blk",
     "free throws made": "ftm",
     "ftm":              "ftm",
+    "fta":              "fta",
+    "fga":              "fga",
+    "fgm":              "fgm",
+    "personal_fouls":   "pf",
+    "offensive_rebounds": "oreb",
+    "defensive_rebounds": "dreb",
     # ── Platform name aliases ──────────────────────────
     "three pointers":   "fg3m",
     "3-pointers":       "fg3m",
