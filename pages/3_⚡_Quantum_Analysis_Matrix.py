@@ -2449,33 +2449,39 @@ if analysis_results:
     # Each player gets one expandable card combining their identity
     # (headshot, name, team, season stats) with all their prop
     # analysis cards.  Click a card to expand and see full analysis.
-    _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-    _grouped = _group_props(_active_results, players_data, todays_games)
+    try:
+        _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
+        _grouped = _group_props(_active_results, players_data, todays_games)
 
-    if _grouped:
-        st.markdown(
-            '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
-            'margin-bottom:8px;">🃏 Quantum Analysis Matrix</h3>'
-            '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
-            'Click any player card to expand and view their full prop analysis.</p>',
-            unsafe_allow_html=True,
-        )
-
-        _unified_html = _compile_unified_matrix(_grouped)
-        st.markdown(_unified_html, unsafe_allow_html=True)
-
-    # Show OUT players in a separate collapsed section
-    _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
-    if _out_display:
-        _out_grouped = _group_props(_out_display, players_data, todays_games)
-        if _out_grouped:
+        if _grouped:
             st.markdown(
-                '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
-                '⚠️ OUT / Inactive Players</div>',
+                '<h3 style="font-family:\'Orbitron\',sans-serif;color:#00C6FF;'
+                'margin-bottom:8px;">🃏 Quantum Analysis Matrix</h3>'
+                '<p style="color:#94A3B8;font-size:0.82rem;margin-bottom:12px;">'
+                'Click any player card to expand and view their full prop analysis.</p>',
                 unsafe_allow_html=True,
             )
-            _out_unified_html = _compile_unified_matrix(_out_grouped)
-            st.markdown(_out_unified_html, unsafe_allow_html=True)
+
+            _unified_html = _compile_unified_matrix(_grouped)
+            st.markdown(_unified_html, unsafe_allow_html=True)
+
+        # Show OUT players in a separate collapsed section
+        _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
+        if _out_display:
+            _out_grouped = _group_props(_out_display, players_data, todays_games)
+            if _out_grouped:
+                st.markdown(
+                    '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
+                    '⚠️ OUT / Inactive Players</div>',
+                    unsafe_allow_html=True,
+                )
+                _out_unified_html = _compile_unified_matrix(_out_grouped)
+                st.markdown(_out_unified_html, unsafe_allow_html=True)
+    except Exception as _card_render_err:
+        _err_msg = str(_card_render_err)
+        if "WebSocketClosedError" not in _err_msg and "StreamClosedError" not in _err_msg:
+            _logger.warning("Card matrix render error: %s", _card_render_err)
+            st.warning("⚠️ Player cards could not be rendered. Please refresh the page.")
 
     # ── Final Verdict ─────────────────────────────────────────────
     st.divider()
