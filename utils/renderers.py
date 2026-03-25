@@ -18,8 +18,11 @@
 # ============================================================
 
 import html as _html
+import logging
 import os as _os
 import base64 as _base64
+
+_logger = logging.getLogger(__name__)
 
 from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
 
@@ -52,6 +55,7 @@ def _get_joseph_avatar_b64() -> str:
                     _JOSEPH_AVATAR_B64 = _base64.b64encode(fh.read()).decode("utf-8")
                     return _JOSEPH_AVATAR_B64
             except Exception:
+                _logger.debug("Failed to read Joseph avatar file")
                 pass
     _JOSEPH_AVATAR_B64 = ""
     return _JOSEPH_AVATAR_B64
@@ -403,6 +407,7 @@ def _build_single_card_html(result, index=0):
                 f'</div>'
             )
     except Exception:
+        _logger.debug("Failed to build wager HTML for vertical card")
         pass
 
     # ── Context metrics grid (Situational / Matchup / Form / Edge) ─
@@ -778,6 +783,7 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
                 f'</div>'
             )
     except Exception:
+        _logger.debug("Failed to build wager HTML for horizontal card")
         pass
 
     # Build the full horizontal card

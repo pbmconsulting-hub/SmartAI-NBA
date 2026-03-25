@@ -393,6 +393,7 @@ def render_joseph_sidebar_widget() -> None:
     try:
         _inject_widget_css()
     except Exception:
+        _logger.debug("Failed to inject widget CSS for sidebar widget")
         pass
 
     try:
@@ -401,6 +402,7 @@ def render_joseph_sidebar_widget() -> None:
         try:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
+            _logger.debug("Failed to load Joseph avatar for sidebar widget")
             pass
 
         if avatar_b64:
@@ -447,6 +449,7 @@ def render_joseph_sidebar_widget() -> None:
                     f'</div>'
                 )
         except Exception:
+            _logger.debug("Failed to build track record HTML for sidebar widget")
             pass
 
         # ── Compose sidebar HTML ──────────────────────────────
@@ -490,6 +493,7 @@ def render_joseph_floating_widget() -> None:
     try:
         _inject_widget_css()
     except Exception:
+        _logger.debug("Failed to inject widget CSS for floating widget")
         pass
 
     try:
@@ -498,6 +502,7 @@ def render_joseph_floating_widget() -> None:
         try:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
+            _logger.debug("Failed to load Joseph avatar for floating widget")
             pass
 
         if avatar_b64:
@@ -613,6 +618,7 @@ def inject_joseph_inline_commentary(
     try:
         _inject_widget_css()
     except Exception:
+        _logger.debug("Failed to inject widget CSS for inline commentary")
         pass
 
     try:
@@ -633,6 +639,7 @@ def inject_joseph_inline_commentary(
         try:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
+            _logger.debug("Failed to load Joseph avatar for inline commentary")
             pass
 
         if avatar_b64:
@@ -722,6 +729,7 @@ def render_joseph_ask_popover(
     try:
         _inject_widget_css()
     except Exception:
+        _logger.debug("Failed to inject widget CSS for popover widget")
         pass
 
     try:
@@ -730,6 +738,7 @@ def render_joseph_ask_popover(
         try:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
+            _logger.debug("Failed to load Joseph avatar for popover widget")
             pass
 
         if avatar_b64:

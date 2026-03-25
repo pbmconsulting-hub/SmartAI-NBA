@@ -23,8 +23,11 @@
 #   so the app continues to work without crashing.
 # ============================================================
 
-import os
 import datetime
+import logging
+import os
+
+_logger = logging.getLogger(__name__)
 
 # ============================================================
 # SECTION: Stripe SDK Import
@@ -150,6 +153,7 @@ def create_checkout_session(customer_email: str = "") -> dict:
         }
 
     except Exception as exc:
+        _logger.debug("create_checkout_session failed: %s", exc)
         return {
             "success": False,
             "url": "",
@@ -258,6 +262,7 @@ def verify_checkout_session(session_id: str) -> dict:
                     product = _stripe.Product.retrieve(price["product"])
                     plan_name = product.get("name", "Premium")
             except Exception:
+                _logger.debug("Failed to retrieve plan name from subscription")
                 pass  # Use default plan name
 
         return {
@@ -273,6 +278,7 @@ def verify_checkout_session(session_id: str) -> dict:
         }
 
     except Exception as exc:
+        _logger.debug("verify_checkout_session failed: %s", exc)
         return {
             "success": False,
             "subscription_id": "",
@@ -347,6 +353,7 @@ def get_subscription_by_id(subscription_id: str) -> dict:
         }
 
     except Exception as exc:
+        _logger.debug("get_subscription_status failed: %s", exc)
         return {
             "success": False,
             "status": "",
@@ -458,6 +465,7 @@ def get_subscription_by_email(customer_email: str) -> dict:
         }
 
     except Exception as exc:
+        _logger.debug("get_subscription_details failed: %s", exc)
         return {
             "success": False,
             "subscription_id": "",
@@ -515,6 +523,7 @@ def create_customer_portal_session(customer_id: str) -> dict:
             "error": "",
         }
     except Exception as exc:
+        _logger.debug("create_portal_session failed: %s", exc)
         return {
             "success": False,
             "url": "",
