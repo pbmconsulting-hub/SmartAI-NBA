@@ -11,20 +11,7 @@
 import math        # For rounding and floor
 import statistics  # For stdev in multi-source agreement bonus (3B)
 
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    Last-line-of-defence guard that prevents NaN or ±inf from leaking
-    out of the confidence engine into downstream UI / rendering code.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
+from engine.math_helpers import _safe_float
 
 
 # ============================================================

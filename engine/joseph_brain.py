@@ -21,9 +21,7 @@ The file is importable and every function returns a type-correct result.
 import random
 import math
 import itertools
-import copy
 import logging
-import datetime
 
 # ═══════════════════════════════════════════════════════════════
 # EXTERNAL / SIBLING IMPORTS  (each wrapped in try/except)
@@ -182,8 +180,6 @@ except ImportError:
 
 try:
     from engine.impact_metrics import (
-        calculate_true_shooting_pct,
-        calculate_effective_fg_pct,
         estimate_epm,
         estimate_raptor,
         calculate_player_efficiency_profile,
@@ -197,9 +193,6 @@ except ImportError:
 
 try:
     from engine.lineup_analysis import (
-        estimate_lineup_net_rating,
-        calculate_synergy_score,
-        find_optimal_rotation,
         find_closing_lineup,
         analyze_lineup_combination,
         detect_lineup_weaknesses,
@@ -210,11 +203,7 @@ except ImportError:
 
 try:
     from engine.regime_detection import (
-        detect_regime_change,
-        bayesian_update_probability,
         detect_player_structural_shift,
-        detect_team_regime_change,
-        calculate_adaptive_weight,
         run_bayesian_player_update,
     )
     _REGIME_DETECTION_AVAILABLE = True
@@ -224,11 +213,7 @@ except ImportError:
 try:
     from engine.trade_evaluator import (
         calculate_player_war,
-        evaluate_player_contract_value,
         evaluate_trade,
-        score_roster_fit,
-        project_cap_sheet,
-        build_trade_package,
     )
     _TRADE_EVALUATOR_AVAILABLE = True
 except ImportError:
@@ -236,12 +221,7 @@ except ImportError:
 
 try:
     from engine.draft_prospect import (
-        translate_college_stats,
-        score_physical_profile,
-        find_historical_comparisons,
-        predict_career_outcome,
         build_prospect_scouting_report,
-        rank_draft_class,
     )
     _DRAFT_PROSPECT_AVAILABLE = True
 except ImportError:

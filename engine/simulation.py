@@ -719,7 +719,6 @@ def generate_alt_line_probabilities(simulation_output, base_line):
 # ============================================================
 
 
-import warnings as _warnings
 
 
 def run_monte_carlo_simulation(*args, **kwargs):

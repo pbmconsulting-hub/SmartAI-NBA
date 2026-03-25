@@ -8,7 +8,6 @@
 # ============================================================
 
 # Standard library only
-import math
 
 from engine.math_helpers import calculate_platform_edge_percentage
 

@@ -24,7 +24,6 @@ from tracking.database import (
     update_bet_result,
     load_all_bets,
     get_performance_summary,
-    initialize_database,
 )
 
 # Import shared constants from the engine package
@@ -1613,7 +1612,6 @@ def save_top_picks_from_analysis(analysis_results):
     AUTO_TIERS = {"Platinum", "Gold"}
     MIN_PROBABILITY = 0.60
 
-    import datetime as _dt
     # Anchor to US/Eastern — NBA game dates are defined in ET.
     today_str = _nba_today_et().isoformat()
 

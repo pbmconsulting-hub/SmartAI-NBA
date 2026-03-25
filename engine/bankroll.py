@@ -22,22 +22,9 @@
 import logging
 import math
 
+from engine.math_helpers import _safe_float
+
 _logger = logging.getLogger(__name__)
-
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    Last-line-of-defence guard that prevents NaN or ±inf from leaking
-    out of the bankroll engine into downstream UI / allocation code.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
 
 
 # ============================================================

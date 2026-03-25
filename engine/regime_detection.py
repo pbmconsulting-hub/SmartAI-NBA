@@ -18,22 +18,9 @@ import logging
 import math
 import statistics
 
+from engine.math_helpers import _safe_float
+
 _logger = logging.getLogger(__name__)
-
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    Last-line-of-defence guard that prevents NaN or ±inf from leaking
-    out of the regime detection engine into downstream scoring code.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
 
 
 # ============================================================

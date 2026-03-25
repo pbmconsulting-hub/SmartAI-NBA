@@ -639,7 +639,6 @@ def _calc_expected_value(legs: list, leg_count: int,
             return ev
     except Exception:
         logger.debug("_calc_expected_value primary calculation failed")
-        pass
 
     # Simple EV fallback
     try:

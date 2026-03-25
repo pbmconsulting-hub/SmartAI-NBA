@@ -4,9 +4,7 @@
 # Standard library only — no numpy/scipy/pandas.
 
 import math
-import statistics
 import logging
-from datetime import date
 
 try:
     from engine.simulation import run_quantum_matrix_simulation

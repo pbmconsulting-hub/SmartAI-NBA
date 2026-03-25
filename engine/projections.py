@@ -11,23 +11,9 @@
 # ============================================================
 
 # Standard library only
-import math  # For rounding and calculation helpers
 import logging
 
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    Prevents NaN or ±inf from leaking out of projection calculations
-    into the simulation and UI layers.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
+from engine.math_helpers import _safe_float
 
 try:
     from engine.rotation_tracker import get_minutes_adjustment

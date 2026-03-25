@@ -16,8 +16,9 @@
 #                   rotation patterns
 # ============================================================
 
-import math
 import logging
+
+from engine.math_helpers import _safe_float
 
 try:
     from engine.rotation_tracker import get_trending_minutes
@@ -27,17 +28,6 @@ except ImportError:
     def get_trending_minutes(*args, **kwargs):  # no-op fallback
         return None
     _HAS_ROTATION_TRACKER = False
-
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
 
 
 # ============================================================

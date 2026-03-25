@@ -5,20 +5,7 @@
 import math
 import itertools
 
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    Prevents NaN or ±inf from leaking out of odds/Kelly calculations
-    into the UI layer.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
+from engine.math_helpers import _safe_float
 
 # Minimum combined overround (sum of both sides' implied probabilities)
 # required for devig to produce stable results. Normal two-sided markets

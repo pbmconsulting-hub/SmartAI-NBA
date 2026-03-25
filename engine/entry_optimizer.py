@@ -21,7 +21,7 @@ except ImportError:
     calculate_flex_ev = None  # Graceful fallback: flex EV uses calculate_entry_expected_value
 
 try:
-    from engine.correlation import build_correlation_matrix, adjust_parlay_probability, get_correlation_summary
+    from engine.correlation import build_correlation_matrix, get_correlation_summary
     _CORRELATION_AVAILABLE = True
 except ImportError:
     _CORRELATION_AVAILABLE = False

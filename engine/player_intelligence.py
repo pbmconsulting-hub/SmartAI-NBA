@@ -9,21 +9,11 @@
 from __future__ import annotations
 
 import logging
-import math as _math
 from typing import Any
 
+from engine.math_helpers import _safe_float
+
 logger = logging.getLogger(__name__)
-
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
-    try:
-        v = float(value)
-        if _math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
 
 
 # ─── Streak & Form Constants ──────────────────────────────────

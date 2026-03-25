@@ -39,8 +39,6 @@ except ImportError:
 try:
     from tracking.database import (
         save_player_game_logs_to_db,
-        load_player_game_logs_from_db,
-        is_game_log_cache_stale,
     )
     _DB_GAME_LOG_AVAILABLE = True
 except ImportError:
@@ -1357,7 +1355,6 @@ def fetch_player_stats(progress_callback=None):
     try:
         from nba_api.stats.endpoints import leaguedashplayerstats
         from nba_api.stats.endpoints import playergamelog
-        from nba_api.stats.static import players as nba_players_static
     except ImportError:
         _logger.error("ERROR: nba_api is not installed. Run: pip install nba_api")
         return False

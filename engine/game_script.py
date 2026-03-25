@@ -21,16 +21,7 @@
 import math
 import random
 
-
-def _safe_float(value, fallback=0.0):
-    """Return *value* as a finite float, or *fallback* if NaN/inf/non-numeric."""
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
+from engine.math_helpers import _safe_float
 
 
 # ============================================================

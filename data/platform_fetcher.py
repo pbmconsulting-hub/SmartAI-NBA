@@ -58,11 +58,6 @@ except ImportError:
 from data.platform_mappings import normalize_stat_type
 
 # Import odds math from the single source of truth — engine/odds_engine.py
-from engine.odds_engine import (
-    american_odds_to_implied_probability,
-    implied_probability_to_american_odds,
-    calculate_breakeven_probability,
-)
 
 try:
     from utils.logger import get_logger
