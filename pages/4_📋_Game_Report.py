@@ -790,8 +790,8 @@ with _tab_report:
     # ════ JOSEPH COMMENTS ON GAME REPORT ════
     if analysis_results and st.session_state.get("joseph_enabled", True):
         try:
-            from utils.joseph_widget import render_joseph_inline_commentary
-            render_joseph_inline_commentary(analysis_results[:10], "analysis_results")
+            from utils.joseph_widget import inject_joseph_inline_commentary
+            inject_joseph_inline_commentary(analysis_results[:10], "analysis_results")
         except Exception:
             pass
     # ════ END JOSEPH GAME REPORT COMMENT ════

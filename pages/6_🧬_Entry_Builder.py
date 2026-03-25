@@ -697,7 +697,7 @@ if build_button:
         # ════ JOSEPH REACTS TO ENTRY ════
         if st.session_state.get("joseph_enabled", True):
             try:
-                from utils.joseph_widget import render_joseph_inline_commentary
+                from utils.joseph_widget import inject_joseph_inline_commentary
                 st.session_state["joseph_entry_just_built"] = True
                 _entry_results = [{"player_name": leg.get("player_name",""), "stat_type": leg.get("stat_type",""),
                                    "line": leg.get("line",0), "direction": leg.get("direction",""),
@@ -705,7 +705,7 @@ if build_button:
                                   for entry in (optimal_entries[:3] if 'optimal_entries' in dir() else [])
                                   for leg in entry.get("legs", [])]
                 if _entry_results:
-                    render_joseph_inline_commentary(_entry_results, "entry_built")
+                    inject_joseph_inline_commentary(_entry_results, "entry_built")
             except Exception:
                 pass
         # ════ END JOSEPH ENTRY REACTION ════

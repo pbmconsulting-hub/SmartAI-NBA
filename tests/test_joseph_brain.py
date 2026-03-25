@@ -359,12 +359,14 @@ class TestImportFallbacks(unittest.TestCase):
             determine_verdict, build_rant,
             joseph_analyze_pick, joseph_rank_picks,
             joseph_evaluate_parlay, joseph_generate_full_slate_analysis,
+            joseph_generate_independent_picks,
             joseph_commentary_for_stat, joseph_blowout_warning,
             reset_fragment_state,
         )
         self.assertTrue(callable(_pick_fragment))
         self.assertTrue(callable(determine_verdict))
         self.assertTrue(callable(joseph_analyze_pick))
+        self.assertTrue(callable(joseph_generate_independent_picks))
         self.assertTrue(callable(reset_fragment_state))
 
     def test_blowout_constants_importable(self):
@@ -1131,6 +1133,247 @@ class TestNewExportsImportable(unittest.TestCase):
         self.assertTrue(callable(joseph_ambient_line))
         self.assertTrue(callable(joseph_commentary))
         self.assertTrue(callable(joseph_auto_log_bets))
+
+
+# ── Independent Pick Generation Tests ──────────────────────
+
+
+class TestJosephGenerateIndependentPicks(unittest.TestCase):
+    """Tests for joseph_generate_independent_picks."""
+
+    def _import(self):
+        from engine.joseph_brain import joseph_generate_independent_picks
+        return joseph_generate_independent_picks
+
+    def test_importable(self):
+        fn = self._import()
+        self.assertTrue(callable(fn))
+
+    def test_empty_props_returns_empty(self):
+        fn = self._import()
+        self.assertEqual(fn([], {}, [], {}), [])
+
+    def test_none_props_returns_empty(self):
+        fn = self._import()
+        self.assertEqual(fn(None, {}, [], {}), [])
+
+    def test_basic_pick_generation(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL", "platform": "PrizePicks"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), 1)
+
+    def test_result_has_dawg_factor(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL", "platform": "PrizePicks"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertIn("dawg_factor", results[0])
+        self.assertIsInstance(results[0]["dawg_factor"], (int, float))
+
+    def test_result_has_narrative_tags(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL", "platform": "PrizePicks"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertIn("narrative_tags", results[0])
+        self.assertIsInstance(results[0]["narrative_tags"], list)
+
+    def test_result_has_verdict(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL", "platform": "PrizePicks"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertIn("verdict", results[0])
+        self.assertIn(results[0]["verdict"], ("SMASH", "LEAN", "FADE", "STAY_AWAY"))
+
+    def test_result_has_player_and_prop(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL", "platform": "PrizePicks"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertEqual(results[0]["player"], "TestPlayer")
+        self.assertEqual(results[0]["prop"], "points")
+        self.assertEqual(results[0]["line"], 20.0)
+        self.assertEqual(results[0]["team"], "LAL")
+
+    def test_skips_zero_line(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 0, "team": "LAL"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0}}
+        results = fn(props, players, [], {})
+        self.assertEqual(len(results), 0)
+
+    def test_skips_zero_avg(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 0.0}}
+        results = fn(props, players, [], {})
+        self.assertEqual(len(results), 0)
+
+    def test_max_picks_cap(self):
+        fn = self._import()
+        props = [
+            {"player_name": f"Player{i}", "stat_type": "points",
+             "line": 20.0, "team": "LAL"}
+            for i in range(50)
+        ]
+        players = {
+            f"player{i}": {"name": f"Player{i}", "points_avg": 25.0,
+                           "team": "LAL", "games_played": 40}
+            for i in range(50)
+        }
+        results = fn(props, players, [], {}, max_picks=5)
+        self.assertLessEqual(len(results), 5)
+
+    def test_combo_stat_support(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "pts+rebs",
+             "line": 30.0, "team": "LAL"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "rebounds_avg": 8.0, "team": "LAL",
+                                  "games_played": 40}}
+        results = fn(props, players, [], {})
+        self.assertEqual(len(results), 1)
+
+    def test_game_data_matched(self):
+        fn = self._import()
+        props = [
+            {"player_name": "TestPlayer", "stat_type": "points",
+             "line": 20.0, "team": "LAL"},
+        ]
+        players = {"testplayer": {"name": "TestPlayer", "points_avg": 25.0,
+                                  "team": "LAL", "games_played": 40}}
+        games = [{"home_team": "LAL", "away_team": "GSW", "total": 224.5}]
+        results = fn(props, players, games, {})
+        self.assertEqual(len(results), 1)
+
+
+class TestJosephRankPicksImplementation(unittest.TestCase):
+    """Tests for the implemented joseph_rank_picks."""
+
+    def _import(self):
+        from engine.joseph_brain import joseph_rank_picks
+        return joseph_rank_picks
+
+    def test_empty_returns_empty(self):
+        fn = self._import()
+        self.assertEqual(fn([]), [])
+
+    def test_ranks_by_edge(self):
+        fn = self._import()
+        picks = [
+            {"edge": 5.0, "verdict": "LEAN", "dawg_factor": 0, "confidence": 60},
+            {"edge": 10.0, "verdict": "SMASH", "dawg_factor": 0, "confidence": 70},
+        ]
+        ranked = fn(picks)
+        self.assertEqual(len(ranked), 2)
+        self.assertEqual(ranked[0]["rank"], 1)
+        self.assertEqual(ranked[1]["rank"], 2)
+        self.assertGreater(ranked[0]["_rank_score"], ranked[1]["_rank_score"])
+
+    def test_dawg_factor_boosts_rank(self):
+        fn = self._import()
+        picks = [
+            {"edge": 5.0, "verdict": "LEAN", "dawg_factor": 5.0, "confidence": 60},
+            {"edge": 5.0, "verdict": "LEAN", "dawg_factor": 0.0, "confidence": 60},
+        ]
+        ranked = fn(picks)
+        self.assertEqual(ranked[0]["rank"], 1)
+        self.assertGreater(ranked[0]["_rank_score"], ranked[1]["_rank_score"])
+
+    def test_smash_verdict_boosts(self):
+        fn = self._import()
+        picks = [
+            {"edge": 5.0, "verdict": "SMASH", "dawg_factor": 0, "confidence": 60},
+            {"edge": 5.0, "verdict": "FADE", "dawg_factor": 0, "confidence": 60},
+        ]
+        ranked = fn(picks)
+        self.assertEqual(ranked[0]["verdict"], "SMASH")
+
+    def test_preserves_original_keys(self):
+        fn = self._import()
+        picks = [{"edge": 5.0, "verdict": "LEAN", "player": "TestPlayer",
+                  "dawg_factor": 0, "confidence": 50}]
+        ranked = fn(picks)
+        self.assertEqual(ranked[0]["player"], "TestPlayer")
+
+
+class TestJosephFullSlateImplementation(unittest.TestCase):
+    """Tests for the implemented joseph_generate_full_slate_analysis."""
+
+    def _import(self):
+        from engine.joseph_brain import joseph_generate_full_slate_analysis
+        return joseph_generate_full_slate_analysis
+
+    def test_empty_returns_structure(self):
+        fn = self._import()
+        result = fn([], [], {})
+        self.assertIsInstance(result, dict)
+        for key in ("picks", "parlays", "top_plays", "summary_rant"):
+            self.assertIn(key, result)
+        self.assertEqual(len(result["picks"]), 0)
+
+    def test_with_data_returns_picks(self):
+        fn = self._import()
+        players = [{"name": "TestPlayer", "points_avg": 25.0,
+                     "team": "LAL", "games_played": 40}]
+        props = [{"player_name": "TestPlayer", "stat_type": "points",
+                  "line": 20.0, "team": "LAL"}]
+        result = fn(players, props, {})
+        self.assertIsInstance(result["picks"], list)
+        self.assertGreater(len(result["picks"]), 0)
+        self.assertIn("rank", result["picks"][0])
+
+    def test_summary_rant_nonempty(self):
+        fn = self._import()
+        players = [{"name": "TestPlayer", "points_avg": 25.0,
+                     "team": "LAL", "games_played": 40}]
+        props = [{"player_name": "TestPlayer", "stat_type": "points",
+                  "line": 20.0, "team": "LAL"}]
+        result = fn(players, props, {})
+        self.assertIsInstance(result["summary_rant"], str)
+        self.assertGreater(len(result["summary_rant"]), 0)
+
+    def test_top_plays_are_smash_or_lean(self):
+        fn = self._import()
+        players = [{"name": "TestPlayer", "points_avg": 25.0,
+                     "team": "LAL", "games_played": 40}]
+        props = [{"player_name": "TestPlayer", "stat_type": "points",
+                  "line": 20.0, "team": "LAL"}]
+        result = fn(players, props, {})
+        for tp in result["top_plays"]:
+            self.assertIn(tp.get("verdict", "").upper(), ("SMASH", "LEAN"))
 
 
 if __name__ == "__main__":
