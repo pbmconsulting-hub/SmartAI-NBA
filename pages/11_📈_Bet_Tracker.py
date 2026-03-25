@@ -453,10 +453,9 @@ with tab_model_health:
         bet_type_perf = performance_stats.get("by_bet_type", {})
         if bet_type_perf:
             with st.expander("Win Rate by Bet Classification", expanded=True):
-                _bt_emoji_map = {"50_50": "⚖️ 50/50", "normal": "Normal"}
                 bt_rows = [
                     {
-                        "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
+                        "Bet Type":  bt.title(),
                         "Total":     d.get("total", 0),
                         "Wins":      d.get("wins", 0),
                         "Losses":    d.get("losses", 0),
@@ -471,64 +470,6 @@ with tab_model_health:
                     ),
                     unsafe_allow_html=True,
                 )
-                # Highlight the key insight
-                _fifty_data  = bet_type_perf.get("50_50", {})
-                if _fifty_data.get("total", 0) > 0:
-                    _f_total = _fifty_data.get("total", 1)
-                    _f_wins  = _fifty_data.get("wins", 0)
-                    _f_wr    = round(_f_wins / max(_f_total, 1) * 100, 1)
-                    st.metric(
-                        "⚖️ 50/50 Win Rate",
-                        f"{_f_wr:.1f}%",
-                        help=f"Based on {_f_total} logged 50/50 bets (standard line picks)",
-                    )
-
-            # ── Individual Uncertain Pick Results (50/50 + risk flags) ──
-            _uncertain_resolved = [
-                b for b in filtered_health
-                if b.get("bet_type", "") == "50_50"
-                and b.get("result") in ("WIN", "LOSS", "PUSH")
-            ]
-            if _uncertain_resolved:
-                _uc_wins   = sum(1 for b in _uncertain_resolved if b.get("result") == "WIN")
-                _uc_losses = sum(1 for b in _uncertain_resolved if b.get("result") == "LOSS")
-                _uc_pushes = sum(1 for b in _uncertain_resolved if b.get("result") == "PUSH")
-                _uc_total  = len(_uncertain_resolved)
-                with st.expander(
-                    f"⚖️ 50/50 Picks — {_uc_wins}W / {_uc_losses}L / {_uc_pushes}P  "
-                    f"({round(_uc_wins/_uc_total*100,1) if _uc_total else 0:.1f}% win rate)",
-                    expanded=False,
-                ):
-                    st.caption(
-                        "**50/50 picks** are the standard O/U line. "
-                        "Picks flagged as uncertain had conflicting forces, high variance, "
-                        "fatigue risk, or hot-streak regression risk."
-                    )
-                    # Uncertain subtype breakdown from notes/reasons
-                    _type_counts = {"Conflict": 0, "Variance": 0, "Fatigue": 0, "Regression": 0, "Other": 0}
-                    for _uc in _uncertain_resolved:
-                        _notes = (_uc.get("notes") or "").lower()
-                        if "conflict" in _notes:
-                            _type_counts["Conflict"] += 1
-                        elif "variance" in _notes or "high-variance" in _notes:
-                            _type_counts["Variance"] += 1
-                        elif "fatigue" in _notes or "back-to-back" in _notes or "blowout" in _notes:
-                            _type_counts["Fatigue"] += 1
-                        elif "regression" in _notes or "hot streak" in _notes or "inflated" in _notes:
-                            _type_counts["Regression"] += 1
-                        else:
-                            _type_counts["Other"] += 1
-                    _active_types = {k: v for k, v in _type_counts.items() if v > 0}
-                    if _active_types:
-                        _tc_cols = st.columns(len(_active_types))
-                        for _tci, (_tname, _tcnt) in enumerate(_active_types.items()):
-                            _tc_cols[_tci].metric(f"{_tname}", str(_tcnt), help=f"Uncertain picks triggered by {_tname} pattern")
-                    st.divider()
-                    _ucc_a, _ucc_b = st.columns(2)
-                    for _uci, _uc in enumerate(_uncertain_resolved):
-                        _ucc = _ucc_a if _uci % 2 == 0 else _ucc_b
-                        with _ucc:
-                            st.markdown(get_bet_card_html(_uc), unsafe_allow_html=True)
 
         # Feature 1: Enhanced tier accuracy report
         try:
@@ -651,7 +592,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["50/50 — Standard Line", "⚡ Normal"],
+            ["Standard"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -660,12 +601,7 @@ with tab_ai_picks:
         _ai_tier_names = [t.split(" ")[0] for t in _ai_tier_filter]
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
-        _ai_bt_map = {
-            "50/50 — Standard Line":  "50_50",
-            "⚡ Normal":              "normal",
-        }
-        _ai_bt_values = {_ai_bt_map[t] for t in _ai_bet_type_filter if t in _ai_bt_map}
-        ai_bets = [b for b in ai_bets if b.get("bet_type", "normal") in _ai_bt_values]
+        ai_bets = [b for b in ai_bets if b.get("bet_type", "standard") == "standard"]
 
     if not ai_bets:
         st.info(
@@ -959,7 +895,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["50/50 — Standard Line", "⚡ Normal"],
+            ["Standard"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -971,12 +907,7 @@ with tab_all_picks:
         _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
-        _ap_bt_map = {
-            "50/50 — Standard Line":  "50_50",
-            "⚡ Normal":              "normal",
-        }
-        _ap_bt_values = {_ap_bt_map[t] for t in _ap_bet_type_filter if t in _ap_bt_map}
-        all_picks_data = [p for p in all_picks_data if p.get("bet_type", "normal") in _ap_bt_values]
+        all_picks_data = [p for p in all_picks_data if p.get("bet_type", "standard") == "standard"]
 
     if not all_picks_data:
         st.info(
@@ -1168,12 +1099,8 @@ with tab_all_picks:
 
         # ── Win Rate by Bet Classification ────────────────────────────
         _ap_bt_data: dict = {}
-        _ap_bt_display_map = {
-            "50_50": "⚖️ 50/50",
-            "normal": "Normal",
-        }
         for _p in all_picks_data:
-            _bt = str(_p.get("bet_type") or "normal")
+            _bt = str(_p.get("bet_type") or "standard")
             _res = _p.get("result")
             if _bt not in _ap_bt_data:
                 _ap_bt_data[_bt] = {"wins": 0, "losses": 0, "total": 0}
@@ -1186,7 +1113,7 @@ with tab_all_picks:
             with st.expander("Win Rate by Bet Classification", expanded=True):
                 _bt_rows = [
                     {
-                        "Bet Type": _ap_bt_display_map.get(_bt, _bt.title()),
+                        "Bet Type": _bt.title(),
                         "Total": d["total"],
                         "Wins": d["wins"],
                         "Losses": d["losses"],
@@ -1204,16 +1131,6 @@ with tab_all_picks:
                     ),
                     unsafe_allow_html=True,
                 )
-                _fifty_d  = _ap_bt_data.get("50_50", {})
-                if _fifty_d.get("total", 0) > 0:
-                    _f_wr = round(
-                        _fifty_d["wins"] / max(_fifty_d["wins"] + _fifty_d["losses"], 1) * 100, 1
-                    )
-                    st.metric(
-                        "⚖️ 50/50 Win Rate",
-                        f"{_f_wr:.1f}%",
-                        help=f"Based on {_fifty_d['total']} logged 50/50 bets (standard O/U line)",
-                    )
 
         # ── Model Tier Accuracy placeholder ──────────────────────────
         with st.expander("📊 Model Tier Accuracy", expanded=False):
@@ -1533,7 +1450,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["50/50 — Standard Line", "⚡ Normal"],
+            ["Standard"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1552,12 +1469,7 @@ with tab_bets:
 
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
-            _bets_bt_map = {
-                "50/50 — Standard Line":  "50_50",
-                "⚡ Normal":              "normal",
-            }
-            _bets_bt_values = {_bets_bt_map[t] for t in _bets_bet_type_filter if t in _bets_bt_map}
-            filtered_bets = [b for b in filtered_bets if b.get("bet_type", "normal") in _bets_bt_values]
+            filtered_bets = [b for b in filtered_bets if b.get("bet_type", "standard") == "standard"]
 
         # ── Summary Cards ─────────────────────────────────────────────
         _res_bets = [b for b in all_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]

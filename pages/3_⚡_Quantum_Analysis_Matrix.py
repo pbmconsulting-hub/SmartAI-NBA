@@ -30,7 +30,6 @@ from engine.simulation import (
     simulate_double_double,
     simulate_triple_double,
     generate_alt_line_probabilities,
-    format_alt_line_prediction,
 )
 from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
@@ -1510,21 +1509,8 @@ if run_analysis:
                     _season_avg_for_classify = float(player_data.get(f"{stat_type}_avg", 0) or 0) or None
                     # Determine the source of the prop line so the classifier can
                     # validate whether it is a real platform line or a synthetic one.
-                    # Props with no platform or marked as estimated are treated as
-                    # synthetic to prevent garbage-in/garbage-out classification.
                     _line_source = prop.get("platform") or prop.get("line_source") or "synthetic"
-                    # Extract line-position category from the ingestion layer
-                    _line_category = prop.get("line_category", None)
                     _standard_line = prop.get("standard_line", None)
-                    # Pull user-configured thresholds from session state (set on Settings page)
-                    _ss = st.session_state
-                    # Goblin/Demon thresholds removed from UI; pass None so
-                    # classify_bet_type() uses its module-level defaults.
-                    _g_std  = None
-                    _g_prob = None
-                    _g_edge = None
-                    _d_conf = None
-                    _d_regr = None
                     _bet_classification = classify_bet_type(
                         probability_over=probability_over,
                         edge_percentage=edge_pct,
@@ -1538,47 +1524,32 @@ if run_analysis:
                         recent_form_ratio=projection_result.get("recent_form_ratio"),
                         season_average=_season_avg_for_classify,
                         line_source=_line_source,
-                        goblin_min_std_devs=_g_std,
-                        goblin_min_probability=_g_prob,
-                        goblin_min_edge=_g_edge,
-                        demon_conflict_ratio=_d_conf,
-                        demon_regression_pct=_d_regr,
-                        line_category=_line_category,
-                        sim_percentile_10=simulation_output.get("percentile_10"),
-                        sim_percentile_90=simulation_output.get("percentile_90"),
                     )
-                    full_result["bet_type"]        = _bet_classification.get("bet_type", "normal")
+                    full_result["bet_type"]        = _bet_classification.get("bet_type", "standard")
                     full_result["bet_type_emoji"]  = _bet_classification.get("bet_type_emoji", "")
-                    full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Normal Bet")
+                    full_result["bet_type_label"]  = _bet_classification.get("bet_type_label", "Standard Bet")
                     full_result["bet_type_reasons"]= _bet_classification.get("reasons", [])
                     full_result["std_devs_from_line"] = _bet_classification.get("std_devs_from_line", 0.0)
                     full_result["line_verified"]   = _bet_classification.get("line_verified", True)
                     full_result["line_reliability_warning"] = _bet_classification.get("line_reliability_warning")
-                    full_result["line_category"]   = _line_category
                     full_result["standard_line"]   = _standard_line
                     full_result["risk_flags"]      = _bet_classification.get("risk_flags", [])
                     full_result["is_uncertain"]    = _bet_classification.get("is_uncertain", False)
-                    # Kept as None — downstream renderers expect these keys.
-                    full_result["goblin_floor"]    = None
-                    full_result["demon_ceiling"]   = None
                     # Risk flags (conflicting forces, high-variance stat, etc.) are
                     # informational — they appear on the card UI as warnings but do NOT
                     # block the pick from being displayed or auto-logged.  The genuine
                     # should_avoid decision comes from should_avoid_prop() only.
                 except Exception:
-                    full_result["bet_type"]         = "normal"
+                    full_result["bet_type"]         = "standard"
                     full_result["bet_type_emoji"]   = ""
-                    full_result["bet_type_label"]   = "Normal Bet"
+                    full_result["bet_type_label"]   = "Standard Bet"
                     full_result["bet_type_reasons"] = []
                     full_result["std_devs_from_line"] = 0.0
                     full_result["line_verified"]    = True
                     full_result["line_reliability_warning"] = None
-                    full_result["line_category"]    = None
                     full_result["standard_line"]    = None
                     full_result["risk_flags"]       = []
                     full_result["is_uncertain"]     = False
-                    full_result["goblin_floor"]     = None
-                    full_result["demon_ceiling"]    = None
 
                 # ── Capture odds from the original prop (for display) ────────
                 full_result["over_odds"]  = prop.get("over_odds",  -110)

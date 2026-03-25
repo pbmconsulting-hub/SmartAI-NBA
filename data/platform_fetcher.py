@@ -137,6 +137,18 @@ _BASE_HEADERS = {
 # PrizePicks public projections endpoint (no API key required)
 PRIZEPICKS_URL = "https://api.prizepicks.com/projections"
 
+# PrizePicks data mirror (https://github.com/enkday/prizepicks-data-mirror)
+# Published as raw JSON on GitHub — no rate limiting or API key required.
+# Includes today's and tomorrow's NBA props with goblin/demon/standard oddsType.
+PRIZEPICKS_MIRROR_TODAY_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/prizepicks-nba-today.json"
+)
+PRIZEPICKS_MIRROR_TOMORROW_URL = (
+    "https://raw.githubusercontent.com/enkday/prizepicks-data-mirror"
+    "/main/data/prizepicks-nba-tomorrow.json"
+)
+
 # Underdog Fantasy public over/under lines endpoint (no API key required)
 UNDERDOG_URL = "https://api.underdogfantasy.com/beta/v3/over_under_lines"
 
@@ -273,6 +285,129 @@ def _now_str():
 
 
 # ============================================================
+# SECTION: PrizePicks Data Mirror Fetcher
+# ============================================================
+
+def _parse_prizepicks_mirror_props(data, today, fetched_at):
+    """
+    Parse the flat-array format from the enkday/prizepicks-data-mirror.
+
+    The mirror publishes a simpler structure than the PrizePicks live API:
+    ``{"props": [{"player": "...", "stat": "...", "line": 20.5,
+                  "oddsType": "standard"|"goblin"|"demon",
+                  "teamCode": "LAL", "startDateCST": "2026-03-24", ...}, ...]}``
+
+    PrizePicks goblin/demon line types:
+      - "goblin"   : lower line (easier to hit, favorable to bettors)
+      - "demon"    : higher line (harder to hit, unfavorable to bettors)
+      - "standard" : the main board line
+
+    Args:
+        data (dict): Parsed JSON from the mirror endpoint.
+        today (str): Today's date string ("YYYY-MM-DD"), used as fallback.
+        fetched_at (str): ISO timestamp for when the data was fetched.
+
+    Returns:
+        list[dict]: Props in the standard internal format (see module header).
+    """
+    props = []
+    for item in data.get("props", []):
+        player_name = item.get("player", "").strip()
+        if not player_name:
+            continue
+
+        raw_stat = item.get("stat", "")
+        stat_type = normalize_stat_type(raw_stat, "PrizePicks")
+
+        try:
+            true_line = float(item.get("line", 0))
+        except (ValueError, TypeError):
+            continue
+        if true_line <= 0:
+            continue
+
+        team = item.get("teamCode", item.get("Team", "")).strip().upper()
+        game_date = item.get("startDateCST", today)
+
+        # oddsType identifies goblin / demon / standard lines
+        odds_type = str(item.get("oddsType", "standard")).lower()
+
+        props.append({
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": true_line,
+            "platform": "PrizePicks",
+            "game_date": game_date,
+            "fetched_at": fetched_at,
+            "over_odds": _DEFAULT_AMERICAN_ODDS,
+            "under_odds": _DEFAULT_AMERICAN_ODDS,
+            "odds_type": odds_type,
+        })
+    return props
+
+
+def fetch_prizepicks_props_from_mirror(include_tomorrow=False):
+    """
+    Fetch NBA props from the enkday/prizepicks-data-mirror GitHub repository.
+
+    The mirror publishes today's (and optionally tomorrow's) PrizePicks NBA
+    props as raw JSON hosted on GitHub.  It includes goblin and demon line
+    variants alongside standard lines.  Because it is served via GitHub's
+    CDN, it is highly available and never rate-limited.
+
+    Args:
+        include_tomorrow (bool): Also fetch tomorrow's props. Default False.
+
+    Returns:
+        list[dict]: Props in the standard format (see module header), or []
+                    if the mirror is unavailable.
+    """
+    if not REQUESTS_AVAILABLE:
+        return []
+
+    today = _today_str()
+    fetched_at = _now_str()
+    all_props = []
+
+    urls = [PRIZEPICKS_MIRROR_TODAY_URL]
+    if include_tomorrow:
+        urls.append(PRIZEPICKS_MIRROR_TOMORROW_URL)
+
+    for url in urls:
+        cached = _cache_get(url)
+        if cached is not None:
+            data = cached
+        else:
+            response = _fetch_with_retry(url, headers=_BASE_HEADERS)
+            if response is None:
+                _logger.warning(f"[PrizePicks Mirror] Could not fetch {url}.")
+                continue
+            try:
+                response.raise_for_status()
+                data = response.json()
+                _cache_set(url, data)
+            except Exception as err:
+                _logger.warning(f"[PrizePicks Mirror] Error reading {url}: {err}")
+                continue
+
+        parsed = _parse_prizepicks_mirror_props(data, today, fetched_at)
+        all_props.extend(parsed)
+        _logger.info(
+            f"[PrizePicks Mirror] {url.split('/')[-1]}: {len(parsed)} props "
+            f"({sum(1 for p in parsed if p.get('odds_type') == 'goblin')} goblin, "
+            f"{sum(1 for p in parsed if p.get('odds_type') == 'demon')} demon)."
+        )
+
+    return all_props
+
+
+# ============================================================
+# END SECTION: PrizePicks Data Mirror Fetcher
+# ============================================================
+
+
+# ============================================================
 # SECTION: PrizePicks Fetcher
 # ============================================================
 
@@ -280,30 +415,43 @@ def fetch_prizepicks_props(league="NBA"):
     """
     Fetch live player prop lines from PrizePicks.
 
-    Uses PrizePicks' public JSON API — no API key required.
-    Filters to NBA only and normalizes stat types to our internal keys.
+    Tries the enkday/prizepicks-data-mirror (GitHub CDN, no rate-limiting)
+    first.  Falls back to the PrizePicks live API if the mirror is
+    unavailable or returns no data.  Both sources populate the ``odds_type``
+    field so callers can distinguish goblin / demon / standard lines.
 
     Args:
         league (str): Sport league filter. Default "NBA".
 
     Returns:
         list[dict]: List of prop dicts (see module header for format).
+                    Includes ``odds_type`` key: "goblin", "demon", or "standard".
                     Returns [] on any error.
 
     Example:
         props = fetch_prizepicks_props()
         # → [{"player_name": "LeBron James", "stat_type": "points",
-        #      "line": 24.5, "platform": "PrizePicks", ...}, ...]
+        #      "line": 24.5, "odds_type": "standard",
+        #      "platform": "PrizePicks", ...}, ...]
     """
     if not REQUESTS_AVAILABLE:
         _logger.warning("Warning: 'requests' library not installed. Cannot fetch PrizePicks props.")
         return []
 
+    # ── 1. Try the data mirror first ─────────────────────────────────────────
+    # The mirror is a GitHub-hosted JSON file that is updated periodically.
+    # It is more reliable (CDN, no rate limits) and includes goblin/demon lines.
+    mirror_props = fetch_prizepicks_props_from_mirror()
+    if mirror_props:
+        _logger.info(f"[PrizePicks] Using mirror data: {len(mirror_props)} props.")
+        return mirror_props
+
+    # ── 2. Fall back to the PrizePicks live API ──────────────────────────────
+    _logger.info(f"[PrizePicks] Mirror unavailable — fetching from live API {PRIZEPICKS_URL} ...")
+
     # PrizePicks requires Referer header in addition to the base headers
     headers = dict(_BASE_HEADERS)
     headers["Referer"] = "https://app.prizepicks.com/"
-
-    _logger.info(f"[PrizePicks] Fetching NBA props from {PRIZEPICKS_URL} ...")
 
     _cached = _cache_get(PRIZEPICKS_URL)
     if _cached is not None:
@@ -407,6 +555,10 @@ def fetch_prizepicks_props(league="NBA"):
         if true_line <= 0:
             continue  # Skip invalid lines
 
+        # Capture the PrizePicks odds_type: "standard", "goblin", or "demon"
+        # Goblin = lower/easier line; Demon = higher/harder line.
+        odds_type = str(attrs.get("odds_type", "standard")).lower()
+
         props.append({
             "player_name": player_name,
             "team": team,
@@ -417,9 +569,10 @@ def fetch_prizepicks_props(league="NBA"):
             "fetched_at": fetched_at,
             "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
             "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
+            "odds_type": odds_type,
         })
 
-    _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props.")
+    _logger.info(f"[PrizePicks] Fetched {len(props)} NBA props from live API.")
     return props
 
 # ============================================================
@@ -632,8 +785,8 @@ def fetch_draftkings_props(api_key=None):
         events = events_resp.json()
 
     except requests.exceptions.HTTPError as err:
-        # HTTPError is raised by raise_for_status() — events_resp is guaranteed to exist
-        status_code = events_resp.status_code
+        # err.response is the Response object that raise_for_status() raised from
+        status_code = err.response.status_code if err.response is not None else 0
         if status_code == 429:
             _logger.warning("[DraftKings] Rate limited (429). Backing off.")
             if _RATE_LIMITER_AVAILABLE and _platform_rate_limiter is not None:
@@ -730,8 +883,8 @@ def fetch_draftkings_props(api_key=None):
                 _cache_set(props_url, event_data)
 
             except requests.exceptions.HTTPError as err:
-                # HTTPError is raised by raise_for_status() — props_resp is guaranteed to exist
-                if props_resp.status_code == 422:
+                # err.response is the Response object that raise_for_status() raised from
+                if err.response is not None and err.response.status_code == 422:
                     _logger.warning("[DraftKings] API quota exceeded. Stopping early.")
                     break
                 _logger.error(f"[DraftKings] HTTP error for event {event_id}: {err}. Skipping.")
@@ -929,8 +1082,8 @@ def fetch_all_platform_props(
     # downstream in the analysis loop so that the engine processes as
     # many raw props as necessary until the target is reached.
 
-    # ── Enrich with alt-line categories ──────────────────────────
-    # Stamp each prop with line_category ("standard") and standard_line.
+    # ── Enrich with standard_line ─────────────────────────────────
+    # Stamp each prop with the standard_line (median line for its group).
     all_props = parse_alt_lines_from_platform_props(all_props)
 
     _logger.info(f"[Master] Total props fetched: {len(all_props)}")
@@ -995,7 +1148,25 @@ async def _async_fetch_json(session, url, headers=None, params=None):
 
 
 async def _async_fetch_prizepicks(session, semaphore):
-    """Fetch PrizePicks props asynchronously."""
+    """Fetch PrizePicks props asynchronously.
+
+    Mirrors the sync ``fetch_prizepicks_props()`` strategy:
+    1. Try the enkday/prizepicks-data-mirror (GitHub CDN, includes goblin/demon).
+    2. Fall back to the PrizePicks live API if the mirror returns nothing.
+
+    Both paths populate the ``odds_type`` field on every returned prop.
+    The mirror fetch runs in a thread executor so the sync ``requests``
+    call does not block the event loop.
+    """
+    # ── 1. Try mirror first (run sync requests call off the event loop) ──────
+    mirror_props = await asyncio.get_event_loop().run_in_executor(
+        None, fetch_prizepicks_props_from_mirror
+    )
+    if mirror_props:
+        _logger.info(f"[Async-PrizePicks] Using mirror data: {len(mirror_props)} props.")
+        return mirror_props
+
+    # ── 2. Fall back to the PrizePicks live API via aiohttp ──────────────────
     async with semaphore:
         headers = dict(_BASE_HEADERS)
         headers["Referer"] = "https://app.prizepicks.com/"
@@ -1049,6 +1220,8 @@ async def _async_fetch_prizepicks(session, semaphore):
                 continue  # KILL SWITCH: invalid line → discard
             if true_line <= 0:
                 continue  # KILL SWITCH: non-positive line → discard
+            # Capture the PrizePicks odds_type: "standard", "goblin", or "demon"
+            odds_type = str(attrs.get("odds_type", "standard")).lower()
             props.append({
                 "player_name": player_name, "team": team,
                 "stat_type": stat_type, "line": true_line,
@@ -1056,8 +1229,9 @@ async def _async_fetch_prizepicks(session, semaphore):
                 "fetched_at": fetched_at,
                 "over_odds": attrs.get("price", attrs.get("over_price", _DEFAULT_AMERICAN_ODDS)),
                 "under_odds": attrs.get("under_price", _DEFAULT_AMERICAN_ODDS),
+                "odds_type": odds_type,
             })
-        _logger.info(f"[Async-PrizePicks] Fetched {len(props)} NBA props.")
+        _logger.info(f"[Async-PrizePicks] Fetched {len(props)} NBA props from live API.")
         return props
 
 
@@ -1231,7 +1405,8 @@ async def fetch_all_platforms_async(
     using aiohttp and asyncio.
 
     Uses a Semaphore(5) to prevent IP rate-limiting while maintaining
-    maximum speed. Enforces a hard cap of 500 props.
+    maximum speed. PrizePicks data comes from the enkday data mirror
+    (includes goblin/demon lines) with live API as fallback.
 
     Args:
         include_prizepicks (bool): Fetch from PrizePicks. Default True.
@@ -1240,7 +1415,7 @@ async def fetch_all_platforms_async(
         odds_api_key (str, optional): The Odds API key for DraftKings.
 
     Returns:
-        list[dict]: All fetched props, capped at 500.
+        list[dict]: All fetched props from enabled platforms.
     """
     if not AIOHTTP_AVAILABLE:
         _logger.warning(
@@ -2145,21 +2320,13 @@ def smart_filter_props(
 
 def parse_alt_lines_from_platform_props(props):
     """
-    Parse a flat list of platform props and enrich each record with its
-    alternate-line category relative to the standard (primary) O/U line.
+    Parse a flat list of platform props and enrich each record with the
+    standard (primary) O/U line for its (player, stat, platform) group.
 
-    Sportsbooks offer a primary "Standard_Line" O/U for each player prop,
-    plus a set of alternate lines at different thresholds.  When the same
-    (player_name, stat_type, platform) combination appears more than once
-    in the props list, the MEDIAN of all available lines is treated as the
-    standard line and the remaining lines are classified as:
-
-        ``'50_50'``    — this entry IS the standard O/U line (the baseline).
-        ``'goblin'``   — this line is BELOW the standard (safe floor bet;
-                         high probability of hitting even if the player
-                         misses the standard line).
-        ``'demon'``    — this line is ABOVE the standard (high risk / high
-                         reward; the player must exceed a higher threshold).
+    When the same (player_name, stat_type, platform) combination appears
+    more than once in the props list, the MEDIAN of all available lines is
+    treated as the standard line and stamped onto every entry as
+    ``'standard_line'``.
 
     Statistical analysis should be triggered ONLY on actual bookmaker lines
     — never on hypothetical or generated values.  Pass the output of this
@@ -2172,11 +2339,9 @@ def parse_alt_lines_from_platform_props(props):
             indicate that alternate lines are available.
 
     Returns:
-        list[dict]: Same props enriched with two new keys on every entry:
+        list[dict]: Same props enriched with one new key on every entry:
             ``'standard_line'``: float — the median line for this
                 (player, stat, platform) group (the Standard_Line).
-            ``'line_category'``: str — ``'50_50'`` | ``'goblin'`` |
-                ``'demon'``.
 
     Example::
 
@@ -2190,15 +2355,14 @@ def parse_alt_lines_from_platform_props(props):
         ]
         enriched = parse_alt_lines_from_platform_props(props)
         # → [
-        #     {..."line": 28.5, "line_category": "goblin",   "standard_line": 31.5},
-        #     {..."line": 31.5, "line_category": "50_50",    "standard_line": 31.5},
-        #     {..."line": 34.5, "line_category": "demon",    "standard_line": 31.5},
+        #     {..."line": 28.5, "standard_line": 31.5},
+        #     {..."line": 31.5, "standard_line": 31.5},
+        #     {..."line": 34.5, "standard_line": 31.5},
         # ]
     """
     import statistics as _statistics
 
     # ── Step 1: Group all lines by (player_name, stat_type, platform) ────
-    # This lets us identify all available lines for each prop slot.
     _groups = {}
     for prop in props:
         key = (
@@ -2209,9 +2373,6 @@ def parse_alt_lines_from_platform_props(props):
         _groups.setdefault(key, []).append(prop)
 
     # ── Step 2: Identify the Standard_Line for each group ────────────────
-    # The standard line is the MEDIAN of all lines in the group.
-    # For a single-entry group the only line IS the standard.
-    # For multi-entry groups the median represents the bookmaker's primary O/U.
     _standard_lines = {}
     for key, group_props in _groups.items():
         valid_lines = []
@@ -2227,7 +2388,7 @@ def parse_alt_lines_from_platform_props(props):
         else:
             _standard_lines[key] = None
 
-    # ── Step 3: Stamp each prop with standard_line and line_category ─────
+    # ── Step 3: Stamp each prop with standard_line ────────────────────────
     enriched = []
     for prop in props:
         key = (
@@ -2237,25 +2398,8 @@ def parse_alt_lines_from_platform_props(props):
         )
         std_line = _standard_lines.get(key)
 
-        try:
-            prop_line = float(prop.get("line", 0) or 0)
-        except (ValueError, TypeError):
-            prop_line = 0.0
-
         enriched_prop = dict(prop)
         enriched_prop["standard_line"] = std_line
-
-        if std_line is None or prop_line <= 0:
-            enriched_prop["line_category"] = "standard"
-        elif len(_groups.get(key, [])) == 1:
-            # Only one line → this IS the standard O/U
-            enriched_prop["line_category"] = "50_50"
-        elif abs(prop_line - std_line) < 0.01:
-            enriched_prop["line_category"] = "50_50"
-        elif prop_line < std_line:
-            enriched_prop["line_category"] = "goblin"
-        else:
-            enriched_prop["line_category"] = "demon"
 
         enriched.append(enriched_prop)
 

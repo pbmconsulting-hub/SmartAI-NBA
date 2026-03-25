@@ -90,28 +90,8 @@ class TestThresholdsBackwardCompat(unittest.TestCase):
         self.assertEqual(SILVER_THRESHOLD, 57)
         self.assertEqual(BRONZE_THRESHOLD, 35)
 
-    def test_goblin_thresholds_importable(self):
-        from config.thresholds import (
-            GOBLIN_MIN_STD_DEVS,
-            GOBLIN_MIN_PROBABILITY,
-            GOBLIN_MIN_EDGE,
-        )
-        self.assertGreater(GOBLIN_MIN_STD_DEVS, 0)
-        self.assertGreater(GOBLIN_MIN_PROBABILITY, 0)
-        self.assertGreater(GOBLIN_MIN_EDGE, 0)
-
-    def test_demon_thresholds_importable(self):
-        from config.thresholds import (
-            DEMON_CONFLICT_RATIO_THRESHOLD,
-            DEMON_HIGH_VAR_MAX_EDGE,
-            DEMON_BLOWOUT_SPREAD_THRESHOLD,
-        )
-        self.assertGreater(DEMON_CONFLICT_RATIO_THRESHOLD, 0)
-        self.assertGreater(DEMON_HIGH_VAR_MAX_EDGE, 0)
-        self.assertGreater(DEMON_BLOWOUT_SPREAD_THRESHOLD, 0)
-
     def test_uncertain_thresholds_importable(self):
-        """New UNCERTAIN_* threshold names must be importable from config.thresholds."""
+        """UNCERTAIN_* threshold names must be importable from config.thresholds."""
         from config.thresholds import (
             UNCERTAIN_CONFLICT_RATIO_THRESHOLD,
             UNCERTAIN_HIGH_VAR_MAX_EDGE,
@@ -124,7 +104,7 @@ class TestThresholdsBackwardCompat(unittest.TestCase):
         self.assertGreater(UNCERTAIN_HOT_STREAK_RATIO, 0)
 
     def test_uncertain_thresholds_from_edge_detection(self):
-        """New UNCERTAIN_* names must be importable from engine.edge_detection."""
+        """UNCERTAIN_* names must be importable from engine.edge_detection."""
         from engine.edge_detection import (
             UNCERTAIN_CONFLICT_RATIO_THRESHOLD,
             UNCERTAIN_HIGH_VAR_MAX_EDGE,
@@ -135,17 +115,13 @@ class TestThresholdsBackwardCompat(unittest.TestCase):
         self.assertGreater(UNCERTAIN_CONFLICT_RATIO_THRESHOLD, 0)
         self.assertIsInstance(UNCERTAIN_HIGH_VAR_STATS, set)
 
-    def test_demon_constant_aliases_from_edge_detection(self):
-        """Old DEMON_* constant names must still be importable from engine.edge_detection."""
-        from engine.edge_detection import (
-            DEMON_CONFLICT_RATIO_THRESHOLD,
-            DEMON_HIGH_VAR_MAX_EDGE,
-            DEMON_HIGH_VAR_STATS,
-            DEMON_BLOWOUT_SPREAD_THRESHOLD,
-            DEMON_HOT_STREAK_RATIO,
-        )
-        self.assertGreater(DEMON_CONFLICT_RATIO_THRESHOLD, 0)
-        self.assertIsInstance(DEMON_HIGH_VAR_STATS, set)
+    def test_goblin_demon_logo_paths_importable(self):
+        """GOBLIN_LOGO_PATH and DEMON_LOGO_PATH must be importable and non-empty."""
+        from styles.theme import GOBLIN_LOGO_PATH, DEMON_LOGO_PATH
+        self.assertTrue(bool(GOBLIN_LOGO_PATH), "GOBLIN_LOGO_PATH must not be empty")
+        self.assertTrue(bool(DEMON_LOGO_PATH),  "DEMON_LOGO_PATH must not be empty")
+        self.assertIn("Goblin", GOBLIN_LOGO_PATH)
+        self.assertIn("Demon",  DEMON_LOGO_PATH)
 
 
 class TestEdgeDetectionBackwardCompat(unittest.TestCase):
@@ -240,31 +216,21 @@ class TestSensitivityAnalysisBackwardCompat(unittest.TestCase):
 
 
 class TestBetTrackerHelpersBackwardCompat(unittest.TestCase):
-    """Bet tracker helper aliases must still work with old function names."""
-
-    def test_classify_demon_subtype_is_callable(self):
-        """classify_demon_subtype() backward-compat alias must be importable."""
-        from pages.helpers.bet_tracker_helpers import classify_demon_subtype
-        self.assertTrue(callable(classify_demon_subtype))
-
-    def test_classify_demon_subtype_returns_string(self):
-        from pages.helpers.bet_tracker_helpers import classify_demon_subtype
-        result = classify_demon_subtype("conflict ratio 85% overlap")
-        self.assertIsInstance(result, str)
-        self.assertEqual(result, "Conflict")
-
-    def test_get_demon_subtype_counts_is_callable(self):
-        """get_demon_subtype_counts() backward-compat alias must be importable."""
-        from pages.helpers.bet_tracker_helpers import get_demon_subtype_counts
-        self.assertTrue(callable(get_demon_subtype_counts))
+    """Bet tracker helper functions must be importable and callable."""
 
     def test_classify_uncertain_subtype_importable(self):
-        """New classify_uncertain_subtype() must be importable."""
+        """classify_uncertain_subtype() must be importable."""
         from pages.helpers.bet_tracker_helpers import classify_uncertain_subtype
         self.assertTrue(callable(classify_uncertain_subtype))
 
+    def test_classify_uncertain_subtype_returns_string(self):
+        from pages.helpers.bet_tracker_helpers import classify_uncertain_subtype
+        result = classify_uncertain_subtype("conflict ratio 85% overlap")
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "Conflict")
+
     def test_get_uncertain_subtype_counts_importable(self):
-        """New get_uncertain_subtype_counts() must be importable."""
+        """get_uncertain_subtype_counts() must be importable."""
         from pages.helpers.bet_tracker_helpers import get_uncertain_subtype_counts
         self.assertTrue(callable(get_uncertain_subtype_counts))
 

@@ -1013,23 +1013,7 @@ def display_prop_analysis_card_qds(result):
     bet_type_label = result.get("bet_type_label", "")
     bet_type_reasons = result.get("bet_type_reasons", []) or []
 
-    if bet_type in ("50_50",):
-        # 50/50 Bet — the standard O/U line (neutral baseline)
-        _fifty_reasons_str = " | ".join(bet_type_reasons[:2]) if bet_type_reasons else ""
-        st.markdown(
-            f'<div style="background:rgba(33,150,243,0.10);border:1px solid #2196f3;border-radius:6px;'
-            f'padding:8px 14px;margin-bottom:6px;display:flex;align-items:center;gap:10px;">'
-            f'<span style="font-size:1.1rem;">⚖️</span>'
-            f'<div>'
-            f'<span style="color:#2196f3;font-weight:700;font-size:0.9rem;">50/50 BET — Standard Line</span>'
-            + (f'<br><span style="color:#90caf9;font-size:0.78rem;">{_html.escape(_fifty_reasons_str)}</span>'
-               if _fifty_reasons_str else "")
-            + f'</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-    # ── Risk flags warning bar (below the bet type badge) ────────
+    # ── Risk flags warning bar ────────────────────────────────────
     _risk_flags = result.get("risk_flags", [])
     if _risk_flags:
         _risk_str = " | ".join(_risk_flags[:2])

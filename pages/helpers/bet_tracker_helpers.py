@@ -51,10 +51,9 @@ def build_stat_performance_rows(stat_perf: dict) -> list:
 
 def build_bet_type_performance_rows(bet_type_perf: dict) -> list:
     """Build table rows for Win Rate by Bet Classification section."""
-    _bt_emoji_map = {"50_50": "⚖️ 50/50", "normal": "Normal"}
     return [
         {
-            "Bet Type":  _bt_emoji_map.get(bt, bt.title()),
+            "Bet Type":  bt.title(),
             "Total":     d.get("total", 0),
             "Wins":      d.get("wins", 0),
             "Losses":    d.get("losses", 0),
@@ -82,10 +81,6 @@ def classify_uncertain_subtype(notes: str) -> str:
     return "Other"
 
 
-# Backward-compat alias (deprecated)
-classify_demon_subtype = classify_uncertain_subtype
-
-
 def get_uncertain_subtype_counts(uncertain_bets: list) -> dict:
     """
     Count how many uncertain picks fall into each risk subtype.
@@ -101,12 +96,6 @@ def get_uncertain_subtype_counts(uncertain_bets: list) -> dict:
         subtype = classify_uncertain_subtype(bet.get("notes", ""))
         counts[subtype] = counts.get(subtype, 0) + 1
     return {k: v for k, v in counts.items() if v > 0}
-
-
-# Backward-compat alias (deprecated)
-def get_demon_subtype_counts(demon_bets: list) -> dict:
-    """Backward-compat alias for get_uncertain_subtype_counts() (deprecated)."""
-    return get_uncertain_subtype_counts(demon_bets)
 
 
 def calculate_win_rate(wins: int, total: int) -> float:

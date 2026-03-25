@@ -32,8 +32,8 @@ class TestCompileCardMatrix(unittest.TestCase):
             "confidence_score": 78,
             "probability_over": 0.62,
             "edge_percentage": 5.3,
-            "bet_type": "goblin",
-            "prediction": "I predict the stat will do at LEAST 23.5",
+            "bet_type": "standard",
+            "prediction": "Model projects 26.2 points",
             "direction": "OVER",
         }
         base.update(overrides)
@@ -60,21 +60,23 @@ class TestCompileCardMatrix(unittest.TestCase):
         self.assertIn("Platinum", html)
         self.assertIn("qcm-tier-platinum", html)
 
-    def test_goblin_prediction_text_displayed(self):
+    def test_no_goblin_css_class_in_card(self):
         html = self.compile([self._sample_result(
-            bet_type="goblin",
-            prediction="I predict the stat will do at LEAST 23.5",
+            bet_type="standard",
+            prediction="",  # No prediction provided
+            prop_line=20.0,
         )])
-        self.assertIn("at LEAST 23.5", html)
-        self.assertIn("qcm-prediction-goblin", html)
+        # Goblin/Demon prediction CSS classes not used
+        self.assertNotIn('class="qcm-prediction qcm-prediction-goblin"', html)
 
-    def test_demon_prediction_text_displayed(self):
+    def test_no_demon_css_class_in_card(self):
         html = self.compile([self._sample_result(
-            bet_type="demon",
-            prediction="I predict the stat will do at MOST 26.5",
+            bet_type="standard",
+            prediction="",
+            prop_line=20.0,
         )])
-        self.assertIn("at MOST 26.5", html)
-        self.assertIn("qcm-prediction-demon", html)
+        # Goblin/Demon prediction CSS classes not used
+        self.assertNotIn('class="qcm-prediction qcm-prediction-demon"', html)
 
     def test_css_grid_class_present(self):
         html = self.compile([self._sample_result()])
@@ -149,77 +151,6 @@ class TestCompileCardMatrix(unittest.TestCase):
         )])
         # Demon prediction auto-gen removed; class not used on any element
         self.assertNotIn('class="qcm-prediction qcm-prediction-demon"', html)
-
-
-class TestContextualGoblinDemon(unittest.TestCase):
-    """Tests for engine/simulation.py generate_contextual_goblin_demon()."""
-
-    def setUp(self):
-        from engine.simulation import generate_contextual_goblin_demon
-        self.gen = generate_contextual_goblin_demon
-
-    def test_over_direction_goblin_minus_one(self):
-        result = self.gen(24.5, direction="over")
-        self.assertAlmostEqual(result["goblin_line"], 24.5)
-
-    def test_over_direction_demon_plus_two(self):
-        result = self.gen(24.5, direction="over")
-        self.assertAlmostEqual(result["demon_line"], 24.5)
-
-    def test_under_direction_goblin_plus_one(self):
-        result = self.gen(24.5, direction="under")
-        self.assertAlmostEqual(result["goblin_line"], 24.5)
-
-    def test_under_direction_demon_minus_two(self):
-        result = self.gen(24.5, direction="under")
-        self.assertAlmostEqual(result["demon_line"], 24.5)
-
-    def test_over_goblin_prediction_at_least(self):
-        result = self.gen(20.0, direction="over")
-        self.assertEqual(result["goblin_prediction"], "")
-
-    def test_over_demon_prediction_at_most(self):
-        result = self.gen(20.0, direction="over")
-        self.assertEqual(result["demon_prediction"], "")
-
-    def test_under_goblin_prediction_at_most(self):
-        result = self.gen(20.0, direction="under")
-        self.assertEqual(result["goblin_prediction"], "")
-
-    def test_under_demon_prediction_at_least(self):
-        result = self.gen(20.0, direction="under")
-        self.assertEqual(result["demon_prediction"], "")
-
-    def test_more_alias_for_over(self):
-        result = self.gen(10.0, direction="more")
-        self.assertEqual(result["direction"], "over")
-        self.assertAlmostEqual(result["goblin_line"], 10.0)
-
-    def test_less_alias_for_under(self):
-        result = self.gen(10.0, direction="less")
-        self.assertEqual(result["direction"], "under")
-        self.assertAlmostEqual(result["goblin_line"], 10.0)
-
-    def test_minimum_line_floor(self):
-        """Lines should never go below 0.5."""
-        result = self.gen(1.0, direction="under")
-        self.assertGreaterEqual(result["demon_line"], 0.5)
-
-    def test_returns_dict_keys(self):
-        result = self.gen(24.5)
-        required_keys = {
-            "true_line", "direction", "goblin_line",
-            "goblin_prediction", "demon_line", "demon_prediction",
-        }
-        self.assertTrue(required_keys.issubset(set(result.keys())))
-
-    def test_default_direction_is_over(self):
-        result = self.gen(20.0)
-        self.assertEqual(result["direction"], "over")
-
-    def test_invalid_line_handled(self):
-        result = self.gen("not_a_number")
-        self.assertEqual(result["true_line"], 0.0)
 
 
 class TestQuantumCardMatrixCSS(unittest.TestCase):
@@ -325,23 +256,6 @@ class TestConfigToml(unittest.TestCase):
         with open(config_path) as f:
             content = f.read()
         self.assertIn("maxMessageSize = 1000", content)
-
-
-class TestFormatAltLinePrediction(unittest.TestCase):
-    """Verify format_alt_line_prediction backward compatibility."""
-
-    def setUp(self):
-        from engine.simulation import format_alt_line_prediction
-        self.fmt = format_alt_line_prediction
-
-    def test_goblin_at_least(self):
-        self.assertEqual(self.fmt(23.5, "goblin"), "")
-
-    def test_demon_at_most(self):
-        self.assertEqual(self.fmt(26.5, "demon"), "")
-
-    def test_base_empty(self):
-        self.assertEqual(self.fmt(24.5, "base"), "")
 
 
 if __name__ == "__main__":

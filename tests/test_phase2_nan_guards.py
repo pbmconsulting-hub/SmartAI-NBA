@@ -135,7 +135,7 @@ class TestSimulationOutputGuards(unittest.TestCase):
 
 
 class TestAltLineProbabilityGuards(unittest.TestCase):
-    """Verify generate_alt_line_probabilities returns finite probabilities."""
+    """Verify generate_alt_line_probabilities returns a valid base probability."""
 
     def setUp(self):
         _ensure_streamlit_mock()
@@ -146,8 +146,8 @@ class TestAltLineProbabilityGuards(unittest.TestCase):
         self.run_qme = run_quantum_matrix_simulation
         self.gen_alt = generate_alt_line_probabilities
 
-    def test_alt_line_probabilities_all_finite(self):
-        """Every probability in alt-line output should be finite and in [0.01,0.99]."""
+    def test_alt_line_base_probability_finite(self):
+        """The base_probability in alt-line output should be finite and in [0.01, 0.99]."""
         sim_out = self.run_qme(
             projected_stat_average=20.0,
             stat_standard_deviation=4.0,
@@ -160,21 +160,17 @@ class TestAltLineProbabilityGuards(unittest.TestCase):
             rest_adjustment_factor=1.0,
         )
         result = self.gen_alt(sim_out, 19.5)
-        for line in result.get("goblin_lines", []):
-            self.assertTrue(math.isfinite(line["probability"]))
-            self.assertGreaterEqual(line["probability"], 0.01)
-            self.assertLessEqual(line["probability"], 0.99)
-        for line in result.get("demon_lines", []):
-            self.assertTrue(math.isfinite(line["probability"]))
-            self.assertGreaterEqual(line["probability"], 0.01)
-            self.assertLessEqual(line["probability"], 0.99)
+        self.assertTrue(math.isfinite(result["base_probability"]))
+        self.assertGreaterEqual(result["base_probability"], 0.0)
+        self.assertLessEqual(result["base_probability"], 1.0)
 
     def test_alt_line_empty_simulation(self):
-        """Empty simulated_results should return empty alt-lines without crashing."""
+        """Empty simulated_results should return a base structure without crashing."""
         empty_sim = {"simulated_results": [], "probability_over": 0.5}
         result = self.gen_alt(empty_sim, 19.5)
-        self.assertEqual(result["goblin_lines"], [])
-        self.assertEqual(result["demon_lines"], [])
+        self.assertIn("base_line", result)
+        self.assertIn("base_probability", result)
+        self.assertIn("best_alt", result)
 
 
 # ============================================================

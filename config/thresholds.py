@@ -25,26 +25,11 @@ BRONZE_MIN_EDGE_PCT   = 1.0
 PLATINUM_MIN_PROBABILITY = 0.62
 GOLD_MIN_PROBABILITY     = 0.57
 
-# ── Internal bet classification thresholds (legacy) ─────────────────────
-GOBLIN_MIN_STD_DEVS   = 2.0    # Projection ≥2 std devs from line
-GOBLIN_MIN_PROBABILITY = 0.80  # Model probability ≥80%
-GOBLIN_MIN_EDGE       = 25.0   # Edge ≥25%
-GOBLIN_LINE_MIN_RATIO = 0.25   # Line ≥25% of season average
-GOBLIN_LINE_MAX_RATIO = 4.0    # Line ≤4× season average
-
-# ── Legacy backward-compat aliases (deprecated) ──────────────────────────────
-# These replace the old "Demon" threshold names — conflicting forces /
-# variance / fatigue / regression are RISK FLAGS, not bet types.
+# ── Risk-flag thresholds (Uncertain detection) ──────────────────────────────
 UNCERTAIN_CONFLICT_RATIO_THRESHOLD = 0.80   # Forces within 20% = conflicting
 UNCERTAIN_HIGH_VAR_MAX_EDGE        = 8.0    # High-variance stats with edge <8%
 UNCERTAIN_BLOWOUT_SPREAD_THRESHOLD = 10.0   # Spread >10 pts on back-to-back
 UNCERTAIN_HOT_STREAK_RATIO         = 1.25   # Line ≥125% of season avg
-
-# Backward-compat aliases — old "DEMON_*" names still importable
-DEMON_CONFLICT_RATIO_THRESHOLD  = UNCERTAIN_CONFLICT_RATIO_THRESHOLD
-DEMON_HIGH_VAR_MAX_EDGE         = UNCERTAIN_HIGH_VAR_MAX_EDGE
-DEMON_BLOWOUT_SPREAD_THRESHOLD  = UNCERTAIN_BLOWOUT_SPREAD_THRESHOLD
-DEMON_HOT_STREAK_RATIO          = UNCERTAIN_HOT_STREAK_RATIO
 
 # ── Auto-log Bronze thresholds ────────────────────────────────────────────────
 BRONZE_AUTO_LOG_MIN_EDGE       = 8.0    # Bronze requires ≥8% edge to auto-log

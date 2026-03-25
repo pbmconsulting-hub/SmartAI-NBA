@@ -177,17 +177,6 @@ class TestEdgeDetectionHelpers(unittest.TestCase):
         )
         self.assertEqual(result["winner"], "trap")
 
-    def test_goblin_thresholds(self):
-        from engine.edge_detection import (
-            GOBLIN_MIN_STD_DEVS_FROM_LINE,
-            GOBLIN_MIN_PROBABILITY,
-            GOBLIN_MIN_EDGE,
-        )
-        self.assertGreaterEqual(GOBLIN_MIN_STD_DEVS_FROM_LINE, 1.5)
-        self.assertGreaterEqual(GOBLIN_MIN_PROBABILITY, 0.75)
-        self.assertGreaterEqual(GOBLIN_MIN_EDGE, 20.0)
-
-
 class TestPlatformFiltering(unittest.TestCase):
     """Tests for platform-only player filtering in data/data_manager.py."""
 
