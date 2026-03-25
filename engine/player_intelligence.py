@@ -89,12 +89,36 @@ def get_recent_form_vs_line(
     stat_type: str,
     prop_line: float,
     window: int = _STREAK_WINDOW,
+    player_id: int | None = None,
+    season: str | None = None,
 ) -> dict[str, Any]:
     """Return hit-rate and per-game results for *stat_type* vs *prop_line*.
 
     Each game log entry is expected to have nba_api field names (e.g. "PTS",
     "REB", "AST", "FG3M", "STL", "BLK", "TOV").  Combo stats (e.g.
     "points_rebounds") are summed from their component columns.
+
+    If *game_logs* is empty and *player_id* is provided, this function will
+    attempt to fetch logs automatically via
+    ``nba_stats_service.get_player_game_logs()``.  This is transparent to the
+    caller — if the fetch fails, the function returns the normal empty result.
+
+    Parameters
+    ----------
+    game_logs : list[dict]
+        Pre-fetched game logs.  Pass an empty list (or None-equivalent) to
+        trigger automatic fetching when *player_id* is supplied.
+    stat_type : str
+        Stat type to analyse (e.g. ``"points"``, ``"rebounds"``).
+    prop_line : float
+        The betting line to compare each game against.
+    window : int
+        Number of most-recent games to analyse.
+    player_id : int | None
+        NBA player ID.  When provided and *game_logs* is empty, logs are
+        fetched from ``nba_stats_service`` automatically.
+    season : str | None
+        Season string passed to ``get_player_game_logs()`` when auto-fetching.
 
     Returns::
 
@@ -111,6 +135,10 @@ def get_recent_form_vs_line(
             "sufficient_data": bool,    # False when window < 3 usable games
         }
     """
+    # Auto-fetch logs via nba_stats_service when none are provided
+    if not game_logs and player_id is not None:
+        game_logs = get_player_game_logs_from_service(player_id, season=season)
+
     if not game_logs or prop_line <= 0:
         return _empty_form_result(window, prop_line)
 

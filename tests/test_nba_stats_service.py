@@ -776,5 +776,124 @@ class TestFindGamesAndPlayByPlay(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
 
+# ── Section 16: get_recent_form_vs_line auto-fetch ────────────────────────────
+
+class TestGetRecentFormAutoFetch(unittest.TestCase):
+    """get_recent_form_vs_line auto-fetches logs when player_id is supplied."""
+
+    def test_autofetch_when_no_logs_and_player_id_given(self):
+        """When game_logs is empty and player_id is provided, logs are fetched."""
+        from engine.player_intelligence import get_recent_form_vs_line
+        fetched_logs = [
+            {"PTS": 30, "REB": 7, "AST": 6, "GAME_DATE": "2024-11-01", "MATCHUP": "LAL vs BOS"},
+            {"PTS": 28, "REB": 5, "AST": 8, "GAME_DATE": "2024-10-28", "MATCHUP": "LAL @ GSW"},
+            {"PTS": 32, "REB": 9, "AST": 5, "GAME_DATE": "2024-10-25", "MATCHUP": "LAL vs PHX"},
+        ]
+        with patch("engine.player_intelligence.get_player_game_logs_from_service",
+                   return_value=fetched_logs) as mock_fetch:
+            result = get_recent_form_vs_line(
+                [], "points", 25.0, player_id=2544
+            )
+        mock_fetch.assert_called_once_with(2544, season=None)
+        self.assertEqual(result["hits"], 3)
+        self.assertAlmostEqual(result["hit_rate"], 1.0)
+        self.assertTrue(result["sufficient_data"])
+
+    def test_autofetch_passes_season(self):
+        """Season is forwarded when provided."""
+        from engine.player_intelligence import get_recent_form_vs_line
+        with patch("engine.player_intelligence.get_player_game_logs_from_service",
+                   return_value=[]) as mock_fetch:
+            get_recent_form_vs_line([], "points", 25.0, player_id=2544, season="2024-25")
+        mock_fetch.assert_called_once_with(2544, season="2024-25")
+
+    def test_no_autofetch_when_logs_provided(self):
+        """Existing logs are used as-is — no service call made."""
+        from engine.player_intelligence import get_recent_form_vs_line
+        logs = [{"PTS": 25, "REB": 7, "GAME_DATE": "2024-11-01", "MATCHUP": "LAL vs BOS"}]
+        with patch("engine.player_intelligence.get_player_game_logs_from_service") as mock_fetch:
+            result = get_recent_form_vs_line(logs, "points", 20.0, player_id=2544)
+        mock_fetch.assert_not_called()
+        self.assertEqual(result["hits"], 1)
+
+    def test_no_autofetch_when_no_player_id(self):
+        """Without player_id, empty logs return the usual empty result."""
+        from engine.player_intelligence import get_recent_form_vs_line
+        with patch("engine.player_intelligence.get_player_game_logs_from_service") as mock_fetch:
+            result = get_recent_form_vs_line([], "points", 25.0)
+        mock_fetch.assert_not_called()
+        self.assertEqual(result["form_label"], "No Data")
+
+    def test_original_callers_unaffected(self):
+        """Existing callers that pass game_logs positionally still work."""
+        from engine.player_intelligence import get_recent_form_vs_line
+        logs = [
+            {"PTS": 20, "REB": 7, "GAME_DATE": "2024-11-01", "MATCHUP": "LAL vs BOS"},
+            {"PTS": 18, "REB": 5, "GAME_DATE": "2024-10-28", "MATCHUP": "LAL @ GSW"},
+            {"PTS": 22, "REB": 9, "GAME_DATE": "2024-10-25", "MATCHUP": "LAL vs PHX"},
+        ]
+        result = get_recent_form_vs_line(logs, "points", 25.0)
+        self.assertEqual(result["hits"], 0)
+        self.assertEqual(result["hit_rate"], 0.0)
+        self.assertEqual(result["form_label"], "Cold 🧊")
+
+
+# ── Section 17: dynamic NBA_API_ABBREV_TO_OURS ───────────────────────────────
+
+class TestDynamicNbaApiAbbrevMap(unittest.TestCase):
+    """NBA_API_ABBREV_TO_OURS is built dynamically from nba_api static teams."""
+
+    def test_map_is_a_dict(self):
+        from data.live_data_fetcher import NBA_API_ABBREV_TO_OURS
+        self.assertIsInstance(NBA_API_ABBREV_TO_OURS, dict)
+
+    def test_fallback_const_exists(self):
+        from data.live_data_fetcher import _NBA_API_ABBREV_TO_OURS_FALLBACK
+        self.assertIsInstance(_NBA_API_ABBREV_TO_OURS_FALLBACK, dict)
+        self.assertIn("GS", _NBA_API_ABBREV_TO_OURS_FALLBACK)
+
+    def test_known_aliases_present(self):
+        """Short-form aliases used by some nba_api endpoints still resolve."""
+        from data.live_data_fetcher import NBA_API_ABBREV_TO_OURS
+        self.assertEqual(NBA_API_ABBREV_TO_OURS.get("GS"), "GSW")
+        self.assertEqual(NBA_API_ABBREV_TO_OURS.get("NY"), "NYK")
+        self.assertEqual(NBA_API_ABBREV_TO_OURS.get("NO"), "NOP")
+        self.assertEqual(NBA_API_ABBREV_TO_OURS.get("SA"), "SAS")
+
+    def test_standard_abbreviations_are_identity(self):
+        """When nba_api is available, full standard abbreviations map to themselves."""
+        from data.live_data_fetcher import NBA_API_ABBREV_TO_OURS
+        for abbrev in ("LAL", "BOS", "GSW", "MIA", "PHX"):
+            self.assertEqual(
+                NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev),
+                abbrev,
+                f"{abbrev} should map to itself",
+            )
+
+    def test_build_nba_abbrev_map_falls_back_on_error(self):
+        """When nba_api.stats.static.teams is unavailable, fallback is used."""
+        from data.live_data_fetcher import _build_nba_abbrev_map, _NBA_API_ABBREV_TO_OURS_FALLBACK
+        with patch("nba_api.stats.static.teams.get_teams", side_effect=Exception("fail")):
+            result = _build_nba_abbrev_map()
+        self.assertEqual(result, _NBA_API_ABBREV_TO_OURS_FALLBACK)
+
+    def test_build_nba_abbrev_map_includes_all_teams(self):
+        """Dynamic build includes identity entries for all nba_api static teams."""
+        mock_teams = [
+            {"abbreviation": "LAL", "full_name": "Los Angeles Lakers"},
+            {"abbreviation": "BOS", "full_name": "Boston Celtics"},
+            {"abbreviation": "GSW", "full_name": "Golden State Warriors"},
+        ]
+        with patch("nba_api.stats.static.teams.get_teams", return_value=mock_teams):
+            from data.live_data_fetcher import _build_nba_abbrev_map
+            result = _build_nba_abbrev_map()
+        self.assertEqual(result["LAL"], "LAL")
+        self.assertEqual(result["BOS"], "BOS")
+        self.assertEqual(result["GSW"], "GSW")
+        # Hardcoded aliases must still be present
+        self.assertEqual(result["GS"], "GSW")
+        self.assertEqual(result["NY"], "NYK")
+
+
 if __name__ == "__main__":
     unittest.main()

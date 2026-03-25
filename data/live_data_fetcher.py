@@ -226,8 +226,11 @@ TEAM_NAME_TO_ABBREVIATION = {
 }
 
 # Map nba_api's team abbreviations to our abbreviations
-# (nba_api sometimes uses slightly different codes, e.g. "GS" vs "GSW")
-NBA_API_ABBREV_TO_OURS = {
+# (nba_api sometimes uses slightly different codes, e.g. "GS" vs "GSW").
+# Built dynamically from nba_api's local static teams list at import time
+# so new teams (expansion) are covered automatically.  The hardcoded dict
+# is used as the fallback when nba_api is unavailable.
+_NBA_API_ABBREV_TO_OURS_FALLBACK: dict[str, str] = {
     "GS": "GSW",   # Golden State Warriors
     "NY": "NYK",   # New York Knicks
     "NO": "NOP",   # New Orleans Pelicans
@@ -237,6 +240,35 @@ NBA_API_ABBREV_TO_OURS = {
     "UTA": "UTA",  # Utah Jazz (same)
     "MEM": "MEM",  # Memphis Grizzlies (same)
 }
+
+
+def _build_nba_abbrev_map() -> dict[str, str]:
+    """Build a nba_api abbreviation → our abbreviation mapping.
+
+    Uses ``nba_api.stats.static.teams.get_teams()`` — a local file read with
+    no network call — to seed an identity mapping for all 30 current teams.
+    The hardcoded alias pairs (GS→GSW, etc.) are then merged in so that
+    short-form codes returned by some endpoints translate correctly.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping of nba_api abbreviation strings to our canonical abbreviations.
+        Falls back to ``_NBA_API_ABBREV_TO_OURS_FALLBACK`` on any error.
+    """
+    try:
+        from nba_api.stats.static import teams as _nba_teams_static
+        nba_teams = _nba_teams_static.get_teams()
+        # Build identity mapping: "GSW" → "GSW", "LAL" → "LAL", etc.
+        mapping = {t["abbreviation"]: t["abbreviation"] for t in nba_teams}
+        # Merge in the known short-form aliases (they override if present)
+        mapping.update(_NBA_API_ABBREV_TO_OURS_FALLBACK)
+        return mapping
+    except Exception:
+        return dict(_NBA_API_ABBREV_TO_OURS_FALLBACK)
+
+
+NBA_API_ABBREV_TO_OURS: dict[str, str] = _build_nba_abbrev_map()
 
 # Conference mapping by abbreviation
 TEAM_CONFERENCE = {
