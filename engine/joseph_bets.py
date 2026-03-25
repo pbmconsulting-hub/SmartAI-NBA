@@ -25,7 +25,7 @@ except ImportError:
 try:
     from tracking.database import load_all_bets
 except ImportError:
-    def load_all_bets(limit=None):
+    def load_all_bets(**kwargs):
         return []
 
 
