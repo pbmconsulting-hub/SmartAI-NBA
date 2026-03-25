@@ -2,11 +2,11 @@
 tests/test_nba_api_endpoints.py
 ------------------------------------
 Tests for API-Basketball client endpoint structure:
-  1. Base URL correctness (v1.basketball.api-sports.io)
+  1. Base URL correctness (v1.basketball.api-sports.io, v2.nba.api-sports.io)
   2. Injury endpoint uses /injuries
   3. 403 status code handling (credit exhaustion)
   4. API key management endpoints (status)
-  5. NBA endpoints (teams, players, standings, games/statistics/teams, games/statistics/players)
+  5. NBA endpoints (teams, games, players, standings, teams/statistics, players/statistics)
   6. No apiKey leaking into query params for new functions
 """
 
@@ -45,6 +45,14 @@ class TestBaseURL(unittest.TestCase):
             'https://v1.basketball.api-sports.io',
             self.src,
             "_BASE_URL must be https://v1.basketball.api-sports.io",
+        )
+
+    def test_players_base_url_has_v2_nba_domain(self):
+        """_PLAYERS_BASE_URL must use v2.nba.api-sports.io."""
+        self.assertIn(
+            'https://v2.nba.api-sports.io',
+            self.src,
+            "_PLAYERS_BASE_URL must be https://v2.nba.api-sports.io",
         )
 
     def test_base_url_not_old_domain(self):
@@ -206,20 +214,25 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_games(", self.src)
 
     def test_get_games_url(self):
-        """get_games must call /games."""
-        idx = self.src.find("def get_games(")
-        self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
-        self.assertIn("/games", snippet)
-
-    def test_get_games_has_params(self):
-        """get_games must accept season, date, and team parameters."""
+        """get_games must call /games via v2 NBA API."""
         idx = self.src.find("def get_games(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
+        self.assertIn("/games", snippet)
+        self.assertIn("_PLAYERS_BASE_URL", snippet,
+                       "get_games must use _PLAYERS_BASE_URL (v2 NBA API)")
+
+    def test_get_games_has_params(self):
+        """get_games must accept season, date, team, id, live, and h2h parameters."""
+        idx = self.src.find("def get_games(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1500]
         self.assertIn('"season"', snippet)
         self.assertIn('"date"', snippet)
         self.assertIn('"team"', snippet)
+        self.assertIn('"id"', snippet)
+        self.assertIn('"live"', snippet)
+        self.assertIn('"h2h"', snippet)
 
     # -- get_players --
 
@@ -228,18 +241,30 @@ class TestCoreNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_players(", self.src)
 
     def test_get_players_url(self):
-        """get_players must call /players."""
+        """get_players must call /players via v2 NBA API."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
+        snippet = self.src[idx:idx + 1200]
         self.assertIn("/players", snippet)
+        self.assertIn("_PLAYERS_BASE_URL", snippet,
+                       "get_players must use _PLAYERS_BASE_URL (v2 NBA API)")
 
-    def test_get_players_has_team_param(self):
-        """get_players must pass team parameter."""
+    def test_get_players_has_all_v2_params(self):
+        """get_players must wire all v2 NBA API query parameters."""
         idx = self.src.find("def get_players(")
         self.assertGreater(idx, 0)
-        snippet = self.src[idx:idx + 500]
-        self.assertIn('"team"', snippet)
+        snippet = self.src[idx:idx + 1800]
+        for param in ('"id"', '"name"', '"team"', '"season"', '"country"', '"search"'):
+            self.assertIn(param, snippet,
+                          f"get_players must wire the {param} query parameter")
+
+    def test_get_players_id_param_uses_player_id_arg(self):
+        """get_players must map player_id argument to 'id' query param."""
+        idx = self.src.find("def get_players(")
+        self.assertGreater(idx, 0)
+        snippet = self.src[idx:idx + 1200]
+        self.assertIn("player_id", snippet,
+                       "get_players must accept player_id argument")
 
     # -- get_injury_report team_id param --
 
@@ -306,18 +331,18 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_nba_team_stats(", self.src)
 
     def test_get_nba_team_stats_url(self):
-        """get_nba_team_stats must call /games/statistics/teams."""
+        """get_nba_team_stats must call /teams/statistics."""
         idx = self.src.find("def get_nba_team_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 500]
-        self.assertIn("/games/statistics/teams", snippet)
+        self.assertIn("/teams/statistics", snippet)
 
     def test_get_nba_team_stats_has_params(self):
-        """get_nba_team_stats must accept team and season parameters."""
+        """get_nba_team_stats must accept team id and season parameters."""
         idx = self.src.find("def get_nba_team_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        self.assertIn('"team"', snippet)
+        self.assertIn('"id"', snippet)
         self.assertIn('"season"', snippet)
 
     # -- get_nba_player_stats --
@@ -327,21 +352,20 @@ class TestNewNBAEndpoints(unittest.TestCase):
         self.assertIn("def get_nba_player_stats(", self.src)
 
     def test_get_nba_player_stats_url(self):
-        """get_nba_player_stats must call /games/statistics/players or /players/statistics."""
+        """get_nba_player_stats must call /players/statistics."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 800]
-        has_game_stats = "/games/statistics/players" in snippet
         has_player_stats = "/players/statistics" in snippet
-        self.assertTrue(has_game_stats or has_player_stats,
-                        "get_nba_player_stats must use /games/statistics/players or /players/statistics")
+        self.assertTrue(has_player_stats,
+                        "get_nba_player_stats must use /players/statistics")
 
     def test_get_nba_player_stats_has_params(self):
-        """get_nba_player_stats must accept player and game parameters."""
+        """get_nba_player_stats must accept player id and game parameters."""
         idx = self.src.find("def get_nba_player_stats(")
         self.assertGreater(idx, 0)
         snippet = self.src[idx:idx + 1200]
-        self.assertIn('"player"', snippet)
+        self.assertIn('"id"', snippet)
         self.assertIn('"game"', snippet)
 
     # -- get_predictions --
@@ -469,6 +493,76 @@ class TestFetchPlayersRuntime(unittest.TestCase):
         result = get_players()
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_player_id_param_sent_as_id(self, mock_request, mock_key):
+        """player_id argument must be sent as 'id' query param."""
+        from data.nba_api_client import get_players, _PLAYERS_BASE_URL, ENDPOINT_PLAYERS
+        mock_request.return_value = {"response": [{"id": 265, "firstname": "LeBron", "lastname": "James"}]}
+        get_players(player_id=265)
+        mock_request.assert_called_once()
+        call_args = mock_request.call_args
+        url = call_args[0][0] if call_args[0] else call_args[1].get("url", "")
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(url, f"{_PLAYERS_BASE_URL}{ENDPOINT_PLAYERS}")
+        self.assertEqual(params.get("id"), 265)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_search_param_wired(self, mock_request, mock_key):
+        """search argument must be sent as 'search' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(search="Jame")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("search"), "Jame")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_name_param_wired(self, mock_request, mock_key):
+        """name argument must be sent as 'name' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(name="James")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("name"), "James")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_country_param_wired(self, mock_request, mock_key):
+        """country argument must be sent as 'country' query param."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(country="USA")
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("country"), "USA")
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_season_param_integer(self, mock_request, mock_key):
+        """season argument must be sent as integer."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": []}
+        get_players(season=2024)
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertEqual(params.get("season"), 2024)
+
+    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
+    @patch("data.nba_api_client._request_with_retry")
+    def test_player_id_skips_default_season(self, mock_request, mock_key):
+        """When player_id is given, season should NOT be sent by default."""
+        from data.nba_api_client import get_players
+        mock_request.return_value = {"response": [{"id": 265}]}
+        get_players(player_id=265)
+        call_args = mock_request.call_args
+        params = call_args[1].get("params") if call_args[1] else (call_args[0][1] if len(call_args[0]) > 1 else {})
+        self.assertNotIn("season", params,
+                         "player_id lookup should not include default season (IDs are unique across seasons)")
 
 
 class TestApiKeyInfoRuntime(unittest.TestCase):

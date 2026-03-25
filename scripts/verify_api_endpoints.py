@@ -4,7 +4,7 @@ scripts/verify_api_endpoints.py
 -------------------------------
 Production-ready API endpoint verification script.
 
-Tests all API-Basketball v1 and The Odds API v4 endpoints using real API keys.
+Tests all API-Basketball v1/v2 and The Odds API v4 endpoints using real API keys.
 Intended to be run manually to confirm the app can pull data before deployment.
 
 Usage:
@@ -38,9 +38,10 @@ except ImportError:
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-API_SPORTS_BASE = "https://v1.basketball.api-sports.io"
-ODDS_API_BASE   = "https://api.the-odds-api.com/v4"
-SPORT_KEY       = "basketball_nba"
+API_SPORTS_BASE     = "https://v1.basketball.api-sports.io"
+API_SPORTS_NBA_BASE = "https://v2.nba.api-sports.io"
+ODDS_API_BASE       = "https://api.the-odds-api.com/v4"
+SPORT_KEY           = "basketball_nba"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,9 +60,9 @@ def _record(name: str, ok: bool, detail: str = ""):
 
 
 def _test_api_sports(endpoint: str, headers: dict, params: dict | None = None,
-                     label: str = "") -> dict | None:
+                     label: str = "", base_url: str = "") -> dict | None:
     """Call an API-Sports endpoint and return the parsed response."""
-    url = f"{API_SPORTS_BASE}{endpoint}"
+    url = f"{base_url or API_SPORTS_BASE}{endpoint}"
     label = label or f"API-Sports {endpoint}"
     print(f"\n  Testing: {label}")
     print(f"    URL: {url}")
@@ -157,15 +158,15 @@ def _test_odds_api(endpoint: str, api_key: str, params: dict | None = None,
 # ── Main test functions ───────────────────────────────────────────────────────
 
 def test_api_sports(api_key: str):
-    """Test all API-Basketball v1 endpoints."""
+    """Test all API-Basketball v1 and v2 NBA API endpoints."""
     print("\n" + "=" * 70)
-    print("  API-BASKETBALL v1 ENDPOINT VERIFICATION")
+    print("  API-BASKETBALL v1 / v2 NBA API ENDPOINT VERIFICATION")
     print("=" * 70)
 
     headers = {"x-apisports-key": api_key}
 
     # 1. /status — Free, verifies key
-    data = _test_api_sports("/status", headers, label="[1/13] /status (key check)")
+    data = _test_api_sports("/status", headers, label="[1/12] /status (key check)")
     if data:
         resp = data.get("response") or data
         reqs = (resp if isinstance(resp, dict) else {}).get("requests", {})
@@ -175,73 +176,86 @@ def test_api_sports(api_key: str):
     # 2. /teams
     _test_api_sports("/teams", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[2/13] /teams?league=12&season=2025-2026")
+                     label="[2/12] /teams?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 3. /games (with season)
+    # 3. /games (v2 NBA API — with season)
     _test_api_sports("/games", headers,
-                     params={"league": "12", "season": "2025-2026"},
-                     label="[3/13] /games?league=12&season=2025-2026")
+                     params={"season": "2025"},
+                     label="[3/12] /games?season=2025 (v2)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
-    # 4. /games (today)
+    # 4. /games (v2 NBA API — today)
     from datetime import date
     today = date.today().isoformat()
     _test_api_sports("/games", headers,
-                     params={"league": "12", "season": "2025-2026", "date": today},
-                     label=f"[4/13] /games?league=12&date={today}")
+                     params={"season": "2025", "date": today},
+                     label=f"[4/12] /games?season=2025&date={today} (v2)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
-    # 5. /players (with team filter)
+    # 5a. /players (v2 NBA API — with team filter)
     _test_api_sports("/players", headers,
-                     params={"league": "12", "season": "2025-2026", "team": "1"},
-                     label="[5/13] /players?league=12&season=2025-2026&team=1")
+                     params={"season": "2025", "team": "1"},
+                     label="[5a/12] /players?season=2025&team=1 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
+    time.sleep(0.3)
+
+    # 5b. /players (v2 NBA API — by player id; IDs are unique across seasons)
+    _test_api_sports("/players", headers,
+                     params={"id": "265"},
+                     label="[5b/12] /players?id=265 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
+    time.sleep(0.3)
+
+    # 5c. /players (v2 NBA API — search by partial name)
+    _test_api_sports("/players", headers,
+                     params={"search": "james", "season": "2025"},
+                     label="[5c/12] /players?search=james&season=2025 (v2 NBA API)",
+                     base_url=API_SPORTS_NBA_BASE)
     time.sleep(0.3)
 
     # 6. /standings
     _test_api_sports("/standings", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[6/13] /standings?league=12&season=2025-2026")
+                     label="[6/12] /standings?league=12&season=2025-2026")
     time.sleep(0.3)
 
     # 7. /injuries
     _test_api_sports("/injuries", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[7/13] /injuries?league=12&season=2025-2026")
+                     label="[7/12] /injuries?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 8. /players/statistics (need season + league + player)
+    # 8. /players/statistics (v2 NBA API — need season + id)
     _test_api_sports("/players/statistics", headers,
-                     params={"league": "12", "season": "2025-2026", "player": "236"},
-                     label="[8/13] /players/statistics?league=12&season=2025-2026&player=236")
+                     params={"season": "2025", "id": "236"},
+                     base_url=API_SPORTS_NBA_BASE,
+                     label="[8/12] /players/statistics?season=2025&id=236 (v2)")
     time.sleep(0.3)
 
-    # 9. /games/statistics/teams
-    _test_api_sports("/games/statistics/teams", headers,
-                     params={"league": "12", "season": "2025-2026"},
-                     label="[9/13] /games/statistics/teams?league=12&season=2025-2026")
+    # 9. /teams/statistics (v2 NBA API — need season + id)
+    _test_api_sports("/teams/statistics", headers,
+                     params={"season": "2025", "id": "1"},
+                     base_url=API_SPORTS_NBA_BASE,
+                     label="[9/12] /teams/statistics?season=2025&id=1 (v2)")
     time.sleep(0.3)
 
-    # 10. /games/statistics/players
-    _test_api_sports("/games/statistics/players", headers,
-                     params={"league": "12", "season": "2025-2026"},
-                     label="[10/13] /games/statistics/players?league=12&season=2025-2026")
-    time.sleep(0.3)
-
-    # 11. /odds
+    # 10. /odds
     _test_api_sports("/odds", headers,
                      params={"league": "12", "season": "2025-2026"},
-                     label="[11/13] /odds?league=12&season=2025-2026")
+                     label="[10/12] /odds?league=12&season=2025-2026")
     time.sleep(0.3)
 
-    # 12. /news
+    # 11. /news
     _test_api_sports("/news", headers,
                      params={"league": "12"},
-                     label="[12/13] /news?league=12")
+                     label="[11/12] /news?league=12")
     time.sleep(0.3)
 
-    # 13. /predictions (requires a game_id for full results)
-    _test_api_sports("/predictions", headers, label="[13/13] /predictions")
+    # 12. /predictions (requires a game_id for full results)
+    _test_api_sports("/predictions", headers, label="[12/12] /predictions")
 
 
 def test_odds_api(api_key: str):
