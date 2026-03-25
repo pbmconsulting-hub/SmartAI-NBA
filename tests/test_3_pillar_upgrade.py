@@ -113,22 +113,25 @@ class TestGlobalSettingsComponent(unittest.TestCase):
 # ============================================================
 
 class TestPreAnalysisFunnel(unittest.TestCase):
-    """Verify the pre-analysis filter funnel is wired in Neural Analysis."""
+    """Verify the pre-analysis filter funnel has been removed from Neural Analysis.
 
-    def test_funnel_expander_exists(self):
-        """Neural Analysis page should have a Market Filters expander."""
+    The prop funnel and stat-type filter UI was removed so the engine
+    analyzes ALL available props without user-facing stat-type filtering.
+    """
+
+    def test_funnel_expander_removed(self):
+        """Neural Analysis page should NOT have a Market Filters expander."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn('Market Filters', source)
+        self.assertNotIn('Market Filters', source)
 
-    def test_funnel_stat_multiselect(self):
-        """Neural Analysis page should have a stat type multiselect widget."""
+    def test_funnel_stat_multiselect_removed(self):
+        """Neural Analysis page should NOT have a stat type multiselect widget."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("Stat Types", source)
-        self.assertIn("_STAT_TYPE_OPTIONS", source)
+        self.assertNotIn("_STAT_TYPE_OPTIONS", source)
 
     def test_funnel_max_per_player_removed(self):
         """Neural Analysis page should NOT have a user-facing max-props-per-player control."""
@@ -146,28 +149,27 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertNotIn("Absolute Max Props", source)
         self.assertNotIn("funnel_absolute_max", source)
 
-    def test_output_quota_constant(self):
-        """Neural Analysis page should define an output quota via _QME_MIN_OUTPUT_BETS."""
+    def test_output_quota_removed(self):
+        """_QME_MIN_OUTPUT_BETS should no longer be present — all props analysed."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("_QME_MIN_OUTPUT_BETS = 500", source)
+        self.assertNotIn("_QME_MIN_OUTPUT_BETS", source)
 
-    def test_funnel_dynamic_metric(self):
-        """Neural Analysis page should show a dynamic metric for the output target."""
+    def test_all_props_passed_directly(self):
+        """Neural Analysis should pass all current_props directly as final_props."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("Output Target", source)
+        self.assertIn("final_props = list(current_props)", source)
 
     def test_smart_filter_wired_in_runner(self):
-        """The analysis runner should call smart_filter_props with funnel settings."""
+        """The analysis runner should call smart_filter_props without stat_type restriction."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
         self.assertIn("smart_filter_props", source)
-        self.assertIn("_funnel_stat_keys_run", source)
-        self.assertNotIn("_funnel_max_pp", source)
+        self.assertIn("stat_types=None", source)
 
     def test_no_per_player_cap_in_neural_analysis(self):
         """Neural Analysis should pass max_props_per_player=None (no per-player cap)."""

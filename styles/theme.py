@@ -5396,8 +5396,8 @@ QUANTUM_CARD_MATRIX_CSS = """
     margin-bottom: 10px;
 }
 .qcm-headshot {
-    width: 48px;
-    height: 48px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -5546,23 +5546,50 @@ QUANTUM_CARD_MATRIX_CSS = """
    HORIZONTAL CARD — Best Single Bets wide layout
    ═══════════════════════════════════════════════════════════ */
 .qcm-h-card {
-    background: rgba(11, 14, 26, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: linear-gradient(135deg, rgba(11, 14, 26, 0.95), rgba(15, 22, 40, 0.90));
+    border: 1px solid rgba(0, 240, 255, 0.18);
     border-radius: 14px;
-    padding: 16px 20px;
+    padding: 18px 22px;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(0, 240, 255, 0.04);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45),
+                0 0 20px rgba(0, 240, 255, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
     margin-bottom: 14px;
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
-    border-left: 4px solid #00f0ff;
+    border-left: 4px solid var(--h-card-accent, #00f0ff);
     animation: qcm-fade-in-up 0.4s ease both;
+    position: relative;
+    overflow: hidden;
+}
+.qcm-h-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg,
+        rgba(0, 240, 255, 0.03) 0%,
+        transparent 40%,
+        transparent 60%,
+        rgba(0, 240, 255, 0.02) 100%);
+    pointer-events: none;
 }
 .qcm-h-card:hover {
-    border-color: rgba(0, 240, 255, 0.25);
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 240, 255, 0.10);
+    border-color: rgba(0, 240, 255, 0.35);
+    box-shadow: 0 6px 32px rgba(0, 0, 0, 0.55),
+                0 0 28px rgba(0, 240, 255, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+    transition: all 0.25s ease;
 }
+/* Tier-specific accent overrides */
+.qcm-h-card[data-tier="Platinum"] { --h-card-accent: #c800ff; border-left-color: #c800ff; }
+.qcm-h-card[data-tier="Gold"]     { --h-card-accent: #ffd700; border-left-color: #ffd700; }
+.qcm-h-card[data-tier="Silver"]   { --h-card-accent: #b0c0d8; border-left-color: #b0c0d8; }
+.qcm-h-card[data-tier="Bronze"]   { --h-card-accent: #cd7f32; border-left-color: #cd7f32; }
 
 /* Top section: identity + metrics side by side */
 .qcm-h-top {
@@ -5599,11 +5626,15 @@ QUANTUM_CARD_MATRIX_CSS = """
 }
 .qcm-h-metric {
     text-align: center;
-    padding: 4px 8px;
-    background: rgba(15, 23, 42, 0.50);
-    border-radius: 5px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 5px 10px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.65), rgba(20, 28, 50, 0.50));
+    border-radius: 6px;
+    border: 1px solid rgba(0, 240, 255, 0.08);
     min-width: 50px;
+    transition: border-color 0.2s ease;
+}
+.qcm-h-metric:hover {
+    border-color: rgba(0, 240, 255, 0.22);
 }
 
 /* Probability pill badge */
@@ -5719,8 +5750,8 @@ UNIFIED_PLAYER_CARD_CSS = """
 
 /* Headshot */
 .upc-headshot {
-    width: 56px;
-    height: 56px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     border: 2px solid rgba(0, 198, 255, 0.35);
     object-fit: cover;
@@ -5812,6 +5843,39 @@ UNIFIED_PLAYER_CARD_CSS = """
     padding-top: 14px;
 }
 
+/* ── Joseph M Smith avatar row inside expanded card ────── */
+.upc-joseph-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(255, 94, 0, 0.08), rgba(255, 158, 0, 0.04));
+    border: 1px solid rgba(255, 94, 0, 0.25);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.upc-joseph-row:hover {
+    border-color: rgba(255, 94, 0, 0.45);
+    box-shadow: 0 0 12px rgba(255, 94, 0, 0.12);
+}
+.upc-joseph-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #ff5e00;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+.upc-joseph-label {
+    color: #ff9e00;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: 0.02em;
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
     .upc-card > summary {
@@ -5820,8 +5884,8 @@ UNIFIED_PLAYER_CARD_CSS = """
         padding: 12px 14px;
     }
     .upc-headshot {
-        width: 44px;
-        height: 44px;
+        width: 60px;
+        height: 60px;
     }
     .upc-summary-right {
         width: 100%;

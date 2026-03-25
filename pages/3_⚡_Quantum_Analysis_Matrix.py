@@ -483,110 +483,28 @@ with st.expander("📖 How Neural Analysis Works — Framework Logic"):
     st.markdown(get_qds_framework_logic_html(), unsafe_allow_html=True)
 
 # ============================================================
-# SECTION: Pre-Analysis Prop Funnel
+# SECTION: Prop Pool (all available props passed to engine)
 # ============================================================
 
-# Available stat type options (human-readable labels → internal keys)
-_STAT_TYPE_OPTIONS = [
-    "Points", "Rebounds", "Assists", "Threes",
-    "Steals", "Blocks", "Turnovers",
-    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
-    "Fantasy Points",
-]
-_STAT_LABEL_TO_KEY = {
-    "Points": "points",
-    "Rebounds": "rebounds",
-    "Assists": "assists",
-    "Threes": "threes",
-    "Steals": "steals",
-    "Blocks": "blocks",
-    "Turnovers": "turnovers",
-    "Pts+Reb+Ast": "points_rebounds_assists",
-    "Pts+Reb": "points_rebounds",
-    "Pts+Ast": "points_assists",
-    "Reb+Ast": "rebounds_assists",
-    "Fantasy Points": "fantasy_points",
-}
-_DEFAULT_SELECTED_STATS = [
-    "Points", "Rebounds", "Assists", "Threes",
-    "Steals", "Blocks", "Turnovers",
-    "Pts+Reb+Ast", "Pts+Reb", "Pts+Ast", "Reb+Ast",
-    "Fantasy Points",
-]
+# All available props are sent to the engine — no stat-type filtering or
+# intake cap.  The analysis loop will process every prop until all are
+# exhausted, outputting as many high-confidence bets as possible.
+final_props = list(current_props)
 
-
-def _labels_to_stat_keys(labels):
-    """Convert user-facing stat labels to internal stat-type keys."""
-    return frozenset(_STAT_LABEL_TO_KEY.get(lbl, lbl.lower()) for lbl in labels)
-
-
-# Guaranteed minimum output of high-confidence bets from the QME 5.6 engine.
-# The engine will process as many raw props as necessary until this target is
-# reached (or all props are exhausted).  This is an OUTPUT quota, not an
-# input cap.
-_QME_MIN_OUTPUT_BETS = 500
-
-
-@st.cache_data(ttl=300, show_spinner=False)
-def _cached_smart_filter(props_tuple, stat_types_tuple):
-    """Cache-friendly wrapper for smart_filter_props."""
-    props_list = list(props_tuple)
-    stat_types_set = set(stat_types_tuple) if stat_types_tuple else None
-    filtered, summary = _smart_filter_props(
-        all_props=props_list,
-        todays_games=None,   # Already filtered by session
-        injury_map=None,     # Already filtered upstream
-        max_props_per_player=None,  # No per-player cap
-        stat_types=stat_types_set,
-    )
-    return filtered, summary
-
-
-# ── Initialize funnel session-state defaults (once) ──────────────
-if "funnel_stat_types" not in st.session_state:
-    st.session_state["funnel_stat_types"] = list(_DEFAULT_SELECTED_STATS)
-
-with st.expander("🎯 Market Filters", expanded=True):
-    st.markdown(
-        '<p style="color:#a0b4d0;font-size:0.85rem;margin-bottom:12px;">'
-        'Narrow the prop pool before running analysis to improve speed and reduce noise.</p>',
-        unsafe_allow_html=True,
-    )
-
-    _selected_stat_labels = st.multiselect(
-        "Stat Types",
-        options=_STAT_TYPE_OPTIONS,
-        key="funnel_stat_types",
-        help="Only props for these stat categories will be analyzed.",
-    )
-
-    # ── Prop Funnel — no intake cap; output quota enforced downstream ─
-    _funnel_stat_keys = _labels_to_stat_keys(_selected_stat_labels)
-    _filtered_props, _funnel_summary = _cached_smart_filter(
-        tuple(current_props),
-        tuple(sorted(_funnel_stat_keys)),
-    )
-    # Pass ALL filtered props to the engine — the analysis loop will
-    # stop only when _QME_MIN_OUTPUT_BETS high-confidence bets are
-    # found (or all props are exhausted).
-    final_props = _filtered_props
-
-    st.metric(
-        label=f"⚡ PROPS IN FUNNEL — Output Target: {_QME_MIN_OUTPUT_BETS} bets",
-        value=f"{len(final_props):,}",
-        delta=f"{len(final_props) - len(current_props):,} filtered" if len(current_props) > len(final_props) else "No reduction",
-        delta_color="normal" if len(final_props) >= len(current_props) else "inverse",
-    )
+st.metric(
+    label="⚡ PROPS IN POOL",
+    value=f"{len(final_props):,}",
+)
 
 # ============================================================
-# END SECTION: Pre-Analysis Prop Funnel
+# END SECTION: Prop Pool
 # ============================================================
 
 # ============================================================
 # SECTION: Analysis Runner
 # ============================================================
 
-run_col, filter_col = st.columns([1, 2])
+run_col, show_col = st.columns([1, 2])
 
 with run_col:
     run_analysis = st.button(
@@ -597,7 +515,7 @@ with run_col:
         help="Analyze all loaded props with Quantum Matrix Engine 5.6",
     )
 
-with filter_col:
+with show_col:
     show_all_or_top = st.radio(
         "Show:",
         ["All picks", "Top picks only (edge ≥ threshold)"],
@@ -775,31 +693,23 @@ if run_analysis:
             )
             st.caption(f"📊 Analyzing: {_plat_summary}")
 
-        # ── Pre-Analysis Funnel: stat types only (no intake cap) ────
-        # Apply the user's stat-type selection from the Market Filters expander
-        # via smart_filter_props() in data.sportsbook_service.  The pipeline
-        # ingests ALL available props; the 500-bet quota is enforced at the
-        # OUTPUT stage so that the engine processes enough to reach the target.
-        _funnel_stats_selected = st.session_state.get("funnel_stat_types", _DEFAULT_SELECTED_STATS)
-        _funnel_stat_keys_run = _labels_to_stat_keys(_funnel_stats_selected)
-
-        _before_funnel = len(props_to_analyze)
-        props_to_analyze, _funnel_summary = _smart_filter_props(
+        # ── Pre-Analysis Filter: team + injury + dedup only (no stat-type cap) ─
+        # All stat types are passed through — no funnel or stat-type filtering.
+        _before_filter = len(props_to_analyze)
+        props_to_analyze, _filter_summary = _smart_filter_props(
             all_props=props_to_analyze,
             players_data=players_data,
             todays_games=todays_games,
             injury_map=st.session_state.get("injury_status_map", {}),
             max_props_per_player=None,  # No per-player cap
-            stat_types=_funnel_stat_keys_run,
+            stat_types=None,            # Accept ALL stat types
             deduplicate_cross_platform=True,
         )
-        # No intake cap — process all available props until the output
-        # quota (_QME_MIN_OUTPUT_BETS) is met or all props are exhausted.
-        _after_funnel = len(props_to_analyze)
-        if _before_funnel > _after_funnel:
+        _after_filter = len(props_to_analyze)
+        if _before_filter > _after_filter:
             st.info(
-                f"🎯 **Pre-Analysis Funnel**: Reduced **{_before_funnel}** → **{_after_funnel}** props "
-                f"(stat types: {len(_funnel_stat_keys_run)}). Output target: {_QME_MIN_OUTPUT_BETS} bets."
+                f"🎯 **Pre-Analysis Filter**: Reduced **{_before_filter}** → **{_after_filter}** props "
+                f"(team/injury/dedup only — all stat types included)."
             )
 
         total_props_count    = len(props_to_analyze)
