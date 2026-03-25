@@ -190,7 +190,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                 archived_line, found = _get_archived_line(
                     player_name, stat_type, game_date, _archive_cache
                 )
-                if found and archived_line and archived_line > 0:
+                if found and archived_line > 0:
                     prop_line = archived_line
                 else:
                     prop_line = _round_to_half(season_avg)

@@ -1124,8 +1124,10 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             turnovers_std = max(0.1, turnovers_avg * FALLBACK_TURNOVERS_STD_RATIO)
             ftm_std                = max(0.1, ftm_avg                * FALLBACK_FTM_STD_RATIO)
             fta_std                = max(0.1, fta_avg                * FALLBACK_FTA_STD_RATIO)
-            fga_std                = max(0.5, fga_avg                * FALLBACK_FGA_STD_RATIO)  # 0.5 floor: FGA/FGM are high-volume (10-20+/game)
-            fgm_std                = max(0.5, fgm_avg                * FALLBACK_FGM_STD_RATIO)  # so a 0.5 absolute floor is reasonable
+            # FGA/FGM use a 0.5 absolute floor (higher than other stats) because
+            # field goal attempts/makes are high-volume (10-20+/game).
+            fga_std                = max(0.5, fga_avg                * FALLBACK_FGA_STD_RATIO)
+            fgm_std                = max(0.5, fgm_avg                * FALLBACK_FGM_STD_RATIO)
             offensive_rebounds_std = max(0.1, offensive_rebounds_avg * FALLBACK_OREB_STD_RATIO)
             defensive_rebounds_std = max(0.3, defensive_rebounds_avg * FALLBACK_DREB_STD_RATIO)
             personal_fouls_std     = max(0.1, personal_fouls_avg     * FALLBACK_PF_STD_RATIO)
