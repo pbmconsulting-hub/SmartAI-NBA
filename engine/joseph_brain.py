@@ -576,7 +576,7 @@ AMBIENT_POOLS = {
         "This is not a GAME. If you're serious, upgrade to Premium. PERIOD.",
         "I've seen the numbers — Premium users have a SIGNIFICANT edge. Just saying.",
         "You're leaving MONEY on the table with the free tier. Don't do that to yourself!",
-        "Premium unlocks my FULL brain. All 500+ props. Every rant. Every override.",
+        "Premium unlocks my FULL brain. ALL the props. Every rant. Every override.",
         "The free version is nice. Premium is a WEAPON. Choose wisely.",
         "Would you go to a 5-star restaurant and only eat the BREAD? Upgrade!",
         "I don't say this lightly — Premium is the best investment you'll make this month.",

@@ -18,15 +18,12 @@ try:
 except ImportError:
     _logger = logging.getLogger(__name__)
 
-try:
-    from data.odds_client import calculate_implied_probability
-except ImportError:
-    def calculate_implied_probability(american_odds: float) -> float:
-        """Fallback: convert American odds to implied probability percentage."""
-        odds = float(american_odds)
-        if odds < 0:
-            return abs(odds) / (abs(odds) + 100.0) * 100
-        return 100.0 / (odds + 100.0) * 100
+def calculate_implied_probability(american_odds: float) -> float:
+    """Convert American odds to implied probability percentage."""
+    odds = float(american_odds)
+    if odds < 0:
+        return abs(odds) / (abs(odds) + 100.0) * 100
+    return 100.0 / (odds + 100.0) * 100
 
 try:
     from engine.odds_engine import devig_probabilities, get_vig_percentage

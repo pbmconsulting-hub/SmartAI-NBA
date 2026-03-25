@@ -168,15 +168,7 @@ def get_player_id(player_name: str) -> int | None:
         except Exception:
             pass
 
-    # 3. API-NBA API
-    if not pid:
-        try:
-            from data.nba_api_client import get_player_id as _cs_lookup
-            pid = _cs_lookup(player_name)
-        except Exception:
-            pass
-
-    # 4. nba_api local static list (no network call, covers all-time players)
+    # 3. nba_api local static list (no network call, covers all-time players)
     if not pid:
         try:
             static_lookup = _build_nba_static_lookup()

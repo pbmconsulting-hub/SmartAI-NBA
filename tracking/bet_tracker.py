@@ -335,7 +335,7 @@ def get_model_performance_stats():
         dict: Performance data with multiple breakdowns
     """
     # Get all bets from the database
-    all_bets = load_all_bets(limit=500)
+    all_bets = load_all_bets()
 
     # Overall summary
     overall_summary = get_performance_summary()
@@ -592,7 +592,7 @@ def auto_resolve_bet_results(date_str=None):
     errors_list = []
 
     # Load all pending bets for the target date
-    all_bets = load_all_bets(limit=500)
+    all_bets = load_all_bets()
     pending_bets = [
         b for b in all_bets
         if b.get("bet_date", "") == date_str and not b.get("result")
@@ -821,7 +821,7 @@ def resolve_todays_bets():
     summary = {"resolved": 0, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "errors": []}
 
     try:
-        all_bets = load_all_bets(limit=500)
+        all_bets = load_all_bets()
         todays_pending = [
             b for b in all_bets
             if b.get("bet_date") == today_str and not b.get("result")
@@ -854,20 +854,9 @@ def resolve_todays_bets():
     except ImportError:
         _lookup_pid = None
 
-    # ── Check API-NBA live scores for finished games ──────
+    # ── Check live scores for finished games ──────
     _scoreboard_available = False
     has_final_games = False
-    try:
-        from data.nba_api_client import get_live_scores as _cs_live
-        live_scores = _cs_live()
-        if live_scores:
-            _scoreboard_available = True
-            has_final_games = any(
-                "final" in str(g.get("status", "")).lower()
-                for g in live_scores
-            )
-    except Exception as exc:
-        summary["errors"].append(f"API-NBA live scores unavailable: {exc}")
 
     # Short-circuit: if the scoreboard responded but no games are Final yet,
     # skip the expensive per-player API calls and tell the user clearly.
@@ -1045,7 +1034,7 @@ def resolve_todays_bets():
 
     # Count remaining unresolved bets
     try:
-        remaining = load_all_bets(limit=500)
+        remaining = load_all_bets()
         summary["pending"] = sum(
             1 for b in remaining
             if b.get("bet_date") == today_str and not b.get("result")
@@ -1539,39 +1528,8 @@ def get_live_bet_status(bets_list):
     """
     augmented = []
 
-    # Retrieve live box scores from API-NBA
+    # Retrieve live box scores
     live_box: dict = {}  # player_name_lower → current stat totals
-    try:
-        from data.nba_api_client import get_live_scores as _cs_live
-        live_scores = _cs_live()
-        for g in (live_scores or []):
-            status_text = str(g.get("status", "")).lower()
-            is_final = "final" in status_text
-            is_live  = "in progress" in status_text or "live" in status_text or "q" in status_text
-
-            if not (is_final or is_live):
-                continue
-
-            # API-NBA may include player stats in the game object
-            for team_key in ("home_players", "away_players", "players"):
-                for player in g.get(team_key, []):
-                    stats = player.get("statistics", player)
-                    pname = str(player.get("name", player.get("player_name", ""))).lower()
-                    if not pname:
-                        continue
-                    live_box[pname] = {
-                        "pts": float(stats.get("pts", stats.get("points", 0))),
-                        "reb": float(stats.get("reb", stats.get("rebounds", 0))),
-                        "ast": float(stats.get("ast", stats.get("assists", 0))),
-                        "stl": float(stats.get("stl", stats.get("steals", 0))),
-                        "blk": float(stats.get("blk", stats.get("blocks", 0))),
-                        "tov": float(stats.get("tov", stats.get("turnovers", 0))),
-                        "fg3m": float(stats.get("fg3m", stats.get("threes_made", 0))),
-                        "is_final": is_final,
-                        "is_live": is_live,
-                    }
-    except Exception as _exc:
-        logging.getLogger(__name__).warning(f"[BetTracker] Live box score retrieval failed: {_exc}")
 
     STAT_TO_BOX = {
         "points": "pts",
@@ -1656,7 +1614,7 @@ def save_top_picks_from_analysis(analysis_results):
     # Anchor to US/Eastern — NBA game dates are defined in ET.
     today_str = _nba_today_et().isoformat()
 
-    existing_bets = load_all_bets(limit=500)
+    existing_bets = load_all_bets()
     existing_keys = set()
     for b in existing_bets:
         key = (

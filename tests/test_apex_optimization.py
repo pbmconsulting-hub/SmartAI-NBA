@@ -24,59 +24,6 @@ def _ensure_streamlit_mock():
 # Pillar 1: True Line Extraction & Crash Prevention
 # ============================================================
 
-class TestTrueLineExtraction(unittest.TestCase):
-    """Verify that the Odds API client correctly extracts prop lines."""
-
-    def setUp(self):
-        _ensure_streamlit_mock()
-
-    def test_prizepicks_uses_true_line_variable(self):
-        """odds_client.py should reference true_line or equivalent line extraction."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertTrue(
-            "point" in content or "line" in content,
-            "Odds API client should extract prop lines from 'point' field",
-        )
-
-    def test_prizepicks_catches_keyerror(self):
-        """Odds API client should have try/except for crash prevention."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn("except", content,
-                       "Odds API client should have exception handling")
-
-    def test_underdog_uses_true_line_variable(self):
-        """Odds API client should use 'line' field in prop dict."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn('"line"', content,
-                       "Odds API client should include 'line' in prop dicts")
-
-    def test_draftkings_uses_true_line_variable(self):
-        """get_player_props should populate 'line' in returned prop dicts."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn("get_player_props", content,
-                       "odds_client should define get_player_props()")
-
-    def test_none_line_discards_silently(self):
-        """If line value is None/missing, the prop should be silently discarded."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn("continue", content,
-                       "Odds API client should skip props with missing lines")
-
-    def test_stat_projection_fallback(self):
-        """Odds API client should normalize stat types using a mapping dict."""
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertTrue(
-            "player_points" in content or "_ODDS_API_STAT_MAP" in content,
-            "Odds API client should define stat type mappings",
-        )
-
-
 # ============================================================
 # Pillar 2: Async Bet Tracker (ThreadPoolExecutor)
 # ============================================================

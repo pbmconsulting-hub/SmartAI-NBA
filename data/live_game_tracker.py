@@ -43,10 +43,9 @@ def _get_live_boxscores_impl() -> list[dict]:
         name, pts, reb, ast, stl, blk, tov, fg3m, minutes, fouls
     """
     try:
-        from data.nba_api_client import get_live_scores as _cs_live
-        raw_scores = _cs_live()
+        raw_scores = []
     except Exception as exc:
-        _logger.warning("live_game_tracker: API-NBA retrieval failed: %s", exc)
+        _logger.warning("live_game_tracker: retrieval failed: %s", exc)
         raw_scores = []
 
     games: list[dict] = []

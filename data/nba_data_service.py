@@ -194,33 +194,14 @@ def get_standings(progress_callback=None) -> list:
         return standings
     except Exception as exc:
         _logger.warning("get_standings failed: %s", exc)
-    # Fallback: try API-NBA client if available
-    try:
-        from data.nba_api_client import get_standings as _cs_standings
-        return _cs_standings()
-    except Exception:
-        pass
     return []
 
 
 def get_player_news(player_name=None, limit=20) -> list:
     """
-    Retrieve recent NBA news.  Falls back to API-NBA if available.
+    Retrieve recent NBA news.
     Returns an empty list if all sources fail.
     """
-    try:
-        from data.nba_api_client import get_news as _cs_news
-        all_news = _cs_news(limit=limit)
-        if player_name:
-            target = player_name.lower().strip()
-            all_news = [
-                item for item in all_news
-                if target in item.get("player_name", "").lower()
-                or target in item.get("title", "").lower()
-            ]
-        return all_news
-    except Exception as exc:
-        _logger.debug("get_player_news: %s", exc)
     return []
 
 

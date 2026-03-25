@@ -416,56 +416,6 @@ class TestFallbackCaching(unittest.TestCase):
 
 # ── Section 9: ApiNba fallback integration ─────────────────────────────
 
-class TestApiNbaFallbackIntegration(unittest.TestCase):
-    """Verify ApiNba functions fall back to free API when primary fails."""
-
-    @patch("data.nba_stats_backup.get_player_stats_backup")
-    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_player_stats_falls_back(self, mock_request, mock_key, mock_fallback):
-        from data.nba_api_client import get_player_stats
-        mock_fallback.return_value = [{"player_id": "10", "name": "LeBron", "team": "LAL"}]
-        result = get_player_stats()
-        self.assertEqual(len(result), 1)
-        mock_fallback.assert_called_once()
-
-    @patch("data.nba_stats_backup.get_players_backup")
-    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._request_with_retry", return_value=None)
-    def test_get_players_falls_back(self, mock_request, mock_key, mock_fallback):
-        from data.nba_api_client import get_players
-        mock_fallback.return_value = [{"id": 10, "name": "LeBron"}]
-        result = get_players()
-        self.assertEqual(len(result), 1)
-        mock_fallback.assert_called_once()
-
-
-# ── Section 10: ApiNba primary still works when not broken ──────────────
-
-class TestApiNbaPrimaryStillWorks(unittest.TestCase):
-    """When ApiNba returns valid data, fallback should NOT be called."""
-
-    @patch("data.nba_stats_backup.get_player_stats_backup")
-    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._request_with_retry")
-    def test_player_stats_uses_primary(self, mock_request, mock_key, mock_fallback):
-        from data.nba_api_client import get_player_stats
-        mock_request.return_value = [{"id": 10, "name": "LeBron", "team": "LAL"}]
-        result = get_player_stats()
-        self.assertEqual(len(result), 1)
-        mock_fallback.assert_not_called()
-
-    @patch("data.nba_stats_backup.get_players_backup")
-    @patch("data.nba_api_client._resolve_api_key", return_value="test-key")
-    @patch("data.nba_api_client._request_with_retry")
-    def test_players_uses_primary(self, mock_request, mock_key, mock_fallback):
-        from data.nba_api_client import get_players
-        mock_request.return_value = [{"id": 10, "name": "LeBron"}]
-        result = get_players()
-        self.assertEqual(len(result), 1)
-        mock_fallback.assert_not_called()
-
-
 # ── Section 11: Retry logic in _request_nba_stats ───────────────────────
 
 class TestRequestNbaStatsRetry(unittest.TestCase):
