@@ -292,9 +292,10 @@ class RosterEngine:
 
     def refresh(self, team_abbrevs: list = None):
         """
-        Fetch fresh data from nba_api — the single authoritative source.
+        Fetch fresh data from multiple sources in priority order.
 
         Sources used (in order):
+            0. Official NBA Injury Report PDF — highest-authority source
             1. nba_api live Injuries endpoint — daily injury designations
             2. nba_api CommonTeamRoster       — official roster + two-way status
 
@@ -302,8 +303,14 @@ class RosterEngine:
             team_abbrevs: List of team abbreviations to fetch rosters for.
                           If None, only the injury data is refreshed.
         """
-        _logger.info("RosterEngine.refresh() — starting data pull (nba_api sources only)")
+        _logger.info("RosterEngine.refresh() — starting data pull")
         merged: dict = {}
+
+        # ── Source 0: Official NBA Injury Report PDF ──────────────
+        src0 = self._fetch_official_pdf_injuries()
+        for k, v in src0.items():
+            merged[k] = _merge_entry(merged.get(k, {}), v)
+        _logger.info(f"  Source 0 (official PDF): {len(src0)} players")
 
         # ── Source 1: nba_api live Injuries endpoint ──────────────
         src1 = self._fetch_nba_api_injuries()
@@ -325,6 +332,63 @@ class RosterEngine:
             f"RosterEngine.refresh() complete: {len(self._injury_map)} injured/flagged players "
             f"({out_count} hard-excluded)"
         )
+
+    # ----------------------------------------------------------
+    # Source 0: Official NBA Injury Report PDF
+    # ----------------------------------------------------------
+
+    def _fetch_official_pdf_injuries(self) -> dict:
+        """
+        Fetch the official NBA Injury Report PDF and return a normalised
+        injury dict compatible with the rest of the RosterEngine pipeline.
+
+        Requires ``pdfplumber`` to be installed.  If the package is absent or
+        the report cannot be retrieved the method returns an empty dict so the
+        existing Sources 1–3 remain unaffected.
+
+        Returns:
+            Dict of {normalized_name: {status, injury, team, return_date,
+            source, game_date, game_time, matchup}} entries, or ``{}`` on any
+            failure.
+        """
+        try:
+            from data.nba_injury_pdf import get_report
+        except ImportError as exc:
+            _logger.debug(f"RosterEngine._fetch_official_pdf_injuries: import error — {exc}")
+            return {}
+
+        try:
+            df = get_report(auto_discover=True)
+            if df.empty:
+                return {}
+
+            result: dict = {}
+            for _, row in df.iterrows():
+                name   = str(row.get("Player Name", "") or "").strip()
+                status = _normalize_status(str(row.get("Current Status", "") or ""))
+                injury = str(row.get("Reason", "") or "").strip()
+                team   = str(row.get("Team", "") or "").strip()
+                if not name:
+                    continue
+                key = _normalize_name(name)
+                result[key] = {
+                    "status":      status,
+                    "injury":      injury,
+                    "team":        team,
+                    "return_date": "",
+                    "source":      "nba-official-pdf",
+                    "game_date":   str(row.get("Game Date", "") or "").strip(),
+                    "game_time":   str(row.get("Game Time", "") or "").strip(),
+                    "matchup":     str(row.get("Matchup", "") or "").strip(),
+                }
+            _logger.info(
+                f"  RosterEngine._fetch_official_pdf_injuries: "
+                f"PDF source returned {len(result)} players"
+            )
+            return result
+        except Exception as exc:
+            _logger.info(f"  RosterEngine._fetch_official_pdf_injuries: {exc}")
+            return {}
 
     # ----------------------------------------------------------
     # Source 1: nba_api live Injuries endpoint
