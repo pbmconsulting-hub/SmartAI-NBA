@@ -623,7 +623,11 @@ with left_column:
                         save_platform_props_to_session as _hoc_sps,
                         save_props_to_session as _hoc_sp,
                     )
-                    _hoc_live = _hoc_fap()
+                    _hoc_live = _hoc_fap(
+                        include_prizepicks=True,
+                        include_underdog=True,
+                        include_draftkings=True,
+                    )
                     if _hoc_live:
                         _hoc_sps(_hoc_live, st.session_state)
                         _hoc_sp(_hoc_live, st.session_state)

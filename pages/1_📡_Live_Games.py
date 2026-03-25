@@ -231,12 +231,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-_include_pp = False
-_include_ud = False
-_dk_col, _load_btn_col = st.columns([1, 2])
+_pp_col, _ud_col, _dk_col, _load_btn_col = st.columns([1, 1, 1, 2])
 
+with _pp_col:
+    _include_pp = st.checkbox("🟢 PrizePicks", value=True, key="platform_pp_checkbox")
+with _ud_col:
+    _include_ud = st.checkbox("🟡 Underdog Fantasy", value=True, key="platform_ud_checkbox")
 with _dk_col:
-    _include_dk = st.checkbox("🔵 All Major Sportsbooks", value=True, key="platform_dk_checkbox")
+    _include_dk = st.checkbox("🔵 DraftKings Pick6", value=True, key="platform_dk_checkbox")
 
 # Smart Filter controls (collapsible)
 with st.expander("🧠 Smart Filter Settings", expanded=False):
@@ -445,7 +447,9 @@ if platform_props_clicked:
     st.subheader("📊 Platform Props & Neural Analysis")
 
     _platforms_label = ", ".join(filter(None, [
-        "All Major Sportsbooks" if _include_dk else "",
+        "PrizePicks" if _include_pp else "",
+        "Underdog Fantasy" if _include_ud else "",
+        "DraftKings Pick6" if _include_dk else "",
     ]))
     st.markdown(f"Loading live props from **{_platforms_label}** and running Neural Analysis…")
 

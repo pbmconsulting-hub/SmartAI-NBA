@@ -1050,25 +1050,42 @@ except ImportError as _pf_err:
 if _SPORTSBOOK_SERVICE_AVAILABLE:
 
     # ── Read current settings ──────────────────────────────────
-    _pp_on = False
-    _ud_on = False
     _dk_on = st.session_state.get("load_draftkings_enabled", True)
     _dk_key = st.session_state.get("odds_api_key", "").strip()
+
+    # Platform checkboxes
+    _df_pp_col, _df_ud_col, _df_dk_col = st.columns(3)
+    with _df_pp_col:
+        _pp_on = st.checkbox("🟢 PrizePicks", value=True, key="datafeed_pp_checkbox")
+    with _df_ud_col:
+        _ud_on = st.checkbox("🟡 Underdog Fantasy", value=True, key="datafeed_ud_checkbox")
+    with _df_dk_col:
+        _dk_cb_on = st.checkbox("🔵 DraftKings Pick6", value=_dk_on and bool(_dk_key), key="datafeed_dk_checkbox",
+                                disabled=not (_dk_on and bool(_dk_key)),
+                                help="Requires Odds API key — configure on ⚙️ Settings page." if not (_dk_on and bool(_dk_key)) else "")
 
     # Show platform status badges
     _badge_style = (
         "padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;"
         "margin-right:8px;display:inline-block;"
     )
+    _pp_badge = (
+        f'<span style="{_badge_style}background:#1a4d2f;color:#b8f8c8;">'
+        f'{"✅" if _pp_on else "⏸️"} PrizePicks</span>'
+    )
+    _ud_badge = (
+        f'<span style="{_badge_style}background:#4d3a1a;color:#f8e4b8;">'
+        f'{"✅" if _ud_on else "⏸️"} Underdog</span>'
+    )
     _dk_badge = (
         f'<span style="{_badge_style}background:#1a2f4d;color:#bee3f8;">'
-        f'{"✅" if _dk_on else "⏸️"} Sportsbook Lines</span>'
+        f'{"✅" if _dk_cb_on else "⏸️"} DraftKings</span>'
     )
     st.markdown(
-        f'<div style="margin-bottom:12px;">{_dk_badge}</div>',
+        f'<div style="margin-bottom:12px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>',
         unsafe_allow_html=True,
     )
-    st.caption("Enable/disable platforms on the ⚙️ Settings page.")
+    st.caption("Toggle platforms above. DraftKings requires an Odds API key (⚙️ Settings page).")
 
     # ── Check for already-loaded props in session ─────────────
     _cached_platform_props = load_platform_props_from_session(st.session_state)
@@ -1081,17 +1098,15 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
         )
 
     # ── Load buttons ─────────────────────────────────────────
+    _any_platform_on = _pp_on or _ud_on or _dk_cb_on
     _load_col1, _load_col2 = st.columns(2)
-
-    _load_pp = False
-    _load_ud = False
 
     with _load_col1:
         _load_dk = st.button(
-            "🔵 Get Sportsbook Lines",
-            disabled=not _dk_on,
+            "🔵 Get DraftKings Only",
+            disabled=not _dk_cb_on,
             width="stretch",
-            help="Load lines from all major sportsbooks.",
+            help="Load lines from DraftKings Pick6 only.",
         )
     with _load_col2:
         _load_all = st.button(
@@ -1099,12 +1114,11 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
             type="primary",
             width="stretch",
             help="Load from all enabled platforms at once.",
+            disabled=not _any_platform_on,
         )
 
     # ── Execute loads ────────────────────────────────────────
     _load_triggered = False
-    _load_pp_only = False
-    _load_ud_only = False
     _load_dk_only = False
 
     if _load_all:
@@ -1123,9 +1137,9 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
         try:
             with st.spinner("Loading live props from betting platforms..."):
                 _new_props = get_all_sportsbook_props(
-                    include_prizepicks=False,
-                    include_underdog=False,
-                    include_draftkings=_dk_on and (_load_all or _load_dk_only),
+                    include_prizepicks=_pp_on and not _load_dk_only,
+                    include_underdog=_ud_on and not _load_dk_only,
+                    include_draftkings=_dk_cb_on and (_load_all or _load_dk_only),
                     odds_api_key=_dk_key or None,
                     progress_callback=_progress_cb,
                 )
