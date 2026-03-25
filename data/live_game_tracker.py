@@ -33,7 +33,7 @@ except ImportError:
 
 def _get_live_boxscores_impl() -> list[dict]:
     """
-    Retrieve live NBA box scores from API-NBA API.
+    Retrieve live NBA box scores.
 
     Returns a list of game dicts, each containing:
         game_id, home_team, away_team, home_score, away_score,
