@@ -64,7 +64,8 @@ except ImportError:
 
 _BASE_URL = "https://v1.basketball.api-sports.io"
 
-# v2 NBA API base URL — used for /players and /players/statistics endpoints.
+# v2 NBA API base URL — used for /players, /players/statistics, and
+# /teams/statistics endpoints.
 _PLAYERS_BASE_URL = "https://v2.nba.api-sports.io"
 
 # ── API Endpoints ─────────────────────────────────────────────────────────────
@@ -74,7 +75,7 @@ ENDPOINT_TEAMS = "/teams"
 ENDPOINT_GAMES = "/games"
 ENDPOINT_PLAYERS = "/players"
 ENDPOINT_PLAYER_STATS = "/players/statistics"
-ENDPOINT_TEAM_GAME_STATS = "/games/statistics/teams"
+ENDPOINT_TEAM_STATS = "/teams/statistics"
 ENDPOINT_INJURIES = "/injuries"
 ENDPOINT_STANDINGS = "/standings"
 ENDPOINT_ODDS = "/odds"
@@ -1827,9 +1828,9 @@ def get_game_odds(game_id=None) -> list[dict]:
 
 def get_nba_team_stats(team_id=None, season=None) -> list[dict]:
     """
-    Retrieve team statistics for NBA games.
+    Retrieve overall team statistics for a given season.
 
-    Endpoint: GET /games/statistics/teams
+    Endpoint: GET /teams/statistics  (v2 NBA API — v2.nba.api-sports.io)
     Fallback: free NBA.com stats endpoint when API-NBA is unavailable.
 
     Args:
@@ -1840,12 +1841,14 @@ def get_nba_team_stats(team_id=None, season=None) -> list[dict]:
         list[dict]: Team statistics entries.
         Returns [] on failure.
     """
-    url = f"{_BASE_URL}{ENDPOINT_TEAM_GAME_STATS}"
+    url = f"{_PLAYERS_BASE_URL}{ENDPOINT_TEAM_STATS}"
     params: dict = {}
     if team_id is not None:
-        params["team"] = team_id
+        params["id"] = team_id
     if season is not None:
         params["season"] = season
+    if season is None:
+        params["season"] = int(_CURRENT_SEASON_YEAR)
 
     try:
         raw = _request_with_retry(url, params=params)
