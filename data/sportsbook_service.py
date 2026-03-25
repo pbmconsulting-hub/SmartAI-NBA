@@ -39,6 +39,14 @@ from data.platform_fetcher import (            # noqa: F401 – re-exports
     quarantine_props,
     smart_filter_props,
     parse_alt_lines_from_platform_props,
+    # Async infrastructure
+    AIOHTTP_AVAILABLE,
+    _ASYNC_SEMAPHORE_LIMIT,
+    fetch_all_platforms_async as get_all_sportsbooks_async,
+    # Quarantine constants
+    QUARANTINE_ODDS_FLOOR,
+    QUARANTINE_ODDS_CEILING,
+    _EQUILIBRIUM_ODDS,
 )
 
 # Import platform_fetcher functions under private names for

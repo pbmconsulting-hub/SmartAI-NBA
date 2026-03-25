@@ -2245,10 +2245,17 @@ def parse_alt_lines_from_platform_props(props):
         enriched_prop = dict(prop)
         enriched_prop["standard_line"] = std_line
 
-        # Tier classification removed — all props are treated as
-        # "standard" regardless of their relationship to the standard
-        # O/U line.  The True More/Less Line remains the primary anchor.
-        enriched_prop["line_category"] = "standard"
+        if std_line is None or prop_line <= 0:
+            enriched_prop["line_category"] = "standard"
+        elif len(_groups.get(key, [])) == 1:
+            # Only one line → this IS the standard O/U
+            enriched_prop["line_category"] = "50_50"
+        elif abs(prop_line - std_line) < 0.01:
+            enriched_prop["line_category"] = "50_50"
+        elif prop_line < std_line:
+            enriched_prop["line_category"] = "goblin"
+        else:
+            enriched_prop["line_category"] = "demon"
 
         enriched.append(enriched_prop)
 
