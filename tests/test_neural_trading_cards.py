@@ -576,10 +576,10 @@ class TestNeuralAnalysisOutputSelection(unittest.TestCase):
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         return na_path.read_text(encoding="utf-8")
 
-    def test_output_quota_constant_is_500(self):
-        """_QME_MIN_OUTPUT_BETS must still be defined (kept for reference)."""
+    def test_output_quota_constant_removed(self):
+        """_QME_MIN_OUTPUT_BETS should no longer be defined — all props are analyzed."""
         source = self._read_source()
-        self.assertIn("_QME_MIN_OUTPUT_BETS = 500", source)
+        self.assertNotIn("_QME_MIN_OUTPUT_BETS", source)
 
     def test_selection_separates_out_players(self):
         """Selection logic must partition Out players from active results."""

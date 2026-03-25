@@ -2428,7 +2428,8 @@ def smart_filter_props(
             player.  Default is 5. Range 1–15.  Pass None to skip the
             per-player cap entirely.
         stat_types (set or list, optional): Stat types to include.
-            Defaults to _DEFAULT_STAT_TYPES. Pass None to use defaults.
+            Defaults to None (accept ALL stat types). Pass a set/list to
+            restrict to specific stat types only.
         deduplicate_cross_platform (bool): If True (default), collapse
             duplicate (player, stat_type) entries from multiple platforms
             into one record and tag it with all offering platforms.
@@ -2456,8 +2457,9 @@ def smart_filter_props(
     })
 
     # ── Resolve stat type filter set ────────────────────────────────────
+    # When stat_types is None, accept ALL stat types (no filtering).
     if stat_types is None:
-        _allowed_stats = _DEFAULT_STAT_TYPES
+        _allowed_stats = None  # sentinel: skip stat-type filtering entirely
     else:
         _allowed_stats = frozenset(str(s).lower().strip() for s in stat_types)
 
@@ -2570,10 +2572,14 @@ def smart_filter_props(
     summary["after_dedup"] = len(dedup_filtered)
 
     # ── Step 4: Filter to selected stat types ────────────────────────────
-    stat_filtered = [
-        p for p in dedup_filtered
-        if str(p.get("stat_type", "")).lower().strip() in _allowed_stats
-    ]
+    if _allowed_stats is None:
+        # No stat-type filtering — accept all stat types
+        stat_filtered = dedup_filtered
+    else:
+        stat_filtered = [
+            p for p in dedup_filtered
+            if str(p.get("stat_type", "")).lower().strip() in _allowed_stats
+        ]
     summary["after_stat_filter"] = len(stat_filtered)
 
     # ── Step 5: Cap props per player ────────────────────────────────────
