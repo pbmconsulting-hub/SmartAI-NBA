@@ -148,16 +148,24 @@ _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 #      height or scroll-bar is needed.
 # ---------------------------------------------------------------------------
 
+_MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
+_HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
+_MAX_IFRAME_HEIGHT = 3000      # px — cap before ResizeObserver takes over
+_RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
+
+# Auto-resize JavaScript injected into every card-matrix iframe.
+# Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
+# the iframe height whenever the content changes (e.g. <details> toggle).
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var t;"
-    "function h(){clearTimeout(t);t=setTimeout(function(){"
+    "var timer;"
+    "function sendHeight(){clearTimeout(timer);timer=setTimeout(function(){"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',"
-    "height:document.body.scrollHeight},'*')},50)}"
-    "h();new ResizeObserver(h).observe(document.body);"
-    "document.addEventListener('toggle',h,true);"
-    "window.addEventListener('load',h)"
+    f"height:document.body.scrollHeight}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
+    "document.addEventListener('toggle',sendHeight,true);"
+    "window.addEventListener('load',sendHeight)"
     "})()"
     "</script>"
 )
@@ -175,7 +183,7 @@ def _render_card_iframe(card_html, player_count):
         Number of player groups — used to estimate the initial iframe
         height before the ``ResizeObserver`` adjusts it.
     """
-    _est_h = max(400, min(player_count * 200, 3000))
+    _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
     _doc = (
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
