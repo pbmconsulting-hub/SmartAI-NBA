@@ -221,29 +221,6 @@ class TestPlatformFetcherCapAndAsync(unittest.TestCase):
         from data.sportsbook_service import AIOHTTP_AVAILABLE
         self.assertIsInstance(AIOHTTP_AVAILABLE, bool)
 
-    def test_true_line_kill_switch_prizepicks(self):
-        """Odds API client (replacing PrizePicks) must discard props with no valid line."""
-        import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        source = src.read_text(encoding="utf-8")
-        self.assertIn("continue", source)
-
-    def test_true_line_kill_switch_underdog(self):
-        """Odds API client (replacing Underdog) must discard props with no valid line."""
-        import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        source = src.read_text(encoding="utf-8")
-        self.assertIn("continue", source)
-        self.assertTrue("point" in source or "line" in source)
-
-    def test_true_line_kill_switch_draftkings(self):
-        """Odds API client (replacing DraftKings getter) must discard invalid props."""
-        import pathlib
-        src = pathlib.Path(__file__).parent.parent / "data" / "odds_client.py"
-        source = src.read_text(encoding="utf-8")
-        self.assertIn("continue", source)
-        self.assertIn("point", source)
-
 
 class TestConfigToml(unittest.TestCase):
     """Tests for .streamlit/config.toml."""

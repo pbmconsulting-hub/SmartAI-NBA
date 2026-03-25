@@ -70,9 +70,8 @@ SmartAI-NBA/
 │   ├── 10_🗺️_Correlation_Matrix.py   # Prop correlation analysis
 │   ├── 11_📈_Bet_Tracker.py           # Bet tracking & model health
 │   ├── 12_📊_Backtester.py            # Historical backtesting engine
-│   ├── 13_⚙️_Settings.py             # Configure engine settings + API keys
-│   ├── 14_💎_Subscription_Level.py    # Premium subscription management
-│   └── 15_🎰_Vegas_Vault.py           # Cross-book edge scanner
+│   ├── 13_⚙️_Settings.py             # Configure engine settings
+│   └── 14_💎_Subscription_Level.py    # Premium subscription management
 │
 ├── engine/
 │   ├── math_helpers.py                 # All math from scratch (no scipy)
@@ -89,8 +88,6 @@ SmartAI-NBA/
 ├── data/
 │   ├── data_manager.py                # Load/save CSV data + session state
 │   ├── nba_data_service.py            # NBA data orchestration service
-│   ├── nba_api_client.py              # API-Basketball v1 NBA client
-│   ├── odds_client.py                 # The Odds API — live sportsbook odds
 │   ├── sportsbook_service.py          # Multi-platform prop fetcher
 │   ├── live_game_tracker.py           # Live game score tracker
 │   ├── nba_stats_backup.py            # Free NBA.com stats fallback
@@ -218,17 +215,12 @@ Configure:
 ### 💎 Page 14: Subscription Level
 Premium subscription management powered by Stripe.
 
-### 🎰 Page 15: Vegas Vault
-Cross-book edge scanner — finds pricing discrepancies across
-DraftKings, FanDuel, BetMGM, and 15+ sportsbooks.
-
 ---
 
 ## 🔴 Live NBA Data
 
-SmartAI-NBA uses **real, up-to-date NBA stats** from two primary APIs:
-- **API-NBA API** — player stats, team metrics, game schedules, rosters
-- **The Odds API** — live sportsbook odds from DraftKings, FanDuel, BetMGM, and 15+ books
+SmartAI-NBA uses **real, up-to-date NBA stats** from the **nba_api** Python package and
+prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
 
 ### Setup
 
@@ -237,7 +229,6 @@ SmartAI-NBA uses **real, up-to-date NBA stats** from two primary APIs:
 pip install -r requirements.txt
 ```
 2. Run the app: `streamlit run app.py`
-3. Go to **⚙️ Settings** (page 13) to enter your API keys
 
 **Alternative — file-based keys (persistent across sessions):**
 ```bash
@@ -378,8 +369,7 @@ All other functionality uses Python's standard library:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `API_NBA_KEY` | For live data | API-Sports Basketball key |
-| `ODDS_API_KEY` | For live data | The Odds API key |
+| `ODDS_API_KEY` | For DraftKings | The Odds API key (powers DraftKings Pick6 props) |
 | `STRIPE_SECRET_KEY` | For payments | Stripe secret key |
 | `STRIPE_PUBLISHABLE_KEY` | For payments | Stripe publishable key |
 | `STRIPE_PRICE_ID` | For payments | Stripe product price ID |

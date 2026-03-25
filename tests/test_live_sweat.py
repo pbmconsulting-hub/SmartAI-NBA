@@ -801,69 +801,13 @@ class TestLiveSweatPageFile(unittest.TestCase):
 # ============================================================
 
 class TestFetchLiveBoxscoresImpl(unittest.TestCase):
-    """Test _get_live_boxscores_impl with mocked ApiNba data."""
+    """Test _get_live_boxscores_impl."""
 
     def test_returns_list(self):
         from data.live_game_tracker import _get_live_boxscores_impl
         # Should return list even when API is unreachable
         result = _get_live_boxscores_impl()
         self.assertIsInstance(result, list)
-
-    def test_player_extraction(self):
-        """Ensure player stats are parsed from game dicts."""
-        from data import live_game_tracker
-        from unittest.mock import patch
-
-        mock_data = [{
-            "game_id": "123",
-            "home_team": "LAL",
-            "away_team": "BOS",
-            "home_score": 100,
-            "away_score": 95,
-            "period": "3",
-            "game_clock": "5:30",
-            "status": "In Progress",
-            "home_players": [
-                {
-                    "name": "LeBron James",
-                    "statistics": {
-                        "pts": 22, "reb": 8, "ast": 6,
-                        "stl": 1, "blk": 1, "tov": 3,
-                        "fg3m": 2, "minutes": 28, "pf": 2,
-                    },
-                }
-            ],
-            "away_players": [
-                {
-                    "name": "Jayson Tatum",
-                    "statistics": {
-                        "pts": 30, "reb": 7, "ast": 4,
-                        "stl": 2, "blk": 0, "tov": 1,
-                        "fg3m": 5, "minutes": 30, "pf": 1,
-                    },
-                }
-            ],
-        }]
-
-        with patch.object(
-            live_game_tracker, "_get_live_boxscores_impl",
-            wraps=live_game_tracker._get_live_boxscores_impl,
-        ):
-            with patch(
-                "data.nba_api_client.get_live_scores",
-                return_value=mock_data,
-            ):
-                games = live_game_tracker._get_live_boxscores_impl()
-
-        self.assertEqual(len(games), 1)
-        home = games[0]["home_players"]
-        away = games[0]["away_players"]
-        self.assertEqual(len(home), 1)
-        self.assertEqual(home[0]["name"], "LeBron James")
-        self.assertEqual(home[0]["pts"], 22)
-        self.assertEqual(away[0]["name"], "Jayson Tatum")
-        self.assertEqual(away[0]["fg3m"], 5)
-        self.assertEqual(away[0]["fouls"], 1)
 
 
 if __name__ == "__main__":

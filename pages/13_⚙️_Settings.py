@@ -158,150 +158,6 @@ st.markdown(get_education_box_html(
 # END SECTION: Page Setup
 # ============================================================
 
-# ============================================================
-# SECTION: API Keys
-# ============================================================
-
-st.subheader("🔑 API Keys")
-st.markdown(
-    "Enter your API keys below. Keys entered here are stored in your browser "
-    "session only (temporary). For persistent keys across sessions, copy "
-    "`.streamlit/secrets.toml.example` to `.streamlit/secrets.toml` and add "
-    "your keys there."
-)
-
-_api_col1, _api_col2 = st.columns(2)
-
-with _api_col1:
-    _current_cs_key = st.session_state.get("api_nba_key", "")
-    _new_cs_key = st.text_input(
-        "API-NBA Key",
-        value=_current_cs_key,
-        type="password",
-        placeholder="Enter your API-NBA key",
-        help="Get your key at https://api-sports.io/",
-    )
-    if st.session_state.get("api_nba_key"):
-        st.caption("✅ API-NBA key is set")
-    else:
-        st.caption("⚠️ API-NBA key is **not set** — live data will be unavailable")
-
-with _api_col2:
-    _current_odds_key = st.session_state.get("odds_api_key", "")
-    _new_odds_key = st.text_input(
-        "Odds API Key",
-        value=_current_odds_key,
-        type="password",
-        placeholder="Enter your Odds API key",
-        help="Get your key at https://the-odds-api.com",
-    )
-    if st.session_state.get("odds_api_key"):
-        st.caption("✅ Odds API key is set")
-    else:
-        st.caption("⚠️ Odds API key is **not set** — odds data will be unavailable")
-
-_api_btn_col1, _api_btn_col2, _api_btn_col3, _ = st.columns([1, 1, 1, 1])
-with _api_btn_col1:
-    if st.button("💾 Save Keys", key="save_api_keys"):
-        from data.nba_api_client import validate_nba_api_key as _validate_cs_key
-        from data.odds_client import validate_odds_api_key as _validate_odds_key
-
-        _changed = False
-        _errors: list[str] = []
-        if _new_cs_key != _current_cs_key:
-            if _new_cs_key:
-                _ok, _msg = _validate_cs_key(_new_cs_key)
-                if not _ok:
-                    _errors.append(f"API-NBA: {_msg}")
-                else:
-                    st.session_state["api_nba_key"] = _new_cs_key
-                    _changed = True
-            else:
-                st.session_state["api_nba_key"] = _new_cs_key
-                _changed = True
-        if _new_odds_key != _current_odds_key:
-            if _new_odds_key:
-                _ok, _msg = _validate_odds_key(_new_odds_key)
-                if not _ok:
-                    _errors.append(f"Odds API: {_msg}")
-                else:
-                    st.session_state["odds_api_key"] = _new_odds_key
-                    _changed = True
-            else:
-                st.session_state["odds_api_key"] = _new_odds_key
-                _changed = True
-        if _errors:
-            for _e in _errors:
-                st.error(f"❌ {_e}")
-        elif _changed:
-            st.success("✅ API keys saved to session!")
-            st.rerun()
-        else:
-            st.info("No changes to save.")
-with _api_btn_col2:
-    if st.button("🗑️ Clear Keys", key="clear_api_keys"):
-        st.session_state.pop("api_nba_key", None)
-        st.session_state.pop("odds_api_key", None)
-        st.warning("API keys cleared.")
-        st.rerun()
-with _api_btn_col3:
-    if st.button("🔍 Test Connection", key="test_api_keys"):
-        _test_results: list[str] = []
-        # ── API-NBA ──
-        _cs_key = st.session_state.get("api_nba_key", "")
-        if _cs_key:
-            try:
-                from data.nba_api_client import get_api_key_info
-                _info = get_api_key_info()
-                if _info:
-                    _credits = _info.get("credits_remaining", "?")
-                    _active = _info.get("is_active", None)
-                    _status = "active" if _active else ("inactive" if _active is False else "unknown")
-                    _test_results.append(
-                        f"✅ **API-NBA**: connected — {_credits} credits remaining, status: {_status}"
-                    )
-                else:
-                    _test_results.append("⚠️ **API-NBA**: key is set but API returned no data")
-            except Exception as _exc:
-                _test_results.append(f"❌ **API-NBA**: connection error — {_exc}")
-        else:
-            _test_results.append("⚠️ **API-NBA**: no API key configured")
-        # ── Odds API ──
-        _odds_key = st.session_state.get("odds_api_key", "")
-        if _odds_key:
-            try:
-                from data.odds_client import get_sports, get_odds_api_usage
-                _sports = get_sports()
-                _usage = get_odds_api_usage()
-                _remaining = _usage.get("requests_remaining")
-                if _sports is not None:
-                    # Check that basketball_nba is in the list
-                    _nba_active = any(
-                        s.get("key") == "basketball_nba" and s.get("active")
-                        for s in _sports if isinstance(s, dict)
-                    )
-                    _nba_str = "NBA is active ✅" if _nba_active else "NBA not in season"
-                    _quota_str = f", {_remaining} requests remaining" if _remaining is not None else ""
-                    _test_results.append(
-                        f"✅ **Odds API**: connected — {len(_sports)} sports available, {_nba_str}{_quota_str}"
-                    )
-                else:
-                    _test_results.append(
-                        "❌ **Odds API**: API key may be invalid or expired — "
-                        "check the key and try again (see logs for details)"
-                    )
-            except Exception as _exc:
-                _test_results.append(f"❌ **Odds API**: connection error — {_exc}")
-        else:
-            _test_results.append("⚠️ **Odds API**: no API key configured")
-        # ── Display results ──
-        for _msg in _test_results:
-            st.markdown(_msg)
-
-# ============================================================
-# END SECTION: API Keys
-# ============================================================
-
 st.divider()
 
 # ============================================================
@@ -562,8 +418,6 @@ st.divider()
 st.subheader("📋 Current Settings Summary")
 
 settings_summary = {
-    "API-NBA Key": "✅ Set" if st.session_state.get("api_nba_key") else "⚠️ Not set",
-    "Odds API Key": "✅ Set" if st.session_state.get("odds_api_key") else "⚠️ Not set",
     "Simulation Depth": f"{st.session_state.get('simulation_depth', 1000):,} simulations",
     "Minimum Edge": f"{st.session_state.get('minimum_edge_threshold', 5.0)}%",
     "Entry Fee": f"${st.session_state.get('entry_fee', 10.0):.2f}",
@@ -585,7 +439,6 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
         "simulation_depth", "minimum_edge_threshold", "entry_fee",
         "selected_platforms", "home_court_boost", "blowout_sensitivity",
         "fatigue_sensitivity", "pace_sensitivity",
-        "api_nba_key", "odds_api_key",
     ]
     for key in settings_keys_to_clear:
         if key in st.session_state:

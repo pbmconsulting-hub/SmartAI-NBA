@@ -292,24 +292,6 @@ if "session_props" not in st.session_state:
 if "loaded_live_picks" not in st.session_state:
     st.session_state["loaded_live_picks"] = []
 
-# ═══ Auto-populate API keys from st.secrets (.streamlit/secrets.toml) ═══
-# Keys loaded here are available immediately and persist for the session.
-# Users can still override them via the Settings page.
-try:
-    if not st.session_state.get("api_nba_key"):
-        _cs_secret = st.secrets.get("API_NBA_KEY", "")
-        if _cs_secret:
-            st.session_state["api_nba_key"] = _cs_secret
-except Exception:
-    pass
-try:
-    if not st.session_state.get("odds_api_key"):
-        _odds_secret = st.secrets.get("ODDS_API_KEY", "")
-        if _odds_secret:
-            st.session_state["odds_api_key"] = _odds_secret
-except Exception:
-    pass
-
 # ═══ Joseph M. Smith Session State ═══
 st.session_state.setdefault("joseph_enabled", True)
 st.session_state.setdefault("joseph_used_fragments", set())
@@ -388,7 +370,6 @@ with st.expander("📖 How to Use SmartBetPro NBA", expanded=False):
     - 🗺️ **Correlation Matrix**: Understand how props relate to each other
     - 🔮 **Player Simulator**: Run what-if scenarios for any player
     - 📊 **Backtester**: Validate the model against historical results
-    - 🎰 **Vegas Vault**: Find edge across multiple sportsbooks
     
     💡 **Pro Tip:** Start with the Data Feed → Live Games → Quantum Analysis workflow each session.
     """)

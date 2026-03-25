@@ -30,7 +30,6 @@ _PAGE_FILES = [
     ("pages/12_📊_Backtester.py", "📖 How to Use"),
     ("pages/13_⚙️_Settings.py", "📖 How to Use"),
     ("pages/14_💎_Subscription_Level.py", "📖 How"),
-    ("pages/15_🎰_Vegas_Vault.py", "📖 How to Use"),
 ]
 
 
@@ -43,7 +42,7 @@ class TestEducationPresence(unittest.TestCase):
             return fh.read()
 
     def test_all_pages_have_education_expander(self):
-        """All 18 page files must contain a How-to-Use education section."""
+        """All 17 page files must contain a How-to-Use education section."""
         missing = []
         for rel_path, marker in _PAGE_FILES:
             try:
@@ -79,7 +78,7 @@ class TestEducationPresence(unittest.TestCase):
 
     def test_page_count(self):
         """Verify we're checking all expected pages."""
-        self.assertEqual(len(_PAGE_FILES), 18, "Expected 18 pages to audit")
+        self.assertEqual(len(_PAGE_FILES), 17, "Expected 17 pages to audit")
 
 
 class TestEducationBoxFunction(unittest.TestCase):
