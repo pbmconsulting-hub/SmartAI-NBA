@@ -421,8 +421,6 @@ def _calculate_win_rate_by_field(bets_list, field_name):
 # ============================================================
 
 _MAX_UNCERTAIN_REASONS = 2   # max risk_flags to include in notes for uncertain picks
-_MAX_DEMON_REASONS = _MAX_UNCERTAIN_REASONS  # backward-compat alias
-_MAX_GOBLIN_REASONS = 1  # max bet_type_reasons to include in notes for Goblin bets
 
 def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
     """
@@ -498,21 +496,15 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
         edge = res.get("edge_percentage", 0)
         tier = res.get("tier", "Bronze")
         confidence = res.get("confidence_score", 0)
-        bet_type = res.get("bet_type", "normal")
-        # Goblin and Demon bets bypass the minimum edge threshold filter to
-        # ensure they are always tracked.  Goblin bets use alt lines set below
-        # the standard O/U (higher probability, but may not hit the minimum_edge
-        # parameter).  Demon bets use alt lines set above the standard O/U so
-        # negative edge is expected and they must bypass the positive-edge check.
-        is_special_bet = bet_type in ("goblin", "demon")
-        # Only log picks where edge is positive (goblin/demon exempt)
-        if edge <= 0 and not is_special_bet:
+        bet_type = res.get("bet_type", "standard")
+        # Only log picks where edge is positive
+        if edge <= 0:
             continue
         # Only auto-log recognised tiers
         if tier not in AUTO_LOG_TIERS:
             continue
-        # Apply tier-specific minimum edge thresholds (goblin/demon bypass all filters)
-        if not is_special_bet:
+        # Apply tier-specific minimum edge thresholds
+        if True:
             if tier == "Silver":
                 min_required_edge = SILVER_MIN_EDGE
             elif tier == "Bronze":
@@ -551,20 +543,11 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
                 f"Auto-logged by SmartAI. "
                 f"SAFE Score: {res.get('confidence_score', 0):.0f}. "
                 + (
-                    # Goblin / 50_50 / Demon / Normal classification notes
-                    "Goblin: " + " | ".join(res.get("bet_type_reasons", [])[:_MAX_GOBLIN_REASONS])
-                    if res.get("bet_type") == "goblin" and res.get("bet_type_reasons")
-                    else (
-                        "50/50 reasons: " + " | ".join(
-                            (res.get("risk_flags") or res.get("bet_type_reasons") or [])[:_MAX_UNCERTAIN_REASONS]
-                        )
-                        if res.get("bet_type") == "50_50" and (res.get("risk_flags") or res.get("bet_type_reasons"))
-                        else (
-                            "Demon (high ceiling): alt line above standard O/U"
-                            if res.get("bet_type") == "demon"
-                            else ""
-                        )
+                    " | ".join(
+                        (res.get("risk_flags") or [])[:_MAX_UNCERTAIN_REASONS]
                     )
+                    if res.get("risk_flags")
+                    else ""
                 )
             ),
             auto_logged=1,

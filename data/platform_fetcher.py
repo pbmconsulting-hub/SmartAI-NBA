@@ -2145,21 +2145,13 @@ def smart_filter_props(
 
 def parse_alt_lines_from_platform_props(props):
     """
-    Parse a flat list of platform props and enrich each record with its
-    alternate-line category relative to the standard (primary) O/U line.
+    Parse a flat list of platform props and enrich each record with the
+    standard (primary) O/U line for its (player, stat, platform) group.
 
-    Sportsbooks offer a primary "Standard_Line" O/U for each player prop,
-    plus a set of alternate lines at different thresholds.  When the same
-    (player_name, stat_type, platform) combination appears more than once
-    in the props list, the MEDIAN of all available lines is treated as the
-    standard line and the remaining lines are classified as:
-
-        ``'50_50'``    — this entry IS the standard O/U line (the baseline).
-        ``'goblin'``   — this line is BELOW the standard (safe floor bet;
-                         high probability of hitting even if the player
-                         misses the standard line).
-        ``'demon'``    — this line is ABOVE the standard (high risk / high
-                         reward; the player must exceed a higher threshold).
+    When the same (player_name, stat_type, platform) combination appears
+    more than once in the props list, the MEDIAN of all available lines is
+    treated as the standard line and stamped onto every entry as
+    ``'standard_line'``.
 
     Statistical analysis should be triggered ONLY on actual bookmaker lines
     — never on hypothetical or generated values.  Pass the output of this
@@ -2172,11 +2164,9 @@ def parse_alt_lines_from_platform_props(props):
             indicate that alternate lines are available.
 
     Returns:
-        list[dict]: Same props enriched with two new keys on every entry:
+        list[dict]: Same props enriched with one new key on every entry:
             ``'standard_line'``: float — the median line for this
                 (player, stat, platform) group (the Standard_Line).
-            ``'line_category'``: str — ``'50_50'`` | ``'goblin'`` |
-                ``'demon'``.
 
     Example::
 
@@ -2190,15 +2180,14 @@ def parse_alt_lines_from_platform_props(props):
         ]
         enriched = parse_alt_lines_from_platform_props(props)
         # → [
-        #     {..."line": 28.5, "line_category": "goblin",   "standard_line": 31.5},
-        #     {..."line": 31.5, "line_category": "50_50",    "standard_line": 31.5},
-        #     {..."line": 34.5, "line_category": "demon",    "standard_line": 31.5},
+        #     {..."line": 28.5, "standard_line": 31.5},
+        #     {..."line": 31.5, "standard_line": 31.5},
+        #     {..."line": 34.5, "standard_line": 31.5},
         # ]
     """
     import statistics as _statistics
 
     # ── Step 1: Group all lines by (player_name, stat_type, platform) ────
-    # This lets us identify all available lines for each prop slot.
     _groups = {}
     for prop in props:
         key = (
@@ -2209,9 +2198,6 @@ def parse_alt_lines_from_platform_props(props):
         _groups.setdefault(key, []).append(prop)
 
     # ── Step 2: Identify the Standard_Line for each group ────────────────
-    # The standard line is the MEDIAN of all lines in the group.
-    # For a single-entry group the only line IS the standard.
-    # For multi-entry groups the median represents the bookmaker's primary O/U.
     _standard_lines = {}
     for key, group_props in _groups.items():
         valid_lines = []
@@ -2227,7 +2213,7 @@ def parse_alt_lines_from_platform_props(props):
         else:
             _standard_lines[key] = None
 
-    # ── Step 3: Stamp each prop with standard_line and line_category ─────
+    # ── Step 3: Stamp each prop with standard_line ────────────────────────
     enriched = []
     for prop in props:
         key = (
@@ -2237,25 +2223,8 @@ def parse_alt_lines_from_platform_props(props):
         )
         std_line = _standard_lines.get(key)
 
-        try:
-            prop_line = float(prop.get("line", 0) or 0)
-        except (ValueError, TypeError):
-            prop_line = 0.0
-
         enriched_prop = dict(prop)
         enriched_prop["standard_line"] = std_line
-
-        if std_line is None or prop_line <= 0:
-            enriched_prop["line_category"] = "standard"
-        elif len(_groups.get(key, [])) == 1:
-            # Only one line → this IS the standard O/U
-            enriched_prop["line_category"] = "50_50"
-        elif abs(prop_line - std_line) < 0.01:
-            enriched_prop["line_category"] = "50_50"
-        elif prop_line < std_line:
-            enriched_prop["line_category"] = "goblin"
-        else:
-            enriched_prop["line_category"] = "demon"
 
         enriched.append(enriched_prop)
 

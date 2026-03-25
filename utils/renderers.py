@@ -15,7 +15,6 @@
 #   - CSS Grid auto-fill layout scales from mobile → ultrawide
 #   - Staggered fade-in-up animation for visual waterfall
 #   - Prominently displays True More/Less Line
-#   - Shows Goblin/Demon prediction text
 # ============================================================
 
 import html as _html
@@ -36,7 +35,7 @@ def _build_single_card_html(result, index=0):
 
     Renders the **Full Breakdown** view: distribution percentiles, expected
     value, standard deviation, individual directional forces, score
-    breakdown bars, and Demon (👹) / Goblin (🟢) tagging.
+    breakdown bars.
 
     Args:
         result (dict): A single prop analysis result from the engine.
@@ -105,23 +104,15 @@ def _build_single_card_html(result, index=0):
     except (ValueError, TypeError):
         proj_d = "—"
 
-    # Bet type + prediction text (tiered Goblin/Demon removed — all standard)
-    bet_type = result.get("bet_type", "standard")
+    # Prediction text
     prediction = _escape(result.get("prediction", ""))
-
-    pred_class = "qcm-prediction-neutral"
-    pred_icon = "⚪"
 
     prediction_html = ""
     if prediction:
         prediction_html = (
-            f'<div class="qcm-prediction {pred_class}">'
-            f'{pred_icon} {prediction}</div>'
+            f'<div class="qcm-prediction qcm-prediction-neutral">'
+            f'⚪ {prediction}</div>'
         )
-
-    # Demon-specific card elements removed (tier system removed)
-    demon_card_cls = ""
-    demon_ceiling_html = ""
 
     # Stagger delay: 20ms per card, capped at 2s for 100 cards
     delay_ms = min(index * 20, 2000)
@@ -222,7 +213,7 @@ def _build_single_card_html(result, index=0):
     except Exception:
         pass
 
-    return f"""<div class="qcm-card{demon_card_cls}" style="animation-delay:{delay_ms}ms;">
+    return f"""<div class="qcm-card" style="animation-delay:{delay_ms}ms;">
   <div class="qcm-card-header">
     <span class="qcm-player-name">{player_name}</span>
     <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
@@ -237,7 +228,6 @@ def _build_single_card_html(result, index=0):
     <span class="qcm-true-line-value">{true_line_display}</span>
   </div>
   {prediction_html}
-  {demon_ceiling_html}
   <div class="qcm-metrics">
     <div class="qcm-metric">
       <div class="qcm-metric-val">{prob_pct}</div>

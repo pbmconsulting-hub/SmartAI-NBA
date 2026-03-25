@@ -23,8 +23,6 @@ import os as _os
 _logger_theme = _logging.getLogger(__name__)
 
 # ── Centralised logo paths ──────────────────────────────────────
-GOBLIN_LOGO_PATH = ""  # Legacy — no longer used
-DEMON_LOGO_PATH  = ""  # Legacy — no longer used
 GOLD_LOGO_PATH   = _os.path.join("assets", "NewGold_Logo.png")
 
 
@@ -106,30 +104,6 @@ GLOSSARY = {
         "The total amount of money set aside exclusively for betting. Good bankroll "
         "management means never risking more than 1–5% on a single bet, so a losing "
         "streak doesn't wipe you out before the edge plays out."
-    ),
-    "Goblin Bet": (
-        "A Goblin bet is an alternate line set BELOW the standard More/Less — "
-        "a safe floor bet. The player only needs to clear a lower threshold to win. "
-        "High probability, lower payout. Think of it as the 'easy money' play. "
-        "Example: Standard line is SGA Points More/Less 31.5, and the platform also offers 28.5 — "
-        "that 28.5 is a Goblin bet (he only needs 29 points to win). "
-        "Goblin criteria (statistical overlay): projection 2+ standard deviations from the "
-        "line, probability ≥80%, edge ≥25%."
-    ),
-    "50/50 Bet": (
-        "A 50/50 bet is the standard More/Less line set by the platform — the baseline "
-        "bet. This is the primary line most bettors see. Example: SGA Points More/Less 31.5 is "
-        "the 50/50 line. Not a special classification — it's the default. A 50/50 pick may "
-        "also carry risk flags (conflicting forces, variance, fatigue, regression) that are "
-        "shown separately as warnings."
-    ),
-    "Demon Bet": (
-        "A Demon bet is an alternate line set ABOVE the standard More/Less — "
-        "a high-ceiling, high-reward play. The player must exceed a higher threshold to win. "
-        "Lower probability but bigger payout. Think of it as the 'swing for the fences' play. "
-        "Example: Standard line is SGA Points More/Less 31.5, and the platform also offers 34.5 — "
-        "that 34.5 is a Demon bet (he needs 35+ points to win). Use when the model shows "
-        "strong edge and you want maximum upside. Demon bets are NOT auto-avoided."
     ),
 }
 
@@ -4758,9 +4732,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
     }
 
     _BET_TYPE_ICON = {
-        "goblin": get_logo_img_tag(GOBLIN_LOGO_PATH, width=16, alt="Goblin"),
-        "demon":  get_logo_img_tag(DEMON_LOGO_PATH, width=16, alt="Demon"),
-        "50_50":  "⚖️",
+        "standard": "",
         "normal": "",
     }
 
@@ -4779,12 +4751,7 @@ def get_styled_stats_table_html(rows, columns, title=""):
         return f"{icon} {text}", False
 
     def _bet_type_lookup_key(raw_key: str) -> str:
-        """Return the normalised key for _BET_TYPE_ICON lookup.
-
-        Tries an exact lower-case match first; if not found, falls back to the
-        last whitespace-separated word so that upstream-prefixed values such as
-        ``"🟢 Goblin"`` still resolve to ``"goblin"``.
-        """
+        """Return the normalised key for _BET_TYPE_ICON lookup."""
         key = raw_key.lower()
         if key in _BET_TYPE_ICON:
             return key
@@ -5169,34 +5136,6 @@ QUANTUM_CARD_MATRIX_CSS = """
     transform: translateY(-2px);
 }
 
-/* ── Demon Card Override ────────────────────────────────── */
-.qcm-card-demon {
-    border-color: rgba(255, 94, 0, 0.30);
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45), 0 0 20px rgba(255, 94, 0, 0.10);
-}
-.qcm-card-demon:hover {
-    border-color: rgba(255, 94, 0, 0.50);
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.50), 0 0 28px rgba(255, 94, 0, 0.18);
-}
-.qcm-card-demon .qcm-player-name { color: #ff8c00; }
-.qcm-card-demon .qcm-true-line-row {
-    background: rgba(255, 94, 0, 0.08);
-    border-color: rgba(255, 94, 0, 0.25);
-}
-.qcm-card-demon .qcm-true-line-value { color: #ff5e00; }
-
-.qcm-demon-ceiling {
-    font-size: 0.72rem;
-    font-family: 'JetBrains Mono', monospace;
-    color: #ef5350;
-    background: rgba(244, 67, 54, 0.08);
-    border: 1px solid rgba(244, 67, 54, 0.25);
-    border-radius: 6px;
-    padding: 6px 10px;
-    margin-bottom: 10px;
-    font-weight: 600;
-}
-
 .qcm-card-header {
     display: flex;
     justify-content: space-between;
@@ -5276,16 +5215,6 @@ QUANTUM_CARD_MATRIX_CSS = """
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
     letter-spacing: 0.02em;
-}
-.qcm-prediction-goblin {
-    background: rgba(0, 255, 157, 0.08);
-    border: 1px solid rgba(0, 255, 157, 0.20);
-    color: #00ff9d;
-}
-.qcm-prediction-demon {
-    background: rgba(255, 94, 0, 0.08);
-    border: 1px solid rgba(255, 94, 0, 0.20);
-    color: #ff5e00;
 }
 .qcm-prediction-neutral {
     background: rgba(148, 163, 184, 0.08);

@@ -680,25 +680,14 @@ def run_quantum_matrix_simulation(
 
 
 # ============================================================
-# SECTION: Alt-Line Probability Generation (Goblin & Demon)
-# Generates alternate lines from a base prop line and evaluates
-# win probabilities for each using the existing simulation output.
+# SECTION: Alt-Line Probability Generation
+# Generates alternate line probabilities from simulation output.
 # ============================================================
-
-# Goblin/Demon offsets removed — all props use the True More/Less Line.
-GOBLIN_OFFSETS = []
-# Demon offsets removed — all props use the True More/Less Line.
-DEMON_OFFSETS = []
 
 
 def generate_alt_line_probabilities(simulation_output, base_line):
     """
-    Generate alternate-line probabilities from simulation output and a base
-    prop line.
-
-    Goblin/Demon alt-line generation has been removed.  This function now
-    returns only the base-line probability.  The return dict keeps the same
-    schema for backward compatibility (empty goblin_lines / demon_lines).
+    Generate the base-line probability from simulation output.
 
     Args:
         simulation_output (dict): Output from ``run_quantum_matrix_simulation``.
@@ -708,8 +697,6 @@ def generate_alt_line_probabilities(simulation_output, base_line):
         dict: {
             'base_line': float,
             'base_probability': float,
-            'goblin_lines': [],
-            'demon_lines': [],
             'best_alt': {'line': float, 'probability': float,
                          'type': 'base', 'prediction': ''},
         }
@@ -719,64 +706,12 @@ def generate_alt_line_probabilities(simulation_output, base_line):
     return {
         "base_line": base_line,
         "base_probability": round(float(base_prob), 4),
-        "goblin_lines": [],
-        "demon_lines": [],
         "best_alt": {
             "line": base_line,
             "probability": float(base_prob),
             "type": "base",
             "prediction": "",
         },
-    }
-
-
-def format_alt_line_prediction(line, bet_type):
-    """
-    Generate the strict natural-language prediction string for an alt-line.
-
-    Goblin/Demon tiers removed — always returns an empty string.  Kept for
-    backward compatibility.
-
-    Args:
-        line (float): The alternate line value.
-        bet_type (str): 'goblin', 'demon', or 'base'.
-
-    Returns:
-        str: Always empty — tiered predictions removed.
-    """
-    return ""
-
-
-def generate_contextual_goblin_demon(true_line, direction="over"):
-    """
-    Backward-compatible stub — Goblin/Demon alt-line generation removed.
-
-    Returns a dict with the true_line only; goblin/demon lines are set
-    equal to the true_line with empty prediction strings.
-
-    Args:
-        true_line (float): The verified sportsbook projection line.
-        direction (str): "over" / "more" or "under" / "less".
-
-    Returns:
-        dict with true_line, direction, goblin_line, goblin_prediction,
-        demon_line, demon_prediction (all neutralised).
-    """
-    try:
-        true_line = float(true_line)
-    except (ValueError, TypeError):
-        true_line = 0.0
-
-    direction_norm = str(direction).strip().lower()
-    is_over = direction_norm in ("over", "more")
-
-    return {
-        "true_line": true_line,
-        "direction": "over" if is_over else "under",
-        "goblin_line": true_line,
-        "goblin_prediction": "",
-        "demon_line": true_line,
-        "demon_prediction": "",
     }
 
 # ============================================================
