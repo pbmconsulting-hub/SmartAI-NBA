@@ -242,11 +242,24 @@ try:
     # Handle checkout redirects even on the home page
     _handle_checkout()
     _user_is_premium = _is_premium()
+    _premium_check_failed = False
 except Exception:
-    _user_is_premium = True  # Fail open — don't block the home page
+    # Fail closed — treat as non-premium so premium features stay gated.
+    # The home page itself still renders normally.
+    _user_is_premium = False
     _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
+    _premium_check_failed = True
+    logging.getLogger(__name__).warning(
+        "[App] Premium status check failed — defaulting to non-premium"
+    )
 
 with st.sidebar:
+    if _premium_check_failed:
+        st.warning(
+            "⚠️ Could not verify subscription status. "
+            "Premium features may be temporarily unavailable. "
+            "Please refresh or check back shortly."
+        )
     if _user_is_premium:
         st.markdown(
             '<div style="background:rgba(0,255,157,0.10);border:1px solid rgba(0,255,157,0.3);'

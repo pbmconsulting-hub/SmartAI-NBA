@@ -17,10 +17,15 @@
 
 import streamlit as st
 
+import logging as _logging
+
 from utils.auth import is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
-except Exception:
+except ImportError:
+    _logging.getLogger(__name__).debug(
+        "stripe_manager not available — using default premium page path"
+    )
     _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
 
 
