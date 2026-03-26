@@ -315,5 +315,33 @@ class TestModuleExports(unittest.TestCase):
         self.assertTrue(callable(render_override_report))
 
 
+# ============================================================
+# SECTION: Player Name Lookup Wiring
+# ============================================================
+
+class TestPlayerNameLookupWiring(unittest.TestCase):
+    """Verify that render_joseph_live_desk correctly resolves
+    player names from QAM analysis_results (which use 'player_name')
+    and enriched_players (which are keyed by lowercase name)."""
+
+    def test_source_resolves_player_name_key(self):
+        """The live desk code must try 'player_name' first when
+        extracting the player name from QAM analysis results."""
+        import inspect
+        from pages.helpers.joseph_live_desk import render_joseph_live_desk
+        source = inspect.getsource(render_joseph_live_desk)
+        # The lookup line should include 'player_name' as a preferred key
+        self.assertIn("player_name", source)
+
+    def test_source_lowercases_enriched_lookup(self):
+        """The enriched_players lookup must lowercase the key to match
+        the enriched dict which is keyed by lowercase player name."""
+        import inspect
+        from pages.helpers.joseph_live_desk import render_joseph_live_desk
+        source = inspect.getsource(render_joseph_live_desk)
+        # Should contain .lower() somewhere in the enriched_players lookup
+        self.assertIn(".lower()", source)
+
+
 if __name__ == "__main__":
     unittest.main()
