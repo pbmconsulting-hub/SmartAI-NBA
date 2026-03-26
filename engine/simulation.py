@@ -251,6 +251,7 @@ def run_quantum_matrix_simulation(
     game_total=None,
     prop_target_line=None,
     platform=None,
+    game_context: dict | None = None,
 ) -> dict:
     """
     Run a full Quantum Matrix Engine 5.6 simulation for one player's one stat.
@@ -342,6 +343,21 @@ def run_quantum_matrix_simulation(
     # Seed the RNG if requested (enables reproducible simulations)
     if random_seed is not None:
         random.seed(random_seed)
+
+    # ── Pre-compute enriched scenario weights from real NBA API data ──────────
+    # When game_context contains game_id / home_team_id / away_team_id, the
+    # enriched weights incorporate real team blowout frequency and four-factors
+    # eFG%, making per-game scenario selection much more accurate than the
+    # static spread-total matrix.  Gracefully returns base weights when data
+    # is unavailable so existing behaviour is fully preserved.
+    _enriched_scenario_weights: dict | None = None
+    if game_context:
+        try:
+            _enriched_scenario_weights = _enrich_scenarios_from_context(game_context)
+        except Exception as _esc_exc:
+            _logger.debug(
+                "run_quantum_matrix_simulation: scenario enrichment failed — %s", _esc_exc
+            )
 
     # ============================================================
     # SECTION: Apply Pre-Simulation Adjustments
@@ -449,6 +465,7 @@ def run_quantum_matrix_simulation(
                 blowout_risk_factor,
                 vegas_spread=vegas_spread,
                 game_total=game_total,
+                enriched_weights=_enriched_scenario_weights,
             )
         )
 
@@ -888,7 +905,12 @@ def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
     return weights
 
 
-def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=225.0):
+def _simulate_game_scenario(
+    blowout_risk_factor,
+    vegas_spread=0.0,
+    game_total=225.0,
+    enriched_weights: dict | None = None,
+):
     """
     Pick a holistic game scenario for this simulated game. (W3)
 
@@ -902,6 +924,11 @@ def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=22
     matrix (1A) may override the base scenario weights with context-
     specific distributions (e.g., tight game + high total → shootout).
 
+    When enriched_weights (from _enrich_scenarios_from_context) are
+    provided they take priority over the static matrix, incorporating
+    real NBA API data (team blowout rates, four-factors eFG%).
+    blowout_risk_factor scaling is still applied on top.
+
     Args:
         blowout_risk_factor (float): 0.0-1.0 blowout probability
             from projections.py. Higher → more weight on blowout
@@ -910,12 +937,46 @@ def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=22
             Defaults to 0.0 (neutral/unknown).
         game_total (float): Vegas over/under; used for matrix matching.
             Defaults to 225.0 (league-average total).
+        enriched_weights (dict | None): Pre-computed scenario weights from
+            ``_enrich_scenarios_from_context()``.  When provided these
+            supersede the static spread-total matrix but still have the
+            blowout_risk_factor scaling applied on top.  Defaults to None.
 
     Returns:
         tuple: (scenario_name: str,
                 minutes_reduction: float,   # fraction of mins lost (negative = gained)
                 stat_multiplier: float)     # additional stat modifier
     """
+    # ── Real-data-enriched weights take priority over the static matrix ──────
+    # When _enrich_scenarios_from_context() has been called for this game
+    # its weights incorporate team blowout frequency and four-factors eFG%,
+    # which are more accurate than the static spread-total matrix.
+    # blowout_risk_factor scaling is still applied on top so that individual
+    # player-level blowout risk (from projections.py) is still reflected.
+    if enriched_weights:
+        blowout_extra = max(0.0, blowout_risk_factor - 0.15)
+        adjusted_scenarios = []
+        for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in GAME_SCENARIOS:
+            w = enriched_weights.get(name, prob)
+            if name in ("blowout_win", "blowout_loss"):
+                w = w + blowout_extra * 0.5
+            elif name == "normal":
+                w = max(0.0, w - blowout_extra)
+            adjusted_scenarios.append((name, max(0.0, w), min_red_lo, min_red_hi, stat_lo, stat_hi))
+        total_weight = sum(s[1] for s in adjusted_scenarios)
+        if total_weight >= 1e-9:
+            roll = random.random() * total_weight
+            cumulative = 0.0
+            for name, prob, min_red_lo, min_red_hi, stat_lo, stat_hi in adjusted_scenarios:
+                cumulative += prob
+                if roll <= cumulative:
+                    return name, random.uniform(min_red_lo, min_red_hi), random.uniform(stat_lo, stat_hi)
+        # Floating-point guard
+        _normal = next((s for s in GAME_SCENARIOS if s[0] == "normal"), None)
+        if _normal:
+            return "normal", random.uniform(_normal[2], _normal[3]), random.uniform(_normal[4], _normal[5])
+        return "normal", random.uniform(0.0, 0.05), random.uniform(0.97, 1.03)
+
     # Check spread-total matrix for context-specific scenario weighting (1A)
     # Thresholds are read directly from _SPREAD_TOTAL_MATRIX (single source of truth).
     abs_spread = abs(vegas_spread or 0.0)
@@ -1300,6 +1361,7 @@ def simulate_combo_stat(
     home_away_adjustment,
     rest_adjustment_factor,
     random_seed=None,
+    game_context: dict | None = None,
 ):
     """
     Run a correlated Quantum Matrix Engine 5.6 simulation for a combo stat prop. (C7)
@@ -1338,6 +1400,16 @@ def simulate_combo_stat(
         * rest_adjustment_factor
     )
 
+    # ── Pre-compute enriched scenario weights (same as run_quantum_matrix_simulation) ─
+    _enriched_scenario_weights: dict | None = None
+    if game_context:
+        try:
+            _enriched_scenario_weights = _enrich_scenarios_from_context(game_context)
+        except Exception as _esc_exc:
+            _logger.debug(
+                "simulate_combo_stat: scenario enrichment failed — %s", _esc_exc
+            )
+
     # Adjust all component projections by the shared multiplier
     adjusted = {
         k: v * combined_multiplier
@@ -1355,7 +1427,8 @@ def simulate_combo_stat(
     for _ in range(number_of_simulations):
         # Shared minutes multiplier (correlated across all components via scenario)
         scenario_name, minutes_reduction, stat_multiplier = _simulate_game_scenario(
-            blowout_risk_factor
+            blowout_risk_factor,
+            enriched_weights=_enriched_scenario_weights,
         )
         minutes_reduction = max(-0.15, min(0.60, minutes_reduction))
         minutes_mult = 1.0 - minutes_reduction

@@ -979,6 +979,7 @@ if run_analysis:
                                 "game_total": game_context.get("game_total", 220.0),
                                 "rest_days": game_context.get("rest_days", 2),
                                 "back_to_back": game_context.get("back_to_back", False),
+                                "game_id": game_context.get("game_id", ""),
                             },
                             teammate_status=_teammate_status,
                             game_logs=recent_form_games if recent_form_games else None,
@@ -986,6 +987,38 @@ if run_analysis:
                         _precise_minutes = _min_result.get("projected_minutes")
                     except Exception:
                         _precise_minutes = None
+
+                # ── Pull per-player advanced context from Deep Fetch enrichment ──
+                # After the user clicks "Deep Fetch", st.session_state["advanced_enrichment"]
+                # is populated with player_metrics (estimated metrics) for all rostered players.
+                # Look up the matching player by ID or name and pass usage_pct to the projection.
+                _advanced_context: dict | None = None
+                try:
+                    _game_enr = st.session_state.get("advanced_enrichment", {}).get(
+                        game_context.get("game_id", ""), {}
+                    )
+                    _all_metrics = _game_enr.get("player_metrics", [])
+                    _player_id = player_data.get("player_id") or player_data.get("id")
+                    _player_name_lower = str(player_data.get("name", "")).lower()
+                    for _m in _all_metrics:
+                        _mid = _m.get("PLAYER_ID") or _m.get("playerId")
+                        _mname = str(_m.get("PLAYER_NAME") or _m.get("playerName") or "").lower()
+                        if (_player_id and _mid and int(_player_id) == int(_mid)) or (
+                            _player_name_lower and _mname and _player_name_lower in _mname
+                        ):
+                            # Normalise usage: API may return 0–100 or 0–1 scale
+                            _usg = _m.get("E_USG_PCT") or _m.get("USG_PCT") or _m.get("usage_pct")
+                            if _usg is not None:
+                                try:
+                                    _usg_f = float(_usg)
+                                    _advanced_context = {
+                                        "usage_pct": _usg_f / 100.0 if _usg_f > 1.0 else _usg_f
+                                    }
+                                except (TypeError, ValueError):
+                                    pass
+                            break
+                except Exception:
+                    pass
 
                 projection_result  = build_player_projection(
                     player_data=player_data,
@@ -999,6 +1032,7 @@ if run_analysis:
                     vegas_spread=game_context.get("vegas_spread", 0.0),
                     minutes_adjustment_factor=teammate_boost,
                     teammate_out_notes=teammate_boost_notes,
+                    advanced_context=_advanced_context,
                 )
 
                 # ── Ensemble Model Override (3-model blend) ────────────────
@@ -1084,6 +1118,7 @@ if run_analysis:
                     matchup_adjustment_factor=projection_result.get("defense_factor", 1.0),
                     home_away_adjustment=projection_result.get("home_away_factor", 0.0),
                     rest_adjustment_factor=projection_result.get("rest_factor", 1.0),
+                    game_context=game_context if game_context.get("game_id") else None,
                 )
 
                 if stat_type in COMBO_STAT_TYPES:
@@ -1293,6 +1328,23 @@ if run_analysis:
                 # probability level.  Returns 0.0 on cold start (no history yet).
                 calibration_adj = get_calibration_adjustment(probability_over)
 
+                # ── Fetch real matchup data for SAFE Score enrichment ─────────
+                # on_off_data: player's team On/Off net-rating differentials
+                # matchup_data: per-matchup defensive assignments from box score
+                # Both are optional — confidence scoring degrades gracefully.
+                _on_off_data: dict | None = None
+                _matchup_data: dict | None = None
+                try:
+                    from data.nba_data_service import get_player_on_off, get_box_score_matchups
+                    _player_team_id = game_context.get("home_team_id") if game_context.get("is_home") else game_context.get("away_team_id")
+                    if _player_team_id:
+                        _on_off_data = get_player_on_off(_player_team_id) or None
+                    _game_id_ctx = game_context.get("game_id", "")
+                    if _game_id_ctx:
+                        _matchup_data = get_box_score_matchups(_game_id_ctx) or None
+                except Exception:
+                    pass
+
                 confidence_output = calculate_confidence_score(
                     probability_over=probability_over,
                     edge_percentage=edge_pct,
@@ -1306,6 +1358,8 @@ if run_analysis:
                     line_sharpness_penalty=line_sharpness_penalty,
                     trap_line_penalty=trap_line_penalty,
                     calibration_adjustment=calibration_adj,  # C10
+                    on_off_data=_on_off_data,
+                    matchup_data=_matchup_data,
                 )
 
                 # ── Apply ensemble model-disagreement penalty to confidence ─

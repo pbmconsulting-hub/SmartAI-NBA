@@ -62,11 +62,30 @@ def find_game_context_for_player(player_team, todays_games_list):
         todays_games_list (list of dict): Tonight's configured games
 
     Returns:
-        dict: Game context with opponent, home/away, spread, total
+        dict: Game context with opponent, home/away, spread, total, game_id,
+              home_team_id, away_team_id (for advanced API enrichment).
     """
+    # Lazy import so the module stays importable without data dependencies
+    try:
+        from data.player_profile_service import _TEAM_ABBREV_TO_ID as _TID_MAP
+    except Exception:
+        _TID_MAP = {}
+
     for game in todays_games_list:
         home_team = game.get("home_team", "")
         away_team = game.get("away_team", "")
+        game_id = str(game.get("game_id") or game.get("GAME_ID") or "")
+        # Prefer explicit NBA team IDs; fall back to static abbreviation map
+        home_team_id = (
+            game.get("home_team_id")
+            or game.get("HOME_TEAM_ID")
+            or _TID_MAP.get(str(home_team).upper())
+        )
+        away_team_id = (
+            game.get("away_team_id")
+            or game.get("VISITOR_TEAM_ID")
+            or _TID_MAP.get(str(away_team).upper())
+        )
 
         if player_team == home_team:
             return {
@@ -75,6 +94,11 @@ def find_game_context_for_player(player_team, todays_games_list):
                 "rest_days": 2,
                 "game_total": game.get("game_total", 220.0),
                 "vegas_spread": game.get("vegas_spread", 0.0),
+                "game_id": game_id,
+                "home_team": home_team,
+                "away_team": away_team,
+                "home_team_id": home_team_id,
+                "away_team_id": away_team_id,
             }
         elif player_team == away_team:
             return {
@@ -83,6 +107,11 @@ def find_game_context_for_player(player_team, todays_games_list):
                 "rest_days": 2,
                 "game_total": game.get("game_total", 220.0),
                 "vegas_spread": -game.get("vegas_spread", 0.0),
+                "game_id": game_id,
+                "home_team": home_team,
+                "away_team": away_team,
+                "home_team_id": home_team_id,
+                "away_team_id": away_team_id,
             }
 
     return {
@@ -91,6 +120,11 @@ def find_game_context_for_player(player_team, todays_games_list):
         "rest_days": 2,
         "game_total": 220.0,
         "vegas_spread": 0.0,
+        "game_id": "",
+        "home_team": "",
+        "away_team": "",
+        "home_team_id": None,
+        "away_team_id": None,
     }
 
 

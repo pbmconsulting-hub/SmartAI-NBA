@@ -693,6 +693,9 @@ if platform_props_clicked:
                             "game_total": _gt_val,
                             "is_home": is_home,
                             "rest_days": 2,
+                            "game_id": str(g.get("game_id") or ""),
+                            "home_team_id": g.get("home_team_id"),
+                            "away_team_id": g.get("away_team_id"),
                             # Odds API consensus fields (may be None if key not configured)
                             "moneyline_home": g.get("moneyline_home"),
                             "moneyline_away": g.get("moneyline_away"),
@@ -702,7 +705,43 @@ if platform_props_clicked:
                             "spread_range": g.get("spread_range", (None, None)),
                             "total_range": g.get("total_range", (None, None)),
                         }
+                        # Fill in team IDs from abbreviation map when not explicit
+                        if not game_ctx["home_team_id"] or not game_ctx["away_team_id"]:
+                            try:
+                                from data.player_profile_service import _TEAM_ABBREV_TO_ID as _TID
+                                game_ctx["home_team_id"] = game_ctx["home_team_id"] or _TID.get(home_team.upper())
+                                game_ctx["away_team_id"] = game_ctx["away_team_id"] or _TID.get(away_team.upper())
+                            except Exception:
+                                pass
                         break
+
+                # ── Pull player advanced context from Deep Fetch enrichment ──
+                _live_adv_context: dict | None = None
+                try:
+                    _lg_enr = st.session_state.get("advanced_enrichment", {}).get(
+                        game_ctx.get("game_id", ""), {}
+                    )
+                    _lg_metrics = _lg_enr.get("player_metrics", [])
+                    _lg_pid = player_data.get("player_id") or player_data.get("id")
+                    _lg_pname = str(player_data.get("name", "")).lower()
+                    for _lm in _lg_metrics:
+                        _lmid = _lm.get("PLAYER_ID") or _lm.get("playerId")
+                        _lmname = str(_lm.get("PLAYER_NAME") or _lm.get("playerName") or "").lower()
+                        if (_lg_pid and _lmid and int(_lg_pid) == int(_lmid)) or (
+                            _lg_pname and _lmname and _lg_pname in _lmname
+                        ):
+                            _usg = _lm.get("E_USG_PCT") or _lm.get("USG_PCT") or _lm.get("usage_pct")
+                            if _usg is not None:
+                                try:
+                                    _usg_f = float(_usg)
+                                    _live_adv_context = {
+                                        "usage_pct": _usg_f / 100.0 if _usg_f > 1.0 else _usg_f
+                                    }
+                                except (TypeError, ValueError):
+                                    pass
+                            break
+                except Exception:
+                    pass
 
                 # Projection — use proper signature matching build_player_projection
                 proj = build_player_projection(
@@ -714,6 +753,7 @@ if platform_props_clicked:
                     defensive_ratings_data=_defensive_ratings,
                     teams_data=_teams_data,
                     vegas_spread=game_ctx.get("vegas_spread", 0.0),
+                    advanced_context=_live_adv_context,
                 )
 
                 # Get stat-specific projected value (e.g., projected_points, projected_rebounds)
@@ -774,6 +814,20 @@ if platform_props_clicked:
                     continue
 
                 # Confidence
+                # Fetch real matchup context when available (cached via nba_data_service)
+                _lg_on_off: dict | None = None
+                _lg_matchup: dict | None = None
+                try:
+                    from data.nba_data_service import get_player_on_off, get_box_score_matchups
+                    _lg_tid = game_ctx.get("home_team_id") if game_ctx.get("is_home") else game_ctx.get("away_team_id")
+                    if _lg_tid:
+                        _lg_on_off = get_player_on_off(_lg_tid) or None
+                    _lg_gid = game_ctx.get("game_id", "")
+                    if _lg_gid:
+                        _lg_matchup = get_box_score_matchups(_lg_gid) or None
+                except Exception:
+                    pass
+
                 conf = calculate_confidence_score(
                     probability_over=prob_over,
                     edge_percentage=raw_edge,
@@ -784,6 +838,8 @@ if platform_props_clicked:
                     simulation_results=sim,
                     games_played=int(player_data.get("games_played", 10) or 10),
                     stat_type=stat_type,
+                    on_off_data=_lg_on_off,
+                    matchup_data=_lg_matchup,
                 )
                 confidence_score = conf.get("confidence_score", 0)
                 tier = conf.get("tier", "Bronze")
