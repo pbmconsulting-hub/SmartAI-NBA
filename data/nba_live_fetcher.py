@@ -113,6 +113,13 @@ def _check_rate_limit() -> bool:
         return True
 
 
+# ── Game-ID validation ────────────────────────────────────────────────────────
+
+def _is_nba_game_id(game_id: str) -> bool:
+    """Return True if *game_id* looks like a real NBA game ID (all digits)."""
+    return bool(game_id) and game_id.isdigit()
+
+
 # ── Season helpers ─────────────────────────────────────────────────────────────
 
 def _current_season() -> str:
@@ -701,6 +708,10 @@ def fetch_box_score_matchups(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        _logger.debug("fetch_box_score_matchups(%s): skipped (not a numeric game ID)", game_id)
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}

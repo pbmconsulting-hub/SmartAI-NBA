@@ -527,7 +527,8 @@ def _fetch_team_records():
 
 
 def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_name,
-                           game_time_et, arena_display, team_records):
+                           game_time_et, arena_display, team_records,
+                           game_id=""):
     """
     Build the standardised game dict used throughout the app.
 
@@ -539,6 +540,8 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
         game_time_et (str): Game time in Eastern Time, e.g. "7:30 PM ET".
         arena_display (str): Arena name and city string.
         team_records (dict): Standings data from _fetch_team_records().
+        game_id (str): Official NBA game ID (10-digit numeric string).
+            Falls back to ``"HOME_vs_AWAY"`` when unavailable.
 
     Returns:
         dict: Standardised game record.
@@ -547,7 +550,7 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
     away_rec = team_records.get(away_abbrev, {})
 
     return {
-        "game_id": f"{home_abbrev}_vs_{away_abbrev}",
+        "game_id": game_id if game_id else f"{home_abbrev}_vs_{away_abbrev}",
         "home_team": home_abbrev,
         "away_team": away_abbrev,
         "home_team_full": f"{home_abbrev} — {home_team_name}",
@@ -635,11 +638,14 @@ def _fetch_games_layer1_scoreboard_v2(team_records):
             home_team_name = f"{home_info.get('city', '')} {home_info.get('name', '')}".strip()
             away_team_name = f"{away_info.get('city', '')} {away_info.get('name', '')}".strip()
 
+            nba_game_id = str(row.get("GAME_ID") or "")
+
             formatted_games.append(_build_formatted_game(
                 home_abbrev, away_abbrev,
                 home_team_name, away_team_name,
                 game_time_et, "",
                 team_records,
+                game_id=nba_game_id,
             ))
 
         return formatted_games
@@ -771,11 +777,14 @@ def _fetch_games_layer3_live_scoreboard(team_records):
             home_team_name = f"{home_team_info.get('teamCity', '')} {home_team_info.get('teamName', '')}".strip()
             away_team_name = f"{away_team_info.get('teamCity', '')} {away_team_info.get('teamName', '')}".strip()
 
+            nba_game_id = str(game.get("gameId") or "")
+
             formatted_games.append(_build_formatted_game(
                 home_abbrev, away_abbrev,
                 home_team_name, away_team_name,
                 game_time_et, arena_display,
                 team_records,
+                game_id=nba_game_id,
             ))
 
         time.sleep(API_DELAY_SECONDS)
