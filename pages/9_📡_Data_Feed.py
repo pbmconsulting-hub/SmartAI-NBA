@@ -1460,8 +1460,11 @@ if st.button(
                 pct = int((current / max(total, 1)) * 100)
                 _deep_progress.progress(pct, text=msg)
                 _deep_status.caption(f"Step {current}/{total}: {msg}")
-            except Exception:
-                pass
+            except Exception as _cb_err:
+                import logging as _logging
+                _logging.getLogger(__name__).debug(
+                    "Deep Fetch progress callback error (non-fatal): %s", _cb_err
+                )
 
         try:
             from data.advanced_fetcher import enrich_tonights_slate, build_enrichment_summary

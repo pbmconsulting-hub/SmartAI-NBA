@@ -380,7 +380,11 @@ def _compute_usage_boost(advanced_context: dict | None, base_projection: float) 
         return base_projection
 
     # Multiplier: usage at league avg → 1.0; each 1% above/below → ±1.5%
-    multiplier = 1.0 + (usage - _LEAGUE_AVG_USAGE) * 1.5
+    # The 1.5 factor was calibrated so that a player with 30% usage (10pp above
+    # league avg) receives a +15% boost — matching the ~15% TEAMMATE_OUT_MAX_BOOST
+    # cap used in projections.py, creating a consistent scale across the model.
+    _USAGE_MULTIPLIER_FACTOR = 1.5
+    multiplier = 1.0 + (usage - _LEAGUE_AVG_USAGE) * _USAGE_MULTIPLIER_FACTOR
 
     # Cap the adjustment: ±12% maximum to avoid extremes from small-sample data
     multiplier = max(0.88, min(1.12, multiplier))

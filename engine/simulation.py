@@ -211,6 +211,12 @@ MOMENTUM_COLD_THRESHOLD = -0.15  # <-15% below average → cold momentum
 MOMENTUM_HOT_CAP = 1.12          # Maximum hot streak multiplier
 MOMENTUM_COLD_FLOOR = 0.88       # Minimum cold streak multiplier
 
+# Blowout margin threshold used in scenario context enrichment.
+# A game is classified as a "blowout" when the final margin exceeds this value.
+# This constant ensures consistency across _enrich_scenarios_from_context and
+# any future blowout-frequency calculations.
+_BLOWOUT_MARGIN_THRESHOLD = 15   # points
+
 # ============================================================
 # END SECTION: Minutes Simulation Constants
 # ============================================================
@@ -833,9 +839,9 @@ def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
                     if pts_opp == 0:
                         # Try alternative fields
                         plus_minus_abs = abs(float(log.get("PLUS_MINUS", 0) or 0))
-                        if plus_minus_abs > 15:
+                        if plus_minus_abs > _BLOWOUT_MARGIN_THRESHOLD:
                             blowout_count += 1
-                    elif abs(pts - pts_opp) > 15:
+                    elif abs(pts - pts_opp) > _BLOWOUT_MARGIN_THRESHOLD:
                         blowout_count += 1
                 blowout_rate = blowout_count / len(logs)
                 # Teams with >40% blowout rate in last 10 get elevated blowout weight

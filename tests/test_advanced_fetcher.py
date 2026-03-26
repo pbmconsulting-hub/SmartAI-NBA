@@ -66,7 +66,7 @@ class TestEmptyInputs(unittest.TestCase):
 
     def test_none_games_treated_as_empty(self):
         import data.advanced_fetcher as af
-        result = af.enrich_tonights_slate(None)  # type: ignore[arg-type]
+        result = af.enrich_tonights_slate(None)
         self.assertIsInstance(result, dict)
         self.assertEqual(result, {})
 

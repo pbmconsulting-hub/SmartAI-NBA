@@ -156,7 +156,7 @@ def _get_rotation_based_minutes(player_id: int, game_id: str | None = None) -> f
     if not rotation_data:
         return None
 
-    total_seconds = 0.0
+    total_deci_seconds = 0.0
     found = False
 
     # Both home and away team rotations are searched
@@ -177,17 +177,17 @@ def _get_rotation_based_minutes(player_id: int, game_id: str | None = None) -> f
             try:
                 duration = float(out_time) - float(in_time)
                 if duration > 0:
-                    total_seconds += duration
+                    total_deci_seconds += duration
                     found = True
             except (TypeError, ValueError):
                 pass
 
-    if not found or total_seconds <= 0:
+    if not found or total_deci_seconds <= 0:
         return None
 
-    # IN_TIME_REAL / OUT_TIME_REAL are in tenths of a second (deci-seconds)
-    # Convert: total_seconds (deci-s) / 10 → seconds / 60 → minutes
-    minutes = (total_seconds / 10.0) / 60.0
+    # IN_TIME_REAL / OUT_TIME_REAL are in tenths of a second (deci-seconds).
+    # Convert: total_deci_seconds / 10 → seconds / 60 → minutes
+    minutes = (total_deci_seconds / 10.0) / 60.0
     _logger.debug(
         "_get_rotation_based_minutes(player_id=%s, game_id=%s): %.1f min from stints",
         player_id, game_id, minutes,

@@ -188,8 +188,8 @@ def fetch_player_game_logs(
 
     try:
         from nba_api.stats.endpoints import playergamelog
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playergamelog.PlayerGameLog(
             player_id=player_id,
             season=season,
@@ -241,8 +241,8 @@ def fetch_box_score_traditional(game_id: str, period: int = 0) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscoretraditionalv3
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscoretraditionalv3.BoxScoreTraditionalV3(
             game_id=game_id,
             start_period=period if period > 0 else 0,
@@ -330,8 +330,8 @@ def fetch_box_score_usage(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscoreusagev3
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscoreusagev3.BoxScoreUsageV3(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -385,8 +385,8 @@ def fetch_player_on_off(team_id: int, season: str | None = None) -> dict:
 
     try:
         from nba_api.stats.endpoints import teamplayeronoffdetails
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = teamplayeronoffdetails.TeamPlayerOnOffDetails(
             team_id=team_id,
             season=season,
@@ -436,8 +436,8 @@ def fetch_player_estimated_metrics(season: str | None = None) -> list[dict]:
 
     try:
         from nba_api.stats.endpoints import playerestimatedmetrics
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playerestimatedmetrics.PlayerEstimatedMetrics(
             season=season,
             season_type="Regular Season",
@@ -492,8 +492,8 @@ def fetch_player_fantasy_profile(
 
     try:
         from nba_api.stats.endpoints import playerdashboardbylastngames
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playerdashboardbylastngames.PlayerDashboardByLastNGames(
             player_id=player_id,
             season=season,
@@ -553,8 +553,8 @@ def fetch_rotations(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import gamerotation
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = gamerotation.GameRotation(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -602,8 +602,8 @@ def fetch_schedule(game_date: str | None = None) -> list[dict]:
 
     try:
         from nba_api.stats.endpoints import scoreboardv2
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = scoreboardv2.ScoreboardV2(
             game_date=game_date,
             league_id="00",
@@ -648,8 +648,8 @@ def fetch_todays_scoreboard() -> dict:
 
     try:
         from nba_api.stats.endpoints import scoreboardv2
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = scoreboardv2.ScoreboardV2(
             game_date=today,
             league_id="00",
@@ -707,8 +707,8 @@ def fetch_box_score_matchups(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscorematchupsv3
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscorematchupsv3.BoxScoreMatchupsV3(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -787,8 +787,8 @@ def fetch_defensive_box_score(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscoredefensivev2
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscoredefensivev2.BoxScoreDefensiveV2(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -832,8 +832,8 @@ def fetch_scoring_box_score(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscorescoringv3
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscorescoringv3.BoxScoreScoringV3(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -914,8 +914,8 @@ def fetch_four_factors_box_score(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscorefourfactorsv3
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscorefourfactorsv3.BoxScoreFourFactorsV3(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -965,8 +965,8 @@ def fetch_player_shooting_splits(
 
     try:
         from nba_api.stats.endpoints import playerdashptshotlog
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playerdashptshotlog.PlayerDashPtShotLog(
             player_id=player_id,
             season=season,
@@ -1055,8 +1055,8 @@ def fetch_player_clutch_stats(season: str | None = None) -> list[dict]:
 
     try:
         from nba_api.stats.endpoints import leaguedashplayerclutch
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = leaguedashplayerclutch.LeagueDashPlayerClutch(
             season=season,
             season_type_all_star="Regular Season",
@@ -1108,8 +1108,8 @@ def fetch_team_lineups(
 
     try:
         from nba_api.stats.endpoints import leaguedashlineups
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = leaguedashlineups.LeagueDashLineups(
             season=season,
             season_type_all_star="Regular Season",
@@ -1167,8 +1167,8 @@ def fetch_team_dashboard(
 
     try:
         from nba_api.stats.endpoints import teamdashboardbygeneralsplits
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = teamdashboardbygeneralsplits.TeamDashboardByGeneralSplits(
             team_id=team_id,
             season=season,
@@ -1261,8 +1261,8 @@ def fetch_team_game_logs(
 
     try:
         from nba_api.stats.endpoints import teamgamelog
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = teamgamelog.TeamGameLog(
             team_id=team_id,
             season=season,
@@ -1315,8 +1315,8 @@ def fetch_player_year_over_year(player_id: int) -> list[dict]:
 
     try:
         from nba_api.stats.endpoints import playerdashboardbyyearoveryear
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playerdashboardbyyearoveryear.PlayerDashboardByYearOverYear(
             player_id=player_id,
             season_type_all_star="Regular Season",
@@ -1379,8 +1379,8 @@ def fetch_player_vs_player(
 
     try:
         from nba_api.stats.endpoints import playervsplayer
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = playervsplayer.PlayerVsPlayer(
             player_id=player1_id,
             vs_player_id=player2_id,
@@ -1440,8 +1440,8 @@ def fetch_win_probability(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import winprobabilitypbp
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = winprobabilitypbp.WinProbabilityPBP(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -1516,8 +1516,8 @@ def fetch_game_summary(game_id: str) -> dict:
 
     try:
         from nba_api.stats.endpoints import boxscoresummaryv2
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = boxscoresummaryv2.BoxScoreSummaryV2(game_id=game_id)
         norm = endpoint.get_normalized_dict()
         elapsed = round((time.monotonic() - t0) * 1000, 1)
@@ -1572,8 +1572,8 @@ def fetch_league_leaders(
 
     try:
         from nba_api.stats.endpoints import leagueleaders
-        t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
+        t0 = time.monotonic()
         endpoint = leagueleaders.LeagueLeaders(
             season=season,
             stat_category_abbreviation=stat_category,

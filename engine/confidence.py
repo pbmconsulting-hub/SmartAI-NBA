@@ -315,8 +315,12 @@ def calculate_confidence_score(
                     avg_on = sum(on_net) / len(on_net)
                     avg_off = sum(off_net) / len(off_net)
                     on_off_diff = avg_on - avg_off
-                    # Each +1 net-rating differential adds ~2.5 pts to matchup score
-                    on_off_adjustment = on_off_diff * 2.5
+                    # Each +1 net-rating differential adds 2.5 pts to matchup score.
+                    # This factor scales so that a league-average on/off split of ~+4
+                    # (typical star player) moves the score by +10 pts — meaningful
+                    # but not dominant relative to the defense_factor baseline.
+                    _NET_RATING_ADJUSTMENT_FACTOR = 2.5
+                    on_off_adjustment = on_off_diff * _NET_RATING_ADJUSTMENT_FACTOR
                     matchup_score = max(0.0, min(100.0, matchup_score + on_off_adjustment))
         except Exception:
             pass  # Degradation: use base matchup_score if on_off_data is malformed

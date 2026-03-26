@@ -38,7 +38,10 @@ except ImportError:
 
 # ── Enrichment constants ───────────────────────────────────────────────────────
 
-# Number of recent team games to fetch for form analysis
+# Number of recent team games to fetch for form analysis.
+# 10 games represents ~2 weeks of NBA play (teams play 3-4 games/week),
+# giving a statistically meaningful sample that's recent enough to capture
+# current rotation patterns and blowout tendencies.
 RECENT_TEAM_GAMES = 10
 
 # Minimum delay between per-game enrichment batches (seconds)
@@ -47,7 +50,7 @@ _BATCH_INTER_GAME_DELAY: float = 0.2
 
 
 def enrich_tonights_slate(
-    games: list[dict],
+    games: list[dict] | None,
     season: str | None = None,
     progress_callback: Callable[[int, int, str], None] | None = None,
 ) -> dict[str, dict]:
@@ -105,7 +108,7 @@ def enrich_tonights_slate(
     enriched = enrich_tonights_slate(games)
     heat_logs = enriched.get("0022401234", {}).get("home_game_logs", [])
     """
-    if not games:
+    if not games:  # handles both None and empty list
         _logger.info("enrich_tonights_slate: no games to enrich")
         return {}
 
