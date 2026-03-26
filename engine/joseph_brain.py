@@ -1499,6 +1499,7 @@ def joseph_generate_independent_picks(props, players_lookup, todays_games,
         diff_pct = (player_avg - line) / max(line, 0.1) * 100.0
         prob_over = 50.0 + min(max(diff_pct * 2.0, -30.0), 30.0)
         prob_over = max(5.0, min(95.0, prob_over))
+        # Standard -110 vig breakeven: 52.38% win rate to break even
         edge = prob_over - 52.38
         direction = "OVER" if diff_pct > 0 else "UNDER"
 
