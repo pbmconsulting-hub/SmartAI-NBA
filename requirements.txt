@@ -8,3 +8,4 @@ streamlit-autorefresh~=1.0.1
 flask~=3.1.0
 python-dotenv~=1.0.0
 pdfplumber~=0.11.0
+basketball_reference_web_scraper>=4.7.0

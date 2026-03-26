@@ -167,6 +167,254 @@ def _is_segment_prop(stat_type: str) -> bool:
 
 
 # ============================================================
+# SECTION: 3-Tier Bulk Box Score Helpers
+# Tier 1: nba_api BoxScore endpoints (bulk, fastest)
+# Tier 2: basketball_reference_web_scraper (one-call fallback)
+# Tier 3: Legacy per-player PlayerGameLog (kept for compatibility)
+# ============================================================
+
+def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
+    """
+    TIER 1: Fetch all player box scores for a date via nba_api BoxScore endpoints.
+
+    Uses ScoreboardV2 to find game IDs, then BoxScoreTraditionalV2 per game.
+    This replaces N per-player calls with ~G game-level calls (~5-8 per night).
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, stl, blk, tov, fg3m, ...}}
+              Empty dict on any failure.
+    """
+    try:
+        import time as _time
+        from nba_api.stats.endpoints import scoreboardv2, boxscoretraditionalv2
+
+        sb = scoreboardv2.ScoreboardV2(
+            game_date=date_str, league_id="00", timeout=NBA_API_TIMEOUT
+        )
+        game_header = sb.game_header.get_data_frame()
+        if game_header.empty:
+            return {}
+
+        game_ids = game_header["GAME_ID"].tolist()
+        lookup: dict = {}
+
+        for game_id in game_ids:
+            try:
+                _time.sleep(0.6)  # gentle rate limiting between game calls
+                bx = boxscoretraditionalv2.BoxScoreTraditionalV2(
+                    game_id=game_id, timeout=NBA_API_TIMEOUT
+                )
+                player_stats = bx.player_stats.get_data_frame()
+                for _, row in player_stats.iterrows():
+                    pname = str(row.get("PLAYER_NAME", "") or "").lower().strip()
+                    if not pname:
+                        continue
+                    # Parse MIN field which may be "MM:SS" or a float
+                    min_raw = str(row.get("MIN") or "0")
+                    try:
+                        mins = (
+                            float(min_raw.split(":")[0])
+                            if ":" in min_raw
+                            else float(min_raw)
+                        )
+                    except (ValueError, TypeError):
+                        mins = 0.0
+                    lookup[pname] = {
+                        "pts":     float(row.get("PTS") or 0),
+                        "reb":     float(row.get("REB") or 0),
+                        "ast":     float(row.get("AST") or 0),
+                        "stl":     float(row.get("STL") or 0),
+                        "blk":     float(row.get("BLK") or 0),
+                        "tov":     float(row.get("TO") or 0),
+                        "fg3m":    float(row.get("FG3M") or 0),
+                        "fg3a":    float(row.get("FG3A") or 0),
+                        "fgm":     float(row.get("FGM") or 0),
+                        "fga":     float(row.get("FGA") or 0),
+                        "ftm":     float(row.get("FTM") or 0),
+                        "fta":     float(row.get("FTA") or 0),
+                        "oreb":    float(row.get("OREB") or 0),
+                        "dreb":    float(row.get("DREB") or 0),
+                        "pf":      float(row.get("PF") or 0),
+                        "minutes": mins,
+                    }
+            except Exception as _game_exc:
+                _logger.warning(
+                    f"[BetTracker] Tier 1: box score fetch failed for game {game_id}: {_game_exc}"
+                )
+                continue
+
+        return lookup
+
+    except Exception as exc:
+        _logger.warning(f"[BetTracker] Tier 1 (nba_api BoxScore) failed: {exc}")
+        return {}
+
+
+def _fetch_all_boxscores_bbref(date_str: str) -> dict:
+    """
+    TIER 2 FALLBACK: Fetch all player box scores via basketball_reference_web_scraper.
+
+    One API call returns ALL player box scores for the date.
+    Safely returns empty dict if the package is not installed.
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, stl, blk, tov, fg3m, ...}}
+              Empty dict on any failure or if package not installed.
+    """
+    try:
+        from basketball_reference_web_scraper import client as _bbref_client
+    except ImportError:
+        return {}
+
+    try:
+        import datetime as _dt
+        target = _dt.datetime.strptime(date_str, "%Y-%m-%d")
+        rows = _bbref_client.player_box_scores(
+            day=target.day, month=target.month, year=target.year
+        )
+
+        lookup: dict = {}
+        for row in rows:
+            pname = str(row.get("name") or "").lower().strip()
+            if not pname:
+                continue
+            secs = float(row.get("seconds_played") or 0)
+            oreb = float(row.get("offensive_rebounds") or 0)
+            dreb = float(row.get("defensive_rebounds") or 0)
+            lookup[pname] = {
+                "pts":     float(row.get("points") or 0),
+                "reb":     oreb + dreb,
+                "ast":     float(row.get("assists") or 0),
+                "stl":     float(row.get("steals") or 0),
+                "blk":     float(row.get("blocks") or 0),
+                "tov":     float(row.get("turnovers") or 0),
+                "fg3m":    float(row.get("made_three_point_field_goals") or 0),
+                "fg3a":    float(row.get("attempted_three_point_field_goals") or 0),
+                "fgm":     float(row.get("made_field_goals") or 0),
+                "fga":     float(row.get("attempted_field_goals") or 0),
+                "ftm":     float(row.get("made_free_throws") or 0),
+                "fta":     float(row.get("attempted_free_throws") or 0),
+                "oreb":    oreb,
+                "dreb":    dreb,
+                "pf":      float(row.get("personal_fouls") or 0),
+                "minutes": round(secs / 60.0, 2),
+            }
+
+        return lookup
+
+    except Exception as exc:
+        _logger.warning(f"[BetTracker] Tier 2 (bbref) failed: {exc}")
+        return {}
+
+
+def _fetch_bulk_boxscores(date_str: str) -> dict:
+    """
+    Orchestrator: Try Tier 1 (nba_api BoxScore), then Tier 2 (bbref).
+
+    Returns the first non-empty lookup dict, or {} if both tiers fail
+    (callers then fall through to the legacy Tier 3 per-player path).
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, ...}} or {}
+    """
+    lookup = _fetch_all_boxscores_nba_api(date_str)
+    if lookup:
+        _logger.info(
+            f"[BetTracker] Tier 1 (nba_api BoxScore) succeeded for {date_str}: "
+            f"{len(lookup)} players"
+        )
+        return lookup
+
+    _logger.info(
+        f"[BetTracker] Tier 1 (nba_api BoxScore) empty/failed for {date_str}, "
+        f"trying Tier 2 (bbref)..."
+    )
+    lookup = _fetch_all_boxscores_bbref(date_str)
+    if lookup:
+        _logger.info(
+            f"[BetTracker] Tier 2 (bbref) succeeded for {date_str}: "
+            f"{len(lookup)} players"
+        )
+        return lookup
+
+    _logger.info(
+        f"[BetTracker] Tier 2 (bbref) also failed for {date_str}, "
+        f"falling through to Tier 3 (legacy per-player path)"
+    )
+    return {}
+
+
+def _compute_actual_value_from_row(
+    row: dict,
+    stat_type: str,
+    stat_col,
+    is_combo: bool,
+    is_fantasy: bool,
+    combo_stats: dict,
+    fantasy_scoring: dict,
+) -> float:
+    """
+    Compute the actual stat value for a bet from a box-score row dict.
+
+    The row dict uses our internal lowercase keys (pts, reb, ast, …) as
+    returned by _fetch_bulk_boxscores or from an API-NBA game log.
+
+    Args:
+        row: dict with internal stat keys (pts, reb, ast, stl, blk, tov, …)
+        stat_type: normalized bet stat type string
+        stat_col: value from _STAT_COL for simple stats (None for combo/fantasy)
+        is_combo: True if stat_type is a combo stat (PRA, P+R, etc.)
+        is_fantasy: True if stat_type is a fantasy scoring stat
+        combo_stats: COMBO_STATS mapping from data.platform_mappings
+        fantasy_scoring: FANTASY_SCORING mapping from data.platform_mappings
+
+    Returns:
+        float: computed actual stat value
+    """
+    if is_combo:
+        return sum(
+            float(row.get(_STAT_COL.get(comp, comp), 0) or 0)
+            for comp in combo_stats[stat_type]
+            if _STAT_COL.get(comp)
+        )
+    if is_fantasy:
+        return round(
+            sum(
+                weight * float(row.get(_STAT_COL.get(comp, comp), 0) or 0)
+                for comp, weight in fantasy_scoring[stat_type].items()
+                if _STAT_COL.get(comp)
+            ),
+            2,
+        )
+    return float(row.get(stat_col, 0) or 0)
+
+def _lookup_bulk_row(bulk_lookup: dict, player_name: str, normalize_fn=None) -> dict | None:
+    """
+    Look up a player's bulk box score row from a date-level lookup dict.
+
+    Tries exact lowercase match first, then normalized name (handles unicode
+    differences, suffixes like "Jr." vs "Jr", etc.).
+
+    Args:
+        bulk_lookup: {player_name_lower: stat_dict} from _fetch_bulk_boxscores
+        player_name: raw player name string from the bet record
+        normalize_fn: optional callable for normalizing the name (e.g. normalize_player_name)
+
+    Returns:
+        dict of stats if found, or None if not found in the lookup
+    """
+    pname_lower = player_name.lower().strip()
+    row = bulk_lookup.get(pname_lower)
+    if row is None and normalize_fn is not None:
+        row = bulk_lookup.get(normalize_fn(player_name))
+    return row
+
+# ============================================================
+# END SECTION: 3-Tier Bulk Box Score Helpers
+# ============================================================
+
+
+# ============================================================
 # SECTION: Bet Logging
 # ============================================================
 
@@ -678,6 +926,9 @@ def auto_resolve_bet_results(date_str=None):
             pid = None
         _name_to_pid[pname] = pid
 
+    # ── Tier 1+2: Try bulk box score fetch ──────────────────────
+    _bulk_lookup = _fetch_bulk_boxscores(date_str)
+
     # ── Retrieve game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
     import time as _time
@@ -713,11 +964,36 @@ def auto_resolve_bet_results(date_str=None):
             except Exception:
                 _game_log_cache[pid] = []
 
+    _tier12_resolved = 0
+
     # ── Resolve bets from cached game logs ────────────────────
     for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
         bet_id = bet.get("bet_id")
 
         try:
+            # ── Try Tier 1/2 bulk lookup first ───────────────────────
+            bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
+
+            if bulk_row is not None:
+                actual_value = _compute_actual_value_from_row(
+                    bulk_row, stat_type, stat_col, is_combo, is_fantasy,
+                    COMBO_STATS, FANTASY_SCORING,
+                )
+                if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
+                    result = "PUSH"
+                elif direction == "OVER":
+                    result = "WIN" if actual_value > prop_line else "LOSS"
+                else:  # UNDER
+                    result = "WIN" if actual_value < prop_line else "LOSS"
+                success, msg = record_bet_result(bet_id, result, actual_value)
+                if success:
+                    resolved_count += 1
+                    _tier12_resolved += 1
+                else:
+                    errors_list.append(f"#{bet_id} {player_name}: DB update failed — {msg}")
+                continue  # Skip Tier 3 for this bet
+
+            # ── Tier 3: Legacy per-player game log path ───────────────
             player_id = _name_to_pid.get(player_name)
             if not player_id:
                 errors_list.append(f"#{bet_id} {player_name}: player ID not found")
@@ -783,6 +1059,12 @@ def auto_resolve_bet_results(date_str=None):
 
         except Exception as exc:
             errors_list.append(f"#{bet_id} {player_name}: {exc}")
+
+    if _tier12_resolved:
+        _logger.info(
+            f"[BetTracker] auto_resolve_bet_results: resolved {_tier12_resolved} bet(s) "
+            f"via Tier 1/2 (bulk BoxScore) for {date_str}"
+        )
 
     return resolved_count, errors_list
 
@@ -921,6 +1203,9 @@ def resolve_todays_bets():
                 pid = _lookup_pid(_normalize_name(pname))
         _name_to_pid[pname] = pid
 
+    # ── Tier 1+2: Try bulk box score fetch ──────────────────────
+    _bulk_lookup = _fetch_bulk_boxscores(today_str)
+
     # ── Retrieve game logs in parallel using ThreadPoolExecutor ──
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -957,11 +1242,39 @@ def resolve_todays_bets():
                 except Exception:
                     _game_log_cache[pid] = []
 
+    _tier12_resolved = 0
+
     # ── Resolve bets from cached game logs ────────────────────
     for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
         bet_id = bet.get("id") or bet.get("bet_id")
 
         try:
+            # ── Try Tier 1/2 bulk lookup first ───────────────────────
+            bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
+
+            if bulk_row is not None:
+                actual_value = _compute_actual_value_from_row(
+                    bulk_row, stat_type, stat_col, is_combo, is_fantasy,
+                    COMBO_STATS, FANTASY_SCORING,
+                )
+                if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
+                    result = "PUSH"
+                elif direction == "OVER":
+                    result = "WIN" if actual_value > prop_line else "LOSS"
+                else:  # UNDER
+                    result = "WIN" if actual_value < prop_line else "LOSS"
+                update_bet_result(bet_id, result, actual_value)
+                summary["resolved"] += 1
+                _tier12_resolved += 1
+                if result == "WIN":
+                    summary["wins"] += 1
+                elif result == "LOSS":
+                    summary["losses"] += 1
+                else:
+                    summary["pushes"] += 1
+                continue  # Skip Tier 3 for this bet
+
+            # ── Tier 3: Legacy per-player game log path ───────────────
             player_id = _name_to_pid.get(player_name)
             if not player_id:
                 summary["errors"].append(f"#{bet_id} {player_name}: player ID not found")
@@ -1027,6 +1340,12 @@ def resolve_todays_bets():
         except Exception as exc:
             summary["errors"].append(f"{player_name}: {exc}")
             summary["pending"] += 1
+
+    if _tier12_resolved:
+        _logger.info(
+            f"[BetTracker] resolve_todays_bets: resolved {_tier12_resolved} bet(s) "
+            f"via Tier 1/2 (bulk BoxScore) for {today_str}"
+        )
 
     # Auto-save daily snapshot after resolving
     if summary["resolved"] > 0:
@@ -1127,6 +1446,10 @@ def resolve_all_pending_bets():
             continue
 
         date_resolved = 0
+        # ── Tier 1+2: Try bulk box score fetch for this date ─────
+        _bulk_lookup = _fetch_bulk_boxscores(date_str)
+        _date_tier12 = 0
+
         for bet in bets:
             bet_id      = bet.get("bet_id") or bet.get("id")
             player_name = bet.get("player_name", "")
@@ -1156,6 +1479,41 @@ def resolve_all_pending_bets():
                 summary["pending"] += 1
                 continue
 
+            # ── Try Tier 1/2 bulk lookup first ───────────────────────
+            bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
+
+            if bulk_row is not None:
+                try:
+                    actual_value = _compute_actual_value_from_row(
+                        bulk_row, stat_type, stat_col, is_combo, is_fantasy,
+                        COMBO_STATS, FANTASY_SCORING,
+                    )
+                    if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
+                        result = "PUSH"
+                    elif direction == "OVER":
+                        result = "WIN" if actual_value > prop_line else "LOSS"
+                    else:
+                        result = "WIN" if actual_value < prop_line else "LOSS"
+                    success, msg = record_bet_result(bet_id, result, actual_value)
+                    if success:
+                        summary["resolved"] += 1
+                        date_resolved += 1
+                        _date_tier12 += 1
+                        if result == "WIN":
+                            summary["wins"] += 1
+                        elif result == "LOSS":
+                            summary["losses"] += 1
+                        else:
+                            summary["pushes"] += 1
+                    else:
+                        summary["errors"].append(f"#{bet_id} {player_name}: DB update failed — {msg}")
+                        summary["pending"] += 1
+                except Exception as exc:
+                    summary["errors"].append(f"#{bet_id} {player_name}: {exc}")
+                    summary["pending"] += 1
+                continue  # Skip Tier 3 for this bet
+
+            # ── Tier 3: Legacy per-player game log path ───────────────
             # Player ID lookup: API-NBA → nba_api static (local)
             player_id = None
             if _lookup_pid is not None:
@@ -1247,6 +1605,12 @@ def resolve_all_pending_bets():
             except Exception as exc:
                 summary["errors"].append(f"#{bet_id} {player_name}: {exc}")
                 summary["pending"] += 1
+
+        if _date_tier12:
+            _logger.info(
+                f"[BetTracker] resolve_all_pending_bets: resolved {_date_tier12} bet(s) "
+                f"via Tier 1/2 (bulk BoxScore) for {date_str}"
+            )
 
         if date_resolved > 0:
             summary["by_date"][date_str] = date_resolved
@@ -1374,6 +1738,10 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
             continue
 
         date_resolved = 0
+        # ── Tier 1+2: Try bulk box score fetch for this date ─────
+        _bulk_lookup = _fetch_bulk_boxscores(_loop_date)
+        _date_tier12 = 0
+
         for pick in picks:
             pick_id     = pick.get("pick_id")
             player_name = pick.get("player_name", "")
@@ -1405,6 +1773,43 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
+            # ── Try Tier 1/2 bulk lookup first ───────────────────────
+            bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
+
+            if bulk_row is not None:
+                try:
+                    actual_value = _compute_actual_value_from_row(
+                        bulk_row, stat_type, stat_col, is_combo, is_fantasy,
+                        COMBO_STATS, FANTASY_SCORING,
+                    )
+                    if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
+                        result = "PUSH"
+                    elif direction == "OVER":
+                        result = "WIN" if actual_value > prop_line else "LOSS"
+                    else:
+                        result = "WIN" if actual_value < prop_line else "LOSS"
+                    ok = update_analysis_pick_result(pick_id, result, actual_value)
+                    if ok:
+                        summary["resolved"] += 1
+                        date_resolved += 1
+                        _date_tier12 += 1
+                        if result == "WIN":
+                            summary["wins"] += 1
+                        elif result == "LOSS":
+                            summary["losses"] += 1
+                        else:
+                            summary["pushes"] += 1
+                    else:
+                        summary["errors"].append(
+                            f"#{pick_id} {player_name}: DB update failed"
+                        )
+                        summary["pending"] += 1
+                except Exception as exc:
+                    summary["errors"].append(f"#{pick_id} {player_name}: {exc}")
+                    summary["pending"] += 1
+                continue  # Skip Tier 3 for this pick
+
+            # ── Tier 3: Legacy per-player game log path ───────────────
             # ── Player ID lookup: API-NBA → nba_api static (local) ──
             player_id = None
             if _lookup_pid is not None:
@@ -1509,6 +1914,12 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
             except Exception as exc:
                 summary["errors"].append(f"#{pick_id} {player_name}: {exc}")
                 summary["pending"] += 1
+
+        if _date_tier12:
+            _logger.info(
+                f"[BetTracker] resolve_all_analysis_picks: resolved {_date_tier12} pick(s) "
+                f"via Tier 1/2 (bulk BoxScore) for {_loop_date}"
+            )
 
         if date_resolved > 0:
             summary["by_date"][_loop_date] = date_resolved
