@@ -246,9 +246,16 @@ try:
     _handle_checkout()
     _user_is_premium = _is_premium()
 except Exception:
-    _logger.debug("Premium check import/call failed — failing open")
-    _user_is_premium = True  # Fail open — don't block the home page
+    _logger.exception("Premium check import/call failed — failing closed, treating user as non-premium")
+    _user_is_premium = False  # Fail closed — do not grant premium when billing/auth is unavailable
     _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
+    if "premium_check_error_shown" not in st.session_state:
+        st.session_state["premium_check_error_shown"] = True
+        st.warning(
+            "We couldn't verify your premium status right now. "
+            "You're being treated as a Free user while we reconnect billing. "
+            "If you have an active subscription, your premium access should return shortly."
+        )
 
 with st.sidebar:
     if _user_is_premium:
