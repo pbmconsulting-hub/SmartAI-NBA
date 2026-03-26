@@ -744,6 +744,144 @@ def run_monte_carlo_simulation(*args, **kwargs):
 # like blowouts and foul trouble.
 # ============================================================
 
+
+def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
+    """
+    Adjust GAME_SCENARIOS probability weights based on real team context data.
+
+    Uses live NBA API data (four factors, team pace, recent blowout frequency)
+    when available to produce context-aware scenario distributions.  Falls back
+    to the static ``GAME_SCENARIOS`` weights when data is unavailable.
+
+    Data sources used (all optional / graceful-degradation):
+    - ``fetch_four_factors_box_score`` → EFG_PCT, TM_TOV_PCT (pace/style)
+    - ``fetch_team_game_logs`` → recent blowout frequency per team
+    - ``fetch_player_estimated_metrics`` → E_PACE (league/team pace)
+
+    Parameters
+    ----------
+    game_context : dict | None
+        Game context dict that may contain:
+        - ``game_id`` (str): For four-factors lookup.
+        - ``home_team_id`` (int): For team game log lookup.
+        - ``away_team_id`` (int): For team game log lookup.
+        - ``vegas_spread`` (float): Used as a baseline blowout signal.
+        - ``game_total`` (float): Used as a baseline pace signal.
+
+    Returns
+    -------
+    dict
+        Keys mirror the GAME_SCENARIOS list entries, mapping scenario name →
+        adjusted probability weight.  All values are normalised so that they
+        sum to 1.0.  Returns a copy of the base GAME_SCENARIOS weights (not
+        modified in place) when no enrichment data is available.
+
+    Example
+    -------
+    ctx = {"game_id": "0022401234", "vegas_spread": 11.5, "game_total": 215.0}
+    weights = _enrich_scenarios_from_context(ctx)
+    # weights["grind_blowout"] is elevated because spread > 10 and total < 215
+    """
+    # Start from the base weights defined in GAME_SCENARIOS
+    weights = {name: prob for name, prob, *_ in GAME_SCENARIOS}
+
+    if not game_context:
+        return weights
+
+    vegas_spread = abs(float(game_context.get("vegas_spread", 0) or 0))
+    game_total = float(game_context.get("game_total", 225) or 225)
+    home_team_id = game_context.get("home_team_id")
+    away_team_id = game_context.get("away_team_id")
+    game_id = game_context.get("game_id")
+
+    # ── Adjust based on pace (game_total proxy) ──────────────────────────────
+    # High-scoring games shift probability toward shootout, away from defensive slug.
+    # Low-scoring games do the opposite.
+    if game_total >= 228:
+        weights["shootout"] = weights.get("shootout", 0.01) * 3.0
+        weights["defensive_slug"] = weights.get("defensive_slug", 0.01) * 0.4
+        weights["close_game"] = weights.get("close_game", 0.06) * 1.2
+    elif game_total <= 213:
+        weights["defensive_slug"] = weights.get("defensive_slug", 0.01) * 3.0
+        weights["shootout"] = weights.get("shootout", 0.01) * 0.4
+        weights["grind_blowout"] = weights.get("grind_blowout", 0.01) * 1.5
+
+    # ── Adjust based on spread (blowout signal) ───────────────────────────────
+    # Large spread → more blowout probability; tight game → close game more likely.
+    if vegas_spread >= 10:
+        blowout_boost = min(2.5, 1.0 + (vegas_spread - 10) * 0.10)
+        weights["blowout_win"] = weights.get("blowout_win", 0.13) * blowout_boost
+        weights["blowout_loss"] = weights.get("blowout_loss", 0.11) * blowout_boost
+        weights["close_game"] = weights.get("close_game", 0.06) * 0.4
+    elif vegas_spread <= 3:
+        weights["close_game"] = weights.get("close_game", 0.06) * 1.8
+        weights["blowout_win"] = weights.get("blowout_win", 0.13) * 0.5
+        weights["blowout_loss"] = weights.get("blowout_loss", 0.11) * 0.5
+
+    # ── Enrich with real blowout frequency from team game logs ───────────────
+    # If either team has a recent history of blowout wins/losses, adjust weight.
+    for team_id in filter(None, [home_team_id, away_team_id]):
+        try:
+            from data.nba_data_service import get_team_game_logs
+            logs = get_team_game_logs(team_id, last_n=10)
+            if logs:
+                # Blowout = margin > 15 points
+                blowout_count = 0
+                for log in logs:
+                    pts = float(log.get("PTS", 0) or 0)
+                    pts_opp = float(log.get("OPP_PTS", log.get("pts_opp", 0)) or 0)
+                    if pts_opp == 0:
+                        # Try alternative fields
+                        plus_minus_abs = abs(float(log.get("PLUS_MINUS", 0) or 0))
+                        if plus_minus_abs > 15:
+                            blowout_count += 1
+                    elif abs(pts - pts_opp) > 15:
+                        blowout_count += 1
+                blowout_rate = blowout_count / len(logs)
+                # Teams with >40% blowout rate in last 10 get elevated blowout weight
+                if blowout_rate > 0.4:
+                    extra = (blowout_rate - 0.4) * 2.0
+                    weights["blowout_win"] = weights.get("blowout_win", 0.13) * (1.0 + extra)
+                    weights["blowout_loss"] = weights.get("blowout_loss", 0.11) * (1.0 + extra)
+        except Exception as _exc:
+            _logger.debug("_enrich_scenarios_from_context: team log lookup failed — %s", _exc)
+
+    # ── Enrich with four-factors data (pace / eFG%) ───────────────────────────
+    if game_id:
+        try:
+            from data.nba_data_service import get_four_factors_box_score
+            ff = get_four_factors_box_score(game_id)
+            team_stats = ff.get("team_stats", []) if ff else []
+            if team_stats:
+                efg_vals = []
+                for ts in team_stats:
+                    efg = ts.get("EFG_PCT") or ts.get("efgPct")
+                    if efg is not None:
+                        try:
+                            efg_vals.append(float(efg))
+                        except (TypeError, ValueError):
+                            pass
+                if efg_vals:
+                    avg_efg = sum(efg_vals) / len(efg_vals)
+                    # High eFG% game → more shootout probability
+                    if avg_efg > 0.56:
+                        weights["shootout"] = weights.get("shootout", 0.01) * 1.5
+                    elif avg_efg < 0.48:
+                        weights["defensive_slug"] = weights.get("defensive_slug", 0.01) * 1.5
+        except Exception as _exc:
+            _logger.debug("_enrich_scenarios_from_context: four-factors lookup failed — %s", _exc)
+
+    # ── Normalise to sum 1.0 ─────────────────────────────────────────────────
+    total = sum(weights.values())
+    if total > 0:
+        weights = {k: v / total for k, v in weights.items()}
+    else:
+        # Fallback to base weights if something went wrong
+        weights = {name: prob for name, prob, *_ in GAME_SCENARIOS}
+
+    return weights
+
+
 def _simulate_game_scenario(blowout_risk_factor, vegas_spread=0.0, game_total=225.0):
     """
     Pick a holistic game scenario for this simulated game. (W3)

@@ -274,6 +274,124 @@ def compute_league_average_game_total(teams_data=None):
     return LEAGUE_AVERAGE_GAME_TOTAL
 
 
+def get_live_league_context(teams_data=None) -> dict:
+    """
+    Fetch real league-level context values (pace, game total, blowout rates)
+    from the NBA API, falling back to module-level constants on failure.
+
+    Calls ``data.nba_data_service.get_player_estimated_metrics()`` to derive
+    a live league-average pace from the season's estimated metrics.  When
+    that call fails or returns nothing, the hardcoded ``LEAGUE_AVERAGE_PACE``
+    and ``LEAGUE_AVERAGE_GAME_TOTAL`` constants are used instead.
+
+    Parameters
+    ----------
+    teams_data : list[dict] | None
+        Optional team-stats list (from teams.csv / data_manager) used to
+        compute the game total via ``compute_league_average_game_total()``.
+
+    Returns
+    -------
+    dict
+        Keys:
+          ``pace``        — float: league-average possessions per 48 min
+          ``game_total``  — float: league-average combined score per game
+          ``source``      — str: 'live' if derived from API, 'fallback' otherwise
+    """
+    pace = None
+
+    # Attempt to derive pace from player estimated metrics (E_PACE column).
+    try:
+        from data.nba_data_service import get_player_estimated_metrics as _get_metrics
+        metrics = _get_metrics()
+        if metrics:
+            paces = []
+            for row in metrics:
+                p = row.get("E_PACE") or row.get("e_pace")
+                if p is not None:
+                    try:
+                        paces.append(float(p))
+                    except (TypeError, ValueError):
+                        pass
+            if paces:
+                pace = round(sum(paces) / len(paces), 2)
+    except Exception as _exc:
+        logging.getLogger(__name__).debug(
+            "get_live_league_context: estimated metrics unavailable — %s", _exc
+        )
+
+    game_total = compute_league_average_game_total(teams_data)
+    source = "live" if pace is not None else "fallback"
+
+    return {
+        "pace": pace if pace is not None else LEAGUE_AVERAGE_PACE,
+        "game_total": game_total,
+        "source": source,
+    }
+
+
+def _compute_usage_boost(advanced_context: dict | None, base_projection: float) -> float:
+    """
+    Apply a usage-rate boost/penalty to a base projection.
+
+    When real usage-rate data is available from the NBA API (via
+    ``fetch_box_score_usage`` or ``enrich_simulation_with_advanced_stats``),
+    this helper scales the base projection proportionally.
+
+    A player with 30% usage receives a small positive nudge; a player with
+    15% usage receives a small negative nudge.  League average usage is
+    normalised to ~20% (1/5 of 5 on-court players).
+
+    Parameters
+    ----------
+    advanced_context : dict | None
+        Dict that may contain ``usage_pct`` (float, 0–1 scale) from the
+        ``enrich_simulation_with_advanced_stats`` function or the
+        ``fetch_box_score_usage`` endpoint.
+    base_projection : float
+        The pre-boost stat projection value.
+
+    Returns
+    -------
+    float
+        Adjusted projection value.  Returns *base_projection* unchanged when
+        no valid usage data is available or when the boost would be negligible
+        (|boost| < 0.5%).
+    """
+    if not advanced_context:
+        return base_projection
+
+    usage_raw = advanced_context.get("usage_pct") or advanced_context.get("USG_PCT")
+    if usage_raw is None:
+        return base_projection
+
+    try:
+        usage = float(usage_raw)
+    except (TypeError, ValueError):
+        return base_projection
+
+    # Normalise from percentage (e.g. 27.4) or decimal (e.g. 0.274)
+    if usage > 1.0:
+        usage = usage / 100.0
+
+    # League-average usage for an active player ≈ 0.20
+    _LEAGUE_AVG_USAGE = 0.20
+    if usage <= 0:
+        return base_projection
+
+    # Multiplier: usage at league avg → 1.0; each 1% above/below → ±1.5%
+    multiplier = 1.0 + (usage - _LEAGUE_AVG_USAGE) * 1.5
+
+    # Cap the adjustment: ±12% maximum to avoid extremes from small-sample data
+    multiplier = max(0.88, min(1.12, multiplier))
+
+    # Only apply if the adjustment is meaningful (> 0.5%)
+    if abs(multiplier - 1.0) < 0.005:
+        return base_projection
+
+    return _safe_float(base_projection * multiplier, base_projection)
+
+
 def build_player_projection(
     player_data: dict,
     opponent_team_abbreviation: str,
@@ -289,6 +407,7 @@ def build_player_projection(
     played_yesterday: bool = False,
     rolling_defensive_data: list | None = None,
     game_context: dict | None = None,
+    advanced_context: dict | None = None,
 ):
     """
     Build a complete stat projection for one player tonight.
@@ -339,6 +458,14 @@ def build_player_projection(
               defense_factor = 0.5 * season_factor + 0.5 * rolling_factor
             When None or opponent not found, falls back to season average
             from defensive_ratings_data (current default behavior).
+        advanced_context (dict, optional): Real advanced stats from the NBA
+            API (via ``enrich_simulation_with_advanced_stats`` or
+            ``fetch_box_score_usage``).  When provided, the following keys
+            are used:
+            - ``usage_pct`` (float): Player usage rate (0–1 or 0–100 scale).
+              Applied as a multiplier to points, assists, and threes via
+              ``_compute_usage_boost()``.
+            Falls back gracefully if the dict is None or missing keys.
 
     Returns:
         dict: Projected stats for tonight with adjustment factors:
@@ -758,6 +885,15 @@ def build_player_projection(
     projected_rebounds  = season_rebounds_average  * _off_mult("rebounds")
     projected_assists   = season_assists_average   * _off_mult("assists")
     projected_threes    = season_threes_average    * _off_mult("threes")
+
+    # Apply usage-rate boost from advanced_context when available.
+    # This scales points/assists/threes projections proportionally to
+    # actual usage rate vs the league average — players with higher usage
+    # typically produce more per-minute on offensive stats.
+    if advanced_context:
+        projected_points  = _compute_usage_boost(advanced_context, projected_points)
+        projected_assists = _compute_usage_boost(advanced_context, projected_assists)
+        projected_threes  = _compute_usage_boost(advanced_context, projected_threes)
 
     # Defensive stats (steals/blocks) scale with pace and have minimal home/away effect
     _def_ha_steals = _home_factor_map.get("steals", home_away_factor * 0.2)

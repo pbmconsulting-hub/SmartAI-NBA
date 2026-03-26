@@ -177,6 +177,8 @@ def calculate_confidence_score(
     alternative_probabilities: dict | None = None,
     streak_info: dict | None = None,
     platform: str | None = None,
+    on_off_data: dict | None = None,
+    matchup_data: dict | None = None,
 ) -> dict:
     """
     Calculate a 0-100 SAFE Score (Statistical Analysis of Force & Edge) for a prop pick.
@@ -296,6 +298,55 @@ def calculate_confidence_score(
     # Scale: 1.0 = neutral (50), 1.10 = great (80), 0.90 = bad (20)
     matchup_score = 50.0 + (defense_factor - 1.0) * 300.0
     matchup_score = max(0.0, min(100.0, matchup_score))
+
+    # Enrich matchup score with real On/Off court differential data when available.
+    # on_off_data comes from fetch_player_on_off() via nba_live_fetcher.
+    # A player whose team has a strong positive net rating when they are ON court
+    # (vs OFF) signals genuine on-court impact which improves prediction quality.
+    if on_off_data:
+        try:
+            on_rows = on_off_data.get("on_court", [])
+            off_rows = on_off_data.get("off_court", [])
+            if on_rows and off_rows:
+                # Average net ratings on/off court across all players in the data
+                on_net = [float(r.get("NET_RATING", r.get("netRating", 0)) or 0) for r in on_rows]
+                off_net = [float(r.get("NET_RATING", r.get("netRating", 0)) or 0) for r in off_rows]
+                if on_net and off_net:
+                    avg_on = sum(on_net) / len(on_net)
+                    avg_off = sum(off_net) / len(off_net)
+                    on_off_diff = avg_on - avg_off
+                    # Each +1 net-rating differential adds ~2.5 pts to matchup score
+                    on_off_adjustment = on_off_diff * 2.5
+                    matchup_score = max(0.0, min(100.0, matchup_score + on_off_adjustment))
+        except Exception:
+            pass  # Degradation: use base matchup_score if on_off_data is malformed
+
+    # Enrich matchup score with defensive assignment quality when matchup data available.
+    # matchup_data comes from fetch_box_score_matchups() via nba_live_fetcher.
+    # When the primary defender guarding this player allows a high points-per-possession,
+    # the matchup is more favorable for the offensive player.
+    if matchup_data:
+        try:
+            matchup_rows = matchup_data.get("player_stats", [])
+            if matchup_rows:
+                # Look for a composite defensive quality signal in the matchup rows.
+                # PLAYER_GUARD_DIFF (how much the player outperforms when guarded by this
+                # defender) is a direct signal of matchup favorability.
+                guard_diffs = []
+                for row in matchup_rows:
+                    gd = row.get("PLAYER_GUARD_DIFF") or row.get("playerGuardDiff")
+                    if gd is not None:
+                        try:
+                            guard_diffs.append(float(gd))
+                        except (TypeError, ValueError):
+                            pass
+                if guard_diffs:
+                    avg_guard_diff = sum(guard_diffs) / len(guard_diffs)
+                    # Positive guard diff = defender gives up more than average → favorable
+                    matchup_adjustment = avg_guard_diff * 3.0
+                    matchup_score = max(0.0, min(100.0, matchup_score + matchup_adjustment))
+        except Exception:
+            pass  # Degradation: use base matchup_score if matchup_data is malformed
 
     # --- Factor 5: Historical Consistency (0-100) ---
     # Players with low coefficient of variation (low std/avg) are

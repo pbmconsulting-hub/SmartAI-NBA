@@ -205,6 +205,275 @@ def get_player_news(player_name=None, limit=20) -> list:
     return []
 
 
+# ============================================================
+# nba_live_fetcher.py wrappers — new NBA API Gateway
+# These functions delegate to data/nba_live_fetcher.py, which
+# wraps the full breadth of stats.nba.com endpoints.
+# ============================================================
+
+try:
+    from data.nba_live_fetcher import (
+        fetch_player_game_logs as _nlf_fetch_player_game_logs,
+        fetch_box_score_traditional as _nlf_fetch_box_score_traditional,
+        fetch_box_score_advanced as _nlf_fetch_box_score_advanced,
+        fetch_box_score_usage as _nlf_fetch_box_score_usage,
+        fetch_player_on_off as _nlf_fetch_player_on_off,
+        fetch_player_estimated_metrics as _nlf_fetch_player_estimated_metrics,
+        fetch_player_fantasy_profile as _nlf_fetch_player_fantasy_profile,
+        fetch_rotations as _nlf_fetch_rotations,
+        fetch_schedule as _nlf_fetch_schedule,
+        fetch_todays_scoreboard as _nlf_fetch_todays_scoreboard,
+        fetch_box_score_matchups as _nlf_fetch_box_score_matchups,
+        fetch_hustle_box_score as _nlf_fetch_hustle_box_score,
+        fetch_defensive_box_score as _nlf_fetch_defensive_box_score,
+        fetch_scoring_box_score as _nlf_fetch_scoring_box_score,
+        fetch_tracking_box_score as _nlf_fetch_tracking_box_score,
+        fetch_four_factors_box_score as _nlf_fetch_four_factors_box_score,
+        fetch_player_shooting_splits as _nlf_fetch_player_shooting_splits,
+        fetch_shot_chart as _nlf_fetch_shot_chart,
+        fetch_player_clutch_stats as _nlf_fetch_player_clutch_stats,
+        fetch_team_lineups as _nlf_fetch_team_lineups,
+        fetch_team_dashboard as _nlf_fetch_team_dashboard,
+        fetch_standings as _nlf_fetch_standings,
+        fetch_team_game_logs as _nlf_fetch_team_game_logs,
+        fetch_player_year_over_year as _nlf_fetch_player_year_over_year,
+        fetch_player_vs_player as _nlf_fetch_player_vs_player,
+        fetch_win_probability as _nlf_fetch_win_probability,
+        fetch_play_by_play as _nlf_fetch_play_by_play,
+        fetch_game_summary as _nlf_fetch_game_summary,
+        fetch_league_leaders as _nlf_fetch_league_leaders,
+        fetch_team_streak_finder as _nlf_fetch_team_streak_finder,
+    )
+    _NLF_AVAILABLE = True
+except Exception as _nlf_import_err:
+    _logger.debug("nba_live_fetcher not available: %s", _nlf_import_err)
+    _NLF_AVAILABLE = False
+
+
+def _nlf_unavailable_list(*_args, **_kwargs):
+    return []
+
+
+def _nlf_unavailable_dict(*_args, **_kwargs):
+    return {}
+
+
+# ── TIER 1: Critical endpoints ───────────────────────────────────────────────
+
+def get_player_game_logs_v2(player_id: int, season: str | None = None, last_n: int = 0) -> list:
+    """Return per-game stats from nba_live_fetcher (supports last_n filter)."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_player_game_logs(player_id, season=season, last_n=last_n)
+
+
+def get_box_score_traditional(game_id: str, period: int = 0) -> dict:
+    """Return the traditional box score for a game."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_box_score_traditional(game_id, period=period)
+
+
+def get_box_score_advanced(game_id: str) -> dict:
+    """Return the advanced box score for a game."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_box_score_advanced(game_id)
+
+
+def get_box_score_usage(game_id: str) -> dict:
+    """Return usage statistics box score for a game (USG_PCT, touches, etc.)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_box_score_usage(game_id)
+
+
+def get_player_on_off(team_id: int, season: str | None = None) -> dict:
+    """Return On/Off court differential stats for all players on a team."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_player_on_off(team_id, season=season)
+
+
+def get_player_estimated_metrics(season: str | None = None) -> list:
+    """Return estimated advanced metrics for all players (pace, ortg, drtg, etc.)."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_player_estimated_metrics(season=season)
+
+
+def get_player_fantasy_profile(player_id: int, season: str | None = None) -> dict:
+    """Return fantasy-relevant stat splits for a player (last 5/10/15/20 games)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_player_fantasy_profile(player_id, season=season)
+
+
+def get_rotations(game_id: str) -> dict:
+    """Return in/out rotation data (exact stint times) for a game."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_rotations(game_id)
+
+
+def get_schedule(game_date: str | None = None) -> list:
+    """Return the game schedule for a given date (defaults to today)."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_schedule(game_date=game_date)
+
+
+def get_todays_scoreboard() -> dict:
+    """Return today's full scoreboard (game headers, line scores, standings)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_todays_scoreboard()
+
+
+# ── TIER 2: High-value endpoints ─────────────────────────────────────────────
+
+def get_box_score_matchups(game_id: str) -> dict:
+    """Return defensive matchup data for a game (who guarded whom)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_box_score_matchups(game_id)
+
+
+def get_hustle_box_score(game_id: str) -> dict:
+    """Return hustle stats box score (charges, deflections, loose balls)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_hustle_box_score(game_id)
+
+
+def get_defensive_box_score(game_id: str) -> dict:
+    """Return defensive statistics box score for a game."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_defensive_box_score(game_id)
+
+
+def get_scoring_box_score(game_id: str) -> dict:
+    """Return scoring breakdown box score (FG% by zone, etc.)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_scoring_box_score(game_id)
+
+
+def get_tracking_box_score(game_id: str) -> dict:
+    """Return player-tracking box score (speed, distance, touches)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_tracking_box_score(game_id)
+
+
+def get_four_factors_box_score(game_id: str) -> dict:
+    """Return four-factors box score (eFG%, TO%, ORB%, FT rate)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_four_factors_box_score(game_id)
+
+
+def get_player_shooting_splits(player_id: int, season: str | None = None) -> dict:
+    """Return detailed shooting splits for a player (by zone, distance, etc.)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_player_shooting_splits(player_id, season=season)
+
+
+def get_shot_chart_v2(player_id: int, season: str | None = None) -> list:
+    """Return shot chart data for a player (x/y coords, made/missed, zone)."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_shot_chart(player_id, season=season)
+
+
+def get_player_clutch_stats(season: str | None = None) -> list:
+    """Return clutch-time stats (last 5 min, margin ≤5) for all players."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_player_clutch_stats(season=season)
+
+
+def get_team_lineups(team_id: int, season: str | None = None) -> list:
+    """Return 5-man lineup stats for a specific team."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_team_lineups(team_id, season=season)
+
+
+def get_team_dashboard(team_id: int, season: str | None = None) -> dict:
+    """Return team dashboard stats (home/away splits, days rest, monthly)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_team_dashboard(team_id, season=season)
+
+
+def get_team_game_logs(team_id: int, season: str | None = None, last_n: int = 0) -> list:
+    """Return per-game stats for a team, optionally capped to last_n games."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_team_game_logs(team_id, season=season, last_n=last_n)
+
+
+def get_player_year_over_year(player_id: int) -> list:
+    """Return year-over-year career stats for a player."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_player_year_over_year(player_id)
+
+
+# ── TIER 3: Reference & context endpoints ────────────────────────────────────
+
+def get_player_vs_player(
+    player1_id: int,
+    player2_id: int,
+    season: str | None = None,
+) -> dict:
+    """Return head-to-head stats for player1 when matched against player2."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_player_vs_player(player1_id, player2_id, season=season)
+
+
+def get_win_probability(game_id: str) -> dict:
+    """Return real-time win probability at each point in the game."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_win_probability(game_id)
+
+
+def get_play_by_play_v2(game_id: str) -> list:
+    """Return play-by-play events for a game."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_play_by_play(game_id)
+
+
+def get_game_summary(game_id: str) -> dict:
+    """Return high-level game summary (arena, officials, attendance, etc.)."""
+    if not _NLF_AVAILABLE:
+        return {}
+    return _nlf_fetch_game_summary(game_id)
+
+
+def get_league_leaders(stat_category: str = "PTS", season: str | None = None) -> list:
+    """Return top players for a given statistical category."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_league_leaders(stat_category=stat_category, season=season)
+
+
+def get_team_streak_finder(team_id: int, season: str | None = None) -> list:
+    """Return full season game log for a team (for streak/form computation)."""
+    if not _NLF_AVAILABLE:
+        return []
+    return _nlf_fetch_team_streak_finder(team_id, season=season)
+
+
+# ── End nba_live_fetcher.py wrappers ─────────────────────────────────────────
+
+
 def get_standings_from_nba_api(season: str | None = None) -> list:
     """
     Retrieve NBA standings via nba_stats_service.get_league_standings().
