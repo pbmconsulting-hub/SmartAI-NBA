@@ -57,6 +57,13 @@ except ImportError:
 # This converts "3-Point Made" → "threes", "Pts+Rebs" → "points_rebounds", etc.
 from data.platform_mappings import normalize_stat_type
 
+# Import player name normalizer for cross-reference / injury checks
+try:
+    from data.data_manager import normalize_player_name as _norm_player_name
+except ImportError:
+    def _norm_player_name(n):
+        return str(n).lower().strip()
+
 # Import odds math from the single source of truth — engine/odds_engine.py
 
 try:
@@ -2091,11 +2098,7 @@ def cross_reference_with_player_data(platform_players, players_data):
         result["missing_from_csv"]  # → ["Marcus Morris Sr."]
         result["matched"]           # → [{"name": "LeBron James", "team": "LAL", ...}]
     """
-    try:
-        from data.data_manager import normalize_player_name as _norm
-    except ImportError:
-        def _norm(n):
-            return n.lower().strip()
+    _norm = _norm_player_name
 
     # Build a normalized-name set from our CSV for fast lookup
     csv_norm_map = {}
@@ -2161,11 +2164,7 @@ def get_platform_confirmed_injuries(platform_players, players_data, todays_games
         # → [{"name": "Damian Lillard", "team": "MIL",
         #      "reason": "Not listed on any platform props"}, ...]
     """
-    try:
-        from data.data_manager import normalize_player_name as _norm
-    except ImportError:
-        def _norm(n):
-            return n.lower().strip()
+    _norm = _norm_player_name
 
     # Collect team abbreviations playing tonight
     tonight_teams = set()

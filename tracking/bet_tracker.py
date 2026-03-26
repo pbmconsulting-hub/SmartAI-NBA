@@ -31,6 +31,32 @@ from tracking.database import (
 # only ONE place that defines what stat types are valid.
 from engine import VALID_STAT_TYPES
 
+# ── Optional imports with safe fallbacks ──────────────────────────────────────
+# These were previously repeated inside 4+ function bodies. Hoisted to module
+# level so there is exactly ONE try/except per import target.
+
+try:
+    from data.platform_mappings import (
+        COMBO_STATS,
+        FANTASY_SCORING,
+        normalize_stat_type as _norm_stat_type,
+    )
+except ImportError:
+    COMBO_STATS: dict = {}
+    FANTASY_SCORING: dict = {}
+    _norm_stat_type = None
+
+try:
+    from data.data_manager import normalize_player_name as _normalize_name
+except ImportError:
+    def _normalize_name(n):
+        return str(n).lower().strip()
+
+try:
+    from data.player_profile_service import get_player_id as _lookup_pid
+except ImportError:
+    _lookup_pid = None
+
 
 # ============================================================
 # SECTION: Valid Values for Validation
@@ -604,25 +630,6 @@ def auto_resolve_bet_results(date_str=None):
     if not pending_bets:
         return 0, [f"No pending bets found for {date_str}"]
 
-    # Import combo/fantasy stat definitions and name normalizer
-    try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
-    except ImportError:
-        COMBO_STATS = {}
-        FANTASY_SCORING = {}
-        _norm_stat_type = None
-    try:
-        from data.data_manager import normalize_player_name as _normalize_name
-    except ImportError:
-        def _normalize_name(n):
-            return n.lower().strip()
-
-    # Player ID lookup: API-NBA API → nba_api static list (local, no network)
-    try:
-        from data.player_profile_service import get_player_id as _lookup_pid
-    except ImportError:
-        _lookup_pid = None
-
     # Target date as a date object (for robust date comparison)
     target_date = _dt.datetime.strptime(date_str, "%Y-%m-%d").date()
 
@@ -839,27 +846,6 @@ def resolve_todays_bets():
 
     if not todays_pending:
         return summary
-
-    # Import combo/fantasy stat definitions
-    try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
-    except ImportError:
-        COMBO_STATS = {}
-        FANTASY_SCORING = {}
-        _norm_stat_type = None
-
-    # Normalizer for fuzzy matching
-    try:
-        from data.data_manager import normalize_player_name as _normalize_name
-    except ImportError:
-        def _normalize_name(n):
-            return str(n).lower().strip()
-
-    # Player ID lookup via API-NBA → nba_api static list (local)
-    try:
-        from data.player_profile_service import get_player_id as _lookup_pid
-    except ImportError:
-        _lookup_pid = None
 
     # ── Check live scores for finished games ──────
     _scoreboard_available = False
@@ -1081,25 +1067,6 @@ def resolve_all_pending_bets():
         "pushes": 0, "pending": 0, "errors": [], "by_date": {},
     }
 
-    # Try importing required modules
-    try:
-        from data.player_profile_service import get_player_id as _lookup_pid
-    except ImportError:
-        _lookup_pid = None
-
-    try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
-    except ImportError:
-        COMBO_STATS = {}
-        FANTASY_SCORING = {}
-        _norm_stat_type = None
-
-    try:
-        from data.data_manager import normalize_player_name as _normalize_name
-    except ImportError:
-        def _normalize_name(n):
-            return n.lower().strip()
-
     # Load all pending bets (no result set) regardless of date
     try:
         all_bets = load_all_bets(limit=2000)
@@ -1313,25 +1280,6 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
         "resolved": 0, "wins": 0, "losses": 0,
         "pushes": 0, "pending": 0, "errors": [], "by_date": {},
     }
-
-    # ── Import dependencies ────────────────────────────────────────────
-    try:
-        from data.player_profile_service import get_player_id as _lookup_pid
-    except ImportError:
-        _lookup_pid = None
-
-    try:
-        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING, normalize_stat_type as _norm_stat_type
-    except ImportError:
-        COMBO_STATS = {}
-        FANTASY_SCORING = {}
-        _norm_stat_type = None
-
-    try:
-        from data.data_manager import normalize_player_name as _normalize_name
-    except ImportError:
-        def _normalize_name(n):
-            return n.lower().strip()
 
     from tracking.database import (
         load_pending_analysis_picks,
@@ -1749,12 +1697,6 @@ def log_props_to_tracker(props_list, direction="OVER"):
             str(b.get("bet_date", ""))[:10],
         )
         existing_keys.add(key)
-
-    # Normaliser: convert any un-normalised platform name to internal key
-    try:
-        from data.platform_mappings import normalize_stat_type as _norm_stat_type
-    except ImportError:
-        _norm_stat_type = None
 
     saved = 0
     skipped = 0
