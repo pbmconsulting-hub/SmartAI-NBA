@@ -16,13 +16,9 @@
 #   - PrizePicks / Underdog / DraftKings (via platform_fetcher.py)
 # ============================================================
 
-import logging as _logging
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    _logger = _logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # ── Re-export every public symbol from live_data_fetcher ─────
 # Pages import constants and path objects from this module;

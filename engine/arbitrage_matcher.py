@@ -10,13 +10,9 @@ find_ev_discrepancies(sportsbook_props) -> list[dict]
 """
 
 import re
-import logging
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 def calculate_implied_probability(american_odds: float) -> float:
     """Convert American odds to implied probability percentage."""

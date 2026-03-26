@@ -13,7 +13,6 @@ corresponding API-NBA functions produce, so callers are unaware
 of the data source.
 """
 
-import logging
 import time
 
 from engine.math_helpers import _safe_float
@@ -24,11 +23,8 @@ try:
 except ImportError:
     _REQUESTS_AVAILABLE = False
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────

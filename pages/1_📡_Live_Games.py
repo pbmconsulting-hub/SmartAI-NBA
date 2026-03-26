@@ -12,12 +12,8 @@ import time
 from data.data_manager import load_teams_data, find_players_by_team, load_players_data
 from data.nba_data_service import get_todays_games, get_todays_players
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # ============================================================
 # SECTION: Page Setup

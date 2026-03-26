@@ -19,15 +19,11 @@
 from __future__ import annotations
 
 import datetime
-import logging
 import time
 from typing import Any
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 

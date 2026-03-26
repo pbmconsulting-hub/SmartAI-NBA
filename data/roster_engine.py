@@ -27,12 +27,8 @@ import time
 import datetime
 from typing import Optional
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # ============================================================
 # SECTION: Module-level constants

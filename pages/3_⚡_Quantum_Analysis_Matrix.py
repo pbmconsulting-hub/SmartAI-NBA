@@ -14,12 +14,8 @@ import datetime         # For analysis result freshness timestamps
 import time             # For elapsed-time measurement
 import os               # For logo path resolution
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # Import our engine modules
 from engine.simulation import (

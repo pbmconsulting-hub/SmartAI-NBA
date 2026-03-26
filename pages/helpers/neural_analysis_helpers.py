@@ -7,12 +7,8 @@ import streamlit as st
 import streamlit.components.v1 as _components
 import html as _html
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 from engine.odds_engine import american_odds_to_implied_probability as _odds_to_implied_prob
 from data.data_manager import get_player_status

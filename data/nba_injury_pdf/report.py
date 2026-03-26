@@ -15,12 +15,8 @@ from data.nba_injury_pdf._exceptions import DataValidationError, URLRetrievalErr
 from data.nba_injury_pdf._parser import extract_tables_from_pdf, fetch_pdf_bytes, validate_columns
 from data.nba_injury_pdf._url import generate_report_url
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 # Known NBA injury report publication times in Eastern Time (hour, minute)
 REPORT_TIMES_ET = [

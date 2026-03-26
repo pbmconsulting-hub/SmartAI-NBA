@@ -22,12 +22,8 @@ import datetime     # For timestamps and date handling
 import statistics   # For calculating standard deviations
 from pathlib import Path  # Modern, cross-platform file path handling
 
-try:
-    from utils.logger import get_logger
-    _logger = get_logger(__name__)
-except ImportError:
-    import logging
-    _logger = logging.getLogger(__name__)
+from utils.log_helper import get_logger
+_logger = get_logger(__name__)
 
 try:
     from data.game_log_cache import save_game_logs_to_cache, load_game_logs_from_cache

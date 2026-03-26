@@ -8,13 +8,9 @@
 
 import streamlit as st
 import html as _html
-import logging as _logging
 
-try:
-    from utils.logger import get_logger as _get_logger
-    _logger = _get_logger(__name__)
-except ImportError:
-    _logger = _logging.getLogger(__name__)
+from utils.log_helper import get_logger as _get_logger
+_logger = _get_logger(__name__)
 
 from data.data_manager import (
     load_players_data,
