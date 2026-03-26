@@ -592,6 +592,10 @@ if run_analysis:
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
 
+    # Clear stale Joseph results so fresh ones are generated after this run.
+    st.session_state.pop("joseph_results", None)
+    st.session_state["joseph_bets_logged"] = False
+
     try:
         # ── Filter props to only tonight's teams (with abbreviation aliases) ──
         # Build expanded playing-teams set that covers all known alias variants
@@ -1813,7 +1817,7 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
         from data.advanced_metrics import enrich_player_god_mode
         from data.data_manager import load_players_data, load_teams_data
         from engine.joseph_bets import joseph_auto_log_bets
-        from utils.joseph_widget import render_joseph_inline_commentary
+        from utils.joseph_widget import inject_joseph_inline_commentary
 
         _players = load_players_data()
         _teams = {t.get("abbreviation", "").upper(): t for t in load_teams_data()}
@@ -1835,10 +1839,15 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
                 todays_games=_games,
             )
 
-        render_joseph_inline_commentary(analysis_results, "analysis_results")
+        # Use joseph_results (enriched with verdicts) for inline commentary
+        # when available; fall back to raw analysis_results.
+        _joseph_results = st.session_state.get("joseph_results", [])
+        inject_joseph_inline_commentary(
+            _joseph_results if _joseph_results else analysis_results,
+            "analysis_results",
+        )
 
         if not st.session_state.get("joseph_bets_logged", False):
-            _joseph_results = st.session_state.get("joseph_results", [])
             if _joseph_results:
                 _logged_count, _logged_msg = joseph_auto_log_bets(_joseph_results)
                 if _logged_count > 0:

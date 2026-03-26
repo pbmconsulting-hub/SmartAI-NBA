@@ -76,6 +76,7 @@ try:
         joseph_analyze_game,
         joseph_analyze_player,
         joseph_generate_best_bets,
+        joseph_generate_independent_picks,
         joseph_quick_take,
         joseph_commentary,
         _extract_edge,
@@ -1152,10 +1153,82 @@ st.markdown(
     unsafe_allow_html=True,
 )
 joseph_results = st.session_state.get("joseph_results", [])
+
+# Auto-generate Joseph's independent picks when none exist yet
+if not joseph_results and _BRAIN_AVAILABLE:
+    _gen_source = analysis_results
+    _from_props = False
+    if not _gen_source:
+        _gen_source = st.session_state.get("platform_props", [])
+        _from_props = True
+
+    if _gen_source:
+        with st.spinner("🎙️ Joseph is scouting the board..."):
+            try:
+                _players_raw = load_players_data()
+                _p_lookup = {
+                    str(p.get("name", p.get("player_name", ""))).lower().strip(): p
+                    for p in _players_raw if p
+                }
+                _games = st.session_state.get("todays_games", [])
+
+                if _from_props:
+                    joseph_results = joseph_generate_independent_picks(
+                        _gen_source, _p_lookup, _games, teams_data,
+                    )
+                else:
+                    _sorted_ar = sorted(
+                        _gen_source,
+                        key=lambda r: abs(_extract_edge(r)),
+                        reverse=True,
+                    )[:20]
+                    joseph_results = []
+                    for _ar in _sorted_ar:
+                        _pn = _ar.get(
+                            "player_name",
+                            _ar.get("player", _ar.get("name", "")),
+                        )
+                        _pd = _p_lookup.get(str(_pn).lower().strip(), {})
+                        _gd = {}
+                        _pt = _ar.get(
+                            "team", _ar.get("player_team", _pd.get("team", "")),
+                        )
+                        for _g in _games:
+                            if _pt in (
+                                _g.get("home_team", ""),
+                                _g.get("away_team", ""),
+                            ):
+                                _gd = _g
+                                break
+                        try:
+                            _res = joseph_full_analysis(
+                                _ar, _pd, _gd, teams_data,
+                            )
+                            _res["player"] = _pn
+                            _res["prop"] = _ar.get("stat_type", "")
+                            _res["line"] = _ar.get(
+                                "line", _ar.get("prop_line", ""),
+                            )
+                            _res["direction"] = _ar.get("direction", "")
+                            _res["team"] = _pt
+                            joseph_results.append(_res)
+                        except Exception:
+                            pass
+
+                if joseph_results:
+                    st.session_state["joseph_results"] = joseph_results
+            except Exception as _dawg_err:
+                _logger.warning(
+                    "Auto-generation of Joseph's picks failed: %s", _dawg_err,
+                )
+
 if joseph_results:
     render_dawg_board(joseph_results)
 else:
-    st.info("Run analysis to see the Dawg Board.")
+    st.info(
+        "📡 Load games on **📡 Live Games** and get live props, "
+        "or run **⚡ Neural Analysis** to populate Joseph's Dawg Board!"
+    )
 
 # ── Override Report ──────────────────────────────────────────
 st.markdown(

@@ -522,8 +522,8 @@ def render_joseph_live_desk(
 
             computed = []
             for ar in sorted_results:
-                player_name = ar.get("player", ar.get("name", ""))
-                player_data = enriched_players.get(player_name, {})
+                player_name = ar.get("player_name", ar.get("player", ar.get("name", "")))
+                player_data = enriched_players.get(str(player_name).lower().strip(), {})
                 game_data = {}
                 player_team = ar.get("team", player_data.get("team", ""))
                 for g in todays_games:

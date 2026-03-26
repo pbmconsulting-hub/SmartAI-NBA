@@ -1389,6 +1389,164 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         }
 
 
+# ═══════════════════════════════════════════════════════════════
+# JOSEPH'S INDEPENDENT PICK GENERATION
+# ═══════════════════════════════════════════════════════════════
+
+_STAT_AVG_KEY_MAP = {
+    "points": "points_avg",
+    "rebounds": "rebounds_avg",
+    "assists": "assists_avg",
+    "steals": "steals_avg",
+    "blocks": "blocks_avg",
+    "threes": "fg3m_avg",
+    "fg3m": "fg3m_avg",
+    "turnovers": "turnovers_avg",
+    "minutes": "minutes_avg",
+    "ftm": "ftm_avg",
+    "fta": "fta_avg",
+    "fga": "fga_avg",
+    "fgm": "fgm_avg",
+    "personal_fouls": "personal_fouls_avg",
+    "offensive_rebounds": "offensive_rebounds_avg",
+    "defensive_rebounds": "defensive_rebounds_avg",
+}
+
+_COMBO_STAT_MAP = {
+    "pts+rebs": ("points_avg", "rebounds_avg"),
+    "pts+asts": ("points_avg", "assists_avg"),
+    "rebs+asts": ("rebounds_avg", "assists_avg"),
+    "pts+rebs+asts": ("points_avg", "rebounds_avg", "assists_avg"),
+    "blks+stls": ("blocks_avg", "steals_avg"),
+}
+
+
+def joseph_generate_independent_picks(props, players_lookup, todays_games,
+                                      teams_data, max_picks=20):
+    """Generate Joseph's own independent picks from raw platform props.
+
+    Joseph selects his top picks based on his eye-test, dawg factor,
+    and narrative analysis — separate from any user-generated analysis.
+
+    Parameters
+    ----------
+    props : list[dict]
+        Raw platform prop dicts with ``player_name``, ``stat_type``,
+        ``line``, ``team``, ``platform``.
+    players_lookup : dict
+        Player data keyed by lowercase player name.
+    todays_games : list[dict]
+        Today's game dicts with ``home_team``, ``away_team``, etc.
+    teams_data : dict
+        All teams data for matchup analysis.
+    max_picks : int
+        Maximum number of picks to generate (default 20).
+
+    Returns
+    -------
+    list[dict]
+        List of Joseph analysis dicts with ``dawg_factor``,
+        ``narrative_tags``, ``verdict``, ``edge``, etc.
+    """
+    if not props:
+        return []
+
+    candidates = []
+    for prop in props:
+        player_name = str(
+            prop.get("player_name", prop.get("player", prop.get("name", "")))
+        ).strip()
+        if not player_name:
+            continue
+        stat_type = str(prop.get("stat_type", "points")).lower().strip()
+        line = _safe_float(prop.get("line", prop.get("prop_line", 0)))
+        if line <= 0:
+            continue
+        team = str(prop.get("team", prop.get("player_team", ""))).upper().strip()
+        platform = str(prop.get("platform", "PrizePicks"))
+
+        # ── player lookup ────────────────────────────────────
+        p_data = players_lookup.get(player_name.lower(), {})
+        if not p_data:
+            for k, v in players_lookup.items():
+                if player_name.lower() in k or k in player_name.lower():
+                    p_data = v
+                    break
+
+        # ── game lookup ──────────────────────────────────────
+        game_data = {}
+        for g in (todays_games or []):
+            ht = str(g.get("home_team", "")).upper().strip()
+            at = str(g.get("away_team", "")).upper().strip()
+            if team and team in (ht, at):
+                game_data = g
+                break
+
+        # ── season average ───────────────────────────────────
+        combo_keys = _COMBO_STAT_MAP.get(stat_type)
+        if combo_keys:
+            player_avg = sum(
+                _safe_float(p_data.get(k, 0.0)) for k in combo_keys
+            )
+        else:
+            avg_key = _STAT_AVG_KEY_MAP.get(stat_type, f"{stat_type}_avg")
+            player_avg = _safe_float(p_data.get(avg_key, 0.0))
+
+        if player_avg <= 0:
+            continue
+
+        # ── basic probability & edge ─────────────────────────
+        diff_pct = (player_avg - line) / max(line, 0.1) * 100.0
+        prob_over = 50.0 + min(max(diff_pct * 2.0, -30.0), 30.0)
+        prob_over = max(5.0, min(95.0, prob_over))
+        # Standard -110 vig breakeven: 52.38% win rate to break even
+        edge = prob_over - 52.38
+        direction = "OVER" if diff_pct > 0 else "UNDER"
+
+        if abs(edge) >= 8.0:
+            tier = "Gold"
+        elif abs(edge) >= 5.0:
+            tier = "Silver"
+        else:
+            tier = "Bronze"
+
+        analysis_result = {
+            "player": player_name,
+            "player_name": player_name,
+            "team": team,
+            "stat_type": stat_type,
+            "line": line,
+            "prop_line": line,
+            "probability_over": prob_over / 100.0,
+            "edge_percentage": edge,
+            "confidence_score": min(50 + abs(edge) * 3, 95),
+            "tier": tier,
+            "direction": direction,
+            "platform": platform,
+        }
+        candidates.append((abs(edge), analysis_result, p_data, game_data))
+
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    top_candidates = candidates[:max_picks]
+
+    results = []
+    for _, ar, p_data, game_data in top_candidates:
+        try:
+            result = joseph_full_analysis(ar, p_data, game_data, teams_data)
+            result["player"] = ar["player_name"]
+            result["prop"] = ar["stat_type"]
+            result["line"] = ar["line"]
+            result["direction"] = ar["direction"]
+            result["team"] = ar["team"]
+            results.append(result)
+        except Exception as exc:
+            logger.debug(
+                "Independent pick for %s failed: %s", ar.get("player_name"), exc
+            )
+
+    return results
+
+
 def joseph_rank_picks(picks, game_contexts=None):
     """Rank a list of analysed picks by Joseph's priority.
 
@@ -1404,7 +1562,26 @@ def joseph_rank_picks(picks, game_contexts=None):
     list[dict]
         The same picks sorted from best to worst with a ``"rank"`` key added.
     """
-    return []
+    if not picks:
+        return []
+    ranked = []
+    for p in picks:
+        score = abs(_safe_float(p.get("edge", p.get("joseph_edge", 0))))
+        score += _safe_float(p.get("dawg_factor", 0)) * 0.5
+        conf = _safe_float(p.get("confidence", 50))
+        score += max(conf - 50, 0) * 0.1
+        v = str(p.get("verdict", "")).upper()
+        if v == "SMASH":
+            score += 3.0
+        elif v == "LEAN":
+            score += 1.0
+        p_copy = dict(p)
+        p_copy["_rank_score"] = round(score, 2)
+        ranked.append(p_copy)
+    ranked.sort(key=lambda x: x.get("_rank_score", 0), reverse=True)
+    for idx, p in enumerate(ranked, 1):
+        p["rank"] = idx
+    return ranked
 
 
 def joseph_evaluate_parlay(picks, platform="DraftKings", entry_fee=10.0):
@@ -1457,11 +1634,40 @@ def joseph_generate_full_slate_analysis(players, props, game_contexts,
         Full slate result with keys: ``picks``, ``parlays``,
         ``top_plays``, ``summary_rant``.
     """
+    if not props:
+        return {"picks": [], "parlays": [], "top_plays": [], "summary_rant": ""}
+
+    players_lookup = {}
+    for p in (players or []):
+        name = str(p.get("name", p.get("player_name", ""))).lower().strip()
+        if name:
+            players_lookup[name] = p
+
+    games_list = list(game_contexts.values()) if isinstance(game_contexts, dict) else []
+    teams_data = game_contexts if isinstance(game_contexts, dict) else {}
+
+    picks = joseph_generate_independent_picks(
+        props, players_lookup, games_list, teams_data, max_picks=30,
+    )
+    ranked = joseph_rank_picks(picks)
+    top_plays = [
+        p for p in ranked
+        if str(p.get("verdict", "")).upper() in ("SMASH", "LEAN")
+    ][:5]
+
+    n_smash = len([p for p in ranked if str(p.get("verdict", "")).upper() == "SMASH"])
+    n_lean = len([p for p in ranked if str(p.get("verdict", "")).upper() == "LEAN"])
+    summary_rant = (
+        f"I've analyzed {len(ranked)} props tonight. "
+        f"{n_smash} SMASH plays, {n_lean} LEAN plays. "
+        f"Let's get to work."
+    )
+
     return {
-        "picks": [],
+        "picks": ranked,
         "parlays": [],
-        "top_plays": [],
-        "summary_rant": "",
+        "top_plays": top_plays,
+        "summary_rant": summary_rant,
     }
 
 

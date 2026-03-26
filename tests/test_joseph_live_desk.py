@@ -315,5 +315,45 @@ class TestModuleExports(unittest.TestCase):
         self.assertTrue(callable(render_override_report))
 
 
+# ============================================================
+# SECTION: Player Name Lookup Wiring
+# ============================================================
+
+class TestPlayerNameLookupWiring(unittest.TestCase):
+    """Verify that render_joseph_live_desk correctly resolves
+    player names from QAM analysis_results (which use 'player_name')
+    and enriched_players (which are keyed by lowercase name)."""
+
+    def test_source_resolves_player_name_key(self):
+        """The live desk code must try 'player_name' first when
+        extracting the player name from QAM analysis results."""
+        import inspect
+        from pages.helpers.joseph_live_desk import render_joseph_live_desk
+        source = inspect.getsource(render_joseph_live_desk)
+        # The lookup line should try 'player_name' before falling back
+        idx_player_name = source.find('ar.get("player_name"')
+        idx_player = source.find('ar.get("player"')
+        self.assertNotEqual(idx_player_name, -1,
+                            "Must look up 'player_name' key from QAM results")
+        self.assertLess(idx_player_name, idx_player,
+                        "'player_name' must be tried before 'player' in get chain")
+
+    def test_source_lowercases_enriched_lookup(self):
+        """The enriched_players lookup must lowercase the key to match
+        the enriched dict which is keyed by lowercase player name."""
+        import inspect
+        from pages.helpers.joseph_live_desk import render_joseph_live_desk
+        source = inspect.getsource(render_joseph_live_desk)
+        # Find the enriched_players.get() call near the player_name lookup
+        idx_enriched = source.find("enriched_players.get(")
+        self.assertNotEqual(idx_enriched, -1, "Must call enriched_players.get()")
+        # The argument should include .lower().strip()
+        snippet = source[idx_enriched:idx_enriched + 100]
+        self.assertIn(".lower()", snippet,
+                      "enriched_players lookup must lowercase the key")
+        self.assertIn(".strip()", snippet,
+                      "enriched_players lookup must strip whitespace")
+
+
 if __name__ == "__main__":
     unittest.main()
