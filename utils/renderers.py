@@ -926,18 +926,23 @@ def _build_unified_player_header(player_name, vitals):
     )
 
 
-def build_unified_player_card_html(player_name, vitals, props):
+def build_unified_player_card_html(player_name, vitals, props,
+                                   joseph_opinion=None):
     """Build a single expandable unified player card.
 
     The card displays a compact identity header (headshot, name, team,
     season stats) and expands on click to reveal all prop analysis cards
     for this player.  Each expanded card includes the Joseph M Smith
-    avatar with an "Ask Joseph M Smith" prompt.
+    avatar with an "Ask Joseph M Smith" button that toggles his
+    Platinum Lock opinion inline.
 
     Args:
         player_name (str): Display name.
         vitals (dict): Player vitals from ``group_props_by_player``.
         props (list[dict]): Prop analysis results for this player.
+        joseph_opinion (dict | None): Pre-computed Joseph opinion from
+            ``joseph_platinum_lock``.  Keys: ``platinum_lock_stat``,
+            ``rant``.  When *None*, the button is hidden.
 
     Returns:
         str: HTML ``<details>`` element for one player.
@@ -946,14 +951,42 @@ def build_unified_player_card_html(player_name, vitals, props):
     prop_count = len(props)
     prop_label = f"{prop_count} prop{'s' if prop_count != 1 else ''}"
 
+    # Unique DOM id for this player's Joseph response panel
+    _safe_id = _html.escape(player_name.replace(" ", "_").replace("'", ""))
+
     # Joseph M Smith avatar footer for expanded cards
     _j_b64 = _get_joseph_avatar_b64()
-    if _j_b64:
+    if _j_b64 and joseph_opinion:
+        lock_stat = _html.escape(str(joseph_opinion.get("platinum_lock_stat", "N/A")))
+        rant_text = _html.escape(str(joseph_opinion.get("rant", "")))
         joseph_html = (
-            '<div class="upc-joseph-row">'
+            f'<div class="upc-joseph-row" onclick="'
+            f"var p=document.getElementById('joseph-resp-{_safe_id}');"
+            f"if(p){{p.style.display=p.style.display==='none'?'block':'none';}}"
+            f'">'
             f'<img class="upc-joseph-avatar" '
             f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
-            '<span class="upc-joseph-label">Ask Joseph M Smith</span>'
+            f'<span class="upc-joseph-label">🎙️ Ask Joseph M Smith</span>'
+            f'</div>'
+            f'<div id="joseph-resp-{_safe_id}" class="upc-joseph-response" style="display:none;">'
+            f'<div class="upc-joseph-resp-header">'
+            f'<img class="upc-joseph-resp-avatar" '
+            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            f'<div class="upc-joseph-resp-title">'
+            f'<span class="upc-joseph-resp-name">Joseph M. Smith</span>'
+            f'<span class="upc-joseph-resp-role">🟢 LIVE — NBA Analyst</span>'
+            f'</div>'
+            f'</div>'
+            f'<div class="upc-joseph-resp-lock">💎 PLATINUM LOCK: {lock_stat}</div>'
+            f'<div class="upc-joseph-resp-rant">{rant_text}</div>'
+            f'</div>'
+        )
+    elif _j_b64:
+        joseph_html = (
+            '<div class="upc-joseph-row" style="opacity:0.5;cursor:default;">'
+            f'<img class="upc-joseph-avatar" '
+            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            '<span class="upc-joseph-label">🎙️ Ask Joseph M Smith</span>'
             '</div>'
         )
     else:
@@ -982,7 +1015,7 @@ def build_unified_player_card_html(player_name, vitals, props):
     )
 
 
-def compile_unified_card_matrix(grouped_players):
+def compile_unified_card_matrix(grouped_players, joseph_opinions=None):
     """Compile all players into a unified expandable card matrix.
 
     Each player gets one expandable card containing their identity header
@@ -992,6 +1025,9 @@ def compile_unified_card_matrix(grouped_players):
         grouped_players (dict): Mapping of ``player_name`` →
             ``{"vitals": dict, "props": list[dict]}`` from
             :func:`utils.data_grouper.group_props_by_player`.
+        joseph_opinions (dict | None): Mapping of ``player_name`` →
+            ``{"platinum_lock_stat": str, "rant": str}`` from
+            :func:`engine.joseph_brain.joseph_platinum_lock`.
 
     Returns:
         str: A single HTML string with all unified player cards,
@@ -1004,12 +1040,16 @@ def compile_unified_card_matrix(grouped_players):
             "No analysis results to display.</div>"
         )
 
+    opinions = joseph_opinions or {}
     cards = []
     for name, data in grouped_players.items():
         vitals = data.get("vitals", {})
         props = data.get("props", [])
         if props:
-            cards.append(build_unified_player_card_html(name, vitals, props))
+            cards.append(build_unified_player_card_html(
+                name, vitals, props,
+                joseph_opinion=opinions.get(name),
+            ))
 
     return (
         f"<style>{QUANTUM_CARD_MATRIX_CSS}{UNIFIED_PLAYER_CARD_CSS}</style>"
