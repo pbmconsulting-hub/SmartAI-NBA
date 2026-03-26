@@ -143,6 +143,11 @@ def _find_opponent(team: str, games: list) -> str:
 
 
 def _find_game_context(team: str, games: list) -> dict:
+    try:
+        from data.player_profile_service import _TEAM_ABBREV_TO_ID as _TID
+    except Exception:
+        _TID = {}
+
     for g in games:
         home = g.get("home_team", "").upper()
         away = g.get("away_team", "").upper()
@@ -158,6 +163,10 @@ def _find_game_context(team: str, games: list) -> dict:
         except (TypeError, ValueError):
             _gt_val = 220.0
 
+        game_id = str(g.get("game_id") or g.get("GAME_ID") or "")
+        home_team_id = g.get("home_team_id") or g.get("HOME_TEAM_ID") or _TID.get(home)
+        away_team_id = g.get("away_team_id") or g.get("VISITOR_TEAM_ID") or _TID.get(away)
+
         if team.upper() == home:
             return {
                 "opponent": g.get("away_team", ""),
@@ -165,6 +174,11 @@ def _find_game_context(team: str, games: list) -> dict:
                 "game_total": _gt_val,
                 "vegas_spread": _vs_val,
                 "rest_days": 2,
+                "game_id": game_id,
+                "home_team": home,
+                "away_team": away,
+                "home_team_id": home_team_id,
+                "away_team_id": away_team_id,
             }
         if team.upper() == away:
             return {
@@ -173,8 +187,17 @@ def _find_game_context(team: str, games: list) -> dict:
                 "game_total": _gt_val,
                 "vegas_spread": -_vs_val,
                 "rest_days": 2,
+                "game_id": game_id,
+                "home_team": home,
+                "away_team": away,
+                "home_team_id": home_team_id,
+                "away_team_id": away_team_id,
             }
-    return {"opponent": "", "is_home": True, "game_total": 220.0, "vegas_spread": 0.0, "rest_days": 2}
+    return {
+        "opponent": "", "is_home": True, "game_total": 220.0, "vegas_spread": 0.0,
+        "rest_days": 2, "game_id": "", "home_team": "", "away_team": "",
+        "home_team_id": None, "away_team_id": None,
+    }
 
 
 # ─── Stat types to simulate ──────────────────────────────────
@@ -324,6 +347,32 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
                 ctx[k] = scenario_overrides[k]
     results = {}
     for stat in _STAT_TYPES:
+        # Look up player estimated metrics from Deep Fetch enrichment (if available)
+        _sim_adv_ctx: dict | None = None
+        try:
+            _sim_enr = st.session_state.get("advanced_enrichment", {}).get(
+                ctx.get("game_id", ""), {}
+            )
+            _sim_metrics = _sim_enr.get("player_metrics", [])
+            _sim_pid = player_data.get("player_id") or player_data.get("id")
+            _sim_pname = str(player_data.get("name", "")).lower()
+            for _mm in _sim_metrics:
+                _mmid = _mm.get("PLAYER_ID") or _mm.get("playerId")
+                _mmname = str(_mm.get("PLAYER_NAME") or _mm.get("playerName") or "").lower()
+                if (_sim_pid and _mmid and int(_sim_pid) == int(_mmid)) or (
+                    _sim_pname and _mmname and _sim_pname in _mmname
+                ):
+                    _usg = _mm.get("E_USG_PCT") or _mm.get("USG_PCT") or _mm.get("usage_pct")
+                    if _usg is not None:
+                        try:
+                            _usg_f = float(_usg)
+                            _sim_adv_ctx = {"usage_pct": _usg_f / 100.0 if _usg_f > 1.0 else _usg_f}
+                        except (TypeError, ValueError):
+                            pass
+                    break
+        except Exception:
+            pass
+
         projection = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=ctx.get("opponent", ""),
@@ -333,6 +382,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             defensive_ratings_data=defensive_ratings_data,
             teams_data=teams_data,
             vegas_spread=ctx.get("vegas_spread", 0.0),
+            advanced_context=_sim_adv_ctx,
         )
         projected_val = projection.get(
             f"projected_{stat}",
@@ -353,6 +403,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             home_away_adjustment=projection.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection.get("rest_factor", 1.0),
             stat_type=stat,
+            game_context=ctx if ctx.get("game_id") else None,
         )
         season_avg = float(player_data.get(f"{stat}_avg", 0) or 0)
         p90 = sim_out.get("percentile_90", projected_val)

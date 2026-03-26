@@ -1409,6 +1409,128 @@ if _standings_display or _news_display:
 
 
 # ============================================================
+# SECTION: Deep Fetch — Advanced Stats Enrichment
+# ============================================================
+
+st.divider()
+
+st.subheader("🔬 Advanced Stats Enrichment")
+st.markdown(
+    "Pre-fetch full advanced NBA data for tonight's games: team dashboards, "
+    "5-man lineups, player estimated metrics, rotation data, and standings context. "
+    "This enriches every engine module — projections, simulation, confidence scoring, "
+    "and matchup analysis — with richer real data from the NBA API."
+)
+
+with st.expander("📖 What Does Deep Fetch Do?", expanded=False):
+    st.markdown("""
+    **🔬 Deep Fetch: Advanced Stats** pre-loads the following data for each of tonight's games:
+
+    | Data Type | Source | Benefit |
+    |---|---|---|
+    | Team game logs (last 10) | NBA Stats API | Recent blowout frequency, pace trends |
+    | 5-man lineup stats | NBA Stats API | Rotation patterns, +/- data |
+    | Player estimated metrics | NBA Stats API | Real pace, ortg, drtg, net rating |
+    | Team dashboards | NBA Stats API | Home/away splits, rest-day performance |
+    | League standings | NBA Stats API | Opponent record context |
+    | Today's scoreboard | NBA Stats API | Live game status |
+
+    **Note:** Deep Fetch respects the NBA API rate limit (1.5s delay per call). For a 10-game
+    slate it may take 2–5 minutes. Results are cached for 1 hour.
+    """)
+
+if st.button(
+    "🔬 Deep Fetch: Advanced Stats",
+    help="Pre-fetch advanced enrichment data for tonight's games (team logs, lineups, metrics, standings)",
+    type="secondary",
+):
+    _deep_fetch_games = st.session_state.get("todays_games", [])
+
+    if not _deep_fetch_games:
+        st.warning(
+            "⚠️ No games loaded yet. Click **🏀 Auto-Load Tonight's Games** "
+            "or **One-Click Full Setup** first, then run Deep Fetch."
+        )
+    else:
+        _deep_progress = st.progress(0, text="Starting advanced stats enrichment…")
+        _deep_status = st.empty()
+
+        def _deep_progress_callback(current: int, total: int, msg: str) -> None:
+            try:
+                pct = int((current / max(total, 1)) * 100)
+                _deep_progress.progress(pct, text=msg)
+                _deep_status.caption(f"Step {current}/{total}: {msg}")
+            except Exception as _cb_err:
+                import logging as _logging
+                _logging.getLogger(__name__).debug(
+                    "Deep Fetch progress callback error (non-fatal): %s", _cb_err
+                )
+
+        try:
+            from data.advanced_fetcher import enrich_tonights_slate, build_enrichment_summary
+
+            with st.spinner("Fetching advanced stats from NBA API…"):
+                _enriched = enrich_tonights_slate(
+                    _deep_fetch_games,
+                    progress_callback=_deep_progress_callback,
+                )
+
+            # Store in session state for engine modules to access
+            st.session_state["advanced_enrichment"] = _enriched
+
+            _deep_progress.progress(100, text="✅ Advanced stats enrichment complete!")
+            _deep_status.empty()
+
+            # Build and display summary
+            _summary = build_enrichment_summary(_enriched)
+
+            st.success("✅ Advanced Stats Loaded!")
+
+            _col1, _col2, _col3 = st.columns(3)
+            with _col1:
+                st.metric("Games Enriched", _summary.get("games_enriched", 0))
+                st.metric("Team Game Logs", _summary.get("game_logs_fetched", 0))
+            with _col2:
+                st.metric("5-Man Lineups", _summary.get("lineups_fetched", 0))
+                st.metric("Team Dashboards", _summary.get("dashboards_fetched", 0))
+            with _col3:
+                st.metric("Standing Rows", _summary.get("standings_rows", 0))
+                st.metric("Player Metrics", _summary.get("player_metrics_rows", 0))
+
+            if _summary.get("scoreboard_available"):
+                st.caption("✅ Live scoreboard data loaded")
+
+            # Detail breakdown per game
+            if _enriched:
+                with st.expander("📋 Per-Game Enrichment Details", expanded=False):
+                    for _gid, _gdata in _enriched.items():
+                        _home_logs = len(_gdata.get("home_game_logs", []))
+                        _away_logs = len(_gdata.get("away_game_logs", []))
+                        _home_lin = len(_gdata.get("home_lineups", []))
+                        _away_lin = len(_gdata.get("away_lineups", []))
+                        st.markdown(
+                            f"**Game {_gid}** — "
+                            f"Home logs: {_home_logs} | Away logs: {_away_logs} | "
+                            f"Home lineups: {_home_lin} | Away lineups: {_away_lin} | "
+                            f"Dashboard: {'✅' if _gdata.get('home_dashboard') else '—'}"
+                        )
+
+        except Exception as _deep_err:
+            _deep_progress.empty()
+            _deep_status.empty()
+            st.error(
+                f"❌ Deep Fetch failed: {_deep_err}\n\n"
+                "The NBA API may be temporarily unavailable. "
+                "All other app features continue to work with existing data."
+            )
+
+
+# ============================================================
+# END SECTION: Deep Fetch — Advanced Stats Enrichment
+# ============================================================
+
+
+# ============================================================
 # SECTION: Help and Tips
 # ============================================================
 

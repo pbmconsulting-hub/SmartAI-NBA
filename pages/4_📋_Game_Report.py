@@ -1028,6 +1028,39 @@ with _tab_builder:
                     pdata_adj_gb["minutes_avg"] = all_minutes_gb.get(pname_gb, float(pdata_gb.get("minutes_avg", 28) or 28))
                     opponent_gb = away_team_gb if is_home_gb else home_team_gb
 
+                    # Look up player estimated metrics from Deep Fetch enrichment.
+                    # The enrichment dict is keyed by game_id as stored by enrich_tonights_slate()
+                    # which uses the synthetic key format "{HOME}_vs_{AWAY}" produced by
+                    # live_data_fetcher.  Try both orderings for robustness.
+                    _gb_adv_ctx: dict | None = None
+                    try:
+                        _adv_enr_all = st.session_state.get("advanced_enrichment", {})
+                        _gb_game_key = f"{home_team_gb}_vs_{away_team_gb}"
+                        _gb_enr = (
+                            _adv_enr_all.get(_gb_game_key)
+                            or _adv_enr_all.get(f"{away_team_gb}_vs_{home_team_gb}")
+                            or {}
+                        )
+                        _gb_metrics = _gb_enr.get("player_metrics", [])
+                        _gb_pid = pdata_gb.get("player_id") or pdata_gb.get("id")
+                        _gb_pname_lwr = pname_gb.lower()
+                        for _gm in _gb_metrics:
+                            _gmid = _gm.get("PLAYER_ID") or _gm.get("playerId")
+                            _gmname = str(_gm.get("PLAYER_NAME") or _gm.get("playerName") or "").lower()
+                            if (_gb_pid and _gmid and int(_gb_pid) == int(_gmid)) or (
+                                _gb_pname_lwr and _gmname and _gb_pname_lwr in _gmname
+                            ):
+                                _usg = _gm.get("E_USG_PCT") or _gm.get("USG_PCT") or _gm.get("usage_pct")
+                                if _usg is not None:
+                                    try:
+                                        _usg_f = float(_usg)
+                                        _gb_adv_ctx = {"usage_pct": _usg_f / 100.0 if _usg_f > 1.0 else _usg_f}
+                                    except (TypeError, ValueError):
+                                        pass
+                                break
+                    except Exception:
+                        pass
+
                     for stat_gb in ["points", "rebounds", "assists", "threes"]:
                         stat_avg_gb = float(pdata_adj_gb.get(f"{stat_gb}_avg", 0) or 0)
                         if stat_avg_gb <= 0:
@@ -1046,6 +1079,7 @@ with _tab_builder:
                                 defensive_ratings_data=_defensive_ratings_gb,
                                 teams_data=_teams_for_sim_gb,
                                 vegas_spread=gb_spread if is_home_gb else -gb_spread,
+                                advanced_context=_gb_adv_ctx,
                             )
                             projected_value_gb = float(proj_gb.get(f"projected_{stat_gb}", stat_avg_gb) or stat_avg_gb)
                         except Exception:
@@ -1072,21 +1106,37 @@ with _tab_builder:
                                 matchup_adjustment_factor=proj_gb.get("defense_factor", 1.0),
                                 home_away_adjustment=proj_gb.get("home_away_factor", 0.0),
                                 rest_adjustment_factor=proj_gb.get("rest_factor", 1.0),
+                                game_context={
+                                    "is_home": is_home_gb,
+                                    "vegas_spread": gb_spread if is_home_gb else -gb_spread,
+                                    "game_total": gb_total,
+                                },
                             )
-                            over_prob_gb = sim_gb.get("over_probability", 0.5)
+                            over_prob_gb = sim_gb.get("probability_over", sim_gb.get("over_probability", 0.5))
                         except Exception:
                             over_prob_gb = 0.5
+                            sim_gb = {}
 
                         try:
+                            edge_gb = (over_prob_gb - 0.5238) * 100.0
+                            _forces_gb = {
+                                "over_count": 1 if over_prob_gb >= 0.5 else 0,
+                                "under_count": 0 if over_prob_gb >= 0.5 else 1,
+                                "over_forces": [],
+                                "under_forces": [],
+                            }
                             conf_gb = calculate_confidence_score(
-                                over_probability=over_prob_gb,
-                                sample_size=gb_sims,
-                                edge_percentage=(over_prob_gb - 0.5) * 100,
-                                directional_forces_count=1,
-                                directional_agreement=0.6,
-                                player_consistency=0.7,
+                                probability_over=over_prob_gb,
+                                edge_percentage=edge_gb,
+                                directional_forces=_forces_gb,
+                                defense_factor=proj_gb.get("defense_factor", 1.0),
+                                stat_standard_deviation=std_dev_gb,
+                                stat_average=stat_avg_gb,
+                                simulation_results=sim_gb,
+                                games_played=gb_sims,
+                                stat_type=stat_gb,
                             )
-                            conf_score_gb = conf_gb if isinstance(conf_gb, (int, float)) else conf_gb.get("confidence_score", 0)
+                            conf_score_gb = conf_gb.get("confidence_score", 0) if isinstance(conf_gb, dict) else float(conf_gb or 0)
                         except Exception:
                             conf_score_gb = 0
 

@@ -20,10 +20,16 @@ import math
 import logging
 
 try:
+    from utils.log_helper import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    _logger = logging.getLogger(__name__)
+
+try:
     from engine.rotation_tracker import get_trending_minutes
     _HAS_ROTATION_TRACKER = True
 except ImportError:
-    logging.getLogger(__name__).warning("[MinutesModel] Optional module not available: rotation_tracker")
+    _logger.warning("[MinutesModel] Optional module not available: rotation_tracker")
     def get_trending_minutes(*args, **kwargs):  # no-op fallback
         return None
     _HAS_ROTATION_TRACKER = False
@@ -105,6 +111,96 @@ MIN_MINUTES_FLOOR = 0.0             # DNP risk — can go to 0 in extreme blowou
 
 
 # ============================================================
+# SECTION: Rotation-Based Minutes Helper
+# ============================================================
+
+def _get_rotation_based_minutes(player_id: int, game_id: str | None = None) -> float | None:
+    """
+    Compute a player's trending minutes from actual NBA rotation stint data.
+
+    Calls ``data.nba_data_service.get_rotations()`` for recent games and
+    sums the total seconds each player was on the court, converting to
+    minutes.  Returns the average across available games, or ``None`` when
+    no rotation data is found.
+
+    This is used as the *primary* minutes source in ``project_player_minutes``
+    when real-time rotation data is available, with the season-average method
+    as fallback.
+
+    Parameters
+    ----------
+    player_id : int
+        NBA player ID to compute minutes for.
+    game_id : str | None
+        Optional specific game ID to fetch rotations for.  When ``None``,
+        the function returns ``None`` (no game to query).
+
+    Returns
+    -------
+    float | None
+        Estimated minutes derived from rotation stint data, or ``None``
+        if unavailable or if the player was not found in the rotation.
+    """
+    if not game_id or not player_id:
+        return None
+
+    try:
+        from data.nba_data_service import get_rotations
+        rotation_data = get_rotations(game_id)
+    except Exception as _exc:
+        _logger.debug(
+            "_get_rotation_based_minutes: get_rotations unavailable — %s", _exc
+        )
+        return None
+
+    if not rotation_data:
+        return None
+
+    total_deci_seconds = 0.0
+    found = False
+
+    # Both home and away team rotations are searched
+    for team_key in ("home_team", "away_team"):
+        stints = rotation_data.get(team_key, [])
+        for stint in stints:
+            stint_player_id = stint.get("PERSON_ID") or stint.get("personId")
+            if stint_player_id is None:
+                continue
+            try:
+                if int(stint_player_id) != int(player_id):
+                    continue
+            except (TypeError, ValueError):
+                continue
+
+            in_time = stint.get("IN_TIME_REAL") or stint.get("inTimeReal") or 0
+            out_time = stint.get("OUT_TIME_REAL") or stint.get("outTimeReal") or 0
+            try:
+                duration = float(out_time) - float(in_time)
+                if duration > 0:
+                    total_deci_seconds += duration
+                    found = True
+            except (TypeError, ValueError):
+                pass
+
+    if not found or total_deci_seconds <= 0:
+        return None
+
+    # IN_TIME_REAL / OUT_TIME_REAL are in tenths of a second (deci-seconds).
+    # Convert: total_deci_seconds / 10 → seconds / 60 → minutes
+    minutes = (total_deci_seconds / 10.0) / 60.0
+    _logger.debug(
+        "_get_rotation_based_minutes(player_id=%s, game_id=%s): %.1f min from stints",
+        player_id, game_id, minutes,
+    )
+    return round(minutes, 1)
+
+
+# ============================================================
+# END SECTION: Rotation-Based Minutes Helper
+# ============================================================
+
+
+# ============================================================
 # SECTION: Minutes Projection
 # ============================================================
 
@@ -148,18 +244,38 @@ def project_player_minutes(player_data, game_context, teammate_status=None, game
     adjustment_notes = []
 
     # ── Step 1: Establish base minutes ──────────────────────────────────────
-    # Use rotation tracker trending minutes if game logs available
-    if _HAS_ROTATION_TRACKER and game_logs:
+    # Priority order:
+    # 1. Real rotation stint data from NBA API (most accurate)
+    # 2. Rotation tracker trending minutes from game logs
+    # 3. Season average minutes from player_data
+    # 4. Default from position/starter status
+
+    player_id = player_data.get("player_id") or player_data.get("id")
+    game_id = game_context.get("game_id") if game_context else None
+
+    # Try real rotation data first (NBA API)
+    base_minutes = None
+    if player_id and game_id:
+        try:
+            rotation_minutes = _get_rotation_based_minutes(player_id, game_id)
+            if rotation_minutes and rotation_minutes > 0:
+                base_minutes = rotation_minutes
+                adjustment_notes.append(
+                    f"Base: {base_minutes:.1f} min (NBA rotation data)"
+                )
+        except Exception as _exc:
+            _logger.debug("[MinutesModel] Rotation-based minutes unavailable: %s", _exc)
+
+    # Fall back to rotation tracker (game-log-based trending)
+    if base_minutes is None and _HAS_ROTATION_TRACKER and game_logs:
         try:
             trending = get_trending_minutes(player_data, game_logs)
-            base_minutes = trending if trending > 0 else None
+            base_minutes = trending if trending and trending > 0 else None
             if base_minutes:
                 adjustment_notes.append(f"Base: {base_minutes:.1f} min (trending avg)")
         except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[MinutesModel] Unexpected error: {_exc}")
+            _logger.warning("[MinutesModel] Unexpected error: %s", _exc)
             base_minutes = None
-    else:
-        base_minutes = None
 
     if base_minutes is None:
         base_minutes = (
