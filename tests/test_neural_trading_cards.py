@@ -773,7 +773,7 @@ class TestStudioKeyAlignment(unittest.TestCase):
 
     def _read_studio_source(self):
         import pathlib
-        studio = pathlib.Path(__file__).parent.parent / "pages" / "7_🎙️_The_Studio.py"
+        studio = pathlib.Path(__file__).parent.parent / "pages" / "8_🎙️_The_Studio.py"
         return studio.read_text(encoding="utf-8")
 
     def test_total_opinion_falls_back_to_joseph_key(self):

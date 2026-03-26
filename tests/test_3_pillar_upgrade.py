@@ -102,7 +102,7 @@ class TestGlobalSettingsComponent(unittest.TestCase):
     def test_settings_injected_in_entry_builder(self):
         """Entry Builder page should import and call render_global_settings."""
         import pathlib
-        eb_path = pathlib.Path(__file__).parent.parent / "pages" / "6_🧬_Entry_Builder.py"
+        eb_path = pathlib.Path(__file__).parent.parent / "pages" / "7_🧬_Entry_Builder.py"
         source = eb_path.read_text(encoding="utf-8")
         self.assertIn("from utils.components import render_global_settings", source)
         self.assertIn("render_global_settings()", source)

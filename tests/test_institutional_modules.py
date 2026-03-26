@@ -391,7 +391,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -403,7 +403,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -415,7 +415,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -427,7 +427,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -439,7 +439,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -453,7 +453,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -466,7 +466,7 @@ class TestCorrelationMatrixPageImports(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "10_🗺️_Correlation_Matrix.py",
+            "pages", "11_🗺️_Correlation_Matrix.py",
         )
         with open(page_path, "r") as f:
             content = f.read()
@@ -595,7 +595,7 @@ class TestAutoSlipOptimizerPageFeatures(unittest.TestCase):
         import os
         page_path = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            "pages", "6_🧬_Entry_Builder.py",
+            "pages", "7_🧬_Entry_Builder.py",
         )
         with open(page_path, "r") as f:
             return f.read()

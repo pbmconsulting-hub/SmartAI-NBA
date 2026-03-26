@@ -277,7 +277,7 @@ class TestEntryBuilderDfsBreakeven(unittest.TestCase):
     def test_entry_builder_has_dfs_breakeven(self):
         eb_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "6_🧬_Entry_Builder.py",
+            "pages", "7_🧬_Entry_Builder.py",
         )
         with open(eb_path, "r") as f:
             content = f.read()
@@ -287,7 +287,7 @@ class TestEntryBuilderDfsBreakeven(unittest.TestCase):
     def test_entry_builder_imports_breakeven(self):
         eb_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "6_🧬_Entry_Builder.py",
+            "pages", "7_🧬_Entry_Builder.py",
         )
         with open(eb_path, "r") as f:
             content = f.read()
@@ -296,7 +296,7 @@ class TestEntryBuilderDfsBreakeven(unittest.TestCase):
     def test_entry_builder_shows_avg_leg_vs_breakeven(self):
         eb_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "6_🧬_Entry_Builder.py",
+            "pages", "7_🧬_Entry_Builder.py",
         )
         with open(eb_path, "r") as f:
             content = f.read()
@@ -305,7 +305,7 @@ class TestEntryBuilderDfsBreakeven(unittest.TestCase):
     def test_entry_builder_shows_payout_multiplier(self):
         eb_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "6_🧬_Entry_Builder.py",
+            "pages", "7_🧬_Entry_Builder.py",
         )
         with open(eb_path, "r") as f:
             content = f.read()
