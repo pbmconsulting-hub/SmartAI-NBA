@@ -77,7 +77,7 @@ def _cache_get(key: str, ttl: int) -> Any | None:
         return None
     payload, ts = entry
     if time.time() - ts > ttl:
-        del _CACHE[key]
+        _CACHE.pop(key, None)
         return None
     return payload
 

@@ -11,6 +11,13 @@
 import math        # For combinations and calculations
 import itertools   # For generating combinations of picks
 
+try:
+    from utils.log_helper import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    import logging
+    _logger = logging.getLogger(__name__)
+
 # Math helpers needed for Flex EV calculation in Feature 10
 try:
     from engine.math_helpers import calculate_flex_ev   # Flex EV with partial-win probabilities
@@ -526,7 +533,8 @@ def calculate_correlation_risk(selected_picks):
                 result["correlation_level"] = "high"
             elif risk == "medium" and correlation_level == "none":
                 result["correlation_level"] = "low"
-        except Exception:
+        except Exception as exc:
+            _logger.debug("analyze_correlation_risk: matrix analysis failed — %s", exc)
             pass  # Fallback to game-grouping result above
 
     return result
@@ -864,7 +872,8 @@ def calculate_flex_vs_power_breakeven(pick_probabilities, entry_size):
             # Flex: use actual probabilities (not uniform)
             flex_result = _compute_flex_ev(list(pick_probabilities), flex_payout, entry_fee)
             actual_flex_ev = round(flex_result.get('ev_dollars', 0.0), 2)
-        except Exception:
+        except Exception as exc:
+            _logger.debug("power_vs_flex: actual EV calc failed — %s", exc)
             pass  # Fall back to zeros; uniform analysis still valid
     power_is_better_actual = actual_power_ev > actual_flex_ev
 

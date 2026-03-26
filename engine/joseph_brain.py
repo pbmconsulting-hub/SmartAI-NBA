@@ -23,7 +23,6 @@ import math
 import itertools
 import copy
 import logging
-import datetime
 
 # ═══════════════════════════════════════════════════════════════
 # EXTERNAL / SIBLING IMPORTS  (each wrapped in try/except)
@@ -1314,14 +1313,16 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             )
             confidence = _safe_float(conf_result.get("confidence_score", 50.0))
             tier = conf_result.get("tier", "Bronze")
-        except Exception:
+        except Exception as exc:
+            logger.debug("joseph_full_analysis: confidence calc failed — %s", exc)
             confidence = 50.0
             tier = "Bronze"
 
         # --- Grading ---
         try:
             grade_result = joseph_grade_player(player_data, game_context)
-        except Exception:
+        except Exception as exc:
+            logger.debug("joseph_full_analysis: grading failed — %s", exc)
             grade_result = {"grade": "C", "archetype": "Unknown"}
         grade = grade_result.get("grade", "C")
         archetype = grade_result.get("archetype", "Unknown")
@@ -1334,7 +1335,8 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             teams_data = game_context.get("teams_data", [])
             if home_team and away_team:
                 strategy = analyze_game_strategy(home_team, away_team, game_context, teams_data)
-        except Exception:
+        except Exception as exc:
+            logger.debug("joseph_full_analysis: strategy analysis failed — %s", exc)
             strategy = {}
 
         # --- Verdict ---
@@ -1363,7 +1365,8 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             explanation = generate_pick_explanation(
                 player_data, prop_line, stat_type, game_context, sim_result
             )
-        except Exception:
+        except Exception as exc:
+            logger.debug("joseph_full_analysis: explanation gen failed — %s", exc)
             explanation = {"summary": f"Projected {round(sim_mean, 1)} vs line {prop_line}"}
 
         return {
@@ -2745,8 +2748,8 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             correlation_adj = adjust_parlay_probability(combined_prob, best_combo)
             if correlation_adj > 0:
                 combined_prob = correlation_adj
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("joseph_build_entry: correlation adjustment failed — %s", exc)
 
         # Calculate expected value
         try:
@@ -2963,8 +2966,8 @@ def joseph_get_ambient_context(session_state: dict) -> tuple:
         try:
             if not is_premium_user() and random.random() < 0.3:
                 return ("premium_pitch", {})
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("_detect_topic: premium check failed — %s", exc)
 
         # Entry just built (transient — consumes the flag)
         if session_state.get("joseph_entry_just_built"):

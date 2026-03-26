@@ -894,8 +894,8 @@ def get_todays_active_players(players_list, todays_games):
                 entry = injury_map.get(key, {})
                 return entry.get("status", "Active") not in _EXCL
             return [p for p in on_tonight if _is_available(p)]
-    except Exception:
-        pass  # If injury data is unavailable, return team-filtered list
+    except Exception as exc:
+        _logger.debug("get_active_players_tonight: injury filter failed — %s", exc)
 
     return on_tonight
 
@@ -1427,7 +1427,8 @@ def is_using_live_data():
         # BEGINNER NOTE: .get() returns False if 'is_live' key doesn't exist
         return bool(timestamps.get("is_live", False))
 
-    except Exception:
+    except Exception as exc:
+        _logger.debug("is_using_live_data: check failed — %s", exc)
         return False  # If file is broken, assume no live data
 
 
@@ -1460,7 +1461,8 @@ def get_data_last_updated(data_type="players"):
         # Returns None if this data type was never updated
         return timestamps.get(data_type, None)
 
-    except Exception:
+    except Exception as exc:
+        _logger.debug("get_data_last_updated: read failed — %s", exc)
         return None  # If any error, return None
 
 
@@ -1481,7 +1483,8 @@ def save_last_updated_timestamp(data_type):
         try:
             with open(LAST_UPDATED_JSON_PATH, "r") as json_file:
                 existing_timestamps = json.load(json_file)
-        except Exception:
+        except Exception as exc:
+            _logger.debug("save_last_updated_timestamp: read failed — %s", exc)
             existing_timestamps = {}  # If broken, start fresh
 
     # Set the current time as the timestamp for this data type
@@ -1558,21 +1561,24 @@ def get_data_health_report():
     try:
         players = load_players_data()
         players_count = len(players)
-    except Exception:
+    except Exception as exc:
+        _logger.debug("data_health_check: players load failed — %s", exc)
         players_count = 0
         warnings.append("Could not load players.csv")
 
     try:
         teams = load_teams_data()
         teams_count = len(teams)
-    except Exception:
+    except Exception as exc:
+        _logger.debug("data_health_check: teams load failed — %s", exc)
         teams_count = 0
         warnings.append("Could not load teams.csv")
 
     try:
         props = load_props_data()
         props_count = len(props)
-    except Exception:
+    except Exception as exc:
+        _logger.debug("data_health_check: props load failed — %s", exc)
         props_count = 0
 
     # Freshness
