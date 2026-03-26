@@ -116,7 +116,7 @@ def _check_rate_limit() -> bool:
 # ── Game-ID validation ────────────────────────────────────────────────────────
 
 def _is_nba_game_id(game_id: str) -> bool:
-    """Return True if *game_id* looks like a real NBA game ID (all digits)."""
+    """Return True if *game_id* is a numeric string (e.g. ``'0022401234'``)."""
     return bool(game_id) and game_id.isdigit()
 
 
