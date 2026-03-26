@@ -53,9 +53,19 @@ APP_URL                = os.environ.get("APP_URL", "http://localhost:8501")
 # Remove trailing slash from APP_URL so URL construction is clean
 APP_URL = APP_URL.rstrip("/")
 
-# Path to the Premium page (URL-encoded emoji in page name).
-# Used in redirect URLs passed to Stripe.
-_PREMIUM_PAGE_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
+#
+# NOTE:
+#   - The numeric prefix (e.g. "15_") comes from Streamlit's page filename.
+#   - Renumbering the page (e.g. from 14_ to 15_) can break deep links and
+#     any in-flight Stripe Checkout sessions whose success/cancel URLs use
+#     the old path. To avoid hard-coding future renumbers, this is now
+#     configurable via the PREMIUM_PAGE_PATH environment variable.
+#   - If you need to maintain compatibility with the old "/14_..." path,
+#     implement a thin redirect/forwarder in the corresponding page file.
+_DEFAULT_PREMIUM_PAGE_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
+# Legacy path used before renumbering; kept for reference/documentation.
+_LEGACY_PREMIUM_PAGE_PATH_14 = "/14_%F0%9F%92%8E_Subscription_Level"
+_PREMIUM_PAGE_PATH = os.environ.get("PREMIUM_PAGE_PATH", _DEFAULT_PREMIUM_PAGE_PATH)
 
 # ── Configure Stripe SDK with our secret key ─────────────────
 # This must be done before any Stripe API calls.
