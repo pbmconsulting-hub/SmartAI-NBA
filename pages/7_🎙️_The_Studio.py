@@ -418,6 +418,7 @@ if teams_data_list is None:
     try:
         teams_data_list = load_teams_data()
     except Exception:
+        _logger.debug("teams data load failed")
         teams_data_list = []
 
 # Convert list to dict keyed by team abbreviation if needed
@@ -459,6 +460,7 @@ if mode == "🏀 GAMES TONIGHT":
             try:
                 h_pri, h_sec = get_team_colors(home)
             except Exception:
+                _logger.debug("team color lookup failed")
                 h_pri, h_sec = "#ff5e00", "#1e293b"
 
             label = f"{away} @ {home} | Spread: {spread} | Total: {total}"
@@ -483,6 +485,7 @@ if mode == "🏀 GAMES TONIGHT":
                                 [result], "analysis_results"
                             )
                         except Exception:
+                            _logger.debug("commentary generation failed")
                             commentary = ""
 
                         st.markdown(
@@ -644,6 +647,7 @@ elif mode == "👤 SCOUT A PLAYER":
                     _seen.add(label)
                     player_options.append((label, pd))
         except Exception:
+            _logger.debug("studio section failed")
             pass
 
     if not player_options:
@@ -928,6 +932,7 @@ elif mode == "🎰 BUILD MY BETS":
                     try:
                         reaction = joseph_commentary([ticket_result], "ticket_generated")
                     except Exception:
+                        _logger.debug("reaction generation failed")
                         reaction = ""
 
                     if reaction:
@@ -1193,6 +1198,7 @@ if _BETS_AVAILABLE:
     try:
         by_verdict = joseph_get_accuracy_by_verdict()
     except Exception:
+        _logger.debug("verdict grouping failed")
         by_verdict = {}
 
     smash_pct = by_verdict.get("SMASH", {}).get("pct", 0)
@@ -1229,6 +1235,7 @@ if _BETS_AVAILABLE:
                 unsafe_allow_html=True,
             )
     except Exception:
+        _logger.debug("top picks rendering failed")
         pass
 else:
     st.info("Bet tracking module not available.")
@@ -1306,6 +1313,7 @@ if _BRAIN_AVAILABLE:
         cp = _select_fragment(CATCHPHRASE_POOL, _used)
         catchphrase_text = cp.get("text", "")
     except Exception:
+        _logger.debug("picks tab rendering failed")
         pass
 
 signoff = _html.escape(closer_text)

@@ -20,6 +20,8 @@ import json
 import logging
 import os
 
+_logger = logging.getLogger(__name__)
+
 import streamlit as st
 
 from tracking.bet_tracker import (
@@ -117,6 +119,7 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
                         _cnt, _ = auto_resolve_bet_results(date_str=_d)
                         _total_resolved += _cnt
                     except Exception:
+                        _logger.debug("date parsing failed")
                         pass  # One date failed — continue with others
                 if _total_resolved > 0:
                     st.toast(f"🤖 Auto-resolved {_total_resolved} past bet(s) on page load.")
@@ -131,6 +134,7 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
                         f"({_today_result['wins']}W / {_today_result['losses']}L)."
                     )
             except Exception:
+                _logger.debug("API data fetch skipped")
                 pass  # Not available or API error — silently skip
 
             # Auto-update CLV closing lines using Odds API prop lines
@@ -143,8 +147,10 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
                         f"with live closing lines."
                     )
             except Exception:
+                _logger.debug("optional data load failed")
                 pass  # Optional — never block page load
         except Exception:
+            _logger.debug("best-effort load failed")
             pass  # Best-effort — never block page load
 
 st.title("📈 Bet Tracker & Model Health")
@@ -1272,6 +1278,7 @@ with tab_auto_resolve:
                 from tracking.bet_tracker import get_live_bet_status
                 _live_bets = get_live_bet_status(_today_pending)
             except Exception:
+                _logger.debug("live bets fetch failed, using pending")
                 _live_bets = _today_pending
 
             _col_a, _col_b = st.columns(2)
@@ -1581,6 +1588,7 @@ with tab_log:
             from data.data_manager import load_platform_props_from_csv
             _platform_props = load_platform_props_from_csv()
         except Exception:
+            _logger.debug("platform props fetch failed")
             _platform_props = []
 
     if _platform_props:

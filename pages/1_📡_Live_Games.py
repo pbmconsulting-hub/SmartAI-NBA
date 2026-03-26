@@ -562,6 +562,7 @@ if platform_props_clicked:
             try:
                 _logger.warning(f"Live Games: non-fatal save error: {_save_err}")
             except Exception:
+                _logger.debug("game card render failed")
                 pass
 
         pp_status.text(f"⏳ 3/5 — Loading player data for {len(props_to_analyze):,} props…")
@@ -580,6 +581,7 @@ if platform_props_clicked:
             try:
                 _logger.warning(f"Live Games: enrichment step failed (non-fatal): {_enrich_err}")
             except Exception:
+                _logger.debug("game detail section failed")
                 pass
 
         player_lookup: dict = {}
@@ -823,6 +825,7 @@ if platform_props_clicked:
                     "line_source": prop.get("platform", platform_name),
                 })
             except Exception as _prop_err:
+                _logger.debug("prop analysis failed: %s", _prop_err)
                 pass  # Skip props that fail analysis
 
         # Sort by confidence descending
@@ -967,6 +970,7 @@ if platform_props_clicked:
                     "You can still use Auto-Load + Neural Analysis for model-generated props."
                 )
             except Exception:
+                _logger.debug("secondary UI cleanup failed")
                 pass  # Swallow any secondary UI error from closed WebSocket
 
 # ============================================================
@@ -1019,6 +1023,7 @@ if one_click_setup_clicked:
         try:
             st.session_state["injury_status_map"] = _oc_load_inj()
         except Exception:
+            _logger.debug("one-click setup step failed")
             pass
 
         # ── Phase 2: Load team stats & standings ─────────────────────
@@ -1057,11 +1062,13 @@ if one_click_setup_clicked:
                 try:
                     _oc_save_csv(_oc_platform_props)
                 except Exception:
+                    _logger.debug("one-click progress cleanup failed")
                     pass
                 _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props retrieved"
             else:
                 _oc_platform_msg = "⚠️ No live platform props returned (data may be unavailable)"
         except Exception as _oc_plat_err:
+            _logger.debug("one-click platform fetch failed: %s", _oc_plat_err)
             _oc_platform_msg = f"⚠️ Platform retrieval failed: {_oc_plat_err}"
 
         _oc_bar.progress(100)

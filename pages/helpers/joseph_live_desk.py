@@ -703,6 +703,7 @@ def render_joseph_live_desk(
             cp = _select_fragment(CATCHPHRASE_POOL, _used)
             catchphrase = cp.get("text", "")
         except Exception:
+            _logger.debug("closer generation failed")
             closer = "And that's a WRAP, ladies and gentlemen!"
             catchphrase = "Stay dangerous."
 

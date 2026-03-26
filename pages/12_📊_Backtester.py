@@ -2,7 +2,10 @@
 # Historical backtesting UI for SmartAI-NBA.
 # Runs the prediction model against historical game log data to validate accuracy.
 
+import logging
 import streamlit as st
+
+_logger = logging.getLogger(__name__)
 
 st.set_page_config(
     page_title="Backtester — SmartAI-NBA",
@@ -286,6 +289,7 @@ if run_btn:
 
         st.session_state["backtest_result"] = result
     except Exception as _bt_err:
+        _logger.debug("backtest execution failed")
         st.error(f"❌ Backtest failed: {_bt_err}")
 
 # ── Display Results ───────────────────────────────────────────

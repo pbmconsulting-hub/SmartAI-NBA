@@ -277,6 +277,7 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
                 '</div>'
             )
     except Exception:
+        _logger.debug("analysis helper section failed")
         pass
 
     return dist_html + forces_html + breakdown_html + kelly_html
@@ -1229,6 +1230,7 @@ def display_prop_analysis_card_qds(result):
                 unsafe_allow_html=True,
             )
         except Exception:
+            _logger.debug("neural analysis helper failed")
             pass
 
         # ── DFS Flex EV Metrics Strip (Phase 3) ──────────────────
@@ -1280,6 +1282,7 @@ def display_prop_analysis_card_qds(result):
                     unsafe_allow_html=True,
                 )
             except Exception:
+                _logger.debug("analysis enrichment failed")
                 pass
 
     # ── Confidence Score Breakdown Expander ───────────────────────

@@ -9,6 +9,8 @@
 import streamlit as st  # Main UI framework
 import logging
 
+_logger = logging.getLogger(__name__)
+
 # Import our entry optimizer engine
 from engine.entry_optimizer import (
     build_optimal_entries,
@@ -707,6 +709,7 @@ if build_button:
                 if _entry_results:
                     render_joseph_inline_commentary(_entry_results, "entry_built")
             except Exception:
+                _logger.debug("entry builder section failed")
                 pass
         # ════ END JOSEPH ENTRY REACTION ════
 

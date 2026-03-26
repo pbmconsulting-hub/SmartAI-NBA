@@ -8,6 +8,9 @@
 
 import streamlit as st
 import datetime
+import logging
+
+_logger = logging.getLogger(__name__)
 
 from data.data_manager import (
     load_players_data,
@@ -60,6 +63,7 @@ from utils.auth import is_premium_user as _is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
+    _logger.debug("premium path import failed")
     _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 _FREE_PROP_LIMIT = 5   # Free users can manually enter up to 5 props
 _user_is_premium = _is_premium_user()
@@ -283,6 +287,7 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
             try:
                 _pb.empty()
             except Exception:
+                _logger.debug("prop scan failed")
                 pass
 
     # ── Cross-Platform Comparison Table ───────────────────────────

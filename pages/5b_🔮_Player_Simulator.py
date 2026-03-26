@@ -714,6 +714,7 @@ if run_sim and selected_names:
                 from data.game_log_cache import load_game_logs_from_cache as _load_cache
                 _cached_logs, _cache_stale = _load_cache(_pname_log)
             except Exception:
+                _logger.debug("game log cache load failed")
                 _cached_logs, _cache_stale = [], True
 
             _game_logs_for_display = _recent_games or _cached_logs
@@ -808,6 +809,7 @@ if run_sim and selected_names:
                             st.dataframe(_mh_rows, hide_index=True, use_container_width=True)
 
                     except Exception as _mh_exc:
+                        _logger.debug("matchup history load failed: %s", _mh_exc)
                         pass  # Matchup history is optional — never break the page
 
             elif _scenario_mode:

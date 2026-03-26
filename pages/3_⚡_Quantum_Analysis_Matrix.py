@@ -158,6 +158,7 @@ from utils.auth import is_premium_user as _is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
+    _logger.debug("premium path import failed")
     _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 _FREE_ANALYSIS_LIMIT = 3   # Free users can analyze up to 3 props
 _user_is_premium = _is_premium_user()
@@ -187,6 +188,7 @@ if not st.session_state.get("analysis_results"):
             # Record the timestamp so the UI can show when the session was saved
             st.session_state["_analysis_session_reloaded_at"] = _saved_session.get("analysis_timestamp", "")
     except Exception:
+        _logger.debug("staleness banner render failed")
         pass  # Non-fatal — just show empty state
 
 # ─── Auto-refresh injury data if empty or stale (>4 hours) ──
@@ -216,6 +218,7 @@ if not _should_auto_refresh_injuries:
                     ) / 3600.0
                     _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
             except Exception:
+                _logger.debug("auto-persist load failed")
                 pass
     else:
         # No record of a refresh this session — check file age
@@ -229,6 +232,7 @@ if not _should_auto_refresh_injuries:
                 ) / 3600.0
                 _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
         except Exception:
+            _logger.debug("staleness check failed")
             pass  # Staleness check is best-effort
 
 if _should_auto_refresh_injuries:
@@ -257,6 +261,7 @@ if _should_auto_refresh_injuries:
         # Record this refresh so subsequent page navigations skip it
         st.session_state["_injury_last_refreshed_at"] = _time_mod.time()
     except Exception:
+        _logger.debug("auto-refresh failed")
         pass  # Non-fatal — analysis page works without auto-refresh
 
 # ============================================================
@@ -380,6 +385,7 @@ try:
                 "Projections are using current stats."
             )
 except Exception:
+    _logger.debug("non-critical pre-check failed")
     pass  # Non-critical check
 
 # ── Matchup header (shown when games are configured) ──────────
@@ -880,6 +886,7 @@ if run_analysis:
                         _td = _minutes_trend.get("trend_direction", "stable")
                         _minutes_trend_indicator = "🔺" if _td == "up" else ("🔻" if _td == "down" else "➡️")
                     except Exception:
+                        _logger.debug("minutes trend calculation failed")
                         _minutes_trend = None
 
                 # ── C4: Teammate-Out Usage Adjustment ────────────────────
@@ -917,6 +924,7 @@ if run_analysis:
                         )
                         _precise_minutes = _min_result.get("projected_minutes")
                     except Exception:
+                        _logger.debug("precise minutes model failed")
                         _precise_minutes = None
 
                 projection_result  = build_player_projection(
@@ -959,6 +967,7 @@ if run_analysis:
                         )
                         _ensemble_penalty = _ensemble_result.get("confidence_adjustment", 0.0)
                     except Exception:
+                        _logger.debug("ensemble aggregation failed")
                         _ensemble_result = None
                         _ensemble_penalty = 0.0
 
@@ -1170,6 +1179,7 @@ if run_analysis:
                                     simulation_output["simulated_std"]  = _blended["blended_std"]
                                     simulation_output["game_script_applied"] = True
                         except Exception:
+                            _logger.debug("game script integration failed")
                             pass  # Game script is additive — never block main flow
 
                 forces_result = analyze_directional_forces(
@@ -1261,6 +1271,7 @@ if run_analysis:
                         edge_percentage=edge_pct,
                     )
                 except Exception:
+                    _logger.debug("CLV recording failed")
                     pass  # CLV recording is non-critical; never block analysis
 
                 # F9: Store initial line snapshot for market movement tracking
@@ -1274,6 +1285,7 @@ if run_analysis:
                             "timestamp": datetime.datetime.now().isoformat(),
                         }
                 except Exception:
+                    _logger.debug("calibration logging failed")
                     pass
 
                 should_avoid_flag, avoid_reasons = should_avoid_prop(
@@ -1444,6 +1456,7 @@ if run_analysis:
                     # block the pick from being displayed or auto-logged.  The genuine
                     # should_avoid decision comes from should_avoid_prop() only.
                 except Exception:
+                    _logger.debug("bet type classification failed")
                     full_result["bet_type"]         = "standard"
                     full_result["bet_type_emoji"]   = ""
                     full_result["bet_type_label"]   = "Standard Bet"
@@ -1472,6 +1485,7 @@ if run_analysis:
                     # edge_detection formatter (anchored to the actual prop line)
                     # rather than the simulation-best line which may differ.
                 except Exception:
+                    _logger.debug("alt lines parsing failed")
                     full_result["alt_lines"] = {}
                     full_result["prediction"] = ""
 
@@ -1483,6 +1497,7 @@ if run_analysis:
                         full_result["confidence_score"] = max(0.0, full_result["confidence_score"] - _clv_stat_penalty)
                         full_result["clv_stat_penalty"] = _clv_stat_penalty
                 except Exception:
+                    _logger.debug("matchup history lookup failed")
                     pass
 
                 # ── Feature 9: Market movement adjustment ────────────────────
@@ -1503,6 +1518,7 @@ if run_analysis:
                                 full_result["confidence_score"] = max(0.0, min(100.0, full_result["confidence_score"] + _mv_adj))
                                 full_result["market_movement"] = _mv
                 except Exception:
+                    _logger.debug("player intelligence lookup failed")
                     pass
 
                 # ── Composite Win Score ───────────────────────────────────────
@@ -1529,6 +1545,7 @@ if run_analysis:
                     full_result["win_score_grade"] = _cws_result["grade"]
                     full_result["win_score_label"] = _cws_result["grade_label"]
                 except Exception:
+                    _logger.debug("composite win score calculation failed")
                     full_result["composite_win_score"] = 0.0
                     full_result["win_score_grade"] = "F"
                     full_result["win_score_label"] = "Error"
@@ -1618,6 +1635,7 @@ if run_analysis:
                     try:
                         load_players_data.clear()  # bust Streamlit's CSV cache
                     except Exception:
+                        _logger.debug("result enrichment failed")
                         pass
                     st.success(
                         f"✅ Smart Roster Update complete — re-running analysis with "
@@ -1656,6 +1674,7 @@ if run_analysis:
                 selected_picks=st.session_state.get("selected_picks", []),
             )
         except Exception as _persist_err:
+            _logger.debug("persist to database failed: %s", _persist_err)
             pass  # Non-fatal — session state still has results
         progress_bar.empty()
         _analysis_elapsed = time.time() - _analysis_start_time
@@ -1694,6 +1713,7 @@ if run_analysis:
         try:
             progress_bar.empty()
         except Exception:
+            _logger.debug("joseph picks generation failed")
             pass
 
 # ============================================================
@@ -1760,6 +1780,7 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
             try:
                 _enriched.append(enrich_player_god_mode(_p, _games, _teams))
             except Exception:
+                _logger.debug("joseph enrichment for single prop failed")
                 _enriched.append(_p)
         _enriched_lookup = {str(p.get("name", "")).lower().strip(): p for p in _enriched}
 

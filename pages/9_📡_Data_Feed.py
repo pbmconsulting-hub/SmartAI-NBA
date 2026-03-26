@@ -18,6 +18,9 @@ import streamlit as st
 # Standard library imports
 import datetime  # For formatting timestamps
 import json      # For reading the last_updated.json file
+import logging
+
+_logger = logging.getLogger(__name__)
 
 # Import our data loading function (to preview data after loading)
 from data.data_manager import (
@@ -151,6 +154,7 @@ def _staleness_badge(timestamp_str: str | None, warn_hours: float = 4.0, error_h
         badge = f'<span style="background:{color};color:{text_color};padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">{label}</span>'
         return badge, age_h
     except Exception:
+        _logger.debug("status badge formatting failed")
         return '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">UNKNOWN</span>', None
 
 
@@ -203,6 +207,7 @@ try:
     if _stale_warning:
         st.warning(f"⏰ {_stale_warning}")
 except Exception:
+    _logger.debug("data feed section failed")
     pass
 
 st.divider()
@@ -468,6 +473,7 @@ if current_action:
                 progress_bar.empty()
                 status_text.empty()
             except Exception:
+                _logger.debug("update action cleanup failed")
                 pass
 
     # --------------------------------------------------------
@@ -534,6 +540,7 @@ if current_action:
                     progress_bar.empty()
                     status_text.empty()
                 except Exception:
+                    _logger.debug("smart filter cleanup failed")
                     pass
 
     # --------------------------------------------------------
@@ -657,6 +664,7 @@ if current_action:
                 progress_bar.empty()
                 status_text.empty()
             except Exception:
+                _logger.debug("player data cleanup failed")
                 pass
 
     # --------------------------------------------------------
@@ -718,6 +726,7 @@ if current_action:
                 progress_bar.empty()
                 status_text.empty()
             except Exception:
+                _logger.debug("team data cleanup failed")
                 pass
 
     # --------------------------------------------------------
@@ -803,6 +812,7 @@ if current_action:
                 progress_bar.empty()
                 status_text.empty()
             except Exception:
+                _logger.debug("full refresh cleanup failed")
                 pass
 
     # --------------------------------------------------------
@@ -1178,6 +1188,7 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
             try:
                 _progress_bar.empty()
             except Exception:
+                _logger.debug("data feed tab failed")
                 pass
 
     # ── Show cached props preview ──────────────────────────────

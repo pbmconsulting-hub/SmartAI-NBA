@@ -218,6 +218,7 @@ def _get_active_bets() -> list[dict]:
             })
         return bets
     except Exception:
+        _logger.debug("live sweat data load failed")
         pass
 
     return []

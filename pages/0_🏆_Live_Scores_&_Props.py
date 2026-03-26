@@ -174,6 +174,7 @@ def _get_quarter_scores(game_id: str) -> dict:
             result["home_q"] = home_q
             return result
     except Exception:
+        _logger.debug("live scores section failed")
         pass
 
     return result
@@ -311,6 +312,7 @@ def _get_tonights_leaders():
                 leaders["assists"].append({"player": name, "team": team, "value": ast})
                 leaders["threes"].append({"player": name, "team": team, "value": fg3m})
     except Exception:
+        _logger.debug("props section failed")
         pass
     # Sort and return top 5
     for cat in leaders:
@@ -369,6 +371,7 @@ if not players_data:
         if players_data:
             st.session_state["players_data"] = players_data
     except Exception:
+        _logger.debug("score card render failed")
         pass
 
 if players_data:
@@ -459,6 +462,7 @@ else:
                     "blocks": float(_pl.get("blocks_avg", 0) or 0),
                 }
     except Exception:
+        _logger.debug("live prop render failed")
         pass
 
     _tracked = 0

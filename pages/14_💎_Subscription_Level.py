@@ -9,6 +9,9 @@
 
 import streamlit as st
 import datetime
+import logging
+
+_logger = logging.getLogger(__name__)
 
 # ============================================================
 # SECTION: Page Configuration (must be first Streamlit call)
@@ -334,6 +337,7 @@ if sub_status["is_premium"]:
                 end_dt = datetime.datetime.fromisoformat(period_end)
                 next_billing = end_dt.strftime("%b %d, %Y")
             except Exception:
+                _logger.debug("billing date parse failed")
                 next_billing = period_end[:10]
         else:
             next_billing = "—"

@@ -14,7 +14,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 import datetime
 import html
+import logging
 import time
+
+_logger = logging.getLogger(__name__)
 
 from styles.theme import (
     get_global_css,
@@ -68,6 +71,7 @@ try:
     _teams_list = _load_teams()
     TEAMS_DATA = {t.get("abbreviation", "").upper(): t for t in _teams_list if t.get("abbreviation")}
 except Exception:
+    _logger.debug("teams data load failed")
     TEAMS_DATA = {}
 
 _LEAGUE_AVG_DRTG = 113.0  # typical NBA league-average defensive rating
@@ -83,6 +87,7 @@ try:
         if _t:
             PLAYERS_BY_TEAM.setdefault(_t, []).append(_p)
 except Exception:
+    _logger.debug("players by team load failed")
     PLAYERS_BY_TEAM = {}
 
 # ── Build expanded team alias set for stale-result filtering ──────
@@ -395,6 +400,7 @@ def _predict_game(home_abbrev, away_abbrev, vegas_spread=None, game_total=None):
                 st.session_state["game_predictions"][cache_key] = result
             return result
         except Exception:
+            _logger.debug("legacy fallback failed")
             pass  # Fall through to legacy fallback
 
     # ── Legacy fallback (used only if engine import fails) ────
@@ -426,6 +432,7 @@ def _predict_game(home_abbrev, away_abbrev, vegas_spread=None, game_total=None):
             "away_ortg": away_ortg, "away_drtg": away_drtg, "away_pace": away_pace,
         }
     except Exception:
+        _logger.debug("game prediction failed")
         return None
 
 
@@ -793,6 +800,7 @@ with _tab_report:
             from utils.joseph_widget import render_joseph_inline_commentary
             render_joseph_inline_commentary(analysis_results[:10], "analysis_results")
         except Exception:
+            _logger.debug("game report section failed")
             pass
     # ════ END JOSEPH GAME REPORT COMMENT ════
 
@@ -1006,6 +1014,7 @@ with _tab_builder:
                         if _gb_game_pred:
                             st.session_state["gb_game_pred"] = _gb_game_pred
                     except Exception:
+                        _logger.debug("game prediction for report failed")
                         _gb_game_pred = None
                 else:
                     _gb_game_pred = None
@@ -1049,6 +1058,7 @@ with _tab_builder:
                             )
                             projected_value_gb = float(proj_gb.get(f"projected_{stat_gb}", stat_avg_gb) or stat_avg_gb)
                         except Exception:
+                            _logger.debug("projection build failed, using average")
                             projected_value_gb = stat_avg_gb
                             proj_gb = {}
 
@@ -1075,6 +1085,7 @@ with _tab_builder:
                             )
                             over_prob_gb = sim_gb.get("over_probability", 0.5)
                         except Exception:
+                            _logger.debug("over probability calculation failed")
                             over_prob_gb = 0.5
 
                         try:
@@ -1088,6 +1099,7 @@ with _tab_builder:
                             )
                             conf_score_gb = conf_gb if isinstance(conf_gb, (int, float)) else conf_gb.get("confidence_score", 0)
                         except Exception:
+                            _logger.debug("confidence score calculation failed")
                             conf_score_gb = 0
 
                         custom_results_gb.append({
@@ -1210,6 +1222,7 @@ def _generate_game_narrative(game, _analysis_results):
                 num_simulations=2000,
             )
         except Exception:
+            _logger.debug("engine prediction failed")
             _engine_pred = None
 
     if _engine_pred:
@@ -1250,6 +1263,7 @@ def _generate_game_narrative(game, _analysis_results):
             proj_away_n  = round(total_float - proj_home_n)
             narrative_n += f"The model projects a **{away_team_n} {proj_away_n} — {home_team_n} {proj_home_n}** final.\n\n"
         except Exception:
+            _logger.debug("narrative game total formatting failed")
             narrative_n += f"Game Total: {total_n}\n\n"
 
     # Spread analysis
@@ -1260,6 +1274,7 @@ def _generate_game_narrative(game, _analysis_results):
             dog_n = away_team_n if spread_val < 0 else home_team_n
             narrative_n += f"**{fav_n}** is favored by {abs(spread_val):.1f} points over **{dog_n}**.\n\n"
     except Exception:
+        _logger.debug("narrative section failed")
         pass
 
     # Top picks from this matchup
