@@ -292,10 +292,12 @@ class TestJosephQamWiring(unittest.TestCase):
     def test_inline_commentary_uses_joseph_results(self):
         """inject_joseph_inline_commentary must receive joseph_results (with
         verdicts) rather than only raw analysis_results."""
-        # Find the actual call site (not the import statement)
+        # Find the actual function call (not the import statement).
+        # The import line contains 'import inject_joseph_inline_commentary'
+        # while the call has 'inject_joseph_inline_commentary(' with arguments.
+        import_context_chars = 80  # chars to check for nearby "import" keyword
         call_site = self.source.find("inject_joseph_inline_commentary(")
-        # Skip the import line (which ends with ')' too)
-        while call_site != -1 and "import" in self.source[max(0, call_site - 60):call_site]:
+        while call_site != -1 and "import" in self.source[max(0, call_site - import_context_chars):call_site]:
             call_site = self.source.find("inject_joseph_inline_commentary(", call_site + 1)
         self.assertNotEqual(call_site, -1, "inject_joseph_inline_commentary call must exist in QAM")
         snippet = self.source[call_site:call_site + 300]

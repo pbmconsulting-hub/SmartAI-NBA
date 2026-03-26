@@ -330,8 +330,13 @@ class TestPlayerNameLookupWiring(unittest.TestCase):
         import inspect
         from pages.helpers.joseph_live_desk import render_joseph_live_desk
         source = inspect.getsource(render_joseph_live_desk)
-        # The lookup line should include 'player_name' as a preferred key
-        self.assertIn("player_name", source)
+        # The lookup line should try 'player_name' before falling back
+        idx_player_name = source.find('ar.get("player_name"')
+        idx_player = source.find('ar.get("player"')
+        self.assertNotEqual(idx_player_name, -1,
+                            "Must look up 'player_name' key from QAM results")
+        self.assertLess(idx_player_name, idx_player,
+                        "'player_name' must be tried before 'player' in get chain")
 
     def test_source_lowercases_enriched_lookup(self):
         """The enriched_players lookup must lowercase the key to match
@@ -339,8 +344,15 @@ class TestPlayerNameLookupWiring(unittest.TestCase):
         import inspect
         from pages.helpers.joseph_live_desk import render_joseph_live_desk
         source = inspect.getsource(render_joseph_live_desk)
-        # Should contain .lower() somewhere in the enriched_players lookup
-        self.assertIn(".lower()", source)
+        # Find the enriched_players.get() call near the player_name lookup
+        idx_enriched = source.find("enriched_players.get(")
+        self.assertNotEqual(idx_enriched, -1, "Must call enriched_players.get()")
+        # The argument should include .lower().strip()
+        snippet = source[idx_enriched:idx_enriched + 100]
+        self.assertIn(".lower()", snippet,
+                      "enriched_players lookup must lowercase the key")
+        self.assertIn(".strip()", snippet,
+                      "enriched_players lookup must strip whitespace")
 
 
 if __name__ == "__main__":
