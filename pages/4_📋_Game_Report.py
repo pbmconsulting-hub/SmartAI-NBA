@@ -1106,6 +1106,11 @@ with _tab_builder:
                                 matchup_adjustment_factor=proj_gb.get("defense_factor", 1.0),
                                 home_away_adjustment=proj_gb.get("home_away_factor", 0.0),
                                 rest_adjustment_factor=proj_gb.get("rest_factor", 1.0),
+                                game_context={
+                                    "is_home": is_home_gb,
+                                    "vegas_spread": gb_spread if is_home_gb else -gb_spread,
+                                    "game_total": gb_total,
+                                },
                             )
                             over_prob_gb = sim_gb.get("probability_over", sim_gb.get("over_probability", 0.5))
                         except Exception:

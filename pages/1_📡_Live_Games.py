@@ -787,6 +787,7 @@ if platform_props_clicked:
                     rest_adjustment_factor=proj.get("rest_factor", 1.0),
                     stat_type=stat_type,
                     projected_minutes=proj.get("projected_minutes"),
+                    game_context=game_ctx if game_ctx.get("game_id") else None,
                 )
                 prob_over = sim.get("probability_over", 0.5)
                 raw_edge = sim.get("edge_percentage", 0.0)
