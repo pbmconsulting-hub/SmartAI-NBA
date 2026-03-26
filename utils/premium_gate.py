@@ -21,7 +21,7 @@ from utils.auth import is_premium_user
 try:
     from utils.stripe_manager import _PREMIUM_PAGE_PATH as _PREM_PATH
 except Exception:
-    _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
+    _PREM_PATH = "/15_%F0%9F%92%8E_Subscription_Level"
 
 
 # ============================================================
@@ -204,7 +204,7 @@ def premium_gate(feature_name: str) -> bool:
             use_container_width=True,
             key=f"_gate_upgrade_{feature_name.replace(' ', '_')}",
         ):
-            st.switch_page("pages/14_💎_Subscription_Level.py")
+            st.switch_page("pages/15_💎_Subscription_Level.py")
 
     st.markdown(
         f'<p class="gate-disclaimer" style="text-align:center;">'

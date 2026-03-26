@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: tests/test_the_studio.py
-# PURPOSE: Tests for pages/7_🎙️_The_Studio.py
+# PURPOSE: Tests for pages/8_🎙️_The_Studio.py
 #          (Joseph's dedicated interactive page — Layer 7)
 # ============================================================
 import sys, os, unittest, ast

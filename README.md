@@ -62,16 +62,16 @@ SmartAI-NBA/
 │   ├── 3_⚡_Quantum_Analysis_Matrix.py # Run Neural Analysis — main engine
 │   ├── 4_📋_Game_Report.py            # AI-powered game reports (SAFE Score™)
 │   ├── 5_💦_Live_Sweat.py             # Live AI Panic Room — in-game tracking
-│   ├── 5b_🔮_Player_Simulator.py      # What-if player scenario simulator
-│   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
-│   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
-│   ├── 8_🛡️_Risk_Shield.py           # Flagged picks to avoid
-│   ├── 9_📡_Data_Feed.py              # Fetch live NBA data from APIs
-│   ├── 10_🗺️_Correlation_Matrix.py   # Prop correlation analysis
-│   ├── 11_📈_Bet_Tracker.py           # Bet tracking & model health
-│   ├── 12_📊_Backtester.py            # Historical backtesting engine
-│   ├── 13_⚙️_Settings.py             # Configure engine settings
-│   └── 14_💎_Subscription_Level.py    # Premium subscription management
+│   ├── 6_🔮_Player_Simulator.py       # What-if player scenario simulator
+│   ├── 7_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
+│   ├── 8_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
+│   ├── 9_🛡️_Risk_Shield.py           # Flagged picks to avoid
+│   ├── 10_📡_Data_Feed.py              # Fetch live NBA data from APIs
+│   ├── 11_🗺️_Correlation_Matrix.py   # Prop correlation analysis
+│   ├── 12_📈_Bet_Tracker.py           # Bet tracking & model health
+│   ├── 13_📊_Backtester.py            # Historical backtesting engine
+│   ├── 14_⚙️_Settings.py             # Configure engine settings
+│   └── 15_💎_Subscription_Level.py    # Premium subscription management
 │
 ├── engine/
 │   ├── math_helpers.py                 # All math from scratch (no scipy)
@@ -163,48 +163,48 @@ The Live AI Panic Room — track your active bets in real-time during games.
 Features pace tracking, Joseph M. Smith live commentary, and sweat cards
 that show whether your bets are on track to cash.
 
-### 🔮 Page 5b: Player Simulator
+### 🔮 Page 6: Player Simulator
 What-if scenario simulator. Adjust minutes, pace, matchup factors and see
 how projected stats change in real-time.
 
-### 🧬 Page 6: Entry Builder
+### 🧬 Page 7: Entry Builder
 Build optimal DFS parlays. The engine tests all combinations of top picks
 and finds the ones with the highest **Expected Value (EV)**. Supports
 PrizePicks, Underdog, and DraftKings payout structures.
 
-### 🎙️ Page 7: The Studio
+### 🎙️ Page 8: The Studio
 Joseph M. Smith's broadcast desk. Three modes:
 - **Games Tonight** — Joseph breaks down every game
 - **Scout a Player** — deep-dive player analysis
 - **Build My Bets** — Joseph constructs optimal tickets
 
-### 🛡️ Page 8: Risk Shield
+### 🛡️ Page 9: Risk Shield
 Shows which props to skip and explains exactly WHY:
 - Low edge, trap lines, sharp lines, high variance, low confidence
 - Educational content explains each risk flag
 
-### 📡 Page 9: Data Feed
+### 📡 Page 10: Data Feed
 Fetch live NBA data from API-NBA API and The Odds API:
 - **Smart Update** — only tonight's teams (fast)
 - **Full Update** — all NBA player stats
 - **Fetch Props** — live odds from 15+ sportsbooks
 
-### 🗺️ Page 10: Correlation Matrix
+### 🗺️ Page 11: Correlation Matrix
 Analyze how player props correlate with each other within games.
 Helps build smarter parlays by avoiding correlated risk.
 
-### 📈 Page 11: Bet Tracker & Model Health
+### 📈 Page 12: Bet Tracker & Model Health
 Track your betting results. Features:
 - Overall win rate by tier
 - Auto-resolve bets against real game results
 - Model health monitoring
 - Performance predictor and bankroll allocation
 
-### 📊 Page 12: Backtester
+### 📊 Page 13: Backtester
 Validate the model against historical game logs. See win rates, ROI,
 and tier-by-tier performance metrics.
 
-### ⚙️ Page 13: Settings
+### ⚙️ Page 14: Settings
 Configure:
 - **Simulation Depth**: 500 (fast) to 5,000 (most accurate)
 - **Minimum Edge**: How much edge before showing a pick (default: 5%)
@@ -212,7 +212,7 @@ Configure:
 - **API Keys**: Odds API + API-NBA API keys
 - **Advanced factors**: Home court boost, fatigue sensitivity, etc.
 
-### 💎 Page 14: Subscription Level
+### 💎 Page 15: Subscription Level
 Premium subscription management powered by Stripe.
 
 ---

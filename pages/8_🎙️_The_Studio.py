@@ -1,5 +1,5 @@
 # ============================================================
-# FILE: pages/7_🎙️_The_Studio.py
+# FILE: pages/8_🎙️_The_Studio.py
 # PURPOSE: Joseph M. Smith's dedicated interactive page — the
 #          deep-dive destination for game analysis, player
 #          scouting, and bet building.

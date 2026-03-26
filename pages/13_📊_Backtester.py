@@ -1,4 +1,4 @@
-# pages/12_📊_Backtester.py
+# pages/13_📊_Backtester.py
 # Historical backtesting UI for SmartAI-NBA.
 # Runs the prediction model against historical game log data to validate accuracy.
 

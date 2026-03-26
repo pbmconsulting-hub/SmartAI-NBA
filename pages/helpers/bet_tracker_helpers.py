@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: pages/helpers/bet_tracker_helpers.py
 # PURPOSE: Helper functions for the Bet Tracker page.
-#          Extracted from pages/11_📈_Bet_Tracker.py to reduce page size.
+#          Extracted from pages/12_📈_Bet_Tracker.py to reduce page size.
 # ============================================================
 import logging
 

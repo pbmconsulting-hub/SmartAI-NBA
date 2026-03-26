@@ -14,7 +14,7 @@
 #          more conservative sizing.
 #
 # CONNECTS TO: engine/entry_optimizer.py (EV values),
-#              pages/6_🧬_Entry_Builder.py (bankroll UI)
+#              pages/7_🧬_Entry_Builder.py (bankroll UI)
 # CONCEPTS COVERED: Kelly Criterion, bankroll management,
 #                   risk of ruin, expected value, sizing
 # ============================================================
