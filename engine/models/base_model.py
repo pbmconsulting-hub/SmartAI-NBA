@@ -66,7 +66,8 @@ class BaseModel(abc.ABC):
             path: File path (e.g. ``engine/models/saved/ridge.joblib``).
         """
         try:
-            import joblib, os
+            import joblib
+            import os
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
             joblib.dump(self, path)
             _logger.info("Saved model %s → %s", self.name, path)

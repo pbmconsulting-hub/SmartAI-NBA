@@ -110,7 +110,7 @@ def log_model_weight(model_name: str, weight: float) -> None:
     import datetime
     with _lock:
         _weight_history[model_name].append(
-            {"weight": float(weight), "ts": datetime.datetime.utcnow().isoformat()}
+            {"weight": float(weight), "ts": datetime.datetime.now(datetime.timezone.utc).isoformat()}
         )
 
 
