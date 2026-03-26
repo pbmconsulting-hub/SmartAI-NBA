@@ -1028,12 +1028,18 @@ with _tab_builder:
                     pdata_adj_gb["minutes_avg"] = all_minutes_gb.get(pname_gb, float(pdata_gb.get("minutes_avg", 28) or 28))
                     opponent_gb = away_team_gb if is_home_gb else home_team_gb
 
-                    # Look up player estimated metrics from Deep Fetch enrichment
+                    # Look up player estimated metrics from Deep Fetch enrichment.
+                    # The enrichment dict is keyed by game_id as stored by enrich_tonights_slate()
+                    # which uses the synthetic key format "{HOME}_vs_{AWAY}" produced by
+                    # live_data_fetcher.  Try both orderings for robustness.
                     _gb_adv_ctx: dict | None = None
                     try:
+                        _adv_enr_all = st.session_state.get("advanced_enrichment", {})
                         _gb_game_key = f"{home_team_gb}_vs_{away_team_gb}"
-                        _gb_enr = st.session_state.get("advanced_enrichment", {}).get(
-                            _gb_game_key, {}
+                        _gb_enr = (
+                            _adv_enr_all.get(_gb_game_key)
+                            or _adv_enr_all.get(f"{away_team_gb}_vs_{home_team_gb}")
+                            or {}
                         )
                         _gb_metrics = _gb_enr.get("player_metrics", [])
                         _gb_pid = pdata_gb.get("player_id") or pdata_gb.get("id")

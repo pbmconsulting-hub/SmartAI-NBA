@@ -848,13 +848,17 @@ def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
             from data.nba_data_service import get_team_game_logs
             logs = get_team_game_logs(team_id, last_n=10)
             if logs:
-                # Blowout = margin > 15 points
+                # Blowout = absolute margin > 15 points (counts both wins and losses;
+                # a team with many blowout games either runs up the score OR gets
+                # blown out — both raise the probability of a non-competitive game).
                 blowout_count = 0
                 for log in logs:
                     pts = float(log.get("PTS", 0) or 0)
                     pts_opp = float(log.get("OPP_PTS", log.get("pts_opp", 0)) or 0)
                     if pts_opp == 0:
-                        # Try alternative fields
+                        # Fall back to PLUS_MINUS when opponent score is unavailable.
+                        # abs() is intentional: a margin of -18 (big loss) is equally
+                        # a blowout game as a margin of +18 (big win).
                         plus_minus_abs = abs(float(log.get("PLUS_MINUS", 0) or 0))
                         if plus_minus_abs > _BLOWOUT_MARGIN_THRESHOLD:
                             blowout_count += 1
