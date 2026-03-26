@@ -165,8 +165,8 @@ def get_player_id(player_name: str) -> int | None:
                          if parts[0] in k and parts[-1] in k),
                         None,
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.debug("get_player_id: dynamic lookup failed for %r — %s", key, exc)
 
     # 3. nba_api local static list (no network call, covers all-time players)
     if not pid:
@@ -182,8 +182,8 @@ def get_player_id(player_name: str) -> int | None:
                          if parts[0] in k and parts[-1] in k),
                         None,
                     )
-        except Exception:
-            pass
+        except Exception as exc:
+            _logger.debug("get_player_id: static lookup failed for %r — %s", key, exc)
 
     # Cache result (even None) to avoid repeated lookups
     _PLAYER_ID_CACHE[key] = pid

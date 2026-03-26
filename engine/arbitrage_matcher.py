@@ -21,6 +21,8 @@ except ImportError:
 def calculate_implied_probability(american_odds: float) -> float:
     """Convert American odds to implied probability percentage."""
     odds = float(american_odds)
+    if odds == 0:
+        return 52.38  # Invalid odds; default to -110 breakeven
     if odds < 0:
         return abs(odds) / (abs(odds) + 100.0) * 100
     return 100.0 / (odds + 100.0) * 100

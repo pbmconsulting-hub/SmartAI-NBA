@@ -86,7 +86,7 @@ def _cache_get(url: str):
         return None
     payload, ts = entry
     if _time.time() - ts > _API_CACHE_TTL:
-        del _API_CACHE[url]
+        _API_CACHE.pop(url, None)
         return None
     return payload
 

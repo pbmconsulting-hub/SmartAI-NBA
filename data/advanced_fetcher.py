@@ -137,8 +137,8 @@ def enrich_tonights_slate(
         if progress_callback:
             try:
                 progress_callback(_step, _total_steps, msg)
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("enrich_tonights_slate: progress callback failed — %s", exc)
 
     # Shared: standings
     _tick("Fetching league standings…")

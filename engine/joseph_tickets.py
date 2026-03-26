@@ -432,8 +432,8 @@ def generate_ticket_pitch(ticket: dict, leg_count: int) -> str:
             closer_used = _used_fragments.setdefault("ticket_closer", set())
             closer = _select_fragment(CLOSER_POOL, closer_used)
             pitch = f"{pitch} {closer['text']}"
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("generate_ticket_pitch: closer fragment failed — %s", exc)
 
         return pitch
     except Exception as exc:
@@ -634,8 +634,8 @@ def _calc_expected_value(legs: list, leg_count: int,
         ev = _safe_float(ev_result.get("expected_value_dollars", 0.0))
         if ev != 0.0:
             return ev
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_calc_ticket_ev: primary EV calc failed — %s", exc)
 
     # Simple EV fallback
     try:
