@@ -137,17 +137,7 @@ except ImportError:
     def log_prediction(*a, **kw):
         return None
 
-try:
-    from engine.math_helpers import _safe_float
-except ImportError:
-    def _safe_float(value, fallback=0.0):
-        try:
-            v = float(value)
-            if math.isfinite(v):
-                return v
-            return fallback
-        except (TypeError, ValueError):
-            return fallback
+from engine.math_helpers import _safe_float
 
 try:
     from data.data_manager import load_players_data, load_teams_data

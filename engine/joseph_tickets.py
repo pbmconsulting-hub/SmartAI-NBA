@@ -87,19 +87,7 @@ except ImportError:
     def calculate_entry_expected_value(*a, **kw):
         return {"expected_value_dollars": 0.0}
 
-try:
-    from engine.math_helpers import _safe_float
-except ImportError:
-    def _safe_float(val, default=0.0):
-        try:
-            f = float(val)
-            if not (f == f):  # NaN check
-                return default
-            if f == float("inf") or f == float("-inf"):
-                return default
-            return f
-        except (TypeError, ValueError):
-            return default
+from engine.math_helpers import _safe_float
 
 
 # ═══════════════════════════════════════════════════════════════

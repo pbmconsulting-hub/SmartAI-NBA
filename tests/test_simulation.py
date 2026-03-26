@@ -27,7 +27,7 @@ class TestSimulationSourceLevel(unittest.TestCase):
 
     def test_has_safe_float_guard(self):
         src = _SIM_SRC.read_text(encoding="utf-8")
-        self.assertIn("def _safe_float(", src)
+        self.assertIn("_safe_float", src)
 
 
 class TestRunQuantumMatrixSimulation(unittest.TestCase):

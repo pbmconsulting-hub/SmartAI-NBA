@@ -21,7 +21,6 @@ receive unexpected types.
 """
 
 import logging
-import math
 
 _logger = logging.getLogger(__name__)
 
@@ -29,20 +28,7 @@ _logger = logging.getLogger(__name__)
 # SECTION: External Imports (graceful fallbacks)
 # ============================================================
 
-try:
-    from engine.math_helpers import _safe_float
-except ImportError:
-    _logger.warning("[ImpactMetrics] Could not import _safe_float from math_helpers")
-
-    def _safe_float(value, fallback=0.0):
-        """Convert *value* to float; return *fallback* on failure or non-finite."""
-        try:
-            v = float(value)
-            if math.isfinite(v):
-                return v
-            return float(fallback)
-        except (ValueError, TypeError):
-            return float(fallback)
+from engine.math_helpers import _safe_float
 
 try:
     from data.advanced_metrics import normalize

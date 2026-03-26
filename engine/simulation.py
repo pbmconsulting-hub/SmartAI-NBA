@@ -17,20 +17,6 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-def _safe_float(value, fallback=0.0):
-    """Return *value* if it is a finite float, otherwise *fallback*.
-
-    This is the last-line-of-defence guard that prevents NaN or ±inf
-    from leaking out of the simulation engine into downstream UI code.
-    """
-    try:
-        v = float(value)
-        if math.isfinite(v):
-            return v
-        return float(fallback)
-    except (ValueError, TypeError):
-        return float(fallback)
-
 try:
     from utils.logger import get_logger
     _logger = get_logger(__name__)
@@ -40,6 +26,7 @@ except ImportError:
 
 # Import our custom math helpers (built from scratch)
 from engine.math_helpers import (
+    _safe_float,                       # Canonical safe float conversion
     sample_from_normal_distribution,  # Draw a random game result (normal)
     sample_skew_normal,               # C5: Skew-normal for right-skewed NBA stats
     get_stat_skew_param,              # C5: Default skew params by stat type

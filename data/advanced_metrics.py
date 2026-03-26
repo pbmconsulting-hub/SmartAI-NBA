@@ -4,7 +4,6 @@
 # CONNECTS TO: data/data_manager.py, data/validators.py, engine/joseph_eval.py
 # ============================================================
 
-import math
 import copy
 
 try:
@@ -25,18 +24,7 @@ except ImportError:
     def load_players_data(): return []
     def load_teams_data(): return []
 
-try:
-    from engine.math_helpers import _safe_float
-except ImportError:
-    def _safe_float(value, fallback=0.0):
-        """Convert *value* to float; return *fallback* on failure or non-finite."""
-        try:
-            v = float(value)
-            if math.isfinite(v):
-                return v
-            return float(fallback)
-        except (ValueError, TypeError):
-            return float(fallback)
+from engine.math_helpers import _safe_float
 
 # ============================================================
 # SECTION: Constants

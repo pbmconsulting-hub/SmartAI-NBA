@@ -5,7 +5,6 @@
 # ============================================================
 
 import logging
-import math
 import random
 
 _logger = logging.getLogger(__name__)
@@ -27,17 +26,7 @@ except ImportError:
     def classify_player_archetype(player):
         return "Role Player"
 
-try:
-    from engine.math_helpers import _safe_float
-except ImportError:
-    def _safe_float(value, fallback=0.0):
-        try:
-            v = float(value)
-            if math.isfinite(v):
-                return v
-            return float(fallback)
-        except (ValueError, TypeError):
-            return float(fallback)
+from engine.math_helpers import _safe_float
 
 
 # ── League Averages ─────────────────────────────────────────
