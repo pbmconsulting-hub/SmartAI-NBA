@@ -310,6 +310,53 @@ if _load_logs_btn and selected_names:
 st.divider()
 
 
+# ─── Stat → game-log key mapping (matches QAM pipeline) ──────
+_STAT_LOG_KEY_MAP = {
+    "points": "pts", "rebounds": "reb", "assists": "ast",
+    "threes": "fg3m", "steals": "stl", "blocks": "blk",
+    "turnovers": "tov",
+}
+
+
+def _load_recent_form(player_name: str, player_data: dict) -> list:
+    """Return recent game-log dicts for a player.
+
+    Priority:
+      1. ``player_data["recent_form_games"]`` (populated by the Get Game Logs
+         button during the current session).
+      2. Persistent game-log cache on disk (populated by earlier sessions or
+         the Data Feed page).
+      3. Empty list (simulation falls back to season averages).
+    """
+    # In-memory first (set by the Get Game Logs button earlier on the page)
+    logs = player_data.get("recent_form_games") or []
+    if logs:
+        return logs
+
+    # Fallback to disk cache
+    try:
+        from data.game_log_cache import load_game_logs_from_cache
+        cached, _stale = load_game_logs_from_cache(player_name)
+        return cached or []
+    except Exception:
+        _logger.debug("Could not load game-log cache for %s", player_name)
+        return []
+
+
+def _extract_stat_values(game_logs: list, stat: str) -> list:
+    """Extract a list of float values for one stat from game-log dicts."""
+    key = _STAT_LOG_KEY_MAP.get(stat, stat)
+    values: list[float] = []
+    for g in game_logs:
+        v = g.get(key, g.get(stat))
+        if v is not None:
+            try:
+                values.append(float(v))
+            except (TypeError, ValueError):
+                pass
+    return values
+
+
 # ─── Simulation runner ───────────────────────────────────────
 def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
                      scenario_overrides: dict | None = None) -> dict:
@@ -322,6 +369,11 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
         for k in ("game_total", "vegas_spread", "rest_days"):
             if k in scenario_overrides:
                 ctx[k] = scenario_overrides[k]
+
+    # ── Load recent game logs (cache or in-memory) ────────────
+    player_name = player_data.get("name", "")
+    recent_form = _load_recent_form(player_name, player_data)
+
     results = {}
     for stat in _STAT_TYPES:
         projection = build_player_projection(
@@ -333,6 +385,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             defensive_ratings_data=defensive_ratings_data,
             teams_data=teams_data,
             vegas_spread=ctx.get("vegas_spread", 0.0),
+            recent_form_games=recent_form if recent_form else None,
         )
         projected_val = projection.get(
             f"projected_{stat}",
@@ -342,6 +395,10 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
         if scenario_overrides and "def_adj" in scenario_overrides:
             projected_val = projected_val * (1.0 + scenario_overrides["def_adj"])
         stat_std = get_stat_standard_deviation(player_data, stat)
+
+        # Extract per-stat float values for KDE / hot-cold momentum
+        stat_log_values = _extract_stat_values(recent_form, stat)
+
         sim_out = run_quantum_matrix_simulation(
             projected_stat_average=projected_val,
             stat_standard_deviation=stat_std,
@@ -353,6 +410,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             home_away_adjustment=projection.get("home_away_factor", 0.0),
             rest_adjustment_factor=projection.get("rest_factor", 1.0),
             stat_type=stat,
+            recent_game_logs=stat_log_values if len(stat_log_values) >= 5 else None,
         )
         season_avg = float(player_data.get(f"{stat}_avg", 0) or 0)
         p90 = sim_out.get("percentile_90", projected_val)
@@ -580,48 +638,42 @@ def _render_sim_card(sim_result: dict):
             f'</tr>'
         )
 
-    card_html = f"""
-<div style="background:#14192b;border-radius:8px;padding:20px;margin-bottom:20px;
-            border-top:3px solid #ff5e00;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <img src="{img_src}"
-             onerror="this.onerror=null;this.src='{fallback_svg}'"
-             style="width:64px;height:64px;border-radius:50%;object-fit:cover;
-                    border:2px solid #ff5e00;flex-shrink:0;"
-             alt="{safe_name}">
-        <div>
-            <div style="font-family:'Orbitron',sans-serif;color:#ff5e00;font-size:1.1rem;font-weight:700;">
-                {safe_name}
-                <span style="font-size:0.8rem;background:rgba(255,255,255,0.1);padding:2px 6px;
-                             border-radius:4px;color:white;font-family:inherit;">{safe_team}</span>
-                {dark_horse_badge}
-            </div>
-            <div style="color:#c0d0e8;font-size:0.9rem;margin-top:4px;">
-                vs <strong style="color:white;">{safe_opp}</strong>
-                {'&nbsp;🏠 Home' if ctx.get('is_home') else '&nbsp;✈️ Away'}
-                &nbsp;| Game Total: {ctx.get('game_total', 220):.0f}
-            </div>
-        </div>
-    </div>
-    <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
-            <thead>
-                <tr style="border-bottom:1px solid rgba(255,94,0,0.4);">
-                    <th style="padding:6px 8px;text-align:left;color:#ff5e00;">Stat</th>
-                    <th style="padding:6px 8px;text-align:left;color:#ff5e00;">Projected</th>
-                    <th style="padding:6px 8px;text-align:left;color:#8a9bb8;">10th%</th>
-                    <th style="padding:6px 8px;text-align:left;color:#c0d0e8;">Median</th>
-                    <th style="padding:6px 8px;text-align:left;color:#00ff9d;">90th%</th>
-                    <th style="padding:6px 8px;text-align:left;color:#8a9bb8;">Season Avg</th>
-                </tr>
-            </thead>
-            <tbody>
-                {stat_rows}
-            </tbody>
-        </table>
-    </div>
-</div>
-"""
+    home_away_label = '&nbsp;🏠 Home' if ctx.get('is_home') else '&nbsp;✈️ Away'
+    game_total_fmt = f"{ctx.get('game_total', 220):.0f}"
+    card_html = (
+        '<div style="background:#14192b;border-radius:8px;padding:20px;margin-bottom:20px;'
+        'border-top:3px solid #ff5e00;">'
+        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">'
+        f'<img src="{img_src}" onerror="this.onerror=null;this.src=\'{fallback_svg}\'"'
+        ' style="width:64px;height:64px;border-radius:50%;object-fit:cover;'
+        'border:2px solid #ff5e00;flex-shrink:0;"'
+        f' alt="{safe_name}">'
+        '<div>'
+        '<div style="font-family:\'Orbitron\',sans-serif;color:#ff5e00;font-size:1.1rem;font-weight:700;">'
+        f'{safe_name} '
+        f'<span style="font-size:0.8rem;background:rgba(255,255,255,0.1);padding:2px 6px;'
+        f'border-radius:4px;color:white;font-family:inherit;">{safe_team}</span>'
+        f'{dark_horse_badge}'
+        '</div>'
+        '<div style="color:#c0d0e8;font-size:0.9rem;margin-top:4px;">'
+        f'vs <strong style="color:white;">{safe_opp}</strong>'
+        f'{home_away_label}'
+        f'&nbsp;| Game Total: {game_total_fmt}'
+        '</div>'
+        '</div></div>'
+        '<div style="overflow-x:auto;">'
+        '<table style="width:100%;border-collapse:collapse;font-size:0.88rem;">'
+        '<thead><tr style="border-bottom:1px solid rgba(255,94,0,0.4);">'
+        '<th style="padding:6px 8px;text-align:left;color:#ff5e00;">Stat</th>'
+        '<th style="padding:6px 8px;text-align:left;color:#ff5e00;">Projected</th>'
+        '<th style="padding:6px 8px;text-align:left;color:#8a9bb8;">10th%</th>'
+        '<th style="padding:6px 8px;text-align:left;color:#c0d0e8;">Median</th>'
+        '<th style="padding:6px 8px;text-align:left;color:#00ff9d;">90th%</th>'
+        '<th style="padding:6px 8px;text-align:left;color:#8a9bb8;">Season Avg</th>'
+        '</tr></thead>'
+        f'<tbody>{stat_rows}</tbody>'
+        '</table></div></div>'
+    )
     st.markdown(card_html, unsafe_allow_html=True)
 
 
@@ -714,6 +766,7 @@ if run_sim and selected_names:
                 from data.game_log_cache import load_game_logs_from_cache as _load_cache
                 _cached_logs, _cache_stale = _load_cache(_pname_log)
             except Exception:
+                _logger.debug("Failed to load game-log cache for %s", _pname_log)
                 _cached_logs, _cache_stale = [], True
 
             _game_logs_for_display = _recent_games or _cached_logs
@@ -808,7 +861,7 @@ if run_sim and selected_names:
                             st.dataframe(_mh_rows, hide_index=True, use_container_width=True)
 
                     except Exception as _mh_exc:
-                        pass  # Matchup history is optional — never break the page
+                        _logger.debug("Matchup history failed for %s: %s", _pname_log, _mh_exc)
 
             elif _scenario_mode:
                 st.caption(
