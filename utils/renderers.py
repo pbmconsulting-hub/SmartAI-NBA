@@ -22,6 +22,13 @@ import os as _os
 import base64 as _base64
 import re as _re
 
+try:
+    from utils.log_helper import get_logger as _get_logger
+    _logger = _get_logger(__name__)
+except ImportError:
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+
 from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
 
 try:
@@ -52,8 +59,8 @@ def _get_joseph_avatar_b64() -> str:
                 with open(norm, "rb") as fh:
                     _JOSEPH_AVATAR_B64 = _base64.b64encode(fh.read()).decode("utf-8")
                     return _JOSEPH_AVATAR_B64
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("_load_joseph_avatar: read failed for %s — %s", norm, exc)
     _JOSEPH_AVATAR_B64 = ""
     return _JOSEPH_AVATAR_B64
 
@@ -403,8 +410,8 @@ def _build_single_card_html(result, index=0):
                 f'<div class="qcm-metric-lbl">Wager</div>'
                 f'</div>'
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        _logger.debug("build_unified_player_card_html: wager calc failed — %s", exc)
 
     # ── Context metrics grid (Situational / Matchup / Form / Edge) ─
     context_metrics = _build_context_metrics(result)
@@ -778,8 +785,8 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
                 f'<div class="qcm-metric-lbl">Wager</div>'
                 f'</div>'
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        _logger.debug("build_horizontal_player_card_html: wager calc failed — %s", exc)
 
     # Build the full horizontal card
     return (
