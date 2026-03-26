@@ -5891,6 +5891,66 @@ UNIFIED_PLAYER_CARD_CSS = """
     letter-spacing: 0.02em;
 }
 
+/* ── Joseph M Smith response panel (toggled on click) ──── */
+.upc-joseph-response {
+    margin-top: 10px;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, rgba(255, 94, 0, 0.06), rgba(15, 23, 42, 0.9));
+    border: 1px solid rgba(255, 94, 0, 0.3);
+    border-radius: 10px;
+    animation: josephFadeIn 0.3s ease-out;
+}
+@keyframes josephFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.upc-joseph-resp-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.upc-joseph-resp-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 2px solid #ff5e00;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(255, 94, 0, 0.3);
+}
+.upc-joseph-resp-title {
+    display: flex;
+    flex-direction: column;
+}
+.upc-joseph-resp-name {
+    color: #ff9e00;
+    font-size: 0.88rem;
+    font-weight: 700;
+    font-family: 'Orbitron', monospace, sans-serif;
+    letter-spacing: 0.5px;
+}
+.upc-joseph-resp-role {
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+.upc-joseph-resp-lock {
+    color: #facc15;
+    font-size: 0.92rem;
+    font-weight: 800;
+    font-family: 'Orbitron', monospace, sans-serif;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    text-shadow: 0 0 8px rgba(250, 204, 21, 0.25);
+}
+.upc-joseph-resp-rant {
+    color: #e2e8f0;
+    font-size: 0.84rem;
+    line-height: 1.65;
+    font-family: 'Montserrat', 'Inter', sans-serif;
+}
+
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 640px) {
     .upc-card > summary {

@@ -255,25 +255,25 @@ def render_sweat_card(
 
     remaining_txt = f" · {minutes_remaining:.0f} MIN left" if minutes_remaining > 0 else ""
 
-    return f"""
-    <div class="{card_class}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <div>
-                <div style="font-size:1.1rem;font-weight:700;color:#c8d8f0;">{safe_name}</div>
-                <div class="sweat-stat-label">{safe_stat} {dir_badge}</div>
-            </div>
-            <div style="text-align:right;">
-                <div class="sweat-stat-value">{current_stat:.1f} / {target_stat:.1f}</div>
-                <div class="sweat-stat-label">{minutes_played:.0f} MIN{remaining_txt}</div>
-            </div>
-        </div>
-        {progress_html}
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-            <div class="sweat-stat-label">Projected: <strong style="color:#00f0ff;">{projected_final:.1f}</strong></div>
-            <div>{badges}</div>
-        </div>
-    </div>
-    """
+    return (
+        f'<div class="{card_class}">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+        f'<div>'
+        f'<div style="font-size:1.1rem;font-weight:700;color:#c8d8f0;">{safe_name}</div>'
+        f'<div class="sweat-stat-label">{safe_stat} {dir_badge}</div>'
+        f'</div>'
+        f'<div style="text-align:right;">'
+        f'<div class="sweat-stat-value">{current_stat:.1f} / {target_stat:.1f}</div>'
+        f'<div class="sweat-stat-label">{minutes_played:.0f} MIN{remaining_txt}</div>'
+        f'</div>'
+        f'</div>'
+        f'{progress_html}'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">'
+        f'<div class="sweat-stat-label">Projected: <strong style="color:#00f0ff;">{projected_final:.1f}</strong></div>'
+        f'<div>{badges}</div>'
+        f'</div>'
+        f'</div>'
+    )
 
 
 def render_waiting_card(player_name: str, stat_type: str,
@@ -288,19 +288,19 @@ def render_waiting_card(player_name: str, stat_type: str,
     dir_upper = str(direction).upper().strip()
     dir_label = "UNDER" if dir_upper == "UNDER" else "OVER"
 
-    return f"""
-    <div class="sweat-card sweat-card-waiting">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <div style="font-size:1.05rem;font-weight:700;color:#8a9bb8;">{safe_name}</div>
-                <div class="sweat-stat-label">{safe_stat} · {dir_label} {target_stat:.1f}</div>
-            </div>
-            <div style="text-align:right;">
-                <div class="sweat-stat-label" style="color:#64748b;">🕐 Awaiting Tip-Off</div>
-            </div>
-        </div>
-    </div>
-    """
+    return (
+        f'<div class="sweat-card sweat-card-waiting">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        f'<div>'
+        f'<div style="font-size:1.05rem;font-weight:700;color:#8a9bb8;">{safe_name}</div>'
+        f'<div class="sweat-stat-label">{safe_stat} · {dir_label} {target_stat:.1f}</div>'
+        f'</div>'
+        f'<div style="text-align:right;">'
+        f'<div class="sweat-stat-label" style="color:#64748b;">🕐 Awaiting Tip-Off</div>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
 
 
 # ============================================================
@@ -453,11 +453,11 @@ def render_panic_room_card(
             f'margin-left:6px;">({safe_state})</span>'
         )
 
-    return f"""
-    <div class="panic-room-card {glow_class}">
-        {header_html}
-        <div class="panic-room-vibe-badge">{emoji} {_html.escape(vibe_status)}{state_badge}</div>
-        <div class="panic-room-headline">{safe_headline}</div>
-        <div class="panic-room-rant">{safe_rant}</div>
-    </div>
-    """
+    return (
+        f'<div class="panic-room-card {glow_class}">'
+        f'{header_html}'
+        f'<div class="panic-room-vibe-badge">{emoji} {_html.escape(vibe_status)}{state_badge}</div>'
+        f'<div class="panic-room-headline">{safe_headline}</div>'
+        f'<div class="panic-room-rant">{safe_rant}</div>'
+        f'</div>'
+    )

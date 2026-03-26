@@ -2539,7 +2539,22 @@ if analysis_results:
             unsafe_allow_html=True,
         )
 
-        _unified_html = _compile_unified_matrix(_grouped)
+        # Pre-compute Joseph's Platinum Lock opinion for each player
+        _joseph_opinions: dict = {}
+        try:
+            from engine.joseph_brain import joseph_platinum_lock as _joseph_lock
+            for _pname, _pdata in _grouped.items():
+                _props = _pdata.get("props", [])
+                _stats = (_pdata.get("vitals") or {}).get("season_stats", {})
+                if _props:
+                    try:
+                        _joseph_opinions[_pname] = _joseph_lock(_props, _stats)
+                    except Exception:
+                        _logger.debug("joseph_platinum_lock failed for %s", _pname, exc_info=True)
+        except ImportError:
+            _logger.debug("joseph_brain not available for card opinions")
+
+        _unified_html = _compile_unified_matrix(_grouped, _joseph_opinions)
         _render_card_iframe(_unified_html, len(_grouped))
 
     # Show OUT players in a separate collapsed section

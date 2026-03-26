@@ -810,5 +810,163 @@ class TestFetchLiveBoxscoresImpl(unittest.TestCase):
         self.assertIsInstance(result, list)
 
 
+# ============================================================
+# SECTION 7: _parse_iso_minutes tests
+# ============================================================
+
+class TestParseIsoMinutes(unittest.TestCase):
+    """Tests for _parse_iso_minutes helper."""
+
+    def setUp(self):
+        from data.live_game_tracker import _parse_iso_minutes
+        self.parse = _parse_iso_minutes
+
+    def test_iso_full(self):
+        """PT25M30.00S → 25.5 minutes."""
+        self.assertAlmostEqual(self.parse("PT25M30.00S"), 25.5, places=1)
+
+    def test_iso_minutes_only(self):
+        """PT12M → 12.0."""
+        self.assertAlmostEqual(self.parse("PT12M"), 12.0, places=1)
+
+    def test_iso_seconds_only(self):
+        """PT90S → 1.5."""
+        self.assertAlmostEqual(self.parse("PT90S"), 1.5, places=1)
+
+    def test_iso_zero(self):
+        """PT00M00.00S → 0.0."""
+        self.assertAlmostEqual(self.parse("PT00M00.00S"), 0.0, places=1)
+
+    def test_plain_float_string(self):
+        self.assertAlmostEqual(self.parse("25.5"), 25.5, places=1)
+
+    def test_plain_int_string(self):
+        self.assertAlmostEqual(self.parse("30"), 30.0, places=1)
+
+    def test_numeric_int(self):
+        self.assertAlmostEqual(self.parse(25), 25.0, places=1)
+
+    def test_numeric_float(self):
+        self.assertAlmostEqual(self.parse(12.3), 12.3, places=1)
+
+    def test_none(self):
+        self.assertEqual(self.parse(None), 0.0)
+
+    def test_empty_string(self):
+        self.assertEqual(self.parse(""), 0.0)
+
+    def test_garbage(self):
+        self.assertEqual(self.parse("not a number"), 0.0)
+
+    def test_negative_clamped(self):
+        self.assertEqual(self.parse(-5), 0.0)
+
+    def test_case_insensitive(self):
+        """Lowercase 'pt25m30.00s' should still parse."""
+        self.assertAlmostEqual(self.parse("pt25m30.00s"), 25.5, places=1)
+
+
+# ============================================================
+# SECTION 8: _build_player_list tests
+# ============================================================
+
+class TestBuildPlayerList(unittest.TestCase):
+    """Tests for _build_player_list helper."""
+
+    def setUp(self):
+        from data.live_game_tracker import _build_player_list
+        self.build = _build_player_list
+
+    def test_empty_team(self):
+        self.assertEqual(self.build({}), [])
+
+    def test_no_players_key(self):
+        self.assertEqual(self.build({"teamTricode": "LAL"}), [])
+
+    def test_basic_player(self):
+        team = {
+            "players": [
+                {
+                    "firstName": "LeBron",
+                    "familyName": "James",
+                    "statistics": {
+                        "points": 28,
+                        "reboundsTotal": 7,
+                        "assists": 9,
+                        "steals": 2,
+                        "blocks": 1,
+                        "turnovers": 3,
+                        "threePointersMade": 4,
+                        "minutes": "PT32M15.00S",
+                        "foulsPersonal": 2,
+                    },
+                }
+            ],
+        }
+        result = self.build(team)
+        self.assertEqual(len(result), 1)
+        p = result[0]
+        self.assertEqual(p["name"], "LeBron James")
+        self.assertEqual(p["pts"], 28)
+        self.assertEqual(p["reb"], 7)
+        self.assertEqual(p["ast"], 9)
+        self.assertEqual(p["stl"], 2)
+        self.assertEqual(p["blk"], 1)
+        self.assertEqual(p["tov"], 3)
+        self.assertEqual(p["fg3m"], 4)
+        self.assertAlmostEqual(p["minutes"], 32.2, places=1)
+        self.assertEqual(p["fouls"], 2)
+
+    def test_name_fallback_to_name_field(self):
+        team = {
+            "players": [
+                {
+                    "name": "Stephen Curry",
+                    "statistics": {"points": 30},
+                }
+            ],
+        }
+        result = self.build(team)
+        self.assertEqual(result[0]["name"], "Stephen Curry")
+
+    def test_skips_unnamed_players(self):
+        team = {
+            "players": [
+                {"statistics": {"points": 10}},
+            ],
+        }
+        self.assertEqual(self.build(team), [])
+
+    def test_missing_stats(self):
+        """Player with empty statistics should get zero defaults."""
+        team = {
+            "players": [
+                {
+                    "firstName": "Test",
+                    "familyName": "Player",
+                    "statistics": {},
+                }
+            ],
+        }
+        result = self.build(team)
+        self.assertEqual(len(result), 1)
+        p = result[0]
+        self.assertEqual(p["pts"], 0)
+        self.assertEqual(p["reb"], 0)
+        self.assertEqual(p["minutes"], 0.0)
+
+    def test_multiple_players(self):
+        team = {
+            "players": [
+                {"firstName": "A", "familyName": "B", "statistics": {"points": 10}},
+                {"firstName": "C", "familyName": "D", "statistics": {"points": 20}},
+            ],
+        }
+        result = self.build(team)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["name"], "A B")
+        self.assertEqual(result[1]["name"], "C D")
+
+
 if __name__ == "__main__":
     unittest.main()
