@@ -1279,6 +1279,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             rest_adjustment_factor=1.0,
             stat_type=stat_type,
             platform=platform,
+            game_context=game_context if game_context.get("game_id") else None,
         )
 
         prob_over = _safe_float(sim_result.get("probability_over", 50.0))
@@ -1290,11 +1291,26 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         edge = (prob_over * 100.0 if prob_over <= 1.0 else prob_over) - _STANDARD_VIG_BREAKEVEN
 
         # --- Confidence scoring ---
+        # Build minimal directional forces from probability and edge for use
+        # when full analyze_directional_forces() has not been run (Joseph quick analysis).
         try:
+            _jab_forces = {
+                "over_count": 1 if edge >= 0 else 0,
+                "under_count": 0 if edge >= 0 else 1,
+                "over_strength": max(0.0, edge),
+                "under_strength": max(0.0, -edge),
+            }
             conf_result = calculate_confidence_score(
                 probability_over=prob_over,
                 edge_percentage=edge,
-                sample_size=_safe_float(player_data.get("games_played", 30)),
+                directional_forces=_jab_forces,
+                defense_factor=1.0,
+                stat_standard_deviation=stat_std,
+                stat_average=projected_avg,
+                simulation_results=sim_result,
+                games_played=int(_safe_float(player_data.get("games_played", 30))),
+                stat_type=stat_type,
+                platform=platform,
             )
             confidence = _safe_float(conf_result.get("confidence_score", 50.0))
             tier = conf_result.get("tier", "Bronze")
