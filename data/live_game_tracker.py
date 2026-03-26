@@ -7,6 +7,7 @@
 # ============================================================
 
 import logging
+import re
 
 try:
     from utils.logger import get_logger
@@ -30,10 +31,76 @@ except ImportError:
 # SECTION: API Firewall — Cached Live Box-Score Service
 # ============================================================
 
+_ISO_DUR_RE = re.compile(
+    r"PT(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?", re.IGNORECASE,
+)
+
+
+def _parse_iso_minutes(raw) -> float:
+    """Parse an ISO-8601 duration or numeric value to float minutes.
+
+    Handles ``"PT25M30.00S"``, ``"PT05M"`` , ``"25.5"``, ``25``, etc.
+    Returns ``0.0`` for any unparseable input.
+    """
+    if raw is None:
+        return 0.0
+    if isinstance(raw, (int, float)):
+        return max(0.0, float(raw))
+    raw_str = str(raw).strip()
+    if not raw_str:
+        return 0.0
+    # Plain numeric value (e.g. "25" or "25.5")
+    try:
+        return max(0.0, float(raw_str))
+    except (ValueError, TypeError):
+        pass
+    # ISO-8601 duration: PT{M}M{S}S
+    m = _ISO_DUR_RE.search(raw_str)
+    if m:
+        minutes = float(m.group(1)) if m.group(1) else 0.0
+        seconds = float(m.group(2)) if m.group(2) else 0.0
+        return round(minutes + seconds / 60.0, 1)
+    return 0.0
+
+
+def _build_player_list(team_data: dict) -> list[dict]:
+    """Extract normalised player stat dicts from an nba_api live team payload."""
+    players: list[dict] = []
+    for p in team_data.get("players", []):
+        stats = p.get("statistics", {})
+        # Full name: prefer firstName+familyName, then name, then nameI
+        first = str(p.get("firstName", "") or "").strip()
+        family = str(p.get("familyName", "") or "").strip()
+        full_name = f"{first} {family}".strip() if first or family else ""
+        if not full_name:
+            full_name = str(
+                p.get("name", "") or p.get("nameI", "") or ""
+            ).strip()
+        if not full_name:
+            continue
+        players.append({
+            "name":    full_name,
+            "pts":     stats.get("points", 0),
+            "reb":     stats.get("reboundsTotal", 0),
+            "ast":     stats.get("assists", 0),
+            "stl":     stats.get("steals", 0),
+            "blk":     stats.get("blocks", 0),
+            "tov":     stats.get("turnovers", 0),
+            "fg3m":    stats.get("threePointersMade", 0),
+            "minutes": _parse_iso_minutes(
+                stats.get("minutes", stats.get("minutesCalculated", ""))
+            ),
+            "fouls":   stats.get("foulsPersonal", 0),
+        })
+    return players
+
 
 def _get_live_boxscores_impl() -> list[dict]:
     """
     Retrieve live NBA box scores.
+
+    Uses the ``nba_api`` live ScoreBoard to discover in-progress games
+    and then fetches per-player box-score data for each one.
 
     Returns a list of game dicts, each containing:
         game_id, home_team, away_team, home_score, away_score,
@@ -43,6 +110,47 @@ def _get_live_boxscores_impl() -> list[dict]:
         name, pts, reb, ast, stl, blk, tov, fg3m, minutes, fouls
     """
     try:
+        from nba_api.live.nba.endpoints import scoreboard as live_scoreboard
+        from nba_api.live.nba.endpoints import boxscore as live_boxscore
+
+        board = live_scoreboard.ScoreBoard()
+        scoreboard_games = board.games.get_dict()
+
+        raw_scores: list[dict] = []
+        for sb_game in scoreboard_games:
+            game_id = sb_game.get("gameId", "")
+            game_status = sb_game.get("gameStatus", 0)
+
+            # gameStatus: 1 = not started, 2 = in progress, 3 = final
+            if game_status < 2 or not game_id:
+                continue
+
+            try:
+                bs = live_boxscore.BoxScore(game_id=game_id)
+                bs_data = bs.game.get_dict()
+            except Exception as exc:
+                _logger.debug(
+                    "BoxScore fetch failed for game %s: %s", game_id, exc,
+                )
+                continue
+
+            home_team_data = bs_data.get("homeTeam", {})
+            away_team_data = bs_data.get("awayTeam", {})
+
+            raw_scores.append({
+                "game_id":      game_id,
+                "home_team":    home_team_data.get("teamTricode", ""),
+                "away_team":    away_team_data.get("teamTricode", ""),
+                "home_score":   home_team_data.get("score", 0),
+                "away_score":   away_team_data.get("score", 0),
+                "period":       str(sb_game.get("period", "")),
+                "game_clock":   str(sb_game.get("gameClock", "")),
+                "status":       str(sb_game.get("gameStatusText", "")),
+                "home_players": _build_player_list(home_team_data),
+                "away_players": _build_player_list(away_team_data),
+            })
+    except ImportError:
+        _logger.debug("nba_api not installed — live box scores unavailable")
         raw_scores = []
     except Exception as exc:
         _logger.warning("live_game_tracker: retrieval failed: %s", exc)
