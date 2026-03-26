@@ -70,7 +70,6 @@ from agent.live_persona import get_joseph_live_reaction, stream_joseph_text
 # ── Pillar 4 Panic Room imports ──────────────────────────────
 
 from agent.payload_builder import build_live_vibe_payload, get_grudge_buffer
-from agent.response_parser import parse_vibe_response, generate_vibe_css_class, get_vibe_emoji
 from styles.live_theme import get_panic_room_css, render_panic_room_card
 
 # Inject Panic Room CSS
@@ -219,7 +218,6 @@ def _get_active_bets() -> list[dict]:
         return bets
     except Exception:
         _logger.debug("live sweat data load failed")
-        pass
 
     return []
 

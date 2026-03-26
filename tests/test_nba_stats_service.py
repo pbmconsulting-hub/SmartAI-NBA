@@ -18,7 +18,7 @@ Verifies:
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 # Add repo root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

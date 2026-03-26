@@ -239,7 +239,6 @@ st.markdown("""
 # ?session_id=XXX — we capture and verify it here.
 from utils.auth import (
     handle_checkout_redirect,
-    is_premium_user,
     get_subscription_status,
     restore_subscription_by_email,
     logout_premium,
@@ -248,7 +247,6 @@ from utils.stripe_manager import (
     is_stripe_configured,
     create_checkout_session,
     create_customer_portal_session,
-    get_publishable_key,
 )
 
 # Check for cancelled checkout (user clicked "back" on Stripe)

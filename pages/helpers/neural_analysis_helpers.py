@@ -5,7 +5,6 @@
 # ============================================================
 import streamlit as st
 import streamlit.components.v1 as _components
-import math
 import html as _html
 
 try:
@@ -15,11 +14,9 @@ except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
 
-from engine.confidence import get_tier_color
 from engine.odds_engine import american_odds_to_implied_probability as _odds_to_implied_prob
 from data.data_manager import get_player_status
 from styles.theme import (
-    get_logo_img_tag,
     get_qds_confidence_bar_html,
     get_qds_prop_card_html,
     get_player_intel_css,
@@ -31,7 +28,6 @@ from styles.theme import (
 
 try:
     from engine.player_intelligence import (
-        get_player_intelligence_summary,
         get_recent_form_vs_line,
         get_availability_context,
     )
@@ -39,7 +35,6 @@ try:
 except ImportError:
     _PLAYER_INTEL_AVAILABLE = False
 
-import os as _os
 
 _ASSETS_DIR = "assets"
 
@@ -278,7 +273,6 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
             )
     except Exception:
         _logger.debug("analysis helper section failed")
-        pass
 
     return dist_html + forces_html + breakdown_html + kelly_html
 
@@ -1231,7 +1225,6 @@ def display_prop_analysis_card_qds(result):
             )
         except Exception:
             _logger.debug("neural analysis helper failed")
-            pass
 
         # ── DFS Flex EV Metrics Strip (Phase 3) ──────────────────
         _dfs_strip = _build_dfs_metrics_html(result)
@@ -1283,7 +1276,6 @@ def display_prop_analysis_card_qds(result):
                 )
             except Exception:
                 _logger.debug("analysis enrichment failed")
-                pass
 
     # ── Confidence Score Breakdown Expander ───────────────────────
     _score_bd = result.get("score_breakdown", {})

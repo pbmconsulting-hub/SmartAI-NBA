@@ -4,7 +4,6 @@
 #          functions and old caller signatures.
 # ============================================================
 import unittest
-import warnings
 
 
 class TestDeprecatedAlias(unittest.TestCase):
@@ -44,7 +43,6 @@ class TestDeprecatedAlias(unittest.TestCase):
 
     def test_old_function_emits_deprecation_log(self):
         """run_monte_carlo_simulation should log a deprecation warning."""
-        import logging
         with self.assertLogs("engine.simulation", level="WARNING") as log_ctx:
             self.old_fn(**self._base_kwargs())
         self.assertTrue(

@@ -8,7 +8,6 @@
 import unittest
 import os
 import sys
-import html as _html
 
 # Ensure project root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -512,13 +511,15 @@ class TestNeuralAnalysisPageIntegration(unittest.TestCase):
         self.assertIn("get_glassmorphic_card_css", self.source)
 
     def test_imports_trading_card_html(self):
-        self.assertIn("get_player_trading_card_html", self.source)
+        # get_player_trading_card_html removed in Phase 5 audit (unused import)
+        self.assertIn("get_glassmorphic_card_css", self.source)
 
     def test_imports_data_grouper(self):
         self.assertIn("group_props_by_player", self.source)
 
     def test_imports_player_modal(self):
-        self.assertIn("show_player_spotlight", self.source)
+        # show_player_spotlight removed in Phase 5 audit (unused import)
+        self.assertIn("group_props_by_player", self.source)
 
     def test_injects_glassmorphic_css(self):
         self.assertIn("_get_gm_css()", self.source)

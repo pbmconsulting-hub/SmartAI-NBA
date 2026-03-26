@@ -8,7 +8,6 @@
 
 import sys
 import os
-import math
 import unittest
 
 # Ensure repo root on path

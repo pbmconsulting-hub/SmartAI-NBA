@@ -8,7 +8,6 @@ Mocks streamlit globally and provides a fresh in-memory SQLite database.
 import sys
 import os
 import types
-import sqlite3
 
 # ── Ensure repo root is on sys.path ──────────────────────────────
 _PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")

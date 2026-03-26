@@ -47,7 +47,7 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
-from utils.components import render_joseph_hero_banner, inject_joseph_floating
+from utils.components import inject_joseph_floating
 st.session_state["joseph_page_context"] = "page_game_report"
 inject_joseph_floating()
 
@@ -801,7 +801,6 @@ with _tab_report:
             render_joseph_inline_commentary(analysis_results[:10], "analysis_results")
         except Exception:
             _logger.debug("game report section failed")
-            pass
     # ════ END JOSEPH GAME REPORT COMMENT ════
 
 # ============================================================
@@ -1275,7 +1274,6 @@ def _generate_game_narrative(game, _analysis_results):
             narrative_n += f"**{fav_n}** is favored by {abs(spread_val):.1f} points over **{dog_n}**.\n\n"
     except Exception:
         _logger.debug("narrative section failed")
-        pass
 
     # Top picks from this matchup
     if game_picks_n:

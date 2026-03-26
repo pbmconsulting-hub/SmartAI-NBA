@@ -6,7 +6,6 @@
 #          the prop cards, summary dashboard, and entry builder.
 # ============================================================
 
-import math
 import sys
 import os
 import types

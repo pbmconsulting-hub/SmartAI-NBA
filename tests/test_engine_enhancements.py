@@ -12,7 +12,6 @@
 # Backward-compatibility with existing callers is verified.
 # ============================================================
 
-import math
 import unittest
 
 

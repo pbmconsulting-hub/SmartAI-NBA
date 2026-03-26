@@ -16,16 +16,13 @@
 # ============================================================
 
 import datetime
-import json
 import logging
-import os
 
 _logger = logging.getLogger(__name__)
 
 import streamlit as st
 
 from tracking.bet_tracker import (
-    auto_log_analysis_bets,
     auto_resolve_bet_results,
     resolve_all_pending_bets,
     resolve_all_analysis_picks,
@@ -37,7 +34,6 @@ from tracking.bet_tracker import (
 from tracking.database import (
     initialize_database,
     load_all_bets,
-    load_daily_snapshots,
     get_rolling_stats,
     save_daily_snapshot,
     load_all_analysis_picks,

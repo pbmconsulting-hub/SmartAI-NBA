@@ -10,7 +10,6 @@
 # ============================================================
 
 import streamlit as st
-import os
 import html as _html
 
 # ── App Logo (removed — only shown on key pages) ─────────────
@@ -26,7 +25,7 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
-from utils.components import render_joseph_hero_banner, inject_joseph_floating
+from utils.components import inject_joseph_floating
 st.session_state["joseph_page_context"] = "page_correlation"
 inject_joseph_floating()
 

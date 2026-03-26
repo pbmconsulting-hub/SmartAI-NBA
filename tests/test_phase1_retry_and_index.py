@@ -5,7 +5,6 @@
 #          2) Pre-indexed player lookup for O(1) fuzzy matching
 # ============================================================
 
-import pathlib
 import sys
 import unittest
 from unittest.mock import MagicMock

@@ -5,14 +5,12 @@
 #   3C — game_log_cache.py stale .tmp cleanup on load
 #   3D — nba_data_service.py safe_avg NaN/None filtering
 # ============================================================
-import datetime
-import math
 import os
 import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 def _ensure_streamlit_mock():
@@ -311,7 +309,6 @@ class TestGameLogCacheTmpCleanup(unittest.TestCase):
 
     def test_write_then_load_roundtrip(self):
         """Write + load should roundtrip without crash."""
-        import json
         cache = {"player_a": {"game_logs": [{"pts": 30}], "cached_at": "2025-01-01T00:00:00+00:00"}}
         self.glc._write_cache_file(cache)
         loaded = self.glc._load_cache_file()

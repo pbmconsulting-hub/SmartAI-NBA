@@ -9,7 +9,6 @@ import os
 import base64
 import html as _html
 import logging
-import random
 
 import streamlit as st
 
@@ -24,7 +23,6 @@ try:
     from engine.joseph_brain import (
         joseph_full_analysis,
         joseph_quick_take,
-        joseph_commentary,
         joseph_generate_best_bets,
         _extract_edge,
         _select_fragment,
@@ -32,7 +30,6 @@ try:
         CATCHPHRASE_POOL,
         VERDICT_EMOJIS,
         TICKET_NAMES,
-        DAWG_FACTOR_TABLE,
     )
     _BRAIN_AVAILABLE = True
 except ImportError:
@@ -42,7 +39,7 @@ except ImportError:
                     5: "HIGH FIVE", 6: "THE FULL SEND"}
 
 try:
-    from engine.joseph_tickets import build_joseph_ticket, generate_ticket_pitch
+    import engine.joseph_tickets  # noqa: F401 – availability check only
     _TICKETS_AVAILABLE = True
 except ImportError:
     _TICKETS_AVAILABLE = False

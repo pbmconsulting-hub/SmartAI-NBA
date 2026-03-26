@@ -54,7 +54,7 @@ from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
-from utils.components import render_joseph_hero_banner, inject_joseph_floating
+from utils.components import inject_joseph_floating
 st.session_state["joseph_page_context"] = "page_prop_scanner"
 inject_joseph_floating()
 
@@ -148,10 +148,8 @@ try:
     from data.sportsbook_service import (
         get_all_sportsbook_props,
         build_cross_platform_comparison,
-        recommend_best_platform,
         summarize_props_by_platform,
         find_new_players_from_props,
-        extract_active_players_from_props,
     )
     from data.data_manager import (
         save_platform_props_to_session,
@@ -288,7 +286,6 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
                 _pb.empty()
             except Exception:
                 _logger.debug("prop scan failed")
-                pass
 
     # ── Cross-Platform Comparison Table ───────────────────────────
     _platform_props = load_platform_props_from_session(st.session_state)

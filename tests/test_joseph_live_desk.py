@@ -4,7 +4,7 @@
 #          (Joseph's Live Broadcast Desk helper — Layer 6)
 # ============================================================
 import sys, os, unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 # Ensure repo root is on path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

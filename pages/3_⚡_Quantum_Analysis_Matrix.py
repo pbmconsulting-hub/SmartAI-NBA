@@ -31,7 +31,7 @@ from engine.simulation import (
     simulate_triple_double,
     generate_alt_line_probabilities,
 )
-from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
+from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, calculate_composite_win_score
 
@@ -40,8 +40,8 @@ try:
     _rotation_tracker_available = True
 except ImportError:
     _rotation_tracker_available = False
-from engine.confidence import calculate_confidence_score, get_tier_color
-from engine.math_helpers import calculate_edge_percentage, clamp_probability
+from engine.confidence import calculate_confidence_score
+from engine.math_helpers import calculate_edge_percentage
 from engine.explainer import generate_pick_explanation
 from engine.odds_engine import american_odds_to_implied_probability as _odds_to_implied_prob
 from engine.calibration import get_calibration_adjustment   # C10: historical calibration
@@ -87,10 +87,8 @@ from data.data_manager import (
     load_teams_data,
     find_player_by_name,
     load_props_from_session,
-    get_roster_health_report,
     validate_props_against_roster,
     get_player_status,
-    get_status_badge_html,
     load_injury_status,
     filter_props_to_platform_players,
 )
@@ -98,34 +96,25 @@ from data.data_manager import (
 # Import the theme helpers — including new QDS generators
 from styles.theme import (
     get_global_css,
-    get_logo_img_tag,
     get_roster_health_html,
-    get_best_bets_section_html,
     get_qds_css,
     get_qds_confidence_bar_html,
-    get_qds_metrics_grid_html,
-    get_qds_prop_card_html,
     get_qds_matchup_header_html,
     get_qds_team_card_html,
-    get_qds_strategy_table_html,
     get_qds_framework_logic_html,
     get_qds_final_verdict_html,
     get_education_box_html,
-    GLOSSARY,
 )
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
 from data.sportsbook_service import smart_filter_props as _smart_filter_props
-from utils.renderers import compile_card_matrix as _compile_card_matrix
 from utils.renderers import compile_unified_card_matrix as _compile_unified_matrix
 from utils.renderers import build_horizontal_card_html as _build_h_card
 from styles.theme import get_quantum_card_matrix_css as _get_qcm_css
 
 # ── Glassmorphic Trading-Card imports ────────────────────────────────────────
 from styles.theme import get_glassmorphic_card_css as _get_gm_css
-from styles.theme import get_player_trading_card_html as _get_trading_card_html
 from utils.data_grouper import group_props_by_player as _group_props
-from utils.player_modal import show_player_spotlight as _show_spotlight
 
 # ── Section logo paths ────────────────────────────────────────────────────────
 # Logos are stored in assets/ and loaded via st.image() for efficient serving.
@@ -219,7 +208,6 @@ if not _should_auto_refresh_injuries:
                     _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
             except Exception:
                 _logger.debug("auto-persist load failed")
-                pass
     else:
         # No record of a refresh this session — check file age
         try:
@@ -274,12 +262,8 @@ if _should_auto_refresh_injuries:
 # ============================================================
 from pages.helpers.neural_analysis_helpers import (
     find_game_context_for_player,
-    _build_result_metrics,
-    _build_bonus_factors,
     _build_entry_strategy,
-    _render_qds_full_breakdown_html,
     render_inline_breakdown_html as _render_inline_breakdown,
-    display_prop_analysis_card_qds,
 )
 # ============================================================
 # END SECTION: Helper Functions
@@ -1286,7 +1270,6 @@ if run_analysis:
                         }
                 except Exception:
                     _logger.debug("calibration logging failed")
-                    pass
 
                 should_avoid_flag, avoid_reasons = should_avoid_prop(
                     probability_over=probability_over,
@@ -1498,7 +1481,6 @@ if run_analysis:
                         full_result["clv_stat_penalty"] = _clv_stat_penalty
                 except Exception:
                     _logger.debug("matchup history lookup failed")
-                    pass
 
                 # ── Feature 9: Market movement adjustment ────────────────────
                 try:
@@ -1519,7 +1501,6 @@ if run_analysis:
                                 full_result["market_movement"] = _mv
                 except Exception:
                     _logger.debug("player intelligence lookup failed")
-                    pass
 
                 # ── Composite Win Score ───────────────────────────────────────
                 # Single 0-100 score combining all signals for quick sorting.
@@ -1636,7 +1617,6 @@ if run_analysis:
                         load_players_data.clear()  # bust Streamlit's CSV cache
                     except Exception:
                         _logger.debug("result enrichment failed")
-                        pass
                     st.success(
                         f"✅ Smart Roster Update complete — re-running analysis with "
                         f"fresh player data for {len(_unmatched_players)} player(s)."
@@ -1714,7 +1694,6 @@ if run_analysis:
             progress_bar.empty()
         except Exception:
             _logger.debug("joseph picks generation failed")
-            pass
 
 # ============================================================
 # END SECTION: Analysis Runner

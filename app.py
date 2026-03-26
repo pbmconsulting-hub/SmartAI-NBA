@@ -603,7 +603,6 @@ with left_column:
                     st.session_state["injury_status_map"] = _hoc_li()
                 except Exception:
                     _logger.debug("Injury status map load failed")
-                    pass
                 try:
                     from data.sportsbook_service import get_all_sportsbook_props as _hoc_fap
                     from data.data_manager import (

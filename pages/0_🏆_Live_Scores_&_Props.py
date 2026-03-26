@@ -7,7 +7,6 @@
 
 import streamlit as st
 import datetime
-import os
 import time
 
 from styles.theme import get_global_css, get_qds_css
@@ -175,7 +174,6 @@ def _get_quarter_scores(game_id: str) -> dict:
             return result
     except Exception:
         _logger.debug("live scores section failed")
-        pass
 
     return result
 
@@ -313,7 +311,6 @@ def _get_tonights_leaders():
                 leaders["threes"].append({"player": name, "team": team, "value": fg3m})
     except Exception:
         _logger.debug("props section failed")
-        pass
     # Sort and return top 5
     for cat in leaders:
         leaders[cat] = sorted(leaders[cat], key=lambda x: x["value"], reverse=True)[:5]
@@ -372,7 +369,6 @@ if not players_data:
             st.session_state["players_data"] = players_data
     except Exception:
         _logger.debug("score card render failed")
-        pass
 
 if players_data:
     def _top_n(data, stat_key, n=5):
@@ -463,7 +459,6 @@ else:
                 }
     except Exception:
         _logger.debug("live prop render failed")
-        pass
 
     _tracked = 0
     _tracker_html = ""

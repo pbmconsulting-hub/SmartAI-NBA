@@ -22,8 +22,6 @@ from engine.entry_optimizer import (
     SPORTSBOOK_PARLAY_TABLE,
     PLATFORM_FLEX_TABLES,
     optimize_play_type,
-    build_optimal_entries_with_play_type,
-    calculate_flex_vs_power_breakeven,
 )
 
 try:
@@ -49,11 +47,11 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css, get_neural_header_html, get_education_box_html
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
-from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
+from utils.components import render_global_settings, inject_joseph_floating
 with st.sidebar:
     render_global_settings()
 st.session_state["joseph_page_context"] = "page_entry_builder"
@@ -710,7 +708,6 @@ if build_button:
                     render_joseph_inline_commentary(_entry_results, "entry_built")
             except Exception:
                 _logger.debug("entry builder section failed")
-                pass
         # ════ END JOSEPH ENTRY REACTION ════
 
     # Feature 5: Session risk summary
@@ -864,7 +861,7 @@ _generate_clicked = st.button(
 )
 
 if _generate_clicked:
-    from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly, calculate_dfs_ev
+    from engine.odds_engine import generate_optimal_slip, calculate_fractional_kelly, calculate_dfs_ev
     from engine.math_helpers import clamp_probability
     import html as _ehtml
 

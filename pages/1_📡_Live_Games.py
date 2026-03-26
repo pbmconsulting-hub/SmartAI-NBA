@@ -7,12 +7,10 @@
 
 import streamlit as st
 import datetime
-import html as _h
-import os
 import time
 
-from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
-from data.nba_data_service import get_todays_games, get_todays_players, get_all_todays_data
+from data.data_manager import load_teams_data, find_players_by_team, load_players_data
+from data.nba_data_service import get_todays_games, get_todays_players
 
 try:
     from utils.logger import get_logger
@@ -32,7 +30,7 @@ st.set_page_config(
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
-from styles.theme import get_global_css, get_education_box_html, get_logo_img_tag, GOLD_LOGO_PATH
+from styles.theme import get_global_css, get_education_box_html
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Floating Widget ───────────────────────────
@@ -563,7 +561,6 @@ if platform_props_clicked:
                 _logger.warning(f"Live Games: non-fatal save error: {_save_err}")
             except Exception:
                 _logger.debug("game card render failed")
-                pass
 
         pp_status.text(f"⏳ 3/5 — Loading player data for {len(props_to_analyze):,} props…")
         pp_bar.progress(25)
@@ -582,7 +579,6 @@ if platform_props_clicked:
                 _logger.warning(f"Live Games: enrichment step failed (non-fatal): {_enrich_err}")
             except Exception:
                 _logger.debug("game detail section failed")
-                pass
 
         player_lookup: dict = {}
         for p in players_data_for_analysis:
@@ -898,7 +894,7 @@ if platform_props_clicked:
             )
         else:
             st.success("✅ Props retrieved and merged! Go to ⚡ Neural Analysis to run analysis on all loaded props.")
-            from styles.theme import get_bet_card_css, get_bet_card_html, get_summary_cards_html
+            from styles.theme import get_bet_card_css, get_bet_card_html
             st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 
             # Summary
@@ -999,7 +995,6 @@ if one_click_setup_clicked:
             get_standings as _oc_get_standings,
         )
         from data.data_manager import (
-            load_players_data as _oc_load_players,
             save_props_to_session as _oc_save_props,
             clear_all_caches as _oc_clear_caches,
             load_injury_status as _oc_load_inj,
@@ -1024,7 +1019,6 @@ if one_click_setup_clicked:
             st.session_state["injury_status_map"] = _oc_load_inj()
         except Exception:
             _logger.debug("one-click setup step failed")
-            pass
 
         # ── Phase 2: Load team stats & standings ─────────────────────
         _oc_status.text("⏳ Phase 2/3 — Loading team stats & standings…")
@@ -1063,7 +1057,6 @@ if one_click_setup_clicked:
                     _oc_save_csv(_oc_platform_props)
                 except Exception:
                     _logger.debug("one-click progress cleanup failed")
-                    pass
                 _oc_platform_msg = f"✅ {len(_oc_platform_props)} live props retrieved"
             else:
                 _oc_platform_msg = "⚠️ No live platform props returned (data may be unavailable)"

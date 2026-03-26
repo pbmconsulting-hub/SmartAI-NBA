@@ -394,7 +394,6 @@ def render_joseph_sidebar_widget() -> None:
         _inject_widget_css()
     except Exception:
         _logger.debug("Failed to inject widget CSS for sidebar widget")
-        pass
 
     try:
         # ── Avatar image ──────────────────────────────────────
@@ -403,7 +402,6 @@ def render_joseph_sidebar_widget() -> None:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             _logger.debug("Failed to load Joseph avatar for sidebar widget")
-            pass
 
         if avatar_b64:
             avatar_html = (
@@ -450,7 +448,6 @@ def render_joseph_sidebar_widget() -> None:
                 )
         except Exception:
             _logger.debug("Failed to build track record HTML for sidebar widget")
-            pass
 
         # ── Compose sidebar HTML ──────────────────────────────
         with st.sidebar:
@@ -494,7 +491,6 @@ def render_joseph_floating_widget() -> None:
         _inject_widget_css()
     except Exception:
         _logger.debug("Failed to inject widget CSS for floating widget")
-        pass
 
     try:
         # ── Avatar image ──────────────────────────────────────
@@ -503,7 +499,6 @@ def render_joseph_floating_widget() -> None:
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             _logger.debug("Failed to load Joseph avatar for floating widget")
-            pass
 
         if avatar_b64:
             avatar_html = (
@@ -619,7 +614,6 @@ def inject_joseph_inline_commentary(
         _inject_widget_css()
     except Exception:
         _logger.debug("Failed to inject widget CSS for inline commentary")
-        pass
 
     try:
         # ── Commentary text ───────────────────────────────────
@@ -640,7 +634,6 @@ def inject_joseph_inline_commentary(
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             _logger.debug("Failed to load Joseph avatar for inline commentary")
-            pass
 
         if avatar_b64:
             inline_avatar = (
@@ -730,7 +723,6 @@ def render_joseph_ask_popover(
         _inject_widget_css()
     except Exception:
         _logger.debug("Failed to inject widget CSS for popover widget")
-        pass
 
     try:
         # ── Avatar image ──────────────────────────────────────
@@ -739,7 +731,6 @@ def render_joseph_ask_popover(
             avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             _logger.debug("Failed to load Joseph avatar for popover widget")
-            pass
 
         if avatar_b64:
             avatar_html = (

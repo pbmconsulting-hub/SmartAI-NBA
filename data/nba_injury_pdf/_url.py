@@ -9,7 +9,6 @@ import datetime
 from data.nba_injury_pdf._constants import (
     URL_STEM,
     _LEGACY_FORMAT_CUTOFF,
-    _NEW_FORMAT_START,
 )
 
 

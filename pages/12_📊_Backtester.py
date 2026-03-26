@@ -73,7 +73,6 @@ try:
     from data.game_log_cache import (
         get_all_cached_players,
         load_game_logs_from_cache,
-        save_game_logs_to_cache,
     )
     _CACHE_AVAILABLE = True
 except ImportError:

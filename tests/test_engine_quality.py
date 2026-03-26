@@ -4,7 +4,6 @@
 #          Covers simulation, confidence, edge detection,
 #          sensitivity analysis, and magic number constants.
 # ============================================================
-import math
 import unittest
 
 

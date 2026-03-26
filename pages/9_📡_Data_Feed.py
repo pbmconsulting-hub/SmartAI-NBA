@@ -208,7 +208,6 @@ try:
         st.warning(f"⏰ {_stale_warning}")
 except Exception:
     _logger.debug("data feed section failed")
-    pass
 
 st.divider()
 
@@ -474,7 +473,6 @@ if current_action:
                 status_text.empty()
             except Exception:
                 _logger.debug("update action cleanup failed")
-                pass
 
     # --------------------------------------------------------
     # Action: Smart Update (today's teams only)
@@ -541,7 +539,6 @@ if current_action:
                     status_text.empty()
                 except Exception:
                     _logger.debug("smart filter cleanup failed")
-                    pass
 
     # --------------------------------------------------------
     # Action: Get Tonight's Games
@@ -665,7 +662,6 @@ if current_action:
                 status_text.empty()
             except Exception:
                 _logger.debug("player data cleanup failed")
-                pass
 
     # --------------------------------------------------------
     # Action: Update Team Stats
@@ -727,7 +723,6 @@ if current_action:
                 status_text.empty()
             except Exception:
                 _logger.debug("team data cleanup failed")
-                pass
 
     # --------------------------------------------------------
     # Action: Update Everything
@@ -813,7 +808,6 @@ if current_action:
                 status_text.empty()
             except Exception:
                 _logger.debug("full refresh cleanup failed")
-                pass
 
     # --------------------------------------------------------
     # Action: Refresh Injury Report (API-NBA + NBA CDN fallback)
@@ -1026,7 +1020,6 @@ try:
         get_all_sportsbook_props,
         summarize_props_by_platform,
         find_new_players_from_props,
-        build_cross_platform_comparison,
     )
     from data.data_manager import (
         save_platform_props_to_session,
@@ -1189,7 +1182,6 @@ if _SPORTSBOOK_SERVICE_AVAILABLE:
                 _progress_bar.empty()
             except Exception:
                 _logger.debug("data feed tab failed")
-                pass
 
     # ── Show cached props preview ──────────────────────────────
     _display_props = load_platform_props_from_session(st.session_state)

@@ -4,7 +4,6 @@
 #          timezone anchoring, and safe datetime arithmetic.
 # ============================================================
 import datetime
-import math
 import os
 import tempfile
 import unittest

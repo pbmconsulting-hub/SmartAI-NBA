@@ -1022,7 +1022,6 @@ def save_daily_snapshot(date_str=None):
                 conn.close()
         except Exception:
             _logger.debug("Failed to close database connection in save_daily_snapshot")
-            pass
 
     try:
         total = len(bets)
@@ -1191,7 +1190,6 @@ def load_daily_snapshots(days=14):
                 conn.close()
         except Exception:
             _logger.debug("Failed to close database connection in load_daily_snapshots")
-            pass
 
 
 def purge_old_snapshots(days=30):
@@ -1223,7 +1221,6 @@ def purge_old_snapshots(days=30):
                 conn.close()
         except Exception:
             _logger.debug("Failed to close database connection in purge_old_snapshots")
-            pass
 
 
 def get_rolling_stats(days=14):

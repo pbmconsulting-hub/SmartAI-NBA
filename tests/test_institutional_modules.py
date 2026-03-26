@@ -7,7 +7,6 @@
 #          - pearson_sim_correlation (Correlation Matrix)
 # ============================================================
 
-import math
 import unittest
 
 

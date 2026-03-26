@@ -56,7 +56,6 @@ def _get_joseph_avatar_b64() -> str:
                     return _JOSEPH_AVATAR_B64
             except Exception:
                 _logger.debug("Failed to read Joseph avatar file")
-                pass
     _JOSEPH_AVATAR_B64 = ""
     return _JOSEPH_AVATAR_B64
 
@@ -408,7 +407,6 @@ def _build_single_card_html(result, index=0):
             )
     except Exception:
         _logger.debug("Failed to build wager HTML for vertical card")
-        pass
 
     # ── Context metrics grid (Situational / Matchup / Form / Edge) ─
     context_metrics = _build_context_metrics(result)
@@ -784,7 +782,6 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
             )
     except Exception:
         _logger.debug("Failed to build wager HTML for horizontal card")
-        pass
 
     # Build the full horizontal card
     return (

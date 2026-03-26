@@ -8,7 +8,6 @@
 # ============================================================
 
 import streamlit as st
-import os
 import html as _html
 import logging
 import random
@@ -72,13 +71,10 @@ except ImportError:
 # ── Engine imports (all safe) ────────────────────────────────
 try:
     from engine.joseph_brain import (
-        joseph_full_analysis,
         joseph_analyze_game,
         joseph_analyze_player,
         joseph_generate_best_bets,
-        joseph_quick_take,
         joseph_commentary,
-        _extract_edge,
         _select_fragment,
         CLOSER_POOL,
         CATCHPHRASE_POOL,
@@ -94,8 +90,6 @@ except ImportError:
 
 try:
     from engine.joseph_tickets import (
-        build_joseph_ticket,
-        generate_ticket_pitch,
         get_alternative_tickets,
     )
     _TICKETS_AVAILABLE = True
@@ -648,7 +642,6 @@ elif mode == "👤 SCOUT A PLAYER":
                     player_options.append((label, pd))
         except Exception:
             _logger.debug("studio section failed")
-            pass
 
     if not player_options:
         st.info("No players available. Run **⚡ Neural Analysis** or check data.")
@@ -1236,7 +1229,6 @@ if _BETS_AVAILABLE:
             )
     except Exception:
         _logger.debug("top picks rendering failed")
-        pass
 else:
     st.info("Bet tracking module not available.")
 
@@ -1314,7 +1306,6 @@ if _BRAIN_AVAILABLE:
         catchphrase_text = cp.get("text", "")
     except Exception:
         _logger.debug("picks tab rendering failed")
-        pass
 
 signoff = _html.escape(closer_text)
 if catchphrase_text:
