@@ -47,7 +47,7 @@ if _FASTAPI_AVAILABLE:
             details["nba_api"] = "not_installed"
             degraded = True
 
-        ts = datetime.datetime.utcnow().isoformat()
+        ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
         if degraded:
             return {"status": "degraded", "timestamp": ts, "details": details}

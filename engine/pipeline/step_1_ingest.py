@@ -42,7 +42,7 @@ def run(context: dict) -> dict:
         import pandas as pd
         for key, rows in raw_data.items():
             if rows:
-                ts = datetime.datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+                ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S")
                 path = os.path.join(_RAW_DIR, f"{key}_{date_str}_{ts}.parquet")
                 df = pd.DataFrame(rows) if isinstance(rows, list) else rows
                 save_parquet(df, path)

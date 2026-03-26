@@ -36,3 +36,7 @@ else:
         """No-op fallback when starlette is not installed."""
         def __init__(self, app=None):
             self.app = app
+            _logger.warning(
+                "TimingMiddleware loaded without starlette — "
+                "request timing is disabled. Install starlette/fastapi to enable."
+            )

@@ -14,6 +14,7 @@ _NBA_CITY_COORDS = {
     "Detroit": (42.3410, -83.0553), "Golden State": (37.7680, -122.3877),
     "Houston": (29.7508, -95.3621), "Indiana": (39.7639, -86.1555),
     "LA Clippers": (34.0430, -118.2673), "LA Lakers": (34.0430, -118.2673),
+    "Los Angeles": (34.0430, -118.2673),
     "Memphis": (35.1382, -90.0505), "Miami": (25.7814, -80.1870),
     "Milwaukee": (43.0450, -87.9170), "Minnesota": (44.9795, -93.2762),
     "New Orleans": (29.9490, -90.0812), "New York": (40.7505, -73.9934),
@@ -169,16 +170,16 @@ def calculate_days_rest_factor(rest_days: int) -> float:
     """Return a performance multiplier based on rest days.
 
     Args:
-        rest_days: Days since last game (1 = back-to-back, played yesterday).
+        rest_days: Days of rest (0 = back-to-back/no rest, 1 = 1 day rest, etc.).
 
     Returns:
-        Multiplier: 0.97 for B2B (1 rest day), 1.00 for 2 rest days, 1.02 for 3, 1.03 for 4+.
+        Multiplier: 0.97 for 0 rest days, 1.00 for 1, 1.02 for 2, 1.03 for 3+.
     """
-    if rest_days <= 1:
+    if rest_days == 0:
         return 0.97
-    if rest_days == 2:
+    if rest_days == 1:
         return 1.00
-    if rest_days == 3:
+    if rest_days == 2:
         return 1.02
     return 1.03
 
@@ -261,7 +262,7 @@ def build_feature_matrix(
     features["rest_days"] = rest_days
     features["rest_factor"] = calculate_days_rest_factor(rest_days)
     features["is_home"] = 1 if game_context.get("is_home") else 0
-    features["is_back_to_back"] = 1 if rest_days == 1 else 0
+    features["is_back_to_back"] = 1 if rest_days == 0 else 0
 
     team_pace = float(game_context.get("team_pace", 100.0))
     opp_pace = float(game_context.get("opponent_pace", 100.0))
