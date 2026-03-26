@@ -814,8 +814,10 @@ if platform_props_clicked:
                 analyzed_props.append({
                     "player_name": player_name,
                     "team": player_data.get("team", ""),
+                    "player_team": player_data.get("team", ""),
                     "stat_type": stat_type,
                     "prop_line": prop_line,
+                    "line": prop_line,
                     "projected_value": round(projected_value, 1),
                     "edge_percentage": round(raw_edge, 1),
                     "confidence_score": confidence_score,
@@ -846,6 +848,12 @@ if platform_props_clicked:
                 _capped_props.append(_ap)
                 _player_prop_counts[_pname] = _count + 1
         analyzed_props = _capped_props
+
+        # ── Save analyzed props to session state for downstream pages ─
+        # Game Report (page 4), Entry Builder (page 6), and The Studio
+        # (page 7) read from "analysis_results" in session state.
+        if analyzed_props:
+            st.session_state["analysis_results"] = analyzed_props
 
         pp_status.text(f"⏳ 5/5 — Analysis complete: {len(analyzed_props)} qualifying pick(s). Auto-logging top picks…")
         pp_bar.progress(75)
