@@ -178,7 +178,7 @@ def parse_vibe_response(raw_text: str, game_state: str = "") -> dict:
         parsed = json.loads(cleaned)
         return validate_vibe_response(parsed)
     except (json.JSONDecodeError, ValueError):
-        pass
+        _logger.debug("JSON parsing failed for cleaned code-block text")
 
     # ── Attempt 2: Find JSON object in the text ───────────────
     json_match = re.search(r'\{[^{}]*"vibe_status"[^{}]*\}', raw_text, re.DOTALL)
@@ -187,7 +187,7 @@ def parse_vibe_response(raw_text: str, game_state: str = "") -> dict:
             parsed = json.loads(json_match.group(0))
             return validate_vibe_response(parsed)
         except (json.JSONDecodeError, ValueError):
-            pass
+            _logger.debug("JSON parsing failed for regex-matched vibe object")
 
     # ── Attempt 3: Use the raw text as the rant ───────────────
     _logger.warning("Could not parse structured vibe response — using raw text as rant")

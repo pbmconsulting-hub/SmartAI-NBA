@@ -6,6 +6,8 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
+_logger = logging.getLogger(__name__)
+
 # Ensure logs directory exists
 _LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 os.makedirs(_LOG_DIR, exist_ok=True)
@@ -59,7 +61,7 @@ def _configure_root_logger():
             root.addHandler(file_handler)
         except (OSError, PermissionError):
             # Silently skip file logging if we can't write (e.g. read-only deployment)
-            pass
+            _logger.debug("file logging unavailable due to OS/permission error")
 
     _configured = True
 

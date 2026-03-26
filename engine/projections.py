@@ -15,6 +15,8 @@ import logging
 
 from engine.math_helpers import _safe_float
 
+_logger = logging.getLogger(__name__)
+
 try:
     from engine.rotation_tracker import get_minutes_adjustment
     _ROTATION_TRACKER_AVAILABLE = True
@@ -444,7 +446,7 @@ def build_player_projection(
                     try:
                         vals.append(float(v))
                     except (TypeError, ValueError):
-                        pass
+                        _logger.debug("non-numeric game log value skipped during projection extraction")
             return vals
 
         def _recent_avg(games, log_key, fallback):

@@ -895,7 +895,7 @@ def get_todays_active_players(players_list, todays_games):
                 return entry.get("status", "Active") not in _EXCL
             return [p for p in on_tonight if _is_available(p)]
     except Exception:
-        pass  # If injury data is unavailable, return team-filtered list
+        _logger.debug("injury data unavailable, returning team-filtered list")
 
     return on_tonight
 

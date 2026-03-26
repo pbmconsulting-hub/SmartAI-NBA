@@ -14,10 +14,13 @@
 # their individual probabilities. Negative correlation means one player's
 # success hurts the other's chances (usage competition).
 
+import logging
 import math
 import statistics
 
 from engine.math_helpers import _safe_float
+
+_logger = logging.getLogger(__name__)
 
 
 # Maximum correlation adjustment magnitude (conservative cap)
@@ -164,7 +167,7 @@ def calculate_player_correlation(player1_logs, player2_logs, stat_type):
                     val = float(g.get(key, 0) or 0)
                     result[date] = val
                 except (ValueError, TypeError):
-                    pass
+                    _logger.debug("non-numeric value skipped during correlation stat extraction")
         return result
 
     p1_map = _get_date_stat_map(player1_logs, api_key)
@@ -798,7 +801,7 @@ def correlation_adjusted_kelly(picks, bankroll, correlation_matrix):
                 c = abs(float(correlation_matrix[i][j]))
                 max_abs_corr = max(max_abs_corr, c)
             except (IndexError, TypeError, ValueError):
-                pass
+                _logger.debug("invalid correlation matrix entry skipped during Kelly adjustment")
 
     correlation_discount = max(0.1, 1.0 - max_abs_corr * 0.5)
     adjusted_kelly = avg_kelly * correlation_discount

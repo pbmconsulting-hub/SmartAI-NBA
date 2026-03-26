@@ -11,6 +11,9 @@
 
 import streamlit as st
 import html as _html
+import logging
+
+_logger = logging.getLogger(__name__)
 
 # ── App Logo (removed — only shown on key pages) ─────────────
 
@@ -35,7 +38,7 @@ try:
     if not premium_gate("Correlation Matrix"):
         st.stop()
 except ImportError:
-    pass
+    _logger.debug("premium gate module not available")
 
 # ── Import correlation engine ─────────────────────────────────
 from engine.correlation import (

@@ -237,7 +237,7 @@ def get_team_stats_backup(season: str | None = None) -> list[dict]:
                 if tid is not None:
                     adv_lookup[tid] = row
         except (KeyError, IndexError, TypeError):
-            pass
+            _logger.debug("failed to build advanced stats lookup from result sets")
 
     teams: list[dict] = []
     for row in basic_rows:

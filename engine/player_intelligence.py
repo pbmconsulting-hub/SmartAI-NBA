@@ -649,7 +649,7 @@ def _sum_combo_avg(stat_type: str, player_data: dict) -> float:
         try:
             total += float(player_data.get(f"{comp}_avg", 0) or 0)
         except (TypeError, ValueError):
-            pass
+            logger.debug("non-numeric combo stat component skipped during summation")
     return round(total, 2)
 
 

@@ -43,7 +43,7 @@ try:
     st.session_state["joseph_page_context"] = "page_live_sweat"
     inject_joseph_floating()
 except ImportError:
-    pass
+    _logger.debug("optional Joseph M. Smith components not available")
 
 # ── Auto-Refresh (silent 120 s reload) ───────────────────────
 

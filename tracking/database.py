@@ -345,7 +345,7 @@ def initialize_database():
                     "ALTER TABLE bets ADD COLUMN auto_logged INTEGER DEFAULT 0"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column auto_logged already exists or schema up to date")
 
             # Ensure actual_value column exists (older schema may not have it)
             try:
@@ -353,7 +353,7 @@ def initialize_database():
                     "ALTER TABLE bets ADD COLUMN actual_value REAL"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column actual_value already exists or schema up to date")
 
             # ── Subscriptions table migration ─────────────────────────
             # If the subscriptions table was created without updated_at
@@ -363,7 +363,7 @@ def initialize_database():
                     "ALTER TABLE subscriptions ADD COLUMN updated_at TEXT DEFAULT (datetime('now'))"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column updated_at already exists or schema up to date")
 
             # ── Goblin/Demon bet_type column migrations ───────────────
             # Add bet_type and std_devs_from_line to bets table
@@ -372,14 +372,14 @@ def initialize_database():
                     "ALTER TABLE bets ADD COLUMN bet_type TEXT DEFAULT 'normal'"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column bet_type already exists or schema up to date")
 
             try:
                 cursor.execute(
                     "ALTER TABLE bets ADD COLUMN std_devs_from_line REAL DEFAULT 0.0"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column std_devs_from_line already exists or schema up to date")
 
             # Add bet_type to all_analysis_picks table
             try:
@@ -387,14 +387,14 @@ def initialize_database():
                     "ALTER TABLE all_analysis_picks ADD COLUMN bet_type TEXT DEFAULT 'normal'"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column bet_type on all_analysis_picks already exists or schema up to date")
 
             try:
                 cursor.execute(
                     "ALTER TABLE all_analysis_picks ADD COLUMN std_devs_from_line REAL DEFAULT 0.0"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column std_devs_from_line on all_analysis_picks already exists or schema up to date")
 
             # ── Line category column migration ────────────────────────
             # Add line_category and standard_line columns for the three-tier
@@ -404,14 +404,14 @@ def initialize_database():
                     "ALTER TABLE bets ADD COLUMN line_category TEXT DEFAULT '50_50'"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column line_category already exists or schema up to date")
 
             try:
                 cursor.execute(
                     "ALTER TABLE bets ADD COLUMN standard_line REAL"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already exists — safe to ignore
+                _logger.debug("DB migration: column standard_line already exists or schema up to date")
 
             # Remap old "demon" bet_type records (conflicting-forces picks under
             # the old system) to "50_50" — they were standard-line uncertain picks,
@@ -421,7 +421,7 @@ def initialize_database():
                     "UPDATE bets SET bet_type = '50_50' WHERE bet_type = 'demon'"
                 )
             except sqlite3.OperationalError:
-                pass
+                _logger.debug("DB migration: demon-to-50_50 remap already applied or column missing")
 
             # ── Rename retrieved_at column in player_game_logs ──
             # Older databases have the column named with old terminology; new schema
@@ -432,7 +432,7 @@ def initialize_database():
                     "ALTER TABLE player_game_logs RENAME COLUMN fetched_at TO retrieved_at"
                 )
             except sqlite3.OperationalError:
-                pass  # Column already renamed or doesn't exist
+                _logger.debug("DB migration: column already renamed or fetched_at does not exist")
 
             # ── Performance indexes ─────────────────────────────────
             # These accelerate the most frequent query patterns used

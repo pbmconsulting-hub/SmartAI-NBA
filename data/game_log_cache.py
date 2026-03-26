@@ -130,7 +130,7 @@ def _load_cache_file():
         try:
             os.remove(_tmp)
         except OSError:
-            pass
+            _logger.debug("failed to remove stale cache temp file")
     if not os.path.exists(_CACHE_FILE):
         return {}
     try:
@@ -151,4 +151,4 @@ def _write_cache_file(cache):
         try:
             os.remove(tmp_path)
         except OSError:
-            pass
+            _logger.debug("failed to clean up temp file after cache write failure")

@@ -470,7 +470,7 @@ if selected_picks:
                         unsafe_allow_html=True,
                     )
                 except (ImportError, Exception):
-                    pass
+                    _logger.debug("flex table rendering failed, skipping display")
             
             # Correlation check
             corr_risk = calculate_correlation_risk(picks_to_include)

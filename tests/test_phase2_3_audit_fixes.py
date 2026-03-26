@@ -4,9 +4,12 @@
 #          timezone anchoring, and safe datetime arithmetic.
 # ============================================================
 import datetime
+import logging
 import os
 import tempfile
 import unittest
+
+_logger = logging.getLogger(__name__)
 
 
 class TestCacheMutationGuard(unittest.TestCase):
@@ -96,7 +99,7 @@ class TestTimezoneAnchoring(unittest.TestCase):
                 cache.pop(_test_player.strip().lower(), None)
                 _write_cache_file(cache)
             except Exception:
-                pass  # Best-effort cleanup
+                _logger.debug("best-effort test cache cleanup failed")
 
     def test_platform_fetcher_now_str_utc(self):
         """platform_fetcher._now_str() should return a UTC timestamp."""

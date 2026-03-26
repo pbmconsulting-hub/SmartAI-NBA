@@ -364,7 +364,7 @@ def _invalidate_data_caches():
         load_injury_status.clear()
         _logger.debug("Streamlit data caches cleared after CSV update.")
     except Exception:
-        pass  # Cache clearing is best-effort — never block a data fetch
+        _logger.debug("Streamlit cache clearing failed, continuing best-effort")
 
 
 def load_last_updated():
@@ -2046,7 +2046,7 @@ def fetch_defensive_ratings(force=False, progress_callback=None):
                     "defensive_path": str(DEFENSIVE_RATINGS_CSV_PATH),
                 }
         except Exception:
-            pass  # If timestamp parse fails, refresh anyway
+            _logger.debug("timestamp parse failed for staleness check, will refresh anyway")
 
     _logger.info("[DefensiveRatings] Data stale or force-refresh. Running fetch_team_stats()...")
     ok = fetch_team_stats(progress_callback=progress_callback)

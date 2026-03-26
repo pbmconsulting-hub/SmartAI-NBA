@@ -1058,7 +1058,7 @@ def fetch_draftkings_props(api_key=None):
             import streamlit as st
             api_key = st.session_state.get("odds_api_key", "").strip() or None
         except Exception:
-            pass  # streamlit may not be available in some contexts
+            _logger.debug("streamlit not available for session state API key lookup")
 
     # Try environment variable as final fallback
     if not api_key:
@@ -1598,7 +1598,7 @@ async def _async_fetch_draftkings(session, semaphore, api_key=None):
             import streamlit as st
             api_key = st.session_state.get("odds_api_key", "").strip() or None
         except Exception:
-            pass
+            _logger.debug("streamlit not available for DraftKings API key lookup")
     if not api_key:
         api_key = os.environ.get("ODDS_API_KEY", "").strip() or None
     if not api_key:
@@ -1954,7 +1954,7 @@ def enrich_props_with_csv_names(props, players_data):
                 if not prop.get("team"):
                     prop["team"] = player.get("team", "")
         except Exception:
-            pass  # Keep original name if matching fails
+            _logger.debug("fuzzy player name matching failed, keeping original name")
 
         enriched.append(prop)
 
@@ -2697,7 +2697,7 @@ def parse_alt_lines_from_platform_props(props):
                 if val > 0:
                     valid_lines.append(val)
             except (ValueError, TypeError):
-                pass
+                _logger.debug("non-numeric prop line skipped during standard line calculation")
         if valid_lines:
             _standard_lines[key] = _statistics.median(valid_lines)
         else:

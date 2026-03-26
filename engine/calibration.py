@@ -147,7 +147,7 @@ def _load_historical_predictions(days=90, stat_type=None):
                         if record_date_parsed >= cutoff:
                             weighted_records.append(r)   # 2x weight for recent records
                 except (ValueError, TypeError, AttributeError):
-                    pass
+                    _logger.debug("date parsing failed for historical prediction record")
 
         return weighted_records
     except Exception:

@@ -166,7 +166,7 @@ def get_player_id(player_name: str) -> int | None:
                         None,
                     )
         except Exception:
-            pass
+            _logger.debug("dynamic player ID lookup failed")
 
     # 3. nba_api local static list (no network call, covers all-time players)
     if not pid:
@@ -183,7 +183,7 @@ def get_player_id(player_name: str) -> int | None:
                         None,
                     )
         except Exception:
-            pass
+            _logger.debug("static NBA player ID lookup failed")
 
     # Cache result (even None) to avoid repeated lookups
     _PLAYER_ID_CACHE[key] = pid
@@ -418,7 +418,7 @@ def enrich_player_data(
         try:
             _PLAYER_ID_CACHE[key] = int(csv_pid)
         except (ValueError, TypeError):
-            pass
+            _logger.debug("player_id conversion to int failed, skipping cache")
 
     return {
         "player_name": safe_name,

@@ -34,7 +34,7 @@ def _season_avg_up_to_date(game_logs, stat_key, cutoff_date_str):
                 v = float(g.get(stat_key, 0) or 0)
                 values.append(v)
             except (ValueError, TypeError):
-                pass
+                _logger.debug("non-numeric value skipped during game log float conversion")
     if not values:
         return None
     return sum(values) / len(values)
@@ -50,7 +50,7 @@ def _season_std_up_to_date(game_logs, stat_key, cutoff_date_str):
                 v = float(g.get(stat_key, 0) or 0)
                 values.append(v)
             except (ValueError, TypeError):
-                pass
+                _logger.debug("non-numeric value skipped during season std calculation")
     if len(values) < 2:
         return None
     mean = sum(values) / len(values)
@@ -205,7 +205,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                     try:
                         prior_log_values.append(float(g.get(stat_key, 0) or 0))
                     except (ValueError, TypeError):
-                        pass
+                        _logger.debug("non-numeric value skipped during KDE prior log extraction")
 
                 try:
                     sim_result = run_quantum_matrix_simulation(

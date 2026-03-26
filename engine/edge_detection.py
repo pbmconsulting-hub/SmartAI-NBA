@@ -9,7 +9,11 @@
 # ============================================================
 
 # Standard library only
+import logging
+
 from engine.math_helpers import _safe_float
+
+_logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -528,7 +532,7 @@ def calculate_dynamic_vig(over_odds=None, under_odds=None, platform=None):
             # Vig = excess implied probability above 1.0, expressed as a percentage
             return round(max(0.0, (total_implied - 1.0) * 100.0), 3)
         except (ValueError, TypeError):
-            pass
+            _logger.debug("vig calculation failed for odds, using default fallback")
 
     # Fallback: standard -110/-110 vig = 2.38%
     return 2.38

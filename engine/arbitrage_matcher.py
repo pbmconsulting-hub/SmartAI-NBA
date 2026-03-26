@@ -193,7 +193,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
                             best_over_odds = over_int
                             best_over_book = platform
                 except (TypeError, ValueError):
-                    pass
+                    _logger.debug("non-numeric over odds skipped for best-odds search")
 
             # Best Under = highest implied probability = most aggressive pricing.
             if under is not None:
@@ -209,7 +209,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
                             best_under_odds = under_int
                             best_under_book = platform
                 except (TypeError, ValueError):
-                    pass
+                    _logger.debug("non-numeric under odds skipped for best-odds search")
 
         if best_over_odds is None and best_under_odds is None:
             continue
@@ -255,7 +255,7 @@ def find_ev_discrepancies(sportsbook_props: list) -> list:
                     consensus_fair_under_sum += fair_u_pct
                     devig_count += 1
                 except (TypeError, ValueError):
-                    pass
+                    _logger.debug("devig calculation failed for book, skipping")
 
         # Consensus fair probability: average devigged prob across all books.
         # This is the market's best estimate of the true probability.

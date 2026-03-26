@@ -16,7 +16,10 @@
 # ============================================================
 
 # Standard library only — no numpy/scipy/pandas
+import logging
 import math
+
+_logger = logging.getLogger(__name__)
 
 from engine.math_helpers import _safe_float
 
@@ -145,7 +148,7 @@ def _model_b_recent_form(player_data, game_context, game_logs):
             try:
                 recent_values.append(float(v))
             except (TypeError, ValueError):
-                pass
+                _logger.debug("non-numeric value skipped in recent-form game extraction")
 
     if len(recent_values) < MIN_GAMES_FOR_RECENT_MODEL:
         # Fall back to season average approach if not enough recent games
@@ -242,7 +245,7 @@ def _model_c_matchup_history(player_data, game_context, game_logs):
                     try:
                         matchup_values.append(float(v))
                     except (TypeError, ValueError):
-                        pass
+                        _logger.debug("non-numeric value skipped in matchup history extraction")
 
     if len(matchup_values) < MIN_GAMES_FOR_MATCHUP_MODEL:
         # Not enough matchup history — fall back to season average

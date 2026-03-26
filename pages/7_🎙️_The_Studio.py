@@ -12,6 +12,8 @@ import html as _html
 import logging
 import random
 
+_logger = logging.getLogger(__name__)
+
 # ── Styles ───────────────────────────────────────────────────
 try:
     from styles.theme import (
@@ -51,7 +53,7 @@ try:
     inject_joseph_floating()
     render_joseph_hero_banner()
 except ImportError:
-    pass
+    _logger.debug("optional global settings/Joseph components not available")
 
 # ── Premium gate ─────────────────────────────────────────────
 try:
@@ -59,7 +61,7 @@ try:
     if not premium_gate("The Studio"):
         st.stop()
 except ImportError:
-    pass
+    _logger.debug("premium gate module not available")
 
 # ── Logger ───────────────────────────────────────────────────
 try:

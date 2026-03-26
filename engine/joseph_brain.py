@@ -1823,7 +1823,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                     if "market_low_total" not in narrative_tags:
                         narrative_tags.append("market_low_total")
             except (TypeError, ValueError):
-                pass
+                logger.debug("consensus total parsing failed for market adjustment")
 
         joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening + market_adj
         joseph_prob = max(1.0, min(99.0, joseph_prob))

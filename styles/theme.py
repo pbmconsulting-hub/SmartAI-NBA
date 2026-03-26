@@ -4631,7 +4631,7 @@ def get_bet_card_html(bet, show_live_status=False):
                     f'</div>'
                 )
         except (TypeError, ValueError):
-            pass
+            _logger_theme.debug("actual value conversion failed in bet card rendering")
 
     # Live status
     live_html = ""

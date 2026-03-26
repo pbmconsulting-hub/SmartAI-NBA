@@ -5,7 +5,10 @@
 
 import datetime
 import json
+import logging
 import os
+
+_logger = logging.getLogger(__name__)
 
 
 REQUIRED_PLAYER_COLUMNS = {"name", "team", "points_avg", "rebounds_avg", "assists_avg"}
@@ -92,7 +95,7 @@ def validate_teams_csv(teams_data):
                     f"teams.csv: {row.get('abbreviation')} has suspicious drtg={drtg}"
                 )
         except (ValueError, TypeError):
-            pass
+            _logger.debug("non-numeric drtg value skipped during team validation")
 
     return errors
 
@@ -167,7 +170,7 @@ def check_data_freshness(last_updated_json_path):
                 if most_recent is None or ts > most_recent:
                     most_recent = ts
             except (ValueError, TypeError):
-                pass
+                _logger.debug("timestamp parsing failed during staleness check")
 
         if most_recent is None:
             result["is_stale"] = True

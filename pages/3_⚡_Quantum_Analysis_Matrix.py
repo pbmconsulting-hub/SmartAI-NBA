@@ -732,7 +732,7 @@ if run_analysis:
                         if _ptl > 0:
                             prop_target_line = _ptl
                     except (ValueError, TypeError):
-                        pass
+                        _logger.debug("non-numeric prop_target_line skipped during conversion")
 
                 # ── Injury gate ───────────────────────────────────────────
                 injury_map        = st.session_state.get("injury_status_map", {})
@@ -996,7 +996,7 @@ if run_analysis:
                         try:
                             recent_game_log_values.append(float(_v))
                         except (TypeError, ValueError):
-                            pass
+                            _logger.debug("non-numeric game log value skipped during recent form extraction")
 
                 # ── Simulation dispatch: use specialist functions for combo/fantasy/yesno ──
                 # Combo stats (PRA, Pts+Rebs, etc.) use correlated Cholesky simulation (C7).
