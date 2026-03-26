@@ -180,12 +180,9 @@ def _nba_today_et():
     NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
     (EDT = UTC-4). Install ``tzdata`` for correct DST handling.
     """
-    try:
-        from zoneinfo import ZoneInfo
-        _eastern = ZoneInfo("America/New_York")
-    except ImportError:
-        _eastern = datetime.timezone(datetime.timedelta(hours=-5))
-    return datetime.datetime.now(_eastern).date()
+    # Canonical implementation in utils/time_helpers.py
+    from utils.time_helpers import nba_today_et
+    return nba_today_et()
 
 
 # ============================================================

@@ -90,30 +90,9 @@ _BACKOFF_INCREMENT = 0.8   # additional seconds per retry (1.2s, 2.0s, 2.8s)
 # ============================================================
 
 
-def _get_eastern_tz():
-    """Return a US/Eastern timezone object for NBA game-date anchoring.
-
-    NBA defines game dates in Eastern Time. This function prefers
-    ``zoneinfo.ZoneInfo`` (DST-aware) and falls back to a fixed UTC-5
-    offset when zoneinfo is unavailable.
-
-    NOTE: The fixed UTC-5 fallback does NOT account for daylight saving
-    time (EDT = UTC-4, roughly March–November). During EDT, dates
-    derived from this fallback may be one hour off near the midnight
-    boundary. If your server runs in UTC and processes games near
-    midnight ET, install ``tzdata`` (``pip install tzdata``) to ensure
-    ``zoneinfo`` is available.
-    """
-    try:
-        from zoneinfo import ZoneInfo
-        return ZoneInfo("America/New_York")
-    except ImportError:
-        return datetime.timezone(datetime.timedelta(hours=-5))
-
-
-def _nba_today_et():
-    """Return today's date anchored to US/Eastern time."""
-    return datetime.datetime.now(_get_eastern_tz()).date()
+# Timezone helpers — canonical implementation in utils/time_helpers.py
+from utils.time_helpers import get_eastern_tz as _get_eastern_tz  # noqa: E402
+from utils.time_helpers import nba_today_et as _nba_today_et      # noqa: E402
 
 
 # ============================================================

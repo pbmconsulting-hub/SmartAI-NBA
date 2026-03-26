@@ -434,33 +434,8 @@ def _build_result_metrics(result):
     ]
 
 
-def _build_bonus_factors(result):
-    """Build the bonus factors list for a QDS prop card."""
-    bonus = []
-    over_forces  = result.get("forces", {}).get("over_forces",  [])
-    under_forces = result.get("forces", {}).get("under_forces", [])
-    direction    = result.get("direction", "OVER")
-    forces_to_show = over_forces if direction == "OVER" else under_forces
-    for f in forces_to_show[:4]:
-        lbl  = f.get("name", f.get("label", f.get("factor", "")))
-        desc = f.get("description", f.get("detail", ""))
-        if lbl:
-            bonus.append(f"{lbl}" + (f" — {desc}" if desc else ""))
-
-    # Append traps / warnings as bonus notes
-    trap = result.get("trap_line_result", {})
-    if trap and trap.get("is_trap"):
-        bonus.append(f"⚠️ {trap.get('warning_message', 'Possible trap line')}")
-
-    ls_force = result.get("line_sharpness_force")
-    if ls_force:
-        bonus.append(f"📐 Sharp line: {ls_force.get('description', '')}")
-
-    teammate_notes = result.get("teammate_out_notes", [])
-    for note in teammate_notes[:2]:
-        bonus.append(f"👥 {note}")
-
-    return bonus[:6]  # cap at 6 items
+# Canonical implementation in utils/renderers.py (slightly more defensive re: None guards)
+from utils.renderers import _build_bonus_factors  # noqa: E402
 
 
 def _build_entry_strategy(results):

@@ -289,12 +289,8 @@ _tab_report, _tab_builder, _tab_narrative = st.tabs([
 
 # Helper functions are defined at module level below before the tab content
 
-_FANTASY_SCORE_STAT_PREFIX = "fantasy_score"
-
-
-def _is_fantasy_score_stat(stat_type: str) -> bool:
-    """Return True if *stat_type* is a composite fantasy-score stat."""
-    return str(stat_type).startswith(_FANTASY_SCORE_STAT_PREFIX)
+# Canonical definition in pages/helpers/neural_analysis_helpers.py
+from pages.helpers.neural_analysis_helpers import _is_fantasy_score_stat
 
 
 def _build_entry_strategy(results):
