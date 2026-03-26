@@ -14,7 +14,6 @@ def save_parquet(df, path: str) -> None:
     """
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     try:
-        import pandas as pd  # noqa: F401
         if isinstance(df, list):
             import pandas as pd
             df = pd.DataFrame(df)

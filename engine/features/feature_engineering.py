@@ -169,16 +169,16 @@ def calculate_days_rest_factor(rest_days: int) -> float:
     """Return a performance multiplier based on rest days.
 
     Args:
-        rest_days: Days since last game (0 = back-to-back).
+        rest_days: Days since last game (1 = back-to-back, played yesterday).
 
     Returns:
-        Multiplier: 0.97 for B2B, 1.00 for 1-day rest, 1.02 for 2 days, 1.03 for 3+.
+        Multiplier: 0.97 for B2B (1 rest day), 1.00 for 2 rest days, 1.02 for 3, 1.03 for 4+.
     """
-    if rest_days == 0:
+    if rest_days <= 1:
         return 0.97
-    if rest_days == 1:
-        return 1.00
     if rest_days == 2:
+        return 1.00
+    if rest_days == 3:
         return 1.02
     return 1.03
 

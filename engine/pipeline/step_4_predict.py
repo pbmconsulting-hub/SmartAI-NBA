@@ -3,6 +3,8 @@ from utils.logger import get_logger
 
 _logger = get_logger(__name__)
 
+_MAX_PLAYERS = 50
+
 
 def run(context: dict) -> dict:
     """Run predictions using saved ML models.
@@ -24,7 +26,7 @@ def run(context: dict) -> dict:
             try:
                 import pandas as pd
                 df = pd.DataFrame(player_df) if isinstance(player_df, list) else player_df
-                for _, row in df.head(50).iterrows():
+                for _, row in df.head(context.get("max_players", _MAX_PLAYERS)).iterrows():
                     player_name = row.get("player_name") or row.get("name", "Unknown")
                     for stat in ["pts", "reb", "ast"]:
                         try:
