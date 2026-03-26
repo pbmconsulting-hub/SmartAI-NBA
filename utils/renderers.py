@@ -20,6 +20,7 @@
 import html as _html
 import os as _os
 import base64 as _base64
+import re as _re
 
 from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
 
@@ -952,7 +953,7 @@ def build_unified_player_card_html(player_name, vitals, props,
     prop_label = f"{prop_count} prop{'s' if prop_count != 1 else ''}"
 
     # Unique DOM id for this player's Joseph response panel
-    _safe_id = _html.escape(player_name.replace(" ", "_").replace("'", ""))
+    _safe_id = _re.sub(r'[^a-zA-Z0-9_-]', '_', player_name)
 
     # Joseph M Smith avatar footer for expanded cards
     _j_b64 = _get_joseph_avatar_b64()
@@ -960,10 +961,7 @@ def build_unified_player_card_html(player_name, vitals, props,
         lock_stat = _html.escape(str(joseph_opinion.get("platinum_lock_stat", "N/A")))
         rant_text = _html.escape(str(joseph_opinion.get("rant", "")))
         joseph_html = (
-            f'<div class="upc-joseph-row" onclick="'
-            f"var p=document.getElementById('joseph-resp-{_safe_id}');"
-            f"if(p){{p.style.display=p.style.display==='none'?'block':'none';}}"
-            f'">'
+            f'<div class="upc-joseph-row" onclick="toggleJoseph(\'{_safe_id}\')">'
             f'<img class="upc-joseph-avatar" '
             f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
             f'<span class="upc-joseph-label">🎙️ Ask Joseph M Smith</span>'
@@ -1051,7 +1049,18 @@ def compile_unified_card_matrix(grouped_players, joseph_opinions=None):
                 joseph_opinion=opinions.get(name),
             ))
 
+    # JavaScript toggle function for Ask Joseph M Smith response panels.
+    _toggle_js = (
+        "<script>"
+        "function toggleJoseph(id){"
+        "var p=document.getElementById('joseph-resp-'+id);"
+        "if(p){p.style.display=p.style.display==='none'?'block':'none';}"
+        "}"
+        "</script>"
+    )
+
     return (
         f"<style>{QUANTUM_CARD_MATRIX_CSS}{UNIFIED_PLAYER_CARD_CSS}</style>"
         f'<div class="upc-grid">{"".join(cards)}</div>'
+        f'{_toggle_js}'
     )

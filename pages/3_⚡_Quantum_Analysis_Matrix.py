@@ -2541,7 +2541,7 @@ if analysis_results:
                     try:
                         _joseph_opinions[_pname] = _joseph_lock(_props, _stats)
                     except Exception:
-                        _logger.debug("joseph_platinum_lock failed for %s", _pname)
+                        _logger.debug("joseph_platinum_lock failed for %s", _pname, exc_info=True)
         except ImportError:
             _logger.debug("joseph_brain not available for card opinions")
 
