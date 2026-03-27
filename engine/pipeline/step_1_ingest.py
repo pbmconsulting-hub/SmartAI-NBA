@@ -29,11 +29,11 @@ def run(context: dict) -> dict:
         raw_data["todays_games"] = []
 
     try:
-        from data.nba_stats_service import get_all_players_stats
-        raw_data["player_stats"] = get_all_players_stats() or []
+        from data.nba_data_service import get_player_stats
+        raw_data["player_stats"] = get_player_stats() or []
         _logger.info("Ingested %d player stat rows", len(raw_data["player_stats"]))
     except Exception as exc:
-        _logger.debug("get_all_players_stats unavailable: %s", exc)
+        _logger.debug("get_player_stats unavailable: %s", exc)
         raw_data["player_stats"] = []
 
     # Persist raw data

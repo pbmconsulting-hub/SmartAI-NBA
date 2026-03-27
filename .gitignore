@@ -16,6 +16,27 @@ data/game_logs/
 tracking/clv_log.json
 tracking/line_movement.json
 
+# Pipeline-generated data files — runtime artifacts, only .gitkeep is tracked
+data/raw/*.parquet
+data/raw/*.csv
+data/raw/*.json
+data/processed/*.parquet
+data/processed/*.csv
+data/processed/*.json
+data/ml_ready/*.parquet
+data/ml_ready/*.csv
+data/ml_ready/*.json
+# Keep the .gitkeep placeholders
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/ml_ready/.gitkeep
+
+# Saved ML model artifacts — large binary files, don't commit
+engine/models/saved/*.joblib
+engine/models/saved/*.pkl
+# Keep the .gitkeep placeholder
+!engine/models/saved/.gitkeep
+
 # Log files — generated at runtime, don't commit
 logs/
 *.log

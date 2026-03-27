@@ -25,10 +25,16 @@ if _FASTAPI_AVAILABLE:
         result = {"player": name, "stats": {}, "projections": {}, "source": "unavailable"}
 
         try:
-            from data.nba_stats_service import get_player_stats
-            stats = get_player_stats(name)
-            if stats:
-                result["stats"] = stats
+            from data.nba_data_service import get_player_stats as _get_all_player_stats
+            all_stats = _get_all_player_stats() or []
+            # Filter to the requested player (case-insensitive partial match)
+            name_lower = name.lower()
+            matched = [
+                s for s in all_stats
+                if name_lower in str(s.get("PLAYER_NAME", s.get("player_name", ""))).lower()
+            ]
+            if matched:
+                result["stats"] = matched[0]
                 result["source"] = "nba_api"
         except Exception as exc:
             _logger.debug("get_player_stats failed: %s", exc)

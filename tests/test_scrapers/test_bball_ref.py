@@ -52,3 +52,32 @@ class TestFetchWithMock:
             assert result == []
         finally:
             mod._DEPS_AVAILABLE = original
+
+    def test_get_player_box_scores_for_date_no_deps(self):
+        """Should return empty dict when deps unavailable."""
+        import engine.scrapers.basketball_ref_scraper as mod
+        original = mod._DEPS_AVAILABLE
+        mod._DEPS_AVAILABLE = False
+        try:
+            result = mod.get_player_box_scores_for_date("2025-01-15")
+            assert result == {}
+        finally:
+            mod._DEPS_AVAILABLE = original
+
+    def test_get_player_box_scores_for_date_invalid_date(self):
+        """Should return empty dict for an invalid date string."""
+        from engine.scrapers.basketball_ref_scraper import get_player_box_scores_for_date
+        result = get_player_box_scores_for_date("not-a-date")
+        assert result == {}
+
+    def test_get_player_box_scores_for_date_returns_dict(self):
+        """Function must always return a dict."""
+        import engine.scrapers.basketball_ref_scraper as mod
+        # Force deps to False so no network call is made
+        original = mod._DEPS_AVAILABLE
+        mod._DEPS_AVAILABLE = False
+        try:
+            result = mod.get_player_box_scores_for_date("2025-01-15")
+            assert isinstance(result, dict)
+        finally:
+            mod._DEPS_AVAILABLE = original
