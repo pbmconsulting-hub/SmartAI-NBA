@@ -501,6 +501,193 @@ class TestBuildFormattedGame(unittest.TestCase):
         )
         self.assertEqual(game["game_id"], "DET_vs_NOP")
 
+    def test_synthetic_id_fallback_logs_info(self):
+        """_build_formatted_game should log at INFO when falling back to synthetic ID."""
+        import logging
+        from data.live_data_fetcher import _build_formatted_game
+        with self.assertLogs("smartai_nba.data.live_data_fetcher", level="INFO") as cm:
+            _build_formatted_game(
+                "GSW", "MIA", "Golden State Warriors", "Miami Heat",
+                "9:00 PM ET", "", {},
+                game_id="",
+            )
+        self.assertTrue(
+            any("synthetic" in msg for msg in cm.output),
+            "Expected 'synthetic' in log output",
+        )
+
+    def test_real_game_id_does_not_log_synthetic(self):
+        """_build_formatted_game should NOT log a synthetic-ID warning when a real game_id is provided."""
+        import logging
+        from data.live_data_fetcher import _build_formatted_game
+        # No log at all (INFO+) should be emitted for the synthetic fallback path
+        import data.live_data_fetcher as ldf
+        with patch.object(ldf, "_logger") as mock_log:
+            _build_formatted_game(
+                "GSW", "MIA", "Golden State Warriors", "Miami Heat",
+                "9:00 PM ET", "", {},
+                game_id="0022401234",
+            )
+        mock_log.info.assert_not_called()
+
+
+# ── Section 7: Diagnostic logging verification ───────────────────────────────
+
+class TestDiagnosticLoggingSyntheticId(unittest.TestCase):
+    """_logger.debug() should be called when _is_nba_game_id() rejects a synthetic ID."""
+
+    def setUp(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+
+    def test_debug_logged_for_traditional_synthetic_id(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_box_score_traditional("LAL_vs_BOS")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+        self.assertIn("LAL_vs_BOS", str(args))
+
+    def test_debug_logged_for_matchups_synthetic_id(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_box_score_matchups("GSW_vs_MIA")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+
+    def test_debug_logged_for_four_factors_synthetic_id(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_four_factors_box_score("DET_vs_NOP")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+
+    def test_debug_logged_for_game_summary_synthetic_id(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_game_summary("LAL_vs_BOS")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+
+
+class TestDiagnosticLoggingRateLimit(unittest.TestCase):
+    """_logger.warning() should be called when _check_rate_limit() blocks a call."""
+
+    def setUp(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=False)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    def test_warning_logged_when_rate_limit_blocks_traditional(self, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_box_score_traditional("0022501066")
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", False)
+    def test_warning_logged_when_nba_api_unavailable_traditional(self):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_box_score_traditional("0022501066")
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=False)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    def test_warning_logged_when_rate_limit_blocks_four_factors(self, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_four_factors_box_score("0022501066")
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=False)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    def test_warning_logged_when_rate_limit_blocks_schedule(self, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch.object(nlf, "_logger") as mock_log:
+            nlf.fetch_schedule()
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+
+class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
+    """_logger.warning() should be called when get_normalized_dict() returns None."""
+
+    def _make_none_ep(self):
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.return_value = None
+        return mock_ep
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_warning_logged_traditional_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscoretraditionalv3.BoxScoreTraditionalV3",
+                   return_value=self._make_none_ep()):
+            with patch.object(nlf, "_logger") as mock_log:
+                nlf.fetch_box_score_traditional("0022501066")
+        warning_calls = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertTrue(
+            any("get_normalized_dict" in c for c in warning_calls),
+            f"Expected get_normalized_dict warning, got: {warning_calls}",
+        )
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_warning_logged_four_factors_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorefourfactorsv3.BoxScoreFourFactorsV3",
+                   return_value=self._make_none_ep()):
+            with patch.object(nlf, "_logger") as mock_log:
+                nlf.fetch_four_factors_box_score("0022501066")
+        warning_calls = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertTrue(
+            any("get_normalized_dict" in c for c in warning_calls),
+            f"Expected get_normalized_dict warning, got: {warning_calls}",
+        )
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_warning_logged_matchups_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorematchupsv3.BoxScoreMatchupsV3",
+                   return_value=self._make_none_ep()):
+            with patch.object(nlf, "_logger") as mock_log:
+                nlf.fetch_box_score_matchups("0022501066")
+        warning_calls = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertTrue(
+            any("get_normalized_dict" in c for c in warning_calls),
+            f"Expected get_normalized_dict warning, got: {warning_calls}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
