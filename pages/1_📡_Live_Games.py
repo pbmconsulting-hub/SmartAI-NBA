@@ -650,7 +650,7 @@ if platform_props_clicked:
                         if _bio.get("position"):
                             # Bio position may be multi-valued ("Guard-Forward"); take first token
                             _bio_pos = _bio["position"].split("-")[0].strip()
-                            _pos = _BIO_POS_ALIAS.get(_bio_pos, _bio_pos) if len(_bio_pos) > 2 else _bio_pos
+                            _pos = _BIO_POS_ALIAS.get(_bio_pos, _bio_pos)
                     except Exception:
                         pass
 
