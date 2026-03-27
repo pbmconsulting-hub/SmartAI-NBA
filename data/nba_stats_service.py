@@ -144,6 +144,7 @@ def get_all_players(active_only: bool = True) -> list[dict]:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_all_players: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -154,7 +155,10 @@ def get_all_players(active_only: bool = True) -> list[dict]:
             is_only_current_season=1 if active_only else 0,
             league_id="00",
         )
-        rows = (endpoint.get_normalized_dict() or {}).get("CommonAllPlayers", [])
+        _norm_tmp = endpoint.get_normalized_dict() or {}
+        if not _norm_tmp:
+            _logger.warning("get_all_players: get_normalized_dict() returned None/empty")
+        rows = _norm_tmp.get("CommonAllPlayers", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         players = [
@@ -202,6 +206,7 @@ def get_player_info(player_id: int) -> dict:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_player_info: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     try:
@@ -210,6 +215,8 @@ def get_player_info(player_id: int) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_player_info: get_normalized_dict() returned None/empty")
         rows = norm.get("CommonPlayerInfo", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -266,6 +273,7 @@ def get_player_game_logs(player_id: int, season: str | None = None) -> list[dict
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_player_game_logs: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -311,6 +319,7 @@ def get_player_career_stats(player_id: int) -> dict:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_player_career_stats: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     try:
@@ -319,6 +328,8 @@ def get_player_career_stats(player_id: int) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = playercareerstats.PlayerCareerStats(player_id=player_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_player_career_stats: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -355,6 +366,7 @@ def get_player_splits(player_id: int, season: str | None = None) -> dict:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_player_splits: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     result: dict = {}
@@ -415,9 +427,11 @@ def get_advanced_box_score(game_id: str) -> dict:
         return cached
 
     if not _is_nba_game_id(game_id):
+        _logger.debug("get_advanced_box_score: rejected non-numeric game_id=%r", game_id)
         return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_advanced_box_score: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     try:
@@ -426,6 +440,8 @@ def get_advanced_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscoreadvancedv3.BoxScoreAdvancedV3(game_id=game_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_advanced_box_score: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -460,9 +476,11 @@ def get_player_tracking_box_score(game_id: str) -> dict:
         return cached
 
     if not _is_nba_game_id(game_id):
+        _logger.debug("get_player_tracking_box_score: rejected non-numeric game_id=%r", game_id)
         return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_player_tracking_box_score: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     try:
@@ -471,6 +489,8 @@ def get_player_tracking_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscoreplayertrackv3.BoxScorePlayerTrackV3(game_id=game_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_player_tracking_box_score: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {"player_stats": norm.get("PlayerStats", [])}
@@ -503,9 +523,11 @@ def get_hustle_box_score(game_id: str) -> dict:
         return cached
 
     if not _is_nba_game_id(game_id):
+        _logger.debug("get_hustle_box_score: rejected non-numeric game_id=%r", game_id)
         return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_hustle_box_score: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return {}
 
     try:
@@ -514,6 +536,8 @@ def get_hustle_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscorehustlev2.BoxScoreHustleV2(game_id=game_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_hustle_box_score: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {"player_stats": norm.get("PlayerStats", [])}
@@ -547,6 +571,7 @@ def get_defensive_matchup_data(
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_defensive_matchup_data: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -558,6 +583,8 @@ def get_defensive_matchup_data(
             per_mode_simple=per_mode,
         )
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_defensive_matchup_data: get_normalized_dict() returned None/empty")
         rows = norm.get("LeagueDashPtDefend", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -591,6 +618,7 @@ def get_shot_chart(player_id: int, season: str | None = None) -> list[dict]:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_shot_chart: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -604,6 +632,8 @@ def get_shot_chart(player_id: int, season: str | None = None) -> list[dict]:
             context_measure_simple="FGA",
         )
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_shot_chart: get_normalized_dict() returned None/empty")
         rows = norm.get("Shot_Chart_Detail", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -640,6 +670,7 @@ def get_lineup_stats(
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_lineup_stats: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -651,6 +682,8 @@ def get_lineup_stats(
             group_quantity=group_quantity,
         )
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_lineup_stats: get_normalized_dict() returned None/empty")
         rows = norm.get("Lineups", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -688,6 +721,7 @@ def get_league_standings(season: str | None = None) -> list[dict]:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_league_standings: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -758,6 +792,7 @@ def find_games(
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("find_games: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -775,6 +810,8 @@ def find_games(
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = leaguegamefinder.LeagueGameFinder(**kwargs)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("find_games: get_normalized_dict() returned None/empty")
         rows = norm.get("LeagueGameFinderResults", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -807,9 +844,11 @@ def get_play_by_play(game_id: str) -> list[dict]:
         return cached
 
     if not _is_nba_game_id(game_id):
+        _logger.debug("get_play_by_play: rejected non-numeric game_id=%r", game_id)
         return []
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_play_by_play: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -818,6 +857,8 @@ def get_play_by_play(game_id: str) -> list[dict]:
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = playbyplayv3.PlayByPlayV3(game_id=game_id)
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_play_by_play: get_normalized_dict() returned None/empty")
         rows = norm.get("PlayByPlay", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -852,6 +893,7 @@ def get_team_roster(team_id: int, season: str | None = None) -> list[dict]:
         return cached
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
+        _logger.warning("get_team_roster: blocked (nba_api=%s, rate_limit=denied)", _NBA_API_AVAILABLE)
         return []
 
     try:
@@ -863,6 +905,8 @@ def get_team_roster(team_id: int, season: str | None = None) -> list[dict]:
             season=season,
         )
         norm = endpoint.get_normalized_dict() or {}
+        if not norm:
+            _logger.warning("get_team_roster: get_normalized_dict() returned None/empty")
         rows = norm.get("CommonTeamRoster", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 

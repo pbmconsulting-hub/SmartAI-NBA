@@ -1039,5 +1039,105 @@ class TestNoneNormGuard(unittest.TestCase):
         self.assertEqual(result.get("player_stats"), [])
 
 
+# ── Section 18: Diagnostic logging verification ───────────────────────────────
+
+class TestNbaStatsServiceDiagnosticLogging(unittest.TestCase):
+    """Verify diagnostic logging in nba_stats_service at every silent-return point."""
+
+    def setUp(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+
+    def _make_none_ep(self):
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.return_value = None
+        return mock_ep
+
+    def test_debug_logged_for_advanced_box_score_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_logger") as mock_log:
+            svc.get_advanced_box_score("LAL_vs_BOS")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+        self.assertIn("LAL_vs_BOS", str(args))
+
+    def test_debug_logged_for_hustle_box_score_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_logger") as mock_log:
+            svc.get_hustle_box_score("DET_vs_NOP")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+
+    def test_debug_logged_for_play_by_play_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_logger") as mock_log:
+            svc.get_play_by_play("GSW_vs_MIA")
+        mock_log.debug.assert_called_once()
+        args = mock_log.debug.call_args[0]
+        self.assertIn("rejected non-numeric", args[0])
+
+    @patch("data.nba_stats_service._check_rate_limit", return_value=False)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    def test_warning_logged_when_rate_limit_blocks_advanced(self, _rate):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_logger") as mock_log:
+            svc.get_advanced_box_score("0022501066")
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", False)
+    def test_warning_logged_when_nba_api_unavailable_hustle(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_logger") as mock_log:
+            svc.get_hustle_box_score("0022501066")
+        mock_log.warning.assert_called()
+        args = mock_log.warning.call_args[0]
+        self.assertIn("blocked", args[0])
+
+    @unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
+    @patch("data.nba_stats_service._check_rate_limit", return_value=True)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    @patch("data.nba_stats_service.time.sleep")
+    @patch("data.nba_stats_service.time.monotonic", return_value=0.0)
+    def test_warning_logged_advanced_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscoreadvancedv3.BoxScoreAdvancedV3",
+                   return_value=self._make_none_ep()):
+            with patch.object(svc, "_logger") as mock_log:
+                svc.get_advanced_box_score("0022501066")
+        warning_calls = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertTrue(
+            any("get_normalized_dict" in c for c in warning_calls),
+            f"Expected get_normalized_dict warning, got: {warning_calls}",
+        )
+
+    @unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
+    @patch("data.nba_stats_service._check_rate_limit", return_value=True)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    @patch("data.nba_stats_service.time.sleep")
+    @patch("data.nba_stats_service.time.monotonic", return_value=0.0)
+    def test_warning_logged_hustle_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorehustlev2.BoxScoreHustleV2",
+                   return_value=self._make_none_ep()):
+            with patch.object(svc, "_logger") as mock_log:
+                svc.get_hustle_box_score("0022501066")
+        warning_calls = [str(c) for c in mock_log.warning.call_args_list]
+        self.assertTrue(
+            any("get_normalized_dict" in c for c in warning_calls),
+            f"Expected get_normalized_dict warning, got: {warning_calls}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

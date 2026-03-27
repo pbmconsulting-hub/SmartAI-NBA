@@ -91,7 +91,10 @@ from data.live_data_fetcher import (
 
 def get_todays_games():
     """Retrieve tonight's NBA games via the nba_api library."""
-    return _ldf_fetch_todays_games()
+    result = _ldf_fetch_todays_games()
+    if not result:
+        _logger.warning("get_todays_games: live_data_fetcher returned no games")
+    return result
 
 
 def get_todays_players(todays_games, progress_callback=None,
@@ -106,7 +109,10 @@ def get_todays_players(todays_games, progress_callback=None,
 
 def get_player_recent_form(player_id, last_n_games=10):
     """Get a player's recent-form stats via nba_api game logs."""
-    return _ldf_fetch_player_recent_form(player_id, last_n_games=last_n_games)
+    result = _ldf_fetch_player_recent_form(player_id, last_n_games=last_n_games)
+    if not result:
+        _logger.debug("get_player_recent_form(%s): live_data_fetcher returned no data", player_id)
+    return result
 
 
 def get_player_stats(progress_callback=None):
@@ -128,7 +134,10 @@ def get_defensive_ratings(force=False, progress_callback=None):
 
 def get_player_game_log(player_id, last_n_games=20):
     """Retrieve a player's game log via nba_api."""
-    return _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
+    result = _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
+    if not result:
+        _logger.warning("get_player_game_log(%s): live_data_fetcher returned no game log", player_id)
+    return result
 
 
 def get_all_data(progress_callback=None, targeted=False, todays_games=None):
