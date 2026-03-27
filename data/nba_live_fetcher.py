@@ -722,7 +722,6 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         return cached
 
     if not _is_nba_game_id(game_id):
-        _logger.debug("fetch_box_score_matchups(%s): skipped (not a numeric game ID)", game_id)
         return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
