@@ -113,6 +113,13 @@ def _check_rate_limit() -> bool:
         return True
 
 
+# ── Game-ID validation ────────────────────────────────────────────────────────
+
+def _is_nba_game_id(game_id: str) -> bool:
+    """Return True if *game_id* is a numeric string (e.g. ``'0022401234'``)."""
+    return bool(game_id) and game_id.isdigit()
+
+
 # ── Season helpers ─────────────────────────────────────────────────────────────
 
 def _current_season() -> str:
@@ -236,6 +243,9 @@ def fetch_box_score_traditional(game_id: str, period: int = 0) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -291,6 +301,9 @@ def fetch_box_score_advanced(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     try:
         from data.nba_stats_service import get_advanced_box_score
         result = get_advanced_box_score(game_id)
@@ -324,6 +337,9 @@ def fetch_box_score_usage(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
@@ -548,6 +564,9 @@ def fetch_rotations(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -702,6 +721,9 @@ def fetch_box_score_matchups(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -749,6 +771,9 @@ def fetch_hustle_box_score(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     try:
         from data.nba_stats_service import get_hustle_box_score
         result = get_hustle_box_score(game_id)
@@ -781,6 +806,9 @@ def fetch_defensive_box_score(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
@@ -826,6 +854,9 @@ def fetch_scoring_box_score(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
@@ -875,6 +906,9 @@ def fetch_tracking_box_score(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     try:
         from data.nba_stats_service import get_player_tracking_box_score
         result = get_player_tracking_box_score(game_id)
@@ -908,6 +942,9 @@ def fetch_four_factors_box_score(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
@@ -1435,6 +1472,9 @@ def fetch_win_probability(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -1479,6 +1519,9 @@ def fetch_play_by_play(game_id: str) -> list[dict]:
         PLAYER1_ID, PLAYER1_NAME, PLAYER2_ID, etc.
         Returns [] on failure.
     """
+    if not _is_nba_game_id(game_id):
+        return []
+
     try:
         from data.nba_stats_service import get_play_by_play
         return get_play_by_play(game_id)
@@ -1510,6 +1553,9 @@ def fetch_game_summary(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}

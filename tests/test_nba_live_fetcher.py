@@ -340,5 +340,73 @@ class TestNbaDataServiceWrappers(unittest.TestCase):
             self.assertIsInstance(svc.get_team_game_logs(1610612738), list)
 
 
+# ── Section 5: Game-ID validation & synthetic-ID guard ────────────────────────
+
+class TestGameIdValidation(unittest.TestCase):
+    """_is_nba_game_id should accept numeric IDs and reject synthetic labels."""
+
+    def test_valid_numeric_game_id(self):
+        from data.nba_live_fetcher import _is_nba_game_id
+        self.assertTrue(_is_nba_game_id("0022401234"))
+
+    def test_valid_short_numeric(self):
+        from data.nba_live_fetcher import _is_nba_game_id
+        self.assertTrue(_is_nba_game_id("12345"))
+
+    def test_rejects_synthetic_vs_label(self):
+        from data.nba_live_fetcher import _is_nba_game_id
+        self.assertFalse(_is_nba_game_id("DET_vs_NOP"))
+
+    def test_rejects_empty_string(self):
+        from data.nba_live_fetcher import _is_nba_game_id
+        self.assertFalse(_is_nba_game_id(""))
+
+    def test_rejects_none_string(self):
+        from data.nba_live_fetcher import _is_nba_game_id
+        # Passing "None" string (edge case from str(None))
+        self.assertFalse(_is_nba_game_id("None"))
+
+    def test_matchups_skips_synthetic_id(self):
+        """fetch_box_score_matchups should return {} for non-numeric IDs
+        without hitting the NBA API."""
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        # Even with API available, a synthetic ID should be skipped
+        with patch.object(nlf, "_NBA_API_AVAILABLE", True):
+            result = nlf.fetch_box_score_matchups("DET_vs_NOP")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result, {})
+
+
+class TestBuildFormattedGame(unittest.TestCase):
+    """_build_formatted_game should use a real game_id when provided."""
+
+    def test_uses_real_game_id(self):
+        from data.live_data_fetcher import _build_formatted_game
+        game = _build_formatted_game(
+            "LAL", "BOS", "Los Angeles Lakers", "Boston Celtics",
+            "7:30 PM ET", "TD Garden, Boston", {},
+            game_id="0022401234",
+        )
+        self.assertEqual(game["game_id"], "0022401234")
+
+    def test_falls_back_to_synthetic_id(self):
+        from data.live_data_fetcher import _build_formatted_game
+        game = _build_formatted_game(
+            "LAL", "BOS", "Los Angeles Lakers", "Boston Celtics",
+            "7:30 PM ET", "TD Garden, Boston", {},
+        )
+        self.assertEqual(game["game_id"], "LAL_vs_BOS")
+
+    def test_empty_game_id_falls_back(self):
+        from data.live_data_fetcher import _build_formatted_game
+        game = _build_formatted_game(
+            "DET", "NOP", "Detroit Pistons", "New Orleans Pelicans",
+            "8:00 PM ET", "", {},
+            game_id="",
+        )
+        self.assertEqual(game["game_id"], "DET_vs_NOP")
+
+
 if __name__ == "__main__":
     unittest.main()

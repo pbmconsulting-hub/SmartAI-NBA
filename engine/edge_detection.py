@@ -54,6 +54,7 @@ STAT_EDGE_THRESHOLDS = {
     "steals": 5.0,
     "blocks": 5.0,
     "turnovers": 4.0,
+    "ftm": 4.0,
     "points_rebounds_assists": 2.0,
     "points_rebounds": 2.0,
     "points_assists": 2.0,
@@ -66,7 +67,7 @@ STAT_EDGE_THRESHOLDS = {
 
 # Low-volume stat types with inherently higher variance.
 # These require a larger raw edge to overcome uncertainty.
-LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes"}
+LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes", "ftm"}
 
 # Uncertainty multiplier applied to low-volume stats' edge calculations.
 # 1.3x means a steal prop needs effectively 1.3x more edge to qualify.
@@ -925,6 +926,7 @@ def detect_trap_line(
         "steals":    [1, 2, 3],
         "blocks":    [1, 2, 3],
         "turnovers": [2, 3, 4, 5],
+        "ftm":       [1, 2, 3, 4, 5, 6],
     }
     stat_type_lower = stat_type.lower() if stat_type else "points"
     common_numbers = _COMMON_HIT_NUMBERS.get(stat_type_lower, [])

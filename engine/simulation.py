@@ -2075,6 +2075,11 @@ def enrich_simulation_with_advanced_stats(
         "available": False,
     }
 
+    # Quick reject: synthetic game IDs (e.g. "DET_vs_NOP") can never
+    # resolve to a real box score.
+    if not game_id or not game_id.isdigit():
+        return _default
+
     try:
         from data.nba_stats_service import get_advanced_box_score
         box = get_advanced_box_score(game_id)

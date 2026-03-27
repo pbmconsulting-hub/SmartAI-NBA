@@ -2461,10 +2461,16 @@ def smart_filter_props(
 
     # ── Resolve stat type filter set ────────────────────────────────────
     # When stat_types is None, accept ALL stat types (no filtering).
+    # Expand "fantasy_score" to include all platform-specific variants.
     if stat_types is None:
         _allowed_stats = None  # sentinel: skip stat-type filtering entirely
     else:
-        _allowed_stats = frozenset(str(s).lower().strip() for s in stat_types)
+        _raw_allowed = set(str(s).lower().strip() for s in stat_types)
+        # "fantasy_score" is the UI label; expand to all platform variants
+        if "fantasy_score" in _raw_allowed:
+            from engine import FANTASY_STAT_TYPES
+            _raw_allowed |= set(FANTASY_STAT_TYPES)
+        _allowed_stats = frozenset(_raw_allowed)
 
     original_count = len(all_props)
     summary: dict = {
@@ -2593,6 +2599,8 @@ def smart_filter_props(
         "points_rebounds": 5, "points_assists": 6,
         "rebounds_assists": 7, "steals": 8,
         "blocks": 9, "turnovers": 10,
+        "blocks_steals": 11, "ftm": 12,
+        "fantasy_score_pp": 13, "fantasy_score_dk": 13, "fantasy_score_ud": 13,
     }
 
     if max_props_per_player is None:

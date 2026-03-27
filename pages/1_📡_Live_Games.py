@@ -260,6 +260,7 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
     with _sf_col3:
         _all_stat_types = [
             "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+            "ftm",
             "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
             "blocks_steals", "fantasy_score", "double_double", "triple_double",
         ]
@@ -268,6 +269,7 @@ with st.expander("🧠 Smart Filter Settings", expanded=False):
             options=_all_stat_types,
             default=[
                 "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+                "ftm",
                 "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
                 "blocks_steals", "fantasy_score",
             ],
@@ -600,8 +602,10 @@ if platform_props_clicked:
         pp_status.text(f"⏳ 4/5 — Running Neural Analysis on {len(props_to_analyze):,} props…")
         pp_bar.progress(40)
 
-        from engine.projections import build_player_projection, get_stat_standard_deviation, POSITION_PRIORS as _POSITION_PRIORS
-        from engine.simulation import run_quantum_matrix_simulation
+        from engine.projections import build_player_projection, get_stat_standard_deviation, POSITION_PRIORS
+        from engine.simulation import run_quantum_matrix_simulation, simulate_combo_stat, simulate_fantasy_score
+        from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES
+        from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
         from engine.edge_detection import analyze_directional_forces, should_avoid_prop, classify_bet_type
         from engine.confidence import calculate_confidence_score
         from data.data_manager import load_defensive_ratings_data, load_teams_data as _load_teams
@@ -613,12 +617,16 @@ if platform_props_clicked:
         games_context = _todays_games  # Use auto-loaded games from Step 0
         injury_map = st.session_state.get("injury_status_map", {})
 
+        # Bio position strings → POSITION_PRIORS keys
+        _BIO_POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
+
         _PLATFORM_STAT_MAP = {
             "pts": "points", "reb": "rebounds", "ast": "assists",
             "stl": "steals", "blk": "blocks", "to": "turnovers", "tov": "turnovers",
-            "3pm": "threes", "fg3m": "threes", "pts+reb": "points_rebounds",
-            "pts+ast": "points_assists", "reb+ast": "rebounds_assists",
-            "pts+reb+ast": "points_rebounds_assists",
+            "3pm": "threes", "fg3m": "threes", "ftm": "ftm",
+            "pts+reb": "points_rebounds", "pts+ast": "points_assists",
+            "reb+ast": "rebounds_assists", "pts+reb+ast": "points_rebounds_assists",
+            "blk+stl": "blocks_steals", "blks+stls": "blocks_steals",
         }
 
         for prop in props_to_analyze:
@@ -634,46 +642,43 @@ if platform_props_clicked:
                 player_data = player_lookup.get(player_name.lower())
                 if not player_data:
                     # Platform props are the source of truth for active players.
-                    # Build a position-prior-seeded profile from the prop line so
-                    # we can still analyze players active in props but missing from
-                    # the CSV (e.g., due to injury-filtered CSV from a previous
-                    # auto-load).  Stats are seeded from POSITION_PRIORS ("SF" as
-                    # median fallback) and the target stat is anchored to prop_line
-                    # (most reliable single data point).  games_played=30 keeps us
-                    # above the Bayesian shrinkage threshold so the prop-line anchor
-                    # is trusted over the position prior, matching QAM page behaviour.
+                    # Build a minimal stub from POSITION_PRIORS so we can still analyze
+                    # players that are active/playing but missing from the CSV
+                    # (e.g., due to injury-filtered CSV from a previous auto-load).
                     player_team = str(prop.get("team") or prop.get("player_team") or "")
-                    _fallback_pos = "SF"
+
+                    # Attempt to resolve position from player bio; default to SF
+                    _pos = "SF"
                     try:
-                        from data.player_profile_service import get_player_bio as _get_bio
-                        _bio_pos = (_get_bio(player_name) or {}).get("position", "")
-                        if "C" in _bio_pos.upper() and "F" not in _bio_pos.upper():
-                            _fallback_pos = "C"
-                        elif "PG" in _bio_pos.upper():
-                            _fallback_pos = "PG"
-                        elif "SG" in _bio_pos.upper():
-                            _fallback_pos = "SG"
-                        elif "PF" in _bio_pos.upper():
-                            _fallback_pos = "PF"
-                        elif _bio_pos.upper() in ("SF", "F"):
-                            _fallback_pos = "SF"
+                        from data.player_profile_service import get_player_bio
+                        _bio = get_player_bio(player_name)
+                        if _bio.get("position"):
+                            # Bio position may be multi-valued ("Guard-Forward"); take first token
+                            _bio_pos = _bio["position"].split("-")[0].strip()
+                            _pos = _BIO_POS_ALIAS.get(_bio_pos, _bio_pos)
                     except Exception:
                         pass
-                    _prior = _POSITION_PRIORS.get(_fallback_pos, _POSITION_PRIORS["SF"])
+
+                    _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
                     _stub: dict = {
                         "name": player_name,
                         "team": player_team,
-                        "position": _fallback_pos,
-                        "minutes_avg": 30.0,
-                        "games_played": 30,   # above Bayesian threshold — trust prop_line anchor
-                        "points_avg":    str(prop_line if stat_type == "points" else _prior["points"]),
-                        "rebounds_avg":  str(prop_line if stat_type == "rebounds" else _prior["rebounds"]),
-                        "assists_avg":   str(prop_line if stat_type == "assists" else _prior["assists"]),
-                        "threes_avg":    str(prop_line if stat_type == "threes" else _prior["threes"]),
-                        "steals_avg":    str(prop_line if stat_type == "steals" else _prior["steals"]),
-                        "blocks_avg":    str(prop_line if stat_type == "blocks" else _prior["blocks"]),
-                        "turnovers_avg": str(prop_line if stat_type == "turnovers" else _prior["turnovers"]),
+                        "position": _pos,
+                        "games_played": 30,       # above Bayesian threshold (25) — trust prop_line anchor
+                        "minutes_avg": 28.0,
+                        "points_avg": _prior["points"],
+                        "rebounds_avg": _prior["rebounds"],
+                        "assists_avg": _prior["assists"],
+                        "threes_avg": _prior["threes"],
+                        "steals_avg": _prior["steals"],
+                        "blocks_avg": _prior["blocks"],
+                        "turnovers_avg": _prior["turnovers"],
                     }
+
+                    # For the specific stat being analyzed, anchor to prop_line
+                    if stat_type in _prior:
+                        _stub[f"{stat_type}_avg"] = prop_line
+
                     player_data = _stub
 
                 # Build game context — find this player's game in tonight's slate
@@ -776,39 +781,89 @@ if platform_props_clicked:
                     advanced_context=_live_adv_context,
                 )
 
-                # Get stat-specific projected value (e.g., projected_points, projected_rebounds)
-                projected_value = proj.get(
-                    f"projected_{stat_type}",
-                    float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
-                )
-                try:
-                    projected_value = float(projected_value)
-                except (TypeError, ValueError):
-                    projected_value = float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
-
-                if projected_value <= 0:
-                    continue
-
-                std_dev = get_stat_standard_deviation(player_data, stat_type)
-                if not std_dev or std_dev <= 0:
-                    std_dev = projected_value * 0.25
+                # ── Projection retrieval & simulation ────────────────────
+                # Combo/fantasy stats need component-level projection;
+                # simple stats read directly from build_player_projection().
                 blowout_risk = proj.get("blowout_risk_factor", 0.1)
-
-                # Simulation
-                sim = run_quantum_matrix_simulation(
-                    projected_stat_average=projected_value,
-                    stat_standard_deviation=std_dev,
-                    prop_line=prop_line,
-                    number_of_simulations=1000,
+                _sim_kwargs = dict(
                     blowout_risk_factor=blowout_risk,
                     pace_adjustment_factor=proj.get("pace_factor", 1.0),
                     matchup_adjustment_factor=proj.get("defense_factor", 1.0),
                     home_away_adjustment=proj.get("home_away_factor", 0.0),
                     rest_adjustment_factor=proj.get("rest_factor", 1.0),
-                    stat_type=stat_type,
-                    projected_minutes=proj.get("projected_minutes"),
                     game_context=game_ctx if game_ctx.get("game_id") else None,
                 )
+
+                if stat_type in COMBO_STAT_TYPES:
+                    # Correlated simulation for combo stats (PRA, Pts+Reb, etc.)
+                    _components = COMBO_STATS.get(stat_type, [])
+                    _comp_proj = {
+                        s: proj.get(f"projected_{s}", float(player_data.get(f"{s}_avg", 0) or 0))
+                        for s in _components
+                    }
+                    _comp_std = {s: get_stat_standard_deviation(player_data, s) for s in _components}
+                    projected_value = sum(_comp_proj.values())
+                    std_dev = sum(_comp_std.values())  # conservative upper bound
+                    if projected_value <= 0:
+                        continue
+                    sim = simulate_combo_stat(
+                        component_projections=_comp_proj,
+                        component_std_devs=_comp_std,
+                        prop_line=prop_line,
+                        number_of_simulations=1000,
+                        **_sim_kwargs,
+                    )
+                    projected_value = sim.get("adjusted_projection", projected_value)
+
+                elif stat_type in FANTASY_STAT_TYPES:
+                    # Weighted-sum simulation for fantasy score props
+                    _formula = FANTASY_SCORING.get(stat_type, {})
+                    _stat_proj = {
+                        s: proj.get(f"projected_{s}", float(player_data.get(f"{s}_avg", 0) or 0))
+                        for s in _formula
+                    }
+                    _stat_std = {s: get_stat_standard_deviation(player_data, s) for s in _formula}
+                    projected_value = sum(v * _formula[s] for s, v in _stat_proj.items())
+                    std_dev = sum(abs(_formula[s]) * _stat_std[s] for s in _formula)
+                    if projected_value <= 0:
+                        continue
+                    sim = simulate_fantasy_score(
+                        stat_projections=_stat_proj,
+                        stat_std_devs=_stat_std,
+                        fantasy_formula=_formula,
+                        prop_line=prop_line,
+                        number_of_simulations=1000,
+                        **_sim_kwargs,
+                    )
+                    projected_value = sim.get("adjusted_projection", projected_value)
+
+                else:
+                    # Simple stat: standard projection lookup + QME simulation
+                    projected_value = proj.get(
+                        f"projected_{stat_type}",
+                        float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+                    )
+                    try:
+                        projected_value = float(projected_value)
+                    except (TypeError, ValueError):
+                        projected_value = float(player_data.get(f"{stat_type}_avg", prop_line) or prop_line)
+
+                    if projected_value <= 0:
+                        continue
+
+                    std_dev = get_stat_standard_deviation(player_data, stat_type)
+                    if not std_dev or std_dev <= 0:
+                        std_dev = projected_value * 0.25
+
+                    sim = run_quantum_matrix_simulation(
+                        projected_stat_average=projected_value,
+                        stat_standard_deviation=std_dev,
+                        prop_line=prop_line,
+                        number_of_simulations=1000,
+                        stat_type=stat_type,
+                        projected_minutes=proj.get("projected_minutes"),
+                        **_sim_kwargs,
+                    )
                 prob_over = sim.get("probability_over", 0.5)
                 raw_edge = sim.get("edge_percentage", 0.0)
 

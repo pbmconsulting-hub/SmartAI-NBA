@@ -919,5 +919,66 @@ class TestDynamicNbaApiAbbrevMap(unittest.TestCase):
         self.assertEqual(result["NY"], "NYK")
 
 
+# ── Section 17: nba_stats_service game-ID validation guards ──────────────────
+
+class TestNbaStatsServiceGameIdGuards(unittest.TestCase):
+    """Verify that nba_stats_service functions reject non-numeric game IDs."""
+
+    def test_is_nba_game_id_accepts_numeric(self):
+        from data.nba_stats_service import _is_nba_game_id
+        self.assertTrue(_is_nba_game_id("0022401234"))
+
+    def test_is_nba_game_id_rejects_synthetic(self):
+        from data.nba_stats_service import _is_nba_game_id
+        self.assertFalse(_is_nba_game_id("DET_vs_NOP"))
+
+    def test_is_nba_game_id_rejects_empty(self):
+        from data.nba_stats_service import _is_nba_game_id
+        self.assertFalse(_is_nba_game_id(""))
+
+    def test_advanced_box_score_rejects_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_NBA_API_AVAILABLE", True):
+            result = svc.get_advanced_box_score("DET_vs_NOP")
+        self.assertEqual(result, {})
+
+    def test_tracking_box_score_rejects_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_NBA_API_AVAILABLE", True):
+            result = svc.get_player_tracking_box_score("DET_vs_NOP")
+        self.assertEqual(result, {})
+
+    def test_hustle_box_score_rejects_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_NBA_API_AVAILABLE", True):
+            result = svc.get_hustle_box_score("DET_vs_NOP")
+        self.assertEqual(result, {})
+
+    def test_play_by_play_rejects_synthetic_id(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+        with patch.object(svc, "_NBA_API_AVAILABLE", True):
+            result = svc.get_play_by_play("DET_vs_NOP")
+        self.assertEqual(result, [])
+
+
+class TestSimulationEnrichGuard(unittest.TestCase):
+    """enrich_simulation_with_advanced_stats should reject synthetic game IDs."""
+
+    def test_rejects_synthetic_game_id(self):
+        from engine.simulation import enrich_simulation_with_advanced_stats
+        result = enrich_simulation_with_advanced_stats("DET_vs_NOP", "LeBron James")
+        self.assertFalse(result["available"])
+        self.assertEqual(result["pace_factor"], 1.0)
+
+    def test_rejects_empty_game_id(self):
+        from engine.simulation import enrich_simulation_with_advanced_stats
+        result = enrich_simulation_with_advanced_stats("", "LeBron James")
+        self.assertFalse(result["available"])
+
+
 if __name__ == "__main__":
     unittest.main()

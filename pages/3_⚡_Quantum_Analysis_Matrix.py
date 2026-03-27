@@ -870,15 +870,24 @@ if run_analysis:
                     # and the directional forces analysis entirely.
                     #
                     # Strategy:
-                    #  1. Fill all 7 stat avgs from the SF position prior (league-average for
-                    #     an unknown player whose position we cannot determine).
-                    #  2. For the specific stat being analyzed, anchor to prop_line (the most
+                    #  1. Resolve the player's position from the NBA bio API (or default to SF).
+                    #  2. Fill all 7 stat avgs from that position's prior.
+                    #  3. For the specific stat being analyzed, anchor to prop_line (the most
                     #     reliable single data point we have) by scaling the prior components
                     #     proportionally so the expected total matches the prop line.
-                    #  3. Set games_played=30 (above the Bayesian threshold of 25) so shrinkage
+                    #  4. Set games_played=30 (above the Bayesian threshold of 25) so shrinkage
                     #     is NOT applied — the prop_line is already our best anchor and further
                     #     shrinkage toward league priors would move estimates away from it.
-                    _pos   = "SF"  # default when position is unknown
+                    _pos = "SF"  # default when position is unknown
+                    try:
+                        from data.player_profile_service import get_player_bio
+                        _bio = get_player_bio(player_name)
+                        if _bio.get("position"):
+                            _bio_pos = _bio["position"].split("-")[0].strip()
+                            _BIO_POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
+                            _pos = _BIO_POS_ALIAS.get(_bio_pos, _bio_pos)
+                    except Exception:
+                        pass
                     _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
                     player_data = {
                         "name":          player_name,
