@@ -190,6 +190,20 @@ def _nba_today_et():
     return datetime.datetime.now(_eastern).date()
 
 
+def _current_season() -> str:
+    """Return the current NBA season string in 'YYYY-YY' format.
+
+    The NBA season starts in October.  If the current month is October
+    or later, the season is ``YYYY-(YY+1)``.  Otherwise it is
+    ``(YYYY-1)-YY``.
+
+    Example: March 2026 → ``'2025-26'``, November 2025 → ``'2025-26'``.
+    """
+    now = datetime.date.today()
+    year = now.year if now.month >= 10 else now.year - 1
+    return f"{year}-{str(year + 1)[-2:]}"
+
+
 # ============================================================
 # SECTION: NBA Team Abbreviation Mapping
 # nba_api uses team IDs internally; we need abbreviations.
@@ -481,6 +495,7 @@ def _fetch_team_records():
     try:
         from nba_api.stats.endpoints import leaguestandingsv3
         standings_endpoint = leaguestandingsv3.LeagueStandingsV3(
+            season=_current_season(),
             season_type="Regular Season",
         )
         standings_data = standings_endpoint.get_data_frames()[0].to_dict("records")
@@ -1034,6 +1049,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                 progress_callback(4, 10, "Fetching bulk player season averages (1 API call)...")
             stats_ep = leaguedashplayerstats.LeagueDashPlayerStats(
                 per_mode_detailed="PerGame",
+                season=_current_season(),
                 season_type_all_star="Regular Season",
             )
             time.sleep(API_DELAY_SECONDS)
@@ -1214,10 +1230,17 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             "steals_avg", "blocks_avg", "turnovers_avg", "ft_pct",
             "usage_rate", "points_std", "rebounds_std", "assists_std",
             "threes_std", "steals_std", "blocks_std", "turnovers_std",
+            "ftm_avg", "fta_avg", "fga_avg", "fgm_avg",
+            "offensive_rebounds_avg", "defensive_rebounds_avg",
+            "personal_fouls_avg",
+            "ftm_std", "fta_std", "fga_std", "fgm_std",
+            "offensive_rebounds_std", "defensive_rebounds_std",
+            "personal_fouls_std",
         ]
 
         with open(PLAYERS_CSV_PATH, "w", newline="", encoding="utf-8") as csv_file:
-            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames,
+                                    extrasaction="ignore")
             writer.writeheader()
             writer.writerows(formatted_players)
 
@@ -1780,6 +1803,7 @@ def fetch_team_stats(progress_callback=None):
         # whether they play fast or slow.
         team_stats_endpoint = leaguedashteamstats.LeagueDashTeamStats(
             per_mode_detailed="PerGame",          # Get per-game stats
+            season=_current_season(),
             season_type_all_star="Regular Season",
         )
 
@@ -1800,6 +1824,7 @@ def fetch_team_stats(progress_callback=None):
         advanced_endpoint = advanced_stats_module.LeagueDashTeamStats(
             per_mode_detailed="Per100Possessions",    # Per 100 possessions = normalized
             measure_type_detailed_defense="Advanced",  # Advanced stats mode
+            season=_current_season(),
             season_type_all_star="Regular Season",
         )
 
