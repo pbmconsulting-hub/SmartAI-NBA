@@ -169,7 +169,8 @@ def _is_segment_prop(stat_type: str) -> bool:
 # ============================================================
 # SECTION: 3-Tier Bulk Box Score Helpers
 # Tier 1: nba_api BoxScore endpoints (bulk, fastest)
-# Tier 2: basketball_reference_web_scraper (one-call fallback)
+# Tier 2: engine/scrapers/basketball_ref_scraper.py (own scraper, replaces
+#          the removed basketball_reference_web_scraper package)
 # Tier 3: Legacy per-player PlayerGameLog (kept for compatibility)
 # ============================================================
 
@@ -252,58 +253,22 @@ def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
 
 def _fetch_all_boxscores_bbref(date_str: str) -> dict:
     """
-    TIER 2 FALLBACK: Fetch all player box scores via basketball_reference_web_scraper.
+    TIER 2 FALLBACK: Fetch all player box scores via the own Basketball Reference scraper.
 
-    One API call returns ALL player box scores for the date.
-    Safely returns empty dict if the package is not installed.
+    Uses ``engine.scrapers.basketball_ref_scraper.get_player_box_scores_for_date``
+    which replaced the removed ``basketball_reference_web_scraper`` package.
+    Returns empty dict if the scraper is unavailable or the request fails.
 
     Returns:
         dict: {player_name_lower: {pts, reb, ast, stl, blk, tov, fg3m, ...}}
-              Empty dict on any failure or if package not installed.
+              Empty dict on any failure.
     """
     try:
-        from basketball_reference_web_scraper import client as _bbref_client
-    except ImportError:
-        return {}
-
-    try:
-        import datetime as _dt
-        target = _dt.datetime.strptime(date_str, "%Y-%m-%d")
-        rows = _bbref_client.player_box_scores(
-            day=target.day, month=target.month, year=target.year
-        )
-
-        lookup: dict = {}
-        for row in rows:
-            pname = str(row.get("name") or "").lower().strip()
-            if not pname:
-                continue
-            secs = float(row.get("seconds_played") or 0)
-            oreb = float(row.get("offensive_rebounds") or 0)
-            dreb = float(row.get("defensive_rebounds") or 0)
-            lookup[pname] = {
-                "pts":     float(row.get("points") or 0),
-                "reb":     oreb + dreb,
-                "ast":     float(row.get("assists") or 0),
-                "stl":     float(row.get("steals") or 0),
-                "blk":     float(row.get("blocks") or 0),
-                "tov":     float(row.get("turnovers") or 0),
-                "fg3m":    float(row.get("made_three_point_field_goals") or 0),
-                "fg3a":    float(row.get("attempted_three_point_field_goals") or 0),
-                "fgm":     float(row.get("made_field_goals") or 0),
-                "fga":     float(row.get("attempted_field_goals") or 0),
-                "ftm":     float(row.get("made_free_throws") or 0),
-                "fta":     float(row.get("attempted_free_throws") or 0),
-                "oreb":    oreb,
-                "dreb":    dreb,
-                "pf":      float(row.get("personal_fouls") or 0),
-                "minutes": round(secs / 60.0, 2),
-            }
-
-        return lookup
-
+        from engine.scrapers.basketball_ref_scraper import get_player_box_scores_for_date
+        lookup = get_player_box_scores_for_date(date_str)
+        return lookup if lookup else {}
     except Exception as exc:
-        _logger.warning(f"[BetTracker] Tier 2 (bbref) failed: {exc}")
+        _logger.warning(f"[BetTracker] Tier 2 (bbref scraper) failed: {exc}")
         return {}
 
 
