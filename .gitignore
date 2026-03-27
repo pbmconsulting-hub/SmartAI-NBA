@@ -43,6 +43,9 @@ logs/
 logs/*.log
 logs/*.log.*
 
+# File-based cache — generated at runtime by utils.cache.FileCache
+cache/
+
 # Environment / secrets — NEVER commit API keys or credentials
 .env
 .env.*
