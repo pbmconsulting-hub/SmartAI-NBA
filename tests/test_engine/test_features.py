@@ -121,3 +121,45 @@ class TestFeatureEngineering:
         assert "rest_days" in result
         assert "is_home" in result
         assert result["rest_factor"] == 1.02
+
+    def test_build_feature_matrix_includes_travel_with_team_abbrevs(self):
+        """build_feature_matrix must use utils.geo when team abbreviations are given."""
+        from engine.features.feature_engineering import build_feature_matrix
+        result = build_feature_matrix(
+            {},
+            {},
+            {},
+            {"prev_team": "BOS", "current_team": "LAL"},
+        )
+        assert "travel_fatigue" in result
+        assert "travel_distance_miles" in result
+        assert result["travel_distance_miles"] > 2000  # Boston → LA
+
+    def test_build_feature_matrix_includes_travel_with_city_names(self):
+        """build_feature_matrix falls back to city-name travel when no team abbrevs."""
+        from engine.features.feature_engineering import build_feature_matrix
+        result = build_feature_matrix(
+            {},
+            {},
+            {},
+            {"prev_city": "Boston", "current_city": "Los Angeles"},
+        )
+        assert "travel_fatigue" in result
+        assert "travel_distance_miles" in result
+
+    def test_build_feature_matrix_uses_constants_defaults(self):
+        """Default pace/DRTG must come from utils.constants."""
+        from engine.features.feature_engineering import build_feature_matrix
+        from utils.constants import LEAGUE_AVG_PACE, LEAGUE_AVG_DRTG
+        result = build_feature_matrix({}, {}, {}, {})
+        # pace_adjustment with league-avg pace for both teams should be ~1.0
+        assert abs(result["pace_adjustment"] - 1.0) < 0.01
+        # defensive_matchup_factor with league-avg DRTG should be 1.0
+        assert abs(result["defensive_matchup_factor"] - 1.0) < 0.01
+
+    def test_constants_league_averages_imported(self):
+        """LEAGUE_AVG_PACE and LEAGUE_AVG_DRTG must be imported from utils.constants."""
+        import engine.features.feature_engineering as fe
+        from utils.constants import LEAGUE_AVG_PACE, LEAGUE_AVG_DRTG
+        assert fe.LEAGUE_AVG_PACE == LEAGUE_AVG_PACE
+        assert fe.LEAGUE_AVG_DRTG == LEAGUE_AVG_DRTG

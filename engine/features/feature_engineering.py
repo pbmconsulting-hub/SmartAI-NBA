@@ -3,6 +3,7 @@ import math
 import datetime
 from typing import List, Dict, Any, Optional
 from utils.logger import get_logger
+from utils.constants import LEAGUE_AVG_PACE, LEAGUE_AVG_DRTG
 
 _logger = get_logger(__name__)
 
@@ -187,7 +188,7 @@ def calculate_days_rest_factor(rest_days: int) -> float:
 def calculate_pace_adjustment(
     team_pace: float,
     opponent_pace: float,
-    league_avg_pace: float = 100.0,
+    league_avg_pace: float = LEAGUE_AVG_PACE,
 ) -> float:
     """Pace adjustment factor for projections.
 
@@ -207,7 +208,7 @@ def calculate_pace_adjustment(
 
 def calculate_defensive_matchup_factor(
     opp_drtg: float,
-    league_avg_drtg: float = 110.0,
+    league_avg_drtg: float = LEAGUE_AVG_DRTG,
 ) -> float:
     """Defensive matchup difficulty adjustment.
 
@@ -264,11 +265,41 @@ def build_feature_matrix(
     features["is_home"] = 1 if game_context.get("is_home") else 0
     features["is_back_to_back"] = 1 if rest_days == 0 else 0
 
-    team_pace = float(game_context.get("team_pace", 100.0))
-    opp_pace = float(game_context.get("opponent_pace", 100.0))
+    team_pace = float(game_context.get("team_pace", LEAGUE_AVG_PACE))
+    opp_pace = float(game_context.get("opponent_pace", LEAGUE_AVG_PACE))
     features["pace_adjustment"] = calculate_pace_adjustment(team_pace, opp_pace)
 
-    opp_drtg = float(game_context.get("opponent_drtg", 110.0))
+    opp_drtg = float(game_context.get("opponent_drtg", LEAGUE_AVG_DRTG))
     features["defensive_matchup_factor"] = calculate_defensive_matchup_factor(opp_drtg)
+
+    # Travel fatigue — use utils.geo when team abbreviations are available,
+    # fall back to city-name-based calculation within this module.
+    travel_fatigue = 1.0
+    try:
+        prev_team = game_context.get("prev_team")
+        curr_team = game_context.get("current_team")
+        if prev_team and curr_team:
+            from utils.geo import get_travel_distance, get_travel_fatigue_factor
+            dist = get_travel_distance(prev_team, curr_team)
+            travel_fatigue = get_travel_fatigue_factor(dist)
+            features["travel_distance_miles"] = dist
+        else:
+            prev_city = game_context.get("prev_city")
+            curr_city = game_context.get("current_city")
+            if prev_city and curr_city:
+                dist = calculate_travel_distance(prev_city, curr_city)
+                # Derive fatigue factor using the same breakpoints as utils.geo
+                if dist < 500:
+                    travel_fatigue = 1.00
+                elif dist < 1500:
+                    travel_fatigue = 0.99
+                elif dist < 2500:
+                    travel_fatigue = 0.98
+                else:
+                    travel_fatigue = 0.97
+                features["travel_distance_miles"] = dist
+    except Exception as exc:
+        _logger.debug("travel fatigue calculation failed: %s", exc)
+    features["travel_fatigue"] = travel_fatigue
 
     return features

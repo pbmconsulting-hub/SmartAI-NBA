@@ -23,6 +23,6 @@ class TestCbsInjuries:
     def test_module_has_expected_constants(self):
         import engine.scrapers.cbs_injuries_scraper as mod
         assert hasattr(mod, "_CBS_INJURY_URL")
-        assert "cbssports.com" in mod._CBS_INJURY_URL
+        assert mod._CBS_INJURY_URL.startswith("https://www.cbssports.com/")
         assert hasattr(mod, "_DELAY")
         assert mod._DELAY >= 1.0

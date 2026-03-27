@@ -84,6 +84,42 @@ class TestModelEnsemble:
         result = ens.predict([[1, 2], [3, 4]])
         assert len(result) == 2
 
+    def test_ensemble_inherits_base_model(self):
+        from engine.models.ensemble import ModelEnsemble
+        from engine.models.base_model import BaseModel
+        assert issubclass(ModelEnsemble, BaseModel)
+
+    def test_ensemble_has_name(self):
+        from engine.models.ensemble import ModelEnsemble
+        assert ModelEnsemble.name == "ensemble"
+
+    def test_ensemble_has_evaluate(self):
+        from engine.models.ensemble import ModelEnsemble
+        ens = ModelEnsemble()
+        assert hasattr(ens, "evaluate") and callable(ens.evaluate)
+
+    def test_ensemble_has_save(self):
+        from engine.models.ensemble import ModelEnsemble
+        ens = ModelEnsemble()
+        assert hasattr(ens, "save") and callable(ens.save)
+
+    def test_ensemble_train_logs_weights(self):
+        """train() must call log_model_weight for each sub-model weight."""
+        pytest.importorskip("sklearn")
+        import numpy as np
+        from engine.models.ensemble import ModelEnsemble
+        from tracking import model_performance as mp
+        # Record weight history size before
+        before = {k: len(v) for k, v in mp._weight_history.items()}
+        ens = ModelEnsemble()
+        X = np.array([[float(i)] for i in range(10)])
+        y = np.array([float(i) for i in range(10)])
+        ens.train(X, y)
+        # At least one new weight entry must have been logged
+        after_total = sum(len(v) for v in mp._weight_history.values())
+        before_total = sum(before.values())
+        assert after_total > before_total, "train() did not call log_model_weight"
+
 
 class TestModelPerformance:
     def test_log_and_retrieve_prediction(self):

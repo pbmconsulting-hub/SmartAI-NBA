@@ -4,6 +4,7 @@ NOTE: This is the NEW ML ensemble in engine/models/.
       The existing engine/ensemble.py is a separate betting ensemble and is NOT touched.
 """
 from utils.logger import get_logger
+from engine.models.base_model import BaseModel
 from engine.models.ridge_model import RidgeModel
 from engine.models.xgboost_model import XGBoostModel
 from engine.models.catboost_model import CatBoostModel
@@ -11,8 +12,10 @@ from engine.models.catboost_model import CatBoostModel
 _logger = get_logger(__name__)
 
 
-class ModelEnsemble:
+class ModelEnsemble(BaseModel):
     """Inverse-variance weighted blend of all available ML models."""
+
+    name = "ensemble"
 
     def __init__(self):
         self.models = [RidgeModel(), XGBoostModel(), CatBoostModel()]
@@ -50,6 +53,14 @@ class ModelEnsemble:
             self._weights = {m.name: 1.0 / n for m in self.models}
 
         _logger.info("Ensemble weights: %s", self._weights)
+
+        # Log weights to model_performance tracker
+        try:
+            from tracking.model_performance import log_model_weight
+            for model_name, weight in self._weights.items():
+                log_model_weight(model_name, weight)
+        except Exception as exc:
+            _logger.debug("log_model_weight failed: %s", exc)
 
     def predict(self, X):
         """Weighted blend prediction.
