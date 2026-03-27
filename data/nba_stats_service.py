@@ -54,6 +54,13 @@ def _cache_set(key: str, payload: Any) -> None:
     _CACHE[key] = (payload, time.time())
 
 
+# ── Game-ID validation ────────────────────────────────────────────────────────
+
+def _is_nba_game_id(game_id: str) -> bool:
+    """Return True if *game_id* is a numeric string (e.g. ``'0022401234'``)."""
+    return bool(game_id) and game_id.isdigit()
+
+
 # ── Rate limiter ──────────────────────────────────────────────────────────────
 
 def _get_limiter():
@@ -407,6 +414,9 @@ def get_advanced_box_score(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -449,6 +459,9 @@ def get_player_tracking_box_score(game_id: str) -> dict:
     if cached is not None:
         return cached
 
+    if not _is_nba_game_id(game_id):
+        return {}
+
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
 
@@ -488,6 +501,9 @@ def get_hustle_box_score(game_id: str) -> dict:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return {}
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return {}
@@ -789,6 +805,9 @@ def get_play_by_play(game_id: str) -> list[dict]:
     cached = _cache_get(cache_key, LIVE_TTL)
     if cached is not None:
         return cached
+
+    if not _is_nba_game_id(game_id):
+        return []
 
     if not _NBA_API_AVAILABLE or not _check_rate_limit():
         return []
