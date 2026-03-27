@@ -64,3 +64,4 @@ Thumbs.db
 .idea/
 *.swp
 .pytest_cache/
+catboost_info/
