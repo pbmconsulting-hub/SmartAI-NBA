@@ -2,11 +2,15 @@
 # FILE: data/roster_engine.py
 # PURPOSE: Centralised active-roster and injury resolution engine.
 #          Uses nba_api as the single authoritative data source for
-#          both roster and injury data.
+#          both roster and injury data, with proper retry logic,
+#          circuit breakers, caching, and unified header management.
 #
 # DATA SOURCES (in priority order):
-#   1. nba_api live Injuries      — daily injury designations (Out/GTD/Doubtful)
-#   2. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
+#   0. Official NBA Injury Report PDF — highest-authority source
+#   1. NBA CDN public injury JSON feed
+#   2. stats.nba.com leagueinjuries endpoint
+#   3. nba_api Injuries endpoint (if available)
+#   4. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
@@ -25,7 +29,7 @@
 import re
 import time
 import datetime
-from typing import Optional
+from typing import Any, Optional
 
 try:
     from utils.logger import get_logger
@@ -34,12 +38,38 @@ except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
 
+try:
+    from utils.headers import get_nba_headers, get_cdn_headers
+    _HAS_HEADERS = True
+except ImportError:
+    _HAS_HEADERS = False
+
+try:
+    from utils.retry import retry_with_backoff, CircuitBreaker
+    _HAS_RETRY = True
+except ImportError:
+    _HAS_RETRY = False
+
+try:
+    from utils.cache import FileCache
+    _HAS_FILE_CACHE = True
+except ImportError:
+    _HAS_FILE_CACHE = False
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
 
 REQUEST_TIMEOUT = 15
 MAX_RETRIES = 3
+
+# Circuit breakers for failing endpoints
+if _HAS_RETRY:
+    _cdn_circuit = CircuitBreaker(name="cdn_injuries", failure_threshold=3, timeout=60)
+    _stats_circuit = CircuitBreaker(name="stats_injuries", failure_threshold=3, timeout=60)
+else:
+    _cdn_circuit = None
+    _stats_circuit = None
 
 
 def _current_nba_season():
@@ -217,6 +247,20 @@ class RosterEngine:
         report = engine.get_injury_report()      # full injury dict
     """
 
+    # Team ID mapping for NBA.com
+    TEAM_IDS = {
+        'ATL': '1610612737', 'BOS': '1610612738', 'BKN': '1610612751',
+        'CHA': '1610612766', 'CHI': '1610612741', 'CLE': '1610612739',
+        'DAL': '1610612742', 'DEN': '1610612743', 'DET': '1610612765',
+        'GSW': '1610612744', 'HOU': '1610612745', 'IND': '1610612754',
+        'LAC': '1610612746', 'LAL': '1610612747', 'MEM': '1610612763',
+        'MIA': '1610612748', 'MIL': '1610612749', 'MIN': '1610612750',
+        'NOP': '1610612740', 'NYK': '1610612752', 'OKC': '1610612760',
+        'ORL': '1610612753', 'PHI': '1610612755', 'PHX': '1610612756',
+        'POR': '1610612757', 'SAC': '1610612758', 'SAS': '1610612759',
+        'TOR': '1610612761', 'UTA': '1610612762', 'WAS': '1610612764',
+    }
+
     def __init__(self):
         # {normalized_player_name → {status, injury, team, return_date, source}}
         self._injury_map: dict = {}
@@ -225,6 +269,20 @@ class RosterEngine:
         # {team_abbrev → [player_name, ...]}  — filtered active-only
         self._active_rosters: dict = {}
         self._last_refresh: Optional[datetime.datetime] = None
+        self._file_cache: Any = None  # Optional[FileCache] when utils.cache available
+        if _HAS_FILE_CACHE:
+            try:
+                self._file_cache = FileCache(cache_dir="cache/roster", ttl_hours=1)
+            except Exception:
+                pass
+
+    # ----------------------------------------------------------
+    # Team ID helper
+    # ----------------------------------------------------------
+
+    def get_team_id(self, team_abbrev: str) -> Optional[str]:
+        """Get NBA.com team ID from abbreviation."""
+        return self.TEAM_IDS.get(team_abbrev.upper().strip())
 
     # ----------------------------------------------------------
     # Public API
@@ -407,25 +465,34 @@ class RosterEngine:
         """
         import requests as _requests  # local import to avoid top-level dep for optional feature
 
-        # User-Agent kept generic enough to work across NBA endpoints;
-        # update the Chrome version string if NBA API starts rejecting requests.
-        _NBA_HEADERS = {
-            "Host": "stats.nba.com",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "x-nba-stats-origin": "stats",
-            "x-nba-stats-token": "true",
-            "Connection": "keep-alive",
-            "Referer": "https://www.nba.com/",
-            "Origin": "https://www.nba.com",
-        }
+        # Use unified headers from utils when available
+        if _HAS_HEADERS:
+            _NBA_HEADERS = get_nba_headers()
+            _CDN_HEADERS = get_cdn_headers()
+        else:
+            _NBA_HEADERS = {
+                "Host": "stats.nba.com",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "x-nba-stats-origin": "stats",
+                "x-nba-stats-token": "true",
+                "Connection": "keep-alive",
+                "Referer": "https://www.nba.com/",
+                "Origin": "https://www.nba.com",
+            }
+            _CDN_HEADERS = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+                "Referer": "https://www.nba.com/",
+            }
 
-        # ── Source 1: NBA CDN ──────────────────────────────────
-        try:
+        # ── Source 1: NBA CDN (with circuit breaker) ──────────
+        def _cdn_fetch():
             resp = _requests.get(
                 "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
+                headers=_CDN_HEADERS,
                 timeout=10,
             )
             resp.raise_for_status()
@@ -436,7 +503,13 @@ class RosterEngine:
                 or data.get("injuredPlayers", [])
                 or data.get("players", [])
             )
-            result = _parse_injured_list(injured_list, "nba-cdn-injuries")
+            return _parse_injured_list(injured_list, "nba-cdn-injuries")
+
+        try:
+            if _cdn_circuit is not None:
+                result = _cdn_circuit.call(_cdn_fetch)
+            else:
+                result = _cdn_fetch()
             if result:
                 _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CDN source returned {len(result)} players")
                 return result
@@ -444,25 +517,29 @@ class RosterEngine:
         except Exception as exc:
             _logger.info(f"  RosterEngine._fetch_nba_api_injuries CDN: {exc}")
 
-        # ── Source 2: stats.nba.com leagueinjuries ────────────
-        try:
+        # ── Source 2: stats.nba.com leagueinjuries (with circuit breaker) ────
+        def _stats_fetch():
             _current_season = _current_nba_season()
             _url = f"https://stats.nba.com/stats/leagueinjuries?LeagueID=00&Season={_current_season}"
             resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
             resp2.raise_for_status()
             data2 = resp2.json()
-            # Try common response structures
             injured_list2 = (
                 data2.get("resultSets", [{}])[0].get("rowSet", [])
                 if data2.get("resultSets")
                 else data2.get("players", [])
             )
-            # If rowSet format, parse columns
             if data2.get("resultSets") and data2["resultSets"][0].get("headers"):
                 headers = data2["resultSets"][0]["headers"]
                 rows    = data2["resultSets"][0].get("rowSet", [])
                 injured_list2 = [dict(zip(headers, row)) for row in rows]
-            result2 = _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
+            return _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
+
+        try:
+            if _stats_circuit is not None:
+                result2 = _stats_circuit.call(_stats_fetch)
+            else:
+                result2 = _stats_fetch()
             if result2:
                 _logger.info(f"  RosterEngine._fetch_nba_api_injuries: stats.nba.com source returned {len(result2)} players")
                 return result2
@@ -562,6 +639,48 @@ class RosterEngine:
                 _logger.info(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
             except Exception as exc:
                 _logger.warning(f"  RosterEngine nba_api error for {abbrev}: {exc}")
+
+    # ----------------------------------------------------------
+    # get_team_roster: convenience wrapper for CommonTeamRoster
+    # ----------------------------------------------------------
+
+    def get_team_roster(self, team_abbrev: str) -> list:
+        """Get full roster for a team via CommonTeamRoster API.
+
+        Returns a list of dicts with keys: name, id, position, number, team.
+        """
+        try:
+            from nba_api.stats.endpoints import CommonTeamRoster
+            from nba_api.stats.static import teams as nba_static_teams
+        except ImportError:
+            _logger.warning("RosterEngine.get_team_roster: nba_api not available")
+            return []
+
+        team_id = self.get_team_id(team_abbrev)
+        if not team_id:
+            all_teams = {t["abbreviation"]: t["id"] for t in nba_static_teams.get_teams()}
+            team_id = all_teams.get(team_abbrev.upper())
+        if not team_id:
+            _logger.warning(f"Could not find team ID for {team_abbrev}")
+            return []
+
+        try:
+            roster = CommonTeamRoster(team_id=team_id)
+            df = roster.get_data_frames()[0]
+
+            players = []
+            for _, row in df.iterrows():
+                players.append({
+                    'name': row.get('PLAYER', ''),
+                    'id': row.get('PLAYER_ID', ''),
+                    'position': row.get('POSITION', ''),
+                    'number': row.get('NUM', ''),
+                    'team': team_abbrev.upper(),
+                })
+            return players
+        except Exception as e:
+            _logger.error(f"Failed to fetch roster for {team_abbrev}: {e}")
+            return []
 
 # ============================================================
 # END SECTION: RosterEngine class
