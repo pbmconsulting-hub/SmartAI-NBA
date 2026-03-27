@@ -2468,7 +2468,8 @@ def smart_filter_props(
         _raw_allowed = set(str(s).lower().strip() for s in stat_types)
         # "fantasy_score" is the UI label; expand to all platform variants
         if "fantasy_score" in _raw_allowed:
-            _raw_allowed |= {"fantasy_score_pp", "fantasy_score_dk", "fantasy_score_ud"}
+            from engine import FANTASY_STAT_TYPES
+            _raw_allowed |= set(FANTASY_STAT_TYPES)
         _allowed_stats = frozenset(_raw_allowed)
 
     original_count = len(all_props)
