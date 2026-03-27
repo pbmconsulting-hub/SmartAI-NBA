@@ -67,6 +67,8 @@ from data.live_data_fetcher import (               # noqa: F401 – re-exports
     get_teams_staleness_warning,
     # Cached roster helper
     get_cached_roster,
+    # Season helper
+    _current_season,
 )
 
 # Import live_data_fetcher functions under private names so we can
@@ -180,7 +182,7 @@ def get_standings(progress_callback=None) -> list:
         from nba_api.stats.endpoints import leaguestandingsv3
         import time
         time.sleep(API_DELAY_SECONDS)
-        raw = leaguestandingsv3.LeagueStandingsV3(season="2024-25")
+        raw = leaguestandingsv3.LeagueStandingsV3(season=_current_season())
         df = raw.get_data_frames()[0]
         standings = []
         for _, row in df.iterrows():

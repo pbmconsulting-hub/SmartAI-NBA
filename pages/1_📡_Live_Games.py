@@ -1259,8 +1259,39 @@ st.markdown(get_education_box_html(
 # SECTION: Display Current Games as Rich Cards
 # ============================================================
 
+def _enrich_games_with_standings(games, standings):
+    """Merge conference/rank/last_10 from standings into game dicts."""
+    if not standings:
+        return
+    lookup = {}
+    for s in standings:
+        abbr = s.get("team_abbreviation", "")
+        if abbr:
+            lookup[abbr] = s
+    for g in games:
+        home_s = lookup.get(g.get("home_team", ""), {})
+        away_s = lookup.get(g.get("away_team", ""), {})
+        g.setdefault("home_conference_rank", home_s.get("conference_rank", 0))
+        g.setdefault("home_conference", home_s.get("conference", ""))
+        g.setdefault("home_last_10", home_s.get("last_10", ""))
+        g.setdefault("away_conference_rank", away_s.get("conference_rank", 0))
+        g.setdefault("away_conference", away_s.get("conference", ""))
+        g.setdefault("away_last_10", away_s.get("last_10", ""))
+        # Backfill basic records when the original fetch returned zeros
+        if not g.get("home_wins") and home_s.get("wins"):
+            g["home_wins"] = home_s["wins"]
+            g["home_losses"] = home_s.get("losses", 0)
+        if not g.get("away_wins") and away_s.get("wins"):
+            g["away_wins"] = away_s["wins"]
+            g["away_losses"] = away_s.get("losses", 0)
+
 current_games = st.session_state.get("todays_games", [])
 players_data = load_players_data()
+
+# Enrich games with standings data (conference rank, conference, last 10)
+_standings_for_enrich = st.session_state.get("league_standings", [])
+if current_games and _standings_for_enrich:
+    _enrich_games_with_standings(current_games, _standings_for_enrich)
 
 if current_games:
     st.subheader(f"🏟️ Tonight's Slate — {len(current_games)} Game(s)")

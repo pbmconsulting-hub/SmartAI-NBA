@@ -92,7 +92,7 @@ except ImportError:
 with st.sidebar:
     st.subheader("⚙️ Backtest Settings")
 
-    season = st.selectbox("Season", ["2024-25", "2023-24", "2022-23"], index=0)
+    season = st.selectbox("Season", ["2025-26", "2024-25", "2023-24", "2022-23"], index=0)
 
     stat_options = [
         "points", "rebounds", "assists", "steals", "blocks", "threes", "turnovers",
