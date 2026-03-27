@@ -261,7 +261,7 @@ def fetch_box_score_traditional(game_id: str, period: int = 0) -> dict:
             end_range=28800,
             range_type=0,
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -349,7 +349,7 @@ def fetch_box_score_usage(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscoreusagev3.BoxScoreUsageV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -408,7 +408,7 @@ def fetch_player_on_off(team_id: int, season: str | None = None) -> dict:
             season=season,
             season_type_all_star="Regular Season",
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -575,7 +575,7 @@ def fetch_rotations(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = gamerotation.GameRotation(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -627,7 +627,7 @@ def fetch_schedule(game_date: str | None = None) -> list[dict]:
             game_date=game_date,
             league_id="00",
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         games = norm.get("GameHeader", [])
@@ -673,7 +673,7 @@ def fetch_todays_scoreboard() -> dict:
             game_date=today,
             league_id="00",
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -732,7 +732,7 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscorematchupsv3.BoxScoreMatchupsV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -818,7 +818,7 @@ def fetch_defensive_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscoredefensivev2.BoxScoreDefensiveV2(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -866,7 +866,7 @@ def fetch_scoring_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscorescoringv3.BoxScoreScoringV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -954,7 +954,7 @@ def fetch_four_factors_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscorefourfactorsv3.BoxScoreFourFactorsV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -1483,7 +1483,7 @@ def fetch_win_probability(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = winprobabilitypbp.WinProbabilityPBP(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -1565,7 +1565,7 @@ def fetch_game_summary(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscoresummaryv2.BoxScoreSummaryV2(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
