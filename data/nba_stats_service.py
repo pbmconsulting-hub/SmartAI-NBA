@@ -154,7 +154,7 @@ def get_all_players(active_only: bool = True) -> list[dict]:
             is_only_current_season=1 if active_only else 0,
             league_id="00",
         )
-        rows = endpoint.get_normalized_dict().get("CommonAllPlayers", [])
+        rows = (endpoint.get_normalized_dict() or {}).get("CommonAllPlayers", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         players = [
@@ -209,7 +209,7 @@ def get_player_info(player_id: int) -> dict:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("CommonPlayerInfo", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -318,7 +318,7 @@ def get_player_career_stats(player_id: int) -> dict:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = playercareerstats.PlayerCareerStats(player_id=player_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -372,7 +372,7 @@ def get_player_splits(player_id: int, season: str | None = None) -> dict:
             player_id=player_id,
             season=season,
         )
-        last_n_norm = last_n.get_normalized_dict()
+        last_n_norm = last_n.get_normalized_dict() or {}
         result["last_5_games"] = last_n_norm.get("Last5Games", [])
         result["last_10_games"] = last_n_norm.get("Last10Games", [])
 
@@ -382,7 +382,7 @@ def get_player_splits(player_id: int, season: str | None = None) -> dict:
             player_id=player_id,
             season=season,
         )
-        general_norm = general.get_normalized_dict()
+        general_norm = general.get_normalized_dict() or {}
         home_away = general_norm.get("LocationPlayerDashboard", [])
         result["home"] = [r for r in home_away if r.get("GROUP_VALUE") == "Home"]
         result["away"] = [r for r in home_away if r.get("GROUP_VALUE") == "Road"]
@@ -425,7 +425,7 @@ def get_advanced_box_score(game_id: str) -> dict:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscoreadvancedv3.BoxScoreAdvancedV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -470,7 +470,7 @@ def get_player_tracking_box_score(game_id: str) -> dict:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscoreplayertrackv3.BoxScorePlayerTrackV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {"player_stats": norm.get("PlayerStats", [])}
@@ -513,7 +513,7 @@ def get_hustle_box_score(game_id: str) -> dict:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = boxscorehustlev2.BoxScoreHustleV2(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {"player_stats": norm.get("PlayerStats", [])}
@@ -557,7 +557,7 @@ def get_defensive_matchup_data(
             season=season,
             per_mode_simple=per_mode,
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("LeagueDashPtDefend", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -603,7 +603,7 @@ def get_shot_chart(player_id: int, season: str | None = None) -> list[dict]:
             season_nullable=season,
             context_measure_simple="FGA",
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("Shot_Chart_Detail", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -650,7 +650,7 @@ def get_lineup_stats(
             season=season,
             group_quantity=group_quantity,
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("Lineups", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -774,7 +774,7 @@ def find_games(
 
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = leaguegamefinder.LeagueGameFinder(**kwargs)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("LeagueGameFinderResults", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -817,7 +817,7 @@ def get_play_by_play(game_id: str) -> list[dict]:
         t0 = time.monotonic()
         time.sleep(_NBA_API_CALL_DELAY)
         endpoint = playbyplayv3.PlayByPlayV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("PlayByPlay", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
@@ -862,7 +862,7 @@ def get_team_roster(team_id: int, season: str | None = None) -> list[dict]:
             team_id=team_id,
             season=season,
         )
-        norm = endpoint.get_normalized_dict()
+        norm = endpoint.get_normalized_dict() or {}
         rows = norm.get("CommonTeamRoster", [])
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 

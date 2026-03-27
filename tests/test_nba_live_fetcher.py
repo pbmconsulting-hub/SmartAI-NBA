@@ -378,6 +378,100 @@ class TestGameIdValidation(unittest.TestCase):
         self.assertEqual(result, {})
 
 
+# ── Section 6: None-norm guard ────────────────────────────────────────────────
+
+class TestNoneNormGuard(unittest.TestCase):
+    """Verify that functions handle get_normalized_dict() returning None."""
+
+    def _make_none_ep(self):
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.return_value = None
+        return mock_ep
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_four_factors_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorefourfactorsv3.BoxScoreFourFactorsV3",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_four_factors_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_matchups_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorematchupsv3.BoxScoreMatchupsV3",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_box_score_matchups("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_box_score_traditional_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscoretraditionalv3.BoxScoreTraditionalV3",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_box_score_traditional("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_defensive_box_score_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscoredefensivev2.BoxScoreDefensiveV2",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_defensive_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_scoring_box_score_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscorescoringv3.BoxScoreScoringV3",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_scoring_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_box_score_usage_none_norm(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+        with patch("nba_api.stats.endpoints.boxscoreusagev3.BoxScoreUsageV3",
+                   return_value=self._make_none_ep()):
+            result = nlf.fetch_box_score_usage("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+
 class TestBuildFormattedGame(unittest.TestCase):
     """_build_formatted_game should use a real game_id when provided."""
 

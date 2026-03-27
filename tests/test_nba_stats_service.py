@@ -980,5 +980,64 @@ class TestSimulationEnrichGuard(unittest.TestCase):
         self.assertFalse(result["available"])
 
 
+# ── Section 13: None-norm guard ───────────────────────────────────────────────
+
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
+class TestNoneNormGuard(unittest.TestCase):
+    """Verify that nba_stats_service functions handle get_normalized_dict() returning None."""
+
+    def setUp(self):
+        import data.nba_stats_service as svc
+        svc._CACHE.clear()
+
+    def _make_none_ep(self):
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.return_value = None
+        return mock_ep
+
+    @patch("data.nba_stats_service._check_rate_limit", return_value=True)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    @patch("data.nba_stats_service.time.sleep")
+    @patch("data.nba_stats_service.time.monotonic", return_value=0.0)
+    def test_advanced_box_score_none_norm(self, _mono, _sleep, _rate):
+        with patch("nba_api.stats.endpoints.boxscoreadvancedv3.BoxScoreAdvancedV3",
+                   return_value=self._make_none_ep()):
+            from data.nba_stats_service import get_advanced_box_score
+            import data.nba_stats_service as svc
+            svc._CACHE.clear()
+            result = get_advanced_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+        self.assertEqual(result.get("team_stats"), [])
+
+    @patch("data.nba_stats_service._check_rate_limit", return_value=True)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    @patch("data.nba_stats_service.time.sleep")
+    @patch("data.nba_stats_service.time.monotonic", return_value=0.0)
+    def test_player_tracking_box_score_none_norm(self, _mono, _sleep, _rate):
+        with patch("nba_api.stats.endpoints.boxscoreplayertrackv3.BoxScorePlayerTrackV3",
+                   return_value=self._make_none_ep()):
+            from data.nba_stats_service import get_player_tracking_box_score
+            import data.nba_stats_service as svc
+            svc._CACHE.clear()
+            result = get_player_tracking_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+
+    @patch("data.nba_stats_service._check_rate_limit", return_value=True)
+    @patch("data.nba_stats_service._NBA_API_AVAILABLE", True)
+    @patch("data.nba_stats_service.time.sleep")
+    @patch("data.nba_stats_service.time.monotonic", return_value=0.0)
+    def test_hustle_box_score_none_norm(self, _mono, _sleep, _rate):
+        with patch("nba_api.stats.endpoints.boxscorehustlev2.BoxScoreHustleV2",
+                   return_value=self._make_none_ep()):
+            from data.nba_stats_service import get_hustle_box_score
+            import data.nba_stats_service as svc
+            svc._CACHE.clear()
+            result = get_hustle_box_score("0022501066")
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
