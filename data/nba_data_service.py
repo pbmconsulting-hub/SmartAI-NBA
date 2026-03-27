@@ -654,6 +654,68 @@ def refresh_historical_data_for_tonight(
 
 
 # ============================================================
+# NBADataService — class-based API wrapper
+# ============================================================
+
+class NBADataService:
+    """
+    Class-based service for NBA data operations.
+
+    Wraps the existing module-level functions in an OOP interface,
+    providing cache management and bulk-refresh convenience methods.
+    All callers can continue using the module-level functions directly;
+    this class is offered for callers that prefer dependency injection.
+    """
+
+    def __init__(self):
+        if _HAS_FILE_CACHE:
+            self.cache = _FileCache(cache_dir="cache/service", ttl_hours=1)
+        else:
+            self.cache = None
+
+        try:
+            from data.roster_engine import RosterEngine
+            self.roster_engine = RosterEngine()
+        except Exception:
+            self.roster_engine = None
+
+    # ── Core data methods ─────────────────────────────────────
+
+    def get_todays_games(self):
+        """Get today's NBA games."""
+        return get_todays_games()
+
+    def get_todays_players(self, games, progress_callback=None,
+                           precomputed_injury_map=None):
+        """Get players for teams playing today."""
+        return get_todays_players(
+            games,
+            progress_callback=progress_callback,
+            precomputed_injury_map=precomputed_injury_map,
+        )
+
+    def get_team_stats(self, progress_callback=None):
+        """Get team statistics."""
+        return get_team_stats(progress_callback=progress_callback)
+
+    def get_injuries(self):
+        """Get current injury data via RosterEngine."""
+        if self.roster_engine:
+            return self.roster_engine.refresh()
+        return {}
+
+    # ── Cache & refresh ───────────────────────────────────────
+
+    def clear_caches(self):
+        """Clear all caches (delegates to module-level clear_caches)."""
+        clear_caches()
+
+    def refresh_all_data(self, progress_callback=None):
+        """Refresh all data (delegates to module-level refresh_all_data)."""
+        return refresh_all_data(progress_callback=progress_callback)
+
+
+# ============================================================
 # Utility-layer integration — cache management & bulk refresh
 # ============================================================
 
