@@ -54,6 +54,26 @@ except ImportError:
     _RATE_LIMITER_AVAILABLE = False
     _rate_limiter = None
 
+try:
+    from utils.headers import get_espn_headers
+    _HAS_HEADERS = True
+except ImportError:
+    _HAS_HEADERS = False
+
+try:
+    from utils.retry import retry_with_backoff
+    _HAS_RETRY = True
+except ImportError:
+    _HAS_RETRY = False
+
+try:
+    from data.player_id_cache import PlayerIDCache
+    _player_id_cache = PlayerIDCache()
+    _HAS_PLAYER_ID_CACHE = True
+except ImportError:
+    _player_id_cache = None
+    _HAS_PLAYER_ID_CACHE = False
+
 # ============================================================
 # SECTION: File Path Constants
 # Same data directory as data_manager.py
@@ -693,7 +713,8 @@ def _fetch_games_layer2_espn(team_records):
         import requests
 
         url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
-        resp = requests.get(url, timeout=ESPN_API_TIMEOUT_SECONDS)
+        _espn_headers = get_espn_headers() if _HAS_HEADERS else {}
+        resp = requests.get(url, headers=_espn_headers, timeout=ESPN_API_TIMEOUT_SECONDS)
         resp.raise_for_status()
         data = resp.json()
 
@@ -990,6 +1011,12 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
             _all_nba_players = _nba_players_static.get_players()
             _name_to_id = {p["full_name"].lower(): p["id"] for p in _all_nba_players}
 
+            # Load player names into PlayerIDCache for fuzzy matching fallback
+            if _HAS_PLAYER_ID_CACHE and _player_id_cache is not None:
+                _player_id_cache.load_nba_player_names(
+                    [{"full_name": p["full_name"], "id": p["id"], "team": ""} for p in _all_nba_players]
+                )
+
             teams_fetched = 0
             for abbrev in sorted(playing_team_abbrevs):
                 if progress_callback:
@@ -1011,6 +1038,11 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                                 ),
                                 None,
                             )
+                    if not pid and _HAS_PLAYER_ID_CACHE and _player_id_cache is not None:
+                        # Fuzzy matching via PlayerIDCache as final fallback
+                        pid = _player_id_cache.get_player_id(player_name, team=abbrev)
+                        if pid:
+                            _logger.debug(f"  PlayerIDCache resolved {player_name} → {pid}")
                     if pid:
                         if pid in seen_pids:
                             continue  # Deduplicate: skip players already added
@@ -1419,6 +1451,7 @@ def fetch_player_stats(progress_callback=None):
         # Make the API call — this fetches ALL players' stats at once
         stats_endpoint = leaguedashplayerstats.LeagueDashPlayerStats(
             per_mode_detailed="PerGame",      # We want per-game averages
+            season=_current_season(),
             season_type_all_star="Regular Season",  # Only regular season
         )
 
