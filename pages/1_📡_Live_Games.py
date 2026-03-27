@@ -600,7 +600,7 @@ if platform_props_clicked:
         pp_status.text(f"⏳ 4/5 — Running Neural Analysis on {len(props_to_analyze):,} props…")
         pp_bar.progress(40)
 
-        from engine.projections import build_player_projection, get_stat_standard_deviation
+        from engine.projections import build_player_projection, get_stat_standard_deviation, POSITION_PRIORS as _POSITION_PRIORS
         from engine.simulation import run_quantum_matrix_simulation
         from engine.edge_detection import analyze_directional_forces, should_avoid_prop, classify_bet_type
         from engine.confidence import calculate_confidence_score
@@ -634,25 +634,45 @@ if platform_props_clicked:
                 player_data = player_lookup.get(player_name.lower())
                 if not player_data:
                     # Platform props are the source of truth for active players.
-                    # Build a minimal stub from the prop line so we can still analyze
-                    # players that are active/playing but missing from the CSV
-                    # (e.g., due to injury-filtered CSV from a previous auto-load).
+                    # Build a position-prior-seeded profile from the prop line so
+                    # we can still analyze players active in props but missing from
+                    # the CSV (e.g., due to injury-filtered CSV from a previous
+                    # auto-load).  Stats are seeded from POSITION_PRIORS ("SF" as
+                    # median fallback) and the target stat is anchored to prop_line
+                    # (most reliable single data point).  games_played=30 keeps us
+                    # above the Bayesian shrinkage threshold so the prop-line anchor
+                    # is trusted over the position prior, matching QAM page behaviour.
                     player_team = str(prop.get("team") or prop.get("player_team") or "")
+                    _fallback_pos = "SF"
+                    try:
+                        from data.player_profile_service import get_player_bio as _get_bio
+                        _bio_pos = (_get_bio(player_name) or {}).get("position", "")
+                        if "C" in _bio_pos.upper() and "F" not in _bio_pos.upper():
+                            _fallback_pos = "C"
+                        elif "PG" in _bio_pos.upper():
+                            _fallback_pos = "PG"
+                        elif "SG" in _bio_pos.upper():
+                            _fallback_pos = "SG"
+                        elif "PF" in _bio_pos.upper():
+                            _fallback_pos = "PF"
+                        elif _bio_pos.upper() in ("SF", "F"):
+                            _fallback_pos = "SF"
+                    except Exception:
+                        pass
+                    _prior = _POSITION_PRIORS.get(_fallback_pos, _POSITION_PRIORS["SF"])
                     _stub: dict = {
                         "name": player_name,
                         "team": player_team,
-                        "position": "G",
-                        "minutes_avg": 28.0,
-                        "games_played": 10,
-                        "points_avg": prop_line if stat_type == "points" else 15.0,
-                        "rebounds_avg": prop_line if stat_type == "rebounds" else 4.5,
-                        "assists_avg": prop_line if stat_type == "assists" else 3.5,
-                        "threes_avg": prop_line if stat_type == "threes" else 1.5,
-                        "steals_avg": prop_line if stat_type == "steals" else 0.8,
-                        "blocks_avg": prop_line if stat_type == "blocks" else 0.5,
-                        "turnovers_avg": prop_line if stat_type == "turnovers" else 1.5,
-                        "usage_rate": 0.20,
-                        "ft_pct": 0.75,
+                        "position": _fallback_pos,
+                        "minutes_avg": 30.0,
+                        "games_played": 30,   # above Bayesian threshold — trust prop_line anchor
+                        "points_avg":    str(prop_line if stat_type == "points" else _prior["points"]),
+                        "rebounds_avg":  str(prop_line if stat_type == "rebounds" else _prior["rebounds"]),
+                        "assists_avg":   str(prop_line if stat_type == "assists" else _prior["assists"]),
+                        "threes_avg":    str(prop_line if stat_type == "threes" else _prior["threes"]),
+                        "steals_avg":    str(prop_line if stat_type == "steals" else _prior["steals"]),
+                        "blocks_avg":    str(prop_line if stat_type == "blocks" else _prior["blocks"]),
+                        "turnovers_avg": str(prop_line if stat_type == "turnovers" else _prior["turnovers"]),
                     }
                     player_data = _stub
 
