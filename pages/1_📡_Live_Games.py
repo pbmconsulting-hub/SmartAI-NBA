@@ -613,6 +613,9 @@ if platform_props_clicked:
         games_context = _todays_games  # Use auto-loaded games from Step 0
         injury_map = st.session_state.get("injury_status_map", {})
 
+        # Bio position strings → POSITION_PRIORS keys
+        _BIO_POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
+
         _PLATFORM_STAT_MAP = {
             "pts": "points", "reb": "rebounds", "ast": "assists",
             "stl": "steals", "blk": "blocks", "to": "turnovers", "tov": "turnovers",
@@ -647,8 +650,7 @@ if platform_props_clicked:
                         if _bio.get("position"):
                             # Bio position may be multi-valued ("Guard-Forward"); take first token
                             _bio_pos = _bio["position"].split("-")[0].strip()
-                            _POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
-                            _pos = _POS_ALIAS.get(_bio_pos, _bio_pos) if len(_bio_pos) > 2 else _bio_pos
+                            _pos = _BIO_POS_ALIAS.get(_bio_pos, _bio_pos) if len(_bio_pos) > 2 else _bio_pos
                     except Exception:
                         pass
 
@@ -657,7 +659,7 @@ if platform_props_clicked:
                         "name": player_name,
                         "team": player_team,
                         "position": _pos,
-                        "games_played": 30,       # above Bayesian threshold — trust prop_line anchor
+                        "games_played": 30,       # above Bayesian threshold (25) — trust prop_line anchor
                         "minutes_avg": 28.0,
                         "points_avg": _prior["points"],
                         "rebounds_avg": _prior["rebounds"],
