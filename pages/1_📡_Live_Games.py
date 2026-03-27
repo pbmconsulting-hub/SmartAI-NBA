@@ -600,7 +600,7 @@ if platform_props_clicked:
         pp_status.text(f"⏳ 4/5 — Running Neural Analysis on {len(props_to_analyze):,} props…")
         pp_bar.progress(40)
 
-        from engine.projections import build_player_projection, get_stat_standard_deviation
+        from engine.projections import build_player_projection, get_stat_standard_deviation, POSITION_PRIORS
         from engine.simulation import run_quantum_matrix_simulation
         from engine.edge_detection import analyze_directional_forces, should_avoid_prop, classify_bet_type
         from engine.confidence import calculate_confidence_score
@@ -634,26 +634,44 @@ if platform_props_clicked:
                 player_data = player_lookup.get(player_name.lower())
                 if not player_data:
                     # Platform props are the source of truth for active players.
-                    # Build a minimal stub from the prop line so we can still analyze
+                    # Build a minimal stub from POSITION_PRIORS so we can still analyze
                     # players that are active/playing but missing from the CSV
                     # (e.g., due to injury-filtered CSV from a previous auto-load).
                     player_team = str(prop.get("team") or prop.get("player_team") or "")
+
+                    # Attempt to resolve position from player bio; default to SF
+                    _pos = "SF"
+                    try:
+                        from data.player_profile_service import get_player_bio
+                        _bio = get_player_bio(player_name)
+                        if _bio.get("position"):
+                            # Bio position may be multi-valued ("Guard-Forward"); take first token
+                            _bio_pos = _bio["position"].split("-")[0].strip()
+                            _POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
+                            _pos = _POS_ALIAS.get(_bio_pos, _bio_pos) if len(_bio_pos) > 2 else _bio_pos
+                    except Exception:
+                        pass
+
+                    _prior = POSITION_PRIORS.get(_pos, POSITION_PRIORS["SF"])
                     _stub: dict = {
                         "name": player_name,
                         "team": player_team,
-                        "position": "G",
+                        "position": _pos,
+                        "games_played": 30,       # above Bayesian threshold — trust prop_line anchor
                         "minutes_avg": 28.0,
-                        "games_played": 10,
-                        "points_avg": prop_line if stat_type == "points" else 15.0,
-                        "rebounds_avg": prop_line if stat_type == "rebounds" else 4.5,
-                        "assists_avg": prop_line if stat_type == "assists" else 3.5,
-                        "threes_avg": prop_line if stat_type == "threes" else 1.5,
-                        "steals_avg": prop_line if stat_type == "steals" else 0.8,
-                        "blocks_avg": prop_line if stat_type == "blocks" else 0.5,
-                        "turnovers_avg": prop_line if stat_type == "turnovers" else 1.5,
-                        "usage_rate": 0.20,
-                        "ft_pct": 0.75,
+                        "points_avg": _prior["points"],
+                        "rebounds_avg": _prior["rebounds"],
+                        "assists_avg": _prior["assists"],
+                        "threes_avg": _prior["threes"],
+                        "steals_avg": _prior["steals"],
+                        "blocks_avg": _prior["blocks"],
+                        "turnovers_avg": _prior["turnovers"],
                     }
+
+                    # For the specific stat being analyzed, anchor to prop_line
+                    if stat_type in _prior:
+                        _stub[f"{stat_type}_avg"] = prop_line
+
                     player_data = _stub
 
                 # Build game context — find this player's game in tonight's slate
