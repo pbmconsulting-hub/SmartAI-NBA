@@ -63,8 +63,6 @@ def retry_with_backoff(
                         )
                         raise
 
-            raise last_exception  # pragma: no cover – safety net
-
         return wrapper
 
     return decorator
