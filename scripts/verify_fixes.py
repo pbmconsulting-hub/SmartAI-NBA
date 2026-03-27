@@ -22,14 +22,15 @@ logging.basicConfig(level=logging.INFO)
 # ── Offline checks (no network required) ────────────────────
 
 def verify_nba_api_version():
-    """Verify nba_api version is correct"""
-    import nba_api
-    print(f"✓ nba_api version: {nba_api.__version__}")
+    """Verify nba_api is installed and key endpoints are available"""
+    from importlib.metadata import version as pkg_version
+    ver = pkg_version("nba_api")
+    print(f"✓ nba_api version: {ver}")
 
-    # Test V3 endpoints
-    from nba_api.stats.endpoints import ScoreboardV3, LeagueInjuries
-    print("✓ ScoreboardV3 import successful")
-    print("✓ LeagueInjuries import successful")
+    # Test endpoints actually used by the codebase
+    from nba_api.stats.endpoints import ScoreboardV2, LeagueStandingsV3
+    print("✓ ScoreboardV2 import successful")
+    print("✓ LeagueStandingsV3 import successful")
     return True
 
 
