@@ -132,15 +132,15 @@ BAYESIAN_SMALL_SAMPLE_THRESHOLD = 25  # games played below which to blend
 
 POSITION_PRIORS = {
     "PG": {"points": 18.5, "rebounds": 4.0, "assists": 6.5, "threes": 2.2,
-           "steals": 1.3, "blocks": 0.4, "turnovers": 2.5},
+           "steals": 1.3, "blocks": 0.4, "turnovers": 2.5, "ftm": 3.5},
     "SG": {"points": 17.0, "rebounds": 3.8, "assists": 4.0, "threes": 2.0,
-           "steals": 1.1, "blocks": 0.4, "turnovers": 1.8},
+           "steals": 1.1, "blocks": 0.4, "turnovers": 1.8, "ftm": 3.2},
     "SF": {"points": 16.0, "rebounds": 5.5, "assists": 3.5, "threes": 1.5,
-           "steals": 1.0, "blocks": 0.6, "turnovers": 1.5},
+           "steals": 1.0, "blocks": 0.6, "turnovers": 1.5, "ftm": 2.8},
     "PF": {"points": 15.5, "rebounds": 7.0, "assists": 3.0, "threes": 1.0,
-           "steals": 0.8, "blocks": 0.8, "turnovers": 1.5},
+           "steals": 0.8, "blocks": 0.8, "turnovers": 1.5, "ftm": 3.1},
     "C":  {"points": 14.0, "rebounds": 9.0, "assists": 2.5, "threes": 0.5,
-           "steals": 0.7, "blocks": 1.4, "turnovers": 1.8},
+           "steals": 0.7, "blocks": 1.4, "turnovers": 1.8, "ftm": 2.9},
 }
 # Default prior for unknown positions
 _DEFAULT_POSITION_PRIOR = POSITION_PRIORS["SF"]

@@ -98,7 +98,9 @@ COMBO_STAT_CONFIDENCE_MULTIPLIER = 0.90  # was 0.85 — softened penalty so comb
 # Stats considered "combo" or "fantasy" for penalty purposes
 COMBO_STAT_TYPES = {
     "points_rebounds", "points_assists", "rebounds_assists",
-    "points_rebounds_assists", "fantasy_score", "double_double", "triple_double",
+    "points_rebounds_assists", "blocks_steals",
+    "fantasy_score", "fantasy_score_pp", "fantasy_score_dk", "fantasy_score_ud",
+    "double_double", "triple_double",
 }
 
 # Synergy bonus: multiplicative interaction between edge + consistency + probability.
