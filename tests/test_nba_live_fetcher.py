@@ -361,7 +361,7 @@ class TestGameIdValidation(unittest.TestCase):
         from data.nba_live_fetcher import _is_nba_game_id
         self.assertFalse(_is_nba_game_id(""))
 
-    def test_rejects_none_like(self):
+    def test_rejects_none_string(self):
         from data.nba_live_fetcher import _is_nba_game_id
         # Passing "None" string (edge case from str(None))
         self.assertFalse(_is_nba_game_id("None"))
@@ -378,7 +378,7 @@ class TestGameIdValidation(unittest.TestCase):
         self.assertEqual(result, {})
 
 
-class TestBuildFormattedGameId(unittest.TestCase):
+class TestBuildFormattedGame(unittest.TestCase):
     """_build_formatted_game should use a real game_id when provided."""
 
     def test_uses_real_game_id(self):
