@@ -65,6 +65,18 @@ def cache_invalidate(key: str) -> None:
         _store.pop(key, None)
 
 
+def cache_clear() -> int:
+    """Remove all keys from the in-memory cache.
+
+    Returns:
+        Number of keys removed.
+    """
+    with _lock:
+        count = len(_store)
+        _store.clear()
+        return count
+
+
 def cache_clear_tier(tier: str) -> int:
     """Remove all keys belonging to a specific tier.
 
