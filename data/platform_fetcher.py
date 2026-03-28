@@ -105,6 +105,16 @@ except ImportError:
     _RATE_LIMITER_AVAILABLE = False
     _platform_rate_limiter = None
 
+# Import rotating-header helpers from the utility layer.
+# These provide per-platform headers with rotating User-Agent strings
+# to reduce 403 blocks.  Falls back to _BASE_HEADERS (defined below)
+# if the utility module is unavailable.
+try:
+    from utils.headers import get_underdog_headers, get_odds_api_headers
+    _HAS_PLATFORM_HEADERS = True
+except ImportError:
+    _HAS_PLATFORM_HEADERS = False
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -927,9 +937,10 @@ def fetch_underdog_props(league="NBA"):
     else:
         try:
             # Use _fetch_with_retry for exponential backoff on 429/5xx
+            _ud_headers = get_underdog_headers() if _HAS_PLATFORM_HEADERS else _BASE_HEADERS
             response = _fetch_with_retry(
                 UNDERDOG_URL,
-                headers=_BASE_HEADERS,
+                headers=_ud_headers,
             )
             if response is None:
                 _logger.warning("[Underdog] All retries exhausted. Skipping.")
@@ -1085,9 +1096,10 @@ def fetch_draftkings_props(api_key=None):
     events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
     try:
         # Use _fetch_with_retry for exponential backoff on 429/5xx
+        _dk_headers = get_odds_api_headers() if _HAS_PLATFORM_HEADERS else _BASE_HEADERS
         events_resp = _fetch_with_retry(
             events_url,
-            headers=_BASE_HEADERS,
+            headers=_dk_headers,
             params={"apiKey": api_key},
         )
         if events_resp is None:
@@ -1176,9 +1188,10 @@ def fetch_draftkings_props(api_key=None):
         else:
             try:
                 # Use _fetch_with_retry for exponential backoff on 429/5xx
+                _dk_h = get_odds_api_headers() if _HAS_PLATFORM_HEADERS else _BASE_HEADERS
                 props_resp = _fetch_with_retry(
                     props_url,
-                    headers=_BASE_HEADERS,
+                    headers=_dk_h,
                     params={
                         "apiKey": api_key,
                         "regions": "us",
@@ -1550,7 +1563,8 @@ async def _async_fetch_prizepicks(session, semaphore):
 async def _async_fetch_underdog(session, semaphore):
     """Fetch Underdog Fantasy props asynchronously."""
     async with semaphore:
-        data = await _async_fetch_json(session, UNDERDOG_URL)
+        _ud_h = get_underdog_headers() if _HAS_PLATFORM_HEADERS else None
+        data = await _async_fetch_json(session, UNDERDOG_URL, headers=_ud_h)
         if not data:
             return []
 
@@ -1612,10 +1626,11 @@ async def _async_fetch_draftkings(session, semaphore, api_key=None):
         _logger.warning("[Async-DraftKings] No Odds API key configured.")
         return []
 
+    _dk_async_h = get_odds_api_headers() if _HAS_PLATFORM_HEADERS else None
     async with semaphore:
         events_url = f"{ODDS_API_BASE_URL}/sports/basketball_nba/events"
         events = await _async_fetch_json(
-            session, events_url, params={"apiKey": api_key}
+            session, events_url, headers=_dk_async_h, params={"apiKey": api_key}
         )
         if not events:
             return []
@@ -1649,7 +1664,7 @@ async def _async_fetch_draftkings(session, semaphore, api_key=None):
                 f"{ODDS_API_BASE_URL}/sports/basketball_nba/events/{event_id}/odds"
             )
             event_data = await _async_fetch_json(
-                session, props_url,
+                session, props_url, headers=_dk_async_h,
                 params={
                     "apiKey": api_key, "regions": "us",
                     "markets": MARKETS, "bookmakers": "draftkings",

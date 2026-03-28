@@ -85,3 +85,38 @@ def get_logger(module_name):
     # Use a child logger under the "smartai_nba" namespace
     name = f"smartai_nba.{module_name}" if not module_name.startswith("smartai_nba") else module_name
     return logging.getLogger(name)
+
+
+def setup_logging(log_level: str = "INFO", log_file: str = None):
+    """
+    Configure logging for the application.
+
+    This is a convenience wrapper that mirrors the auto-configuration done
+    by :func:`get_logger` but allows callers to override the log level and
+    optionally direct output to a specific file.
+
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR).
+        log_file: Optional file path for log output.
+
+    Returns:
+        logging.Logger: The root ``smartai_nba`` logger.
+    """
+    global _configured
+    # Allow reconfiguration when called explicitly
+    _configured = False
+    if log_level:
+        os.environ["LOG_LEVEL"] = log_level.upper()
+    _configure_root_logger()
+
+    root = logging.getLogger("smartai_nba")
+
+    if log_file:
+        from pathlib import Path
+        log_path = Path(log_file)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_path, encoding="utf-8")
+        file_handler.setFormatter(_FORMATTER)
+        root.addHandler(file_handler)
+
+    return root

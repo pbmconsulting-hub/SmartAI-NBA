@@ -26,6 +26,22 @@ try:
 except ImportError:
     _logger = _logging.getLogger(__name__)
 
+# Import utility-layer cache helpers for cross-module cache management.
+# FileCache provides file-based caching; used by clear_caches() to
+# clear downstream caches in live_data_fetcher and roster_engine.
+try:
+    from utils.cache import FileCache as _FileCache
+    _HAS_FILE_CACHE = True
+except ImportError:
+    _HAS_FILE_CACHE = False
+
+# Import retry helper for the refresh_all_data convenience function.
+try:
+    from utils.retry import retry_with_backoff as _retry_with_backoff
+    _HAS_RETRY = True
+except ImportError:
+    _HAS_RETRY = False
+
 # ── Re-export every public symbol from live_data_fetcher ─────
 # Pages import constants and path objects from this module;
 # live_data_fetcher defines them identically.
@@ -635,3 +651,182 @@ def refresh_historical_data_for_tonight(
         results["players_refreshed"], results["clv_updated"], results["errors"],
     )
     return results
+
+
+# ============================================================
+# NBADataService — class-based API wrapper
+# ============================================================
+
+class NBADataService:
+    """
+    Class-based service for NBA data operations.
+
+    Wraps the existing module-level functions in an OOP interface,
+    providing cache management and bulk-refresh convenience methods.
+    All callers can continue using the module-level functions directly;
+    this class is offered for callers that prefer dependency injection.
+    """
+
+    def __init__(self):
+        if _HAS_FILE_CACHE:
+            self.cache = _FileCache(cache_dir="cache/service", ttl_hours=1)
+        else:
+            self.cache = None
+
+        try:
+            from data.roster_engine import RosterEngine
+            self.roster_engine = RosterEngine()
+        except Exception:
+            self.roster_engine = None
+
+    # ── Core data methods ─────────────────────────────────────
+
+    def get_todays_games(self):
+        """Get today's NBA games."""
+        return get_todays_games()
+
+    def get_todays_players(self, games, progress_callback=None,
+                           precomputed_injury_map=None):
+        """Get players for teams playing today."""
+        return get_todays_players(
+            games,
+            progress_callback=progress_callback,
+            precomputed_injury_map=precomputed_injury_map,
+        )
+
+    def get_team_stats(self, progress_callback=None):
+        """Get team statistics."""
+        return get_team_stats(progress_callback=progress_callback)
+
+    def get_injuries(self):
+        """Get current injury data via RosterEngine."""
+        if self.roster_engine:
+            return self.roster_engine.refresh()
+        return {}
+
+    # ── Cache & refresh ───────────────────────────────────────
+
+    def clear_caches(self):
+        """Clear all caches (delegates to module-level clear_caches)."""
+        clear_caches()
+
+    def refresh_all_data(self, progress_callback=None):
+        """Refresh all data (delegates to module-level refresh_all_data)."""
+        return refresh_all_data(progress_callback=progress_callback)
+
+
+# ============================================================
+# Utility-layer integration — cache management & bulk refresh
+# ============================================================
+
+def clear_caches() -> None:
+    """
+    Clear file-based and in-memory caches across the data layer.
+
+    Clears caches in live_data_fetcher, roster_engine, and the
+    in-memory tiered cache used by utils.cache.  Safe to call even
+    if some modules are unavailable (graceful no-ops).
+    """
+    cleared = []
+
+    # 1. In-memory tiered cache (utils.cache.cache_clear)
+    try:
+        from utils.cache import cache_clear
+        cache_clear()
+        cleared.append("in-memory")
+    except Exception:
+        pass
+
+    # 2. File-based cache directories
+    if _HAS_FILE_CACHE:
+        for cache_dir in ("cache/service", "cache/props", "cache/rosters"):
+            try:
+                fc = _FileCache(cache_dir=cache_dir, ttl_hours=0)
+                fc.clear()
+                cleared.append(cache_dir)
+            except Exception:
+                pass
+
+    _logger.info("clear_caches: cleared %s", ", ".join(cleared) if cleared else "(none)")
+
+
+def refresh_all_data(progress_callback=None) -> dict:
+    """
+    Refresh all core data sources with per-source error isolation.
+
+    Fetches games, players, team stats, and injury data.  Each source
+    is wrapped in its own try/except so a single failure does not
+    block the others.
+
+    Parameters
+    ----------
+    progress_callback : callable or None
+        Called as ``progress_callback(current, total, message)`` to
+        report incremental progress (e.g. to a Streamlit progress bar).
+
+    Returns
+    -------
+    dict
+        Keys: ``games``, ``players``, ``team_stats``, ``injuries``,
+        ``errors`` (list of error strings for any source that failed).
+    """
+    result = {
+        "games": [],
+        "players": [],
+        "team_stats": None,
+        "injuries": None,
+        "errors": [],
+    }
+    total_steps = 4
+    step = 0
+
+    # ── Games ──────────────────────────────────────────────────
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching today's games…")
+    try:
+        result["games"] = get_todays_games()
+    except Exception as exc:
+        _logger.error("refresh_all_data — games failed: %s", exc)
+        result["errors"].append(f"Games: {exc}")
+
+    # ── Players (only if games available) ──────────────────────
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching players…")
+    if result["games"]:
+        try:
+            result["players"] = get_todays_players(result["games"])
+        except Exception as exc:
+            _logger.error("refresh_all_data — players failed: %s", exc)
+            result["errors"].append(f"Players: {exc}")
+
+    # ── Team stats ─────────────────────────────────────────────
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching team stats…")
+    try:
+        result["team_stats"] = get_team_stats()
+    except Exception as exc:
+        _logger.error("refresh_all_data — team stats failed: %s", exc)
+        result["errors"].append(f"Team stats: {exc}")
+
+    # ── Injuries ───────────────────────────────────────────────
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching injury data…")
+    try:
+        from data.roster_engine import RosterEngine as _RE
+        _re = _RE()
+        result["injuries"] = _re.refresh()
+    except Exception as exc:
+        _logger.error("refresh_all_data — injuries failed: %s", exc)
+        result["errors"].append(f"Injuries: {exc}")
+
+    _logger.info(
+        "refresh_all_data: games=%d, players=%d, errors=%d",
+        len(result["games"]),
+        len(result["players"]),
+        len(result["errors"]),
+    )
+    return result
