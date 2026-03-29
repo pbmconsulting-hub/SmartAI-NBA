@@ -386,6 +386,7 @@ class TestNoneNormGuard(unittest.TestCase):
     def _make_none_ep(self):
         mock_ep = MagicMock()
         mock_ep.get_normalized_dict.return_value = None
+        mock_ep.get_dict.return_value = {}
         return mock_ep
 
     @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
@@ -635,6 +636,7 @@ class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
     def _make_none_ep(self):
         mock_ep = MagicMock()
         mock_ep.get_normalized_dict.return_value = None
+        mock_ep.get_dict.return_value = {}
         return mock_ep
 
     @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
@@ -667,8 +669,8 @@ class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
                 nlf.fetch_four_factors_box_score("0022501066")
         warning_calls = [str(c) for c in mock_log.warning.call_args_list]
         self.assertTrue(
-            any("get_normalized_dict" in c for c in warning_calls),
-            f"Expected get_normalized_dict warning, got: {warning_calls}",
+            any("no data" in c or "get_normalized_dict" in c for c in warning_calls),
+            f"Expected no-data/get_normalized_dict warning, got: {warning_calls}",
         )
 
     @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
@@ -684,8 +686,8 @@ class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
                 nlf.fetch_box_score_matchups("0022501066")
         warning_calls = [str(c) for c in mock_log.warning.call_args_list]
         self.assertTrue(
-            any("get_normalized_dict" in c for c in warning_calls),
-            f"Expected get_normalized_dict warning, got: {warning_calls}",
+            any("no data" in c or "get_normalized_dict" in c for c in warning_calls),
+            f"Expected no-data/get_normalized_dict warning, got: {warning_calls}",
         )
 
 

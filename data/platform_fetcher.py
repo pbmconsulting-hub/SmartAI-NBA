@@ -963,6 +963,7 @@ def fetch_underdog_props(league="NBA"):
     # Underdog returns a flat list in "over_under_lines"
     # Each entry has: title (player name), display_stat, stat_value,
     #                 sport_id, etc.
+    # NOTE: sport_id may be a numeric ID (e.g. 7 for NBA) or a string.
 
     lines = data.get("over_under_lines", [])
 
@@ -973,31 +974,56 @@ def fetch_underdog_props(league="NBA"):
         ap_id = ap.get("id", "")
         appearances[ap_id] = ap
 
+    # Numeric sport_id mapping — Underdog uses integer IDs in some API
+    # versions instead of string sport names.
+    _SPORT_ID_MAP = {7: "NBA", 2: "NFL", 3: "MLB", 4: "NHL", 10: "WNBA"}
+
     props = []
     today = _today_str()
     fetched_at = _now_str()
 
     for line_item in lines:
         # Underdog uses "sport_id" or similar for league filtering
-        # Common values: "NBA", "nba", etc.
-        sport_id = str(line_item.get("sport_id", line_item.get("sport", ""))).upper()
+        # Common values: "NBA", "nba", or numeric IDs (e.g. 7)
+        raw_sport_id = line_item.get("sport_id", line_item.get("sport", ""))
+        if isinstance(raw_sport_id, (int, float)):
+            sport_id = _SPORT_ID_MAP.get(int(raw_sport_id), str(raw_sport_id)).upper()
+        else:
+            sport_id = str(raw_sport_id).upper()
         if league.upper() not in sport_id and sport_id:
             continue  # Skip non-NBA lines
 
-        # Player name is in "over_under" → "appearance" relationship, or directly
-        # in "title". Structure varies slightly by API version.
-        player_name = line_item.get("title", "").strip()
+        # Player name may be directly on line_item, or nested under
+        # "over_under" (newer API versions nest the data).
+        over_under = line_item.get("over_under", {}) or {}
+        player_name = (
+            line_item.get("title", "").strip()
+            or over_under.get("title", "").strip()
+        )
 
         # Try to get team from the appearance object
-        ap_id = line_item.get("appearance_id", "")
+        ap_id = (
+            line_item.get("appearance_id", "")
+            or over_under.get("appearance_id", "")
+        )
         ap_data = appearances.get(ap_id, {})
         team = ap_data.get("team_abbreviation", ap_data.get("team", "")).strip().upper()
 
         if not player_name:
-            continue  # Skip entries with no player name
+            # Last resort: try the appearance lookup by name
+            if ap_data:
+                player_name = ap_data.get("title", ap_data.get("display_name", "")).strip()
+            if not player_name:
+                continue  # Skip entries with no player name
 
-        # Normalize stat type
-        raw_stat = line_item.get("display_stat", line_item.get("stat_type", ""))
+        # Normalize stat type — check nested over_under as well
+        appearance_stat = over_under.get("appearance_stat", {}) or {}
+        raw_stat = (
+            line_item.get("display_stat",
+                          line_item.get("stat_type", ""))
+            or appearance_stat.get("display_stat",
+                                   appearance_stat.get("stat_type", ""))
+        )
         stat_type = normalize_stat_type(raw_stat, "Underdog")
 
         # Extract the sportsbook's true Over/Under projection line.
@@ -1220,7 +1246,8 @@ def fetch_draftkings_props(api_key=None):
 
         # ── Parse bookmaker data ───────────────────────────────
         for bookmaker in event_data.get("bookmakers", []):
-            if bookmaker.get("key", "") != "draftkings":
+            bk_key = bookmaker.get("key", "")
+            if not bk_key.startswith("draftkings"):
                 continue
 
             for market in bookmaker.get("markets", []):
@@ -1291,6 +1318,8 @@ def fetch_draftkings_props(api_key=None):
                         "under_odds": under_price,
                     })
 
+    if not props and events:
+        _logger.info("[DraftKings] 0 props despite %d events — possible API format change or no player prop markets available", len(events))
     _logger.info(f"[DraftKings] Fetched {len(props)} NBA props.")
     return props
 
@@ -1573,20 +1602,41 @@ async def _async_fetch_underdog(session, semaphore):
         for ap in data.get("appearances", []):
             appearances[ap.get("id", "")] = ap
 
+        # Numeric sport_id mapping (same as sync version)
+        _SPORT_ID_MAP = {7: "NBA", 2: "NFL", 3: "MLB", 4: "NHL", 10: "WNBA"}
+
         props = []
         today = _today_str()
         fetched_at = _now_str()
         for line_item in lines:
-            sport_id = str(line_item.get("sport_id", line_item.get("sport", ""))).upper()
+            raw_sport_id = line_item.get("sport_id", line_item.get("sport", ""))
+            if isinstance(raw_sport_id, (int, float)):
+                sport_id = _SPORT_ID_MAP.get(int(raw_sport_id), str(raw_sport_id)).upper()
+            else:
+                sport_id = str(raw_sport_id).upper()
             if "NBA" not in sport_id and sport_id:
                 continue
-            player_name = line_item.get("title", "").strip()
-            ap_id = line_item.get("appearance_id", "")
+            over_under = line_item.get("over_under", {}) or {}
+            player_name = (
+                line_item.get("title", "").strip()
+                or over_under.get("title", "").strip()
+            )
+            ap_id = (
+                line_item.get("appearance_id", "")
+                or over_under.get("appearance_id", "")
+            )
             ap_data = appearances.get(ap_id, {})
             team = ap_data.get("team_abbreviation", ap_data.get("team", "")).strip().upper()
             if not player_name:
-                continue
-            raw_stat = line_item.get("display_stat", line_item.get("stat_type", ""))
+                if ap_data:
+                    player_name = ap_data.get("title", ap_data.get("display_name", "")).strip()
+                if not player_name:
+                    continue
+            appearance_stat = over_under.get("appearance_stat", {}) or {}
+            raw_stat = (
+                line_item.get("display_stat", line_item.get("stat_type", ""))
+                or appearance_stat.get("display_stat", appearance_stat.get("stat_type", ""))
+            )
             stat_type = normalize_stat_type(raw_stat, "Underdog")
             # TRUE LINE KILL SWITCH: stat_value → fallback chain
             try:
@@ -1675,7 +1725,8 @@ async def _async_fetch_draftkings(session, semaphore, api_key=None):
                 continue
 
         for bookmaker in event_data.get("bookmakers", []):
-            if bookmaker.get("key", "") != "draftkings":
+            bk_key = bookmaker.get("key", "")
+            if not bk_key.startswith("draftkings"):
                 continue
             for market in bookmaker.get("markets", []):
                 market_key = market.get("key", "")

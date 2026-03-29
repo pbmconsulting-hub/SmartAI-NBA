@@ -152,6 +152,24 @@ except ImportError:
     _NBA_API_AVAILABLE = False
 
 
+def _parse_resultsets(raw: dict) -> dict:
+    """Convert raw ``{resultSets: [{name, headers, rowSet}, ...]}`` to
+    ``{name: [dict, ...]}`` so callers can use the same key look-ups as with
+    ``get_normalized_dict()``.
+
+    Used as a fallback when ``get_normalized_dict()`` raises an internal
+    ``IndexError`` / ``KeyError`` / ``TypeError`` inside *nba_api*.
+    """
+    result: dict = {}
+    for rs in raw.get("resultSets", []):
+        name = rs.get("name", "")
+        headers = rs.get("headers", [])
+        rows = rs.get("rowSet", [])
+        if name and headers:
+            result[name] = [dict(zip(headers, row)) for row in rows]
+    return result
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TIER 1 — Critical endpoints (feed projections & simulation directly)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -759,9 +777,31 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscorematchupsv3.BoxScoreMatchupsV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict() or {}
+
+        # Try get_normalized_dict first; nba_api's normaliser can raise
+        # IndexError on certain game IDs where the response shape is
+        # unexpected (e.g. games that haven't started or have no data).
+        try:
+            norm = endpoint.get_normalized_dict() or {}
+        except (IndexError, KeyError, TypeError):
+            norm = {}
+
+        # Fallback: parse the raw dict returned by get_dict()
         if not norm:
-            _logger.warning("fetch_box_score_matchups: get_normalized_dict() returned None/empty")
+            try:
+                raw = endpoint.get_dict() or {}
+                parsed = _parse_resultsets(raw)
+                matchups = (
+                    parsed.get("MatchUps", parsed.get("matchUps", []))
+                    or raw.get("boxScoreMatchups", [])
+                )
+                if matchups:
+                    norm = {"MatchUps": matchups}
+            except Exception:
+                pass
+
+        if not norm:
+            _logger.warning("fetch_box_score_matchups(%s): no data from normalized or raw dict", game_id)
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
@@ -995,9 +1035,36 @@ def fetch_four_factors_box_score(game_id: str) -> dict:
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
         endpoint = boxscorefourfactorsv3.BoxScoreFourFactorsV3(game_id=game_id)
-        norm = endpoint.get_normalized_dict() or {}
+
+        try:
+            norm = endpoint.get_normalized_dict() or {}
+        except (IndexError, KeyError, TypeError):
+            norm = {}
+
+        # Fallback: parse the raw dict returned by get_dict()
         if not norm:
-            _logger.warning("fetch_four_factors_box_score: get_normalized_dict() returned None/empty")
+            try:
+                raw = endpoint.get_dict() or {}
+                parsed = _parse_resultsets(raw)
+                player_stats = (
+                    parsed.get("sqlPlayersFourFactors",
+                               parsed.get("PlayerStats",
+                                          parsed.get("playerStats", [])))
+                    or raw.get("playerStats", [])
+                )
+                team_stats = (
+                    parsed.get("sqlTeamsFourFactors",
+                               parsed.get("TeamStats",
+                                          parsed.get("teamStats", [])))
+                    or raw.get("teamStats", [])
+                )
+                if player_stats or team_stats:
+                    norm = {"PlayerStats": player_stats, "TeamStats": team_stats}
+            except Exception:
+                pass
+
+        if not norm:
+            _logger.warning("fetch_four_factors_box_score(%s): no data from normalized or raw dict", game_id)
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
