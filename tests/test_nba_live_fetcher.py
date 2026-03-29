@@ -691,5 +691,136 @@ class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
         )
 
 
+# ── Section: _parse_resultsets helper ─────────────────────────────────────────
+
+class TestParseResultsets(unittest.TestCase):
+    """Tests for _parse_resultsets() fallback helper."""
+
+    def test_empty_dict(self):
+        from data.nba_live_fetcher import _parse_resultsets
+        self.assertEqual(_parse_resultsets({}), {})
+
+    def test_basic_resultsets(self):
+        from data.nba_live_fetcher import _parse_resultsets
+        raw = {
+            "resultSets": [
+                {
+                    "name": "PlayerStats",
+                    "headers": ["PLAYER_ID", "PLAYER_NAME", "PTS"],
+                    "rowSet": [[101, "Test Player", 25]],
+                }
+            ]
+        }
+        result = _parse_resultsets(raw)
+        self.assertIn("PlayerStats", result)
+        self.assertEqual(len(result["PlayerStats"]), 1)
+        self.assertEqual(result["PlayerStats"][0]["PLAYER_NAME"], "Test Player")
+        self.assertEqual(result["PlayerStats"][0]["PTS"], 25)
+
+    def test_multiple_resultsets(self):
+        from data.nba_live_fetcher import _parse_resultsets
+        raw = {
+            "resultSets": [
+                {"name": "PlayerStats", "headers": ["ID"], "rowSet": [[1], [2]]},
+                {"name": "TeamStats", "headers": ["TID"], "rowSet": [[10]]},
+            ]
+        }
+        result = _parse_resultsets(raw)
+        self.assertEqual(len(result["PlayerStats"]), 2)
+        self.assertEqual(len(result["TeamStats"]), 1)
+
+    def test_missing_headers_skipped(self):
+        from data.nba_live_fetcher import _parse_resultsets
+        raw = {"resultSets": [{"name": "NoHeaders", "rowSet": [[1]]}]}
+        self.assertEqual(_parse_resultsets(raw), {})
+
+
+# ── Section: IndexError fallback via get_dict() ──────────────────────────────
+
+class TestIndexErrorFallback(unittest.TestCase):
+    """Verify that get_dict() fallback works when get_normalized_dict() raises IndexError."""
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_matchups_indexerror_falls_back_to_get_dict(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.side_effect = IndexError("list index out of range")
+        mock_ep.get_dict.return_value = {
+            "resultSets": [
+                {
+                    "name": "MatchUps",
+                    "headers": ["PLAYER_ID", "PLAYER_NAME"],
+                    "rowSet": [[101, "Test Player"]],
+                }
+            ]
+        }
+
+        with patch("nba_api.stats.endpoints.boxscorematchupsv3.BoxScoreMatchupsV3",
+                   return_value=mock_ep):
+            result = nlf.fetch_box_score_matchups("0022501082")
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(len(result["player_stats"]), 1)
+        self.assertEqual(result["player_stats"][0]["PLAYER_NAME"], "Test Player")
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_four_factors_indexerror_falls_back_to_get_dict(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.side_effect = IndexError("list index out of range")
+        mock_ep.get_dict.return_value = {
+            "resultSets": [
+                {
+                    "name": "sqlPlayersFourFactors",
+                    "headers": ["GAME_ID", "EFG_PCT"],
+                    "rowSet": [["0022501082", 0.55]],
+                },
+                {
+                    "name": "sqlTeamsFourFactors",
+                    "headers": ["GAME_ID", "TM_TOV_PCT"],
+                    "rowSet": [["0022501082", 0.12]],
+                },
+            ]
+        }
+
+        with patch("nba_api.stats.endpoints.boxscorefourfactorsv3.BoxScoreFourFactorsV3",
+                   return_value=mock_ep):
+            result = nlf.fetch_four_factors_box_score("0022501082")
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(len(result["player_stats"]), 1)
+        self.assertEqual(result["player_stats"][0]["EFG_PCT"], 0.55)
+        self.assertEqual(len(result["team_stats"]), 1)
+
+    @patch("data.nba_live_fetcher._check_rate_limit", return_value=True)
+    @patch("data.nba_live_fetcher._NBA_API_AVAILABLE", True)
+    @patch("data.nba_live_fetcher.time.sleep")
+    @patch("data.nba_live_fetcher.time.monotonic", return_value=0.0)
+    def test_matchups_both_methods_fail_returns_empty(self, _mono, _sleep, _rate):
+        import data.nba_live_fetcher as nlf
+        nlf._CACHE.clear()
+
+        mock_ep = MagicMock()
+        mock_ep.get_normalized_dict.side_effect = IndexError("list index out of range")
+        mock_ep.get_dict.return_value = {}
+
+        with patch("nba_api.stats.endpoints.boxscorematchupsv3.BoxScoreMatchupsV3",
+                   return_value=mock_ep):
+            result = nlf.fetch_box_score_matchups("0022501082")
+
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("player_stats"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
