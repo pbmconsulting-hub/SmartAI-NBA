@@ -1,5 +1,6 @@
 streamlit~=1.55.0
 nba_api>=1.4.1
+nba-injury-report~=0.1.0
 requests~=2.31.0
 stripe~=14.4.0
 aiohttp~=3.13.0

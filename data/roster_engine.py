@@ -7,12 +7,11 @@
 #
 # DATA SOURCES (in priority order):
 #   0. Official NBA Injury Report PDF — highest-authority source
-#   1. NBA CDN public injury JSON feed
-#   2. stats.nba.com leagueinjuries endpoint
-#   3. nba_api Injuries endpoint (if available)
-#   4. ESPN public injury API
-#   5. CBS Sports injury scraper (if available)
-#   6. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
+#   1. nba-injury-report PyPI package (programmatic NBA injury PDF data)
+#   2. ESPN public injury API (site.api.espn.com)
+#   3. CBS Sports injury scraper (if available)
+#   4. Rotowire HTML injury scraper (final fallback)
+#   5. nba_api CommonTeamRoster   — authoritative roster (trades/signings)
 #
 # FILTERING RULES:
 #   - Hard-exclude: Out / Inactive / IR / Injured Reserve / Doubtful (< 25% chance)
@@ -459,132 +458,46 @@ class RosterEngine:
         Fetch today's injury report via multiple sources with fallback.
 
         Sources tried in order:
-          1. NBA CDN public injury JSON feed
-          2. stats.nba.com leagueinjuries endpoint with NBA headers
-          3. nba_api Injuries endpoint (if available)
-          4. ESPN public injury API
-          5. CBS Sports injury scraper (if available)
+          1. nba-injury-report PyPI package (programmatic NBA injury PDF data)
+          2. ESPN public injury API (site.api.espn.com)
+          3. CBS Sports injury scraper (if available)
+          4. Rotowire HTML injury scraper (final fallback)
 
         Falls back to an empty dict if all sources fail.
         """
         import requests as _requests  # local import to avoid top-level dep for optional feature
 
-        # Use unified headers from utils when available
-        if _HAS_HEADERS:
-            _NBA_HEADERS = get_nba_headers()
-            _CDN_HEADERS = get_cdn_headers()
-        else:
-            _NBA_HEADERS = {
-                "Host": "stats.nba.com",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br",
-                "x-nba-stats-origin": "stats",
-                "x-nba-stats-token": "true",
-                "Connection": "keep-alive",
-                "Referer": "https://www.nba.com/",
-                "Origin": "https://www.nba.com",
-            }
-            _CDN_HEADERS = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Referer": "https://www.nba.com/",
-                "Origin": "https://www.nba.com",
-            }
-
-        # ── Source 1: NBA CDN (with circuit breaker) ──────────
-        def _cdn_fetch():
-            resp = _requests.get(
-                "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
-                headers=_CDN_HEADERS,
-                timeout=10,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            injured_list = (
-                data.get("league", {}).get("standard", [])
-                or data.get("injuries", {}).get("injuredPlayers", [])
-                or data.get("injuredPlayers", [])
-                or data.get("players", [])
-            )
-            return _parse_injured_list(injured_list, "nba-cdn-injuries")
-
+        # ── Source 1: nba-injury-report PyPI package ──────────
         try:
-            if _cdn_circuit is not None:
-                result = _cdn_circuit.call(_cdn_fetch)
-            else:
-                result = _cdn_fetch()
-            if result:
-                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CDN source returned {len(result)} players")
-                return result
-            _logger.info("  RosterEngine._fetch_nba_api_injuries: CDN returned 0 players, trying fallback")
-        except Exception as exc:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries CDN: {exc}")
-
-        # ── Source 2: stats.nba.com leagueinjuries (with circuit breaker) ────
-        def _stats_fetch():
-            _current_season = _current_nba_season()
-            _url = f"https://stats.nba.com/stats/leagueinjuries?LeagueID=00&Season={_current_season}"
-            resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
-            resp2.raise_for_status()
-            data2 = resp2.json()
-            injured_list2 = (
-                data2.get("resultSets", [{}])[0].get("rowSet", [])
-                if data2.get("resultSets")
-                else data2.get("players", [])
-            )
-            if data2.get("resultSets") and data2["resultSets"][0].get("headers"):
-                headers = data2["resultSets"][0]["headers"]
-                rows    = data2["resultSets"][0].get("rowSet", [])
-                injured_list2 = [dict(zip(headers, row)) for row in rows]
-            return _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
-
-        try:
-            if _stats_circuit is not None:
-                result2 = _stats_circuit.call(_stats_fetch)
-            else:
-                result2 = _stats_fetch()
-            if result2:
-                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: stats.nba.com source returned {len(result2)} players")
-                return result2
-            _logger.info("  RosterEngine._fetch_nba_api_injuries: stats.nba.com returned 0 players, trying nba_api")
-        except Exception as exc2:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries stats.nba.com: {exc2}")
-
-        # ── Source 3: nba_api Injuries endpoint ───────────────
-        try:
-            from nba_api.stats.endpoints import injuries as _injuries_ep
-            inj = _injuries_ep.Injuries(timeout=12)
-            inj_df = inj.get_data_frames()[0] if inj.get_data_frames() else None
-            if inj_df is not None and not inj_df.empty:
-                result3: dict = {}
-                for _, row in inj_df.iterrows():
-                    name   = str(row.get("Player_Name", row.get("PLAYER_NAME", "")) or "")
-                    status = _normalize_status(str(row.get("Status", row.get("STATUS", "")) or ""))
-                    injury = str(row.get("Injury", row.get("INJURY", row.get("Comment", "")) or "") or "")
-                    team   = str(row.get("Team", row.get("TEAM", "") or "") or "")
+            from nba_injury_report import get_injury_report as _get_nba_injury_report
+            report = _get_nba_injury_report()
+            injuries_list = report.to_list()
+            if injuries_list:
+                result1: dict = {}
+                for entry in injuries_list:
+                    name = str(entry.get("Player Name", "") or "")
                     if not name:
                         continue
                     key = _normalize_name(name)
-                    result3[key] = {
-                        "status":      status,
-                        "injury":      injury,
-                        "team":        team,
+                    result1[key] = {
+                        "status":      _normalize_status(str(entry.get("Current Status", "") or "")),
+                        "injury":      str(entry.get("Reason", "") or ""),
+                        "team":        str(entry.get("Team", "") or ""),
                         "return_date": "",
-                        "source":      "nba_api-injuries",
+                        "source":      "nba-injury-report-pkg",
                     }
-                if result3:
-                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: nba_api source returned {len(result3)} players")
-                    return result3
-        except Exception as exc3:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries nba_api: {exc3}")
+                if result1:
+                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: nba-injury-report-pkg source returned {len(result1)} players")
+                    return result1
+        except ImportError:
+            _logger.debug("  RosterEngine._fetch_nba_api_injuries: nba-injury-report not installed, skipping")
+        except Exception as exc1:
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries nba-injury-report-pkg: {exc1}")
 
-        # ── Source 4: ESPN public injury API ──────────────────────
+        # ── Source 2: ESPN public injury API ──────────────────────
         try:
             _espn_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
-            resp4 = _requests.get(
+            resp2 = _requests.get(
                 _espn_url,
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -592,60 +505,143 @@ class RosterEngine:
                 },
                 timeout=10,
             )
-            resp4.raise_for_status()
-            espn_data = resp4.json()
-            result4: dict = {}
-            for team_block in espn_data.get("items", espn_data.get("teams", [])):
-                team_abbr = ""
-                team_obj = team_block.get("team", {})
-                if team_obj:
-                    team_abbr = team_obj.get("abbreviation", "")
-                for athlete in team_block.get("injuries", []):
-                    name = ""
-                    athlete_obj = athlete.get("athlete", {})
-                    if athlete_obj:
-                        name = athlete_obj.get("displayName", athlete_obj.get("fullName", ""))
-                    status = _normalize_status(athlete.get("status", ""))
-                    injury_desc = athlete.get("longComment", athlete.get("shortComment", ""))
-                    if not name:
-                        continue
-                    key = _normalize_name(name)
-                    result4[key] = {
-                        "status":      status,
-                        "injury":      str(injury_desc or ""),
-                        "team":        str(team_abbr or ""),
-                        "return_date": "",
-                        "source":      "espn-injuries",
-                    }
-            if result4:
-                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: ESPN source returned {len(result4)} players")
-                return result4
-        except Exception as exc4:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries ESPN: {exc4}")
+            resp2.raise_for_status()
+            espn_data = resp2.json()
+            result2: dict = {}
 
-        # ── Source 5: CBS Sports scraper (if available) ───────────
+            # ESPN may return injuries under several different top-level keys.
+            # Priority: "leagues" list (each with "injuries") > "items" / "teams" (each with "injuries")
+            league_blocks = espn_data.get("leagues", [])
+            if league_blocks:
+                # Structure: {"leagues": [{"injuries": [...], ...}, ...]}
+                for league_block in league_blocks:
+                    for athlete in league_block.get("injuries", []):
+                        name = ""
+                        athlete_obj = athlete.get("athlete", {})
+                        if athlete_obj:
+                            name = athlete_obj.get("displayName", athlete_obj.get("fullName", ""))
+                        team_abbr = ""
+                        team_obj = athlete.get("team", {})
+                        if team_obj:
+                            team_abbr = team_obj.get("abbreviation", "")
+                        raw_status = athlete.get("status", "")
+                        if isinstance(raw_status, dict):
+                            raw_status = raw_status.get("name", raw_status.get("type", ""))
+                        status = _normalize_status(str(raw_status or ""))
+                        injury_desc = athlete.get("longComment", athlete.get("comment", athlete.get("shortComment", "")))
+                        if not name:
+                            continue
+                        key = _normalize_name(name)
+                        result2[key] = {
+                            "status":      status,
+                            "injury":      str(injury_desc or ""),
+                            "team":        str(team_abbr or ""),
+                            "return_date": "",
+                            "source":      "espn-injuries",
+                        }
+            else:
+                # Structure: {"items": [...]} or {"teams": [...]} each team block has "injuries"
+                for team_block in espn_data.get("items", espn_data.get("teams", [])):
+                    team_abbr = ""
+                    team_obj = team_block.get("team", {})
+                    if team_obj:
+                        team_abbr = team_obj.get("abbreviation", "")
+                    for athlete in team_block.get("injuries", []):
+                        name = ""
+                        athlete_obj = athlete.get("athlete", {})
+                        if athlete_obj:
+                            name = athlete_obj.get("displayName", athlete_obj.get("fullName", ""))
+                        raw_status = athlete.get("status", "")
+                        if isinstance(raw_status, dict):
+                            raw_status = raw_status.get("name", raw_status.get("type", ""))
+                        status = _normalize_status(str(raw_status or ""))
+                        injury_desc = athlete.get("longComment", athlete.get("comment", athlete.get("shortComment", "")))
+                        if not name:
+                            continue
+                        key = _normalize_name(name)
+                        result2[key] = {
+                            "status":      status,
+                            "injury":      str(injury_desc or ""),
+                            "team":        str(team_abbr or ""),
+                            "return_date": "",
+                            "source":      "espn-injuries",
+                        }
+            if result2:
+                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: ESPN source returned {len(result2)} players")
+                return result2
+        except Exception as exc2:
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries ESPN: {exc2}")
+
+        # ── Source 3: CBS Sports scraper (if available) ───────────
         try:
             from engine.scrapers.cbs_injuries_scraper import get_injury_report
             cbs_list = get_injury_report()
             if cbs_list:
-                result5: dict = {}
+                result3: dict = {}
                 for item in cbs_list:
                     name = item.get("player", "")
                     if not name:
                         continue
                     key = _normalize_name(name)
-                    result5[key] = {
+                    result3[key] = {
                         "status":      _normalize_status(item.get("status", "")),
                         "injury":      str(item.get("injury", "") or ""),
                         "team":        str(item.get("team", "") or ""),
                         "return_date": str(item.get("date", "") or ""),
                         "source":      "cbs-injuries",
                     }
-                if result5:
-                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CBS source returned {len(result5)} players")
-                    return result5
-        except Exception as exc5:
-            _logger.info(f"  RosterEngine._fetch_nba_api_injuries CBS: {exc5}")
+                if result3:
+                    _logger.info(f"  RosterEngine._fetch_nba_api_injuries: CBS source returned {len(result3)} players")
+                    return result3
+        except Exception as exc3:
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries CBS: {exc3}")
+
+        # ── Source 4: Rotowire HTML scraper (final fallback) ──────
+        try:
+            from bs4 import BeautifulSoup as _BeautifulSoup
+            time.sleep(3)
+            _roto_url = "https://www.rotowire.com/basketball/injury-report.php"
+            resp4 = _requests.get(
+                _roto_url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Referer": "https://www.rotowire.com/",
+                },
+                timeout=15,
+            )
+            resp4.raise_for_status()
+            soup4 = _BeautifulSoup(resp4.text, "lxml")
+            result4: dict = {}
+            for row in soup4.select("li.lineup__player") or soup4.select("tr.injury-report__row") or []:
+                # Try table row structure first
+                cells = row.find_all("td")
+                if len(cells) >= 3:
+                    name        = cells[0].get_text(strip=True)
+                    team_abbr   = cells[1].get_text(strip=True)
+                    status_text = cells[2].get_text(strip=True)
+                    injury_text = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                    return_text = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                else:
+                    continue
+                if not name:
+                    continue
+                key = _normalize_name(name)
+                result4[key] = {
+                    "status":      _normalize_status(status_text),
+                    "injury":      injury_text,
+                    "team":        team_abbr,
+                    "return_date": return_text,
+                    "source":      "rotowire-injuries",
+                }
+            if result4:
+                _logger.info(f"  RosterEngine._fetch_nba_api_injuries: Rotowire source returned {len(result4)} players")
+                return result4
+        except ImportError:
+            _logger.debug("  RosterEngine._fetch_nba_api_injuries: beautifulsoup4/lxml not installed, skipping Rotowire")
+        except Exception as exc4:
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries Rotowire: {exc4}")
 
         _logger.info("  RosterEngine._fetch_nba_api_injuries: all sources returned 0 players")
         return {}

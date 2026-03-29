@@ -812,6 +812,7 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         return result
     except Exception as exc:
         _logger.warning("fetch_box_score_matchups(%s) failed: %s", game_id, exc)
+        _cache_set(cache_key, {})
         return {}
 
 
