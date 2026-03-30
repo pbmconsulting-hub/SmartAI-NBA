@@ -2527,3 +2527,104 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 # ============================================================
 # END SECTION: Dynamic CV Estimation Helper
 # ============================================================
+
+
+# ============================================================
+# SECTION: ETL-Backed Refresh Functions
+# These functions use the pre-populated SQLite database
+# (db/smartai_nba.db) instead of making live API calls.
+# "Smart Update" → incremental pull; "Full Update" → full season pull.
+# ============================================================
+
+
+def refresh_from_etl(progress_callback=None) -> dict:
+    """
+    Smart Update via ETL: fetch only game logs added since the last
+    stored date in db/smartai_nba.db.
+
+    Args:
+        progress_callback (callable | None):
+            Called with (current, total, message).
+
+    Returns:
+        dict: {new_games, new_logs, new_players, error (optional)}
+    """
+    if progress_callback:
+        progress_callback(0, 4, "Connecting to ETL database…")
+
+    try:
+        from data.etl_data_service import refresh_data as _etl_refresh
+        if progress_callback:
+            progress_callback(1, 4, "Running incremental update…")
+
+        result = _etl_refresh()
+
+        if progress_callback:
+            ng = result.get("new_games", 0)
+            nl = result.get("new_logs",  0)
+            progress_callback(3, 4, f"Update complete — {ng} new games, {nl} new logs.")
+
+        # Bust Streamlit caches so load_players_data() re-reads the DB
+        _invalidate_data_caches()
+
+        if progress_callback:
+            progress_callback(4, 4, "✅ Smart ETL update done!")
+
+        return result
+    except Exception as exc:
+        _logger.error("refresh_from_etl failed: %s", exc)
+        if progress_callback:
+            progress_callback(4, 4, f"❌ ETL update failed: {exc}")
+        return {"new_games": 0, "new_logs": 0, "new_players": 0, "error": str(exc)}
+
+
+def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
+    """
+    Full Update via ETL: re-pull the entire season of game logs from
+    nba_api.stats.endpoints.LeagueGameLog and repopulate db/smartai_nba.db.
+
+    Args:
+        season (str | None): Season string e.g. '2025-26'.  Defaults to
+            current season as determined by scripts/initial_pull.py.
+        progress_callback (callable | None):
+            Called with (current, total, message).
+
+    Returns:
+        dict: {players_inserted, games_inserted, logs_inserted, error (optional)}
+    """
+    if progress_callback:
+        progress_callback(0, 4, "Starting full ETL pull from nba_api…")
+
+    try:
+        from scripts.initial_pull import run_initial_pull
+        kwargs = {}
+        if season:
+            kwargs["season"] = season
+
+        if progress_callback:
+            progress_callback(1, 4, "Fetching all game logs (this may take ~30 s)…")
+
+        result = run_initial_pull(**kwargs)
+
+        if progress_callback:
+            pi = result.get("players_inserted", 0)
+            gi = result.get("games_inserted",   0)
+            li = result.get("logs_inserted",    0)
+            progress_callback(3, 4, f"DB populated — {pi} players, {gi} games, {li} logs.")
+
+        # Bust Streamlit caches
+        _invalidate_data_caches()
+
+        if progress_callback:
+            progress_callback(4, 4, "✅ Full ETL pull done!")
+
+        return result
+    except Exception as exc:
+        _logger.error("full_refresh_from_etl failed: %s", exc)
+        if progress_callback:
+            progress_callback(4, 4, f"❌ Full ETL pull failed: {exc}")
+        return {"players_inserted": 0, "games_inserted": 0, "logs_inserted": 0, "error": str(exc)}
+
+# ============================================================
+# END SECTION: ETL-Backed Refresh Functions
+# ============================================================

@@ -62,16 +62,18 @@ INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
 @st.cache_data(ttl=300, show_spinner=False)
 def load_players_data():
     """
-    Load all player data from the players.csv file.
+    Load all player data.
 
-    Returns a list of dictionaries, where each dictionary
-    represents one player with all their stats as keys.
-    Returns an empty list if the file does not exist yet (first run before
-    a live data retrieval has been performed).
+    Primary source: ETL SQLite database (db/smartai_nba.db) when available.
+    Fallback: players.csv (legacy / manually-loaded data).
+
+    Returns a list of dictionaries, where each dictionary represents one
+    player with all their stats as keys.
+    Returns an empty list if neither the database nor the CSV file exists.
 
     Returns:
         list of dict: Player rows, e.g.:
-            [{'name': 'LeBron James', 'team': 'LAL', ...}, ...]
+            [{'name': 'LeBron James', 'team': 'LAL', 'points_avg': 24.8, ...}, ...]
 
     Example:
         players = load_players_data()
@@ -82,7 +84,82 @@ def load_players_data():
             lebron = players[0]
             print(lebron['points_avg'])  # → '24.8'
     """
+    # ── Try ETL database first ────────────────────────────────────────────────
+    try:
+        from data.etl_data_service import get_all_players as _etl_get_all_players
+        etl_players = _etl_get_all_players()
+        if etl_players:
+            return _convert_etl_players_to_app_format(etl_players)
+    except Exception as _etl_err:
+        _logger.debug("load_players_data: ETL source unavailable (%s), falling back to CSV.", _etl_err)
+
+    # ── Fallback: CSV file ────────────────────────────────────────────────────
     return _load_csv_file(PLAYERS_CSV_PATH)
+
+
+def _convert_etl_players_to_app_format(etl_players: list) -> list:
+    """
+    Convert ETL player dicts to the format expected by the rest of the app.
+
+    ETL format:  player_id, first_name, last_name, team_id, team_abbreviation,
+                 gp, ppg, rpg, apg, spg, bpg, topg, mpg
+    App format:  player_id, name, team, position, minutes_avg, points_avg,
+                 rebounds_avg, assists_avg, steals_avg, blocks_avg,
+                 turnovers_avg, threes_avg, ft_pct, usage_rate,
+                 points_std, rebounds_std, assists_std, ...
+    """
+    result = []
+    for p in etl_players:
+        ppg  = float(p.get("ppg",  0) or 0)
+        rpg  = float(p.get("rpg",  0) or 0)
+        apg  = float(p.get("apg",  0) or 0)
+        spg  = float(p.get("spg",  0) or 0)
+        bpg  = float(p.get("bpg",  0) or 0)
+        topg = float(p.get("topg", 0) or 0)
+        mpg  = float(p.get("mpg",  0) or 0)
+
+        # Estimate std deviations using typical NBA CV ratios
+        result.append({
+            "player_id":               str(p.get("player_id", "")),
+            "name":                    f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "team":                    p.get("team_abbreviation", "") or "",
+            "position":                "SF",    # ETL doesn't store position
+            "minutes_avg":             round(mpg, 1),
+            "points_avg":              round(ppg, 1),
+            "rebounds_avg":            round(rpg, 1),
+            "assists_avg":             round(apg, 1),
+            "steals_avg":              round(spg, 1),
+            "blocks_avg":              round(bpg, 1),
+            "turnovers_avg":           round(topg, 1),
+            "threes_avg":              0.0,    # not in ETL schema
+            "ft_pct":                  0.0,    # not in ETL schema
+            "usage_rate":              0.0,    # not in ETL schema
+            # Estimated standard deviations
+            "points_std":              round(ppg  * 0.30, 1),
+            "rebounds_std":            round(rpg  * 0.40, 1),
+            "assists_std":             round(apg  * 0.40, 1),
+            "threes_std":              0.0,
+            "steals_std":              round(spg  * 0.50, 1),
+            "blocks_std":              round(bpg  * 0.60, 1),
+            "turnovers_std":           round(topg * 0.40, 1),
+            "ftm_avg":                 0.0,
+            "fta_avg":                 0.0,
+            "fga_avg":                 0.0,
+            "fgm_avg":                 0.0,
+            "offensive_rebounds_avg":  0.0,
+            "defensive_rebounds_avg":  round(rpg * 0.75, 1),
+            "personal_fouls_avg":      0.0,
+            "ftm_std":                 0.0,
+            "fta_std":                 0.0,
+            "fga_std":                 0.0,
+            "fgm_std":                 0.0,
+            "offensive_rebounds_std":  0.0,
+            "defensive_rebounds_std":  0.0,
+            "personal_fouls_std":      0.0,
+            # Games played (bonus field used by some analysis pages)
+            "games_played":            str(p.get("gp", 0)),
+        })
+    return result
 
 
 @st.cache_data(ttl=300, show_spinner=False)

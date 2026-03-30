@@ -112,6 +112,42 @@ def is_cache_stale(player_name):
     return is_stale
 
 
+def get_player_game_logs_from_etl(player_name_or_id, limit=None):
+    """
+    Retrieve game logs from the ETL SQLite database.
+
+    Parameters
+    ----------
+    player_name_or_id : str or int
+        Player name (fuzzy matched) or integer player ID.
+    limit : int | None
+        Maximum number of recent games to return.
+
+    Returns
+    -------
+    list[dict] : Game log entries, or empty list if not available.
+    """
+    try:
+        from data.etl_data_service import (
+            get_player_game_logs,
+            get_player_by_id,
+            get_player_by_name,
+        )
+
+        if isinstance(player_name_or_id, int) or (
+            isinstance(player_name_or_id, str) and player_name_or_id.isdigit()
+        ):
+            return get_player_game_logs(int(player_name_or_id), limit=limit)
+
+        # Name-based lookup — resolve to player_id first
+        player = get_player_by_name(str(player_name_or_id))
+        if player is None:
+            return []
+        return get_player_game_logs(player["player_id"], limit=limit)
+    except Exception:
+        return []
+
+
 def _load_cache_file():
     """Load the raw cache JSON file.
 
