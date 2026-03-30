@@ -2532,7 +2532,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 # ============================================================
 # SECTION: ETL-Backed Refresh Functions
 # These functions use the pre-populated SQLite database
-# (db/smartai_nba.db) instead of making live API calls.
+# (db/etl_data.db) instead of making live API calls.
 # "Smart Update" → incremental pull; "Full Update" → full season pull.
 # ============================================================
 
@@ -2540,7 +2540,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 def refresh_from_etl(progress_callback=None) -> dict:
     """
     Smart Update via ETL: fetch only game logs added since the last
-    stored date in db/smartai_nba.db.
+    stored date in db/etl_data.db.
 
     Args:
         progress_callback (callable | None):
@@ -2581,7 +2581,7 @@ def refresh_from_etl(progress_callback=None) -> dict:
 def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
     """
     Full Update via ETL: re-pull the entire season of game logs from
-    nba_api.stats.endpoints.LeagueGameLog and repopulate db/smartai_nba.db.
+    nba_api.stats.endpoints.LeagueGameLog and repopulate db/etl_data.db.
 
     Args:
         season (str | None): Season string e.g. '2025-26'.  Defaults to

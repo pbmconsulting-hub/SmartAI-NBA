@@ -841,7 +841,7 @@ def refresh_all_data(progress_callback=None) -> dict:
 def refresh_from_etl(progress_callback=None) -> dict:
     """
     Incremental ETL update — fetch only new game logs since the last
-    stored date in db/smartai_nba.db.
+    stored date in db/etl_data.db.
 
     Args:
         progress_callback (callable | None): (current, total, message).
@@ -855,7 +855,7 @@ def refresh_from_etl(progress_callback=None) -> dict:
 def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
     """
     Full ETL pull — re-fetches the entire season from nba_api and
-    repopulates db/smartai_nba.db.
+    repopulates db/etl_data.db.
 
     Args:
         season (str | None): Season string, e.g. '2025-26'.
