@@ -100,6 +100,8 @@ from data.live_data_fetcher import (
     fetch_all_data as _ldf_fetch_all_data,
     fetch_all_todays_data as _ldf_fetch_all_todays_data,
     fetch_active_rosters as _ldf_fetch_active_rosters,
+    refresh_from_etl as _ldf_refresh_from_etl,          # noqa: F401
+    full_refresh_from_etl as _ldf_full_refresh_from_etl, # noqa: F401
 )
 
 
@@ -830,3 +832,36 @@ def refresh_all_data(progress_callback=None) -> dict:
         len(result["errors"]),
     )
     return result
+
+
+# ============================================================
+# ETL refresh helpers — thin wrappers around live_data_fetcher
+# ============================================================
+
+def refresh_from_etl(progress_callback=None) -> dict:
+    """
+    Incremental ETL update — fetch only new game logs since the last
+    stored date in db/etl_data.db.
+
+    Args:
+        progress_callback (callable | None): (current, total, message).
+
+    Returns:
+        dict: {new_games, new_logs, new_players, error (optional)}
+    """
+    return _ldf_refresh_from_etl(progress_callback=progress_callback)
+
+
+def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
+    """
+    Full ETL pull — re-fetches the entire season from nba_api and
+    repopulates db/etl_data.db.
+
+    Args:
+        season (str | None): Season string, e.g. '2025-26'.
+        progress_callback (callable | None): (current, total, message).
+
+    Returns:
+        dict: {players_inserted, games_inserted, logs_inserted, error (optional)}
+    """
+    return _ldf_full_refresh_from_etl(season=season, progress_callback=progress_callback)

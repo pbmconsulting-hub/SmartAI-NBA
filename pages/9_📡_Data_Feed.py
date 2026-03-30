@@ -38,8 +38,21 @@ from data.nba_data_service import (
     load_last_updated,           # Load timestamps from last_updated.json
 )
 
-# RosterEngine is the single source for injury data.
-# It uses API-NBA API as the primary source, with NBA CDN feed as fallback.
+# ETL refresh functions — use pre-populated SQLite DB instead of live API calls
+try:
+    from data.nba_data_service import refresh_from_etl, full_refresh_from_etl
+    _ETL_AVAILABLE = True
+except ImportError:
+    _ETL_AVAILABLE = False
+
+# ETL database status
+try:
+    from data.etl_data_service import is_db_available, get_db_counts
+    _ETL_DB_AVAILABLE = is_db_available()
+    _ETL_DB_COUNTS = get_db_counts() if _ETL_DB_AVAILABLE else {}
+except Exception:
+    _ETL_DB_AVAILABLE = False
+    _ETL_DB_COUNTS = {}
 
 # ============================================================
 # SECTION: Page Setup
@@ -209,6 +222,60 @@ st.divider()
 
 # ============================================================
 # END SECTION: Data Status Display
+# ============================================================
+
+
+# ============================================================
+# SECTION: ETL Database Status
+# Shows the state of the local SQLite database populated by
+# the ETL pipeline (scripts/initial_pull.py / data_updater.py).
+# ============================================================
+
+st.subheader("🗄️ ETL Database (Local SQLite)")
+
+_etl_status_cols = st.columns([1, 3])
+with _etl_status_cols[0]:
+    if _ETL_DB_AVAILABLE:
+        st.success("✅ Database ready")
+        _p = _ETL_DB_COUNTS.get("players", 0)
+        _g = _ETL_DB_COUNTS.get("games",   0)
+        _l = _ETL_DB_COUNTS.get("logs",    0)
+        st.caption(f"👤 **{_p:,}** players  |  🏀 **{_g:,}** games  |  📋 **{_l:,}** logs")
+    else:
+        st.warning("⚠️ Database empty")
+        st.caption("Run `python scripts/initial_pull.py` to populate.")
+
+with _etl_status_cols[1]:
+    st.markdown("""
+**ETL Database** is the fastest, most reliable data source.
+- **Smart ETL Update** — pulls only game logs added since the last stored date (~30 seconds).
+- **Full ETL Pull** — re-fetches the entire season and repopulates the database (~60 seconds).
+
+Both options avoid live per-player API calls.  Use these **before** each session for fresh stats.
+""")
+
+_etl_btn_cols = st.columns([1, 1, 2])
+with _etl_btn_cols[0]:
+    if st.button(
+        "⚡ Smart ETL Update",
+        type="primary",
+        help="Incremental update — fetches only new games since the last stored date",
+        key="etl_smart_btn",
+    ):
+        st.session_state["update_action"] = "etl_smart"
+
+with _etl_btn_cols[1]:
+    if st.button(
+        "🔄 Full ETL Pull",
+        help="Re-pull entire season from nba_api and repopulate db/etl_data.db",
+        key="etl_full_btn",
+    ):
+        st.session_state["update_action"] = "etl_full"
+
+st.divider()
+
+# ============================================================
+# END SECTION: ETL Database Status
 # ============================================================
 
 
@@ -411,9 +478,105 @@ if current_action:
     st.divider()
 
     # --------------------------------------------------------
+    # Action: Smart ETL Update (incremental)
+    # --------------------------------------------------------
+    if current_action == "etl_smart":
+        st.subheader("⚡ Smart ETL Update")
+        progress_bar = st.progress(0, text="Starting incremental ETL update…")
+        status_text = st.empty()
+
+        def _etl_smart_progress(current, total, message):
+            frac = current / max(total, 1)
+            progress_bar.progress(frac, text=message)
+            status_text.caption(message)
+
+        try:
+            with st.spinner("Fetching new game logs from nba_api…"):
+                result = refresh_from_etl(progress_callback=_etl_smart_progress)
+
+            st.session_state["update_action"] = None
+            ng = result.get("new_games", 0)
+            nl = result.get("new_logs",  0)
+            err = result.get("error")
+
+            if err:
+                st.error(f"❌ Smart ETL Update failed: {err}")
+            else:
+                st.success(
+                    f"✅ Smart ETL Update complete! "
+                    f"**{ng}** new game(s) · **{nl}** new log row(s) added to db/etl_data.db."
+                )
+                if ng == 0 and nl == 0:
+                    st.info("ℹ️ Database is already up to date — no new games since last update.")
+                # Show updated counts
+                try:
+                    from data.etl_data_service import get_db_counts
+                    counts = get_db_counts()
+                    st.caption(
+                        f"DB now has **{counts['players']:,}** players · "
+                        f"**{counts['games']:,}** games · **{counts['logs']:,}** logs"
+                    )
+                except Exception:
+                    pass
+        except Exception as _etl_err:
+            st.session_state["update_action"] = None
+            st.error(f"❌ Smart ETL Update failed: {_etl_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
+
+    # --------------------------------------------------------
+    # Action: Full ETL Pull (re-seed entire season)
+    # --------------------------------------------------------
+    elif current_action == "etl_full":
+        st.subheader("🔄 Full ETL Pull")
+        st.info(
+            "⏳ This re-fetches the entire 2025-26 season from nba_api. "
+            "Takes approximately 30–60 seconds."
+        )
+        progress_bar = st.progress(0, text="Starting full ETL pull…")
+        status_text = st.empty()
+
+        def _etl_full_progress(current, total, message):
+            frac = current / max(total, 1)
+            progress_bar.progress(frac, text=message)
+            status_text.caption(message)
+
+        try:
+            with st.spinner("Pulling full season game logs…"):
+                result = full_refresh_from_etl(progress_callback=_etl_full_progress)
+
+            st.session_state["update_action"] = None
+            pi = result.get("players_inserted", 0)
+            gi = result.get("games_inserted",   0)
+            li = result.get("logs_inserted",    0)
+            err = result.get("error")
+
+            if err:
+                st.error(f"❌ Full ETL Pull failed: {err}")
+            else:
+                st.success(
+                    f"✅ Full ETL Pull complete! "
+                    f"db/etl_data.db now has **{pi:,}** players · "
+                    f"**{gi:,}** games · **{li:,}** logs."
+                )
+        except Exception as _etl_err:
+            st.session_state["update_action"] = None
+            st.error(f"❌ Full ETL Pull failed: {_etl_err}")
+        finally:
+            try:
+                progress_bar.empty()
+                status_text.empty()
+            except Exception:
+                pass
+
+    # --------------------------------------------------------
     # Action: One-Click Full Setup
     # --------------------------------------------------------
-    if current_action == "one_click":
+    elif current_action == "one_click":
         st.subheader("🏀 One-Click Full Setup")
 
         progress_bar = st.progress(0, text="Starting one-click setup...")
