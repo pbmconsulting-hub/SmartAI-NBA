@@ -102,7 +102,10 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
     Convert ETL player dicts to the format expected by the rest of the app.
 
     ETL format:  player_id, first_name, last_name, team_id, team_abbreviation,
-                 gp, ppg, rpg, apg, spg, bpg, topg, mpg
+                 position, gp, ppg, rpg, apg, spg, bpg, topg, mpg,
+                 fg3_avg, ftm_avg, fta_avg, ft_pct_avg, fgm_avg, fga_avg,
+                 fg_pct_avg, oreb_avg, dreb_avg, pf_avg, plus_minus_avg,
+                 points_std, rebounds_std, assists_std, threes_std
     App format:  player_id, name, team, position, minutes_avg, points_avg,
                  rebounds_avg, assists_avg, steals_avg, blocks_avg,
                  turnovers_avg, threes_avg, ft_pct, usage_rate,
@@ -118,12 +121,29 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
         topg = float(p.get("topg", 0) or 0)
         mpg  = float(p.get("mpg",  0) or 0)
 
-        # Estimate std deviations using typical NBA CV ratios
+        # Real computed values from the DB (fall back to estimates when 0/missing)
+        fg3_avg    = float(p.get("fg3_avg",    0) or 0)
+        ftm_avg    = float(p.get("ftm_avg",    0) or 0)
+        fta_avg    = float(p.get("fta_avg",    0) or 0)
+        ft_pct_avg = float(p.get("ft_pct_avg", 0) or 0)
+        fgm_avg    = float(p.get("fgm_avg",    0) or 0)
+        fga_avg    = float(p.get("fga_avg",    0) or 0)
+        oreb_avg   = float(p.get("oreb_avg",   0) or 0)
+        dreb_avg   = float(p.get("dreb_avg",   0) or 0)
+        pf_avg     = float(p.get("pf_avg",     0) or 0)
+
+        # Real standard deviations from DB; fall back to CV-ratio estimates
+        points_std   = float(p.get("points_std",   0) or 0) or round(ppg  * 0.30, 1)
+        rebounds_std = float(p.get("rebounds_std", 0) or 0) or round(rpg  * 0.40, 1)
+        assists_std  = float(p.get("assists_std",  0) or 0) or round(apg  * 0.40, 1)
+        threes_std   = float(p.get("threes_std",   0) or 0)
+
         result.append({
             "player_id":               str(p.get("player_id", "")),
             "name":                    f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
             "team":                    p.get("team_abbreviation", "") or "",
-            "position":                "SF",    # ETL doesn't store position
+            # Use real position from DB; fall back to "SF" only when NULL/absent
+            "position":                p.get("position") or "SF",
             "minutes_avg":             round(mpg, 1),
             "points_avg":              round(ppg, 1),
             "rebounds_avg":            round(rpg, 1),
@@ -131,24 +151,25 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
             "steals_avg":              round(spg, 1),
             "blocks_avg":              round(bpg, 1),
             "turnovers_avg":           round(topg, 1),
-            "threes_avg":              0.0,    # not in ETL schema
-            "ft_pct":                  0.0,    # not in ETL schema
-            "usage_rate":              0.0,    # not in ETL schema
-            # Estimated standard deviations
-            "points_std":              round(ppg  * 0.30, 1),
-            "rebounds_std":            round(rpg  * 0.40, 1),
-            "assists_std":             round(apg  * 0.40, 1),
-            "threes_std":              0.0,
+            "threes_avg":              round(fg3_avg, 1),
+            "ft_pct":                  round(ft_pct_avg, 3),
+            # usage_rate is not available from LeagueGameLog — requires advanced stats endpoint
+            "usage_rate":              0.0,
+            # Standard deviations: real DB-computed values when available, estimates otherwise
+            "points_std":              round(points_std, 1),
+            "rebounds_std":            round(rebounds_std, 1),
+            "assists_std":             round(assists_std, 1),
+            "threes_std":              round(threes_std, 1),
             "steals_std":              round(spg  * 0.50, 1),
             "blocks_std":              round(bpg  * 0.60, 1),
             "turnovers_std":           round(topg * 0.40, 1),
-            "ftm_avg":                 0.0,
-            "fta_avg":                 0.0,
-            "fga_avg":                 0.0,
-            "fgm_avg":                 0.0,
-            "offensive_rebounds_avg":  0.0,
-            "defensive_rebounds_avg":  round(rpg * 0.75, 1),
-            "personal_fouls_avg":      0.0,
+            "ftm_avg":                 round(ftm_avg, 1),
+            "fta_avg":                 round(fta_avg, 1),
+            "fga_avg":                 round(fga_avg, 1),
+            "fgm_avg":                 round(fgm_avg, 1),
+            "offensive_rebounds_avg":  round(oreb_avg, 1),
+            "defensive_rebounds_avg":  round(dreb_avg, 1),
+            "personal_fouls_avg":      round(pf_avg, 1),
             "ftm_std":                 0.0,
             "fta_std":                 0.0,
             "fga_std":                 0.0,

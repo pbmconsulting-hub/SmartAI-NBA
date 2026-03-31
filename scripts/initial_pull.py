@@ -131,6 +131,8 @@ def run_initial_pull(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
         "TEAM_ID": "team_id",
         "TEAM_ABBREVIATION": "team_abbreviation",
     })[["player_id", "first_name", "last_name", "team_id", "team_abbreviation"]]
+    # position is not available from LeagueGameLog — left NULL for now
+    players_df["position"] = None
     logger.info("Built Players DataFrame: %d unique players.", len(players_df))
 
     # Games
@@ -144,23 +146,44 @@ def run_initial_pull(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
 
     # Player_Game_Logs
     logs_df = raw.rename(columns={
-        "PLAYER_ID": "player_id",
-        "GAME_ID":   "game_id",
-        "PTS":       "pts",
-        "REB":       "reb",
-        "AST":       "ast",
-        "BLK":       "blk",
-        "STL":       "stl",
-        "TOV":       "tov",
-        "MIN":       "min",
-    })[["player_id", "game_id", "pts", "reb", "ast", "blk", "stl", "tov", "min"]].copy()
+        "PLAYER_ID":  "player_id",
+        "GAME_ID":    "game_id",
+        "PTS":        "pts",
+        "REB":        "reb",
+        "AST":        "ast",
+        "BLK":        "blk",
+        "STL":        "stl",
+        "TOV":        "tov",
+        "MIN":        "min",
+        "FGM":        "fgm",
+        "FGA":        "fga",
+        "FG_PCT":     "fg_pct",
+        "FG3M":       "fg3m",
+        "FG3A":       "fg3a",
+        "FG3_PCT":    "fg3_pct",
+        "FTM":        "ftm",
+        "FTA":        "fta",
+        "FT_PCT":     "ft_pct",
+        "OREB":       "oreb",
+        "DREB":       "dreb",
+        "PF":         "pf",
+        "PLUS_MINUS": "plus_minus",
+        "WL":         "wl",
+    })[["player_id", "game_id", "pts", "reb", "ast", "blk", "stl", "tov", "min",
+        "fgm", "fga", "fg_pct", "fg3m", "fg3a", "fg3_pct",
+        "ftm", "fta", "ft_pct", "oreb", "dreb", "pf", "plus_minus", "wl"]].copy()
 
     # Normalise minute strings
     logs_df["min"] = logs_df["min"].apply(_parse_minutes)
 
     # Fill NaN integers with 0
-    for col in ["pts", "reb", "ast", "blk", "stl", "tov"]:
+    for col in ["pts", "reb", "ast", "blk", "stl", "tov",
+                "fgm", "fga", "fg3m", "fg3a", "ftm", "fta", "oreb", "dreb", "pf", "plus_minus"]:
         logs_df[col] = logs_df[col].fillna(0).astype(int)
+
+    # Fill NaN floats with 0.0
+    for col in ["fg_pct", "fg3_pct", "ft_pct"]:
+        logs_df[col] = logs_df[col].fillna(0.0).astype(float)
 
     logger.info("Built Player_Game_Logs DataFrame: %d rows.", len(logs_df))
 
