@@ -19,6 +19,7 @@ import datetime
 import logging
 import os
 import sqlite3
+import statistics
 from pathlib import Path
 from typing import Any
 
@@ -181,7 +182,6 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
             (player_id,),
         ).fetchall()
         if len(logs) >= 2:
-            import statistics
             pts_list  = [float(r[0] or 0) for r in logs]
             reb_list  = [float(r[1] or 0) for r in logs]
             ast_list  = [float(r[2] or 0) for r in logs]
@@ -701,11 +701,18 @@ def get_db_counts() -> dict:
     conn = _get_conn()
     if conn is None:
         return {"players": 0, "games": 0, "logs": 0}
+    # Table names are hardcoded constants — not user input — but use explicit
+    # per-query strings (no interpolation) to satisfy static-analysis tooling.
+    _table_queries: list[tuple[str, str]] = [
+        ("players", "SELECT COUNT(*) FROM Players"),
+        ("games",   "SELECT COUNT(*) FROM Games"),
+        ("logs",    "SELECT COUNT(*) FROM Player_Game_Logs"),
+    ]
     try:
         counts: dict = {}
-        for key, table in [("players", "Players"), ("games", "Games"), ("logs", "Player_Game_Logs")]:
+        for key, sql in _table_queries:
             try:
-                counts[key] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                counts[key] = conn.execute(sql).fetchone()[0]
             except Exception:
                 counts[key] = 0
         return counts
