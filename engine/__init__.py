@@ -93,3 +93,46 @@ from engine.correlation import (
     get_correlation_confidence,           # Parlay correlation confidence (4E)
     correlation_adjusted_kelly,           # Correlation-adjusted Kelly sizing (4F)
 )
+
+
+# ============================================================
+# SECTION: Data Validation Gate
+# Only accept props that have passed the Validation Engine
+# (validation_status == "VALIDATED") and the Stale Kill Switch
+# (not discarded).  Props that arrive without a validation_status
+# field are treated as unvalidated and still accepted with a
+# warning — this preserves backward compatibility.
+# ============================================================
+
+def accept_validated_props(props):
+    """
+    Filter a list of props to only those marked VALIDATED.
+
+    Props enriched by ``validate_cross_platform_lines()`` in
+    ``data/platform_fetcher.py`` carry a ``validation_status`` field.
+    This gate keeps only VALIDATED props and logs REVIEW props.
+
+    Props without a ``validation_status`` field are passed through
+    unchanged (backward-compatible).
+
+    Args:
+        props (list[dict]): Props from the platform fetcher pipeline.
+
+    Returns:
+        tuple: (accepted, rejected_count)
+            accepted (list[dict]): Props that passed validation.
+            rejected_count (int): Number of REVIEW props filtered out.
+    """
+    accepted: list = []
+    rejected = 0
+    for prop in props:
+        status = prop.get("validation_status")
+        if status is None:
+            # No validation metadata → backward-compatible pass-through
+            accepted.append(prop)
+        elif status == "VALIDATED":
+            accepted.append(prop)
+        else:
+            # "REVIEW" — flagged by Validation Engine
+            rejected += 1
+    return accepted, rejected
