@@ -144,6 +144,8 @@ def run_update(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
         "TEAM_ID": "team_id",
         "TEAM_ABBREVIATION": "team_abbreviation",
     })[["player_id", "first_name", "last_name", "team_id", "team_abbreviation"]]
+    # position is not available from LeagueGameLog — leave NULL on new rows
+    players_df["position"] = None
 
     # New games
     games_df = (
@@ -153,21 +155,40 @@ def run_update(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
         .copy()
     )
 
-    # New logs
+    # New logs — full column set from the API response
     logs_df = raw.rename(columns={
-        "PLAYER_ID": "player_id",
-        "GAME_ID":   "game_id",
-        "PTS":       "pts",
-        "REB":       "reb",
-        "AST":       "ast",
-        "BLK":       "blk",
-        "STL":       "stl",
-        "TOV":       "tov",
-        "MIN":       "min",
-    })[["player_id", "game_id", "pts", "reb", "ast", "blk", "stl", "tov", "min"]].copy()
+        "PLAYER_ID":  "player_id",
+        "GAME_ID":    "game_id",
+        "PTS":        "pts",
+        "REB":        "reb",
+        "AST":        "ast",
+        "BLK":        "blk",
+        "STL":        "stl",
+        "TOV":        "tov",
+        "MIN":        "min",
+        "FGM":        "fgm",
+        "FGA":        "fga",
+        "FG_PCT":     "fg_pct",
+        "FG3M":       "fg3m",
+        "FG3A":       "fg3a",
+        "FG3_PCT":    "fg3_pct",
+        "FTM":        "ftm",
+        "FTA":        "fta",
+        "FT_PCT":     "ft_pct",
+        "OREB":       "oreb",
+        "DREB":       "dreb",
+        "PF":         "pf",
+        "PLUS_MINUS": "plus_minus",
+        "WL":         "wl",
+    })[["player_id", "game_id", "pts", "reb", "ast", "blk", "stl", "tov", "min",
+        "fgm", "fga", "fg_pct", "fg3m", "fg3a", "fg3_pct",
+        "ftm", "fta", "ft_pct", "oreb", "dreb", "pf", "plus_minus", "wl"]].copy()
     logs_df["min"] = logs_df["min"].apply(_parse_minutes)
-    for col in ["pts", "reb", "ast", "blk", "stl", "tov"]:
+    for col in ["pts", "reb", "ast", "blk", "stl", "tov",
+                "fgm", "fga", "fg3m", "fg3a", "ftm", "fta", "oreb", "dreb", "pf", "plus_minus"]:
         logs_df[col] = logs_df[col].fillna(0).astype(int)
+    for col in ["fg_pct", "fg3_pct", "ft_pct"]:
+        logs_df[col] = logs_df[col].fillna(0.0).astype(float)
 
     # ── Write to database ─────────────────────────────────────────────────────
     conn = sqlite3.connect(str(db_path))
@@ -178,15 +199,15 @@ def run_update(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
         new_players = 0
         for _, row in players_df.iterrows():
             cur.execute(
-                """INSERT INTO Players (player_id, first_name, last_name, team_id, team_abbreviation)
-                   VALUES (?, ?, ?, ?, ?)
+                """INSERT INTO Players (player_id, first_name, last_name, team_id, team_abbreviation, position)
+                   VALUES (?, ?, ?, ?, ?, ?)
                    ON CONFLICT(player_id) DO UPDATE SET
                        team_id = excluded.team_id,
                        team_abbreviation = excluded.team_abbreviation
                 """,
                 (int(row.player_id), row.first_name, row.last_name,
                  int(row.team_id) if row.team_id else None,
-                 row.team_abbreviation),
+                 row.team_abbreviation, None),
             )
             if cur.rowcount > 0 and cur.lastrowid:
                 new_players += 1
@@ -201,17 +222,26 @@ def run_update(season: str = SEASON, db_path: Path = DB_PATH) -> dict:
             if cur.rowcount:
                 new_games += 1
 
-        # Insert new logs (ignore duplicates)
+        # Insert new logs (ignore duplicates) — full column set
         new_logs = 0
         for _, row in logs_df.iterrows():
             cur.execute(
                 """INSERT OR IGNORE INTO Player_Game_Logs
-                   (player_id, game_id, pts, reb, ast, blk, stl, tov, min)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   (player_id, game_id, pts, reb, ast, blk, stl, tov, min,
+                    fgm, fga, fg_pct, fg3m, fg3a, fg3_pct,
+                    ftm, fta, ft_pct, oreb, dreb, pf, plus_minus, wl)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?,
+                           ?, ?, ?, ?, ?, ?,
+                           ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (int(row.player_id), row.game_id,
                  int(row.pts), int(row.reb), int(row.ast),
-                 int(row.blk), int(row.stl), int(row.tov), row["min"]),
+                 int(row.blk), int(row.stl), int(row.tov), row["min"],
+                 int(row.fgm), int(row.fga), float(row.fg_pct),
+                 int(row.fg3m), int(row.fg3a), float(row.fg3_pct),
+                 int(row.ftm), int(row.fta), float(row.ft_pct),
+                 int(row.oreb), int(row.dreb), int(row.pf),
+                 int(row.plus_minus), row.wl),
             )
             if cur.rowcount:
                 new_logs += 1

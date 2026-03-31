@@ -311,7 +311,10 @@ def _build_nba_abbrev_map() -> dict[str, str]:
 
 NBA_API_ABBREV_TO_OURS: dict[str, str] = _build_nba_abbrev_map()
 
-# Conference mapping by abbreviation
+# Conference mapping by abbreviation.
+# Intentionally hardcoded: NBA conference membership does not change
+# during a season, and the Teams table is not present in this repo's
+# db/etl_data.db (which only stores Players, Games, and Player_Game_Logs).
 TEAM_CONFERENCE = {
     "ATL": "East", "BOS": "East", "BKN": "East", "CHA": "East",
     "CHI": "East", "CLE": "East", "DET": "East", "IND": "East",

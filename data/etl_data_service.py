@@ -107,7 +107,13 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
 
     if row is None or row["gp"] == 0:
         return {"gp": 0, "ppg": 0.0, "rpg": 0.0, "apg": 0.0,
-                "spg": 0.0, "bpg": 0.0, "topg": 0.0, "mpg": 0.0}
+                "spg": 0.0, "bpg": 0.0, "topg": 0.0, "mpg": 0.0,
+                "fg3_avg": 0.0, "ftm_avg": 0.0, "fta_avg": 0.0,
+                "ft_pct_avg": 0.0, "fgm_avg": 0.0, "fga_avg": 0.0,
+                "fg_pct_avg": 0.0, "oreb_avg": 0.0, "dreb_avg": 0.0,
+                "pf_avg": 0.0, "plus_minus_avg": 0.0,
+                "points_std": 0.0, "rebounds_std": 0.0,
+                "assists_std": 0.0, "threes_std": 0.0}
 
     def _r(val, decimals: int = 1) -> float:
         try:
@@ -115,7 +121,7 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
         except (TypeError, ValueError):
             return 0.0
 
-    return {
+    averages: dict = {
         "gp":   int(row["gp"]),
         "ppg":  _r(row["ppg"]),
         "rpg":  _r(row["rpg"]),
@@ -126,6 +132,83 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
         "mpg":  _r(row["mpg"]),
     }
 
+    # Extended averages — gracefully skip if columns don't exist in old DBs
+    try:
+        ext = conn.execute(
+            """
+            SELECT
+                AVG(fg3m)       AS fg3_avg,
+                AVG(ftm)        AS ftm_avg,
+                AVG(fta)        AS fta_avg,
+                AVG(ft_pct)     AS ft_pct_avg,
+                AVG(fgm)        AS fgm_avg,
+                AVG(fga)        AS fga_avg,
+                AVG(fg_pct)     AS fg_pct_avg,
+                AVG(oreb)       AS oreb_avg,
+                AVG(dreb)       AS dreb_avg,
+                AVG(pf)         AS pf_avg,
+                AVG(plus_minus) AS plus_minus_avg
+            FROM Player_Game_Logs
+            WHERE player_id = ?
+            """,
+            (player_id,),
+        ).fetchone()
+        averages.update({
+            "fg3_avg":        _r(ext["fg3_avg"]),
+            "ftm_avg":        _r(ext["ftm_avg"]),
+            "fta_avg":        _r(ext["fta_avg"]),
+            "ft_pct_avg":     _r(ext["ft_pct_avg"], 3),
+            "fgm_avg":        _r(ext["fgm_avg"]),
+            "fga_avg":        _r(ext["fga_avg"]),
+            "fg_pct_avg":     _r(ext["fg_pct_avg"], 3),
+            "oreb_avg":       _r(ext["oreb_avg"]),
+            "dreb_avg":       _r(ext["dreb_avg"]),
+            "pf_avg":         _r(ext["pf_avg"]),
+            "plus_minus_avg": _r(ext["plus_minus_avg"]),
+        })
+    except Exception:
+        averages.update({
+            "fg3_avg": 0.0, "ftm_avg": 0.0, "fta_avg": 0.0,
+            "ft_pct_avg": 0.0, "fgm_avg": 0.0, "fga_avg": 0.0,
+            "fg_pct_avg": 0.0, "oreb_avg": 0.0, "dreb_avg": 0.0,
+            "pf_avg": 0.0, "plus_minus_avg": 0.0,
+        })
+
+    # Real standard deviations from game logs — gracefully fall back to estimates
+    try:
+        logs = conn.execute(
+            "SELECT pts, reb, ast, fg3m FROM Player_Game_Logs WHERE player_id = ?",
+            (player_id,),
+        ).fetchall()
+        if len(logs) >= 2:
+            import statistics
+            pts_list  = [float(r[0] or 0) for r in logs]
+            reb_list  = [float(r[1] or 0) for r in logs]
+            ast_list  = [float(r[2] or 0) for r in logs]
+            fg3m_list = [float(r[3] or 0) for r in logs]
+            averages["points_std"]   = _r(statistics.stdev(pts_list),  2)
+            averages["rebounds_std"] = _r(statistics.stdev(reb_list),  2)
+            averages["assists_std"]  = _r(statistics.stdev(ast_list),  2)
+            averages["threes_std"]   = _r(statistics.stdev(fg3m_list), 2)
+        else:
+            ppg = averages["ppg"]
+            rpg = averages["rpg"]
+            apg = averages["apg"]
+            averages["points_std"]   = _r(ppg * 0.30, 2)
+            averages["rebounds_std"] = _r(rpg * 0.40, 2)
+            averages["assists_std"]  = _r(apg * 0.40, 2)
+            averages["threes_std"]   = 0.0
+    except Exception:
+        ppg = averages["ppg"]
+        rpg = averages["rpg"]
+        apg = averages["apg"]
+        averages["points_std"]   = _r(ppg * 0.30, 2)
+        averages["rebounds_std"] = _r(rpg * 0.40, 2)
+        averages["assists_std"]  = _r(apg * 0.40, 2)
+        averages["threes_std"]   = 0.0
+
+    return averages
+
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -135,8 +218,11 @@ def get_all_players() -> list[dict]:
     Return all players with season averages computed from game logs.
 
     Each dict has:
-        player_id, first_name, last_name, team_id, team_abbreviation,
-        gp, ppg, rpg, apg, spg, bpg, topg, mpg
+        player_id, first_name, last_name, team_id, team_abbreviation, position,
+        gp, ppg, rpg, apg, spg, bpg, topg, mpg,
+        fg3_avg, ftm_avg, fta_avg, ft_pct_avg, fgm_avg, fga_avg,
+        fg_pct_avg, oreb_avg, dreb_avg, pf_avg, plus_minus_avg,
+        points_std, rebounds_std, assists_std, threes_std
     """
     conn = _get_conn()
     if conn is None:
@@ -150,6 +236,7 @@ def get_all_players() -> list[dict]:
                 p.last_name,
                 p.team_id,
                 p.team_abbreviation,
+                p.position,
                 COUNT(l.game_id)  AS gp,
                 AVG(l.pts)        AS ppg,
                 AVG(l.reb)        AS rpg,
@@ -178,14 +265,42 @@ def get_all_players() -> list[dict]:
             except (TypeError, ValueError):
                 return 0.0
 
+        # Also try to pull extended averages in one bulk query
+        try:
+            ext_rows = conn.execute(
+                """
+                SELECT
+                    player_id,
+                    AVG(fg3m)       AS fg3_avg,
+                    AVG(ftm)        AS ftm_avg,
+                    AVG(fta)        AS fta_avg,
+                    AVG(ft_pct)     AS ft_pct_avg,
+                    AVG(fgm)        AS fgm_avg,
+                    AVG(fga)        AS fga_avg,
+                    AVG(fg_pct)     AS fg_pct_avg,
+                    AVG(oreb)       AS oreb_avg,
+                    AVG(dreb)       AS dreb_avg,
+                    AVG(pf)         AS pf_avg,
+                    AVG(plus_minus) AS plus_minus_avg
+                FROM Player_Game_Logs
+                GROUP BY player_id
+                """
+            ).fetchall()
+            ext_map = {int(r["player_id"]): r for r in ext_rows}
+        except Exception:
+            ext_map = {}
+
         result = []
         for row in rows:
+            pid = int(row["player_id"])
+            ext = ext_map.get(pid)
             result.append({
-                "player_id":         int(row["player_id"]),
+                "player_id":         pid,
                 "first_name":        row["first_name"] or "",
                 "last_name":         row["last_name"] or "",
                 "team_id":           int(row["team_id"]) if row["team_id"] else None,
                 "team_abbreviation": row["team_abbreviation"] or "",
+                "position":          row["position"] or None,
                 "gp":    int(row["gp"] or 0),
                 "ppg":   _r(row["ppg"]),
                 "rpg":   _r(row["rpg"]),
@@ -194,6 +309,18 @@ def get_all_players() -> list[dict]:
                 "bpg":   _r(row["bpg"]),
                 "topg":  _r(row["topg"]),
                 "mpg":   _r(row["mpg"]),
+                # Extended averages (0.0 if columns not present in old DB)
+                "fg3_avg":        _r(ext["fg3_avg"])        if ext else 0.0,
+                "ftm_avg":        _r(ext["ftm_avg"])        if ext else 0.0,
+                "fta_avg":        _r(ext["fta_avg"])        if ext else 0.0,
+                "ft_pct_avg":     _r(ext["ft_pct_avg"], 3) if ext else 0.0,
+                "fgm_avg":        _r(ext["fgm_avg"])        if ext else 0.0,
+                "fga_avg":        _r(ext["fga_avg"])        if ext else 0.0,
+                "fg_pct_avg":     _r(ext["fg_pct_avg"], 3) if ext else 0.0,
+                "oreb_avg":       _r(ext["oreb_avg"])       if ext else 0.0,
+                "dreb_avg":       _r(ext["dreb_avg"])       if ext else 0.0,
+                "pf_avg":         _r(ext["pf_avg"])         if ext else 0.0,
+                "plus_minus_avg": _r(ext["plus_minus_avg"]) if ext else 0.0,
             })
         return result
     except Exception as exc:
@@ -239,7 +366,7 @@ def get_player_by_name(name: str) -> dict | None:
         name_lower = name.strip().lower()
         rows = conn.execute(
             """
-            SELECT player_id, first_name, last_name, team_id, team_abbreviation
+            SELECT player_id, first_name, last_name, team_id, team_abbreviation, position
             FROM Players
             """
         ).fetchall()
@@ -305,7 +432,21 @@ def get_player_game_logs(player_id: int, limit: int | None = None) -> list[dict]
                 l.stl,
                 l.blk,
                 l.tov,
-                l.min
+                l.min,
+                l.fgm,
+                l.fga,
+                l.fg_pct,
+                l.fg3m,
+                l.fg3a,
+                l.fg3_pct,
+                l.ftm,
+                l.fta,
+                l.ft_pct,
+                l.oreb,
+                l.dreb,
+                l.pf,
+                l.plus_minus,
+                l.wl
             FROM Player_Game_Logs l
             JOIN Games g ON l.game_id = g.game_id
             WHERE l.player_id = ?
@@ -380,12 +521,21 @@ def get_todays_games() -> list[dict]:
     if conn is not None:
         try:
             rows = conn.execute(
-                "SELECT game_id, game_date, matchup FROM Games WHERE game_date = ?",
+                """SELECT game_id, game_date, matchup, home_score, away_score
+                   FROM Games WHERE game_date = ?""",
                 (today,),
             ).fetchall()
             db_games = _rows_to_dicts(rows)
-        except Exception as exc:
-            _logger.warning("get_todays_games DB query failed: %s", exc)
+        except Exception:
+            # home_score/away_score may not exist in old DBs — fall back to basic columns
+            try:
+                rows = conn.execute(
+                    "SELECT game_id, game_date, matchup FROM Games WHERE game_date = ?",
+                    (today,),
+                ).fetchall()
+                db_games = _rows_to_dicts(rows)
+            except Exception as exc:
+                _logger.warning("get_todays_games DB query failed: %s", exc)
         finally:
             conn.close()
 
@@ -424,7 +574,11 @@ def get_players_for_game(game_id: str) -> list[dict]:
             """
             SELECT p.player_id, p.first_name, p.last_name,
                    p.team_id, p.team_abbreviation,
-                   l.pts, l.reb, l.ast, l.stl, l.blk, l.tov, l.min
+                   l.pts, l.reb, l.ast, l.stl, l.blk, l.tov, l.min,
+                   l.fgm, l.fga, l.fg_pct,
+                   l.fg3m, l.fg3a, l.fg3_pct,
+                   l.ftm, l.fta, l.ft_pct,
+                   l.oreb, l.dreb, l.pf, l.plus_minus, l.wl
             FROM Player_Game_Logs l
             JOIN Players p ON l.player_id = p.player_id
             WHERE l.game_id = ?
@@ -444,7 +598,8 @@ def get_team_stats(team_id: int) -> dict:
     Return aggregate offensive/defensive stats for a team computed
     from game logs.
 
-    Returns dict with: team_id, gp, ppg, rpg, apg, spg, bpg, topg
+    Returns dict with: team_id, gp, ppg, rpg, apg, spg, bpg, topg,
+                       fg3_avg, ftm_avg, ft_pct_avg, fgm_avg, fga_avg, fg_pct_avg
     """
     conn = _get_conn()
     if conn is None:
@@ -476,7 +631,7 @@ def get_team_stats(team_id: int) -> dict:
         if row is None:
             return {"team_id": team_id, "gp": 0}
 
-        return {
+        result: dict = {
             "team_id": team_id,
             "gp":   int(row["gp"] or 0),
             "ppg":  _r(row["ppg"]),
@@ -486,6 +641,39 @@ def get_team_stats(team_id: int) -> dict:
             "bpg":  _r(row["bpg"]),
             "topg": _r(row["topg"]),
         }
+
+        # Extended shooting stats — gracefully skip if columns don't exist
+        try:
+            ext = conn.execute(
+                """
+                SELECT
+                    AVG(l.fg3m)   AS fg3_avg,
+                    AVG(l.ftm)    AS ftm_avg,
+                    AVG(l.ft_pct) AS ft_pct_avg,
+                    AVG(l.fgm)    AS fgm_avg,
+                    AVG(l.fga)    AS fga_avg,
+                    AVG(l.fg_pct) AS fg_pct_avg
+                FROM Player_Game_Logs l
+                JOIN Players p ON l.player_id = p.player_id
+                WHERE p.team_id = ?
+                """,
+                (int(team_id),),
+            ).fetchone()
+            result.update({
+                "fg3_avg":    _r(ext["fg3_avg"]),
+                "ftm_avg":    _r(ext["ftm_avg"]),
+                "ft_pct_avg": _r(ext["ft_pct_avg"], 3),
+                "fgm_avg":    _r(ext["fgm_avg"]),
+                "fga_avg":    _r(ext["fga_avg"]),
+                "fg_pct_avg": _r(ext["fg_pct_avg"], 3),
+            })
+        except Exception:
+            result.update({
+                "fg3_avg": 0.0, "ftm_avg": 0.0, "ft_pct_avg": 0.0,
+                "fgm_avg": 0.0, "fga_avg": 0.0, "fg_pct_avg": 0.0,
+            })
+
+        return result
     except Exception as exc:
         _logger.warning("get_team_stats(%s) failed: %s", team_id, exc)
         return {"team_id": team_id}
@@ -514,12 +702,12 @@ def get_db_counts() -> dict:
     if conn is None:
         return {"players": 0, "games": 0, "logs": 0}
     try:
-        return {
-            "players": conn.execute("SELECT COUNT(*) FROM Players").fetchone()[0],
-            "games":   conn.execute("SELECT COUNT(*) FROM Games").fetchone()[0],
-            "logs":    conn.execute("SELECT COUNT(*) FROM Player_Game_Logs").fetchone()[0],
-        }
-    except Exception:
-        return {"players": 0, "games": 0, "logs": 0}
+        counts: dict = {}
+        for key, table in [("players", "Players"), ("games", "Games"), ("logs", "Player_Game_Logs")]:
+            try:
+                counts[key] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            except Exception:
+                counts[key] = 0
+        return counts
     finally:
         conn.close()
