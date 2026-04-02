@@ -159,11 +159,12 @@ def get_api_status() -> dict:
     Useful for health checks and the Data Feed page.
     """
     if not _BDL_AVAILABLE:
-        try:
-            if not _bdl.has_api_key():
-                return {"ok": False, "error": "BALLDONTLIE_API_KEY not configured"}
-        except NameError:
+        # _bdl may be undefined if the import itself failed.
+        bdl_mod = globals().get("_bdl")
+        if bdl_mod is None:
             return {"ok": False, "error": "balldontlie_client module not installed"}
+        if not bdl_mod.has_api_key():
+            return {"ok": False, "error": "BALLDONTLIE_API_KEY not configured"}
         return {"ok": False, "error": "BDL bridge disabled"}
     try:
         return _bdl.check_api_health()

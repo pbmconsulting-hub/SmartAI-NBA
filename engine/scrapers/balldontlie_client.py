@@ -52,8 +52,10 @@ try:
     _REQUESTS_AVAILABLE = True
 except ImportError:
     _REQUESTS_AVAILABLE = False
-    _ConnError = OSError  # type: ignore[misc,assignment]
-    _Timeout = OSError    # type: ignore[misc,assignment]
+    # Fallback exception types used only to satisfy the except clause syntax;
+    # when requests is unavailable, _get() early-returns before any network call.
+    _ConnError = ConnectionError  # type: ignore[misc,assignment]
+    _Timeout = TimeoutError       # type: ignore[misc,assignment]
     _logger.debug("requests not installed; balldontlie_client unavailable")
 
 
