@@ -68,6 +68,12 @@ try:
 except ImportError:
     _BDL_AVAILABLE = False
 
+# Mapping from nba_api stat category names to BDL stat type names.
+_NBA_API_TO_BDL_STAT_MAP: dict[str, str] = {
+    "PTS": "pts", "REB": "reb", "AST": "ast", "STL": "stl",
+    "BLK": "blk", "FG3M": "fg3m", "FG_PCT": "fg_pct", "FT_PCT": "ft_pct",
+}
+
 # ── Re-export every public symbol from live_data_fetcher ─────
 # Pages import constants and path objects from this module;
 # live_data_fetcher defines them identically.
@@ -560,10 +566,7 @@ def get_league_leaders(stat_category: str = "PTS", season: str | None = None) ->
     """Return top players for a given statistical category — BDL primary."""
     if _BDL_AVAILABLE:
         try:
-            # Map nba_api stat names to BDL names
-            _stat_map = {"PTS": "pts", "REB": "reb", "AST": "ast", "STL": "stl",
-                         "BLK": "blk", "FG3M": "fg3m", "FG_PCT": "fg_pct", "FT_PCT": "ft_pct"}
-            bdl_stat = _stat_map.get(stat_category, stat_category.lower())
+            bdl_stat = _NBA_API_TO_BDL_STAT_MAP.get(stat_category, stat_category.lower())
             result = _bdl_fetch_league_leaders(stat_type=bdl_stat)
             if result:
                 return result

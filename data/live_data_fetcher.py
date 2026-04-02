@@ -906,7 +906,7 @@ def fetch_todays_games():
     fails or returns no games.
 
     Layers:
-        0. BallDontLie API     — primary source (fastest, most reliable)
+        0. BallDontLie API     — primary source
         1. ScoreboardV2        — NBA Stats API (fallback)
         2. ESPN Public API     — free unauthenticated endpoint (fallback)
         3. Live ScoreBoard     — nba_api live endpoint (final fallback)

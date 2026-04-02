@@ -63,10 +63,20 @@ def _parse_min(min_str: Any) -> float:
         return 0.0
 
 
+# The NBA regular season starts in October.
+NBA_SEASON_START_MONTH: int = 10
+
+# Rough normalisation factor for estimating pace from average team scoring:
+# pace ≈ (pts_scored + pts_allowed) / PACE_NORMALIZATION_FACTOR
+# Derived from the relationship: league-average pace ≈ 100 and average
+# combined scoring ≈ 220 → 220/2.2 = 100.
+PACE_NORMALIZATION_FACTOR: float = 2.2
+
+
 def _current_season_int() -> int:
     """Return current NBA season start year (e.g. 2025 for the 2025-26 season)."""
     today = datetime.date.today()
-    return today.year if today.month >= 10 else today.year - 1
+    return today.year if today.month >= NBA_SEASON_START_MONTH else today.year - 1
 
 
 def _today_et() -> datetime.date:
@@ -596,7 +606,7 @@ def fetch_team_stats_for_csv() -> list[dict]:
                 # Rough estimates: ortg ≈ ppg (when pace ≈ 100)
                 ortg = round(avg_scored, 1)
                 drtg = round(avg_allowed, 1)
-                pace = round((avg_scored + avg_allowed) / 2.2, 1)  # ~100 for league avg
+                pace = round((avg_scored + avg_allowed) / PACE_NORMALIZATION_FACTOR, 1)
             else:
                 pace, ortg, drtg = 100.0, 110.0, 110.0
 
