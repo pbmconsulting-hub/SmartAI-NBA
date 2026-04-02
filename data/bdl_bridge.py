@@ -33,6 +33,12 @@ except Exception:
 try:
     from engine.scrapers import balldontlie_client as _bdl
     _BDL_AVAILABLE = True
+    if not _bdl.has_api_key():
+        _BDL_AVAILABLE = False
+        _logger.warning(
+            "BallDontLie client imported but BALLDONTLIE_API_KEY is not set — "
+            "BDL bridge disabled. Set the key in env or Streamlit secrets."
+        )
 except ImportError:
     _BDL_AVAILABLE = False
     _logger.debug("balldontlie_client not available; bdl_bridge disabled")
@@ -140,8 +146,30 @@ TEAM_CONFERENCE: dict[str, str] = {
 
 
 def is_available() -> bool:
-    """Return True if the BDL bridge can make API calls."""
+    """Return True if the BDL bridge can make API calls.
+
+    Requires both the ``balldontlie_client`` module and a valid API key.
+    """
     return _BDL_AVAILABLE
+
+
+def get_api_status() -> dict:
+    """Return a diagnostic dict about BDL API availability.
+
+    Useful for health checks and the Data Feed page.
+    """
+    if not _BDL_AVAILABLE:
+        # _bdl may be undefined if the import itself failed.
+        bdl_mod = globals().get("_bdl")
+        if bdl_mod is None:
+            return {"ok": False, "error": "balldontlie_client module not installed"}
+        if not bdl_mod.has_api_key():
+            return {"ok": False, "error": "BALLDONTLIE_API_KEY not configured"}
+        return {"ok": False, "error": "BDL bridge disabled"}
+    try:
+        return _bdl.check_api_health()
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

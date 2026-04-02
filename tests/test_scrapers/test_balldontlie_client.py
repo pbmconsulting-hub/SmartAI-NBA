@@ -94,6 +94,23 @@ class TestLoadApiKey:
 
 
 # ---------------------------------------------------------------------------
+# has_api_key
+# ---------------------------------------------------------------------------
+
+class TestHasApiKey:
+    def test_returns_true_when_key_set(self, monkeypatch):
+        monkeypatch.setenv("BALLDONTLIE_API_KEY", "test-key")
+        import engine.scrapers.balldontlie_client as mod
+        assert mod.has_api_key() is True
+
+    def test_returns_false_when_key_missing(self, monkeypatch):
+        monkeypatch.delenv("BALLDONTLIE_API_KEY", raising=False)
+        import engine.scrapers.balldontlie_client as mod
+        with patch.object(mod, "_load_api_key", return_value=""):
+            assert mod.has_api_key() is False
+
+
+# ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
 
@@ -102,6 +119,24 @@ class TestErrorHandling:
         import engine.scrapers.balldontlie_client as mod
         resp = _make_response({}, status_code=401)
         resp.raise_for_status.side_effect = None  # we check status_code first
+        with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
+            mock_req.get.return_value = resp
+            result = mod._get("/nba/v1/players")
+        assert result == {}
+
+    def test_returns_empty_dict_on_403(self, monkeypatch):
+        import engine.scrapers.balldontlie_client as mod
+        resp = _make_response({}, status_code=403)
+        resp.raise_for_status.side_effect = None
+        with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
+            mock_req.get.return_value = resp
+            result = mod._get("/nba/v1/players")
+        assert result == {}
+
+    def test_returns_empty_dict_on_404(self, monkeypatch):
+        import engine.scrapers.balldontlie_client as mod
+        resp = _make_response({}, status_code=404)
+        resp.raise_for_status.side_effect = None
         with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
             mock_req.get.return_value = resp
             result = mod._get("/nba/v1/players")
@@ -454,13 +489,13 @@ class TestOdds:
             result = mod.get_odds(date="2024-01-15")
         assert isinstance(result, list)
 
-    def test_get_odds_uses_v2_path(self):
+    def test_get_odds_uses_v1_path(self):
         import engine.scrapers.balldontlie_client as mod
         with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
             mock_req.get.return_value = _make_response({"data": []})
             mod.get_odds(date="2024-01-15")
         url = mock_req.get.call_args[0][0]
-        assert "/nba/v2/odds" in url
+        assert "/nba/v1/odds" in url
 
     def test_get_player_props_returns_list(self):
         import engine.scrapers.balldontlie_client as mod
@@ -469,13 +504,13 @@ class TestOdds:
             result = mod.get_player_props(game_id=1001, player_id=237, prop_type="pts")
         assert isinstance(result, list)
 
-    def test_get_player_props_uses_v2_path(self):
+    def test_get_player_props_uses_v1_path(self):
         import engine.scrapers.balldontlie_client as mod
         with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
             mock_req.get.return_value = _make_response({"data": []})
             mod.get_player_props(game_id=1001)
         url = mock_req.get.call_args[0][0]
-        assert "/nba/v2/odds/player_props" in url
+        assert "/nba/v1/player_props" in url
 
 
 # ---------------------------------------------------------------------------
@@ -512,3 +547,62 @@ class TestLineupsPlays:
         with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
             mock_req.get.side_effect = Exception("error")
             assert mod.get_plays() == []
+
+
+# ---------------------------------------------------------------------------
+# check_api_health
+# ---------------------------------------------------------------------------
+
+class TestCheckApiHealth:
+    def test_health_ok(self, monkeypatch):
+        monkeypatch.setenv("BALLDONTLIE_API_KEY", "test-key")
+        import engine.scrapers.balldontlie_client as mod
+        with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
+            mock_req.get.return_value = _make_response({"data": [{"id": 1}]})
+            result = mod.check_api_health()
+        assert result["ok"] is True
+        assert result["has_api_key"] is True
+        assert result["status_code"] == 200
+
+    def test_health_no_api_key(self, monkeypatch):
+        monkeypatch.delenv("BALLDONTLIE_API_KEY", raising=False)
+        import engine.scrapers.balldontlie_client as mod
+        with patch.object(mod, "_load_api_key", return_value=""):
+            result = mod.check_api_health()
+        assert result["ok"] is False
+        assert result["has_api_key"] is False
+        assert "not configured" in result["error"]
+
+    def test_health_bad_key(self, monkeypatch):
+        monkeypatch.setenv("BALLDONTLIE_API_KEY", "bad-key")
+        import engine.scrapers.balldontlie_client as mod
+        resp = _make_response({}, status_code=401)
+        resp.raise_for_status.side_effect = None
+        with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
+            mock_req.get.return_value = resp
+            result = mod.check_api_health()
+        assert result["ok"] is False
+        assert result["status_code"] == 401
+        assert "invalid" in result["error"].lower()
+
+    def test_health_connection_error(self, monkeypatch):
+        monkeypatch.setenv("BALLDONTLIE_API_KEY", "test-key")
+        import engine.scrapers.balldontlie_client as mod
+        import requests as real_requests
+        with patch("engine.scrapers.balldontlie_client.requests") as mock_req:
+            mock_req.get.side_effect = real_requests.exceptions.ConnectionError("fail")
+            mock_req.exceptions = real_requests.exceptions
+            result = mod.check_api_health()
+        assert result["ok"] is False
+        assert "connect" in result["error"].lower()
+
+    def test_health_requests_unavailable(self):
+        import engine.scrapers.balldontlie_client as mod
+        original = mod._REQUESTS_AVAILABLE
+        mod._REQUESTS_AVAILABLE = False
+        try:
+            result = mod.check_api_health()
+            assert result["ok"] is False
+            assert "not installed" in result["error"]
+        finally:
+            mod._REQUESTS_AVAILABLE = original
