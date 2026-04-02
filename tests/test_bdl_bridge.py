@@ -24,6 +24,10 @@ class TestBdlBridgeImport:
         from data.bdl_bridge import is_available
         assert callable(is_available)
 
+    def test_get_api_status_callable(self):
+        from data.bdl_bridge import get_api_status
+        assert callable(get_api_status)
+
     def test_position_map(self):
         from data.bdl_bridge import _BDL_POSITION_MAP
         assert _BDL_POSITION_MAP["G"] == "PG"
@@ -101,6 +105,7 @@ class TestHelpers:
 # Team records / standings
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchTeamRecords:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_records(self, mock_bdl):
@@ -135,6 +140,7 @@ class TestFetchTeamRecords:
 # Today's games
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchTodaysGames:
     @patch("data.bdl_bridge._bdl")
     @patch("data.bdl_bridge._today_et")
@@ -178,6 +184,7 @@ class TestFetchTodaysGames:
 # Player season averages
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchPlayerSeasonAverages:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_averages(self, mock_bdl):
@@ -248,6 +255,7 @@ class TestComputeStdDevs:
 # Player game log
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchPlayerGameLog:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_log(self, mock_bdl):
@@ -324,6 +332,7 @@ class TestFetchPlayerRecentForm:
 # Team stats for CSV
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchTeamStatsForCsv:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_teams(self, mock_bdl):
@@ -346,6 +355,7 @@ class TestFetchTeamStatsForCsv:
 # Standings list
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchStandingsList:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_standings(self, mock_bdl):
@@ -374,6 +384,7 @@ class TestFetchStandingsList:
 # Injuries
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchInjuries:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_injuries(self, mock_bdl):
@@ -398,6 +409,7 @@ class TestFetchInjuries:
 # Active players
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestFetchActivePlayers:
     @patch("data.bdl_bridge._bdl")
     def test_returns_formatted_players(self, mock_bdl):
@@ -448,6 +460,7 @@ class TestComputeAveragesFromGames:
 # Box scores & lineups
 # ---------------------------------------------------------------------------
 
+@patch("data.bdl_bridge._BDL_AVAILABLE", True)
 class TestBoxScoresAndLineups:
     @patch("data.bdl_bridge._bdl")
     def test_fetch_box_scores_live(self, mock_bdl):

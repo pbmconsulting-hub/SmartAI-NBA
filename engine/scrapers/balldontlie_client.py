@@ -1,6 +1,6 @@
-"""engine/scrapers/balldontlie_client.py – BallDontLie API REST client (backup data source).
+"""engine/scrapers/balldontlie_client.py – BallDontLie API REST client (primary data source).
 
-Covers all NBA endpoints from the BallDontLie v1/v2 API with:
+Covers all NBA endpoints from the BallDontLie v1 API with:
 - API key authentication via Authorization header
 - TTL-based in-memory caching (LIVE_TTL=300s, HIST_TTL=3600s)
 - Configurable rate-limiting delay (default 1.0 s, free tier)
@@ -48,9 +48,12 @@ def _cache_set(key: str, payload: Any) -> None:
 # ── requests import (graceful) ───────────────────────────────────────────────
 try:
     import requests
+    from requests.exceptions import ConnectionError as _ConnError, Timeout as _Timeout
     _REQUESTS_AVAILABLE = True
 except ImportError:
     _REQUESTS_AVAILABLE = False
+    _ConnError = OSError  # type: ignore[misc,assignment]
+    _Timeout = OSError    # type: ignore[misc,assignment]
     _logger.debug("requests not installed; balldontlie_client unavailable")
 
 
@@ -65,6 +68,11 @@ def _load_api_key() -> str:
         except Exception:
             pass
     return key or ""
+
+
+def has_api_key() -> bool:
+    """Return True if a BallDontLie API key is configured."""
+    return bool(_load_api_key())
 
 
 # ── Core request helper ──────────────────────────────────────────────────────
@@ -91,13 +99,28 @@ def _get(path: str, params: dict | None = None) -> dict:
     try:
         resp = requests.get(url, params=params or {}, headers=headers, timeout=10)
         if resp.status_code == 401:
-            _logger.error("BallDontLie API: invalid or missing API key (401) for %s", path)
+            _logger.error("BallDontLie API: invalid or missing API key (401) for %s — "
+                          "set BALLDONTLIE_API_KEY in env or Streamlit secrets", path)
+            return {}
+        if resp.status_code == 403:
+            _logger.error("BallDontLie API: forbidden (403) for %s — "
+                          "your plan may not include this endpoint", path)
+            return {}
+        if resp.status_code == 404:
+            _logger.error("BallDontLie API: endpoint not found (404) for %s", path)
             return {}
         if resp.status_code == 429:
             _logger.warning("BallDontLie API: rate limit hit (429) for %s", path)
             return {}
         resp.raise_for_status()
         return resp.json()
+    except _ConnError as exc:
+        _logger.error("BallDontLie API: connection failed for %s — "
+                      "check network connectivity: %s", path, exc)
+        return {}
+    except _Timeout as exc:
+        _logger.error("BallDontLie API: request timed out for %s: %s", path, exc)
+        return {}
     except Exception as exc:
         _logger.error("BallDontLie API error [%s]: %s", path, exc)
         return {}
@@ -483,7 +506,7 @@ def get_odds(
 ) -> list:
     """Return betting odds.
 
-    GET /nba/v2/odds
+    GET /nba/v1/odds
     """
     cache_key = f"bdl:odds:{date}:{game_id}:{per_page}"
     cached = _cache_get(cache_key, LIVE_TTL)
@@ -496,7 +519,7 @@ def get_odds(
     if game_id is not None:
         params["game_ids[]"] = game_id
 
-    data = _get("/nba/v2/odds", params)
+    data = _get("/nba/v1/odds", params)
     result = data.get("data", [])
     _cache_set(cache_key, result)
     return result
@@ -509,7 +532,7 @@ def get_player_props(
 ) -> list:
     """Return player prop lines for a game.
 
-    GET /nba/v2/odds/player_props
+    GET /nba/v1/player_props
     """
     cache_key = f"bdl:player_props:{game_id}:{player_id}:{prop_type}"
     cached = _cache_get(cache_key, LIVE_TTL)
@@ -522,7 +545,7 @@ def get_player_props(
     if prop_type:
         params["prop_type"] = prop_type
 
-    data = _get("/nba/v2/odds/player_props", params)
+    data = _get("/nba/v1/player_props", params)
     result = data.get("data", [])
     _cache_set(cache_key, result)
     return result
@@ -565,4 +588,62 @@ def get_plays(game_id: int | None = None, per_page: int = 100) -> list:
     data = _get("/nba/v1/plays", params)
     result = data.get("data", [])
     _cache_set(cache_key, result)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Health / Diagnostics
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def check_api_health() -> dict:
+    """Run a lightweight health check against the BallDontLie API.
+
+    Returns a dict with diagnostic info::
+
+        {"ok": True/False,
+         "has_api_key": True/False,
+         "requests_available": True/False,
+         "status_code": 200 | None,
+         "error": "..." | None}
+    """
+    result: dict = {
+        "ok": False,
+        "has_api_key": has_api_key(),
+        "requests_available": _REQUESTS_AVAILABLE,
+        "status_code": None,
+        "error": None,
+    }
+
+    if not _REQUESTS_AVAILABLE:
+        result["error"] = "requests library not installed"
+        return result
+
+    if not result["has_api_key"]:
+        result["error"] = ("BALLDONTLIE_API_KEY not configured — "
+                           "set it in environment variables or Streamlit secrets")
+        return result
+
+    try:
+        url = f"{_BASE_URL}/nba/v1/teams"
+        headers = {"Authorization": _load_api_key()}
+        resp = requests.get(url, headers=headers, timeout=10,
+                            params={"per_page": 1})
+        result["status_code"] = resp.status_code
+        if resp.status_code == 200:
+            result["ok"] = True
+        elif resp.status_code == 401:
+            result["error"] = "API key is invalid or expired (401)"
+        elif resp.status_code == 403:
+            result["error"] = "API key lacks permission for this endpoint (403)"
+        elif resp.status_code == 429:
+            result["error"] = "Rate limit exceeded (429)"
+        else:
+            result["error"] = f"Unexpected status code: {resp.status_code}"
+    except _ConnError:
+        result["error"] = "Cannot connect to api.balldontlie.io — check network"
+    except _Timeout:
+        result["error"] = "Request timed out"
+    except Exception as exc:
+        result["error"] = str(exc)
+
     return result
