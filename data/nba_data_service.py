@@ -1,19 +1,20 @@
 # ============================================================
 # FILE: data/nba_data_service.py
 # PURPOSE: Thin delegation layer that routes all NBA data
-#          retrieval through data/live_data_fetcher.py (nba_api
-#          Python package — free, no API key needed).
+#          retrieval through data/bdl_bridge.py (BallDontLie API
+#          — primary) with data/live_data_fetcher.py (nba_api)
+#          as fallback.
 #
 #          This module preserves the public API that every page
 #          and engine module imports (get_todays_games, etc.)
-#          while the actual fetching happens via the nba_api
-#          library endpoints (ScoreboardV2, LeagueDashPlayerStats,
-#          CommonTeamRoster, etc.).
+#          while the actual fetching is routed: BDL first → nba_api
+#          fallback.
 #
-# DATA SOURCES:
-#   - nba_api Python package: games, player stats, team stats,
-#     defensive ratings, standings, rosters, game logs
-#   - PrizePicks / Underdog / DraftKings (via platform_fetcher.py)
+# DATA SOURCES (priority order):
+#   1. BallDontLie API (via bdl_bridge.py) — primary
+#   2. nba_api / stats.nba.com (via live_data_fetcher.py) — fallback
+#   3. PrizePicks / Underdog / DraftKings (via platform_fetcher.py)
+#      — props only, unchanged
 # ============================================================
 
 from pathlib import Path as _Path
@@ -41,6 +42,37 @@ try:
     _HAS_RETRY = True
 except ImportError:
     _HAS_RETRY = False
+
+# ── BDL bridge — primary data source ─────────────────────────
+# BallDontLie is now the primary source for games, players, stats,
+# standings, game logs, injuries, and box scores.  nba_api is kept
+# as a fallback layer only.
+try:
+    from data.bdl_bridge import (
+        is_available as _bdl_is_available,
+        fetch_todays_games as _bdl_fetch_todays_games,
+        fetch_team_records as _bdl_fetch_team_records,
+        fetch_player_game_log as _bdl_fetch_player_game_log,
+        fetch_player_recent_form as _bdl_fetch_player_recent_form,
+        fetch_team_stats_for_csv as _bdl_fetch_team_stats_for_csv,
+        fetch_standings_list as _bdl_fetch_standings_list,
+        fetch_injuries as _bdl_fetch_injuries,
+        fetch_league_leaders as _bdl_fetch_league_leaders,
+        fetch_box_scores_live as _bdl_fetch_box_scores_live,
+        fetch_box_scores as _bdl_fetch_box_scores,
+        fetch_lineups as _bdl_fetch_lineups,
+        fetch_plays as _bdl_fetch_plays,
+        fetch_active_players as _bdl_fetch_active_players,
+    )
+    _BDL_AVAILABLE = _bdl_is_available()
+except ImportError:
+    _BDL_AVAILABLE = False
+
+# Mapping from nba_api stat category names to BDL stat type names.
+_NBA_API_TO_BDL_STAT_MAP: dict[str, str] = {
+    "PTS": "pts", "REB": "reb", "AST": "ast", "STL": "stl",
+    "BLK": "blk", "FG3M": "fg3m", "FG_PCT": "fg_pct", "FT_PCT": "ft_pct",
+}
 
 # ── Re-export every public symbol from live_data_fetcher ─────
 # Pages import constants and path objects from this module;
@@ -110,10 +142,15 @@ from data.live_data_fetcher import (
 # ============================================================
 
 def get_todays_games():
-    """Retrieve tonight's NBA games via the nba_api library."""
+    """Retrieve tonight's NBA games — BDL primary, nba_api fallback."""
+    if _BDL_AVAILABLE:
+        result = _bdl_fetch_todays_games()
+        if result:
+            return result
+        _logger.debug("get_todays_games: BDL returned empty, falling back to nba_api")
     result = _ldf_fetch_todays_games()
     if not result:
-        _logger.warning("get_todays_games: live_data_fetcher returned no games")
+        _logger.warning("get_todays_games: all sources returned no games")
     return result
 
 
@@ -128,10 +165,17 @@ def get_todays_players(todays_games, progress_callback=None,
 
 
 def get_player_recent_form(player_id, last_n_games=10):
-    """Get a player's recent-form stats via nba_api game logs."""
+    """Get a player's recent-form stats — BDL primary, nba_api fallback."""
+    if _BDL_AVAILABLE:
+        try:
+            result = _bdl_fetch_player_recent_form(int(player_id), last_n_games=last_n_games)
+            if result:
+                return result
+        except Exception:
+            pass
     result = _ldf_fetch_player_recent_form(player_id, last_n_games=last_n_games)
     if not result:
-        _logger.debug("get_player_recent_form(%s): live_data_fetcher returned no data", player_id)
+        _logger.debug("get_player_recent_form(%s): all sources returned no data", player_id)
     return result
 
 
@@ -153,10 +197,17 @@ def get_defensive_ratings(force=False, progress_callback=None):
 
 
 def get_player_game_log(player_id, last_n_games=20):
-    """Retrieve a player's game log via nba_api."""
+    """Retrieve a player's game log — BDL primary, nba_api fallback."""
+    if _BDL_AVAILABLE:
+        try:
+            result = _bdl_fetch_player_game_log(int(player_id), last_n=last_n_games)
+            if result:
+                return result
+        except Exception:
+            pass
     result = _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
     if not result:
-        _logger.warning("get_player_game_log(%s): live_data_fetcher returned no game log", player_id)
+        _logger.warning("get_player_game_log(%s): all sources returned no game log", player_id)
     return result
 
 
@@ -191,11 +242,36 @@ def get_standings(progress_callback=None) -> list:
     """
     Retrieve current NBA standings.
 
-    Tries the nba_api LeagueStandingsV3 first, then falls back to
-    API-NBA if available.  Returns an empty list on failure.
+    Tries BDL first, then nba_api LeagueStandingsV3 as fallback.
+    Returns an empty list on failure.
     """
     if progress_callback:
         progress_callback(0, 10, "Retrieving NBA standings…")
+
+    # ── BDL primary ──────────────────────────────────────────
+    if _BDL_AVAILABLE:
+        try:
+            bdl_standings = _bdl_fetch_standings_list()
+            if bdl_standings:
+                standings = []
+                for row in bdl_standings:
+                    standings.append({
+                        "team_abbreviation": row.get("TeamAbbreviation", ""),
+                        "conference": row.get("Conference", ""),
+                        "conference_rank": int(row.get("PlayoffRank", 0)),
+                        "wins": int(row.get("WINS", 0)),
+                        "losses": int(row.get("LOSSES", 0)),
+                        "win_pct": float(row.get("WinPCT", 0.0)),
+                        "streak": str(row.get("strCurrentStreak", "")),
+                        "last_10": "",
+                    })
+                if progress_callback:
+                    progress_callback(10, 10, f"Standings loaded ({len(standings)} teams).")
+                return standings
+        except Exception as exc:
+            _logger.debug("get_standings: BDL failed (%s), falling back to nba_api", exc)
+
+    # ── nba_api fallback ─────────────────────────────────────
     try:
         from nba_api.stats.endpoints import leaguestandingsv3
         import time
@@ -487,7 +563,15 @@ def get_game_summary(game_id: str) -> dict:
 
 
 def get_league_leaders(stat_category: str = "PTS", season: str | None = None) -> list:
-    """Return top players for a given statistical category."""
+    """Return top players for a given statistical category — BDL primary."""
+    if _BDL_AVAILABLE:
+        try:
+            bdl_stat = _NBA_API_TO_BDL_STAT_MAP.get(stat_category, stat_category.lower())
+            result = _bdl_fetch_league_leaders(stat_type=bdl_stat)
+            if result:
+                return result
+        except Exception:
+            pass
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_league_leaders(stat_category=stat_category, season=season)
@@ -505,11 +589,7 @@ def get_team_streak_finder(team_id: int, season: str | None = None) -> list:
 
 def get_standings_from_nba_api(season: str | None = None) -> list:
     """
-    Retrieve NBA standings via nba_stats_service.get_league_standings().
-
-    Intended as a secondary fallback when the primary nba_api
-    LeagueStandingsV3 call inside ``get_standings()`` fails.  If this
-    also fails, returns an empty list.
+    Retrieve NBA standings — BDL primary, nba_stats_service fallback.
 
     Parameters
     ----------
@@ -523,6 +603,13 @@ def get_standings_from_nba_api(season: str | None = None) -> list:
         conference, conference_rank, wins, losses, win_pct, streak,
         last_10.
     """
+    if _BDL_AVAILABLE:
+        try:
+            result = _bdl_fetch_standings_list()
+            if result:
+                return result
+        except Exception:
+            pass
     try:
         from data.nba_stats_service import get_league_standings
         return get_league_standings(season=season)
