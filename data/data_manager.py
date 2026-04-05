@@ -64,7 +64,7 @@ def load_players_data():
     """
     Load all player data.
 
-    Primary source: ETL SQLite database (db/etl_data.db) when available.
+    Primary source: ETL SQLite database (db/smartpicks.db) when available.
     Fallback: players.csv (legacy / manually-loaded data).
 
     Returns a list of dictionaries, where each dictionary represents one

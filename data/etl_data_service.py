@@ -1,12 +1,12 @@
 """
 data/etl_data_service.py
 =========================
-Bridge between the ETL SQLite database (db/etl_data.db) and
+Bridge between the ETL SQLite database (db/smartpicks.db) and
 SmartAI-NBA's data layer.
 
 All functions connect to the database read-only for queries and return
 plain Python dicts/lists.  No live API calls are made here — those happen
-only in scripts/initial_pull.py and scripts/data_updater.py.
+only in etl/initial_pull.py and etl/data_updater.py.
 
 If the database does not exist yet (fresh install, before running
 initial_pull.py), every function degrades gracefully and returns an
@@ -32,7 +32,7 @@ except ImportError:
 # ── DB path ───────────────────────────────────────────────────────────────────
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = _REPO_ROOT / "db" / "etl_data.db"
+DB_PATH = _REPO_ROOT / "db" / "smartpicks.db"
 
 
 # ── Connection helper ─────────────────────────────────────────────────────────
@@ -689,8 +689,13 @@ def refresh_data() -> dict:
     Returns dict with: new_games, new_logs, new_players
     """
     try:
-        from scripts.data_updater import run_update
-        return run_update()
+        from etl.data_updater import run_update
+        result = run_update()
+        # etl.data_updater.run_update() returns an int (new log count).
+        # Wrap it in the dict format callers expect.
+        if isinstance(result, int):
+            return {"new_games": 0, "new_logs": result, "new_players": 0}
+        return result
     except Exception as exc:
         _logger.error("refresh_data failed: %s", exc)
         return {"new_games": 0, "new_logs": 0, "new_players": 0, "error": str(exc)}

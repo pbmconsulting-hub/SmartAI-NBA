@@ -332,7 +332,7 @@ NBA_API_ABBREV_TO_OURS: dict[str, str] = _build_nba_abbrev_map()
 # Conference mapping by abbreviation.
 # Intentionally hardcoded: NBA conference membership does not change
 # during a season, and the Teams table is not present in this repo's
-# db/etl_data.db (which only stores Players, Games, and Player_Game_Logs).
+# db/smartpicks.db (which stores Players, Games, Player_Game_Logs, Teams, etc.).
 TEAM_CONFERENCE = {
     "ATL": "East", "BOS": "East", "BKN": "East", "CHA": "East",
     "CHI": "East", "CLE": "East", "DET": "East", "IND": "East",
@@ -2596,7 +2596,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 # ============================================================
 # SECTION: ETL-Backed Refresh Functions
 # These functions use the pre-populated SQLite database
-# (db/etl_data.db) instead of making live API calls.
+# (db/smartpicks.db) instead of making live API calls.
 # "Smart Update" → incremental pull; "Full Update" → full season pull.
 # ============================================================
 
@@ -2604,7 +2604,7 @@ def _dynamic_cv_for_live_fetch(stat_type, stat_avg):
 def refresh_from_etl(progress_callback=None) -> dict:
     """
     Smart Update via ETL: fetch only game logs added since the last
-    stored date in db/etl_data.db.
+    stored date in db/smartpicks.db.
 
     Args:
         progress_callback (callable | None):
@@ -2645,11 +2645,11 @@ def refresh_from_etl(progress_callback=None) -> dict:
 def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
     """
     Full Update via ETL: re-pull the entire season of game logs from
-    nba_api.stats.endpoints.LeagueGameLog and repopulate db/etl_data.db.
+    nba_api.stats.endpoints.LeagueGameLog and repopulate db/smartpicks.db.
 
     Args:
         season (str | None): Season string e.g. '2025-26'.  Defaults to
-            current season as determined by scripts/initial_pull.py.
+            current season as determined by etl/initial_pull.py.
         progress_callback (callable | None):
             Called with (current, total, message).
 
@@ -2660,7 +2660,7 @@ def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> 
         progress_callback(0, 4, "Starting full ETL pull from nba_api…")
 
     try:
-        from scripts.initial_pull import run_initial_pull
+        from etl.initial_pull import run_initial_pull
         kwargs = {}
         if season:
             kwargs["season"] = season
@@ -2669,6 +2669,11 @@ def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> 
             progress_callback(1, 4, "Fetching all game logs (this may take ~30 s)…")
 
         result = run_initial_pull(**kwargs)
+
+        # etl.initial_pull.run_initial_pull() returns None — provide a
+        # default dict so callers that inspect .get() still work.
+        if result is None:
+            result = {"players_inserted": 0, "games_inserted": 0, "logs_inserted": 0}
 
         if progress_callback:
             pi = result.get("players_inserted", 0)
