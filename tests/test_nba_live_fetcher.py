@@ -30,6 +30,14 @@ sys.modules.setdefault("streamlit", _mock_st)
 sys.modules.setdefault("streamlit.components", MagicMock())
 sys.modules.setdefault("streamlit.components.v1", MagicMock())
 
+# Check whether nba_api is installed — some tests patch nba_api endpoints
+# directly and must be skipped when the package isn't available.
+try:
+    import nba_api  # noqa: F401
+    _HAS_NBA_API = True
+except ModuleNotFoundError:
+    _HAS_NBA_API = False
+
 
 # ── Section 1: Module Structure ───────────────────────────────────────────────
 
@@ -380,6 +388,7 @@ class TestGameIdValidation(unittest.TestCase):
 
 # ── Section 6: None-norm guard ────────────────────────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestNoneNormGuard(unittest.TestCase):
     """Verify that functions handle get_normalized_dict() returning None."""
 
@@ -630,6 +639,7 @@ class TestDiagnosticLoggingRateLimit(unittest.TestCase):
         self.assertIn("blocked", args[0])
 
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestDiagnosticLoggingNoneNorm(unittest.TestCase):
     """_logger.warning() should be called when get_normalized_dict() returns None."""
 
@@ -737,6 +747,7 @@ class TestParseResultsets(unittest.TestCase):
 
 # ── Section: IndexError fallback via get_dict() ──────────────────────────────
 
+@unittest.skipUnless(_HAS_NBA_API, "nba_api not installed")
 class TestIndexErrorFallback(unittest.TestCase):
     """Verify that get_dict() fallback works when get_normalized_dict() raises IndexError."""
 
