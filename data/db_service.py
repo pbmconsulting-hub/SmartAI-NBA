@@ -607,30 +607,39 @@ def get_player_estimated_metrics(season: str | None = None) -> list:
     """
     Replacement for ``nba_data_service.get_player_estimated_metrics``.
 
-    Returns estimated advanced metrics from the Player_Bio table.
+    Returns estimated advanced metrics from the Player_Bio table, enriched
+    with team-level pace/ratings from the Teams table.
     """
     conn = _get_conn()
     if conn is None:
         return []
     try:
         rows = conn.execute(
-            "SELECT * FROM Player_Bio"
+            """
+            SELECT pb.*, t.pace AS team_pace, t.ortg AS team_ortg, t.drtg AS team_drtg
+            FROM Player_Bio pb
+            LEFT JOIN Teams t ON pb.team_id = t.team_id
+            """
         ).fetchall()
         result = []
         for row in rows:
             d = dict(row)
+            # E_PACE comes from the player's team pace (possessions per game)
+            team_pace = _safe_float(d.get("team_pace"))
+            team_ortg = _safe_float(d.get("team_ortg"))
+            team_drtg = _safe_float(d.get("team_drtg"))
             result.append({
-                "PLAYER_ID":   d.get("player_id"),
-                "PLAYER_NAME": d.get("player_name", ""),
-                "TEAM_ID":     d.get("team_id"),
-                "GP":          d.get("gp", 0),
-                "E_PACE":      d.get("pts", 0),  # Approximate pace proxy
-                "e_pace":      d.get("pts", 0),
-                "E_OFF_RATING": d.get("net_rating", 0),
-                "E_DEF_RATING": 0,
-                "USG_PCT":     d.get("usg_pct", 0),
-                "TS_PCT":      d.get("ts_pct", 0),
-                "AST_PCT":     d.get("ast_pct", 0),
+                "PLAYER_ID":    d.get("player_id"),
+                "PLAYER_NAME":  d.get("player_name", ""),
+                "TEAM_ID":      d.get("team_id"),
+                "GP":           d.get("gp", 0),
+                "E_PACE":       team_pace,
+                "e_pace":       team_pace,
+                "E_OFF_RATING": team_ortg,
+                "E_DEF_RATING": team_drtg,
+                "USG_PCT":      d.get("usg_pct", 0),
+                "TS_PCT":       d.get("ts_pct", 0),
+                "AST_PCT":      d.get("ast_pct", 0),
             })
         return result
     except Exception as exc:
