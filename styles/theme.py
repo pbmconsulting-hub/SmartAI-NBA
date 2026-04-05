@@ -3802,6 +3802,10 @@ def get_qds_prop_card_html(
     metrics,
     bonus_factors,
     player_id=None,
+    opponent=None,
+    is_home=None,
+    season_stats=None,
+    bet_direction=None,
 ):
     """
     Render a full QDS prop card for a single analysis result.
@@ -3815,6 +3819,11 @@ def get_qds_prop_card_html(
         metrics (list[dict]): Metrics for the 4-card grid (see get_qds_metrics_grid_html).
         bonus_factors (list[str]): Short bonus factor strings.
         player_id (str|None): NBA player ID for headshot CDN URL.
+        opponent (str|None): Opponent team abbreviation, e.g. "BOS".
+        is_home (bool|None): Whether the player's team is the home team.
+        season_stats (dict|None): Season averages dict with keys like
+            ``pts_avg``, ``reb_avg``, ``ast_avg``.
+        bet_direction (str|None): Recommended direction, e.g. "OVER" or "UNDER".
 
     Returns:
         str: Self-contained HTML card string.
@@ -3911,6 +3920,78 @@ def get_qds_prop_card_html(
             f'</div>'
         )
 
+    # ── Matchup strip (opponent & home/away) ────────────────────
+    matchup_html = ""
+    if opponent:
+        opp_safe = _html.escape(str(opponent))
+        opp_primary, _ = get_team_colors(str(opponent))
+        home_away_label = "HOME" if is_home else "AWAY" if is_home is not None else ""
+        ha_icon = "🏠" if is_home else "✈️" if is_home is not None else ""
+        matchup_html = (
+            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;'
+            f'padding:5px 10px;background:rgba(255,255,255,0.03);'
+            f'border-radius:6px;border:1px solid rgba(255,255,255,0.06);">'
+            f'<span style="font-size:0.72rem;color:var(--qds-text-muted);'
+            f'text-transform:uppercase;letter-spacing:0.5px;">Matchup</span>'
+            f'<span style="font-weight:700;color:#fff;font-size:0.82rem;">'
+            f'{_html.escape(str(team))}</span>'
+            f'<span style="color:var(--qds-text-muted);font-size:0.78rem;">vs</span>'
+            f'<span class="qds-na-team-badge" '
+            f'style="background:{opp_primary};color:#fff;">{opp_safe}</span>'
+            + (
+                f'<span style="margin-left:auto;font-size:0.7rem;color:var(--qds-text-muted);'
+                f'letter-spacing:0.5px;">{ha_icon} {home_away_label}</span>'
+                if home_away_label else ""
+            )
+            + f'</div>'
+        )
+
+    # ── Season stats strip ────────────────────────────────────────
+    stats_strip_html = ""
+    if season_stats:
+        _stat_items = []
+        _stat_display = [
+            ("PTS", season_stats.get("pts_avg", 0)),
+            ("REB", season_stats.get("reb_avg", 0)),
+            ("AST", season_stats.get("ast_avg", 0)),
+        ]
+        for label, val in _stat_display:
+            fval = float(val or 0)
+            if fval > 0:
+                _stat_items.append(
+                    f'<div style="text-align:center;flex:1;">'
+                    f'<div style="font-size:0.65rem;color:var(--qds-text-muted);'
+                    f'text-transform:uppercase;letter-spacing:0.5px;">{label}</div>'
+                    f'<div style="font-size:0.95rem;font-weight:700;color:#fff;">'
+                    f'{fval:.1f}</div></div>'
+                )
+        if _stat_items:
+            stats_strip_html = (
+                f'<div style="display:flex;gap:4px;margin-bottom:8px;'
+                f'padding:6px 10px;background:rgba(255,255,255,0.03);'
+                f'border-radius:6px;border:1px solid rgba(255,255,255,0.06);">'
+                + "".join(_stat_items)
+                + f'</div>'
+            )
+
+    # ── Bet direction badge ───────────────────────────────────────
+    dir_badge_html = ""
+    if bet_direction:
+        _dir_upper = str(bet_direction).upper()
+        _dir_colors = {
+            "OVER": ("#69f0ae", "rgba(105,240,174,0.12)"),
+            "UNDER": ("#ff6b6b", "rgba(255,107,107,0.12)"),
+        }
+        _dir_color, _dir_bg = _dir_colors.get(
+            _dir_upper, ("#a0b4d0", "rgba(160,180,208,0.12)")
+        )
+        dir_badge_html = (
+            f'<span style="background:{_dir_bg};color:{_dir_color};padding:2px 8px;'
+            f'border-radius:4px;font-size:0.72rem;font-weight:700;'
+            f'border:1px solid {_dir_color}40;margin-left:6px;">'
+            f'{"📈" if _dir_upper == "OVER" else "📉"} {_dir_upper}</span>'
+        )
+
     # ── Build card ────────────────────────────────────────────────
     safe_player = _html.escape(str(player_name))
     safe_prop   = _html.escape(str(prop_text))
@@ -3921,13 +4002,14 @@ def get_qds_prop_card_html(
 
     return (
         f'<div class="qds-na-card" style="border-top-color:{border_color};">'
-        # Badge
-        f'<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">'
+        # Badge row (tier badge + optional direction badge)
+        f'<div style="display:flex;justify-content:{"space-between" if dir_badge_html else "flex-end"};align-items:center;margin-bottom:8px;">'
+        f'{dir_badge_html}'
         f'<span class="qds-na-badge" style="background:{badge_bg};color:{badge_fg};">'
         f'{badge_text}</span>'
         f'</div>'
-        # Player row
-        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">'
+        # Player row (headshot, name, team, score)
+        f'<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">'
         f'{img_html}'
         f'<div style="flex:1;">'
         f'<div class="qds-na-player-name">{safe_player}{team_badge_html}</div>'
@@ -3941,6 +4023,10 @@ def get_qds_prop_card_html(
         f'color:var(--qds-text-muted);">/10</span></div>'
         f'</div>'
         f'</div>'
+        # Matchup strip (opponent + home/away)
+        f'{matchup_html}'
+        # Season stats strip (PTS / REB / AST)
+        f'{stats_strip_html}'
         # Confidence bar
         f'{conf_bar}'
         # Metrics grid

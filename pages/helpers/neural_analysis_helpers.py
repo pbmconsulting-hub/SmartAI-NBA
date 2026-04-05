@@ -1179,6 +1179,13 @@ def display_prop_analysis_card_qds(result):
 
     # ── Render QDS prop card ─────────────────────────────────────
     player_id = result.get("player_id", "") or ""
+    _opponent = result.get("opponent", "") or ""
+    _is_home = result.get("is_home")
+    _season_stats = {
+        "pts_avg": float(result.get("season_pts_avg", result.get("points_avg", 0)) or 0),
+        "reb_avg": float(result.get("season_reb_avg", result.get("rebounds_avg", 0)) or 0),
+        "ast_avg": float(result.get("season_ast_avg", result.get("assists_avg", 0)) or 0),
+    }
     card_html = get_qds_prop_card_html(
         player_name=player,
         team=team,
@@ -1188,6 +1195,10 @@ def display_prop_analysis_card_qds(result):
         metrics=metrics,
         bonus_factors=bonus_factors,
         player_id=player_id if player_id else None,
+        opponent=_opponent if _opponent else None,
+        is_home=_is_home,
+        season_stats=_season_stats,
+        bet_direction=direction,
     )
     st.markdown(card_html, unsafe_allow_html=True)
 
