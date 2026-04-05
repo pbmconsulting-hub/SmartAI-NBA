@@ -14,10 +14,15 @@ the app keeps working.
 
 from __future__ import annotations
 
+import csv
 import datetime
+import json
 import logging
 import math
+import re
 import sqlite3
+import threading as _threading
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +31,20 @@ try:
     _logger = get_logger(__name__)
 except ImportError:
     _logger = logging.getLogger(__name__)
+
+# Streamlit import — optional so db_service works in non-Streamlit contexts
+try:
+    import streamlit as st
+except ImportError:
+    # Provide a no-op decorator mimicking @st.cache_data
+    class _FakeCache:
+        @staticmethod
+        def cache_data(ttl=None, show_spinner=True):
+            def decorator(fn):
+                fn.clear = lambda: None
+                return fn
+            return decorator
+    st = _FakeCache()  # type: ignore[assignment]
 
 # ── DB path ───────────────────────────────────────────────────────────────────
 
@@ -830,50 +849,6 @@ def get_player_stats(progress_callback=None) -> list:
     return get_all_players()
 
 
-# ── from data.data_manager ───────────────────────────────────────────────────
-
-def load_players_data() -> list:
-    """
-    Replacement for ``data_manager.load_players_data``.
-
-    Delegates to data_manager to preserve Streamlit caching behaviour.
-    """
-    try:
-        from data.data_manager import load_players_data as _dm_load
-        return _dm_load()
-    except Exception as exc:
-        _logger.warning("load_players_data delegation failed: %s", exc)
-        return []
-
-
-def load_teams_data() -> list:
-    """
-    Replacement for ``data_manager.load_teams_data``.
-
-    Delegates to data_manager to preserve Streamlit caching behaviour.
-    """
-    try:
-        from data.data_manager import load_teams_data as _dm_load
-        return _dm_load()
-    except Exception as exc:
-        _logger.warning("load_teams_data delegation failed: %s", exc)
-        return []
-
-
-def find_player_by_name(players_list, player_name):
-    """
-    Replacement for ``data_manager.find_player_by_name``.
-
-    Delegates to data_manager's fuzzy matcher.
-    """
-    try:
-        from data.data_manager import find_player_by_name as _dm_find
-        return _dm_find(players_list, player_name)
-    except Exception as exc:
-        _logger.warning("find_player_by_name delegation failed: %s", exc)
-        return None
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -884,3 +859,1176 @@ def _current_season() -> str:
     today = datetime.date.today()
     year = today.year if today.month >= 10 else today.year - 1
     return f"{year}-{str(year + 1)[-2:]}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Constants (from live_data_fetcher.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+DATA_DIRECTORY = Path(__file__).parent
+PLAYERS_CSV_PATH = DATA_DIRECTORY / "players.csv"
+TEAMS_CSV_PATH = DATA_DIRECTORY / "teams.csv"
+DEFENSIVE_RATINGS_CSV_PATH = DATA_DIRECTORY / "defensive_ratings.csv"
+LAST_UPDATED_JSON_PATH = DATA_DIRECTORY / "last_updated.json"
+INJURY_STATUS_JSON_PATH = DATA_DIRECTORY / "injury_status.json"
+PROPS_CSV_PATH = DATA_DIRECTORY / "props.csv"
+LIVE_PROPS_CSV_PATH = DATA_DIRECTORY / "live_props.csv"
+
+API_DELAY_SECONDS = 1.5
+FALLBACK_POINTS_STD_RATIO = 0.3
+FALLBACK_REBOUNDS_STD_RATIO = 0.4
+FALLBACK_ASSISTS_STD_RATIO = 0.4
+FALLBACK_THREES_STD_RATIO = 0.55
+FALLBACK_STEALS_STD_RATIO = 0.5
+FALLBACK_BLOCKS_STD_RATIO = 0.6
+FALLBACK_TURNOVERS_STD_RATIO = 0.4
+MIN_MINUTES_THRESHOLD = 15.0
+GP_ABSENT_THRESHOLD = 12
+MIN_TEAM_GP_FOR_RECENCY_CHECK = 20
+HOT_TREND_THRESHOLD = 1.1
+COLD_TREND_THRESHOLD = 0.9
+DEFAULT_VEGAS_SPREAD = 0.0
+DEFAULT_GAME_TOTAL = 220.0
+ESPN_API_TIMEOUT_SECONDS = 10
+
+INACTIVE_INJURY_STATUSES = frozenset({
+    "Out",
+    "Doubtful",
+    "Questionable",
+    "Injured Reserve",
+    "Out (No Recent Games)",
+    "Suspended",
+    "Not With Team",
+    "G League - Two-Way",
+    "G League - On Assignment",
+    "G League",
+})
+
+GTD_INJURY_STATUSES = frozenset({
+    "GTD",
+    "Day-to-Day",
+})
+
+TEAM_NAME_TO_ABBREVIATION = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BKN",
+    "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHX",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Washington Wizards": "WAS",
+}
+
+_NBA_API_ABBREV_TO_OURS_FALLBACK: dict[str, str] = {
+    "GS": "GSW",
+    "NY": "NYK",
+    "NO": "NOP",
+    "SA": "SAS",
+    "OKC": "OKC",
+    "PHX": "PHX",
+    "UTA": "UTA",
+    "MEM": "MEM",
+}
+
+
+def _build_nba_abbrev_map() -> dict[str, str]:
+    """Build nba_api abbreviation → our abbreviation mapping."""
+    try:
+        from nba_api.stats.static import teams as _nba_teams_static
+        nba_teams = _nba_teams_static.get_teams()
+        mapping = {t["abbreviation"]: t["abbreviation"] for t in nba_teams}
+        mapping.update(_NBA_API_ABBREV_TO_OURS_FALLBACK)
+        return mapping
+    except Exception:
+        return dict(_NBA_API_ABBREV_TO_OURS_FALLBACK)
+
+
+NBA_API_ABBREV_TO_OURS: dict[str, str] = _build_nba_abbrev_map()
+
+TEAM_CONFERENCE = {
+    "ATL": "East", "BOS": "East", "BKN": "East", "CHA": "East",
+    "CHI": "East", "CLE": "East", "DET": "East", "IND": "East",
+    "MIA": "East", "MIL": "East", "NYK": "East", "ORL": "East",
+    "PHI": "East", "TOR": "East", "WAS": "East",
+    "DAL": "West", "DEN": "West", "GSW": "West", "HOU": "West",
+    "LAC": "West", "LAL": "West", "MEM": "West", "MIN": "West",
+    "NOP": "West", "OKC": "West", "PHX": "West", "POR": "West",
+    "SAC": "West", "SAS": "West", "UTA": "West",
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Timestamp Functions (from live_data_fetcher.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def save_last_updated(data_type):
+    """Save the current timestamp to last_updated.json for a given data type."""
+    existing_timestamps = {}
+    if LAST_UPDATED_JSON_PATH.exists():
+        try:
+            with open(LAST_UPDATED_JSON_PATH, "r") as json_file:
+                existing_timestamps = json.load(json_file)
+        except Exception:
+            existing_timestamps = {}
+
+    existing_timestamps[data_type] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    existing_timestamps["is_live"] = True
+
+    try:
+        with open(LAST_UPDATED_JSON_PATH, "w") as json_file:
+            json.dump(existing_timestamps, json_file, indent=2)
+    except Exception as error:
+        _logger.warning("Warning: Could not save timestamp: %s", error)
+
+
+def load_last_updated():
+    """Load all timestamps from last_updated.json."""
+    if not LAST_UPDATED_JSON_PATH.exists():
+        return {}
+    try:
+        with open(LAST_UPDATED_JSON_PATH, "r") as json_file:
+            return json.load(json_file)
+    except Exception:
+        return {}
+
+
+def _invalidate_data_caches():
+    """Bust all @st.cache_data caches for CSV/DB loaders."""
+    try:
+        load_players_data.clear()
+        load_teams_data.clear()
+        load_defensive_ratings_data.clear()
+        load_props_data.clear()
+        load_injury_status.clear()
+        _logger.debug("Streamlit data caches cleared after CSV update.")
+    except Exception:
+        pass  # Cache clearing is best-effort
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: CSV Loading Functions (from data_manager.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _load_csv_file(file_path):
+    """Internal helper: load any CSV file and return list of dicts."""
+    file_path = Path(file_path)
+    if not file_path.exists():
+        return []
+
+    rows = []
+    try:
+        with open(file_path, encoding="utf-8", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            for row in reader:
+                cleaned_row = {
+                    key.strip(): value.strip()
+                    for key, value in row.items()
+                    if key is not None
+                }
+                rows.append(cleaned_row)
+    except Exception as error:
+        _logger.warning("Error loading %s: %s", file_path, error)
+        return []
+
+    return list(rows)
+
+
+def _convert_etl_players_to_app_format(etl_players: list) -> list:
+    """Convert ETL player dicts to the format expected by the rest of the app."""
+    result = []
+    for p in etl_players:
+        ppg  = float(p.get("ppg",  0) or 0)
+        rpg  = float(p.get("rpg",  0) or 0)
+        apg  = float(p.get("apg",  0) or 0)
+        spg  = float(p.get("spg",  0) or 0)
+        bpg  = float(p.get("bpg",  0) or 0)
+        topg = float(p.get("topg", 0) or 0)
+        mpg  = float(p.get("mpg",  0) or 0)
+
+        fg3_avg    = float(p.get("fg3_avg",    0) or 0)
+        ftm_avg    = float(p.get("ftm_avg",    0) or 0)
+        fta_avg    = float(p.get("fta_avg",    0) or 0)
+        ft_pct_avg = float(p.get("ft_pct_avg", 0) or 0)
+        fgm_avg    = float(p.get("fgm_avg",    0) or 0)
+        fga_avg    = float(p.get("fga_avg",    0) or 0)
+        oreb_avg   = float(p.get("oreb_avg",   0) or 0)
+        dreb_avg   = float(p.get("dreb_avg",   0) or 0)
+        pf_avg     = float(p.get("pf_avg",     0) or 0)
+
+        points_std   = float(p.get("points_std",   0) or 0) or round(ppg  * FALLBACK_POINTS_STD_RATIO, 1)
+        rebounds_std = float(p.get("rebounds_std", 0) or 0) or round(rpg  * FALLBACK_REBOUNDS_STD_RATIO, 1)
+        assists_std  = float(p.get("assists_std",  0) or 0) or round(apg  * FALLBACK_ASSISTS_STD_RATIO, 1)
+        threes_std   = float(p.get("threes_std",   0) or 0)
+
+        result.append({
+            "player_id":               str(p.get("player_id", "")),
+            "name":                    f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+            "team":                    p.get("team_abbreviation", "") or "",
+            "position":                p.get("position") or "SF",
+            "minutes_avg":             round(mpg, 1),
+            "points_avg":              round(ppg, 1),
+            "rebounds_avg":            round(rpg, 1),
+            "assists_avg":             round(apg, 1),
+            "steals_avg":              round(spg, 1),
+            "blocks_avg":              round(bpg, 1),
+            "turnovers_avg":           round(topg, 1),
+            "threes_avg":              round(fg3_avg, 1),
+            "ft_pct":                  round(ft_pct_avg, 3),
+            "usage_rate":              0.0,
+            "points_std":              round(points_std, 1),
+            "rebounds_std":            round(rebounds_std, 1),
+            "assists_std":             round(assists_std, 1),
+            "threes_std":              round(threes_std, 1),
+            "steals_std":              round(spg  * FALLBACK_STEALS_STD_RATIO, 1),
+            "blocks_std":              round(bpg  * FALLBACK_BLOCKS_STD_RATIO, 1),
+            "turnovers_std":           round(topg * FALLBACK_TURNOVERS_STD_RATIO, 1),
+            "ftm_avg":                 round(ftm_avg, 1),
+            "fta_avg":                 round(fta_avg, 1),
+            "fga_avg":                 round(fga_avg, 1),
+            "fgm_avg":                 round(fgm_avg, 1),
+            "offensive_rebounds_avg":  round(oreb_avg, 1),
+            "defensive_rebounds_avg":  round(dreb_avg, 1),
+            "personal_fouls_avg":      round(pf_avg, 1),
+            "ftm_std":                 0.0,
+            "fta_std":                 0.0,
+            "fga_std":                 0.0,
+            "fgm_std":                 0.0,
+            "offensive_rebounds_std":  0.0,
+            "defensive_rebounds_std":  0.0,
+            "personal_fouls_std":      0.0,
+            "games_played":            str(p.get("gp", 0)),
+        })
+    return result
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_players_data() -> list:
+    """
+    Load all player data.
+
+    Primary source: ETL SQLite database (db/smartpicks.db) when available.
+    Fallback: players.csv (legacy / manually-loaded data).
+    Returns an empty list if neither source is available.
+    """
+    try:
+        from data.etl_data_service import get_all_players as _etl_get_all_players
+        etl_players = _etl_get_all_players()
+        if etl_players:
+            return _convert_etl_players_to_app_format(etl_players)
+    except Exception as _etl_err:
+        _logger.debug("load_players_data: ETL source unavailable (%s), falling back to CSV.", _etl_err)
+
+    return _load_csv_file(PLAYERS_CSV_PATH)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_props_data():
+    """Load all prop lines from props.csv."""
+    return _load_csv_file(PROPS_CSV_PATH)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_teams_data() -> list:
+    """Load all 30 NBA teams from teams.csv."""
+    return _load_csv_file(TEAMS_CSV_PATH)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_defensive_ratings_data():
+    """Load team defensive ratings by position from defensive_ratings.csv."""
+    return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_injury_status():
+    """Load the persisted player injury/availability status map from disk."""
+    if not INJURY_STATUS_JSON_PATH.exists():
+        return {}
+    try:
+        with open(INJURY_STATUS_JSON_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return {k: dict(v) if isinstance(v, dict) else v for k, v in data.items()}
+    except Exception as err:
+        _logger.warning("load_injury_status: could not read %s: %s", INJURY_STATUS_JSON_PATH, err)
+        return {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Player Name Normalization & Fuzzy Matching (from data_manager.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+NAME_ALIASES = {
+    "nic claxton": "nicolas claxton",
+    "nicolas claxton": "nicolas claxton",
+    "og anunoby": "o.g. anunoby",
+    "o.g. anunoby": "o.g. anunoby",
+    "mo bamba": "mohamed bamba",
+    "tj mcconnell": "t.j. mcconnell",
+    "t.j. mcconnell": "t.j. mcconnell",
+    "tj warren": "t.j. warren",
+    "cj mccollum": "c.j. mccollum",
+    "c.j. mccollum": "c.j. mccollum",
+    "pj tucker": "p.j. tucker",
+    "p.j. tucker": "p.j. tucker",
+    "rj barrett": "r.j. barrett",
+    "r.j. barrett": "r.j. barrett",
+    "aj green": "a.j. green",
+    "nah'shon hyland": "bones hyland",
+    "bones hyland": "bones hyland",
+    "gary trent jr": "gary trent jr.",
+    "gary trent jr.": "gary trent jr.",
+    "wendell carter jr": "wendell carter jr.",
+    "wendell carter jr.": "wendell carter jr.",
+    "jaren jackson jr": "jaren jackson jr.",
+    "jaren jackson jr.": "jaren jackson jr.",
+    "kenyon martin jr": "kenyon martin jr.",
+    "kenyon martin jr.": "kenyon martin jr.",
+    "kevin porter jr": "kevin porter jr.",
+    "larry nance jr": "larry nance jr.",
+    "otto porter jr": "otto porter jr.",
+    "derrick jones jr": "derrick jones jr.",
+    "marcus morris sr": "marcus morris sr.",
+    "naji marshall": "naji marshall",
+    "alex len": "alex len",
+    "alexandre sarr": "alexandre sarr",
+    "goga bitadze": "goga bitadze",
+    "giddey": "josh giddey",
+    "josh giddey": "josh giddey",
+    "sga": "shai gilgeous-alexander",
+    "shai": "shai gilgeous-alexander",
+    "shai gilgeous-alexander": "shai gilgeous-alexander",
+    "kt": "karl-anthony towns",
+    "karl-anthony towns": "karl-anthony towns",
+    "zion": "zion williamson",
+    "zion williamson": "zion williamson",
+    "kd": "kevin durant",
+    "kevin durant": "kevin durant",
+    "kyrie": "kyrie irving",
+    "kyrie irving": "kyrie irving",
+    "steph": "stephen curry",
+    "stephen curry": "stephen curry",
+    "lebron": "lebron james",
+    "lebron james": "lebron james",
+    "bron": "lebron james",
+    "ad": "anthony davis",
+    "anthony davis": "anthony davis",
+    "joker": "nikola jokic",
+    "nikola jokic": "nikola jokic",
+    "embiid": "joel embiid",
+    "joel embiid": "joel embiid",
+    "luka": "luka doncic",
+    "luka doncic": "luka doncic",
+    "tatum": "jayson tatum",
+    "jayson tatum": "jayson tatum",
+    "ja": "ja morant",
+    "ja morant": "ja morant",
+    "jrue holiday": "jrue holiday",
+    "demar derozan": "demar derozan",
+    "pascal siakam": "pascal siakam",
+    "darius garland": "darius garland",
+    "donovan mitchell": "donovan mitchell",
+    "damian lillard": "damian lillard",
+    "dam lillard": "damian lillard",
+    "dame": "damian lillard",
+    "khris middleton": "khris middleton",
+    "giannis": "giannis antetokounmpo",
+    "giannis antetokounmpo": "giannis antetokounmpo",
+    "bam": "bam adebayo",
+    "bam adebayo": "bam adebayo",
+    "jimmy butler": "jimmy butler",
+    "jimmy": "jimmy butler",
+    "trae": "trae young",
+    "trae young": "trae young",
+    "devin booker": "devin booker",
+    "book": "devin booker",
+    "ayton": "deandre ayton",
+    "deandre ayton": "deandre ayton",
+}
+
+_NAME_SUFFIXES_TO_STRIP = re.compile(
+    r'\s+(jr\.?|sr\.?|ii|iii|iv|v)$',
+    flags=re.IGNORECASE,
+)
+
+
+def normalize_player_name(name):
+    """Normalize a player name for fuzzy matching."""
+    if not name:
+        return ""
+    name = name.strip().lower()
+    nfkd = unicodedata.normalize("NFKD", name)
+    name = "".join(c for c in nfkd if not unicodedata.combining(c))
+    name = _NAME_SUFFIXES_TO_STRIP.sub("", name).strip()
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
+
+def _build_player_index(players_list):
+    """Build pre-computed lookup indices for a players list."""
+    lower_index = {}
+    normalized_index = {}
+
+    for player in players_list:
+        raw_name = player.get("name", "")
+        lname = raw_name.lower().strip()
+        nname = normalize_player_name(raw_name)
+
+        if lname and lname not in lower_index:
+            lower_index[lname] = player
+        if nname and nname not in normalized_index:
+            normalized_index[nname] = player
+
+    alias_index = {}
+    for alias_key, canonical in NAME_ALIASES.items():
+        if alias_key not in alias_index and canonical in lower_index:
+            alias_index[alias_key] = lower_index[canonical]
+
+    return lower_index, alias_index, normalized_index
+
+
+_player_index_lock = _threading.Lock()
+_player_index_cache: dict = {"list_id": None, "index": (None, None, None)}
+
+
+def find_player_by_name_fuzzy(players_list, player_name):
+    """Find a player using fuzzy / normalized name matching."""
+    if not player_name:
+        return None
+
+    list_id = id(players_list)
+    with _player_index_lock:
+        if _player_index_cache["list_id"] != list_id:
+            _player_index_cache["index"] = _build_player_index(players_list)
+            _player_index_cache["list_id"] = list_id
+
+    lower_index, alias_index, normalized_index = _player_index_cache["index"]
+
+    search_lower = player_name.lower().strip()
+
+    # Pass 1: Exact case-insensitive
+    match = lower_index.get(search_lower)
+    if match is not None:
+        return match
+
+    # Pass 2: Alias lookup
+    match = alias_index.get(search_lower)
+    if match is not None:
+        return match
+
+    # Pass 3: Normalized name match
+    search_normalized = normalize_player_name(player_name)
+    match = normalized_index.get(search_normalized)
+    if match is not None and search_normalized:
+        return match
+
+    # Pass 4: Partial / substring match (O(n) fallback)
+    if len(search_normalized) > 3:
+        for player in players_list:
+            stored_normalized = normalize_player_name(player.get("name", ""))
+            if (search_normalized in stored_normalized or stored_normalized in search_normalized):
+                return player
+
+    return None
+
+
+def find_player_by_name(players_list, player_name):
+    """Find a player by name (delegates to fuzzy matcher)."""
+    return find_player_by_name_fuzzy(players_list, player_name)
+
+
+def find_players_by_team(players_list, team_abbrev):
+    """Return all players on a given team, sorted by points avg desc."""
+    abbrev_upper = team_abbrev.upper().strip()
+    matches = [p for p in players_list if p.get("team", "").upper() == abbrev_upper]
+    try:
+        matches.sort(key=lambda p: float(p.get("points_avg", 0) or 0), reverse=True)
+    except Exception:
+        pass
+    return matches
+
+
+def get_all_team_abbreviations(teams_list):
+    """Get all 30 NBA team abbreviations."""
+    abbreviations = [
+        team.get("abbreviation", "") for team in teams_list
+        if team.get("abbreviation")
+    ]
+    return sorted(abbreviations)
+
+
+def get_player_status(player_name, status_map):
+    """Look up a player's injury/availability status from a status map."""
+    _default = {
+        "status": "Active",
+        "injury_note": "",
+        "games_missed": 0,
+        "return_date": "",
+        "last_game_date": "",
+        "gp_ratio": 1.0,
+        "injury": "",
+        "source": "",
+        "comment": "",
+    }
+
+    if not player_name:
+        return _default
+
+    if not status_map:
+        status_map = load_injury_status()
+
+    if not status_map:
+        return _default
+
+    key = player_name.lower().strip()
+    if key in status_map:
+        entry = dict(_default)
+        entry.update(status_map[key])
+        return entry
+
+    normalized = normalize_player_name(player_name)
+    if normalized in status_map:
+        entry = dict(_default)
+        entry.update(status_map[normalized])
+        return entry
+
+    return _default
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Props / Session helpers (from data_manager.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def save_props_to_session(props_list, session_state):
+    """Save a list of props to Streamlit session state."""
+    session_state["current_props"] = props_list
+
+
+def load_props_from_session(session_state):
+    """Load props from Streamlit session state."""
+    if session_state.get("current_props"):
+        return session_state["current_props"]
+    if session_state.get("platform_props"):
+        return session_state["platform_props"]
+    return load_props_data()
+
+
+def save_platform_props_to_session(props_list, session_state):
+    """Save platform-retrieved props to Streamlit session state."""
+    session_state["platform_props"] = props_list
+
+
+def load_platform_props_from_csv(file_path=None):
+    """Load platform-retrieved props from a CSV file on disk."""
+    if file_path is None:
+        file_path = LIVE_PROPS_CSV_PATH
+    if not Path(file_path).exists():
+        return []
+    return _load_csv_file(file_path)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Cache Management & Data Health (from data_manager.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def clear_all_caches():
+    """Clear all @st.cache_data caches for data loading functions."""
+    try:
+        load_players_data.clear()
+        load_teams_data.clear()
+        load_defensive_ratings_data.clear()
+        load_props_data.clear()
+        load_injury_status.clear()
+    except Exception as _exc:
+        _logger.warning("clear_all_caches: %s", _exc)
+
+
+def get_data_health_report():
+    """Return a summary of the current data health status."""
+    warnings_list: list[str] = []
+
+    files_present = {
+        "players.csv": PLAYERS_CSV_PATH.exists(),
+        "teams.csv": TEAMS_CSV_PATH.exists(),
+        "props.csv": PROPS_CSV_PATH.exists(),
+        "defensive_ratings.csv": DEFENSIVE_RATINGS_CSV_PATH.exists(),
+        "last_updated.json": LAST_UPDATED_JSON_PATH.exists(),
+    }
+
+    for fname, exists in files_present.items():
+        if not exists:
+            warnings_list.append(f"Missing file: {fname}")
+
+    try:
+        players = load_players_data()
+        players_count = len(players)
+    except Exception:
+        players_count = 0
+        warnings_list.append("Could not load players.csv")
+
+    try:
+        teams = load_teams_data()
+        teams_count = len(teams)
+    except Exception:
+        teams_count = 0
+        warnings_list.append("Could not load teams.csv")
+
+    try:
+        props = load_props_data()
+        props_count = len(props)
+    except Exception:
+        props_count = 0
+
+    is_live = False
+    last_updated = None
+    if LAST_UPDATED_JSON_PATH.exists():
+        try:
+            with open(LAST_UPDATED_JSON_PATH, "r") as f:
+                timestamps = json.load(f)
+            is_live = bool(timestamps.get("is_live", False))
+            last_updated = timestamps.get("players")
+        except Exception:
+            pass
+
+    days_old = 0
+    is_stale = True
+    if last_updated:
+        try:
+            ts = datetime.datetime.fromisoformat(last_updated)
+            now_utc = datetime.datetime.now(datetime.timezone.utc)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=datetime.timezone.utc)
+            age = now_utc - ts
+            days_old = age.days
+            is_stale = days_old > 3
+            if is_stale:
+                warnings_list.append(f"Data is {days_old} day(s) old — consider refreshing")
+        except Exception:
+            pass
+
+    if players_count == 0:
+        warnings_list.append("No players loaded — run Data Feed to populate")
+    if teams_count < 30:
+        warnings_list.append(f"Only {teams_count}/30 teams loaded")
+
+    return {
+        "players_count": players_count,
+        "teams_count": teams_count,
+        "props_count": props_count,
+        "is_live": is_live,
+        "last_updated": last_updated,
+        "days_old": days_old,
+        "is_stale": is_stale,
+        "files_present": files_present,
+        "warnings": warnings_list,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Staleness warning (from live_data_fetcher.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_teams_staleness_warning():
+    """Return a warning string if teams.csv/defensive_ratings.csv are stale."""
+    _WARN_DAYS  = 7
+    _STALE_DAYS = 14
+
+    timestamps = load_last_updated()
+    teams_ts_str = timestamps.get("teams")
+
+    if not teams_ts_str:
+        return "⚠️ teams.csv has never been updated — run Data Feed → Fetch Team Stats."
+
+    try:
+        teams_ts = datetime.datetime.fromisoformat(str(teams_ts_str))
+        _now_utc = datetime.datetime.now(datetime.timezone.utc)
+        if teams_ts.tzinfo is None:
+            teams_ts = teams_ts.replace(tzinfo=datetime.timezone.utc)
+        age_days = (_now_utc - teams_ts).total_seconds() / 86400.0
+        if age_days >= _STALE_DAYS:
+            return (
+                f"🔴 Team data is **{age_days:.0f} days old** — seriously stale! "
+                "Go to 📡 Data Feed → Fetch Team Stats to refresh defensive ratings."
+            )
+        if age_days >= _WARN_DAYS:
+            return (
+                f"🟡 Team data is **{age_days:.0f} days old**. "
+                "Consider refreshing via 📡 Data Feed → Fetch Team Stats."
+            )
+    except Exception:
+        return "⚠️ Could not determine team data age — check last_updated.json."
+
+    return None
+
+
+def get_cached_roster(team_abbrev):
+    """Return the active roster for a team via RosterEngine."""
+    try:
+        from data.roster_engine import RosterEngine
+        engine = RosterEngine()
+        return engine.get_active_roster(team_abbrev.upper())
+    except Exception:
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: NBADataService class & refresh functions (from nba_data_service.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class NBADataService:
+    """Class-based service wrapping module-level functions."""
+
+    def __init__(self):
+        self.cache = None
+        try:
+            from utils.cache import FileCache as _FileCache
+            self.cache = _FileCache(cache_dir="cache/service", ttl_hours=1)
+        except Exception:
+            pass
+
+        self.roster_engine = None
+        try:
+            from data.roster_engine import RosterEngine
+            self.roster_engine = RosterEngine()
+        except Exception:
+            pass
+
+    def get_todays_games(self):
+        return get_todays_games()
+
+    def get_todays_players(self, games, progress_callback=None,
+                           precomputed_injury_map=None):
+        _logger.debug("NBADataService.get_todays_players: not implemented in db_service")
+        return []
+
+    def get_team_stats(self, progress_callback=None):
+        _logger.debug("NBADataService.get_team_stats: not implemented in db_service")
+        return None
+
+    def get_injuries(self):
+        if self.roster_engine:
+            try:
+                return self.roster_engine.refresh()
+            except Exception:
+                pass
+        return {}
+
+    def clear_caches(self):
+        clear_caches()
+
+    def refresh_all_data(self, progress_callback=None):
+        return refresh_all_data(progress_callback=progress_callback)
+
+
+def clear_caches() -> None:
+    """Clear file-based and in-memory caches across the data layer."""
+    cleared = []
+
+    try:
+        from utils.cache import cache_clear
+        cache_clear()
+        cleared.append("in-memory")
+    except Exception:
+        pass
+
+    try:
+        from utils.cache import FileCache as _FileCache
+        for cache_dir in ("cache/service", "cache/props", "cache/rosters"):
+            try:
+                fc = _FileCache(cache_dir=cache_dir, ttl_hours=0)
+                fc.clear()
+                cleared.append(cache_dir)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    _invalidate_data_caches()
+    _logger.info("clear_caches: cleared %s", ", ".join(cleared) if cleared else "(none)")
+
+
+def refresh_all_data(progress_callback=None) -> dict:
+    """Refresh all core data sources with per-source error isolation."""
+    result: dict[str, Any] = {
+        "games": [],
+        "players": [],
+        "team_stats": None,
+        "injuries": None,
+        "errors": [],
+    }
+    total_steps = 4
+    step = 0
+
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching today's games…")
+    try:
+        result["games"] = get_todays_games()
+    except Exception as exc:
+        _logger.error("refresh_all_data — games failed: %s", exc)
+        result["errors"].append(f"Games: {exc}")
+
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching players…")
+    if result["games"]:
+        try:
+            result["players"] = get_player_stats(progress_callback=None)
+        except Exception as exc:
+            _logger.error("refresh_all_data — players failed: %s", exc)
+            result["errors"].append(f"Players: {exc}")
+
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching team stats…")
+    # Team stats are available from CSV / DB already
+
+    step += 1
+    if progress_callback:
+        progress_callback(step, total_steps, "Fetching injury data…")
+    try:
+        from data.roster_engine import RosterEngine as _RE
+        _re = _RE()
+        result["injuries"] = _re.refresh()
+    except Exception as exc:
+        _logger.error("refresh_all_data — injuries failed: %s", exc)
+        result["errors"].append(f"Injuries: {exc}")
+
+    _logger.info(
+        "refresh_all_data: games=%d, players=%d, errors=%d",
+        len(result["games"]),
+        len(result["players"]),
+        len(result["errors"]),
+    )
+    return result
+
+
+def refresh_from_etl(progress_callback=None) -> dict:
+    """Incremental ETL update — fetch only new game logs since the last stored date."""
+    if progress_callback:
+        progress_callback(0, 4, "Connecting to ETL database…")
+
+    try:
+        from data.etl_data_service import refresh_data as _etl_refresh
+        if progress_callback:
+            progress_callback(1, 4, "Running incremental update…")
+
+        result = _etl_refresh()
+
+        if progress_callback:
+            ng = result.get("new_games", 0)
+            nl = result.get("new_logs",  0)
+            progress_callback(3, 4, f"Update complete — {ng} new games, {nl} new logs.")
+
+        _invalidate_data_caches()
+
+        if progress_callback:
+            progress_callback(4, 4, "✅ Smart ETL update done!")
+
+        return result
+    except Exception as exc:
+        _logger.error("refresh_from_etl failed: %s", exc)
+        if progress_callback:
+            progress_callback(4, 4, f"❌ ETL update failed: {exc}")
+        return {"new_games": 0, "new_logs": 0, "new_players": 0, "error": str(exc)}
+
+
+def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> dict:
+    """Full ETL pull — re-fetches the entire season and repopulates the DB."""
+    if progress_callback:
+        progress_callback(0, 4, "Starting full ETL pull from nba_api…")
+
+    try:
+        from etl.initial_pull import run_initial_pull
+        kwargs: dict[str, Any] = {}
+        if season:
+            kwargs["season"] = season
+
+        if progress_callback:
+            progress_callback(1, 4, "Fetching all game logs (this may take ~30 s)…")
+
+        result = run_initial_pull(**kwargs)
+
+        if result is None:
+            result = {"players_inserted": 0, "games_inserted": 0, "logs_inserted": 0}
+
+        if progress_callback:
+            pi = result.get("players_inserted", 0)
+            gi = result.get("games_inserted",   0)
+            li = result.get("logs_inserted",    0)
+            progress_callback(3, 4, f"DB populated — {pi} players, {gi} games, {li} logs.")
+
+        _invalidate_data_caches()
+
+        if progress_callback:
+            progress_callback(4, 4, "✅ Full ETL pull done!")
+
+        return result
+    except Exception as exc:
+        _logger.error("full_refresh_from_etl failed: %s", exc)
+        if progress_callback:
+            progress_callback(4, 4, f"❌ Full ETL pull failed: {exc}")
+        return {"players_inserted": 0, "games_inserted": 0, "logs_inserted": 0, "error": str(exc)}
+
+
+def refresh_historical_data_for_tonight(
+    games=None,
+    last_n_games=30,
+    progress_callback=None,
+) -> dict:
+    """Auto-retrieve historical game logs for tonight's players."""
+    results: dict[str, int] = {"players_refreshed": 0, "clv_updated": 0, "errors": 0}
+
+    if games is None:
+        try:
+            import streamlit as _st
+            games = _st.session_state.get("todays_games", [])
+        except Exception:
+            games = []
+
+    if not games:
+        _logger.debug("refresh_historical_data_for_tonight: no games — skipping")
+        return results
+
+    playing_teams: set[str] = set()
+    for g in games:
+        for key in ("home_team", "away_team"):
+            t = str(g.get(key, "")).upper().strip()
+            if t:
+                playing_teams.add(t)
+
+    if not playing_teams:
+        return results
+
+    try:
+        all_players = load_players_data()
+    except Exception as exc:
+        _logger.warning("refresh_historical_data_for_tonight: could not load players — %s", exc)
+        return results
+
+    tonight_players = [
+        p for p in all_players
+        if str(p.get("team", "")).upper().strip() in playing_teams
+        and p.get("player_id")
+    ]
+
+    if not tonight_players:
+        _logger.debug("refresh_historical_data_for_tonight: no players with IDs found")
+        return results
+
+    total = len(tonight_players)
+    if progress_callback:
+        progress_callback(0, total, f"Retrieving historical logs for {total} player(s)…")
+
+    for idx, p in enumerate(tonight_players):
+        player_id = p.get("player_id")
+        player_name = p.get("name", f"ID-{player_id}")
+        try:
+            logs = get_player_last_n_games(int(player_id), n=last_n_games)
+            if logs:
+                results["players_refreshed"] += 1
+        except Exception:
+            results["errors"] += 1
+        if progress_callback:
+            progress_callback(idx + 1, total, f"Cached logs for {player_name}")
+
+    try:
+        from engine.clv_tracker import auto_update_closing_lines as _clv_update
+        clv_result = _clv_update(days_back=1)
+        results["clv_updated"] = clv_result.get("updated", 0)
+    except Exception as exc:
+        _logger.debug("refresh_historical_data_for_tonight: CLV update skipped — %s", exc)
+
+    _logger.info(
+        "refresh_historical_data_for_tonight: players_refreshed=%d, clv_updated=%d, errors=%d",
+        results["players_refreshed"], results["clv_updated"], results["errors"],
+    )
+    return results
+
+
+def get_standings(progress_callback=None) -> list:
+    """Retrieve current NBA standings (ETL DB → nba_api fallback)."""
+    if progress_callback:
+        progress_callback(0, 10, "Retrieving NBA standings…")
+
+    try:
+        from data.etl_data_service import get_standings as _etl_standings
+        standings = _etl_standings()
+        if standings:
+            if progress_callback:
+                progress_callback(10, 10, f"Standings loaded ({len(standings)} teams).")
+            return standings
+    except Exception:
+        pass
+
+    try:
+        from nba_api.stats.endpoints import leaguestandingsv3
+        import time
+        time.sleep(API_DELAY_SECONDS)
+        raw = leaguestandingsv3.LeagueStandingsV3(season=_current_season())
+        df = raw.get_data_frames()[0]
+        standings = []
+        for _, row in df.iterrows():
+            abbr = TEAM_NAME_TO_ABBREVIATION.get(
+                f"{row.get('TeamCity', '')} {row.get('TeamName', '')}".strip(),
+                row.get("TeamAbbreviation", ""),
+            )
+            standings.append({
+                "team_abbreviation": abbr,
+                "conference": row.get("Conference", ""),
+                "conference_rank": int(row.get("PlayoffRank", 0)),
+                "wins": int(row.get("WINS", 0)),
+                "losses": int(row.get("LOSSES", 0)),
+                "win_pct": float(row.get("WinPCT", 0.0)),
+                "streak": str(row.get("strCurrentStreak", "")),
+                "last_10": str(row.get("L10", "")),
+            })
+        if progress_callback:
+            progress_callback(10, 10, f"Standings loaded ({len(standings)} teams).")
+        return standings
+    except Exception as exc:
+        _logger.warning("get_standings failed: %s", exc)
+
+    return []
+
+
+def get_player_news(player_name=None, limit=20) -> list:
+    """Return recent NBA news. Placeholder — returns empty list."""
+    return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: Live NBA API thin wrappers (from nba_data_service.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_player_on_off(team_id: int, season: str | None = None) -> dict:
+    """Player on/off court data via nba_api (live call)."""
+    _logger.debug("get_player_on_off(%s): not implemented in db_service — returning empty", team_id)
+    return {}
+
+
+def get_box_score_matchups(game_id: str) -> dict:
+    """Defensive matchup data (who guarded whom) — live call stub."""
+    _logger.debug("get_box_score_matchups(%s): not implemented in db_service — returning empty", game_id)
+    return {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: nba_stats_service wrappers for player_profile_service.py
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_all_players(active_only: bool = True) -> list[dict]:
+    """Fetch all players via nba_api CommonAllPlayers (for player_profile_service)."""
+    try:
+        from nba_api.stats.endpoints import commonallplayers
+        import time
+        time.sleep(API_DELAY_SECONDS)
+        endpoint = commonallplayers.CommonAllPlayers(
+            is_only_current_season=1 if active_only else 0,
+            league_id="00",
+        )
+        norm = endpoint.get_normalized_dict() or {}
+        rows = norm.get("CommonAllPlayers", [])
+        players = [
+            {
+                "id": int(r.get("PERSON_ID", 0)),
+                "full_name": str(r.get("DISPLAY_FIRST_LAST", "")),
+                "first_name": (lambda parts: parts[0] if parts else "")(
+                    str(r.get("DISPLAY_FIRST_LAST", "")).split()
+                ),
+                "last_name": str(r.get("DISPLAY_LAST_COMMA_FIRST", "")).split(",")[0].strip() if r.get("DISPLAY_LAST_COMMA_FIRST") else "",
+                "is_active": bool(r.get("ROSTERSTATUS", 0)),
+                "team_id": r.get("TEAM_ID"),
+                "team_abbreviation": str(r.get("TEAM_ABBREVIATION", "")),
+            }
+            for r in rows
+        ]
+        return players
+    except Exception as exc:
+        _logger.warning("get_all_players failed: %s", exc)
+        return []
+
+
+def get_player_info(player_id: int) -> dict:
+    """Fetch player bio/info via nba_api CommonPlayerInfo."""
+    try:
+        from nba_api.stats.endpoints import commonplayerinfo
+        import time
+        time.sleep(API_DELAY_SECONDS)
+        endpoint = commonplayerinfo.CommonPlayerInfo(player_id=player_id)
+        norm = endpoint.get_normalized_dict() or {}
+        rows = norm.get("CommonPlayerInfo", [])
+        if not rows:
+            return {}
+        r = rows[0]
+        return {
+            "id": player_id,
+            "full_name": str(r.get("DISPLAY_FIRST_LAST", "")),
+            "position": str(r.get("POSITION", "")),
+            "height": str(r.get("HEIGHT", "")),
+            "weight": str(r.get("WEIGHT", "")),
+            "country": str(r.get("COUNTRY", "")),
+            "birthdate": str(r.get("BIRTHDATE", "")),
+            "draft_year": r.get("DRAFT_YEAR"),
+            "draft_round": r.get("DRAFT_ROUND"),
+            "draft_number": r.get("DRAFT_NUMBER"),
+            "school": str(r.get("SCHOOL", "")),
+            "team_id": r.get("TEAM_ID"),
+            "team_abbreviation": str(r.get("TEAM_ABBREVIATION", "")),
+            "jersey": str(r.get("JERSEY", "")),
+            "from_year": r.get("FROM_YEAR"),
+            "to_year": r.get("TO_YEAR"),
+        }
+    except Exception as exc:
+        _logger.warning("get_player_info(%s) failed: %s", player_id, exc)
+        return {}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: game_log_cache stubs
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def save_game_logs_to_cache(player_name, logs):
+    """No-op — DB is the cache now."""
+    pass
+
+
+def load_game_logs_from_cache(player_name, **kwargs):
+    """No-op — DB is the cache now."""
+    return []
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SECTION: PlayerIDCache stub (replaces data/player_id_cache.py)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class PlayerIDCache:
+    """Stub replacement — use db_service.search_players() instead."""
+
+    def get(self, name):
+        return None
+
+    def set(self, name, player_id):
+        pass
