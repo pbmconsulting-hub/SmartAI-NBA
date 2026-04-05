@@ -50,8 +50,8 @@ from nba_api.stats.endpoints import (
 )
 from nba_api.stats.static import teams as static_teams
 
-import setup_db
-from utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
+from . import setup_db
+from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,1 +1,0 @@
-# SmartPicksProAI — NBA intelligence platform.

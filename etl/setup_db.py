@@ -1,22 +1,23 @@
 """
-setup_db.py
------------
-Creates the smartpicks.db SQLite database and initialises all tables used by
+etl/setup_db.py
+---------------
+Creates the db/smartpicks.db SQLite database and initialises all tables used by
 the SmartPicksProAI data pipeline.
 
-Run this script once before any other pipeline script:
-    python setup_db.py
+Run this module once before any other pipeline script:
+    python -m etl.setup_db
 
 NOTE: The Player_Game_Logs table uses a composite PRIMARY KEY (player_id,
 game_id) which replaces the old log_id autoincrement PK.  Because SQLite
 does not support ALTER TABLE … ADD PRIMARY KEY, this composite PK only takes
 effect on a fresh database.  Existing databases with the old log_id schema
-must be re-initialised (delete smartpicks.db and re-run this script followed
-by initial_pull.py).
+must be re-initialised (delete db/smartpicks.db and re-run this script
+followed by initial_pull.py).
 """
 
 import logging
 import sqlite3
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +25,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = "smartpicks.db"
+# ── Paths ─────────────────────────────────────────────────────────────────────
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = str(_REPO_ROOT / "db" / "smartpicks.db")
 
 CREATE_PLAYERS = """
 CREATE TABLE IF NOT EXISTS Players (

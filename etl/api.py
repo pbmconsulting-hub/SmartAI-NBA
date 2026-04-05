@@ -30,8 +30,8 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-import data_updater
-import setup_db
+from . import data_updater
+from . import setup_db
 
 logging.basicConfig(
     level=logging.INFO,

@@ -14,7 +14,7 @@ endpoint in api.py).
 
 Usage::
 
-    from data_updater import run_update
+    from etl.data_updater import run_update
     new_records = run_update()
 """
 
@@ -26,9 +26,9 @@ from typing import Optional
 import pandas as pd
 from nba_api.stats.endpoints import LeagueGameLog, ScoreboardV3
 
-import initial_pull
-import setup_db
-from utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
+from . import initial_pull
+from . import setup_db
+from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
 logging.basicConfig(
     level=logging.INFO,
