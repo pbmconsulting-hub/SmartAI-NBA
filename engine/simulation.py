@@ -845,7 +845,7 @@ def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
     # If either team has a recent history of blowout wins/losses, adjust weight.
     for team_id in filter(None, [home_team_id, away_team_id]):
         try:
-            from data.nba_data_service import get_team_game_logs
+            from data.db_service import get_team_game_logs
             logs = get_team_game_logs(team_id, last_n=10)
             if logs:
                 # Blowout = absolute margin > 15 points (counts both wins and losses;
@@ -876,7 +876,7 @@ def _enrich_scenarios_from_context(game_context: dict | None) -> dict:
     # ── Enrich with four-factors data (pace / eFG%) ───────────────────────────
     if game_id:
         try:
-            from data.nba_data_service import get_four_factors_box_score
+            from data.db_service import get_four_factors_box_score
             ff = get_four_factors_box_score(game_id)
             team_stats = ff.get("team_stats", []) if ff else []
             if team_stats:
@@ -2081,7 +2081,7 @@ def enrich_simulation_with_advanced_stats(
         return _default
 
     try:
-        from data.nba_stats_service import get_advanced_box_score
+        from data.db_service import get_advanced_box_score
         box = get_advanced_box_score(game_id)
     except Exception as exc:
         _logger.debug("enrich_simulation_with_advanced_stats: service unavailable: %s", exc)

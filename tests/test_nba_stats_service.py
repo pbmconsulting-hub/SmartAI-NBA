@@ -600,7 +600,7 @@ class TestPlayerIntelligenceIntegration(unittest.TestCase):
 
     def test_get_player_home_away_splits_returns_zeros_when_no_data(self):
         from engine.player_intelligence import get_player_home_away_splits
-        with patch("data.nba_stats_service.get_player_splits", return_value={}):
+        with patch("data.db_service.get_player_splits", return_value={}):
             result = get_player_home_away_splits(2544)
         self.assertEqual(result["home_pts"], 0.0)
         self.assertEqual(result["away_pts"], 0.0)
@@ -615,7 +615,7 @@ class TestPlayerIntelligenceIntegration(unittest.TestCase):
             "last_5_games": [{"PTS": 30.0, "REB": 8.0, "AST": 9.0}],
             "last_10_games": [{"PTS": 27.0, "REB": 7.5, "AST": 8.3}],
         }
-        with patch("data.nba_stats_service.get_player_splits", return_value=splits_data):
+        with patch("data.db_service.get_player_splits", return_value=splits_data):
             result = get_player_home_away_splits(2544)
         self.assertAlmostEqual(result["home_pts"], 28.5)
         self.assertAlmostEqual(result["away_pts"], 24.0)
@@ -661,7 +661,7 @@ class TestSimulationAdvancedStats(unittest.TestCase):
 
     def test_enrich_returns_default_when_no_data(self):
         from engine.simulation import enrich_simulation_with_advanced_stats
-        with patch("data.nba_stats_service.get_advanced_box_score", return_value={}):
+        with patch("data.db_service.get_advanced_box_score", return_value={}):
             result = enrich_simulation_with_advanced_stats("bad_id", "LeBron James")
         self.assertFalse(result["available"])
         self.assertEqual(result["pace_factor"], 1.0)
@@ -676,7 +676,7 @@ class TestSimulationAdvancedStats(unittest.TestCase):
                 {"TEAM_ABBREVIATION": "LAL", "PACE": 102.0}
             ],
         }
-        with patch("data.nba_stats_service.get_advanced_box_score", return_value=box):
+        with patch("data.db_service.get_advanced_box_score", return_value=box):
             result = enrich_simulation_with_advanced_stats("0022400001", "LeBron James")
         self.assertTrue(result["available"])
         self.assertAlmostEqual(result["efg_pct"], 0.55)
@@ -686,7 +686,7 @@ class TestSimulationAdvancedStats(unittest.TestCase):
 
     def test_enrich_returns_default_when_service_unavailable(self):
         from engine.simulation import enrich_simulation_with_advanced_stats
-        with patch("data.nba_stats_service.get_advanced_box_score",
+        with patch("data.db_service.get_advanced_box_score",
                    side_effect=Exception("service down")):
             result = enrich_simulation_with_advanced_stats("bad_id", "Any Player")
         self.assertFalse(result["available"])
@@ -700,7 +700,7 @@ class TestSimulationAdvancedStats(unittest.TestCase):
             ],
             "team_stats": [],
         }
-        with patch("data.nba_stats_service.get_advanced_box_score", return_value=box):
+        with patch("data.db_service.get_advanced_box_score", return_value=box):
             result = enrich_simulation_with_advanced_stats("0022400001", "LeBron James")
         self.assertFalse(result["available"])
 

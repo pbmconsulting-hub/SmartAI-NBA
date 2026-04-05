@@ -302,7 +302,7 @@ def get_live_league_context(teams_data=None) -> dict:
 
     # Attempt to derive pace from player estimated metrics (E_PACE column).
     try:
-        from data.nba_data_service import get_player_estimated_metrics as _get_metrics
+        from data.db_service import get_player_estimated_metrics as _get_metrics
         metrics = _get_metrics()
         if metrics:
             paces = []
