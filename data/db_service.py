@@ -1078,9 +1078,9 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
         dreb_avg   = float(p.get("dreb_avg",   0) or 0)
         pf_avg     = float(p.get("pf_avg",     0) or 0)
 
-        points_std   = float(p.get("points_std",   0) or 0) or round(ppg  * 0.30, 1)
-        rebounds_std = float(p.get("rebounds_std", 0) or 0) or round(rpg  * 0.40, 1)
-        assists_std  = float(p.get("assists_std",  0) or 0) or round(apg  * 0.40, 1)
+        points_std   = float(p.get("points_std",   0) or 0) or round(ppg  * FALLBACK_POINTS_STD_RATIO, 1)
+        rebounds_std = float(p.get("rebounds_std", 0) or 0) or round(rpg  * FALLBACK_REBOUNDS_STD_RATIO, 1)
+        assists_std  = float(p.get("assists_std",  0) or 0) or round(apg  * FALLBACK_ASSISTS_STD_RATIO, 1)
         threes_std   = float(p.get("threes_std",   0) or 0)
 
         result.append({
@@ -1102,9 +1102,9 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
             "rebounds_std":            round(rebounds_std, 1),
             "assists_std":             round(assists_std, 1),
             "threes_std":              round(threes_std, 1),
-            "steals_std":              round(spg  * 0.50, 1),
-            "blocks_std":              round(bpg  * 0.60, 1),
-            "turnovers_std":           round(topg * 0.40, 1),
+            "steals_std":              round(spg  * FALLBACK_STEALS_STD_RATIO, 1),
+            "blocks_std":              round(bpg  * FALLBACK_BLOCKS_STD_RATIO, 1),
+            "turnovers_std":           round(topg * FALLBACK_TURNOVERS_STD_RATIO, 1),
             "ftm_avg":                 round(ftm_avg, 1),
             "fta_avg":                 round(fta_avg, 1),
             "fga_avg":                 round(fga_avg, 1),
