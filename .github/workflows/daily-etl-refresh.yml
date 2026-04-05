@@ -1,0 +1,46 @@
+name: Daily ETL Refresh
+
+on:
+  schedule:
+    - cron: "0 12 * * *"   # Noon UTC — after previous night's games are final
+  workflow_dispatch:        # Manual trigger
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Ensure database schema exists
+        run: python -m etl.setup_db
+
+      - name: Run incremental data update
+        run: python -m etl.data_updater
+        env:
+          LOG_LEVEL: INFO
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add db/smartpicks.db
+          if git diff --cached --quiet; then
+            echo "No database changes to commit."
+          else
+            git commit -m "chore: daily ETL refresh $(date -u +%Y-%m-%d)"
+            git push
+          fi

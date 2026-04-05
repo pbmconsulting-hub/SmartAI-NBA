@@ -228,7 +228,7 @@ st.divider()
 # ============================================================
 # SECTION: ETL Database Status
 # Shows the state of the local SQLite database populated by
-# the ETL pipeline (scripts/initial_pull.py / data_updater.py).
+# the ETL pipeline (etl/initial_pull.py / etl/data_updater.py).
 # ============================================================
 
 st.subheader("🗄️ ETL Database (Local SQLite)")
@@ -243,7 +243,7 @@ with _etl_status_cols[0]:
         st.caption(f"👤 **{_p:,}** players  |  🏀 **{_g:,}** games  |  📋 **{_l:,}** logs")
     else:
         st.warning("⚠️ Database empty")
-        st.caption("Run `python scripts/initial_pull.py` to populate.")
+        st.caption("Run `python -m etl.initial_pull` to populate.")
 
 with _etl_status_cols[1]:
     st.markdown("""
@@ -267,7 +267,7 @@ with _etl_btn_cols[0]:
 with _etl_btn_cols[1]:
     if st.button(
         "🔄 Full ETL Pull",
-        help="Re-pull entire season from nba_api and repopulate db/etl_data.db",
+        help="Re-pull entire season from nba_api and repopulate db/smartpicks.db",
         key="etl_full_btn",
     ):
         st.session_state["update_action"] = "etl_full"
@@ -504,7 +504,7 @@ if current_action:
             else:
                 st.success(
                     f"✅ Smart ETL Update complete! "
-                    f"**{ng}** new game(s) · **{nl}** new log row(s) added to db/etl_data.db."
+                    f"**{ng}** new game(s) · **{nl}** new log row(s) added to db/smartpicks.db."
                 )
                 if ng == 0 and nl == 0:
                     st.info("ℹ️ Database is already up to date — no new games since last update.")
@@ -560,7 +560,7 @@ if current_action:
             else:
                 st.success(
                     f"✅ Full ETL Pull complete! "
-                    f"db/etl_data.db now has **{pi:,}** players · "
+                    f"db/smartpicks.db now has **{pi:,}** players · "
                     f"**{gi:,}** games · **{li:,}** logs."
                 )
         except Exception as _etl_err:
