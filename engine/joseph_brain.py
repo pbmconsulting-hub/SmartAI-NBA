@@ -151,7 +151,7 @@ except ImportError:
             return fallback
 
 try:
-    from data.data_manager import load_players_data, load_teams_data
+    from data.db_service import load_players_data, load_teams_data
 except ImportError:
     def load_players_data():
         return []

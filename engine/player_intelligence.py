@@ -574,7 +574,7 @@ def build_quick_analysis_rows(
     ``form_results`` (list), ``hit_rate``, ``form_label``,
     ``availability_badge``, ``injury_note``, ``streak_label``.
     """
-    from data.data_manager import find_player_by_name  # local import to avoid circular
+    from data.db_service import find_player_by_name  # local import to avoid circular
 
     rows: list[dict] = []
     for prop in props:
@@ -691,7 +691,7 @@ def get_player_game_logs_from_service(
         Per-game stat dicts with nba_api column names (PTS, REB, …).
     """
     try:
-        from data.nba_stats_service import get_player_game_logs
+        from data.db_service import get_player_game_logs
         return get_player_game_logs(player_id, season=season)
     except Exception as exc:
         logger.warning("get_player_game_logs_from_service(%s) failed: %s", player_id, exc)
@@ -737,7 +737,7 @@ def get_player_matchup_grade(
     }
 
     try:
-        from data.nba_stats_service import get_defensive_matchup_data
+        from data.db_service import get_defensive_matchup_data
         rows = get_defensive_matchup_data(season=season)
     except Exception as exc:
         logger.warning("get_player_matchup_grade: service call failed: %s", exc)
@@ -814,7 +814,7 @@ def get_player_home_away_splits(
     }
 
     try:
-        from data.nba_stats_service import get_player_splits
+        from data.db_service import get_player_splits
         splits = get_player_splits(player_id, season=season)
     except Exception as exc:
         logger.warning("get_player_home_away_splits(%s) failed: %s", player_id, exc)

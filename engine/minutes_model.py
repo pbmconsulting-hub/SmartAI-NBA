@@ -145,7 +145,7 @@ def _get_rotation_based_minutes(player_id: int, game_id: str | None = None) -> f
         return None
 
     try:
-        from data.nba_data_service import get_rotations
+        from data.db_service import get_rotations
         rotation_data = get_rotations(game_id)
     except Exception as _exc:
         _logger.debug(

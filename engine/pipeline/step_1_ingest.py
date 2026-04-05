@@ -21,7 +21,7 @@ def run(context: dict) -> dict:
     raw_data = {}
 
     try:
-        from data.nba_data_service import get_todays_games
+        from data.db_service import get_todays_games
         raw_data["todays_games"] = get_todays_games() or []
         _logger.info("Ingested %d today's games", len(raw_data["todays_games"]))
     except Exception as exc:
@@ -29,7 +29,7 @@ def run(context: dict) -> dict:
         raw_data["todays_games"] = []
 
     try:
-        from data.nba_data_service import get_player_stats
+        from data.db_service import get_player_stats
         raw_data["player_stats"] = get_player_stats() or []
         _logger.info("Ingested %d player stat rows", len(raw_data["player_stats"]))
     except Exception as exc:
