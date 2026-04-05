@@ -4003,7 +4003,7 @@ def get_qds_prop_card_html(
     return (
         f'<div class="qds-na-card" style="border-top-color:{border_color};">'
         # Badge row (tier badge + optional direction badge)
-        f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+        f'<div style="display:flex;justify-content:{"space-between" if dir_badge_html else "flex-end"};align-items:center;margin-bottom:8px;">'
         f'{dir_badge_html}'
         f'<span class="qds-na-badge" style="background:{badge_bg};color:{badge_fg};">'
         f'{badge_text}</span>'
