@@ -95,6 +95,7 @@ def _fetch_logs_for_range(
         season_type_all_star="Regular Season",
         date_from_nullable=str_from,
         date_to_nullable=str_to,
+        timeout=initial_pull._BULK_ENDPOINT_TIMEOUT,
     )
     initial_pull._rate_limited_sleep()
     df = initial_pull._call_with_retries(
@@ -269,7 +270,10 @@ def sync_todays_games(conn: sqlite3.Connection) -> int:
 
     try:
         def _fetch_scoreboard():
-            sb = ScoreboardV2(game_date=today_str)
+            sb = ScoreboardV2(
+                game_date=today_str,
+                timeout=initial_pull._SEASON_DASHBOARD_TIMEOUT,
+            )
             return sb.game_header.get_data_frame(), sb.line_score.get_data_frame()
 
         initial_pull._rate_limited_sleep()
