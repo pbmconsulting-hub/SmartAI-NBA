@@ -489,6 +489,8 @@ def get_player_splits(player_id: int, season: str | None = None) -> dict:
                 "FTA":  _r(sum(_safe_float(g.get("fta")) for g in subset) / n),
                 "FGM":  _r(sum(_safe_float(g.get("fgm")) for g in subset) / n),
                 "FGA":  _r(sum(_safe_float(g.get("fga")) for g in subset) / n),
+                "OREB": _r(sum(_safe_float(g.get("oreb")) for g in subset) / n),
+                "PLUS_MINUS": _r(sum(_safe_float(g.get("plus_minus")) for g in subset) / n),
             }]
 
         # Determine home/away by comparing player's team_id to game's home/away

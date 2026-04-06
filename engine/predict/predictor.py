@@ -46,6 +46,12 @@ _STAT_STD_MAP = {
     "ast": "assists_std",
     "fg3m": "threes_std",
     "threes": "threes_std",
+    "stl": "steals_std",
+    "blk": "blocks_std",
+    "tov": "turnovers_std",
+    "ftm": "ftm_std",
+    "oreb": "oreb_std",
+    "plus_minus": "plus_minus_std",
 }
 
 # Combo stat definitions: maps combo stat key to its component game-log
@@ -110,23 +116,23 @@ def _lookup_player_data(player_name: str):
 
     Bridges the two databases by resolving *player_name* to a
     ``player_id`` and pulling season averages, recent game logs,
-    and team info.
+    team info, and home/away splits.
 
     Returns:
-        Tuple of (player_averages_dict, team_dict, game_logs_list).
+        Tuple of (player_averages_dict, team_dict, game_logs_list, splits_dict).
         Any element may be empty if the data is unavailable.
     """
     try:
         from data.etl_data_service import get_player_by_name, get_player_game_logs
-        from data.db_service import get_team
+        from data.db_service import get_team, get_player_splits
     except ImportError:
         _logger.debug("_lookup_player_data: import failed")
-        return {}, {}, []
+        return {}, {}, [], {}
 
     player = get_player_by_name(player_name)
     if not player:
         _logger.debug("_lookup_player_data: player '%s' not found", player_name)
-        return {}, {}, []
+        return {}, {}, [], {}
 
     player_id = player.get("player_id")
     team_id = player.get("team_id")
@@ -139,7 +145,11 @@ def _lookup_player_data(player_name: str):
 
     team = get_team(team_id) if team_id else {}
 
-    return averages, team, game_logs
+    # Fetch home/away splits so the prediction can use location-specific
+    # averages instead of just a binary is_home flag.
+    splits = get_player_splits(player_id) if player_id else {}
+
+    return averages, team, game_logs, splits
 
 
 def _compute_confidence_interval(prediction, stat_type, game_logs, player_averages):
@@ -228,13 +238,34 @@ def predict_player_stat(
         import numpy as np
 
         # ── Fix #1 & #6: Fetch real data from smartpicks.db ──────────
-        player_averages, team_data, game_logs = _lookup_player_data(player_name)
+        player_averages, team_data, game_logs, splits = _lookup_player_data(player_name)
 
         # Build a richer player_data dict from season averages + rolling
         player_data = dict(player_averages)
         if game_logs:
             rolling = calculate_rolling_averages(game_logs)
             player_data.update(rolling)
+
+        # ── Fix #2: Enrich with home/away split averages ─────────────
+        # Instead of just passing is_home as a binary flag, load the
+        # player's actual home vs away stat averages so the model can
+        # leverage the real location-specific performance signal.
+        if splits:
+            is_home = game_context.get("is_home")
+            loc_key = "home" if is_home else "away"
+            loc_rows = splits.get(loc_key, [])
+            if loc_rows:
+                loc = loc_rows[0]
+                _SPLIT_KEY_MAP = {
+                    "ha_pts": "PTS", "ha_reb": "REB", "ha_ast": "AST",
+                    "ha_stl": "STL", "ha_blk": "BLK", "ha_tov": "TOV",
+                    "ha_fg3m": "FG3M", "ha_ftm": "FTM",
+                    "ha_oreb": "OREB", "ha_plus_minus": "PLUS_MINUS",
+                }
+                for feat, split_key in _SPLIT_KEY_MAP.items():
+                    val = loc.get(split_key)
+                    if val is not None:
+                        player_data[feat] = float(val)
 
         # Opponent data: use game_context overrides when provided,
         # otherwise fall through to empty (build_feature_matrix handles defaults).

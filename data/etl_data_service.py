@@ -114,7 +114,10 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
                 "fg_pct_avg": 0.0, "oreb_avg": 0.0, "dreb_avg": 0.0,
                 "pf_avg": 0.0, "plus_minus_avg": 0.0,
                 "points_std": 0.0, "rebounds_std": 0.0,
-                "assists_std": 0.0, "threes_std": 0.0}
+                "assists_std": 0.0, "threes_std": 0.0,
+                "steals_std": 0.0, "blocks_std": 0.0,
+                "turnovers_std": 0.0, "ftm_std": 0.0,
+                "oreb_std": 0.0, "plus_minus_std": 0.0}
 
     def _r(val, decimals: int = 1) -> float:
         try:
@@ -178,7 +181,8 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
     # Real standard deviations from game logs — gracefully fall back to estimates
     try:
         logs = conn.execute(
-            "SELECT pts, reb, ast, fg3m FROM Player_Game_Logs WHERE player_id = ?",
+            "SELECT pts, reb, ast, fg3m, stl, blk, tov, ftm, oreb, plus_minus"
+            " FROM Player_Game_Logs WHERE player_id = ?",
             (player_id,),
         ).fetchall()
         if len(logs) >= 2:
@@ -186,26 +190,50 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
             reb_list  = [float(r[1] or 0) for r in logs]
             ast_list  = [float(r[2] or 0) for r in logs]
             fg3m_list = [float(r[3] or 0) for r in logs]
-            averages["points_std"]   = _r(statistics.stdev(pts_list),  2)
-            averages["rebounds_std"] = _r(statistics.stdev(reb_list),  2)
-            averages["assists_std"]  = _r(statistics.stdev(ast_list),  2)
-            averages["threes_std"]   = _r(statistics.stdev(fg3m_list), 2)
+            stl_list  = [float(r[4] or 0) for r in logs]
+            blk_list  = [float(r[5] or 0) for r in logs]
+            tov_list  = [float(r[6] or 0) for r in logs]
+            ftm_list  = [float(r[7] or 0) for r in logs]
+            oreb_list = [float(r[8] or 0) for r in logs]
+            pm_list   = [float(r[9] or 0) for r in logs]
+            averages["points_std"]      = _r(statistics.stdev(pts_list),  2)
+            averages["rebounds_std"]    = _r(statistics.stdev(reb_list),  2)
+            averages["assists_std"]     = _r(statistics.stdev(ast_list),  2)
+            averages["threes_std"]      = _r(statistics.stdev(fg3m_list), 2)
+            averages["steals_std"]      = _r(statistics.stdev(stl_list),  2)
+            averages["blocks_std"]      = _r(statistics.stdev(blk_list),  2)
+            averages["turnovers_std"]   = _r(statistics.stdev(tov_list),  2)
+            averages["ftm_std"]         = _r(statistics.stdev(ftm_list),  2)
+            averages["oreb_std"]        = _r(statistics.stdev(oreb_list), 2)
+            averages["plus_minus_std"]  = _r(statistics.stdev(pm_list),   2)
         else:
             ppg = averages["ppg"]
             rpg = averages["rpg"]
             apg = averages["apg"]
-            averages["points_std"]   = _r(ppg * 0.30, 2)
-            averages["rebounds_std"] = _r(rpg * 0.40, 2)
-            averages["assists_std"]  = _r(apg * 0.40, 2)
-            averages["threes_std"]   = 0.0
+            averages["points_std"]      = _r(ppg * 0.30, 2)
+            averages["rebounds_std"]    = _r(rpg * 0.40, 2)
+            averages["assists_std"]     = _r(apg * 0.40, 2)
+            averages["threes_std"]      = 0.0
+            averages["steals_std"]      = _r(averages.get("spg", 0) * 0.40, 2)
+            averages["blocks_std"]      = _r(averages.get("bpg", 0) * 0.40, 2)
+            averages["turnovers_std"]   = _r(averages.get("topg", 0) * 0.40, 2)
+            averages["ftm_std"]         = 0.0
+            averages["oreb_std"]        = 0.0
+            averages["plus_minus_std"]  = 0.0
     except Exception:
         ppg = averages["ppg"]
         rpg = averages["rpg"]
         apg = averages["apg"]
-        averages["points_std"]   = _r(ppg * 0.30, 2)
-        averages["rebounds_std"] = _r(rpg * 0.40, 2)
-        averages["assists_std"]  = _r(apg * 0.40, 2)
-        averages["threes_std"]   = 0.0
+        averages["points_std"]      = _r(ppg * 0.30, 2)
+        averages["rebounds_std"]    = _r(rpg * 0.40, 2)
+        averages["assists_std"]     = _r(apg * 0.40, 2)
+        averages["threes_std"]      = 0.0
+        averages["steals_std"]      = _r(averages.get("spg", 0) * 0.40, 2)
+        averages["blocks_std"]      = _r(averages.get("bpg", 0) * 0.40, 2)
+        averages["turnovers_std"]   = _r(averages.get("topg", 0) * 0.40, 2)
+        averages["ftm_std"]         = 0.0
+        averages["oreb_std"]        = 0.0
+        averages["plus_minus_std"]  = 0.0
 
     return averages
 

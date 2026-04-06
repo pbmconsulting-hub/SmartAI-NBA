@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 class TestLookupPlayerData(unittest.TestCase):
     """_lookup_player_data should bridge to the ETL DB."""
 
+    @patch("data.db_service.get_player_splits", return_value={"home": [{"PTS": 28.0}], "away": [{"PTS": 22.0}]})
     @patch("data.db_service.get_team", return_value={"drtg": 108.5})
     @patch(
         "data.etl_data_service.get_player_game_logs",
@@ -35,16 +36,18 @@ class TestLookupPlayerData(unittest.TestCase):
         "data.etl_data_service.get_player_by_name",
         return_value={"player_id": 1, "team_id": 10, "ppg": 25.3, "rpg": 7.0},
     )
-    def test_returns_averages_team_logs(self, mock_player, mock_logs, mock_team):
+    def test_returns_averages_team_logs_splits(self, mock_player, mock_logs, mock_team, mock_splits):
         from engine.predict.predictor import _lookup_player_data
 
-        avgs, team, logs = _lookup_player_data("LeBron James")
+        avgs, team, logs, splits = _lookup_player_data("LeBron James")
         mock_player.assert_called_once_with("LeBron James")
         mock_logs.assert_called_once_with(1, limit=30)
         mock_team.assert_called_once_with(10)
+        mock_splits.assert_called_once_with(1)
         self.assertIn("ppg", avgs)
         self.assertEqual(team["drtg"], 108.5)
         self.assertEqual(len(logs), 1)
+        self.assertIn("home", splits)
 
     @patch(
         "data.etl_data_service.get_player_by_name",
@@ -53,10 +56,11 @@ class TestLookupPlayerData(unittest.TestCase):
     def test_returns_empty_when_player_not_found(self, mock_player):
         from engine.predict.predictor import _lookup_player_data
 
-        avgs, team, logs = _lookup_player_data("Nonexistent Player")
+        avgs, team, logs, splits = _lookup_player_data("Nonexistent Player")
         self.assertEqual(avgs, {})
         self.assertEqual(team, {})
         self.assertEqual(logs, [])
+        self.assertEqual(splits, {})
 
 
 class TestPredictPlayerStatUsesRealData(unittest.TestCase):
@@ -69,6 +73,7 @@ class TestPredictPlayerStatUsesRealData(unittest.TestCase):
             {"ppg": 27.5, "rpg": 7.2, "apg": 7.1, "points_std": 5.3},
             {"drtg": 109.0},
             [{"pts": 30}, {"pts": 25}, {"pts": 28}],
+            {"home": [{"PTS": 29.0}], "away": [{"PTS": 24.0}]},
         ),
     )
     def test_uses_season_average_fallback(self, mock_lookup, mock_model):
@@ -83,7 +88,7 @@ class TestPredictPlayerStatUsesRealData(unittest.TestCase):
     @patch("engine.predict.predictor._load_best_model", return_value=None)
     @patch(
         "engine.predict.predictor._lookup_player_data",
-        return_value=({}, {}, []),
+        return_value=({}, {}, [], {}),
     )
     def test_falls_back_to_defaults_when_no_data(self, mock_lookup, mock_model):
         from engine.predict.predictor import predict_player_stat
@@ -91,6 +96,49 @@ class TestPredictPlayerStatUsesRealData(unittest.TestCase):
         result = predict_player_stat("Unknown Player", "pts", {})
         self.assertEqual(result["prediction"], 15.0)
         self.assertEqual(result["source"], "default_fallback")
+
+    @patch("engine.predict.predictor._load_best_model", return_value=None)
+    @patch(
+        "engine.predict.predictor._lookup_player_data",
+        return_value=(
+            {"ppg": 25.0, "rpg": 6.0, "apg": 5.0},
+            {"drtg": 110.0},
+            [{"pts": 28}, {"pts": 22}],
+            {
+                "home": [{"PTS": 28.0, "REB": 7.0, "AST": 6.0, "STL": 1.5}],
+                "away": [{"PTS": 22.0, "REB": 5.0, "AST": 4.0, "STL": 0.8}],
+            },
+        ),
+    )
+    def test_home_splits_enrich_features(self, mock_lookup, mock_model):
+        """When is_home=True, home split averages should appear in features."""
+        from engine.predict.predictor import predict_player_stat
+
+        result = predict_player_stat("Test Player", "pts", {"is_home": True})
+        # Prediction uses season average (no ML model), so ppg = 25.0
+        self.assertEqual(result["prediction"], 25.0)
+        self.assertEqual(result["source"], "season_average")
+
+    @patch("engine.predict.predictor._load_best_model", return_value=None)
+    @patch(
+        "engine.predict.predictor._lookup_player_data",
+        return_value=(
+            {"ppg": 25.0, "rpg": 6.0, "apg": 5.0},
+            {"drtg": 110.0},
+            [{"pts": 28}, {"pts": 22}],
+            {
+                "home": [{"PTS": 28.0, "REB": 7.0}],
+                "away": [{"PTS": 22.0, "REB": 5.0}],
+            },
+        ),
+    )
+    def test_away_splits_enrich_features(self, mock_lookup, mock_model):
+        """When is_home=False, away split averages should appear in features."""
+        from engine.predict.predictor import predict_player_stat
+
+        result = predict_player_stat("Test Player", "pts", {"is_home": False})
+        self.assertEqual(result["prediction"], 25.0)
+        self.assertEqual(result["source"], "season_average")
 
 
 # ── Fix #5: Confidence interval from real variance ────────────────────
@@ -127,10 +175,65 @@ class TestComputeConfidenceInterval(unittest.TestCase):
     def test_fallback_to_heuristic(self):
         from engine.predict.predictor import _compute_confidence_interval
 
+        # No game logs AND no std key in averages → heuristic
         lower, upper = _compute_confidence_interval(20.0, "stl", [], {})
         # Heuristic: ±15%
         self.assertAlmostEqual(lower, 17.0, places=1)
         self.assertAlmostEqual(upper, 23.0, places=1)
+
+    def test_steals_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            1.5, "stl", [], {"steals_std": 0.8}
+        )
+        self.assertAlmostEqual(lower, 0.7, places=2)
+        self.assertAlmostEqual(upper, 2.3, places=2)
+
+    def test_blocks_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            1.0, "blk", [], {"blocks_std": 0.6}
+        )
+        self.assertAlmostEqual(lower, 0.4, places=2)
+        self.assertAlmostEqual(upper, 1.6, places=2)
+
+    def test_turnovers_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            3.0, "tov", [], {"turnovers_std": 1.2}
+        )
+        self.assertAlmostEqual(lower, 1.8, places=2)
+        self.assertAlmostEqual(upper, 4.2, places=2)
+
+    def test_ftm_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            5.0, "ftm", [], {"ftm_std": 2.0}
+        )
+        self.assertAlmostEqual(lower, 3.0, places=2)
+        self.assertAlmostEqual(upper, 7.0, places=2)
+
+    def test_oreb_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            2.0, "oreb", [], {"oreb_std": 1.0}
+        )
+        self.assertAlmostEqual(lower, 1.0, places=2)
+        self.assertAlmostEqual(upper, 3.0, places=2)
+
+    def test_plus_minus_std_used_when_available(self):
+        from engine.predict.predictor import _compute_confidence_interval
+
+        lower, upper = _compute_confidence_interval(
+            3.0, "plus_minus", [], {"plus_minus_std": 8.0}
+        )
+        self.assertAlmostEqual(lower, 0.0, places=2)  # max(3.0-8.0, 0)
+        self.assertAlmostEqual(upper, 11.0, places=2)
 
 
 # ── Fix #2: Indexes on tracking DB ───────────────────────────────────
@@ -248,6 +351,17 @@ class TestStatMaps(unittest.TestCase):
 
         for stat in ("pts", "reb", "ast"):
             self.assertIn(stat, _STAT_AVG_MAP)
+
+    def test_stat_std_map_covers_all_simple_stats(self):
+        """_STAT_STD_MAP should have entries for all 10 simple stats."""
+        from engine.predict.predictor import _STAT_STD_MAP
+
+        simple_stats = [
+            "pts", "reb", "ast", "stl", "blk",
+            "tov", "fg3m", "ftm", "oreb", "plus_minus",
+        ]
+        for stat in simple_stats:
+            self.assertIn(stat, _STAT_STD_MAP, f"Missing _STAT_STD_MAP entry for {stat}")
 
 
 if __name__ == "__main__":
