@@ -288,17 +288,26 @@ CREATE TABLE IF NOT EXISTS player_game_logs (
 # SECTION: Database Initialization
 # ============================================================
 
+_DB_INITIALIZED = False
+
+
 def initialize_database():
     """
     Create the database and tables if they don't exist.
 
     Call this once when the app starts. It's safe to call
     multiple times — CREATE TABLE IF NOT EXISTS won't
-    overwrite existing tables.
+    overwrite existing tables.  After the first successful
+    initialization the heavy work (PRAGMA integrity_check,
+    CREATE TABLE, ALTER TABLE migrations) is skipped.
 
     Returns:
         bool: True if successful, False if error occurred
     """
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return True
+
     # Make sure the db directory exists
     # exist_ok=True means don't error if it already exists
     DB_DIRECTORY.mkdir(parents=True, exist_ok=True)
@@ -336,6 +345,24 @@ def initialize_database():
             cursor.execute(CREATE_ANALYSIS_SESSIONS_TABLE_SQL)    # analysis session persistence
             cursor.execute(CREATE_BACKTEST_RESULTS_TABLE_SQL)     # historical backtesting results
             cursor.execute(CREATE_PLAYER_GAME_LOGS_TABLE_SQL)     # Feature 12: game log persistence
+
+            # ── Indexes for performance ───────────────────────────────
+            _TRACKING_INDEXES = (
+                ("idx_pgl_player_id", "player_game_logs", "(player_id)"),
+                ("idx_pgl_game_date", "player_game_logs", "(game_date)"),
+                ("idx_pgl_player_date", "player_game_logs", "(player_id, game_date)"),
+                ("idx_bets_player", "bets", "(player_name)"),
+                ("idx_bets_date", "bets", "(bet_date)"),
+                ("idx_bets_created", "bets", "(created_at)"),
+                ("idx_ph_date", "prediction_history", "(prediction_date)"),
+                ("idx_ph_stat", "prediction_history", "(stat_type)"),
+                ("idx_aap_date", "all_analysis_picks", "(pick_date)"),
+                ("idx_aap_player", "all_analysis_picks", "(player_name)"),
+            )
+            for idx_name, table, columns in _TRACKING_INDEXES:
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} {columns}"
+                )
 
             # ── Schema migrations for existing databases ──────────────
             # Add auto_logged column if it doesn't exist yet
@@ -437,6 +464,7 @@ def initialize_database():
             # Save the changes
             connection.commit()
 
+        _DB_INITIALIZED = True
         return True
 
     except sqlite3.Error as database_error:
@@ -584,7 +612,7 @@ def update_bet_result(bet_id, result, actual_value):
     return False
 
 
-def load_all_bets(limit=200):
+def load_all_bets(limit=10000):
     """
     Load recent bets from the database.
 

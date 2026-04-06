@@ -67,14 +67,17 @@ class TestDatabaseInitialization(unittest.TestCase):
         import tracking.database as db_mod
         self.original_db_dir = db_mod.DB_DIRECTORY
         self.original_db_path = db_mod.DB_FILE_PATH
+        self._original_init_flag = db_mod._DB_INITIALIZED
         db_mod.DB_DIRECTORY = pathlib.Path(self.temp_dir)
         db_mod.DB_FILE_PATH = pathlib.Path(self.temp_dir) / "test.db"
+        db_mod._DB_INITIALIZED = False
 
     def tearDown(self):
         """Restore original database paths."""
         import tracking.database as db_mod
         db_mod.DB_DIRECTORY = self.original_db_dir
         db_mod.DB_FILE_PATH = self.original_db_path
+        db_mod._DB_INITIALIZED = self._original_init_flag
         # Clean up temp dir
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -114,8 +117,10 @@ class TestInsertAndLoadBets(unittest.TestCase):
         import tracking.database as db_mod
         self.original_db_dir = db_mod.DB_DIRECTORY
         self.original_db_path = db_mod.DB_FILE_PATH
+        self._original_init_flag = db_mod._DB_INITIALIZED
         db_mod.DB_DIRECTORY = pathlib.Path(self.temp_dir)
         db_mod.DB_FILE_PATH = pathlib.Path(self.temp_dir) / "test.db"
+        db_mod._DB_INITIALIZED = False
         from tracking.database import initialize_database
         initialize_database()
 
@@ -123,6 +128,7 @@ class TestInsertAndLoadBets(unittest.TestCase):
         import tracking.database as db_mod
         db_mod.DB_DIRECTORY = self.original_db_dir
         db_mod.DB_FILE_PATH = self.original_db_path
+        db_mod._DB_INITIALIZED = self._original_init_flag
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
