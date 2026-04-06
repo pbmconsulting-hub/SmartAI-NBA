@@ -64,6 +64,15 @@ _COMBO_STAT_AVGS: dict[str, list[str]] = {
     "blk+stl": ["bpg", "spg"],
 }
 
+# Default prediction values when no data is available.
+_STAT_DEFAULTS = {
+    "pts": 15.0, "reb": 5.0, "ast": 4.0, "stl": 1.0,
+    "blk": 0.5, "tov": 2.0, "fg3m": 1.5, "ftm": 2.0,
+    "oreb": 1.0, "plus_minus": 0.0,
+    "pts+reb": 20.0, "pts+ast": 19.0,
+    "pts+reb+ast": 24.0, "blk+stl": 1.5,
+}
+
 
 def _load_best_model(stat_type: str):
     """Load the best available saved model for a stat type.
@@ -242,6 +251,8 @@ def predict_player_stat(
         model = _load_best_model(stat_type)
         combo_avg_keys = _COMBO_STAT_AVGS.get(stat_type)
 
+        # ML models are only trained for simple stats; combo stats always
+        # use the season-average fallback (sum of component averages).
         if model is not None and combo_avg_keys is None:
             preds = model.predict(X)
             prediction = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
@@ -269,13 +280,6 @@ def predict_player_stat(
                 )
                 result["source"] = "season_average"
             else:
-                _STAT_DEFAULTS = {
-                    "pts": 15.0, "reb": 5.0, "ast": 4.0, "stl": 1.0,
-                    "blk": 0.5, "tov": 2.0, "fg3m": 1.5, "ftm": 2.0,
-                    "oreb": 1.0, "plus_minus": 0.0,
-                    "pts+reb": 20.0, "pts+ast": 19.0,
-                    "pts+reb+ast": 24.0, "blk+stl": 1.5,
-                }
                 result["prediction"] = _STAT_DEFAULTS.get(stat_type, 5.0)
                 result["confidence_interval"] = None
                 result["source"] = "default_fallback"

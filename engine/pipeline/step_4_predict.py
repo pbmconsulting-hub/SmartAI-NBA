@@ -7,6 +7,9 @@ from utils.logger import get_logger
 _logger = get_logger(__name__)
 
 _MAX_PLAYERS = 50
+_DEFAULT_REST_DAYS = 1
+_DEFAULT_DRTG = 110.0
+_DEFAULT_PACE = 100.0
 
 # All stat types the pipeline predicts: simple + combo.
 _SIMPLE_STATS = ["pts", "reb", "ast", "stl", "blk", "tov", "fg3m", "ftm", "oreb", "plus_minus"]
@@ -63,17 +66,17 @@ def _build_game_context_map() -> dict:
 
         ctx_map[int(home_id)] = {
             "is_home": True,
-            "rest_days": 1,
-            "opponent_drtg": float(away_t.get("drtg") or 110.0),
-            "team_pace": float(home_t.get("pace") or 100.0),
-            "opponent_pace": float(away_t.get("pace") or 100.0),
+            "rest_days": _DEFAULT_REST_DAYS,
+            "opponent_drtg": float(away_t.get("drtg") or _DEFAULT_DRTG),
+            "team_pace": float(home_t.get("pace") or _DEFAULT_PACE),
+            "opponent_pace": float(away_t.get("pace") or _DEFAULT_PACE),
         }
         ctx_map[int(away_id)] = {
             "is_home": False,
-            "rest_days": 1,
-            "opponent_drtg": float(home_t.get("drtg") or 110.0),
-            "team_pace": float(away_t.get("pace") or 100.0),
-            "opponent_pace": float(home_t.get("pace") or 100.0),
+            "rest_days": _DEFAULT_REST_DAYS,
+            "opponent_drtg": float(home_t.get("drtg") or _DEFAULT_DRTG),
+            "team_pace": float(away_t.get("pace") or _DEFAULT_PACE),
+            "opponent_pace": float(home_t.get("pace") or _DEFAULT_PACE),
         }
 
     _logger.debug("Built game context map for %d teams", len(ctx_map))
