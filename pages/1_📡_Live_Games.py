@@ -769,6 +769,16 @@ if platform_props_clicked:
                     pass
 
                 # Projection — use proper signature matching build_player_projection
+                # Fetch recent game logs from DB for projection context
+                _recent_form_for_proj: list | None = None
+                try:
+                    from data.etl_data_service import get_player_game_logs as _etl_get_logs_live
+                    _pid_live = player_data.get("player_id", "")
+                    if _pid_live:
+                        _recent_form_for_proj = _etl_get_logs_live(int(_pid_live), limit=20) or None
+                except Exception:
+                    pass
+
                 proj = build_player_projection(
                     player_data=player_data,
                     opponent_team_abbreviation=game_ctx.get("opponent", ""),
@@ -779,6 +789,7 @@ if platform_props_clicked:
                     teams_data=_teams_data,
                     vegas_spread=game_ctx.get("vegas_spread", 0.0),
                     advanced_context=_live_adv_context,
+                    recent_form_games=_recent_form_for_proj,
                 )
 
                 # ── Projection retrieval & simulation ────────────────────

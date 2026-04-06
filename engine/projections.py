@@ -1003,6 +1003,13 @@ def _get_defense_adjustment_factor(
         float: Adjustment multiplier (typically 0.88 to 1.12)
     """
     # Find the opponent's row in defensive ratings data
+    if not defensive_ratings_data:
+        logging.getLogger(__name__).warning(
+            "_get_defense_adjustment_factor: defensive_ratings_data is empty — "
+            "returning neutral 1.0 for %s vs %s",
+            opponent_team_abbreviation, player_position,
+        )
+        return 1.0
     for team_row in defensive_ratings_data:
         if team_row.get("abbreviation", "") == opponent_team_abbreviation:
             # Build the column name: "vs_PG_pts", "vs_C_pts", etc.
@@ -1143,6 +1150,14 @@ def _get_pace_adjustment_factor(
     """
     league_average_pace = LEAGUE_AVERAGE_PACE  # From module-level constant
 
+    if not teams_data:
+        logging.getLogger(__name__).warning(
+            "_get_pace_adjustment_factor: teams_data is empty — "
+            "returning neutral 1.0 for %s vs %s",
+            player_team_abbreviation, opponent_team_abbreviation,
+        )
+        return 1.0
+
     player_team_pace = league_average_pace   # Default if not found
     opponent_team_pace = league_average_pace  # Default if not found
 
@@ -1220,6 +1235,12 @@ def _estimate_blowout_risk(
     """
     # ---- Base blowout risk from defensive ratings (legacy fallback) ----
     # Find the opponent's defensive rating for spread-independent baseline
+    if not teams_data:
+        logging.getLogger(__name__).warning(
+            "_estimate_blowout_risk: teams_data is empty — "
+            "returning base risk 0.15 for %s vs %s",
+            player_team_abbreviation, opponent_team_abbreviation,
+        )
     opponent_drtg = 115.0  # League average if not found
     for team_row in teams_data:
         if team_row.get("abbreviation", "") == opponent_team_abbreviation:

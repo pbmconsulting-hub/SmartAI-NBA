@@ -948,6 +948,16 @@ if run_analysis:
 
                 recent_form_games  = prop.get("recent_form_results", [])
 
+                # ── DB fallback: fetch game logs when recent_form_games is empty ──
+                if not recent_form_games:
+                    try:
+                        from data.etl_data_service import get_player_game_logs as _etl_get_logs
+                        _pid_for_logs = player_data.get("player_id", "")
+                        if _pid_for_logs:
+                            recent_form_games = _etl_get_logs(int(_pid_for_logs), limit=20) or []
+                    except Exception:
+                        pass
+
                 # ── Feature 6: Minutes Trend — compute using rotation_tracker ──
                 # If game logs contain minutes (MIN field), detect trend vs season avg.
                 _minutes_trend = None
@@ -1342,18 +1352,32 @@ if run_analysis:
                 # on_off_data: player's team On/Off net-rating differentials
                 # matchup_data: per-matchup defensive assignments from box score
                 # Both are optional — confidence scoring degrades gracefully.
+                # Skip live API calls for synthetic/future game IDs.
                 _on_off_data: dict | None = None
                 _matchup_data: dict | None = None
+                _game_id_ctx = game_context.get("game_id", "")
+                _is_synthetic_game = game_context.get("is_synthetic", False) or "_vs_" in _game_id_ctx
                 try:
                     from data.nba_data_service import get_player_on_off, get_box_score_matchups
                     _player_team_id = game_context.get("home_team_id") if game_context.get("is_home") else game_context.get("away_team_id")
-                    if _player_team_id:
+                    if _player_team_id and not _is_synthetic_game:
                         _on_off_data = get_player_on_off(_player_team_id) or None
-                    _game_id_ctx = game_context.get("game_id", "")
-                    if _game_id_ctx:
+                    if _game_id_ctx and not _is_synthetic_game:
                         _matchup_data = get_box_score_matchups(_game_id_ctx) or None
                 except Exception:
                     pass
+
+                # ── DB fallback for on/off and matchup data ───────────────
+                if _on_off_data is None or _matchup_data is None:
+                    try:
+                        from data.etl_data_service import get_player_game_logs as _etl_logs_for_matchup
+                        _pid_matchup = player_data.get("player_id", "")
+                        if _pid_matchup and _on_off_data is None:
+                            _db_logs = _etl_logs_for_matchup(int(_pid_matchup), limit=10)
+                            if _db_logs:
+                                _on_off_data = {"source": "db_game_logs", "games": len(_db_logs)}
+                    except Exception:
+                        pass
 
                 confidence_output = calculate_confidence_score(
                     probability_over=probability_over,

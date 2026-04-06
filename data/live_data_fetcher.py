@@ -616,14 +616,17 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
     home_rec = team_records.get(home_abbrev, {})
     away_rec = team_records.get(away_abbrev, {})
 
-    actual_id = game_id if game_id else f"{home_abbrev}_vs_{away_abbrev}"
-    if not game_id:
+    actual_id = game_id if game_id and game_id not in ("0", "", "0000000000") else ""
+    is_synthetic = not actual_id
+    if is_synthetic:
+        actual_id = f"{home_abbrev}_vs_{away_abbrev}"
         _logger.info(
             "_build_formatted_game: no real game_id for %s vs %s, using synthetic=%r",
             away_abbrev, home_abbrev, actual_id,
         )
     return {
         "game_id": actual_id,
+        "is_synthetic": is_synthetic,
         "home_team": home_abbrev,
         "away_team": away_abbrev,
         "home_team_full": f"{home_abbrev} — {home_team_name}",
