@@ -70,6 +70,15 @@ _COMBO_STAT_AVGS: dict[str, list[str]] = {
     "blk+stl": ["bpg", "spg"],
 }
 
+# Maps feature names added to player_data from home/away splits to the
+# uppercase keys returned by ``db_service.get_player_splits()._summarise``.
+_SPLIT_KEY_MAP = {
+    "ha_pts": "PTS", "ha_reb": "REB", "ha_ast": "AST",
+    "ha_stl": "STL", "ha_blk": "BLK", "ha_tov": "TOV",
+    "ha_fg3m": "FG3M", "ha_ftm": "FTM",
+    "ha_oreb": "OREB", "ha_plus_minus": "PLUS_MINUS",
+}
+
 # Default prediction values when no data is available.
 _STAT_DEFAULTS = {
     "pts": 15.0, "reb": 5.0, "ast": 4.0, "stl": 1.0,
@@ -256,12 +265,6 @@ def predict_player_stat(
             loc_rows = splits.get(loc_key, [])
             if loc_rows:
                 loc = loc_rows[0]
-                _SPLIT_KEY_MAP = {
-                    "ha_pts": "PTS", "ha_reb": "REB", "ha_ast": "AST",
-                    "ha_stl": "STL", "ha_blk": "BLK", "ha_tov": "TOV",
-                    "ha_fg3m": "FG3M", "ha_ftm": "FTM",
-                    "ha_oreb": "OREB", "ha_plus_minus": "PLUS_MINUS",
-                }
                 for feat, split_key in _SPLIT_KEY_MAP.items():
                     val = loc.get(split_key)
                     if val is not None:

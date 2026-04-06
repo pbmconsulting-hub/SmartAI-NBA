@@ -178,6 +178,19 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
             "pf_avg": 0.0, "plus_minus_avg": 0.0,
         })
 
+    def _estimate_std(avgs: dict) -> None:
+        """Fill std fields with heuristic estimates based on averages."""
+        avgs["points_std"]      = _r(avgs.get("ppg", 0) * 0.30, 2)
+        avgs["rebounds_std"]    = _r(avgs.get("rpg", 0) * 0.40, 2)
+        avgs["assists_std"]     = _r(avgs.get("apg", 0) * 0.40, 2)
+        avgs["threes_std"]      = 0.0
+        avgs["steals_std"]      = _r(avgs.get("spg", 0) * 0.40, 2)
+        avgs["blocks_std"]      = _r(avgs.get("bpg", 0) * 0.40, 2)
+        avgs["turnovers_std"]   = _r(avgs.get("topg", 0) * 0.40, 2)
+        avgs["ftm_std"]         = 0.0
+        avgs["oreb_std"]        = 0.0
+        avgs["plus_minus_std"]  = 0.0
+
     # Real standard deviations from game logs — gracefully fall back to estimates
     try:
         logs = conn.execute(
@@ -207,33 +220,9 @@ def _compute_averages(player_id: int, conn: sqlite3.Connection) -> dict:
             averages["oreb_std"]        = _r(statistics.stdev(oreb_list), 2)
             averages["plus_minus_std"]  = _r(statistics.stdev(pm_list),   2)
         else:
-            ppg = averages["ppg"]
-            rpg = averages["rpg"]
-            apg = averages["apg"]
-            averages["points_std"]      = _r(ppg * 0.30, 2)
-            averages["rebounds_std"]    = _r(rpg * 0.40, 2)
-            averages["assists_std"]     = _r(apg * 0.40, 2)
-            averages["threes_std"]      = 0.0
-            averages["steals_std"]      = _r(averages.get("spg", 0) * 0.40, 2)
-            averages["blocks_std"]      = _r(averages.get("bpg", 0) * 0.40, 2)
-            averages["turnovers_std"]   = _r(averages.get("topg", 0) * 0.40, 2)
-            averages["ftm_std"]         = 0.0
-            averages["oreb_std"]        = 0.0
-            averages["plus_minus_std"]  = 0.0
+            _estimate_std(averages)
     except Exception:
-        ppg = averages["ppg"]
-        rpg = averages["rpg"]
-        apg = averages["apg"]
-        averages["points_std"]      = _r(ppg * 0.30, 2)
-        averages["rebounds_std"]    = _r(rpg * 0.40, 2)
-        averages["assists_std"]     = _r(apg * 0.40, 2)
-        averages["threes_std"]      = 0.0
-        averages["steals_std"]      = _r(averages.get("spg", 0) * 0.40, 2)
-        averages["blocks_std"]      = _r(averages.get("bpg", 0) * 0.40, 2)
-        averages["turnovers_std"]   = _r(averages.get("topg", 0) * 0.40, 2)
-        averages["ftm_std"]         = 0.0
-        averages["oreb_std"]        = 0.0
-        averages["plus_minus_std"]  = 0.0
+        _estimate_std(averages)
 
     return averages
 
