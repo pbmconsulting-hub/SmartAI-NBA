@@ -1084,6 +1084,12 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
         rebounds_std = float(p.get("rebounds_std", 0) or 0) or round(rpg  * FALLBACK_REBOUNDS_STD_RATIO, 1)
         assists_std  = float(p.get("assists_std",  0) or 0) or round(apg  * FALLBACK_ASSISTS_STD_RATIO, 1)
         threes_std   = float(p.get("threes_std",   0) or 0)
+        steals_std   = float(p.get("steals_std",   0) or 0) or round(spg  * FALLBACK_STEALS_STD_RATIO, 1)
+        blocks_std   = float(p.get("blocks_std",   0) or 0) or round(bpg  * FALLBACK_BLOCKS_STD_RATIO, 1)
+        turnovers_std = float(p.get("turnovers_std", 0) or 0) or round(topg * FALLBACK_TURNOVERS_STD_RATIO, 1)
+        ftm_std      = float(p.get("ftm_std",      0) or 0)
+        oreb_std     = float(p.get("oreb_std",     0) or 0)
+        plus_minus_std = float(p.get("plus_minus_std", 0) or 0)
 
         result.append({
             "player_id":               str(p.get("player_id", "")),
@@ -1104,9 +1110,9 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
             "rebounds_std":            round(rebounds_std, 1),
             "assists_std":             round(assists_std, 1),
             "threes_std":              round(threes_std, 1),
-            "steals_std":              round(spg  * FALLBACK_STEALS_STD_RATIO, 1),
-            "blocks_std":              round(bpg  * FALLBACK_BLOCKS_STD_RATIO, 1),
-            "turnovers_std":           round(topg * FALLBACK_TURNOVERS_STD_RATIO, 1),
+            "steals_std":              round(steals_std, 1),
+            "blocks_std":              round(blocks_std, 1),
+            "turnovers_std":           round(turnovers_std, 1),
             "ftm_avg":                 round(ftm_avg, 1),
             "fta_avg":                 round(fta_avg, 1),
             "fga_avg":                 round(fga_avg, 1),
@@ -1114,13 +1120,14 @@ def _convert_etl_players_to_app_format(etl_players: list) -> list:
             "offensive_rebounds_avg":  round(oreb_avg, 1),
             "defensive_rebounds_avg":  round(dreb_avg, 1),
             "personal_fouls_avg":      round(pf_avg, 1),
-            "ftm_std":                 0.0,
+            "ftm_std":                 round(ftm_std, 1),
             "fta_std":                 0.0,
             "fga_std":                 0.0,
             "fgm_std":                 0.0,
-            "offensive_rebounds_std":  0.0,
+            "offensive_rebounds_std":  round(oreb_std, 1),
             "defensive_rebounds_std":  0.0,
             "personal_fouls_std":      0.0,
+            "plus_minus_std":          round(plus_minus_std, 1),
             "games_played":            str(p.get("gp", 0)),
         })
     return result
@@ -1154,13 +1161,27 @@ def load_props_data():
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_teams_data() -> list:
-    """Load all 30 NBA teams from teams.csv."""
+    """Load all 30 NBA teams — tries ETL database first, then CSV fallback."""
+    try:
+        from data.etl_data_service import get_all_teams as _etl_get_all_teams
+        etl_teams = _etl_get_all_teams()
+        if etl_teams:
+            return etl_teams
+    except Exception as _etl_err:
+        _logger.debug("load_teams_data: ETL source unavailable (%s), falling back to CSV.", _etl_err)
     return _load_csv_file(TEAMS_CSV_PATH)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_defensive_ratings_data():
-    """Load team defensive ratings by position from defensive_ratings.csv."""
+    """Load team defensive ratings by position — tries ETL database first, then CSV fallback."""
+    try:
+        from data.etl_data_service import get_all_defense_vs_position as _etl_get_dvp
+        etl_dvp = _etl_get_dvp()
+        if etl_dvp:
+            return etl_dvp
+    except Exception as _etl_err:
+        _logger.debug("load_defensive_ratings_data: ETL source unavailable (%s), falling back to CSV.", _etl_err)
     return _load_csv_file(DEFENSIVE_RATINGS_CSV_PATH)
 
 
