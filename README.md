@@ -29,11 +29,6 @@ Replace `path/to/SmartAI-NBA` with the actual folder path (e.g., `cd ~/Downloads
 ### Step 3: Install Dependencies
 
 ```bash
-pip install streamlit nba_api
-```
-
-Or using the requirements file:
-```bash
 pip install -r requirements.txt
 ```
 
@@ -52,6 +47,8 @@ Your browser will automatically open to `http://localhost:8501` with the app run
 ```
 SmartAI-NBA/
 ├── app.py                              # Main entry point — home dashboard
+├── bootstrap.py                        # First-run ETL bootstrap
+├── webhook_server.py                   # Stripe webhook server
 ├── requirements.txt                    # All dependencies
 ├── README.md                           # This file
 │
@@ -71,7 +68,11 @@ SmartAI-NBA/
 │   ├── 11_📈_Bet_Tracker.py           # Bet tracking & model health
 │   ├── 12_📊_Backtester.py            # Historical backtesting engine
 │   ├── 13_⚙️_Settings.py             # Configure engine settings
-│   └── 14_💎_Subscription_Level.py    # Premium subscription management
+│   ├── 14_💎_Subscription_Level.py    # Premium subscription management
+│   └── helpers/                        # Page helper modules
+│       ├── bet_tracker_helpers.py
+│       ├── joseph_live_desk.py
+│       └── neural_analysis_helpers.py
 │
 ├── engine/
 │   ├── math_helpers.py                 # All math from scratch (no scipy)
@@ -83,23 +84,88 @@ SmartAI-NBA/
 │   ├── joseph_brain.py                # Joseph M. Smith AI persona engine
 │   ├── arbitrage_matcher.py           # Cross-book EV scanner
 │   ├── live_math.py                   # Live game pacing engine
-│   └── ...                            # + 25 more engine modules
+│   ├── backtester.py                  # Historical backtesting engine
+│   ├── calibration.py                 # Model calibration
+│   ├── correlation.py                 # Prop correlation analysis
+│   ├── ensemble.py                    # Multi-model ensemble combiner
+│   ├── game_prediction.py             # Full game outcome prediction
+│   ├── game_script.py                 # Game script / flow analysis
+│   ├── impact_metrics.py              # Player impact metrics
+│   ├── lineup_analysis.py             # Lineup analysis engine
+│   ├── minutes_model.py               # Minutes projection model
+│   ├── player_intelligence.py         # Deep player intelligence
+│   ├── regime_detection.py            # Play-style regime detection
+│   ├── stat_distributions.py          # Statistical distribution models
+│   ├── features/                      # Feature engineering
+│   │   ├── feature_engineering.py
+│   │   ├── player_metrics.py
+│   │   └── team_metrics.py
+│   ├── models/                        # ML models (XGBoost, CatBoost, Ridge)
+│   │   ├── base_model.py
+│   │   ├── catboost_model.py
+│   │   ├── ensemble.py
+│   │   ├── ridge_model.py
+│   │   ├── train.py
+│   │   └── xgboost_model.py
+│   ├── pipeline/                      # ML pipeline (ingest → export)
+│   │   ├── run_pipeline.py
+│   │   ├── step_1_ingest.py
+│   │   ├── step_2_clean.py
+│   │   ├── step_3_features.py
+│   │   ├── step_4_predict.py
+│   │   ├── step_5_evaluate.py
+│   │   └── step_6_export.py
+│   ├── predict/                       # Prediction engine
+│   │   └── predictor.py
+│   └── scrapers/                      # External data scrapers
+│       ├── balldontlie_client.py
+│       ├── basketball_ref_scraper.py
+│       ├── cbs_injuries_scraper.py
+│       └── transactions_scraper.py
 │
 ├── data/
 │   ├── data_manager.py                # Load/save CSV data + session state
+│   ├── db_service.py                  # Local SQLite DB gateway for engine
+│   ├── etl_data_service.py            # ETL data service (reads smartpicks.db)
 │   ├── nba_data_service.py            # NBA data orchestration service
+│   ├── nba_live_fetcher.py            # Live NBA.com data fetcher
+│   ├── live_data_fetcher.py           # Live data fetching + enrichment
 │   ├── sportsbook_service.py          # Multi-platform prop fetcher
+│   ├── platform_fetcher.py            # Async platform line fetcher
 │   ├── live_game_tracker.py           # Live game score tracker
-│   ├── nba_stats_backup.py            # Free NBA.com stats fallback
+│   ├── bdl_bridge.py                  # BallDontLie API bridge
 │   ├── player_profile_service.py      # Player context & headshots
+│   ├── player_id_cache.py             # Player ID resolution cache
 │   ├── roster_engine.py               # Active roster & injury engine
+│   ├── advanced_fetcher.py            # Advanced stats fetcher
+│   ├── advanced_metrics.py            # Advanced metric calculations
+│   ├── validators.py                  # Data validation utilities
+│   ├── nba_injury_pdf/                # NBA injury report PDF parser
 │   ├── teams.csv                      # All 30 NBA teams with pace/ratings
 │   └── defensive_ratings.csv          # Team defense by position
+│
+├── etl/                                # ETL pipeline (writes to smartpicks.db)
+│   ├── setup_db.py                    # Database schema setup (39 tables)
+│   ├── initial_pull.py                # Full historical data pull
+│   ├── data_updater.py                # Incremental data updates
+│   ├── api.py                         # ETL FastAPI endpoints
+│   └── utils.py                       # ETL utility functions
+│
+├── api/                                # REST API (FastAPI)
+│   ├── main.py                        # API app entry point
+│   ├── middleware.py                   # API middleware
+│   └── routes/                        # API route handlers
+│       ├── health.py
+│       ├── players.py
+│       └── predictions.py
 │
 ├── agent/
 │   ├── payload_builder.py             # Live Sweat game state classifier
 │   ├── live_persona.py                # Joseph's live commentary persona
 │   └── response_parser.py             # Vibe response parsing
+│
+├── config/
+│   └── thresholds.py                  # Configurable thresholds
 │
 ├── styles/
 │   ├── theme.py                       # Global CSS + education box helpers
@@ -109,14 +175,24 @@ SmartAI-NBA/
 │   ├── components.py                  # Shared UI components
 │   ├── joseph_widget.py               # Joseph floating widget
 │   ├── premium_gate.py                # Premium feature gates
-│   └── ...                            # + auth, logger, renderers, etc.
+│   ├── stripe_manager.py              # Stripe subscription management
+│   ├── auth.py                        # Authentication utilities
+│   ├── cache.py                       # Caching utilities
+│   ├── logger.py                      # Logging configuration
+│   ├── renderers.py                   # UI renderers
+│   ├── rate_limiter.py                # API rate limiting
+│   ├── parquet_helpers.py             # Parquet file helpers
+│   └── ...                            # + constants, headers, geo, etc.
 │
 ├── tracking/
 │   ├── bet_tracker.py                 # Log bets + results
-│   └── database.py                    # SQLite wrapper
+│   ├── database.py                    # SQLite wrapper
+│   └── model_performance.py           # Model performance tracking
+│
+├── scripts/                            # Utility scripts
 │
 └── db/
-    └── smartai_nba.db                 # Created automatically on first run
+    └── smartpicks.db                   # ETL database (created by etl/setup_db.py)
 ```
 
 ---
@@ -248,11 +324,12 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 
 | Data | Source | Storage |
 |------|--------|---------|
-| Player stats (PPG, RPG, APG, etc.) | API-NBA API | `players.csv` |
-| Team pace + ratings (ORTG/DRTG) | API-NBA API | `teams.csv` |
+| Player stats (PPG, RPG, APG, etc.) | nba_api + API-NBA API | `db/smartpicks.db` |
+| Team pace + ratings (ORTG/DRTG) | nba_api + API-NBA API | `db/smartpicks.db` |
+| Player game logs | nba_api | `db/smartpicks.db` |
 | Tonight's games + spreads/totals | API-NBA API + Odds API | Session state |
 | Live prop lines | The Odds API (15+ books) | Session state |
-| Defensive ratings by position | Calculated from team DRTG | `defensive_ratings.csv` |
+| Defensive ratings by position | Calculated from team DRTG | `data/defensive_ratings.csv` |
 
 ### Live Data
 
@@ -339,17 +416,49 @@ Positive EV = profitable on average. Negative EV = house wins.
 
 ## 📦 Dependencies
 
-```
-streamlit   # UI framework (required)
-nba_api     # Live NBA data (optional but recommended)
-```
+### Core
+| Package | Purpose |
+|---------|---------|
+| `streamlit` | UI framework |
+| `streamlit-autorefresh` | Auto-refresh for live pages |
+| `pandas` | Data manipulation & analysis |
+| `numpy` | Numerical computing |
+| `requests` | HTTP client for API calls |
+| `aiohttp` | Async HTTP for platform fetching |
 
-Install both:
+### Machine Learning
+| Package | Purpose |
+|---------|---------|
+| `scikit-learn` | Ridge regression model |
+| `xgboost` | Gradient boosted tree model |
+| `catboost` | CatBoost ensemble model |
+| `joblib` | Model serialization |
+
+### Data & Parsing
+| Package | Purpose |
+|---------|---------|
+| `nba_api` | NBA.com stats API client |
+| `beautifulsoup4` | HTML parsing for scrapers |
+| `lxml` | Fast XML/HTML parser backend |
+| `pdfplumber` | NBA injury report PDF parsing |
+| `pyarrow` | Parquet file I/O engine |
+| `thefuzz` | Fuzzy string matching for player names |
+
+### API & Web
+| Package | Purpose |
+|---------|---------|
+| `fastapi` | REST API framework |
+| `uvicorn` | ASGI server for FastAPI |
+| `flask` | Stripe webhook server |
+| `stripe` | Payment processing |
+| `python-dotenv` | Environment variable management |
+
+Install all:
 ```bash
-pip install streamlit nba_api
+pip install -r requirements.txt
 ```
 
-All other functionality uses Python's standard library:
+The engine also uses Python's standard library extensively:
 `math`, `random`, `statistics`, `csv`, `sqlite3`, `datetime`, `os`, `pathlib`,
 `itertools`, `collections`, `json`, `io`, `copy`
 
