@@ -307,6 +307,43 @@ def get_all_players() -> list[dict]:
         except Exception:
             ext_map = {}
 
+        # Bulk std-dev query — one pass over all game logs
+        try:
+            _all_logs = conn.execute(
+                """
+                SELECT player_id, pts, reb, ast, fg3m, stl, blk, tov, ftm, oreb, plus_minus
+                FROM Player_Game_Logs
+                ORDER BY player_id
+                """
+            ).fetchall()
+            # Group by player_id
+            from collections import defaultdict
+            _logs_by_player: dict[int, list] = defaultdict(list)
+            for _log in _all_logs:
+                _logs_by_player[int(_log["player_id"])].append(_log)
+
+            def _std(values):
+                if len(values) >= 2:
+                    return round(statistics.stdev(values), 2)
+                return 0.0
+
+            std_map: dict[int, dict] = {}
+            for _pid, _plogs in _logs_by_player.items():
+                std_map[_pid] = {
+                    "points_std":     _std([float(lg["pts"] or 0) for lg in _plogs]),
+                    "rebounds_std":   _std([float(lg["reb"] or 0) for lg in _plogs]),
+                    "assists_std":    _std([float(lg["ast"] or 0) for lg in _plogs]),
+                    "threes_std":     _std([float(lg["fg3m"] or 0) for lg in _plogs]),
+                    "steals_std":     _std([float(lg["stl"] or 0) for lg in _plogs]),
+                    "blocks_std":     _std([float(lg["blk"] or 0) for lg in _plogs]),
+                    "turnovers_std":  _std([float(lg["tov"] or 0) for lg in _plogs]),
+                    "ftm_std":        _std([float(lg["ftm"] or 0) for lg in _plogs]),
+                    "oreb_std":       _std([float(lg["oreb"] or 0) for lg in _plogs]),
+                    "plus_minus_std": _std([float(lg["plus_minus"] or 0) for lg in _plogs]),
+                }
+        except Exception:
+            std_map = {}
+
         result = []
         for row in rows:
             pid = int(row["player_id"])
@@ -338,10 +375,117 @@ def get_all_players() -> list[dict]:
                 "dreb_avg":       _r(ext["dreb_avg"])       if ext else 0.0,
                 "pf_avg":         _r(ext["pf_avg"])         if ext else 0.0,
                 "plus_minus_avg": _r(ext["plus_minus_avg"]) if ext else 0.0,
+                # Standard deviations (real, computed from game logs)
+                "points_std":     std_map.get(pid, {}).get("points_std", 0.0),
+                "rebounds_std":   std_map.get(pid, {}).get("rebounds_std", 0.0),
+                "assists_std":    std_map.get(pid, {}).get("assists_std", 0.0),
+                "threes_std":     std_map.get(pid, {}).get("threes_std", 0.0),
+                "steals_std":     std_map.get(pid, {}).get("steals_std", 0.0),
+                "blocks_std":     std_map.get(pid, {}).get("blocks_std", 0.0),
+                "turnovers_std":  std_map.get(pid, {}).get("turnovers_std", 0.0),
+                "ftm_std":        std_map.get(pid, {}).get("ftm_std", 0.0),
+                "oreb_std":       std_map.get(pid, {}).get("oreb_std", 0.0),
+                "plus_minus_std": std_map.get(pid, {}).get("plus_minus_std", 0.0),
             })
         return result
     except Exception as exc:
         _logger.warning("get_all_players failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_all_teams() -> list[dict]:
+    """
+    Return all 30 NBA teams with pace/ORTG/DRTG from Team_Game_Stats.
+
+    Falls back to static Teams-table columns when Team_Game_Stats is empty.
+    Each dict mirrors the CSV format expected by engine/projections.py:
+        abbreviation, team_name, pace, ortg, drtg
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                t.team_id,
+                t.abbreviation,
+                t.team_name,
+                COALESCE(AVG(tgs.pace_est), t.pace)  AS pace,
+                COALESCE(AVG(tgs.ortg_est), t.ortg)  AS ortg,
+                COALESCE(AVG(tgs.drtg_est), t.drtg)  AS drtg
+            FROM Teams t
+            LEFT JOIN Team_Game_Stats tgs ON t.team_id = tgs.team_id
+            GROUP BY t.team_id
+            ORDER BY t.abbreviation
+            """
+        ).fetchall()
+
+        def _r(val, d=1):
+            try:
+                return round(float(val or 0), d)
+            except (TypeError, ValueError):
+                return 0.0
+
+        return [
+            {
+                "team_id":      int(r["team_id"]),
+                "abbreviation": r["abbreviation"] or "",
+                "team_name":    r["team_name"] or "",
+                "pace":         _r(r["pace"]),
+                "ortg":         _r(r["ortg"]),
+                "drtg":         _r(r["drtg"]),
+            }
+            for r in rows
+        ]
+    except Exception as exc:
+        _logger.warning("get_all_teams failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_all_defense_vs_position() -> list[dict]:
+    """
+    Return defense-vs-position multipliers pivoted into the format that
+    engine/projections.py expects (one row per team).
+
+    Each dict has:
+        abbreviation, vs_PG_pts, vs_PG_reb, vs_SG_pts, vs_SG_reb, ...
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT team_abbreviation, pos,
+                   vs_pts_mult, vs_reb_mult, vs_ast_mult,
+                   vs_stl_mult, vs_blk_mult, vs_3pm_mult
+            FROM Defense_Vs_Position
+            """
+        ).fetchall()
+        if not rows:
+            return []
+
+        # Pivot: group by team_abbreviation, then spread pos columns
+        team_map: dict[str, dict] = {}
+        for r in rows:
+            abbr = r["team_abbreviation"] or ""
+            if abbr not in team_map:
+                team_map[abbr] = {"abbreviation": abbr}
+            pos = r["pos"] or ""
+            team_map[abbr][f"vs_{pos}_pts"] = float(r["vs_pts_mult"] or 1.0)
+            team_map[abbr][f"vs_{pos}_reb"] = float(r["vs_reb_mult"] or 1.0)
+            team_map[abbr][f"vs_{pos}_ast"] = float(r["vs_ast_mult"] or 1.0)
+            team_map[abbr][f"vs_{pos}_stl"] = float(r["vs_stl_mult"] or 1.0)
+            team_map[abbr][f"vs_{pos}_blk"] = float(r["vs_blk_mult"] or 1.0)
+            team_map[abbr][f"vs_{pos}_3pm"] = float(r["vs_3pm_mult"] or 1.0)
+        return list(team_map.values())
+    except Exception as exc:
+        _logger.warning("get_all_defense_vs_position failed: %s", exc)
         return []
     finally:
         conn.close()
