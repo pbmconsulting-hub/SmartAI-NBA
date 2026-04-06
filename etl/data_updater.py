@@ -89,17 +89,16 @@ def _fetch_logs_for_range(
         "Fetching %s logs from %s to %s …", kind, str_from, str_to
     )
 
-    endpoint = LeagueGameLog(
-        player_or_team_abbreviation=player_or_team,
-        season=SEASON,
-        season_type_all_star="Regular Season",
-        date_from_nullable=str_from,
-        date_to_nullable=str_to,
-        timeout=initial_pull._BULK_ENDPOINT_TIMEOUT,
-    )
     initial_pull._rate_limited_sleep()
     df = initial_pull._call_with_retries(
-        lambda: endpoint.get_data_frames()[0],
+        lambda: LeagueGameLog(
+            player_or_team_abbreviation=player_or_team,
+            season=SEASON,
+            season_type_all_star="Regular Season",
+            date_from_nullable=str_from,
+            date_to_nullable=str_to,
+            timeout=initial_pull._BULK_ENDPOINT_TIMEOUT,
+        ).get_data_frames()[0],
         description=f"LeagueGameLog({kind}, {str_from}–{str_to})",
     )
     logger.info("%s-level API returned %d rows.", kind.capitalize(), len(df))

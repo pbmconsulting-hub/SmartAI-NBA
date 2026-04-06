@@ -2605,6 +2605,9 @@ def refresh_from_etl(progress_callback=None) -> dict:
     Smart Update via ETL: fetch only game logs added since the last
     stored date in db/smartpicks.db.
 
+    If the database is empty (no games loaded yet), automatically performs
+    a full initial pull instead of an incremental update.
+
     Args:
         progress_callback (callable | None):
             Called with (current, total, message).
@@ -2616,6 +2619,27 @@ def refresh_from_etl(progress_callback=None) -> dict:
         progress_callback(0, 4, "Connecting to ETL database…")
 
     try:
+        # Check whether the database needs a full initial seed.
+        from data.etl_data_service import get_db_counts
+        counts = get_db_counts()
+        if counts.get("games", 0) == 0:
+            _logger.info(
+                "Database has no games — running full initial pull."
+            )
+            if progress_callback:
+                progress_callback(1, 4,
+                    "Database is empty — running full initial pull…")
+            result = full_refresh_from_etl(
+                progress_callback=progress_callback,
+            )
+            # Normalise to the dict keys the Smart-ETL UI handler expects.
+            return {
+                "new_games": result.get("games_inserted", 0),
+                "new_logs": result.get("logs_inserted", 0),
+                "new_players": result.get("players_inserted", 0),
+                "error": result.get("error"),
+            }
+
         from data.etl_data_service import refresh_data as _etl_refresh
         if progress_callback:
             progress_callback(1, 4, "Running incremental update…")
@@ -2665,14 +2689,30 @@ def full_refresh_from_etl(season: str | None = None, progress_callback=None) -> 
             kwargs["season"] = season
 
         if progress_callback:
-            progress_callback(1, 4, "Fetching all game logs (this may take ~30 s)…")
+            progress_callback(1, 4, "Fetching all game logs (this may take ~60 s)…")
 
         result = run_initial_pull(**kwargs)
 
-        # etl.initial_pull.run_initial_pull() returns None — provide a
-        # default dict so callers that inspect .get() still work.
+        # run_initial_pull() now returns a counts dict.  Fall back to
+        # reading the DB if it ever returns None (legacy safety).
         if result is None:
-            result = {"players_inserted": 0, "games_inserted": 0, "logs_inserted": 0}
+            import sqlite3
+            from etl.setup_db import DB_PATH as _etl_db_path
+            conn = sqlite3.connect(_etl_db_path)
+            try:
+                result = {
+                    "players_inserted": conn.execute(
+                        "SELECT COUNT(*) FROM Players"
+                    ).fetchone()[0],
+                    "games_inserted": conn.execute(
+                        "SELECT COUNT(*) FROM Games"
+                    ).fetchone()[0],
+                    "logs_inserted": conn.execute(
+                        "SELECT COUNT(*) FROM Player_Game_Logs"
+                    ).fetchone()[0],
+                }
+            finally:
+                conn.close()
 
         if progress_callback:
             pi = result.get("players_inserted", 0)

@@ -709,9 +709,26 @@ def refresh_data() -> dict:
         from etl.data_updater import run_update
         result = run_update()
         # etl.data_updater.run_update() returns an int (new log count).
-        # Wrap it in the dict format callers expect.
+        # Wrap it in the dict format callers expect.  Also query actual
+        # game counts so the UI can report them accurately.
         if isinstance(result, int):
-            return {"new_games": 0, "new_logs": result, "new_players": 0}
+            new_logs = result
+            conn = _get_conn()
+            new_games = 0
+            if conn is not None:
+                try:
+                    new_games = conn.execute(
+                        "SELECT COUNT(*) FROM Games"
+                    ).fetchone()[0]
+                except Exception:
+                    pass
+                finally:
+                    conn.close()
+            return {
+                "new_games": new_games,
+                "new_logs": new_logs,
+                "new_players": 0,
+            }
         return result
     except Exception as exc:
         _logger.error("refresh_data failed: %s", exc)

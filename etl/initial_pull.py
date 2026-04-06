@@ -1943,7 +1943,7 @@ def _fetch_single_game_box_scores(
 # ---------------------------------------------------------------------------
 
 
-def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> None:
+def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> dict:
     """Orchestrate the full initial data pull and database seed.
 
     1. Ensures the database schema exists (calls :func:`setup_db.create_tables`).
@@ -1963,6 +1963,10 @@ def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> None:
     Args:
         db_path: Path to the SQLite database file.
         season: NBA season string, e.g. ``'2025-26'``.
+
+    Returns:
+        dict with keys ``players_inserted``, ``games_inserted``,
+        ``logs_inserted``.
     """
     logger.info("=== SmartPicksProAI — Initial Data Pull ===")
     setup_db.create_tables(db_path)
@@ -2052,7 +2056,22 @@ def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> None:
             populate_game_advanced_box_scores(conn, season)
             conn.commit()
 
-        logger.info("=== Initial pull complete. Database is ready. ===")
+        # Read actual row counts to return to callers.
+        p_count = conn.execute("SELECT COUNT(*) FROM Players").fetchone()[0]
+        g_count = conn.execute("SELECT COUNT(*) FROM Games").fetchone()[0]
+        l_count = conn.execute(
+            "SELECT COUNT(*) FROM Player_Game_Logs"
+        ).fetchone()[0]
+
+        logger.info(
+            "=== Initial pull complete. %d players, %d games, %d logs. ===",
+            p_count, g_count, l_count,
+        )
+        return {
+            "players_inserted": p_count,
+            "games_inserted": g_count,
+            "logs_inserted": l_count,
+        }
     finally:
         conn.close()
         logger.info("Database connection closed.")
