@@ -40,7 +40,7 @@ class TestLookupPlayerData(unittest.TestCase):
 
         avgs, team, logs = _lookup_player_data("LeBron James")
         mock_player.assert_called_once_with("LeBron James")
-        mock_logs.assert_called_once_with(1, limit=20)
+        mock_logs.assert_called_once_with(1, limit=30)
         mock_team.assert_called_once_with(10)
         self.assertIn("ppg", avgs)
         self.assertEqual(team["drtg"], 108.5)

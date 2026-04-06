@@ -18,6 +18,9 @@ _STAT_COL_MAP = {
     "tov": "tov",
     "fg3m": "fg3m",
     "threes": "fg3m",
+    "ftm": "ftm",
+    "oreb": "oreb",
+    "plus_minus": "plus_minus",
 }
 
 # Mapping from stat_type to the season-average key returned by
@@ -31,6 +34,9 @@ _STAT_AVG_MAP = {
     "tov": "topg",
     "fg3m": "fg3_avg",
     "threes": "fg3_avg",
+    "ftm": "ftm_avg",
+    "oreb": "oreb_avg",
+    "plus_minus": "plus_minus_avg",
 }
 
 # Standard-deviation key from etl_data_service averages dict.
@@ -40,6 +46,31 @@ _STAT_STD_MAP = {
     "ast": "assists_std",
     "fg3m": "threes_std",
     "threes": "threes_std",
+}
+
+# Combo stat definitions: maps combo stat key to its component game-log
+# column names and season-average keys.
+_COMBO_STAT_COLS: dict[str, list[str]] = {
+    "pts+reb": ["pts", "reb"],
+    "pts+ast": ["pts", "ast"],
+    "pts+reb+ast": ["pts", "reb", "ast"],
+    "blk+stl": ["blk", "stl"],
+}
+
+_COMBO_STAT_AVGS: dict[str, list[str]] = {
+    "pts+reb": ["ppg", "rpg"],
+    "pts+ast": ["ppg", "apg"],
+    "pts+reb+ast": ["ppg", "rpg", "apg"],
+    "blk+stl": ["bpg", "spg"],
+}
+
+# Default prediction values when no data is available.
+_STAT_DEFAULTS = {
+    "pts": 15.0, "reb": 5.0, "ast": 4.0, "stl": 1.0,
+    "blk": 0.5, "tov": 2.0, "fg3m": 1.5, "ftm": 2.0,
+    "oreb": 1.0, "plus_minus": 0.0,
+    "pts+reb": 20.0, "pts+ast": 19.0,
+    "pts+reb+ast": 24.0, "blk+stl": 1.5,
 }
 
 
@@ -104,7 +135,7 @@ def _lookup_player_data(player_name: str):
     # get_player_by_name (it calls _compute_averages internally).
     averages = {k: v for k, v in player.items() if isinstance(v, (int, float))}
 
-    game_logs = get_player_game_logs(player_id, limit=20) if player_id else []
+    game_logs = get_player_game_logs(player_id, limit=30) if player_id else []
 
     team = get_team(team_id) if team_id else {}
 
@@ -119,15 +150,25 @@ def _compute_confidence_interval(prediction, stat_type, game_logs, player_averag
     ``etl_data_service._compute_averages``, and only as a last resort
     uses a ±15 % heuristic.
 
+    Supports combo stats (e.g. ``"pts+reb"``) by summing the component
+    columns per game before computing the standard deviation.
+
     Returns:
         Tuple ``(lower, upper)`` rounded to two decimals, or *None*.
     """
     col = _STAT_COL_MAP.get(stat_type)
+    combo_cols = _COMBO_STAT_COLS.get(stat_type)
     std = None
 
     # Strategy 1: compute from recent game logs
-    if game_logs and col:
-        values = [float(g.get(col, 0) or 0) for g in game_logs]
+    if game_logs:
+        values: list[float] = []
+        if combo_cols:
+            # Sum component columns per game for combo stats
+            for g in game_logs:
+                values.append(sum(float(g.get(c, 0) or 0) for c in combo_cols))
+        elif col:
+            values = [float(g.get(col, 0) or 0) for g in game_logs]
         if len(values) >= 2:
             try:
                 std = _statistics.stdev(values)
@@ -208,7 +249,11 @@ def predict_player_stat(
         X = np.array([list(features.values())], dtype=float)
 
         model = _load_best_model(stat_type)
-        if model is not None:
+        combo_avg_keys = _COMBO_STAT_AVGS.get(stat_type)
+
+        # ML models are only trained for simple stats; combo stats always
+        # use the season-average fallback (sum of component averages).
+        if model is not None and combo_avg_keys is None:
             preds = model.predict(X)
             prediction = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
             result["prediction"] = round(prediction, 2)
@@ -218,9 +263,16 @@ def predict_player_stat(
             )
             result["source"] = "ml_model"
         else:
-            # Statistical fallback: use player's actual season average
-            avg_key = _STAT_AVG_MAP.get(stat_type)
-            avg_val = float(player_averages.get(avg_key, 0) or 0) if avg_key and player_averages else 0
+            # Statistical fallback: use player's actual season average.
+            # For combo stats, sum the component averages.
+            avg_val = 0.0
+            if combo_avg_keys and player_averages:
+                for k in combo_avg_keys:
+                    avg_val += float(player_averages.get(k, 0) or 0)
+            else:
+                avg_key = _STAT_AVG_MAP.get(stat_type)
+                avg_val = float(player_averages.get(avg_key, 0) or 0) if avg_key and player_averages else 0
+
             if avg_val > 0:
                 result["prediction"] = round(avg_val, 2)
                 result["confidence_interval"] = _compute_confidence_interval(
@@ -228,7 +280,6 @@ def predict_player_stat(
                 )
                 result["source"] = "season_average"
             else:
-                _STAT_DEFAULTS = {"pts": 15.0, "reb": 5.0, "ast": 4.0, "stl": 1.0, "blk": 0.5}
                 result["prediction"] = _STAT_DEFAULTS.get(stat_type, 5.0)
                 result["confidence_interval"] = None
                 result["source"] = "default_fallback"
