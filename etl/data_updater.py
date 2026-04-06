@@ -437,13 +437,10 @@ def run_update(db_path: str = DB_PATH) -> int:
                 "Games table is empty — running initial pull to seed the database."
             )
             conn.close()
-            initial_pull.run_initial_pull(db_path)
-            # Re-open to count the rows that were inserted.
+            result = initial_pull.run_initial_pull(db_path)
+            count = (result or {}).get("logs_inserted", 0)
+            # Re-open so the finally block can close it cleanly.
             conn = sqlite3.connect(db_path)
-            row = conn.execute(
-                "SELECT COUNT(*) FROM Player_Game_Logs"
-            ).fetchone()
-            count = row[0] if row else 0
             logger.info(
                 "=== Initial seed complete. %d log records loaded. ===", count
             )
