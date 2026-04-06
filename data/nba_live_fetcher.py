@@ -812,7 +812,9 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         return result
     except Exception as exc:
         _logger.warning("fetch_box_score_matchups(%s) failed: %s", game_id, exc)
-        return {}
+        _fail = {"player_stats": []}
+        _cache_set(cache_key, _fail)
+        return _fail
 
 
 def fetch_hustle_box_score(game_id: str) -> dict:
@@ -904,7 +906,9 @@ def fetch_defensive_box_score(game_id: str) -> dict:
         return result
     except Exception as exc:
         _logger.warning("fetch_defensive_box_score(%s) failed: %s", game_id, exc)
-        return {}
+        _fail = {"player_stats": [], "team_stats": []}
+        _cache_set(cache_key, _fail)
+        return _fail
 
 
 def fetch_scoring_box_score(game_id: str) -> dict:
@@ -956,7 +960,9 @@ def fetch_scoring_box_score(game_id: str) -> dict:
         return result
     except Exception as exc:
         _logger.warning("fetch_scoring_box_score(%s) failed: %s", game_id, exc)
-        return {}
+        _fail = {"player_stats": [], "team_stats": []}
+        _cache_set(cache_key, _fail)
+        return _fail
 
 
 def fetch_tracking_box_score(game_id: str) -> dict:
@@ -1076,7 +1082,9 @@ def fetch_four_factors_box_score(game_id: str) -> dict:
         return result
     except Exception as exc:
         _logger.warning("fetch_four_factors_box_score(%s) failed: %s", game_id, exc)
-        return {}
+        _fail = {"player_stats": [], "team_stats": []}
+        _cache_set(cache_key, _fail)
+        return _fail
 
 
 def fetch_player_shooting_splits(

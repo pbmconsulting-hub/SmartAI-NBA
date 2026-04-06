@@ -373,6 +373,16 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
         except Exception:
             pass
 
+        # Fetch recent game logs from DB for projection context
+        _recent_form_for_sim: list | None = None
+        try:
+            from data.etl_data_service import get_player_game_logs as _etl_get_logs_sim
+            _pid_sim = player_data.get("player_id", "")
+            if _pid_sim:
+                _recent_form_for_sim = _etl_get_logs_sim(int(_pid_sim), limit=20) or None
+        except Exception:
+            pass
+
         projection = build_player_projection(
             player_data=player_data,
             opponent_team_abbreviation=ctx.get("opponent", ""),
@@ -383,6 +393,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             teams_data=teams_data,
             vegas_spread=ctx.get("vegas_spread", 0.0),
             advanced_context=_sim_adv_ctx,
+            recent_form_games=_recent_form_for_sim,
         )
         projected_val = projection.get(
             f"projected_{stat}",

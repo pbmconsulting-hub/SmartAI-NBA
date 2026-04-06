@@ -647,6 +647,39 @@ class RosterEngine:
         except Exception as exc5:
             _logger.info(f"  RosterEngine._fetch_nba_api_injuries CBS: {exc5}")
 
+        # ── Source 6: DB Injury_Status table fallback ─────────────
+        try:
+            from data.etl_data_service import _get_conn as _etl_conn
+            _db = _etl_conn()
+            if _db is not None:
+                try:
+                    # Check if Injury_Status table exists
+                    _db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='Injury_Status'")
+                    _inj_rows = _db.execute(
+                        "SELECT player_name, status, injury, team FROM Injury_Status"
+                    ).fetchall()
+                    if _inj_rows:
+                        result6: dict = {}
+                        for _ir in _inj_rows:
+                            _name = str(_ir["player_name"] or "")
+                            if not _name:
+                                continue
+                            _key = _normalize_name(_name)
+                            result6[_key] = {
+                                "status":      _normalize_status(str(_ir["status"] or "")),
+                                "injury":      str(_ir["injury"] or ""),
+                                "team":        str(_ir["team"] or ""),
+                                "return_date": "",
+                                "source":      "db-injury-status",
+                            }
+                        if result6:
+                            _logger.info(f"  RosterEngine._fetch_nba_api_injuries: DB source returned {len(result6)} players")
+                            return result6
+                finally:
+                    _db.close()
+        except Exception as exc6:
+            _logger.info(f"  RosterEngine._fetch_nba_api_injuries DB: {exc6}")
+
         _logger.info("  RosterEngine._fetch_nba_api_injuries: all sources returned 0 players")
         return {}
 
