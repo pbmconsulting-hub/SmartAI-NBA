@@ -9,6 +9,17 @@
 import streamlit as st
 import html as _html
 import logging as _logging
+import hashlib as _hashlib
+import io as _io
+import csv as _csv
+from datetime import datetime as _datetime
+
+try:
+    import plotly.graph_objects as _go
+    _HAS_PLOTLY = True
+except ImportError:
+    _go = None  # type: ignore[assignment]
+    _HAS_PLOTLY = False
 
 try:
     from utils.logger import get_logger as _get_logger
@@ -24,6 +35,11 @@ from data.data_manager import (
 from engine.projections import build_player_projection, get_stat_standard_deviation
 from engine.simulation import run_quantum_matrix_simulation
 
+try:
+    from engine.correlation import CROSS_STAT_CORRELATIONS as _CROSS_STAT_CORRELATIONS
+except ImportError:
+    _CROSS_STAT_CORRELATIONS = {}
+
 # ─── Page config ────────────────────────────────────────────
 st.set_page_config(
     page_title="Player Simulator — SmartBetPro NBA",
@@ -31,7 +47,7 @@ st.set_page_config(
     layout="wide",
 )
 
-from styles.theme import get_global_css, get_qds_css
+from styles.theme import get_global_css, get_qds_css, get_team_colors
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
@@ -227,6 +243,43 @@ with col_dark_horse:
         help="Scan ALL tonight's players and rank by upside vs season average",
     )
 
+# ── Enhancement 6: Auto-load game logs toggle ──────────────────
+_auto_load_logs = st.checkbox(
+    "⚡ Auto-load game logs on player select",
+    value=False,
+    help="Automatically fetch the last 20 game logs when a player is selected.",
+)
+if "auto_loaded_players" not in st.session_state:
+    st.session_state["auto_loaded_players"] = set()
+
+if _auto_load_logs and selected_names:
+    _players_to_autoload = [
+        n for n in selected_names
+        if n not in st.session_state["auto_loaded_players"]
+    ]
+    if _players_to_autoload:
+        _al_bar = st.progress(0, text="⚡ Auto-loading game logs…")
+        for _al_i, _al_name in enumerate(_players_to_autoload):
+            _al_bar.progress(
+                (_al_i + 1) / len(_players_to_autoload),
+                text=f"⚡ Auto-loading logs for {_al_name}…",
+            )
+            _al_pdata = next(
+                (p for p in tonight_players if p.get("name") == _al_name), None
+            )
+            _al_pid = _al_pdata.get("player_id", "") if _al_pdata else ""
+            if _al_pid:
+                try:
+                    from data.nba_data_service import get_player_game_log as _al_gl_fn
+                    from data.game_log_cache import save_game_logs_to_cache as _al_gl_save
+                    _al_logs = _al_gl_fn(_al_pid, last_n_games=20)
+                    if _al_logs:
+                        _al_gl_save(_al_name, _al_logs)
+                except Exception:
+                    pass
+            st.session_state["auto_loaded_players"].add(_al_name)
+        _al_bar.empty()
+
 # ── Mode toggle ────────────────────────────────────────────────
 _sim_mode = st.radio(
     "Mode",
@@ -245,6 +298,27 @@ if _scenario_mode and selected_names:
             "Override the default game environment for this simulation. "
             "Useful for 'what if' analysis (e.g., if the pace is faster, or a star opponent is out)."
         )
+        # ── Enhancement 9: Scenario presets ──────────────────────────
+        st.markdown("**Quick Presets:**")
+        _preset_cols = st.columns(4)
+        with _preset_cols[0]:
+            if st.button("🏠 Blowout Win", use_container_width=True, key="preset_blowout"):
+                st.session_state["sce_spread"] = -10.0
+                st.session_state["sce_total"] = 230.0
+                st.rerun()
+        with _preset_cols[1]:
+            if st.button("⚔️ Close Game", use_container_width=True, key="preset_close"):
+                st.session_state["sce_spread"] = -1.0
+                st.session_state["sce_total"] = 215.0
+                st.rerun()
+        with _preset_cols[2]:
+            if st.button("😴 Back-to-Back", use_container_width=True, key="preset_b2b"):
+                st.session_state["sce_rest"] = 0
+                st.rerun()
+        with _preset_cols[3]:
+            if st.button("🔥 Pace-Up", use_container_width=True, key="preset_pace"):
+                st.session_state["sce_total"] = 240.0
+                st.rerun()
         _sc1, _sc2, _sc3, _sc4 = st.columns(4)
         with _sc1:
             _sce_total = st.slider("Game O/U Total", 195.0, 260.0, 220.0, 0.5, key="sce_total")
@@ -265,7 +339,7 @@ if _scenario_mode and selected_names:
             f"Rest {_sce_rest}d | Def {_sce_def_adj:+d}%"
         )
 
-_sim_btn_col1, _sim_btn_col2 = st.columns([2, 3])
+_sim_btn_col1, _sim_btn_col2, _sim_btn_col3 = st.columns([2, 2, 1])
 with _sim_btn_col1:
     run_sim = st.button(
         "🚀 Run Simulation",
@@ -280,6 +354,15 @@ with _sim_btn_col2:
         help="Load the last 20 games per player for more accurate simulation",
         disabled=not selected_names,
     )
+with _sim_btn_col3:
+    # Enhancement 7: Clear simulation cache button
+    if st.button("🗑️ Clear Cache", use_container_width=True, help="Clear cached simulation results"):
+        st.session_state.pop("sim_cache", None)
+        st.toast("🗑️ Simulation cache cleared.")
+
+# Enhancement 7: Initialize sim cache
+if "sim_cache" not in st.session_state:
+    st.session_state["sim_cache"] = {}
 
 # ── On-demand API-NBA game log retrieval ──────────────────────
 if _load_logs_btn and selected_names:
@@ -426,6 +509,7 @@ def _simulate_player(player_data: dict, sim_depth: int, todays_games: list,
             "p90": round(p90, 1),
             "season_avg": round(season_avg, 1),
             "upside_ratio": round(upside_ratio, 2),
+            "sim_raw": sim_out.get("simulated_results", []),
         }
     return {
         "player": player_data,
@@ -461,6 +545,7 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
                 live_props_lookup[key] = prop
 
     rec_rows = ""
+    _has_live_props = False
     for stat in _STAT_TYPES:
         s = stats.get(stat, {})
         projected = s.get("projected", 0)
@@ -478,6 +563,7 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
         if live_prop is not None:
             prop_line = float(live_prop.get("line", 0))
             live_platform = live_prop.get("platform", "")
+            _has_live_props = True
         else:
             prop_line = round(season_avg * 2) / 2  # Round to nearest 0.5 (typical book format)
             live_platform = ""
@@ -490,8 +576,20 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
         edge_label = f"{edge_pct:+.1f}%"
         emoji = _STAT_EMOJI.get(stat, "📊")
 
+        # Enhancement 3: Color-coded edge indicator
+        abs_edge = abs(edge_pct)
+        if abs_edge >= 10:
+            edge_bg = "rgba(0,255,157,0.15)"
+            edge_color = "#00ff9d"
+        elif abs_edge >= 5:
+            edge_bg = "rgba(255,215,0,0.15)"
+            edge_color = "#ffd700"
+        else:
+            edge_bg = "rgba(255,107,107,0.10)"
+            edge_color = "#ff6b6b"
+
         # Only show meaningful edges (≥ 3%)
-        if abs(edge_pct) < 3.0:
+        if abs_edge < 3.0:
             continue
 
         upside_tag = ""
@@ -512,7 +610,8 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
             + f'</td>'
             f'<td style="padding:6px 8px;color:{dir_color};font-weight:700;">'
             f'{direction} {upside_tag}</td>'
-            f'<td style="padding:6px 8px;color:{dir_color};">{edge_label}</td>'
+            f'<td style="padding:6px 8px;background:{edge_bg};color:{edge_color};font-weight:700;'
+            f'border-radius:4px;">{edge_label}</td>'
             f'<td style="padding:6px 8px;color:#8a9bb8;font-size:0.8rem;">'
             f'{p10}–{p90}</td>'
             f'</tr>'
@@ -520,6 +619,19 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
 
     if not rec_rows:
         return  # Nothing actionable to show
+
+    # Enhancement 12: Prop line integration indicator badge
+    _prop_badge = (
+        '<div style="margin-bottom:10px;">'
+        '<span style="background:rgba(0,255,157,0.15);color:#00ff9d;padding:4px 10px;'
+        'border-radius:4px;font-size:0.78rem;font-weight:600;">'
+        '✅ Live Props Loaded</span></div>'
+    ) if _has_live_props else (
+        '<div style="margin-bottom:10px;">'
+        '<span style="background:rgba(255,215,0,0.15);color:#ffd700;padding:4px 10px;'
+        'border-radius:4px;font-size:0.78rem;font-weight:600;">'
+        '⚠️ Using Season Avg as Proxy</span></div>'
+    )
 
     # Dark horse explanation block
     dark_horse_explain = ""
@@ -551,6 +663,7 @@ def _render_betting_recommendations(sim_result: dict, is_dark_horse: bool = Fals
     html_out = (
         f'<div style="background:#0f1424;border-radius:8px;padding:16px 18px;'
         f'margin-top:6px;margin-bottom:16px;border-top:2px solid #00ff9d;">'
+        + _prop_badge
         + dark_horse_explain +
         f'<div style="overflow-x:auto;">'
         f'<table style="width:100%;border-collapse:collapse;font-size:0.86rem;">'
@@ -589,6 +702,12 @@ def _render_sim_card(sim_result: dict):
     opponent = ctx.get("opponent", "?")
     player_id = player_data.get("player_id", "")
 
+    # Enhancement 1: Dynamic team colors
+    try:
+        _team_primary, _team_secondary = get_team_colors(team)
+    except Exception:
+        _team_primary, _team_secondary = "#ff5e00", "#ffffff"
+
     # Dark horse check: any stat with upside_ratio ≥ 1.5 (90th pct ≥ 150% of season avg)
     is_dark_horse = any(
         s["upside_ratio"] >= 1.5 for s in stats.values() if s["season_avg"] > 0.5
@@ -597,6 +716,11 @@ def _render_sim_card(sim_result: dict):
     headshot_url = (
         f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
         if player_id else ""
+    )
+    # Enhancement 1: Team logo URL
+    team_logo_url = (
+        f"https://a.espncdn.com/i/teamlogos/nba/500/{team.lower()}.png"
+        if team else ""
     )
     fallback_svg = (
         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
@@ -611,11 +735,36 @@ def _render_sim_card(sim_result: dict):
     safe_team = _html.escape(team)
     safe_opp = _html.escape(opponent)
 
-    dark_horse_badge = (
-        '<span style="background:#ff5e00;color:#0a0f1a;padding:3px 10px;border-radius:4px;'
-        'font-size:0.78rem;font-weight:700;margin-left:8px;">🌑 DARK HORSE</span>'
-        if is_dark_horse else ""
-    )
+    # Enhancement 5: Animated dark horse badge with CSS pulse
+    if is_dark_horse:
+        dark_horse_badge = (
+            '<style>'
+            '@keyframes dark-horse-pulse{0%,100%{box-shadow:0 0 4px #ff5e00}'
+            '50%{box-shadow:0 0 16px #ff5e00,0 0 32px rgba(255,94,0,0.3)}}'
+            '</style>'
+            '<span style="background:#ff5e00;color:#0a0f1a;padding:3px 10px;border-radius:4px;'
+            'font-size:0.78rem;font-weight:700;margin-left:8px;'
+            'animation:dark-horse-pulse 2s ease-in-out infinite;">🌑 DARK HORSE</span>'
+        )
+        # Dark horse corner ribbon
+        dark_horse_ribbon = (
+            '<div style="position:absolute;top:12px;right:-30px;'
+            'background:#ff5e00;color:#0a0f1a;padding:4px 40px;'
+            'font-size:0.7rem;font-weight:700;transform:rotate(45deg);'
+            'box-shadow:0 2px 8px rgba(255,94,0,0.4);z-index:2;">'
+            '🌑 DARK HORSE</div>'
+        )
+    else:
+        dark_horse_badge = ""
+        dark_horse_ribbon = ""
+
+    # Enhancement 1: Team logo HTML
+    team_logo_html = (
+        f'<img src="{team_logo_url}" '
+        f'onerror="this.style.display=\'none\'" '
+        f'style="width:48px;height:48px;object-fit:contain;flex-shrink:0;" '
+        f'alt="{safe_team}">'
+    ) if team_logo_url else ""
 
     # Build stat rows
     stat_rows = ""
@@ -644,15 +793,17 @@ def _render_sim_card(sim_result: dict):
 
     card_html = f"""
 <div style="background:#14192b;border-radius:8px;padding:20px;margin-bottom:20px;
-            border-top:3px solid #ff5e00;">
+            border-top:3px solid {_team_primary};position:relative;overflow:hidden;">
+    {dark_horse_ribbon}
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        {team_logo_html}
         <img src="{img_src}"
              onerror="this.onerror=null;this.src='{fallback_svg}'"
              style="width:64px;height:64px;border-radius:50%;object-fit:cover;
-                    border:2px solid #ff5e00;flex-shrink:0;"
+                    border:2px solid {_team_primary};flex-shrink:0;"
              alt="{safe_name}">
         <div>
-            <div style="font-family:'Orbitron',sans-serif;color:#ff5e00;font-size:1.1rem;font-weight:700;">
+            <div style="font-family:'Orbitron',sans-serif;color:{_team_primary};font-size:1.1rem;font-weight:700;">
                 {safe_name}
                 <span style="font-size:0.8rem;background:rgba(255,255,255,0.1);padding:2px 6px;
                              border-radius:4px;color:white;font-family:inherit;">{safe_team}</span>
@@ -669,8 +820,8 @@ def _render_sim_card(sim_result: dict):
         <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
             <thead>
                 <tr style="border-bottom:1px solid rgba(255,94,0,0.4);">
-                    <th style="padding:6px 8px;text-align:left;color:#ff5e00;">Stat</th>
-                    <th style="padding:6px 8px;text-align:left;color:#ff5e00;">Projected</th>
+                    <th style="padding:6px 8px;text-align:left;color:{_team_primary};">Stat</th>
+                    <th style="padding:6px 8px;text-align:left;color:{_team_primary};">Projected</th>
                     <th style="padding:6px 8px;text-align:left;color:#8a9bb8;">10th%</th>
                     <th style="padding:6px 8px;text-align:left;color:#c0d0e8;">Median</th>
                     <th style="padding:6px 8px;text-align:left;color:#00ff9d;">90th%</th>
@@ -686,6 +837,111 @@ def _render_sim_card(sim_result: dict):
 """
     st.markdown(card_html, unsafe_allow_html=True)
 
+    # Enhancement 13: Stat correlation highlights for high-upside stats
+    if _CROSS_STAT_CORRELATIONS:
+        _corr_notes = []
+        for stat in _STAT_TYPES:
+            s = stats.get(stat, {})
+            if s.get("upside_ratio", 1.0) >= 1.5 and s.get("season_avg", 0) > 0.5:
+                for other_stat in _STAT_TYPES:
+                    if other_stat == stat:
+                        continue
+                    corr = _CROSS_STAT_CORRELATIONS.get(
+                        (stat, other_stat),
+                        _CROSS_STAT_CORRELATIONS.get((other_stat, stat), None),
+                    )
+                    if corr is not None and abs(corr) >= 0.10:
+                        direction_word = "increase" if corr > 0 else "decrease"
+                        _corr_notes.append(
+                            f"📊 When **{stat.title()}** spikes, "
+                            f"**{other_stat.title()}** also tends to {direction_word} "
+                            f"(r={corr:.2f})."
+                        )
+        if _corr_notes:
+            # Deduplicate
+            seen = set()
+            unique_notes = []
+            for note in _corr_notes:
+                if note not in seen:
+                    seen.add(note)
+                    unique_notes.append(note)
+            # Convert markdown-style bold **text** to <strong>text</strong>
+            import re as _re_corr
+            _formatted = []
+            for n in unique_notes[:5]:
+                _safe = _html.escape(n)
+                _safe = _re_corr.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', _safe)
+                _formatted.append(_safe)
+            st.markdown(
+                '<div style="background:rgba(0,255,213,0.06);border-radius:6px;padding:10px 14px;'
+                'margin-bottom:12px;border-left:3px solid #00ffd5;font-size:0.84rem;color:#c0d0e8;">'
+                + "<br>".join(_formatted)
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
+    # Enhancement 2: Plotly interactive charts
+    if _HAS_PLOTLY:
+        try:
+            # Projected vs Season Avg bar chart
+            _chart_stats = [s for s in _STAT_TYPES if stats.get(s, {}).get("season_avg", 0) > 0.3]
+            _chart_labels = [s.title() for s in _chart_stats]
+            _chart_proj = [stats[s]["projected"] for s in _chart_stats]
+            _chart_avg = [stats[s]["season_avg"] for s in _chart_stats]
+
+            fig_bar = _go.Figure()
+            fig_bar.add_trace(_go.Bar(
+                name="Projected", x=_chart_labels, y=_chart_proj,
+                marker_color=_team_primary, text=_chart_proj, textposition="auto",
+            ))
+            fig_bar.add_trace(_go.Bar(
+                name="Season Avg", x=_chart_labels, y=_chart_avg,
+                marker_color="rgba(138,155,184,0.6)", text=_chart_avg, textposition="auto",
+            ))
+            fig_bar.update_layout(
+                barmode="group",
+                title=dict(text=f"{safe_name} — Projected vs Season Avg", font=dict(color="#c0d0e8")),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(20,25,43,0.8)",
+                font=dict(color="#c0d0e8"),
+                legend=dict(font=dict(color="#c0d0e8")),
+                margin=dict(l=40, r=20, t=40, b=30),
+                height=300,
+            )
+            st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_{player_id}_{id(sim_result)}")
+
+            # Distribution histograms per stat (using raw sim data)
+            _hist_stats = [
+                s for s in _chart_stats
+                if stats.get(s, {}).get("sim_raw") and len(stats[s]["sim_raw"]) > 10
+            ]
+            if _hist_stats:
+                fig_hist = _go.Figure()
+                _colors = ["#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b", "#8a9bb8", "#c0d0e8"]
+                for i, stat in enumerate(_hist_stats):
+                    fig_hist.add_trace(_go.Histogram(
+                        x=stats[stat]["sim_raw"],
+                        name=stat.title(),
+                        opacity=0.65,
+                        marker_color=_colors[i % len(_colors)],
+                        nbinsx=25,
+                    ))
+                fig_hist.update_layout(
+                    barmode="overlay",
+                    title=dict(text=f"{safe_name} — Simulation Distributions", font=dict(color="#c0d0e8")),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(20,25,43,0.8)",
+                    font=dict(color="#c0d0e8"),
+                    legend=dict(font=dict(color="#c0d0e8")),
+                    margin=dict(l=40, r=20, t=40, b=30),
+                    height=350,
+                    xaxis_title="Stat Value",
+                    yaxis_title="Frequency",
+                )
+                st.plotly_chart(fig_hist, use_container_width=True, key=f"hist_{player_id}_{id(sim_result)}")
+        except Exception as _plot_err:
+            _logger.debug("Plotly chart rendering failed: %s", _plot_err)
+
 
 # ─── Run simulation for selected players ────────────────────
 if run_sim and selected_names:
@@ -693,23 +949,75 @@ if run_sim and selected_names:
     st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
 
     try:
-        with st.spinner("🔮 Running Quantum Matrix Engine 5.6 simulations…"):
-            _all_sim_results = []
-            for pname in selected_names:
-                pdata = next((p for p in tonight_players if p.get("name") == pname), None)
-                if pdata is None:
-                    st.warning(f"⚠️ Could not find data for **{pname}**.")
-                    continue
-                sim_result = _simulate_player(
-                    pdata, sim_depth, todays_games,
-                    scenario_overrides=_scenario_overrides if _scenario_mode else None,
+        # Enhancement 4: Animated progress bar per player + per stat
+        _all_sim_results = []
+        _total_work = len(selected_names) * len(_STAT_TYPES)
+        _work_done = 0
+        _progress_bar = st.progress(0, text="🏀 Initializing simulation…")
+
+        for _p_idx, pname in enumerate(selected_names):
+            pdata = next((p for p in tonight_players if p.get("name") == pname), None)
+            if pdata is None:
+                st.warning(f"⚠️ Could not find data for **{pname}**.")
+                _work_done += len(_STAT_TYPES)
+                continue
+
+            # Enhancement 7: Check cache before simulating
+            _player_id_for_cache = pdata.get("player_id", pname)
+            _scenario_hash = _hashlib.md5(
+                str(sorted((_scenario_overrides or {}).items())).encode()
+            ).hexdigest()[:8] if _scenario_mode else "std"
+            _cache_key = (_player_id_for_cache, sim_depth, _scenario_hash)
+
+            if _cache_key in st.session_state.get("sim_cache", {}):
+                _all_sim_results.append(st.session_state["sim_cache"][_cache_key])
+                _work_done += len(_STAT_TYPES)
+                _progress_bar.progress(
+                    min(_work_done / max(_total_work, 1), 1.0),
+                    text=f"🏀 {pname} — loaded from cache",
                 )
-                _all_sim_results.append(sim_result)
+                continue
+
+            # Update progress per stat during simulation
+            for _s_idx, _sname in enumerate(_STAT_TYPES):
+                _work_done += 1
+                _progress_bar.progress(
+                    min(_work_done / max(_total_work, 1), 1.0),
+                    text=f"🏀 Simulating {pname} — {_sname} ({_s_idx + 1}/{len(_STAT_TYPES)} stats)…",
+                )
+
+            sim_result = _simulate_player(
+                pdata, sim_depth, todays_games,
+                scenario_overrides=_scenario_overrides if _scenario_mode else None,
+            )
+            _all_sim_results.append(sim_result)
+
+            # Enhancement 7: Store in cache
+            st.session_state.setdefault("sim_cache", {})[_cache_key] = sim_result
+
+        _progress_bar.empty()
+
     except Exception as _sim_err:
         _sim_err_str = str(_sim_err)
         if "WebSocketClosedError" not in _sim_err_str and "StreamClosedError" not in _sim_err_str:
             st.error(f"❌ Simulation failed: {_sim_err}")
         _all_sim_results = []
+
+    # Enhancement 11: Save to session history
+    if _all_sim_results:
+        if "sim_history" not in st.session_state:
+            st.session_state["sim_history"] = []
+        for _sr in _all_sim_results:
+            st.session_state["sim_history"].append({
+                "timestamp": _datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "player": _sr["player"].get("name", ""),
+                "team": _sr["player"].get("team", ""),
+                "mode": "Scenario" if _scenario_mode else ("Compare" if _compare_mode else "Standard"),
+                "stats_summary": {
+                    s: {"proj": v.get("projected", 0), "avg": v.get("season_avg", 0)}
+                    for s, v in _sr["stats"].items()
+                },
+            })
 
     if _compare_mode and len(_all_sim_results) >= 2:
         # ── Compare Mode: side-by-side table for all selected players ──
@@ -727,6 +1035,55 @@ if run_sim and selected_names:
             _cmp_rows.append(_row)
         st.dataframe(_cmp_rows, width="stretch", hide_index=True)
         st.caption("Format: Projected (10th pct – 90th pct)")
+
+        # Enhancement 10: Plotly radar/spider chart for compare mode
+        if _HAS_PLOTLY:
+            try:
+                _radar_stats = [s for s in _STAT_TYPES if any(
+                    r["stats"].get(s, {}).get("projected", 0) > 0.3 for r in _all_sim_results
+                )]
+                _radar_labels = [s.title() for s in _radar_stats]
+                # Compute max per stat for normalization
+                _radar_maxes = []
+                for s in _radar_stats:
+                    _mx = max(r["stats"].get(s, {}).get("projected", 0) for r in _all_sim_results)
+                    _radar_maxes.append(_mx if _mx > 0 else 1.0)
+
+                _radar_colors = ["#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b",
+                                 "#8a9bb8", "#c0d0e8", "#e066ff", "#66ccff", "#ff9966"]
+                fig_radar = _go.Figure()
+                for _ri, _r in enumerate(_all_sim_results):
+                    _r_vals = [
+                        _r["stats"].get(s, {}).get("projected", 0) / _radar_maxes[j]
+                        for j, s in enumerate(_radar_stats)
+                    ]
+                    # Close the polygon
+                    _r_vals_closed = _r_vals + [_r_vals[0]] if _r_vals else _r_vals
+                    _labels_closed = _radar_labels + [_radar_labels[0]] if _radar_labels else _radar_labels
+                    fig_radar.add_trace(_go.Scatterpolar(
+                        r=_r_vals_closed,
+                        theta=_labels_closed,
+                        fill="toself",
+                        name=_r["player"].get("name", ""),
+                        opacity=0.6,
+                        line=dict(color=_radar_colors[_ri % len(_radar_colors)]),
+                    ))
+                fig_radar.update_layout(
+                    polar=dict(
+                        bgcolor="rgba(20,25,43,0.8)",
+                        radialaxis=dict(visible=True, range=[0, 1.1], color="#8a9bb8"),
+                        angularaxis=dict(color="#c0d0e8"),
+                    ),
+                    title=dict(text="Player Comparison — Normalized Projections", font=dict(color="#c0d0e8")),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    font=dict(color="#c0d0e8"),
+                    legend=dict(font=dict(color="#c0d0e8")),
+                    margin=dict(l=60, r=60, t=50, b=30),
+                    height=420,
+                )
+                st.plotly_chart(fig_radar, use_container_width=True, key="compare_radar")
+            except Exception as _radar_err:
+                _logger.debug("Radar chart error: %s", _radar_err)
 
         # Also render individual cards
         for sim_result in _all_sim_results:
@@ -877,6 +1234,63 @@ if run_sim and selected_names:
                     f"ℹ️ No recent game log stored for {_pname_log}. "
                     "Scenario simulation uses season averages + your overrides."
                 )
+
+    # Enhancement 8: Export simulation results as CSV
+    if _all_sim_results:
+        try:
+            _csv_buf = _io.StringIO()
+            _writer = _csv.writer(_csv_buf)
+            _writer.writerow([
+                "Player", "Team", "Opponent", "Home/Away", "Game Total",
+                "Stat", "Projected", "10th Pct", "Median", "90th Pct", "Season Avg", "Upside Ratio",
+            ])
+            for _sr in _all_sim_results:
+                _p = _sr["player"]
+                _c = _sr["context"]
+                for _stat_name in _STAT_TYPES:
+                    _sv = _sr["stats"].get(_stat_name, {})
+                    _writer.writerow([
+                        _p.get("name", ""), _p.get("team", ""),
+                        _c.get("opponent", ""), "Home" if _c.get("is_home") else "Away",
+                        _c.get("game_total", 220),
+                        _stat_name.title(), _sv.get("projected", 0),
+                        _sv.get("p10", 0), _sv.get("p50", 0), _sv.get("p90", 0),
+                        _sv.get("season_avg", 0), _sv.get("upside_ratio", 1.0),
+                    ])
+            st.download_button(
+                label="📥 Download Report (CSV)",
+                data=_csv_buf.getvalue(),
+                file_name=f"simulation_report_{_datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        except Exception as _csv_err:
+            _logger.debug("CSV export failed: %s", _csv_err)
+
+# ─── Enhancement 11: Historical Accuracy / Session Simulation History ───
+if st.session_state.get("sim_history"):
+    with st.expander("📜 Session Simulation History", expanded=False):
+        st.markdown(
+            '<div style="color:#8a9bb8;font-size:0.82rem;margin-bottom:8px;">'
+            'All simulations run during this session. '
+            'Historical accuracy tracking will compare past projections to actual results '
+            'once game outcomes are available.</div>',
+            unsafe_allow_html=True,
+        )
+        _hist_display = []
+        for _h in st.session_state["sim_history"][-30:]:
+            _summary_parts = []
+            for _sn, _sd in _h.get("stats_summary", {}).items():
+                if _sd.get("avg", 0) > 0.3:
+                    _summary_parts.append(f'{_sn.title()}: {_sd["proj"]}')
+            _hist_display.append({
+                "Time": _h.get("timestamp", ""),
+                "Player": _h.get("player", ""),
+                "Team": _h.get("team", ""),
+                "Mode": _h.get("mode", ""),
+                "Key Projections": ", ".join(_summary_parts[:4]),
+            })
+        st.dataframe(list(reversed(_hist_display)), hide_index=True, use_container_width=True)
 
 
 # ─── Dark Horse Finder ───────────────────────────────────────
