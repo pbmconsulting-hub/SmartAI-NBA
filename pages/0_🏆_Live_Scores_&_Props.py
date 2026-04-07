@@ -9,6 +9,7 @@ import streamlit as st
 import datetime
 import os
 import time
+import html as _html_mod
 
 from styles.theme import get_global_css, get_qds_css
 
@@ -93,11 +94,114 @@ with col_interval:
 
 def _get_live_scores():
     """
-    Attempt to retrieve live/today's game scores.
+    Retrieve live/today's game scores from multiple sources.
+
+    Priority order:
+    1. nba_api live ScoreBoard (real-time box scores)
+    2. nba_api ScoreboardV2 (today's scoreboard with line scores)
+    3. Session state todays_games (loaded by Auto-Load)
 
     Returns:
-        list of dict: Game score data, or empty list on failure.
+        list of dict: Game score data with keys:
+            home_team, away_team, home_score, away_score,
+            status, clock, period, game_id
     """
+    # Source 1: Live box scores from nba_api live endpoints
+    try:
+        from data.live_game_tracker import get_live_boxscores
+        live = get_live_boxscores()
+        if live:
+            games = []
+            for g in live:
+                games.append({
+                    "game_id": g.get("game_id", ""),
+                    "home_team": g.get("home_team", ""),
+                    "away_team": g.get("away_team", ""),
+                    "home_score": int(g.get("home_score", 0) or 0),
+                    "away_score": int(g.get("away_score", 0) or 0),
+                    "status": g.get("status", ""),
+                    "clock": g.get("game_clock", ""),
+                    "period": g.get("period", ""),
+                })
+            if games:
+                return games
+    except Exception as _exc:
+        _logger.debug("Live box scores unavailable: %s", _exc)
+
+    # Source 2: ScoreboardV2 via nba_data_service
+    try:
+        from data.nba_data_service import get_todays_scoreboard
+        sb = get_todays_scoreboard()
+        if sb:
+            game_headers = sb.get("game_header", [])
+            line_scores = sb.get("line_score", [])
+
+            # Build a team→score lookup from line_scores
+            score_map = {}
+            for ls in line_scores:
+                gid = ls.get("GAME_ID", "")
+                tid = ls.get("TEAM_ID", "")
+                abbr = ls.get("TEAM_ABBREVIATION", "")
+                pts = ls.get("PTS")
+                if gid and abbr:
+                    score_map[(gid, abbr)] = int(pts) if pts is not None else 0
+
+            games = []
+            for gh in game_headers:
+                gid = gh.get("GAME_ID", "")
+                home_abbr = gh.get("HOME_TEAM_ABBREVIATION",
+                                   gh.get("GAMECODE", "")[-3:] if gh.get("GAMECODE") else "")
+                away_abbr = gh.get("VISITOR_TEAM_ABBREVIATION",
+                                   gh.get("GAMECODE", "")[:3] if gh.get("GAMECODE") else "")
+
+                # Try to extract abbreviations from line_scores if missing
+                if not home_abbr or not away_abbr:
+                    home_tid = gh.get("HOME_TEAM_ID", "")
+                    vis_tid = gh.get("VISITOR_TEAM_ID", "")
+                    for ls in line_scores:
+                        if ls.get("GAME_ID") == gid:
+                            if str(ls.get("TEAM_ID")) == str(home_tid):
+                                home_abbr = ls.get("TEAM_ABBREVIATION", home_abbr)
+                            elif str(ls.get("TEAM_ID")) == str(vis_tid):
+                                away_abbr = ls.get("TEAM_ABBREVIATION", away_abbr)
+
+                h_pts = score_map.get((gid, home_abbr), 0)
+                a_pts = score_map.get((gid, away_abbr), 0)
+
+                status_text = gh.get("GAME_STATUS_TEXT", "")
+
+                games.append({
+                    "game_id": gid,
+                    "home_team": home_abbr,
+                    "away_team": away_abbr,
+                    "home_score": h_pts,
+                    "away_score": a_pts,
+                    "status": status_text.strip(),
+                    "clock": "",
+                    "period": "",
+                })
+            if games:
+                return games
+    except Exception as _exc:
+        _logger.debug("ScoreboardV2 unavailable: %s", _exc)
+
+    # Source 3: Session state (from Auto-Load)
+    _session_games = st.session_state.get("todays_games", [])
+    if _session_games:
+        games = []
+        for g in _session_games:
+            games.append({
+                "game_id": g.get("game_id", ""),
+                "home_team": g.get("home_team", ""),
+                "away_team": g.get("away_team", ""),
+                "home_score": 0,
+                "away_score": 0,
+                "status": g.get("game_time_et", "Scheduled"),
+                "clock": "",
+                "period": "",
+            })
+        return games
+
     return []
 
 
@@ -116,6 +220,90 @@ with st.spinner("🏆 Loading live scores..."):
 
 # ============================================================
 # END SECTION: Load Live Scoreboard
+# ============================================================
+
+
+# ============================================================
+# SECTION: ESPN-Style Scrolling Score Ticker
+# ============================================================
+
+if live_games:
+    # Build ticker cards for each game
+    _ticker_cards = []
+    for _tg in live_games:
+        _t_away = _html_mod.escape(str(_tg.get("away_team", "?")))
+        _t_home = _html_mod.escape(str(_tg.get("home_team", "?")))
+        _t_a_pts = int(_tg.get("away_score", 0) or 0)
+        _t_h_pts = int(_tg.get("home_score", 0) or 0)
+        _t_status = _html_mod.escape(str(_tg.get("status", "")))
+        _t_badge = _status_badge(_tg.get("status", ""))
+
+        _a_clr = "#00ff9d" if _t_a_pts > _t_h_pts else "#c0d0e8"
+        _h_clr = "#00ff9d" if _t_h_pts > _t_a_pts else "#c0d0e8"
+        _border_clr = "rgba(255,94,0,0.5)" if "LIVE" in _t_badge else "rgba(0,240,255,0.18)"
+
+        _ticker_cards.append(
+            f'<div class="ticker-card" style="border-color:{_border_clr};">'
+            f'<div class="ticker-status">{_t_badge}</div>'
+            f'<div class="ticker-teams">'
+            f'<div class="ticker-row">'
+            f'<span class="ticker-abbr">{_t_away}</span>'
+            f'<span class="ticker-score" style="color:{_a_clr};">{_t_a_pts}</span></div>'
+            f'<div class="ticker-row">'
+            f'<span class="ticker-abbr">{_t_home}</span>'
+            f'<span class="ticker-score" style="color:{_h_clr};">{_t_h_pts}</span></div>'
+            f'</div></div>'
+        )
+
+    _ticker_css = """
+    <style>
+    .score-ticker-wrap {
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 8px 0 12px 0;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0,240,255,0.3) transparent;
+        -webkit-overflow-scrolling: touch;
+    }
+    .score-ticker-wrap::-webkit-scrollbar { height: 4px; }
+    .score-ticker-wrap::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.3); border-radius: 4px; }
+    .ticker-card {
+        display: inline-block;
+        vertical-align: top;
+        background: rgba(13,18,40,0.95);
+        border: 1px solid rgba(0,240,255,0.18);
+        border-radius: 10px;
+        padding: 10px 16px;
+        margin-right: 10px;
+        min-width: 140px;
+        text-align: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .ticker-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,240,255,0.2);
+    }
+    .ticker-status { font-size: 0.7rem; color: #8a9bb8; margin-bottom: 4px; }
+    .ticker-teams { text-align: left; }
+    .ticker-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 2px 0;
+    }
+    .ticker-abbr { color: #c0d0e8; font-weight: 700; font-size: 0.9rem; }
+    .ticker-score { font-weight: 900; font-size: 1.1rem; min-width: 30px; text-align: right; }
+    </style>
+    """
+
+    st.markdown(_ticker_css, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="score-ticker-wrap">' + ''.join(_ticker_cards) + '</div>',
+        unsafe_allow_html=True,
+    )
+
+# ============================================================
+# END SECTION: ESPN-Style Scrolling Score Ticker
 # ============================================================
 
 
