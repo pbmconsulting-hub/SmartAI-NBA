@@ -377,12 +377,11 @@ SmartAI-NBA/
 ├── README.md                           # This file
 │
 ├── pages/
-│   ├── 0_🏆_Live_Scores_&_Props.py    # Real-time NBA scores & stat leaders
+│   ├── 0_💦_Live_Sweat.py              # Live AI Panic Room — in-game tracking
 │   ├── 1_📡_Live_Games.py             # Tonight's games + one-click setup
 │   ├── 2_🔬_Prop_Scanner.py           # Enter/upload/fetch prop lines
 │   ├── 3_⚡_Quantum_Analysis_Matrix.py # Run Neural Analysis — main engine
 │   ├── 4_📋_Game_Report.py            # AI-powered game reports (SAFE Score™)
-│   ├── 5_💦_Live_Sweat.py             # Live AI Panic Room — in-game tracking
 │   ├── 5b_🔮_Player_Simulator.py      # What-if player scenario simulator
 │   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
 │   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
@@ -525,8 +524,10 @@ SmartAI-NBA/
 The dashboard. Shows tonight's slate, quick-start workflow guide, status
 dashboard, and links to all pages.
 
-### 🏆 Page 0: Live Scores & Props
-Real-time NBA scores and season stat leaders, updated automatically.
+### 💦 Page 0: Live Sweat
+The Live AI Panic Room — track your active bets in real-time during games.
+Features pace tracking, Joseph M. Smith live commentary, and sweat cards
+that show whether your bets are on track to cash.
 
 ### 📡 Page 1: Live Games
 Load tonight's matchups, fetch rosters and stats from API-NBA API,
@@ -555,11 +556,6 @@ The main engine. Click **Run Analysis** to simulate each prop. For every prop yo
 ### 📋 Page 4: Game Report
 AI-powered game reports with SAFE Score™ analysis, collapsible sections,
 confidence bars, and entry strategy matrix.
-
-### 💦 Page 5: Live Sweat
-The Live AI Panic Room — track your active bets in real-time during games.
-Features pace tracking, Joseph M. Smith live commentary, and sweat cards
-that show whether your bets are on track to cash.
 
 ### 🔮 Page 5b: Player Simulator
 What-if scenario simulator. Adjust minutes, pace, matchup factors and see

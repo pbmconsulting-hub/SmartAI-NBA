@@ -396,7 +396,7 @@ class TestAmbientPools(unittest.TestCase):
     def test_has_all_page_contexts(self):
         """Each page should have a dedicated ambient pool."""
         page_keys = {
-            "page_home", "page_live_scores", "page_live_games",
+            "page_home", "page_live_games",
             "page_prop_scanner", "page_analysis", "page_game_report",
             "page_live_sweat", "page_simulator", "page_entry_builder",
             "page_studio", "page_risk_shield", "page_data_feed",
@@ -406,8 +406,8 @@ class TestAmbientPools(unittest.TestCase):
         self.assertTrue(page_keys.issubset(set(self.pool.keys())))
 
     def test_total_pool_count(self):
-        """AMBIENT_POOLS should have 24 pools (6 original + 18 page)."""
-        self.assertEqual(len(self.pool), 24)
+        """AMBIENT_POOLS should have 23 pools (6 original + 17 page)."""
+        self.assertEqual(len(self.pool), 23)
 
     def test_each_context_has_15_lines(self):
         for key, lines in self.pool.items():
@@ -908,10 +908,10 @@ class TestJosephGetAmbientContextImplementation(unittest.TestCase):
         self.assertEqual(kwargs, {})
 
     def test_page_context_all_pages(self):
-        """All 18 page context keys should be recognized."""
+        """All 17 page context keys should be recognized."""
         from engine.joseph_brain import joseph_get_ambient_context
         page_keys = [
-            "page_home", "page_live_scores", "page_live_games",
+            "page_home", "page_live_games",
             "page_prop_scanner", "page_analysis", "page_game_report",
             "page_live_sweat", "page_simulator", "page_entry_builder",
             "page_studio", "page_risk_shield", "page_data_feed",
