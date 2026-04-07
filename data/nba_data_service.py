@@ -360,15 +360,42 @@ def get_all_todays_data(progress_callback=None):
 
 def get_active_rosters(team_abbrevs=None, progress_callback=None):
     """Retrieve active rosters (DB-first, live API fallback)."""
+    def _normalize_roster_player(player):
+        """Normalize a DB roster entry to the live API shape: a player name string."""
+        if isinstance(player, str):
+            return player.strip()
+        if isinstance(player, dict):
+            first = str(player.get("first_name") or player.get("firstname") or "").strip()
+            last = str(player.get("last_name") or player.get("lastname") or "").strip()
+            full_name = f"{first} {last}".strip()
+            if full_name:
+                return full_name
+
+            for key in ("full_name", "name", "player_name"):
+                value = player.get(key)
+                if value:
+                    return str(value).strip()
+        return str(player).strip()
+
     # 1. Try ETL database first
     if _is_db_available() and team_abbrevs:
         try:
             from data.etl_data_service import get_rosters_for_teams as _db_get_rosters
             db_rosters = _db_get_rosters(list(team_abbrevs))
             if db_rosters:
+                normalized_rosters = {
+                    team: [
+                        normalized_name
+                        for normalized_name in (
+                            _normalize_roster_player(player) for player in players or []
+                        )
+                        if normalized_name
+                    ]
+                    for team, players in db_rosters.items()
+                }
                 _logger.info("get_active_rosters: loaded rosters for %d teams from ETL DB",
-                             len(db_rosters))
-                return db_rosters
+                             len(normalized_rosters))
+                return normalized_rosters
         except Exception as exc:
             _logger.debug("get_active_rosters: DB read failed (%s), falling back to API", exc)
 
