@@ -963,12 +963,17 @@ def resolve_entry_from_legs(entry_id):
 
     # If all legs have results and none are LOSS
     if all(r in ("WIN", "PUSH") for r in results):
-        # All WIN (or PUSH): entry is WIN
         if all(r == "WIN" for r in results):
+            # All legs won — entry is a WIN
             update_entry_result(entry_id, "WIN")
             return "WIN"
-        # Mix of WIN and PUSH
-        update_entry_result(entry_id, "PUSH")
+        if all(r == "PUSH" for r in results):
+            # All legs pushed — entry is a full PUSH (fee returned)
+            update_entry_result(entry_id, "PUSH", payout=0.0)
+            return "PUSH"
+        # Mix of WIN and PUSH — standard rule: pushed legs are removed,
+        # payout adjusts to lower leg count. Mark as PUSH for manual review.
+        update_entry_result(entry_id, "PUSH", payout=0.0)
         return "PUSH"
 
     # Some legs still pending

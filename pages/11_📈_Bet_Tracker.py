@@ -373,6 +373,11 @@ st.divider()
 # Shared result emoji map
 _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄", None: "⏳", "": "⏳"}
 
+# DFS payout ratio (standard: $0.909 profit per $1 risked on a winning bet)
+_DFS_PAYOUT_RATIO = 0.909
+# Win rate required to break even at this payout ratio: 1 / (1 + 0.909) ≈ 52.38%
+_BREAKEVEN_WIN_RATE = 52.38
+
 # ============================================================
 # SECTION: Model Health Tab
 # ============================================================
@@ -2518,7 +2523,7 @@ with tab_history:
 
     if len(_resolved_bets) >= 3:
         with st.expander("📈 Cumulative P&L Curve (resolved bets)", expanded=True):
-            _HIST_PAYOUT = 0.909
+            _HIST_PAYOUT = _DFS_PAYOUT_RATIO
             _cum_pnl = 0.0
             _total_dollar_pnl = 0.0  # B9: actual dollar P&L
             _pnl_vals = []
@@ -2551,7 +2556,7 @@ with tab_history:
             _roi_cols = st.columns(5)
             _roi_cols[0].metric("Resolved Bets", len(_resolved_bets))
             _roi_cols[1].metric("Win Rate", f"{_wr_total:.1f}%",
-                                delta=f"{_wr_total - 52.38:+.1f}% vs breakeven")
+                                delta=f"{_wr_total - _BREAKEVEN_WIN_RATE:+.1f}% vs breakeven")
             _roi_cols[2].metric("Unit P&L", f"{_cum_pnl:+.2f}u")
             if _total_dollar_pnl != 0:
                 _roi_cols[3].metric("Dollar P&L", f"${_total_dollar_pnl:+.2f}",
