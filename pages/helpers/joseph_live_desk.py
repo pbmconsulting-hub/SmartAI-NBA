@@ -468,6 +468,289 @@ def _build_nerd_stats_html(result: dict) -> str:
 
 
 # ═════════════════════════════════════════════════════════════
+# render_nerd_stats — unified nerd stats expander helper
+# ═════════════════════════════════════════════════════════════
+
+def render_nerd_stats(result: dict, keys: list = None) -> str:
+    """Return HTML for a nerd-stats block.
+
+    Consolidates the three different Nerd Stats expander patterns used
+    across The Studio page into a single helper.
+
+    Parameters
+    ----------
+    result : dict
+        Analysis result dictionary (from joseph_full_analysis, etc.).
+    keys : list, optional
+        Specific keys to display.  When *None*, delegates to the full
+        ``_build_nerd_stats_html`` implementation which uses the
+        standard key list.
+    """
+    if keys is None:
+        return _build_nerd_stats_html(result)
+
+    parts = []
+    for key in keys:
+        val = result.get(key)
+        if val is not None:
+            parts.append(
+                f"<strong>{_html.escape(str(key))}:</strong> "
+                f"{_html.escape(str(val))}"
+            )
+    if not parts:
+        return ""
+    return '<div class="joseph-nerd-stats">' + "<br>".join(parts) + "</div>"
+
+
+# ═════════════════════════════════════════════════════════════
+# render_avatar_commentary — avatar + commentary HTML block
+# ═════════════════════════════════════════════════════════════
+
+def render_avatar_commentary(commentary_text: str, size: int = 48) -> str:
+    """Return HTML for the Joseph avatar + commentary bubble.
+
+    Replaces the repeated avatar-plus-text blocks scattered across
+    The Studio page with a single reusable helper.
+
+    Parameters
+    ----------
+    commentary_text : str
+        Markdown/plain-text commentary to display.
+    size : int
+        Avatar diameter in pixels (default 48 — uses ``joseph-avatar-sm``
+        CSS class when ≤48, otherwise ``joseph-avatar``).
+    """
+    avatar_b64 = get_joseph_avatar_b64()
+    css_class = "joseph-avatar-sm" if size <= 48 else "joseph-avatar"
+    if avatar_b64:
+        img_html = (
+            f'<img src="data:image/png;base64,{avatar_b64}" '
+            f'class="{css_class}" alt="Joseph M. Smith" '
+            f'style="width:{size}px;height:{size}px">'
+        )
+    else:
+        img_html = (
+            f'<div class="{css_class}" style="width:{size}px;height:{size}px;'
+            f'background:#1e293b;display:flex;align-items:center;'
+            f'justify-content:center;font-size:1rem">🎙️</div>'
+        )
+    escaped = _html.escape(str(commentary_text))
+    return (
+        f'<div style="display:flex;align-items:flex-start;gap:12px;'
+        f'margin:10px 0">'
+        f'{img_html}'
+        f'<div style="color:#e2e8f0;font-size:0.95rem;line-height:1.5;'
+        f'font-family:\'Montserrat\',sans-serif">{escaped}</div>'
+        f'</div>'
+    )
+
+
+# ═════════════════════════════════════════════════════════════
+# render_confidence_gauge_svg — inline SVG confidence donut
+# ═════════════════════════════════════════════════════════════
+
+def render_confidence_gauge_svg(
+    probability: float, ev: float = 0.0, synergy: float = 0.0
+) -> str:
+    """Return inline SVG HTML for a confidence gauge donut chart.
+
+    The donut shows *probability* as a percentage fill with color
+    coding: green (>60 %), orange (40-60 %), red (<40 %).  Small EV
+    and synergy bars are rendered below the donut.
+
+    Parameters
+    ----------
+    probability : float
+        Probability value in the range 0-100.
+    ev : float
+        Expected-value metric (arbitrary scale; clamped to 0-100 for bar).
+    synergy : float
+        Synergy/correlation score (0-100 range).
+    """
+    prob = max(0.0, min(100.0, float(probability)))
+    ev_pct = max(0.0, min(100.0, float(ev)))
+    syn_pct = max(0.0, min(100.0, float(synergy)))
+
+    if prob > 60:
+        color = "#22c55e"
+    elif prob >= 40:
+        color = "#f59e0b"
+    else:
+        color = "#ef4444"
+
+    # Donut parameters (SVG circle math)
+    radius = 36
+    circumference = 2 * 3.14159265 * radius
+    dash = circumference * prob / 100.0
+    gap = circumference - dash
+
+    return (
+        f'<div style="text-align:center">'
+        # ── Donut ──
+        f'<svg width="90" height="90" viewBox="0 0 90 90">'
+        f'<circle cx="45" cy="45" r="{radius}" fill="none" '
+        f'stroke="#1e293b" stroke-width="8"/>'
+        f'<circle cx="45" cy="45" r="{radius}" fill="none" '
+        f'stroke="{color}" stroke-width="8" '
+        f'stroke-dasharray="{dash:.1f} {gap:.1f}" '
+        f'stroke-linecap="round" '
+        f'transform="rotate(-90 45 45)"/>'
+        f'<text x="45" y="49" text-anchor="middle" '
+        f'fill="{color}" font-size="14" font-weight="700" '
+        f'font-family="Orbitron,sans-serif">{prob:.0f}%</text>'
+        f'</svg>'
+        # ── EV bar ──
+        f'<div style="margin:4px auto;width:80px;text-align:left">'
+        f'<div style="font-size:0.65rem;color:#94a3b8;margin-bottom:2px">'
+        f'EV</div>'
+        f'<div style="height:4px;background:#1e293b;border-radius:2px">'
+        f'<div style="height:4px;width:{ev_pct:.0f}%;background:#38bdf8;'
+        f'border-radius:2px"></div></div></div>'
+        # ── Synergy bar ──
+        f'<div style="margin:4px auto;width:80px;text-align:left">'
+        f'<div style="font-size:0.65rem;color:#94a3b8;margin-bottom:2px">'
+        f'SYN</div>'
+        f'<div style="height:4px;background:#1e293b;border-radius:2px">'
+        f'<div style="height:4px;width:{syn_pct:.0f}%;background:#a78bfa;'
+        f'border-radius:2px"></div></div></div>'
+        f'</div>'
+    )
+
+
+# ═════════════════════════════════════════════════════════════
+# render_outcome_badge — color-coded outcome label
+# ═════════════════════════════════════════════════════════════
+
+def render_outcome_badge(result_str: str) -> str:
+    """Return HTML for a color-coded outcome badge.
+
+    Mapping:
+    * ``"win"``  → green ✅
+    * ``"loss"`` → red ❌
+    * ``"pending"`` / ``"push"`` → yellow ⏳
+    """
+    label = str(result_str).strip().lower()
+    if label == "win":
+        bg, text_color, icon = "#064e3b", "#34d399", "✅"
+    elif label == "loss":
+        bg, text_color, icon = "#7f1d1d", "#fca5a5", "❌"
+    else:
+        bg, text_color, icon = "#713f12", "#fde68a", "⏳"
+
+    display = _html.escape(str(result_str).strip().upper() or "PENDING")
+    return (
+        f'<span style="display:inline-block;padding:2px 10px;'
+        f'border-radius:8px;font-size:0.78rem;font-weight:700;'
+        f'font-family:\'Orbitron\',sans-serif;letter-spacing:0.5px;'
+        f'background:{bg};color:{text_color}">'
+        f'{icon} {display}</span>'
+    )
+
+
+# ═════════════════════════════════════════════════════════════
+# render_empty_state — styled empty-state card with CTA
+# ═════════════════════════════════════════════════════════════
+
+def render_empty_state(
+    message: str, cta_text: str = None, cta_page: str = None
+) -> str:
+    """Return styled empty-state card HTML.
+
+    Provides a visually consistent "nothing here yet" block that uses
+    studio theme colors, optionally including a call-to-action button.
+
+    Parameters
+    ----------
+    message : str
+        Primary message to display.
+    cta_text : str, optional
+        Label for an optional CTA button.
+    cta_page : str, optional
+        Target page/URL for the CTA link.
+    """
+    escaped_msg = _html.escape(str(message))
+    cta_html = ""
+    if cta_text and cta_page:
+        esc_label = _html.escape(str(cta_text))
+        esc_href = _html.escape(str(cta_page))
+        cta_html = (
+            f'<a href="{esc_href}" style="display:inline-block;margin-top:12px;'
+            f'padding:8px 20px;border-radius:8px;font-size:0.85rem;'
+            f'font-weight:700;font-family:\'Orbitron\',sans-serif;'
+            f'background:linear-gradient(135deg,#ff5e00,#ff9e00);color:#0a0f1c;'
+            f'text-decoration:none;letter-spacing:0.5px">{esc_label}</a>'
+        )
+    return (
+        f'<div style="text-align:center;padding:32px 24px;'
+        f'background:rgba(7,10,19,0.7);border:1px dashed rgba(255,94,0,0.3);'
+        f'border-radius:12px;margin:16px 0">'
+        f'<div style="font-size:2rem;margin-bottom:8px">📭</div>'
+        f'<div style="color:#94a3b8;font-size:0.95rem;'
+        f'font-family:\'Montserrat\',sans-serif">{escaped_msg}</div>'
+        f'{cta_html}'
+        f'</div>'
+    )
+
+
+# ═════════════════════════════════════════════════════════════
+# render_verdict_heatmap_html — SMASH / LEAN / FADE distribution
+# ═════════════════════════════════════════════════════════════
+
+def render_verdict_heatmap_html(joseph_results: list) -> str:
+    """Return HTML showing a SMASH/LEAN/FADE distribution summary.
+
+    Iterates *joseph_results* (a list of analysis result dicts), counts
+    verdicts, and renders styled mini-bars with counts and percentages.
+
+    Parameters
+    ----------
+    joseph_results : list[dict]
+        Each dict should contain a ``"verdict"`` key whose value is one
+        of ``"SMASH"``, ``"LEAN"``, ``"FADE"``, or ``"STAY_AWAY"``.
+    """
+    counts: dict = {}
+    for r in joseph_results:
+        v = str(r.get("verdict", "")).upper()
+        if v:
+            counts[v] = counts.get(v, 0) + 1
+    total = sum(counts.values())
+    if total == 0:
+        return ""
+
+    verdict_meta = {
+        "SMASH": ("#ff5e00", VERDICT_EMOJIS.get("SMASH", "🔥")),
+        "LEAN": ("#22c55e", VERDICT_EMOJIS.get("LEAN", "✅")),
+        "FADE": ("#f59e0b", VERDICT_EMOJIS.get("FADE", "⚠️")),
+        "STAY_AWAY": ("#ef4444", VERDICT_EMOJIS.get("STAY_AWAY", "🚫")),
+    }
+
+    bars = []
+    for verdict, (color, emoji) in verdict_meta.items():
+        cnt = counts.get(verdict, 0)
+        pct = cnt * 100.0 / total if cnt else 0.0
+        bars.append(
+            f'<div style="margin:4px 0">'
+            f'<div style="display:flex;justify-content:space-between;'
+            f'font-size:0.75rem;color:#cbd5e1;font-family:\'Montserrat\','
+            f'sans-serif;margin-bottom:2px">'
+            f'<span>{emoji} {_html.escape(verdict)}</span>'
+            f'<span>{cnt} ({pct:.0f}%)</span></div>'
+            f'<div style="height:6px;background:#1e293b;border-radius:3px">'
+            f'<div style="height:6px;width:{pct:.0f}%;background:{color};'
+            f'border-radius:3px"></div></div></div>'
+        )
+    return (
+        f'<div style="padding:8px 12px;background:rgba(7,10,19,0.6);'
+        f'border-radius:8px;border:1px solid rgba(255,94,0,0.15)">'
+        f'<div style="font-size:0.8rem;font-weight:700;color:#ff5e00;'
+        f'font-family:\'Orbitron\',sans-serif;margin-bottom:6px">'
+        f'VERDICT DISTRIBUTION</div>'
+        + "".join(bars)
+        + '</div>'
+    )
+
+
+# ═════════════════════════════════════════════════════════════
 # render_joseph_live_desk — the main broadcast desk
 # ═════════════════════════════════════════════════════════════
 
