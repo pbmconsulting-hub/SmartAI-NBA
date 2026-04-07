@@ -811,7 +811,7 @@ def fetch_box_score_matchups(game_id: str) -> dict:
                 pass
 
         if not norm:
-            _logger.debug("fetch_box_score_matchups(%s): no data available", game_id)
+            _logger.warning("fetch_box_score_matchups(%s): no data from normalized or raw dict", game_id)
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
