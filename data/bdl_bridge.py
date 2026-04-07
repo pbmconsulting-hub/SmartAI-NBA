@@ -468,6 +468,13 @@ def fetch_player_game_log(player_id: int, last_n: int = 20) -> list[dict]:
                 "tov": _safe_float(s.get("turnover", s.get("tov", 0))),
                 "fg3m": _safe_float(s.get("fg3m")),
                 "ft_pct": _safe_float(s.get("ft_pct")),
+                "ftm": _safe_float(s.get("ftm")),
+                "fta": _safe_float(s.get("fta")),
+                "fgm": _safe_float(s.get("fgm")),
+                "fga": _safe_float(s.get("fga")),
+                "oreb": _safe_float(s.get("oreb")),
+                "dreb": _safe_float(s.get("dreb")),
+                "pf": _safe_float(s.get("pf")),
             })
 
         # Sort by date descending (newest first)

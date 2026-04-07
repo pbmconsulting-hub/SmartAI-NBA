@@ -91,6 +91,36 @@ def _nba_today_et():
     return datetime.datetime.now(_get_eastern_tz()).date()
 
 
+# Ordered list of date formats returned by upstream APIs.
+# BDL → "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS…" ([:10] works).
+# nba_api PlayerGameLog → "MMM DD, YYYY" (e.g. "MAR 05, 2026").
+_GAME_DATE_FORMATS = ["%Y-%m-%d", "%b %d, %Y", "%B %d, %Y"]
+
+
+def _parse_game_date(raw: str):
+    """Parse a game-date string from any known API format into a ``date``.
+
+    Tries ISO (YYYY-MM-DD), short-month (MAR 05, 2026), and long-month
+    (March 05, 2026) formats so the caller does not need to know which
+    data source supplied the log row.
+
+    Returns:
+        ``datetime.date`` on success, ``None`` on failure.
+    """
+    if not raw:
+        return None
+    # Fast path: ISO date is always the first 10 chars
+    snippet = raw[:10].strip()
+    for fmt in _GAME_DATE_FORMATS:
+        try:
+            return datetime.datetime.strptime(
+                snippet if fmt == "%Y-%m-%d" else raw.strip(), fmt
+            ).date()
+        except (ValueError, TypeError):
+            continue
+    return None
+
+
 # ============================================================
 # SECTION: Unified Stat Column Mapping
 # Maps ALL known internal stat keys AND platform-native aliases
@@ -163,6 +193,106 @@ def _is_segment_prop(stat_type: str) -> bool:
 
 # ============================================================
 # END SECTION: Unified Stat Column Mapping
+# ============================================================
+
+
+# ============================================================
+# SECTION: Per-Player Game Log Fetcher for Bet Resolution
+# Uses ETL database first, nba_api as fallback. BDL is NOT used.
+# ============================================================
+
+def _parse_minutes(raw) -> float:
+    """Convert a MIN field (could be "MM:SS", float, or str) to a float."""
+    if raw is None:
+        return 0.0
+    s = str(raw)
+    try:
+        if ":" in s:
+            return float(s.split(":")[0])
+        return float(s)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _fetch_resolve_game_log(player_id, last_n: int = 10) -> list[dict]:
+    """Fetch game log for bet resolution — ETL primary, nba_api fallback.
+
+    BallDontLie is intentionally skipped.  The ETL database is fast
+    and already populated by the ETL pipeline; ``nba_api.PlayerGameLog``
+    is the online fallback when the ETL DB has no data.
+
+    Returns a list of dicts with lowercase stat keys
+    (``pts``, ``reb``, ``ast``, ``minutes``, ``fg3m``, ``ftm``, …)
+    ordered newest-first. ``game_date`` is always ISO ``YYYY-MM-DD``.
+    """
+    # ── Source 1: local ETL database (fastest, no API call) ───────────
+    try:
+        from data.etl_data_service import get_player_game_logs as _etl_logs
+        rows = _etl_logs(int(player_id), limit=last_n)
+        if rows:
+            normalised = []
+            for r in rows:
+                entry = dict(r)
+                # Ensure 'minutes' key exists (ETL stores 'min')
+                if "minutes" not in entry and "min" in entry:
+                    entry["minutes"] = _parse_minutes(entry["min"])
+                elif "minutes" not in entry:
+                    entry["minutes"] = 0.0
+                # ETL game_date is already YYYY-MM-DD
+                normalised.append(entry)
+            return normalised
+    except Exception as _etl_exc:
+        _logger.debug(
+            "_fetch_resolve_game_log: ETL source failed for %s: %s",
+            player_id, _etl_exc,
+        )
+
+    # ── Source 2: nba_api PlayerGameLog (online, no BDL) ──────────────
+    try:
+        from nba_api.stats.endpoints import playergamelog
+        game_log_endpoint = playergamelog.PlayerGameLog(
+            player_id=player_id,
+            season_type_all_star="Regular Season",
+        )
+        rows_raw = game_log_endpoint.get_data_frames()[0].to_dict("records")
+        time.sleep(0.6)  # rate-limit courtesy
+
+        formatted = []
+        for g in rows_raw[:last_n]:
+            # GAME_DATE from nba_api may be 'MMM DD, YYYY'; normalise
+            raw_dt = g.get("GAME_DATE", "")
+            parsed = _parse_game_date(raw_dt)
+            iso_date = parsed.isoformat() if parsed else raw_dt
+            formatted.append({
+                "game_date": iso_date,
+                "matchup":   g.get("MATCHUP", ""),
+                "win_loss":  g.get("WL", ""),
+                "minutes":   float(g.get("MIN", 0) or 0),
+                "pts":       float(g.get("PTS", 0) or 0),
+                "reb":       float(g.get("REB", 0) or 0),
+                "ast":       float(g.get("AST", 0) or 0),
+                "stl":       float(g.get("STL", 0) or 0),
+                "blk":       float(g.get("BLK", 0) or 0),
+                "tov":       float(g.get("TOV", 0) or 0),
+                "fg3m":      float(g.get("FG3M", 0) or 0),
+                "ftm":       float(g.get("FTM", 0) or 0),
+                "fta":       float(g.get("FTA", 0) or 0),
+                "fgm":       float(g.get("FGM", 0) or 0),
+                "fga":       float(g.get("FGA", 0) or 0),
+                "oreb":      float(g.get("OREB", 0) or 0),
+                "dreb":      float(g.get("DREB", 0) or 0),
+                "pf":        float(g.get("PF", 0) or 0),
+            })
+        return formatted
+    except Exception as _api_exc:
+        _logger.warning(
+            "_fetch_resolve_game_log: nba_api failed for %s: %s",
+            player_id, _api_exc,
+        )
+    return []
+
+# ============================================================
+# END SECTION: Per-Player Game Log Fetcher for Bet Resolution
 # ============================================================
 
 
@@ -786,9 +916,9 @@ def auto_resolve_bet_results(date_str=None):
     For all pending bets on date_str (default: yesterday), retrieve actual
     player stats from API-NBA API and automatically mark WIN/LOSS/PUSH.
 
-    Uses data.nba_data_service.get_player_game_log() to get actual stat
-    values from API-NBA. Falls back to game_log_cache if the API is
-    unavailable. Player IDs are resolved via data.player_profile_service.get_player_id().
+    Uses the ETL database (primary) or nba_api PlayerGameLog (fallback) to
+    get actual stat values. Player IDs are resolved via
+    data.player_profile_service.get_player_id().
 
     Args:
         date_str (str|None): ISO date string "YYYY-MM-DD".
@@ -905,13 +1035,12 @@ def auto_resolve_bet_results(date_str=None):
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _get_player_log(pid):
-        """Retrieve a single player's API-NBA game log with retry + backoff."""
+        """Retrieve a single player's game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
                     _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                from data.nba_data_service import get_player_game_log as _ldf_gl
-                logs = _ldf_gl(pid, last_n_games=5)
+                logs = _fetch_resolve_game_log(pid, last_n=5)
                 return pid, logs
             except Exception:
                 if _attempt == RESOLVE_MAX_RETRIES - 1:
@@ -969,17 +1098,13 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(f"#{bet_id} {player_name}: no game log found")
                 continue
 
-            # Find the game on target date (API-NBA returns "YYYY-MM-DD")
+            # Find the game on target date
             matching_log = None
             for log_row in logs:
-                raw_date = log_row.get("game_date", "")
-                try:
-                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
-                    if log_date == target_date:
-                        matching_log = log_row
-                        break
-                except (ValueError, TypeError):
-                    continue
+                log_date = _parse_game_date(log_row.get("game_date", ""))
+                if log_date == target_date:
+                    matching_log = log_row
+                    break
 
             if matching_log is None:
                 last_date = logs[0].get("game_date", "N/A") if logs else "N/A"
@@ -1045,10 +1170,9 @@ def resolve_todays_bets():
     """
     Resolve today's pending bets by checking live game status via API-NBA API.
 
-    Uses API-NBA get_live_scores() to detect finished games,
-    then retrieves player game logs via data.nba_data_service.get_player_game_log().
+    Uses bulk nba_api BoxScore endpoints for Tier 1/2 resolution,
+    then the ETL database or nba_api PlayerGameLog for Tier 3.
     Player IDs are resolved via data.player_profile_service.get_player_id().
-    Only resolves bets where the game has a FINAL status.
 
     Returns:
         dict: {
@@ -1067,7 +1191,7 @@ def resolve_todays_bets():
         save_daily_snapshot,
     )
 
-    today_str = _dt.date.today().isoformat()
+    today_str = _nba_today_et().isoformat()
     summary = {"resolved": 0, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "errors": []}
 
     try:
@@ -1178,13 +1302,12 @@ def resolve_todays_bets():
     _game_log_cache: dict = {}  # player_id → list[dict] of API-NBA game log rows
 
     def _get_player_log(pid):
-        """Retrieve a single player's API-NBA game log with retry + backoff."""
+        """Retrieve a single player's game log with retry + backoff."""
         for _attempt in range(RESOLVE_MAX_RETRIES):
             try:
                 if _attempt > 0:
                     time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                from data.nba_data_service import get_player_game_log as _ldf_gl
-                logs = _ldf_gl(pid, last_n_games=5)
+                logs = _fetch_resolve_game_log(pid, last_n=5)
                 return pid, logs
             except Exception as _retry_exc:
                 _logger.warning(
@@ -1251,17 +1374,13 @@ def resolve_todays_bets():
                 summary["pending"] += 1
                 continue
 
-            # Find the game log entry for today (API-NBA returns "YYYY-MM-DD")
+            # Find the game log entry for today
             latest = None
             for log_row in logs:
-                raw_date = log_row.get("game_date", "")
-                try:
-                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
-                    if log_date == target_date:
-                        latest = log_row
-                        break
-                except (ValueError, TypeError):
-                    continue
+                log_date = _parse_game_date(log_row.get("game_date", ""))
+                if log_date == target_date:
+                    latest = log_row
+                    break
 
             if latest is None:
                 summary["pending"] += 1
@@ -1496,8 +1615,7 @@ def resolve_all_pending_bets():
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        from data.nba_data_service import get_player_game_log as _ldf_gl
-                        logs = _ldf_gl(player_id, last_n_games=10)
+                        logs = _fetch_resolve_game_log(player_id, last_n=10)
                         _log_cache[player_id] = logs or []
                         _api_exc = None
                         break
@@ -1515,17 +1633,13 @@ def resolve_all_pending_bets():
                 summary["pending"] += 1
                 continue
 
-            # Find the game on target date (API-NBA returns "YYYY-MM-DD")
+            # Find the game on target date
             matching_log = None
             for log_row in logs:
-                raw_date = log_row.get("game_date", "")
-                try:
-                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
-                    if log_date == target_date:
-                        matching_log = log_row
-                        break
-                except (ValueError, TypeError):
-                    continue
+                log_date = _parse_game_date(log_row.get("game_date", ""))
+                if log_date == target_date:
+                    matching_log = log_row
+                    break
 
             if matching_log is None:
                 summary["pending"] += 1
@@ -1795,8 +1909,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                     try:
                         if _attempt > 0:
                             _time.sleep(_BACKOFF_BASE + _attempt * _BACKOFF_INCREMENT)
-                        from data.nba_data_service import get_player_game_log as _ldf_gl
-                        logs = _ldf_gl(player_id, last_n_games=10)
+                        logs = _fetch_resolve_game_log(player_id, last_n=10)
                         _log_cache[player_id] = logs or []
                         _api_exc = None
                         break
@@ -1818,17 +1931,13 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 summary["pending"] += 1
                 continue
 
-            # ── Match game by date (API-NBA: "YYYY-MM-DD") ────────
+            # ── Match game by date ────────────────────────────────
             matching_log = None
             for log_row in logs:
-                raw_date = log_row.get("game_date", "")
-                try:
-                    log_date = _dt.datetime.strptime(raw_date[:10], "%Y-%m-%d").date()
-                    if log_date == target_date:
-                        matching_log = log_row
-                        break
-                except (ValueError, TypeError):
-                    continue
+                log_date = _parse_game_date(log_row.get("game_date", ""))
+                if log_date == target_date:
+                    matching_log = log_row
+                    break
 
             if matching_log is None:
                 summary["pending"] += 1
