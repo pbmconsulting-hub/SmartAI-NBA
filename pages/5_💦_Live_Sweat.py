@@ -9,6 +9,7 @@
 
 import streamlit as st
 import datetime
+import html as _html_mod
 import logging
 
 try:
@@ -95,14 +96,23 @@ real-time NBA box-score data.  It calculates whether each player is
 **on pace** to hit their line (OVER or UNDER) and surfaces Joseph M. Smith's
 live vibe-check reactions so you know the emotional temperature of every bet.
 
+### Selecting Your Bets
+All your bets from every source are loaded automatically.  Use the
+**Select Bets to Sweat** multiselect to pick exactly which bets you want
+to track — you don't have to sweat them all at once.
+
 ### How Bets Get Here
-Your active bets are pulled automatically from **three sources** (in priority order):
+Your bets are pulled automatically from **three sources** (all merged):
 1. **Manual Locks** — props you locked on the Neural Analysis or Prop Scanner pages.
 2. **Analysis Results** — the last Neural Analysis run stored in your session.
 3. **Bet Tracker Database** — bets recorded through the 📈 Bet Tracker page.
 
 If no bets appear, head to **📡 Live Games → ⚡ Quantum Analysis Matrix** and
 lock some props first, or record a bet in the **📈 Bet Tracker**.
+
+### Today's Scoreboard
+The scoreboard at the top shows **live scores for all NBA games** today —
+including games that haven't tipped off yet and games that are already final.
 
 ### Reading the Sweat Cards
 | Element | Meaning |
@@ -171,65 +181,83 @@ def _resolve_current_stat(player_stats: dict, stat_type: str) -> float | None:
 
 def _get_active_bets() -> list[dict]:
     """
-    Collect the user's active bets from available sources.
+    Collect the user's active bets from **all** available sources.
+
+    Merges bets from manual locks, Neural Analysis results, and the
+    Bet Tracker database so the user can see every bet in one place
+    and pick which ones to sweat.
 
     Each returned dict has at least:
-        player_name, stat_type, line (float), direction
+        player_name, stat_type, line (float), direction, source
     """
-    # Source 1: explicit active_bets in session state
-    active = st.session_state.get("active_bets", [])
-    if active:
-        return list(active)
+    seen: set[tuple] = set()
+    bets: list[dict] = []
+
+    def _add(player: str, stat: str, line: float, direction: str,
+             tier: str, source: str) -> None:
+        key = (player.lower().strip(), stat.lower().strip(), line, direction.upper())
+        if key in seen or not player:
+            return
+        seen.add(key)
+        bets.append({
+            "player_name": player,
+            "stat_type":   stat,
+            "line":        line,
+            "direction":   direction,
+            "tier":        tier,
+            "source":      source,
+        })
+
+    # Source 1: explicit active_bets in session state (manual locks)
+    for b in st.session_state.get("active_bets", []):
+        _add(
+            b.get("player_name", ""), b.get("stat_type", ""),
+            float(b.get("line", 0) or 0),
+            str(b.get("direction", "OVER")),
+            b.get("tier", ""), "Lock",
+        )
 
     # Source 2: analysis_results from Neural Analysis
-    analysis = st.session_state.get("analysis_results", [])
-    if analysis:
-        bets = []
-        for r in analysis:
-            if r.get("should_avoid"):
-                continue
-            bets.append({
-                "player_name": r.get("player_name", ""),
-                "stat_type":   r.get("stat_type", ""),
-                "line":        float(r.get("line", 0) or 0),
-                "direction":   r.get("direction", "OVER"),
-                "tier":        r.get("tier", ""),
-            })
-        return bets
+    for r in st.session_state.get("analysis_results", []):
+        if r.get("should_avoid"):
+            continue
+        _add(
+            r.get("player_name", ""), r.get("stat_type", ""),
+            float(r.get("line", 0) or 0),
+            str(r.get("direction", "OVER")),
+            r.get("tier", ""), "Analysis",
+        )
 
     # Source 3: database (today's pending bets)
     try:
         from tracking.bet_tracker import load_all_bets
         today_str = datetime.date.today().strftime("%Y-%m-%d")
-        all_bets = load_all_bets(limit=200)
+        all_db = load_all_bets(limit=200)
         today_bets = [
-            b for b in all_bets
+            b for b in all_db
             if str(b.get("date", "")).startswith(today_str)
             and str(b.get("result", "")).upper() not in ("WIN", "LOSS", "PUSH")
         ]
-        bets = []
         for b in today_bets:
-            bets.append({
-                "player_name": b.get("player_name", ""),
-                "stat_type":   b.get("stat_type", ""),
-                "line":        float(b.get("prop_line", 0) or 0),
-                "direction":   b.get("direction", "OVER"),
-                "tier":        b.get("tier", ""),
-            })
-        return bets
+            _add(
+                b.get("player_name", ""), b.get("stat_type", ""),
+                float(b.get("prop_line", 0) or 0),
+                str(b.get("direction", "OVER")),
+                b.get("tier", ""), "Tracker",
+            )
     except Exception:
         pass
 
-    return []
+    return bets
 
 
 # ============================================================
 # SECTION: Load Live Data & Render Cards
 # ============================================================
 
-active_bets = _get_active_bets()
+all_available_bets = _get_active_bets()
 
-if not active_bets:
+if not all_available_bets:
     st.info(
         "📌 **No active bets to track yet.**\n\n"
         "Run **⚡ Neural Analysis** to generate picks, or lock bets "
@@ -237,9 +265,172 @@ if not active_bets:
     )
     st.stop()
 
+# ── Bet Selector ──────────────────────────────────────────────
+# Build human-readable labels for multiselect
+
+def _bet_label(b: dict) -> str:
+    name = b.get("player_name", "Unknown")
+    stat = str(b.get("stat_type", "")).replace("_", " ").title()
+    line = b.get("line", 0)
+    direction = str(b.get("direction", "OVER")).upper()
+    source = b.get("source", "")
+    source_tag = f" [{source}]" if source else ""
+    return f"{name} — {stat} {direction} {line}{source_tag}"
+
+
+_bet_labels = [_bet_label(b) for b in all_available_bets]
+_label_to_bet = dict(zip(_bet_labels, all_available_bets))
+
+st.markdown("### 🎯 Select Bets to Sweat")
+selected_labels = st.multiselect(
+    "Choose which bets to track live (all selected by default)",
+    options=_bet_labels,
+    default=_bet_labels,
+    key="sweat_bet_selector",
+)
+
+active_bets = [_label_to_bet[lbl] for lbl in selected_labels if lbl in _label_to_bet]
+
+if not active_bets:
+    st.warning("⬆ Select at least one bet above to start sweating!")
+    st.stop()
+
 # Load live box scores (API-firewalled: cached 120 s)
 live_games = get_live_boxscores()
 all_live_players = get_all_live_players(live_games)
+
+# ============================================================
+# SECTION: Live Scoreboard
+# ============================================================
+
+
+def _get_all_todays_games() -> list[dict]:
+    """Return all of today's games (live + scheduled + final).
+
+    Uses the live box-scores already fetched and supplements with the
+    ScoreboardV2 endpoint so that pre-tipoff and final games also
+    appear.
+    """
+    seen_ids: set[str] = set()
+    games: list[dict] = []
+
+    # Include live games we already have
+    for g in (live_games or []):
+        gid = g.get("game_id", "")
+        if gid:
+            seen_ids.add(gid)
+        games.append({
+            "game_id":    gid,
+            "home_team":  g.get("home_team", ""),
+            "away_team":  g.get("away_team", ""),
+            "home_score": int(g.get("home_score", 0) or 0),
+            "away_score": int(g.get("away_score", 0) or 0),
+            "status":     g.get("status", ""),
+            "period":     g.get("period", ""),
+        })
+
+    # Supplement with ScoreboardV2 for pre-tipoff / final games
+    try:
+        from data.nba_data_service import get_todays_scoreboard
+        sb = get_todays_scoreboard()
+        if sb:
+            game_headers = sb.get("game_header", [])
+            line_scores = sb.get("line_score", [])
+            score_map: dict[tuple, int] = {}
+            for ls in line_scores:
+                gid = ls.get("GAME_ID", "")
+                abbr = ls.get("TEAM_ABBREVIATION", "")
+                pts = ls.get("PTS")
+                if gid and abbr:
+                    score_map[(gid, abbr)] = int(pts) if pts is not None else 0
+
+            for gh in game_headers:
+                gid = gh.get("GAME_ID", "")
+                if gid in seen_ids:
+                    continue
+                home_abbr = gh.get("HOME_TEAM_ABBREVIATION", "")
+                away_abbr = gh.get("VISITOR_TEAM_ABBREVIATION", "")
+                if not home_abbr or not away_abbr:
+                    home_tid = gh.get("HOME_TEAM_ID", "")
+                    vis_tid = gh.get("VISITOR_TEAM_ID", "")
+                    for ls in line_scores:
+                        if ls.get("GAME_ID") == gid:
+                            if str(ls.get("TEAM_ID")) == str(home_tid):
+                                home_abbr = ls.get("TEAM_ABBREVIATION", home_abbr)
+                            elif str(ls.get("TEAM_ID")) == str(vis_tid):
+                                away_abbr = ls.get("TEAM_ABBREVIATION", away_abbr)
+                games.append({
+                    "game_id":    gid,
+                    "home_team":  home_abbr,
+                    "away_team":  away_abbr,
+                    "home_score": score_map.get((gid, home_abbr), 0),
+                    "away_score": score_map.get((gid, away_abbr), 0),
+                    "status":     str(gh.get("GAME_STATUS_TEXT", "")).strip(),
+                    "period":     "",
+                })
+    except Exception:
+        pass
+
+    # Fallback: session state todays_games
+    if not games:
+        for g in st.session_state.get("todays_games", []):
+            games.append({
+                "game_id":    g.get("game_id", ""),
+                "home_team":  g.get("home_team", ""),
+                "away_team":  g.get("away_team", ""),
+                "home_score": 0,
+                "away_score": 0,
+                "status":     g.get("game_time_et", "Scheduled"),
+                "period":     "",
+            })
+
+    return games
+
+
+def _status_badge(status_text: str) -> str:
+    """Return a coloured emoji badge for a game status string."""
+    s = str(status_text).upper().strip()
+    if "FINAL" in s:
+        return "🏁 Final"
+    if any(kw in s for kw in ("QTR", "HALF", "OT", "Q1", "Q2", "Q3", "Q4")):
+        return "🔴 LIVE"
+    return "🗓️ Scheduled"
+
+
+scoreboard_games = _get_all_todays_games()
+
+if scoreboard_games:
+    st.subheader("🏀 Today's Scoreboard")
+    _ticker_cards: list[str] = []
+    for _tg in scoreboard_games:
+        _t_away = _html_mod.escape(str(_tg.get("away_team", "?")))
+        _t_home = _html_mod.escape(str(_tg.get("home_team", "?")))
+        _t_a_pts = int(_tg.get("away_score", 0) or 0)
+        _t_h_pts = int(_tg.get("home_score", 0) or 0)
+        _t_badge = _status_badge(_tg.get("status", ""))
+
+        _a_clr = "#00ff9d" if _t_a_pts > _t_h_pts else "#c0d0e8"
+        _h_clr = "#00ff9d" if _t_h_pts > _t_a_pts else "#c0d0e8"
+        _border_clr = "rgba(255,94,0,0.5)" if "LIVE" in _t_badge else "rgba(0,240,255,0.18)"
+
+        _ticker_cards.append(
+            f'<div class="sweat-ticker-card" style="border-color:{_border_clr};">'
+            f'<div class="sweat-ticker-status">{_t_badge}</div>'
+            f'<div class="sweat-ticker-teams">'
+            f'<div class="sweat-ticker-row">'
+            f'<span class="sweat-ticker-abbr">{_t_away}</span>'
+            f'<span class="sweat-ticker-score" style="color:{_a_clr};">{_t_a_pts}</span></div>'
+            f'<div class="sweat-ticker-row">'
+            f'<span class="sweat-ticker-abbr">{_t_home}</span>'
+            f'<span class="sweat-ticker-score" style="color:{_h_clr};">{_t_h_pts}</span></div>'
+            f'</div></div>'
+        )
+
+    st.markdown(
+        '<div class="sweat-ticker-wrap">' + ''.join(_ticker_cards) + '</div>',
+        unsafe_allow_html=True,
+    )
+    st.divider()
 
 # ── Last Refresh Timestamp ────────────────────────────────────
 
