@@ -1100,7 +1100,45 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                         team_max_gp[t_abbrev] = gp
             _logger.info(f"  Bulk stats: {len(bulk_stats)} players loaded")
         except Exception as bulk_err:
-            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Will use zero defaults for missing players.")
+            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Falling back to ETL database.")
+            try:
+                from data.etl_data_service import get_all_players as _db_get_all
+                db_players = _db_get_all()
+                if db_players:
+                    for p in db_players:
+                        pid = p.get("player_id")
+                        if pid:
+                            bulk_stats[int(pid)] = {
+                                "PLAYER_ID":            pid,
+                                "PLAYER_NAME":          f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+                                "TEAM_ABBREVIATION":    p.get("team_abbreviation", ""),
+                                "GP":                   p.get("gp", 0),
+                                "PTS":                  p.get("ppg", 0.0),
+                                "REB":                  p.get("rpg", 0.0),
+                                "AST":                  p.get("apg", 0.0),
+                                "STL":                  p.get("spg", 0.0),
+                                "BLK":                  p.get("bpg", 0.0),
+                                "TOV":                  p.get("topg", 0.0),
+                                "MIN":                  p.get("mpg", 0.0),
+                                "FG3M":                 p.get("fg3_avg", 0.0),
+                                "FTM":                  p.get("ftm_avg", 0.0),
+                                "FTA":                  p.get("fta_avg", 0.0),
+                                "FT_PCT":               p.get("ft_pct_avg", 0.0),
+                                "FGM":                  p.get("fgm_avg", 0.0),
+                                "FGA":                  p.get("fga_avg", 0.0),
+                                "FG_PCT":               p.get("fg_pct_avg", 0.0),
+                                "OREB":                 p.get("oreb_avg", 0.0),
+                                "DREB":                 p.get("dreb_avg", 0.0),
+                                "PF":                   p.get("pf_avg", 0.0),
+                                "PLUS_MINUS":           p.get("plus_minus_avg", 0.0),
+                            }
+                            t_abbrev = p.get("team_abbreviation", "")
+                            gp = int(p.get("gp", 0) or 0)
+                            if t_abbrev and gp > team_max_gp.get(t_abbrev, 0):
+                                team_max_gp[t_abbrev] = gp
+                    _logger.info(f"  ETL DB fallback: {len(bulk_stats)} players loaded")
+            except Exception as db_err:
+                _logger.warning(f"  ETL DB fallback also failed: {db_err}")
 
         # --------------------------------------------------------
         # Step 4: Build formatted players from bulk stats.

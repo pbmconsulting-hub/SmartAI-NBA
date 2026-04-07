@@ -661,7 +661,14 @@ class RosterEngine:
                         _logger.debug("  RosterEngine._fetch_nba_api_injuries: Injury_Status table not found")
                     else:
                         _inj_rows = _db.execute(
-                            "SELECT player_name, status, injury, team FROM Injury_Status"
+                            """
+                            SELECT p.first_name || ' ' || p.last_name AS player_name,
+                                   i.status, i.reason AS injury,
+                                   p.team_abbreviation AS team
+                            FROM Injury_Status i
+                            JOIN Players p ON i.player_id = p.player_id
+                            WHERE i.report_date = date('now')
+                            """
                         ).fetchall()
                         if _inj_rows:
                             result6: dict = {}
@@ -697,11 +704,41 @@ class RosterEngine:
         Fetch full rosters from nba_api, store them in _full_rosters,
         and update the injury map for G-League / two-way contract players.
 
+        Tries the ETL database (Team_Roster + Players) first for each team.
+        Falls back to nba_api CommonTeamRoster only for teams not found in DB.
+
         CommonTeamRoster is the authoritative source for who is currently
         on an NBA roster (reflects all trades and signings).  Players
         on two-way contracts who are on G-League assignment are flagged
         as inactive so they are excluded from tonight's active roster.
         """
+        # ── DB-first: try loading rosters from the ETL database ──
+        teams_needing_api = list(team_abbrevs or [])
+        try:
+            from data.etl_data_service import get_rosters_for_teams as _db_rosters
+            db_result = _db_rosters(teams_needing_api)
+            if db_result:
+                for abbrev_key, players in db_result.items():
+                    abbrev_upper = abbrev_key.upper()
+                    names = [
+                        f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+                        for p in players
+                    ]
+                    names = [n for n in names if n]
+                    if names:
+                        self._full_rosters[abbrev_upper] = names
+                        _logger.info(f"  RosterEngine DB: {abbrev_upper} → {len(names)} players")
+                teams_needing_api = [
+                    a for a in teams_needing_api
+                    if a.upper() not in self._full_rosters
+                ]
+        except Exception as db_exc:
+            _logger.debug(f"  RosterEngine DB roster lookup failed: {db_exc}")
+
+        if not teams_needing_api:
+            return
+
+        # ── Live API fallback for teams not found in DB ──
         try:
             from nba_api.stats.endpoints import CommonTeamRoster
             from nba_api.stats.static import teams as nba_static_teams
@@ -711,7 +748,7 @@ class RosterEngine:
 
         all_teams = {t["abbreviation"]: t["id"] for t in nba_static_teams.get_teams()}
 
-        for abbrev in (team_abbrevs or []):
+        for abbrev in teams_needing_api:
             team_id = all_teams.get(abbrev.upper())
             if not team_id:
                 _logger.info(f"  RosterEngine: no team_id for {abbrev}")
@@ -749,6 +786,21 @@ class RosterEngine:
                 _logger.info(f"  RosterEngine nba_api: {abbrev} → {len(all_players)} players")
             except Exception as exc:
                 _logger.warning(f"  RosterEngine nba_api error for {abbrev}: {exc}")
+                # ── Final fallback: try DB for this specific team ──
+                try:
+                    from data.etl_data_service import get_rosters_for_teams as _db_rosters_fb
+                    db_fb = _db_rosters_fb([abbrev])
+                    for abbr_key, players in db_fb.items():
+                        names = [
+                            f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+                            for p in players
+                        ]
+                        names = [n for n in names if n]
+                        if names:
+                            self._full_rosters[abbr_key.upper()] = names
+                            _logger.info(f"  RosterEngine DB fallback: {abbr_key} → {len(names)} players")
+                except Exception as db_fb_exc:
+                    _logger.debug(f"  RosterEngine DB fallback for {abbrev} failed: {db_fb_exc}")
 
     # ----------------------------------------------------------
     # get_team_roster: convenience wrapper for CommonTeamRoster

@@ -901,3 +901,235 @@ def get_db_counts() -> dict:
         return counts
     finally:
         conn.close()
+
+
+# ── New helpers for DB-first data layer ───────────────────────────────────────
+
+
+def get_standings() -> list[dict]:
+    """Read current standings from the Standings table.
+
+    Returns a list of dicts with keys: team_abbreviation, conference,
+    conference_rank, wins, losses, win_pct, streak, last_10.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT s.team_id, t.abbreviation AS team_abbreviation,
+                   s.conference, s.playoff_rank AS conference_rank,
+                   s.wins, s.losses, s.win_pct,
+                   s.str_current_streak AS streak,
+                   s.l10 AS last_10
+            FROM Standings s
+            JOIN Teams t ON s.team_id = t.team_id
+            ORDER BY s.conference, s.playoff_rank
+            """
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.warning("get_standings failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_rosters_for_teams(team_abbrevs: list[str]) -> dict[str, list[dict]]:
+    """Read rosters from Team_Roster + Players tables.
+
+    Parameters
+    ----------
+    team_abbrevs : list[str]
+        Team abbreviation codes (e.g. ``["NYK", "ATL"]``).
+
+    Returns
+    -------
+    dict[str, list[dict]]
+        ``{team_abbrev: [player_dict, …]}``.  Each player dict has
+        player_id, first_name, last_name, team_abbreviation, position.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        result: dict[str, list[dict]] = {}
+        placeholders = ",".join("?" for _ in team_abbrevs)
+        rows = conn.execute(
+            f"""
+            SELECT p.player_id, p.first_name, p.last_name,
+                   p.team_abbreviation, p.position
+            FROM Team_Roster tr
+            JOIN Players p ON tr.player_id = p.player_id
+            JOIN Teams t ON tr.team_id = t.team_id
+            WHERE t.abbreviation IN ({placeholders})
+            """,
+            [a.upper() for a in team_abbrevs],
+        ).fetchall()
+        for r in rows:
+            abbr = r["team_abbreviation"] or ""
+            result.setdefault(abbr, []).append(dict(r))
+        return result
+    except Exception as exc:
+        _logger.warning("get_rosters_for_teams failed: %s", exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_players_for_teams(team_abbrevs: list[str]) -> list[dict]:
+    """Like :func:`get_all_players` but filtered to specified teams.
+
+    Avoids loading all 578 players when only a handful of teams are
+    playing tonight.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        placeholders = ",".join("?" for _ in team_abbrevs)
+        rows = conn.execute(
+            f"""
+            SELECT
+                p.player_id, p.first_name, p.last_name,
+                p.team_id, p.team_abbreviation, p.position,
+                COUNT(l.game_id) AS gp,
+                AVG(l.pts)  AS ppg,
+                AVG(l.reb)  AS rpg,
+                AVG(l.ast)  AS apg,
+                AVG(l.stl)  AS spg,
+                AVG(l.blk)  AS bpg,
+                AVG(l.tov)  AS topg,
+                AVG(
+                    CASE
+                        WHEN instr(l.min, ':') > 0
+                        THEN CAST(substr(l.min, 1, instr(l.min, ':') - 1) AS REAL)
+                             + CAST(substr(l.min, instr(l.min, ':') + 1) AS REAL) / 60.0
+                        ELSE CAST(l.min AS REAL)
+                    END
+                ) AS mpg
+            FROM Players p
+            LEFT JOIN Player_Game_Logs l ON p.player_id = l.player_id
+            WHERE p.team_abbreviation IN ({placeholders})
+            GROUP BY p.player_id
+            ORDER BY ppg DESC
+            """,
+            [a.upper() for a in team_abbrevs],
+        ).fetchall()
+
+        def _r(val, d=1):
+            try:
+                return round(float(val or 0), d)
+            except (TypeError, ValueError):
+                return 0.0
+
+        # Extended averages
+        try:
+            ext_rows = conn.execute(
+                f"""
+                SELECT l.player_id,
+                       AVG(l.fg3m) AS fg3_avg, AVG(l.ftm) AS ftm_avg,
+                       AVG(l.fta) AS fta_avg, AVG(l.ft_pct) AS ft_pct_avg,
+                       AVG(l.fgm) AS fgm_avg, AVG(l.fga) AS fga_avg,
+                       AVG(l.fg_pct) AS fg_pct_avg, AVG(l.oreb) AS oreb_avg,
+                       AVG(l.dreb) AS dreb_avg, AVG(l.pf) AS pf_avg,
+                       AVG(l.plus_minus) AS plus_minus_avg
+                FROM Player_Game_Logs l
+                JOIN Players p ON l.player_id = p.player_id
+                WHERE p.team_abbreviation IN ({placeholders})
+                GROUP BY l.player_id
+                """,
+                [a.upper() for a in team_abbrevs],
+            ).fetchall()
+            ext_map = {int(r["player_id"]): r for r in ext_rows}
+        except Exception:
+            ext_map = {}
+
+        # Standard deviations
+        try:
+            all_logs = conn.execute(
+                f"""
+                SELECT l.player_id, l.pts, l.reb, l.ast, l.fg3m,
+                       l.stl, l.blk, l.tov, l.ftm, l.oreb, l.plus_minus
+                FROM Player_Game_Logs l
+                JOIN Players p ON l.player_id = p.player_id
+                WHERE p.team_abbreviation IN ({placeholders})
+                ORDER BY l.player_id
+                """,
+                [a.upper() for a in team_abbrevs],
+            ).fetchall()
+            from collections import defaultdict
+            logs_by_player: dict[int, list] = defaultdict(list)
+            for lg in all_logs:
+                logs_by_player[int(lg["player_id"])].append(lg)
+
+            def _std(values):
+                if len(values) >= 2:
+                    return round(statistics.stdev(values), 2)
+                return 0.0
+
+            std_map: dict[int, dict] = {}
+            for pid, plogs in logs_by_player.items():
+                std_map[pid] = {
+                    "points_std":     _std([float(g["pts"] or 0) for g in plogs]),
+                    "rebounds_std":   _std([float(g["reb"] or 0) for g in plogs]),
+                    "assists_std":    _std([float(g["ast"] or 0) for g in plogs]),
+                    "threes_std":     _std([float(g["fg3m"] or 0) for g in plogs]),
+                    "steals_std":     _std([float(g["stl"] or 0) for g in plogs]),
+                    "blocks_std":     _std([float(g["blk"] or 0) for g in plogs]),
+                    "turnovers_std":  _std([float(g["tov"] or 0) for g in plogs]),
+                    "ftm_std":        _std([float(g["ftm"] or 0) for g in plogs]),
+                    "oreb_std":       _std([float(g["oreb"] or 0) for g in plogs]),
+                    "plus_minus_std": _std([float(g["plus_minus"] or 0) for g in plogs]),
+                }
+        except Exception:
+            std_map = {}
+
+        result = []
+        for row in rows:
+            pid = int(row["player_id"])
+            ext = ext_map.get(pid)
+            result.append({
+                "player_id":         pid,
+                "first_name":        row["first_name"] or "",
+                "last_name":         row["last_name"] or "",
+                "team_id":           int(row["team_id"]) if row["team_id"] else None,
+                "team_abbreviation": row["team_abbreviation"] or "",
+                "position":          row["position"] or None,
+                "gp":    int(row["gp"] or 0),
+                "ppg":   _r(row["ppg"]),
+                "rpg":   _r(row["rpg"]),
+                "apg":   _r(row["apg"]),
+                "spg":   _r(row["spg"]),
+                "bpg":   _r(row["bpg"]),
+                "topg":  _r(row["topg"]),
+                "mpg":   _r(row["mpg"]),
+                "fg3_avg":        _r(ext["fg3_avg"])        if ext else 0.0,
+                "ftm_avg":        _r(ext["ftm_avg"])        if ext else 0.0,
+                "fta_avg":        _r(ext["fta_avg"])        if ext else 0.0,
+                "ft_pct_avg":     _r(ext["ft_pct_avg"], 3) if ext else 0.0,
+                "fgm_avg":        _r(ext["fgm_avg"])        if ext else 0.0,
+                "fga_avg":        _r(ext["fga_avg"])        if ext else 0.0,
+                "fg_pct_avg":     _r(ext["fg_pct_avg"], 3) if ext else 0.0,
+                "oreb_avg":       _r(ext["oreb_avg"])       if ext else 0.0,
+                "dreb_avg":       _r(ext["dreb_avg"])       if ext else 0.0,
+                "pf_avg":         _r(ext["pf_avg"])         if ext else 0.0,
+                "plus_minus_avg": _r(ext["plus_minus_avg"]) if ext else 0.0,
+                "points_std":     std_map.get(pid, {}).get("points_std", 0.0),
+                "rebounds_std":   std_map.get(pid, {}).get("rebounds_std", 0.0),
+                "assists_std":    std_map.get(pid, {}).get("assists_std", 0.0),
+                "threes_std":     std_map.get(pid, {}).get("threes_std", 0.0),
+                "steals_std":     std_map.get(pid, {}).get("steals_std", 0.0),
+                "blocks_std":     std_map.get(pid, {}).get("blocks_std", 0.0),
+                "turnovers_std":  std_map.get(pid, {}).get("turnovers_std", 0.0),
+                "ftm_std":        std_map.get(pid, {}).get("ftm_std", 0.0),
+                "oreb_std":       std_map.get(pid, {}).get("oreb_std", 0.0),
+                "plus_minus_std": std_map.get(pid, {}).get("plus_minus_std", 0.0),
+            })
+        return result
+    except Exception as exc:
+        _logger.warning("get_players_for_teams failed: %s", exc)
+        return []
+    finally:
+        conn.close()
