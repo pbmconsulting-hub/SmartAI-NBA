@@ -22,6 +22,12 @@ import os
 
 import streamlit as st
 
+try:
+    from utils.logger import get_logger
+    _logger = get_logger(__name__)
+except ImportError:
+    _logger = logging.getLogger(__name__)
+
 from tracking.bet_tracker import (
     auto_log_analysis_bets,
     auto_resolve_bet_results,
@@ -260,6 +266,7 @@ st.divider()
     tab_model_health,
     tab_ai_picks,
     tab_all_picks,
+    tab_joseph_bets,
     tab_auto_resolve,
     tab_bets,
     tab_log,
@@ -270,6 +277,7 @@ st.divider()
     "📊 Model Health",
     "📊 AI Picks",
     "📋 All Picks",
+    "🎙️ Joseph's Bets",
     "🤖 Auto-Resolve",
     "📋 My Bets",
     "➕ Log a Bet",
@@ -1204,6 +1212,73 @@ with tab_all_picks:
 # END SECTION: All Picks Tab
 # ============================================================
 
+
+# ============================================================
+# SECTION: Joseph's Bets Tab
+# ============================================================
+
+with tab_joseph_bets:
+    st.subheader("🎙️ Joseph M. Smith's Bets")
+    st.markdown(
+        "Track all bets placed by Joseph M. Smith — filtered from your bet database. "
+        "Joseph's picks are auto-logged from **The Studio** page when he makes SMASH or LEAN calls."
+    )
+
+    try:
+        _jbt_all = load_all_bets()
+        _jbt_joseph = [
+            b for b in _jbt_all
+            if (b.get("platform", "").lower() in ("joseph m. smith", "joseph")
+                or b.get("notes", "").lower().startswith("joseph ")
+                or "joseph" in b.get("notes", "").lower())
+        ]
+
+        if _jbt_joseph:
+            # Summary metrics
+            _jbt_total = len(_jbt_joseph)
+            _jbt_wins = sum(1 for b in _jbt_joseph if str(b.get("result", "")).upper() == "WIN")
+            _jbt_losses = sum(1 for b in _jbt_joseph if str(b.get("result", "")).upper() == "LOSS")
+            _jbt_pending = sum(1 for b in _jbt_joseph if not b.get("result") or str(b.get("result", "")).upper() not in ("WIN", "LOSS", "PUSH"))
+            _jbt_wr = _jbt_wins / max(_jbt_wins + _jbt_losses, 1)
+
+            _jbt_m1, _jbt_m2, _jbt_m3, _jbt_m4 = st.columns(4)
+            _jbt_m1.metric("Total Bets", _jbt_total)
+            _jbt_m2.metric("Win Rate", f"{_jbt_wr:.1%}" if (_jbt_wins + _jbt_losses) > 0 else "—")
+            _jbt_m3.metric("Wins / Losses", f"{_jbt_wins}W / {_jbt_losses}L")
+            _jbt_m4.metric("Pending", _jbt_pending)
+
+            st.markdown("---")
+
+            # Show bet cards
+            st.markdown(get_bet_card_css(), unsafe_allow_html=True)
+            for _jb in sorted(_jbt_joseph, key=lambda x: x.get("bet_date", ""), reverse=True)[:30]:
+                _card = get_bet_card_html(_jb)
+                if _card:
+                    st.markdown(_card, unsafe_allow_html=True)
+                else:
+                    _jb_name = _jb.get("player_name", "Unknown")
+                    _jb_stat = _jb.get("stat_type", "")
+                    _jb_dir = _jb.get("direction", "")
+                    _jb_line = _jb.get("prop_line", "")
+                    _jb_result = _jb.get("result", "pending")
+                    _jb_emoji = _RESULT_EMOJI.get(str(_jb_result).upper() if _jb_result else None, "⏳")
+                    st.markdown(
+                        f"**{_jb_name}** — {_jb_stat} {_jb_dir} {_jb_line} | "
+                        f"Result: {_jb_emoji} {_jb_result or 'pending'}"
+                    )
+        else:
+            st.info(
+                "🎙️ No Joseph M. Smith bets found yet.\n\n"
+                "Go to **🎙️ The Studio** and run Neural Analysis — "
+                "Joseph's SMASH and LEAN picks will be auto-logged here."
+            )
+    except Exception as _jbt_err:
+        _logger.warning("Failed to load Joseph's bets: %s", _jbt_err)
+        st.warning("Could not load Joseph's bet history.")
+
+# ============================================================
+# END SECTION: Joseph's Bets Tab
+# ============================================================
 
 # ============================================================
 # SECTION: Auto-Resolve Tab

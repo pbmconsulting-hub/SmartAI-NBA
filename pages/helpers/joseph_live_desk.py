@@ -308,7 +308,7 @@ def render_broadcast_segment(segment_data: dict) -> str:
 # ═════════════════════════════════════════════════════════════
 
 def render_dawg_board(joseph_results: list) -> None:
-    """Render top-10 players by dawg_factor as an HTML leaderboard."""
+    """Render top-10 players by dawg_factor as an HTML leaderboard with bet info."""
     scored = []
     for r in joseph_results:
         df = r.get("dawg_factor", 0)
@@ -332,6 +332,38 @@ def render_dawg_board(joseph_results: list) -> None:
             tags = _html.escape(str(tags_raw))
         archetype = _html.escape(str(r.get("archetype", r.get("comp", {}).get("archetype", "—"))))
 
+        # Build bet column: prop direction line + verdict
+        prop_str = _html.escape(str(r.get("prop", r.get("stat_type", ""))))
+        direction_str = _html.escape(str(r.get("direction", "")))
+        line_val = r.get("line", "")
+        verdict = r.get("verdict", "")
+        verdict_emoji = r.get("verdict_emoji", "")
+
+        if prop_str and direction_str and line_val != "":
+            bet_text = f"{direction_str} {line_val} {prop_str}"
+        elif prop_str and line_val != "":
+            bet_text = f"{prop_str} {line_val}"
+        else:
+            bet_text = "—"
+        bet_escaped = _html.escape(bet_text)
+
+        # Verdict badge color
+        if verdict == "SMASH":
+            v_clr = "#ff4444"
+        elif verdict == "LEAN":
+            v_clr = "#00ff9d"
+        elif verdict == "FADE":
+            v_clr = "#eab308"
+        else:
+            v_clr = "#94a3b8"
+
+        verdict_badge = ""
+        if verdict:
+            verdict_badge = (
+                f' <span style="color:{v_clr};font-size:0.75rem;font-weight:700">'
+                f'{_html.escape(verdict_emoji)} {_html.escape(verdict)}</span>'
+            )
+
         # Color-code dawg factor
         if df_val >= 5:
             df_color = "#ff4444"
@@ -346,6 +378,7 @@ def render_dawg_board(joseph_results: list) -> None:
             f'<tr>'
             f'<td style="color:#ff5e00;font-weight:700">#{idx}</td>'
             f'<td><strong>{name}</strong></td>'
+            f'<td style="color:#00f0ff;font-size:0.85rem">{bet_escaped}{verdict_badge}</td>'
             f'<td style="color:{df_color};font-weight:700">{df_val:+.1f}</td>'
             f'<td style="font-size:0.8rem">{tags}</td>'
             f'<td style="color:#00f0ff">{archetype}</td>'
@@ -355,7 +388,7 @@ def render_dawg_board(joseph_results: list) -> None:
     html = (
         '<table class="joseph-dawg-table">'
         '<thead><tr>'
-        '<th>Rank</th><th>Player</th><th>Dawg Factor</th><th>Tags</th><th>Archetype</th>'
+        '<th>Rank</th><th>Player</th><th>Bet</th><th>Dawg Factor</th><th>Tags</th><th>Archetype</th>'
         '</tr></thead>'
         f'<tbody>{rows_html}</tbody>'
         '</table>'
