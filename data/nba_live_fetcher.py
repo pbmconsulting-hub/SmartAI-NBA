@@ -776,7 +776,17 @@ def fetch_box_score_matchups(game_id: str) -> dict:
         from nba_api.stats.endpoints import boxscorematchupsv3
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
-        endpoint = boxscorematchupsv3.BoxScoreMatchupsV3(game_id=game_id)
+
+        # The constructor + get_normalized_dict can raise IndexError when
+        # the NBA API returns unexpected shapes (e.g. games not started,
+        # no matchup data).  Wrap the entire block defensively.
+        try:
+            endpoint = boxscorematchupsv3.BoxScoreMatchupsV3(game_id=game_id)
+        except (IndexError, KeyError, TypeError) as _ctor_err:
+            _logger.debug("fetch_box_score_matchups(%s): constructor failed: %s", game_id, _ctor_err)
+            _fail = {"player_stats": []}
+            _cache_set(cache_key, _fail)
+            return _fail
 
         # Try get_normalized_dict first; nba_api's normaliser can raise
         # IndexError on certain game IDs where the response shape is
@@ -797,11 +807,11 @@ def fetch_box_score_matchups(game_id: str) -> dict:
                 )
                 if matchups:
                     norm = {"MatchUps": matchups}
-            except Exception:
+            except (IndexError, KeyError, TypeError):
                 pass
 
         if not norm:
-            _logger.warning("fetch_box_score_matchups(%s): no data from normalized or raw dict", game_id)
+            _logger.debug("fetch_box_score_matchups(%s): no data available", game_id)
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
         result = {
