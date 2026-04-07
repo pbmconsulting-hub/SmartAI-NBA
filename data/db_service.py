@@ -4,7 +4,7 @@ data/db_service.py
 Single gateway to the local SmartPicks ETL database (db/smartpicks.db).
 
 Replaces: live_data_fetcher.py, nba_live_fetcher.py, nba_stats_service.py,
-          nba_data_service.py, data_manager.py, bdl_bridge.py
+          nba_data_service.py, data_manager.py
 
 All functions read directly from the local SQLite database — no live API
 calls are made.  If the database does not exist yet (fresh install), every

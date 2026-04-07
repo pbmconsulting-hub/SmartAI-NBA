@@ -74,24 +74,6 @@ except ImportError:
     _player_id_cache = None
     _HAS_PLAYER_ID_CACHE = False
 
-# ── BDL bridge — primary data source ─────────────────────────
-# BallDontLie is now the primary source for NBA data.
-# nba_api is kept only as fallback.
-try:
-    from data.bdl_bridge import (
-        is_available as _bdl_is_available,
-        fetch_todays_games as _bdl_fetch_todays_games,
-        fetch_team_records as _bdl_fetch_team_records,
-        fetch_player_game_log as _bdl_fetch_player_game_log,
-        fetch_player_recent_form as _bdl_fetch_player_recent_form,
-        fetch_team_stats_for_csv as _bdl_fetch_team_stats_for_csv,
-        fetch_player_season_averages as _bdl_fetch_player_season_averages,
-        fetch_active_players as _bdl_fetch_active_players,
-    )
-    _BDL_AVAILABLE = _bdl_is_available()
-except ImportError:
-    _BDL_AVAILABLE = False
-
 # ============================================================
 # SECTION: File Path Constants
 # Same data directory as data_manager.py
@@ -526,23 +508,12 @@ def _fetch_team_records():
     Shared helper used by all three game-fetching layers so standings are
     only pulled once regardless of which layer succeeds.
 
-    Uses BDL as primary source, nba_api as fallback.
-
     Returns:
         dict: Maps team abbreviation → {wins, losses, streak,
               home_record, away_record, conf_rank}.
               Returns empty dict if all sources fail.
     """
-    # ── BDL primary ──────────────────────────────────────────
-    if _BDL_AVAILABLE:
-        try:
-            bdl_records = _bdl_fetch_team_records()
-            if bdl_records:
-                return bdl_records
-        except Exception as bdl_err:
-            _logger.debug("_fetch_team_records: BDL failed (%s), trying nba_api", bdl_err)
-
-    # ── nba_api fallback ─────────────────────────────────────
+    # ── nba_api ──────────────────────────────────────────────
     team_records = {}
     try:
         from nba_api.stats.endpoints import leaguestandingsv3
@@ -908,8 +879,7 @@ def fetch_todays_games():
     fails or returns no games.
 
     Layers:
-        0. BallDontLie API     — primary source
-        1. ScoreboardV2        — NBA Stats API (fallback)
+        1. ScoreboardV2        — NBA Stats API
         2. ESPN Public API     — free unauthenticated endpoint (fallback)
         3. Live ScoreBoard     — nba_api live endpoint (final fallback)
 
@@ -919,20 +889,8 @@ def fetch_todays_games():
                       Returns empty list if all layers fail or no games today.
     """
     # Fetch team records once — shared by all layers
-    team_records = _fetch_team_records()
 
-    # --------------------------------------------------------
-    # Layer 0: BallDontLie API (PRIMARY)
-    # --------------------------------------------------------
-    if _BDL_AVAILABLE:
-        _logger.info("Trying Layer 0: BallDontLie API...")
-        try:
-            bdl_games = _bdl_fetch_todays_games(team_records=team_records)
-            if bdl_games:
-                _logger.info(f"Layer 0 (BDL) success: {len(bdl_games)} game(s) found.")
-                return _deduplicate_games(bdl_games)
-        except Exception as bdl_error:
-            _logger.warning(f"Layer 0 (BDL) failed: {bdl_error}")
+    team_records = _fetch_team_records()
 
     # --------------------------------------------------------
     # Layer 1: ScoreboardV2
@@ -1347,9 +1305,7 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
 
 def fetch_player_recent_form(player_id, last_n_games=10):
     """
-    Fetch recent form data for a specific player.
-
-    Uses BDL as primary source, nba_api as fallback.
+    Fetch recent form data for a specific player via nba_api.
 
     Returns the last N game logs along with:
     - Recent averages (last N games)
@@ -1366,16 +1322,7 @@ def fetch_player_recent_form(player_id, last_n_games=10):
               'recent_ast_avg', 'trend', 'game_results'
               Returns empty dict if fetch fails.
     """
-    # ── BDL primary ──────────────────────────────────────────
-    if _BDL_AVAILABLE:
-        try:
-            result = _bdl_fetch_player_recent_form(int(player_id), last_n_games=last_n_games)
-            if result:
-                return result
-        except Exception as bdl_err:
-            _logger.debug("fetch_player_recent_form: BDL failed (%s), trying nba_api", bdl_err)
-
-    # ── nba_api fallback ─────────────────────────────────────
+    # ── nba_api ──────────────────────────────────────────────
     try:
         from nba_api.stats.endpoints import playergamelog
     except ImportError:
@@ -2247,9 +2194,7 @@ def get_teams_staleness_warning():
 
 def fetch_player_game_log(player_id, last_n_games=20):
     """
-    Fetch the last N game logs for a specific player.
-
-    Uses BDL as primary source, nba_api as fallback.
+    Fetch the last N game logs for a specific player via nba_api.
 
     This is useful for analyzing recent form (hot/cold streaks) and
     calculating how consistent (or inconsistent) a player has been lately.
@@ -2268,16 +2213,7 @@ def fetch_player_game_log(player_id, last_n_games=20):
             {'game_date': '2026-03-03', 'pts': 14, 'reb': 4, 'ast': 8, ...},
         ]
     """
-    # ── BDL primary ──────────────────────────────────────────
-    if _BDL_AVAILABLE:
-        try:
-            result = _bdl_fetch_player_game_log(int(player_id), last_n=last_n_games)
-            if result:
-                return result
-        except Exception as bdl_err:
-            _logger.debug("fetch_player_game_log: BDL failed (%s), trying nba_api", bdl_err)
-
-    # ── nba_api fallback ─────────────────────────────────────
+    # ── nba_api ──────────────────────────────────────────────
     # Import inside function for graceful failure
     try:
         from nba_api.stats.endpoints import playergamelog
