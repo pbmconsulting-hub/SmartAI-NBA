@@ -204,7 +204,7 @@ except ImportError:
 
     def render_empty_state(msg, cta_text=None, cta_page=None):
         return (
-            f'<div style="text-align:center;padding:24px;color:#94a3b8">'
+            f'<div style="text-align:center;padding:24px;color:var(--studio-muted,#94a3b8)">'
             f'{_html.escape(str(msg))}</div>'
         )
 
@@ -941,7 +941,7 @@ elif mode == "👤 SCOUT A PLAYER":
                             )
                         if grade:
                             grade_color = "#22c55e" if grade in ("A+", "A", "A-") else (
-                                "#eab308" if grade.startswith("B") else "#94a3b8"
+                                "#eab308" if grade.startswith("B") else "var(--studio-muted,#94a3b8)"
                             )
                             badge_parts.append(
                                 f'<span style="background:rgba(15,23,42,0.8);'
@@ -1359,7 +1359,7 @@ elif mode == "🎰 BUILD MY BETS":
                                     )
                                     if alt_pitch:
                                         st.markdown(
-                                            f'<div style="color:#94a3b8;font-size:0.85rem;'
+                                            f'<div style="color:var(--studio-muted,#94a3b8);font-size:0.85rem;'
                                             f'margin-bottom:8px">'
                                             f'{_html.escape(str(alt_pitch))}</div>',
                                             unsafe_allow_html=True,
