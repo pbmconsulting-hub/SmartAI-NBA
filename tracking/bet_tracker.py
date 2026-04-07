@@ -520,19 +520,19 @@ def _fetch_all_boxscores_espn(date_str: str) -> dict:
                         # Parse FG field "M-A" to fgm/fga
                         fg_raw = str(stat_dict.get("fg", "0-0"))
                         fg_parts = fg_raw.split("-")
-                        fgm = float(fg_parts[0]) if len(fg_parts) >= 2 else 0.0
+                        fgm = float(fg_parts[0]) if fg_parts else 0.0
                         fga = float(fg_parts[1]) if len(fg_parts) >= 2 else 0.0
 
                         # Parse 3PT field "M-A" to fg3m/fg3a
                         fg3_raw = str(stat_dict.get("3pt", "0-0"))
                         fg3_parts = fg3_raw.split("-")
-                        fg3m = float(fg3_parts[0]) if len(fg3_parts) >= 2 else 0.0
+                        fg3m = float(fg3_parts[0]) if fg3_parts else 0.0
                         fg3a = float(fg3_parts[1]) if len(fg3_parts) >= 2 else 0.0
 
                         # Parse FT field "M-A" to ftm/fta
                         ft_raw = str(stat_dict.get("ft", "0-0"))
                         ft_parts = ft_raw.split("-")
-                        ftm = float(ft_parts[0]) if len(ft_parts) >= 2 else 0.0
+                        ftm = float(ft_parts[0]) if ft_parts else 0.0
                         fta = float(ft_parts[1]) if len(ft_parts) >= 2 else 0.0
 
                         def _safe_float(val):
