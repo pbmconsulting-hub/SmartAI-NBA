@@ -175,6 +175,7 @@ def calculate_live_pace(
         "distance":          round(distance, 1),
         "minutes_played":    round(minutes_played, 1),
         "minutes_remaining": round(minutes_remaining, 1),
+        "est_total_minutes": round(est_total_minutes, 1),
         "pace_per_minute":   round(pace_per_minute, 2),
         "projected_final":   round(projected_final, 1),
         "pct_of_target":     round(pct_of_target, 1),
@@ -184,6 +185,7 @@ def calculate_live_pace(
         "cashed":            cashed,
         "direction":         direction,
         "is_overtime":       is_overtime,
+        "period_num":        period_num,
     }
 
 
@@ -219,3 +221,50 @@ def pace_color_tier(pct_of_target: float, direction: str = "OVER") -> str:
     if pct_of_target >= 51:
         return "orange"
     return "blue"
+
+
+def calculate_sweat_score(pace_results: list[dict]) -> int:
+    """
+    Calculate a composite Sweat Score (0-100) across all active bets.
+
+    Factors in aggregate pace, risk flags, and cashed count to produce
+    a single number representing overall parlay health.
+
+    Parameters
+    ----------
+    pace_results : list[dict]
+        List of pace result dicts from ``calculate_live_pace``.
+
+    Returns
+    -------
+    int
+        Score from 0 (total panic) to 100 (all cashed).
+    """
+    if not pace_results:
+        return 0
+
+    total = len(pace_results)
+    cashed = sum(1 for p in pace_results if p.get("cashed"))
+    on_pace = sum(1 for p in pace_results if p.get("on_pace") and not p.get("cashed"))
+    risk = sum(1 for p in pace_results if p.get("blowout_risk") or p.get("foul_trouble"))
+
+    # Cashed bets contribute fully (100 pts each)
+    # On-pace bets contribute based on pct_of_target (scaled)
+    # At-risk bets get a penalty
+    score = 0.0
+    for p in pace_results:
+        if p.get("cashed"):
+            score += 100.0
+        elif p.get("on_pace"):
+            pct = min(100.0, p.get("pct_of_target", 50))
+            score += pct * 0.85
+        else:
+            pct = min(100.0, p.get("pct_of_target", 30))
+            score += pct * 0.5
+
+    # Risk penalty
+    score -= risk * 8
+
+    # Normalize to 0-100
+    raw = score / total if total > 0 else 0
+    return max(0, min(100, int(round(raw))))
