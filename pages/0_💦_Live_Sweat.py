@@ -746,17 +746,19 @@ if cashed_count > 0:
 if cards_html:
     st.markdown(f'<div class="sweat-cards-grid">{cards_html}</div>', unsafe_allow_html=True)
 
+    # Build lookup for bet details by player name (O(1) access)
+    _bet_by_player: dict[str, dict] = {}
+    for b in active_bets:
+        _bet_by_player.setdefault(b.get("player_name", ""), b)
+
     # ── Tap-to-Expand Card Details + Emoji Reactions ──────────
     for i, (player_name, pace) in enumerate(vibe_checks):
         bet_key = f"{player_name}|{pace.get('target_stat', 0)}"
         col_card, col_remove = st.columns([10, 1])
         with col_remove:
             if st.button("❌", key=f"remove_{i}", help="Remove from sweat"):
-                stat_t = ""
-                for b in active_bets:
-                    if b.get("player_name") == player_name:
-                        stat_t = b.get("stat_type", "")
-                        break
+                bet_info = _bet_by_player.get(player_name, {})
+                stat_t = bet_info.get("stat_type", "")
                 rm_key = f"{player_name}|{stat_t}|{pace.get('target_stat', 0)}|{pace.get('direction', 'OVER')}"
                 st.session_state.setdefault("sweat_removed_bets", set()).add(rm_key)
                 st.rerun()
@@ -782,11 +784,8 @@ if cards_html:
                 dist = pace.get("distance", 0)
                 target_val = pace.get("target_stat", 1)
                 if 0 < dist <= target_val * 0.10 and not pace["cashed"]:
-                    stat_t = ""
-                    for b in active_bets:
-                        if b.get("player_name") == player_name:
-                            stat_t = b.get("stat_type", "")
-                            break
+                    bet_info = _bet_by_player.get(player_name, {})
+                    stat_t = bet_info.get("stat_type", "")
                     st.markdown(
                         render_danger_zone(dist, pace["minutes_remaining"], stat_t),
                         unsafe_allow_html=True,

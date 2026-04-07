@@ -1244,6 +1244,15 @@ class TestNewCSSClasses(unittest.TestCase):
     def test_glow_gold_class(self):
         self.assertIn(".sweat-card.glow-gold", self.css)
 
+    def test_panic_pulse_keyframes(self):
+        self.assertIn("@keyframes panicPulse", self.css)
+
+    def test_victory_shimmer_keyframes(self):
+        self.assertIn("@keyframes victoryShimmer", self.css)
+
+    def test_defense_badge_mid_css(self):
+        self.assertIn("defense-badge-mid", self.css)
+
     def test_heartbeat_animation(self):
         self.assertIn("@keyframes heartbeat", self.css)
         self.assertIn("live-heartbeat-dot", self.css)
@@ -1404,6 +1413,17 @@ class TestSweatCardEnhancements(unittest.TestCase):
         )
         self.assertIn("defense-badge-weak", html)
         self.assertIn("#28 DEF", html)
+
+    def test_defense_badge_mid(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25, projected_final=20,
+            pct_of_target=80, color_tier="orange",
+            defense_rank=15,
+        )
+        self.assertIn("defense-badge-mid", html)
+        self.assertIn("#15 DEF", html)
 
     def test_bet_of_night_badge(self):
         from styles.live_theme import render_sweat_card

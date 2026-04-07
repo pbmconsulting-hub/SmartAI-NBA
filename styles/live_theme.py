@@ -113,6 +113,14 @@ def get_live_sweat_css() -> str:
     box-shadow: 0 0 18px rgba(234, 179, 8, 0.4), 0 0 50px rgba(234, 179, 8, 0.15);
     animation: slideUp 0.5s ease-out both, victoryShimmer 2s ease-in-out infinite;
 }
+@keyframes panicPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(239, 68, 68, 0.3), 0 0 40px rgba(239, 68, 68, 0.1); }
+    50%      { box-shadow: 0 0 24px rgba(239, 68, 68, 0.5), 0 0 60px rgba(239, 68, 68, 0.2); }
+}
+@keyframes victoryShimmer {
+    0%, 100% { box-shadow: 0 0 18px rgba(234, 179, 8, 0.4), 0 0 50px rgba(234, 179, 8, 0.15); }
+    50%      { box-shadow: 0 0 28px rgba(234, 179, 8, 0.6), 0 0 70px rgba(234, 179, 8, 0.25); }
+}
 
 /* ── Sweat Cards Grid Layout ─────────────────────────────── */
 .sweat-cards-grid {
@@ -447,6 +455,11 @@ def get_live_sweat_css() -> str:
     background: rgba(34, 197, 94, 0.2);
     color: #4ade80;
     border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.defense-badge-mid {
+    background: rgba(234, 179, 8, 0.15);
+    color: #facc15;
+    border: 1px solid rgba(234, 179, 8, 0.3);
 }
 .defense-badge-strong {
     background: rgba(239, 68, 68, 0.2);
@@ -1058,7 +1071,7 @@ def render_sweat_card(
         elif defense_rank >= 21:
             def_badge = f'<span class="defense-badge defense-badge-weak">🔓 vs. #{defense_rank} DEF</span>'
         else:
-            def_badge = f'<span class="defense-badge defense-badge-weak">🛡️ vs. #{defense_rank} DEF</span>'
+            def_badge = f'<span class="defense-badge defense-badge-mid">🛡️ vs. #{defense_rank} DEF</span>'
 
     # Sparkline
     sparkline_html = ""
