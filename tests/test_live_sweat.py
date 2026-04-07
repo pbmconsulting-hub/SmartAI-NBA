@@ -435,6 +435,28 @@ class TestLiveThemeCSS(unittest.TestCase):
         css = get_live_sweat_css()
         self.assertIn(".progress-pct-label", css)
 
+    # ── Score ticker CSS tests ───────────────────────────────
+
+    def test_ticker_wrap_class(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-ticker-wrap", css)
+
+    def test_ticker_card_class(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-ticker-card", css)
+
+    def test_ticker_score_class(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-ticker-score", css)
+
+    def test_ticker_row_class(self):
+        from styles.live_theme import get_live_sweat_css
+        css = get_live_sweat_css()
+        self.assertIn(".sweat-ticker-row", css)
+
 
 class TestRenderProgressBar(unittest.TestCase):
 
@@ -794,6 +816,43 @@ class TestLiveSweatPageFile(unittest.TestCase):
 
     def test_blocks_steals_combo(self):
         self.assertIn("blocks_steals", self.source)
+
+    # ── Bet selection & scoreboard tests ─────────────────────
+
+    def test_multiselect_bet_selector(self):
+        """Page should contain a st.multiselect for picking bets."""
+        self.assertIn("st.multiselect", self.source)
+        self.assertIn("sweat_bet_selector", self.source)
+
+    def test_all_sources_merged(self):
+        """_get_active_bets should merge from all three sources, not short-circuit."""
+        self.assertIn("Source 1", self.source)
+        self.assertIn("Source 2", self.source)
+        self.assertIn("Source 3", self.source)
+        # The 'seen' dedup set indicates merging, not priority-return
+        self.assertIn("seen", self.source)
+
+    def test_bet_label_function(self):
+        self.assertIn("def _bet_label", self.source)
+
+    def test_scoreboard_section_present(self):
+        """Page should have a scoreboard section showing game scores."""
+        self.assertIn("Today's Scoreboard", self.source)
+        self.assertIn("sweat-ticker-card", self.source)
+
+    def test_status_badge_function(self):
+        self.assertIn("def _status_badge", self.source)
+
+    def test_get_all_todays_games_function(self):
+        self.assertIn("def _get_all_todays_games", self.source)
+
+    def test_scoreboard_uses_scoreboard_v2(self):
+        """Scoreboard should fall back to ScoreboardV2 for complete game list."""
+        self.assertIn("get_todays_scoreboard", self.source)
+
+    def test_source_tag_in_bets(self):
+        """Each bet should carry a 'source' key for display."""
+        self.assertIn('"source"', self.source)
 
 
 # ============================================================
