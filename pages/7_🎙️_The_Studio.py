@@ -13,6 +13,15 @@ import html as _html
 import logging
 import random
 
+
+def _safe_float(val, default=0.0):
+    """Convert *val* to float, returning *default* on failure."""
+    try:
+        return float(val) if val is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 # ── Styles ───────────────────────────────────────────────────
 try:
     from styles.theme import (
@@ -1301,13 +1310,13 @@ if joseph_results:
                                 "player_name": _jb.get("player", _jb.get("name", "")),
                                 "team": _jb.get("team", ""),
                                 "stat_type": _jb.get("prop", _jb.get("stat_type", "")),
-                                "prop_line": float(_jb.get("line", 0) or 0),
+                                "prop_line": _safe_float(_jb.get("line", 0)),
                                 "direction": _jb.get("direction", "OVER"),
                                 "platform": "Joseph M. Smith",
-                                "confidence_score": float(_jb.get("confidence", 50) or 50),
-                                "edge_percentage": float(_jb.get("edge", 0) or 0),
+                                "confidence_score": _safe_float(_jb.get("confidence", 50)),
+                                "edge_percentage": _safe_float(_jb.get("edge", 0)),
                                 "tier": _jb.get("verdict", ""),
-                                "notes": f"Joseph {_jb.get('verdict', '')} pick — edge {float(_jb.get('edge', 0) or 0):+.1f}%",
+                                "notes": f"Joseph {_jb.get('verdict', '')} pick — edge {_safe_float(_jb.get('edge', 0)):+.1f}%",
                                 "auto_logged": 1,
                             })
                             _saved_count += 1

@@ -1226,12 +1226,12 @@ with tab_joseph_bets:
 
     try:
         _jbt_all = load_all_bets()
-        _jbt_joseph = [
-            b for b in _jbt_all
-            if (b.get("platform", "").lower() in ("joseph m. smith", "joseph")
-                or b.get("notes", "").lower().startswith("joseph ")
-                or "joseph" in b.get("notes", "").lower())
-        ]
+        _jbt_joseph = []
+        for b in _jbt_all:
+            _plat = b.get("platform", "").lower()
+            _notes = b.get("notes", "").lower()
+            if _plat in ("joseph m. smith", "joseph") or "joseph" in _notes:
+                _jbt_joseph.append(b)
 
         if _jbt_joseph:
             # Summary metrics

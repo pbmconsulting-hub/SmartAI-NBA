@@ -339,9 +339,9 @@ def render_dawg_board(joseph_results: list) -> None:
         verdict = r.get("verdict", "")
         verdict_emoji = r.get("verdict_emoji", "")
 
-        if prop_str and direction_str and line_val != "":
+        if prop_str and direction_str and line_val:
             bet_text = f"{direction_str} {line_val} {prop_str}"
-        elif prop_str and line_val != "":
+        elif prop_str and line_val:
             bet_text = f"{prop_str} {line_val}"
         else:
             bet_text = "—"
