@@ -172,20 +172,36 @@ def _normalize_db_player(p: dict) -> dict:
     """Convert an etl_data_service player dict to the CSV-format keys
     expected by engine/projections.py, engine/monte_carlo.py, and all
     Streamlit pages.
+
+    The live fetcher (fetch_todays_players_only / fetch_player_stats)
+    emits ``offensive_rebounds_avg``, ``defensive_rebounds_avg``,
+    ``personal_fouls_avg``, ``usage_rate``, and ``games_played``.
+    Engine modules (projections, impact_metrics, joseph_eval,
+    advanced_metrics) read those exact keys, so they MUST be present
+    here as well.  Short aliases (``oreb_avg``, ``dreb_avg``,
+    ``pf_avg``) are kept for data_manager / db_service callers.
     """
+    minutes_avg = float(p.get("mpg", 0.0) or 0.0)
+    gp = int(p.get("gp", 0) or 0)
+    oreb_avg = float(p.get("oreb_avg", 0.0) or 0.0)
+    dreb_avg = float(p.get("dreb_avg", 0.0) or 0.0)
+    pf_avg = float(p.get("pf_avg", 0.0) or 0.0)
+    oreb_std = float(p.get("oreb_std", 0.0) or 0.0)
+
     return {
         "player_id":       p.get("player_id"),
         "name":            f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
         "team":            p.get("team_abbreviation", ""),
         "position":        p.get("position", ""),
-        "gp":              p.get("gp", 0),
+        "gp":              gp,
+        "games_played":    str(gp),
         "points_avg":      p.get("ppg", 0.0),
         "rebounds_avg":    p.get("rpg", 0.0),
         "assists_avg":     p.get("apg", 0.0),
         "steals_avg":      p.get("spg", 0.0),
         "blocks_avg":      p.get("bpg", 0.0),
         "turnovers_avg":   p.get("topg", 0.0),
-        "minutes_avg":     p.get("mpg", 0.0),
+        "minutes_avg":     minutes_avg,
         "threes_avg":      p.get("fg3_avg", 0.0),
         "ftm_avg":         p.get("ftm_avg", 0.0),
         "fta_avg":         p.get("fta_avg", 0.0),
@@ -193,20 +209,35 @@ def _normalize_db_player(p: dict) -> dict:
         "fgm_avg":         p.get("fgm_avg", 0.0),
         "fga_avg":         p.get("fga_avg", 0.0),
         "fg_pct":          p.get("fg_pct_avg", 0.0),
-        "oreb_avg":        p.get("oreb_avg", 0.0),
-        "dreb_avg":        p.get("dreb_avg", 0.0),
-        "pf_avg":          p.get("pf_avg", 0.0),
-        "plus_minus_avg":  p.get("plus_minus_avg", 0.0),
-        "points_std":      p.get("points_std", 0.0),
-        "rebounds_std":    p.get("rebounds_std", 0.0),
-        "assists_std":     p.get("assists_std", 0.0),
-        "threes_std":      p.get("threes_std", 0.0),
-        "steals_std":      p.get("steals_std", 0.0),
-        "blocks_std":      p.get("blocks_std", 0.0),
-        "turnovers_std":   p.get("turnovers_std", 0.0),
-        "ftm_std":         p.get("ftm_std", 0.0),
-        "oreb_std":        p.get("oreb_std", 0.0),
-        "plus_minus_std":  p.get("plus_minus_std", 0.0),
+        # Short aliases kept for data_manager / db_service callers
+        "oreb_avg":                oreb_avg,
+        "dreb_avg":                dreb_avg,
+        "pf_avg":                  pf_avg,
+        # Full-name aliases required by engine/projections, impact_metrics, etc.
+        "offensive_rebounds_avg":  oreb_avg,
+        "defensive_rebounds_avg":  dreb_avg,
+        "personal_fouls_avg":     pf_avg,
+        "plus_minus_avg":         p.get("plus_minus_avg", 0.0),
+        # Usage rate estimate (same formula as live_data_fetcher)
+        "usage_rate":             round(min(35.0, max(10.0, minutes_avg * 0.8)), 1),
+        # Standard deviations
+        "points_std":             p.get("points_std", 0.0),
+        "rebounds_std":           p.get("rebounds_std", 0.0),
+        "assists_std":            p.get("assists_std", 0.0),
+        "threes_std":             p.get("threes_std", 0.0),
+        "steals_std":             p.get("steals_std", 0.0),
+        "blocks_std":             p.get("blocks_std", 0.0),
+        "turnovers_std":          p.get("turnovers_std", 0.0),
+        "ftm_std":                p.get("ftm_std", 0.0),
+        "oreb_std":               oreb_std,
+        "plus_minus_std":         p.get("plus_minus_std", 0.0),
+        # Extended std fields (match live_data_fetcher output)
+        "offensive_rebounds_std": oreb_std,
+        "defensive_rebounds_std": 0.0,
+        "personal_fouls_std":     0.0,
+        "fta_std":                0.0,
+        "fga_std":                0.0,
+        "fgm_std":                0.0,
     }
 
 
