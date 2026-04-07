@@ -237,33 +237,33 @@ class TestDfsMetricsInPropCard(unittest.TestCase):
 # ============================================================
 
 class TestNeuralAnalysisSummaryDfs(unittest.TestCase):
-    """Verify DFS aggregate metrics are present in Neural Analysis page."""
+    """Verify DFS aggregate metrics are present in Neural Analysis page or helpers."""
+
+    @staticmethod
+    def _read_page_and_helpers():
+        """Return combined source text of the page and its extracted helpers."""
+        base = os.path.join(os.path.dirname(__file__), "..")
+        paths = [
+            os.path.join(base, "pages", "3_⚡_Quantum_Analysis_Matrix.py"),
+            os.path.join(base, "pages", "helpers", "quantum_analysis_helpers.py"),
+        ]
+        parts = []
+        for p in paths:
+            if os.path.exists(p):
+                with open(p, "r") as f:
+                    parts.append(f.read())
+        return "\n".join(parts)
 
     def test_summary_has_dfs_flex_edge(self):
-        page_path = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
-        )
-        with open(page_path, "r") as f:
-            content = f.read()
+        content = self._read_page_and_helpers()
         self.assertIn("DFS FLEX EDGE", content)
 
     def test_summary_counts_beats_breakeven(self):
-        page_path = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
-        )
-        with open(page_path, "r") as f:
-            content = f.read()
+        content = self._read_page_and_helpers()
         self.assertIn("legs beat breakeven", content)
 
     def test_summary_uses_dfs_parlay_ev(self):
-        page_path = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
-        )
-        with open(page_path, "r") as f:
-            content = f.read()
+        content = self._read_page_and_helpers()
         self.assertIn("dfs_parlay_ev", content)
 
 

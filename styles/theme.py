@@ -5866,8 +5866,8 @@ QUANTUM_CARD_MATRIX_CSS = """
     flex: 0 0 200px;
 }
 
-/* Responsive stacking */
-@media (max-width: 900px) {
+/* Responsive stacking — Container Queries (adapt to iframe/container width) */
+@container (max-width: 900px) {
     .qcm-h-top {
         flex-direction: column;
     }
@@ -5878,12 +5878,35 @@ QUANTUM_CARD_MATRIX_CSS = """
         flex: 1;
     }
 }
-@media (max-width: 640px) {
+@container (max-width: 640px) {
     .qcm-grid {
         grid-template-columns: 1fr;
     }
     .qcm-forces {
         flex-direction: column;
+    }
+}
+
+/* Fallback for contexts without a container ancestor (e.g. inline st.markdown) */
+@supports not (container-type: inline-size) {
+    @media (max-width: 900px) {
+        .qcm-h-top {
+            flex-direction: column;
+        }
+        .qcm-h-bottom {
+            flex-direction: column;
+        }
+        .qcm-h-col-narrow {
+            flex: 1;
+        }
+    }
+    @media (max-width: 640px) {
+        .qcm-grid {
+            grid-template-columns: 1fr;
+        }
+        .qcm-forces {
+            flex-direction: column;
+        }
     }
 }
 """
@@ -6142,8 +6165,8 @@ UNIFIED_PLAYER_CARD_CSS = """
     font-family: 'Montserrat', 'Inter', sans-serif;
 }
 
-/* ── Responsive ─────────────────────────────────────────── */
-@media (max-width: 640px) {
+/* ── Responsive — Container Queries (adapt to iframe width) ── */
+@container (max-width: 640px) {
     .upc-card > summary {
         flex-wrap: wrap;
         gap: 10px;
@@ -6156,6 +6179,25 @@ UNIFIED_PLAYER_CARD_CSS = """
     .upc-summary-right {
         width: 100%;
         justify-content: flex-end;
+    }
+}
+
+/* Fallback for contexts without a container ancestor */
+@supports not (container-type: inline-size) {
+    @media (max-width: 640px) {
+        .upc-card > summary {
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 12px 14px;
+        }
+        .upc-headshot {
+            width: 60px;
+            height: 60px;
+        }
+        .upc-summary-right {
+            width: 100%;
+            justify-content: flex-end;
+        }
     }
 }
 """

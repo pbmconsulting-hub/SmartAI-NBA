@@ -189,7 +189,8 @@ def _render_card_iframe(card_html, player_count):
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<style>html{overflow:visible}"
-        "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
+        "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
+        "container-type:inline-size}</style>"
         "</head><body>"
         f"{card_html}"
         f"{_IFRAME_RESIZE_JS}"
@@ -339,6 +340,18 @@ from pages.helpers.neural_analysis_helpers import (
     _render_qds_full_breakdown_html,
     render_inline_breakdown_html as _render_inline_breakdown,
     display_prop_analysis_card_qds,
+)
+from pages.helpers.quantum_analysis_helpers import (
+    JOSEPH_DESK_SIZE_CSS,
+    build_news_alert_html,
+    build_market_movement_card_html,
+    build_uncertain_pick_card_html,
+    BEST_BETS_HEADER_HTML,
+    GOLD_TIER_BANNER_HTML,
+    PARLAYS_HEADER_HTML,
+    build_parlay_card_html,
+    build_slate_summary_html,
+    build_dfs_edge_banner_html,
 )
 # ============================================================
 # END SECTION: Helper Functions
@@ -1905,27 +1918,8 @@ if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
     )
 
 # ════ JOSEPH M. SMITH LIVE BROADCAST DESK ════
-# Reduce Joseph's container size by 60% on this page per design requirements.
-_JOSEPH_DESK_SIZE_CSS = """<style>
-.joseph-live-desk{
-    padding:10px 12px !important;
-    margin:10px 0 !important;
-    font-size:0.85rem !important;
-    max-height:40vh;
-    overflow-y:auto;
-}
-.joseph-live-desk .joseph-desk-avatar{
-    width:40px !important;height:40px !important;
-}
-.joseph-live-desk h3,.joseph-live-desk h4{
-    font-size:0.85rem !important;margin:4px 0 !important;
-}
-.joseph-live-desk .joseph-desk-title{
-    font-size:0.9rem !important;
-}
-</style>"""
 if analysis_results and st.session_state.get("joseph_enabled", True):
-    st.markdown(_JOSEPH_DESK_SIZE_CSS, unsafe_allow_html=True)
+    st.markdown(JOSEPH_DESK_SIZE_CSS, unsafe_allow_html=True)
     try:
         from pages.helpers.joseph_live_desk import render_joseph_live_desk
         from data.advanced_metrics import enrich_player_god_mode
@@ -2062,18 +2056,8 @@ if analysis_results:
             for r in _dfs_results
             if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
         ) / max(_beats_be_count, 1)
-        _dfs_edge_c = "#00ff9d" if _avg_dfs_edge > 0 else "#ff5e00"
         st.markdown(
-            f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);'
-            f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:10px 16px;margin:6px 0;">'
-            f'<span style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;">'
-            f'📈 DFS FLEX EDGE</span>'
-            f'<span style="color:#475569;font-size:0.68rem;margin-left:8px;">'
-            f'{_beats_be_count}/{len(_dfs_results)} legs beat breakeven</span>'
-            f'<span style="color:{_dfs_edge_c};font-size:0.82rem;font-weight:800;margin-left:12px;'
-            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
-            f'Avg Edge: {_avg_dfs_edge:+.1f}%</span>'
-            f'</div>',
+            build_dfs_edge_banner_html(_avg_dfs_edge, _beats_be_count, len(_dfs_results)),
             unsafe_allow_html=True,
         )
 
@@ -2085,39 +2069,15 @@ if analysis_results:
         key=lambda r: r.get("confidence_score", 0),
         default=None,
     )
-    _tier_bar_html = (
-        f'<span style="color:#c800ff;font-weight:700;">💎 {platinum_count} Platinum</span>'
-        f' &nbsp;·&nbsp; <span style="color:#ffd700;font-weight:600;">🥇 {gold_count} Gold</span>'
-        f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥈 {silver_count} Silver</span>'
-        f' &nbsp;·&nbsp; <span style="color:#b0bec5;">🥉 {bronze_count} Bronze</span>'
-    )
-    _best_html = ""
-    if best_pick:
-        _bp_name  = _html.escape(str(best_pick.get("player_name", "")))
-        _bp_stat  = _html.escape(str(best_pick.get("stat_type", "")).title())
-        _bp_line  = best_pick.get("line", 0)
-        _bp_dir   = "More" if best_pick.get("direction") == "OVER" else "Less"
-        _bp_conf  = best_pick.get("confidence_score", 0)
-        _bp_tier  = best_pick.get("tier", "")
-        _bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(_bp_tier, "🏀")
-        _best_html = (
-            f'<div style="margin-top:10px;padding:10px 14px;background:rgba(255,94,0,0.08);'
-            f'border-radius:6px;border-left:3px solid #ff5e00;">'
-            f'<span style="color:#ff5e00;font-weight:700;font-size:0.85rem;">🏆 Best Pick: </span>'
-            f'<span style="color:#e0e7ef;font-weight:600;">{_bp_emoji} {_bp_name} — {_bp_dir} {_bp_line} {_bp_stat}</span>'
-            f'<span style="color:#00f0ff;font-weight:700;margin-left:10px;">{_bp_conf:.0f}/100</span>'
-            f'</div>'
-        )
     st.markdown(
-        f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);border:1px solid rgba(255,94,0,0.25);'
-        f'border-radius:8px;padding:14px 18px;margin:8px 0 14px;">'
-        f'<div style="font-size:0.9rem;font-weight:600;color:#e0e7ef;margin-bottom:6px;">'
-        f'🗂️ Tier Distribution &nbsp;·&nbsp; '
-        f'<span style="color:#00f0ff;">Avg Edge: {avg_edge:.1f}%</span>'
-        f'</div>'
-        f'<div style="font-size:0.85rem;">{_tier_bar_html}</div>'
-        + _best_html +
-        f'</div>',
+        build_slate_summary_html(
+            platinum_count=platinum_count,
+            gold_count=gold_count,
+            silver_count=silver_count,
+            bronze_count=bronze_count,
+            avg_edge=avg_edge,
+            best_pick=best_pick,
+        ),
         unsafe_allow_html=True,
     )
 
@@ -2241,46 +2201,14 @@ if analysis_results:
     _slate_news.sort(key=lambda x: (_imp_order.get(x.get("impact", "low"), 3), x.get("published_at", "")))
 
     if _slate_news:
-        _imp_colors = {"high": "#ff4444", "medium": "#ffd700", "low": "#8b949e"}
-        _cat_emoji  = {
-            "injury": "🏥", "trade": "🔄", "performance": "📈",
-            "suspension": "🚫", "contract": "💰", "roster": "📋",
-        }
         with st.expander(
             f"📰 Player News Alerts — {len(_slate_news)} item(s) for tonight's slate",
             expanded=any(n.get("impact") == "high" for n in _slate_news),
         ):
             for _na in _slate_news[:15]:
-                _na_title  = _na.get("title", "")
-                _na_player = _na.get("player_name", "")
-                _na_body   = _na.get("body", "")
-                _na_cat    = _na.get("category", "")
-                _na_imp    = _na.get("impact", "").lower()
-                _na_pub    = _na.get("published_at", "")[:10]
-                if not _na_title:
-                    continue
-                _na_c = _imp_colors.get(_na_imp, "#555")
-                _na_em = _cat_emoji.get(_na_cat, "📰")
-                st.markdown(
-                    f'<div style="background:#0d1117;border-left:4px solid {_na_c};'
-                    f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    f'<span style="color:#e0e7ef;font-weight:700;">{_na_em} {_html.escape(_na_title[:80])}</span>'
-                    f'<span style="background:{_na_c};color:#000;border-radius:4px;'
-                    f'padding:1px 6px;font-size:0.72rem;font-weight:700;">'
-                    f'{_na_imp.upper() if _na_imp else "NEWS"}</span>'
-                    f'</div>'
-                    f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
-                    f'<strong style="color:#c0d0e8;">{_html.escape(_na_player)}</strong>'
-                    + (f' · {_html.escape(_na_pub)}' if _na_pub else "")
-                    + f'</div>'
-                    + (f'<div style="color:#a0b4d0;font-size:0.82rem;margin-top:6px;">'
-                       f'{_html.escape(_na_body[:200])}'
-                       + ("…" if len(_na_body) > 200 else "")
-                       + f'</div>' if _na_body else "")
-                    + f'</div>',
-                    unsafe_allow_html=True,
-                )
+                _card = build_news_alert_html(_na)
+                if _card:
+                    st.markdown(_card, unsafe_allow_html=True)
         st.divider()
 
     # ============================================================
@@ -2297,29 +2225,8 @@ if analysis_results:
             expanded=False,
         ):
             for _mm_r in _mm_results:
-                _mm = _mm_r["market_movement"]
-                _mm_player = _mm_r.get("player_name", "")
-                _mm_stat = _mm_r.get("stat_type", "")
-                _mm_dir = _mm.get("direction", "")
-                _mm_shift = _mm.get("line_shift", 0)
-                _mm_signal = _mm.get("signal", "neutral")
-                _mm_adj = _mm.get("confidence_adjustment", 0)
-                _sig_colors = {"sharp_buy": "#00ff9d", "sharp_fade": "#ff6b6b", "neutral": "#8b949e"}
-                _sig_c = _sig_colors.get(_mm_signal, "#8b949e")
-                _sig_labels = {"sharp_buy": "🟢 SHARP BUY", "sharp_fade": "🔴 SHARP FADE", "neutral": "⚪ NEUTRAL"}
-                _sig_lbl = _sig_labels.get(_mm_signal, "⚪ NEUTRAL")
                 st.markdown(
-                    f'<div style="background:#0d1117;border-left:4px solid {_sig_c};'
-                    f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    f'<span style="color:#e0e7ef;font-weight:700;">'
-                    f'{_html.escape(_mm_player)} — {_html.escape(_mm_stat.title())} {_html.escape(_mm_dir)}</span>'
-                    f'<span style="color:{_sig_c};font-weight:700;font-size:0.85rem;">{_sig_lbl}</span>'
-                    f'</div>'
-                    f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
-                    f'Line shift: <strong style="color:#c0d0e8;">{_mm_shift:+.1f}</strong>'
-                    + (f' · Confidence adj: <strong style="color:{_sig_c};">{_mm_adj:+.1f}</strong>' if _mm_adj else '')
-                    + f'</div></div>',
+                    build_market_movement_card_html(_mm_r),
                     unsafe_allow_html=True,
                 )
         st.divider()
@@ -2366,63 +2273,8 @@ if analysis_results:
                 unsafe_allow_html=True,
             )
             for _up in _uncertain_picks:
-                _up_name  = _html.escape(str(_up.get("player_name", "")))
-                _up_team  = _html.escape(str(_up.get("player_team", _up.get("team", ""))))
-                _up_stat  = _html.escape(str(_up.get("stat_type", "")).title())
-                _up_dir   = _html.escape(str(_up.get("direction", "OVER")))
-                _up_line  = _up.get("line", 0)
-                _up_proj  = _up.get("adjusted_projection", 0)
-                _up_edge  = _up.get("edge_percentage", 0)
-                _up_flags = _up.get("risk_flags", _up.get("bet_type_reasons", []))
-                _up_team_badge = (
-                    f'<span style="background:rgba(255,193,7,0.15);color:#ffe082;padding:1px 7px;'
-                    f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-                    f'border:1px solid rgba(255,193,7,0.3);">{_up_team}</span>'
-                    if _up_team else ""
-                )
-                _up_flags_html = "".join(
-                    f'<li style="color:#ffe082;font-size:0.82rem;">{_html.escape(str(r))}</li>'
-                    for r in _up_flags
-                )
-                # Classify risk type from flag text
-                _up_flag_type = "Uncertain"
-                for _ft in _up_flags:
-                    _ftl = str(_ft).lower()
-                    if "conflict" in _ftl:
-                        _up_flag_type = "Conflicting Forces"
-                        break
-                    elif "variance" in _ftl or "high-variance" in _ftl:
-                        _up_flag_type = "High Variance"
-                        break
-                    elif "fatigue" in _ftl or "back-to-back" in _ftl:
-                        _up_flag_type = "Fatigue Risk"
-                        break
-                    elif "regression" in _ftl or "hot streak" in _ftl or "inflated" in _ftl:
-                        _up_flag_type = "Regression Risk"
-                        break
                 st.markdown(
-                    f'<div style="background:rgba(255,193,7,0.06);border:1px solid rgba(255,193,7,0.35);'
-                    f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
-                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-                    f'<div>'
-                    f'<span style="color:#ffc107;font-weight:700;">⚠️ {_up_name}</span>'
-                    f'{_up_team_badge}'
-                    f'<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:4px;'
-                    f'font-size:0.72rem;font-weight:700;margin-left:8px;">{_up_flag_type}</span>'
-                    f'</div>'
-                    f'<div style="text-align:right;">'
-                    f'<span style="color:#ffe082;font-size:0.85rem;">{_up_dir} {_up_line} {_up_stat} '
-                    f'(Proj: {_up_proj:.1f})</span>'
-                    f'<br><span style="color:#ffc107;font-size:0.8rem;font-weight:600;">'
-                    f'Edge: {_up_edge:+.1f}%</span>'
-                    f'</div>'
-                    f'</div>'
-                    f'<div style="margin-top:8px;">'
-                    f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">RISK FLAGS (AVOID):</span>'
-                    f'<ul style="margin:4px 0 0 16px;padding:0;">{_up_flags_html}</ul>'
-                    f'</div>'
-                    + _render_inline_breakdown(_up, accent_color="#ffc107")
-                    + f'</div>',
+                    build_uncertain_pick_card_html(_up, _render_inline_breakdown),
                     unsafe_allow_html=True,
                 )
         st.divider()
@@ -2449,26 +2301,9 @@ if analysis_results:
                 if os.path.exists(_GOLD_LOGO_PATH):
                     st.image(_GOLD_LOGO_PATH, width=110)
             with _goldcol_title:
-                st.markdown(
-                    '<div style="background:linear-gradient(135deg,#1a1200,#231800);'
-                    'border:2px solid #ffd700;border-radius:10px;padding:14px 18px;margin-bottom:4px;">'
-                    '<h3 style="color:#ffd700;font-family:Orbitron,sans-serif;margin:0 0 4px;">🥇 Gold Tier Picks</h3>'
-                    '<p style="color:#ffe082;font-size:0.85rem;margin:0;">'
-                    'High-confidence picks with strong model projections and favorable matchups. '
-                    'Gold picks are ideal for your core entry legs.'
-                    '</p>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(GOLD_TIER_BANNER_HTML, unsafe_allow_html=True)
 
-        st.markdown(
-            '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
-            'border:2px solid #00f0ff;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
-            '<h3 style="color:#00f0ff;font-family:Orbitron,sans-serif;margin:0 0 6px;">🏆 Best Single Bets</h3>'
-            '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Top individual picks ranked by SAFE Score™ — Silver tier and above</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(BEST_BETS_HEADER_HTML, unsafe_allow_html=True)
         _TIER_COLORS = {"Platinum": "#c800ff", "Gold": "#ff5e00", "Silver": "#b0c0d8"}
         # Inject the shared QCM CSS once for horizontal cards
         st.markdown(_get_qcm_css(), unsafe_allow_html=True)
@@ -2483,62 +2318,10 @@ if analysis_results:
     # ── 🎯 Strongly Suggested Parlays (at TOP for maximum visibility) ─
     strategy_entries = _build_entry_strategy(displayed_results)
     if strategy_entries:
-        st.markdown(
-            '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
-            'border:2px solid #ff5e00;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
-            '<h3 style="color:#ff5e00;font-family:Orbitron,sans-serif;margin:0 0 6px;">🎯 Strongly Suggested Parlays</h3>'
-            '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Optimized multi-leg combos ranked by combined EDGE Score™</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        _PARLAY_STARS = {2: "⭐", 3: "⭐⭐", 4: "⭐⭐⭐", 5: "⭐⭐⭐", 6: "⭐⭐⭐"}
-        _PARLAY_LABEL = {
-            2: "Best 2-Leg Parlay",
-            3: "Best 3-Leg Parlay",
-            4: "Best 4-Leg Parlay",
-            5: "Best 5-Leg Parlay",
-            6: "Max Entry (6-Leg)",
-        }
+        st.markdown(PARLAYS_HEADER_HTML, unsafe_allow_html=True)
         for _i, entry in enumerate(strategy_entries):
-            _num     = entry.get("num_legs", 0)
-            _label   = _PARLAY_LABEL.get(_num, entry.get("combo_type", ""))
-            _star    = _PARLAY_STARS.get(_num, "")
-            # Top 2 entries get a glow border
-            _glow = "box-shadow:0 0 14px rgba(255,94,0,0.45);" if _i < 2 else ""
-            picks_html = ""
-            for pick_str in entry.get("picks", []):
-                parts = pick_str.split(" ", 1)
-                pname = _html.escape(parts[0]) if parts else ""
-                rest  = _html.escape(parts[1]) if len(parts) > 1 else ""
-                picks_html += (
-                    f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
-                    f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
-                    f'<span style="color:#c0d0e8;">{rest}</span>'
-                    f'</div>'
-                )
-            reasons = entry.get("reasons", [])
-            reason_text = _html.escape(" | ".join(reasons)) if reasons else _html.escape(entry.get("strategy", ""))
-            combined = entry.get("combined_prob", 0)
-            avg_edge = entry.get("avg_edge", 0)
-            avg_conf = entry.get("safe_avg", "—")
             st.markdown(
-                f'<div style="background:#14192b;border-radius:8px;padding:15px 18px;'
-                f'margin-bottom:14px;border-left:4px solid #ff5e00;{_glow}">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-                f'<h4 style="color:#ff5e00;margin:0;font-family:Orbitron,sans-serif;">'
-                f'{_star} {_label}</h4>'
-                f'<span style="background:#ff5e00;color:#0a0f1a;padding:3px 10px;border-radius:4px;'
-                f'font-size:0.8rem;font-weight:700;">SAFE: {avg_conf}/100</span>'
-                f'</div>'
-                f'{picks_html}'
-                f'<div style="margin-top:10px;padding:7px 10px;background:rgba(20,25,43,0.7);border-radius:4px;">'
-                f'<span style="color:#00c8ff;font-size:0.82rem;">💡 {reason_text}</span>'
-                f'</div>'
-                f'<div style="display:flex;gap:18px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
-                f'<span>Combined prob: {combined:.1f}%</span>'
-                f'<span>Avg edge: {avg_edge:+.1f}%</span>'
-                f'</div>'
-                f'</div>',
+                build_parlay_card_html(entry, _i),
                 unsafe_allow_html=True,
             )
     else:
