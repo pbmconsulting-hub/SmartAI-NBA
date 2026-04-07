@@ -300,8 +300,15 @@ live_games = get_live_boxscores()
 all_live_players = get_all_live_players(live_games)
 
 # ============================================================
-# SECTION: Live Scoreboard
+# SECTION: Live Scoreboard — ESPN-Style Ticker with Leaders
 # ============================================================
+
+# Build a lookup from game_id → live game data (for leaders)
+_live_game_map: dict[str, dict] = {}
+for _lg in (live_games or []):
+    _lgid = _lg.get("game_id", "")
+    if _lgid:
+        _live_game_map[_lgid] = _lg
 
 
 def _get_all_todays_games() -> list[dict]:
@@ -309,7 +316,7 @@ def _get_all_todays_games() -> list[dict]:
 
     Uses the live box-scores already fetched and supplements with the
     ScoreboardV2 endpoint so that pre-tipoff and final games also
-    appear.
+    appear.  Includes per-game leaders when box-score data is available.
     """
     seen_ids: set[str] = set()
     games: list[dict] = []
@@ -320,13 +327,15 @@ def _get_all_todays_games() -> list[dict]:
         if gid:
             seen_ids.add(gid)
         games.append({
-            "game_id":    gid,
-            "home_team":  g.get("home_team", ""),
-            "away_team":  g.get("away_team", ""),
-            "home_score": int(g.get("home_score", 0) or 0),
-            "away_score": int(g.get("away_score", 0) or 0),
-            "status":     g.get("status", ""),
-            "period":     g.get("period", ""),
+            "game_id":      gid,
+            "home_team":    g.get("home_team", ""),
+            "away_team":    g.get("away_team", ""),
+            "home_score":   int(g.get("home_score", 0) or 0),
+            "away_score":   int(g.get("away_score", 0) or 0),
+            "status":       g.get("status", ""),
+            "period":       g.get("period", ""),
+            "home_players": g.get("home_players", []),
+            "away_players": g.get("away_players", []),
         })
 
     # Supplement with ScoreboardV2 for pre-tipoff / final games
@@ -360,13 +369,15 @@ def _get_all_todays_games() -> list[dict]:
                             elif str(ls.get("TEAM_ID")) == str(vis_tid):
                                 away_abbr = ls.get("TEAM_ABBREVIATION", away_abbr)
                 games.append({
-                    "game_id":    gid,
-                    "home_team":  home_abbr,
-                    "away_team":  away_abbr,
-                    "home_score": score_map.get((gid, home_abbr), 0),
-                    "away_score": score_map.get((gid, away_abbr), 0),
-                    "status":     str(gh.get("GAME_STATUS_TEXT", "")).strip(),
-                    "period":     "",
+                    "game_id":      gid,
+                    "home_team":    home_abbr,
+                    "away_team":    away_abbr,
+                    "home_score":   score_map.get((gid, home_abbr), 0),
+                    "away_score":   score_map.get((gid, away_abbr), 0),
+                    "status":       str(gh.get("GAME_STATUS_TEXT", "")).strip(),
+                    "period":       "",
+                    "home_players": [],
+                    "away_players": [],
                 })
     except Exception:
         pass
@@ -375,61 +386,140 @@ def _get_all_todays_games() -> list[dict]:
     if not games:
         for g in st.session_state.get("todays_games", []):
             games.append({
-                "game_id":    g.get("game_id", ""),
-                "home_team":  g.get("home_team", ""),
-                "away_team":  g.get("away_team", ""),
-                "home_score": 0,
-                "away_score": 0,
-                "status":     g.get("game_time_et", "Scheduled"),
-                "period":     "",
+                "game_id":      g.get("game_id", ""),
+                "home_team":    g.get("home_team", ""),
+                "away_team":    g.get("away_team", ""),
+                "home_score":   0,
+                "away_score":   0,
+                "status":       g.get("game_time_et", "Scheduled"),
+                "period":       "",
+                "home_players": [],
+                "away_players": [],
             })
 
     return games
 
 
-def _status_badge(status_text: str) -> str:
-    """Return a coloured emoji badge for a game status string."""
+def _game_leaders(players: list[dict]) -> dict:
+    """Extract top scorer from a player list.
+
+    Returns dict with keys: name, pts, reb, ast.
+    """
+    if not players:
+        return {}
+    top = max(players, key=lambda p: float(p.get("pts", 0) or 0))
+    name = str(top.get("name", ""))
+    # Use last name only for compact display
+    parts = name.split()
+    short = parts[-1] if parts else name
+    first_initial = parts[0][0] + "." if len(parts) > 1 else ""
+    return {
+        "name": f"{first_initial} {short}".strip(),
+        "pts":  int(float(top.get("pts", 0) or 0)),
+        "reb":  int(float(top.get("reb", 0) or 0)),
+        "ast":  int(float(top.get("ast", 0) or 0)),
+    }
+
+
+def _status_class_and_label(status_text: str) -> tuple[str, str]:
+    """Return (css_class, label) for a game status string."""
     s = str(status_text).upper().strip()
     if "FINAL" in s:
-        return "🏁 Final"
+        return "espn-status-final", "FINAL"
     if any(kw in s for kw in ("QTR", "HALF", "OT", "Q1", "Q2", "Q3", "Q4")):
-        return "🔴 LIVE"
-    return "🗓️ Scheduled"
+        return "espn-status-live", status_text.strip()
+    # Check for time patterns like "7:00 PM ET"
+    if ":" in s and ("PM" in s or "AM" in s or "ET" in s):
+        return "espn-status-sched", status_text.strip()
+    if s:
+        return "espn-status-sched", status_text.strip()
+    return "espn-status-sched", "SCHEDULED"
 
 
 scoreboard_games = _get_all_todays_games()
 
 if scoreboard_games:
-    st.subheader("🏀 Today's Scoreboard")
-    _ticker_cards: list[str] = []
+    _game_cards: list[str] = []
+    _has_live = False
+
     for _tg in scoreboard_games:
         _t_away = _html_mod.escape(str(_tg.get("away_team", "?")))
         _t_home = _html_mod.escape(str(_tg.get("home_team", "?")))
         _t_a_pts = int(_tg.get("away_score", 0) or 0)
         _t_h_pts = int(_tg.get("home_score", 0) or 0)
-        _t_badge = _status_badge(_tg.get("status", ""))
 
-        _a_clr = "#00ff9d" if _t_a_pts > _t_h_pts else "#c0d0e8"
-        _h_clr = "#00ff9d" if _t_h_pts > _t_a_pts else "#c0d0e8"
-        _border_clr = "rgba(255,94,0,0.5)" if "LIVE" in _t_badge else "rgba(0,240,255,0.18)"
+        _status_cls, _status_lbl = _status_class_and_label(_tg.get("status", ""))
+        if "live" in _status_cls:
+            _has_live = True
 
-        _ticker_cards.append(
-            f'<div class="sweat-ticker-card" style="border-color:{_border_clr};">'
-            f'<div class="sweat-ticker-status">{_t_badge}</div>'
-            f'<div class="sweat-ticker-teams">'
-            f'<div class="sweat-ticker-row">'
-            f'<span class="sweat-ticker-abbr">{_t_away}</span>'
-            f'<span class="sweat-ticker-score" style="color:{_a_clr};">{_t_a_pts}</span></div>'
-            f'<div class="sweat-ticker-row">'
-            f'<span class="sweat-ticker-abbr">{_t_home}</span>'
-            f'<span class="sweat-ticker-score" style="color:{_h_clr};">{_t_h_pts}</span></div>'
-            f'</div></div>'
+        _a_cls = "espn-team-winning" if _t_a_pts >= _t_h_pts else "espn-team-losing"
+        _h_cls = "espn-team-winning" if _t_h_pts >= _t_a_pts else "espn-team-losing"
+
+        # Status line with live dot for active games
+        _live_dot = '<span class="espn-ticker-live-dot"></span>' if "live" in _status_cls else ""
+        _status_html = (
+            f'<div class="espn-game-status {_status_cls}">'
+            f'{_live_dot}{_html_mod.escape(_status_lbl)}</div>'
         )
 
-    st.markdown(
-        '<div class="sweat-ticker-wrap">' + ''.join(_ticker_cards) + '</div>',
-        unsafe_allow_html=True,
+        # Team rows
+        _teams_html = (
+            f'<div class="espn-team-row">'
+            f'<span class="espn-team-abbr">{_t_away}</span>'
+            f'<span class="espn-team-score {_a_cls}">{_t_a_pts}</span></div>'
+            f'<div class="espn-team-row">'
+            f'<span class="espn-team-abbr">{_t_home}</span>'
+            f'<span class="espn-team-score {_h_cls}">{_t_h_pts}</span></div>'
+        )
+
+        # Leaders (from live box-score data)
+        _leaders_html = ""
+        _home_players = _tg.get("home_players", [])
+        _away_players = _tg.get("away_players", [])
+        _all_players = (_home_players or []) + (_away_players or [])
+        _leader = _game_leaders(_all_players)
+        if _leader:
+            _l_name = _html_mod.escape(_leader["name"])
+            _leaders_html = (
+                f'<div class="espn-leaders">'
+                f'<div class="espn-leader-row">'
+                f'<span class="espn-leader-name">🏆 {_l_name}</span>'
+                f'<span class="espn-leader-stat">'
+                f'{_leader["pts"]} PTS  {_leader["reb"]} REB  {_leader["ast"]} AST</span>'
+                f'</div></div>'
+            )
+
+        _game_cards.append(
+            f'<div class="espn-game-card">'
+            f'{_status_html}{_teams_html}{_leaders_html}</div>'
+        )
+
+    # Duplicate cards for seamless infinite scroll when there are
+    # enough games to fill the viewport.
+    _cards_html = ''.join(_game_cards)
+    _n_games = len(scoreboard_games)
+    _scroll_duration = max(15, _n_games * 5)  # 5s per game, min 15s
+
+    # Only auto-scroll when there are 3+ games (otherwise static)
+    if _n_games >= 3:
+        _inner = (
+            f'<div class="espn-ticker-scroll" '
+            f'style="--scroll-duration:{_scroll_duration}s;">'
+            f'{_cards_html}{_cards_html}</div>'  # duplicated for infinite loop
+        )
+    else:
+        _inner = f'<div class="espn-ticker-track">{_cards_html}</div>'
+
+    _header_text = "🔴 LIVE SCORES" if _has_live else "🏀 TODAY'S GAMES"
+    _ticker_html = (
+        f'<div class="espn-ticker-container">'
+        f'<div class="espn-ticker-header">'
+        f'{_header_text} — {datetime.date.today().strftime("%b %d, %Y")}</div>'
+        f'<div class="espn-ticker-track">{_inner}</div>'
+        f'</div>'
     )
+
+    st.markdown(_ticker_html, unsafe_allow_html=True)
     st.divider()
 
 # ── Last Refresh Timestamp ────────────────────────────────────
