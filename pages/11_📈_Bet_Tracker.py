@@ -53,6 +53,13 @@ from tracking.database import (
     search_bets_by_player,
     load_bets_by_date_range,
     export_bets_csv,
+    insert_entry,
+    load_all_entries,
+    update_entry_result,
+    link_bets_to_entry,
+    get_entry_legs,
+    resolve_entry_from_legs,
+    delete_entry,
 )
 from styles.theme import (
     get_global_css,
@@ -341,6 +348,7 @@ st.divider()
     tab_auto_resolve,
     tab_bets,
     tab_log,
+    tab_parlays,
     tab_predict,
     tab_history,
     tab_achievements,
@@ -352,6 +360,7 @@ st.divider()
     "⚡ Resolve",
     "📋 My Bets",
     "➕ Log Bet",
+    "🎰 Parlays",
     "🔮 Predict",
     "📅 History",
     "🏆 Awards",
@@ -2053,6 +2062,247 @@ with tab_log:
 
 # ============================================================
 # END SECTION: Log a Bet Tab
+# ============================================================
+
+
+# ============================================================
+# SECTION: Parlays Tab — Multi-Leg Entry Tracker
+# ============================================================
+
+with tab_parlays:
+    st.subheader("🎰 Parlay / Entry Tracker")
+    st.markdown(
+        "Track multi-leg entries as parlays. Group bets into entries and see parlay-level results. "
+        "All legs must hit for a parlay WIN."
+    )
+
+    # ── Create New Parlay ─────────────────────────────────────────────
+    with st.expander("➕ Create New Parlay Entry", expanded=False):
+        with st.form("create_parlay_form"):
+            _parlay_cols = st.columns([1, 1, 1])
+            with _parlay_cols[0]:
+                _parlay_date = st.date_input(
+                    "Entry Date", value=datetime.date.today(),
+                    key="parlay_date_input",
+                )
+            with _parlay_cols[1]:
+                _parlay_platform = st.selectbox(
+                    "Platform",
+                    ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6", "Other"],
+                    key="parlay_platform_input",
+                )
+            with _parlay_cols[2]:
+                _parlay_fee = st.number_input(
+                    "Entry Fee ($)", min_value=0.0, max_value=5000.0,
+                    value=10.0, step=5.0, key="parlay_fee_input",
+                )
+
+            _parlay_type = st.selectbox(
+                "Entry Type",
+                ["Parlay (All Must Hit)", "Flex Play (Some Can Miss)", "Power Play"],
+                key="parlay_type_input",
+            )
+
+            # Select bets to include as legs
+            _available_bets = _cached_load_all_bets()
+            _unlinked_bets = [
+                b for b in _available_bets
+                if not b.get("entry_id")
+                and b.get("bet_date", "") == _parlay_date.isoformat()
+            ]
+            _bet_labels = {
+                b.get("bet_id", b.get("id", idx)): (
+                    f"#{b.get('bet_id', b.get('id', idx))} — "
+                    f"{b.get('player_name', '?')} "
+                    f"{b.get('direction', '')} {b.get('prop_line', '')} "
+                    f"{str(b.get('stat_type', '')).title()} "
+                    f"({b.get('result') or 'Pending'})"
+                )
+                for idx, b in enumerate(_unlinked_bets)
+            }
+            _selected_legs = st.multiselect(
+                "Select Legs (bets from same day)",
+                options=list(_bet_labels.keys()),
+                format_func=lambda x: _bet_labels.get(x, str(x)),
+                key="parlay_legs_select",
+                help="Pick 2+ bets to form a parlay. Only unlinked bets from the selected date are shown.",
+            )
+
+            _parlay_notes = st.text_input("Notes (optional)", key="parlay_notes_input")
+            _parlay_submit = st.form_submit_button("🎰 Create Entry", type="primary")
+
+        if _parlay_submit:
+            if len(_selected_legs) < 2:
+                st.warning("⚠️ Select at least 2 legs to create a parlay.")
+            else:
+                _entry_id = insert_entry({
+                    "entry_date": _parlay_date.isoformat(),
+                    "platform": _parlay_platform,
+                    "entry_type": _parlay_type.split(" ")[0].lower(),
+                    "entry_fee": _parlay_fee,
+                    "expected_value": 0.0,
+                    "pick_count": len(_selected_legs),
+                    "notes": _parlay_notes,
+                })
+                if _entry_id:
+                    _linked = link_bets_to_entry(_selected_legs, _entry_id)
+                    # Auto-resolve if possible
+                    resolve_entry_from_legs(_entry_id)
+                    _reload_bets()
+                    st.success(
+                        f"✅ Created entry #{_entry_id} with {_linked} leg(s) on {_parlay_platform}."
+                    )
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to create entry.")
+
+    st.divider()
+
+    # ── Existing Entries ──────────────────────────────────────────────
+    _all_entries = load_all_entries()
+
+    if not _all_entries:
+        st.info(
+            "📭 No parlay entries yet. Use the form above to group your bets into multi-leg entries, "
+            "or build an entry in the **🧬 Entry Builder** page to auto-log it here."
+        )
+    else:
+        # Summary
+        _e_total = len(_all_entries)
+        _e_resolved = [e for e in _all_entries if e.get("result") in ("WIN", "LOSS", "PUSH")]
+        _e_wins = sum(1 for e in _e_resolved if e.get("result") == "WIN")
+        _e_losses = sum(1 for e in _e_resolved if e.get("result") == "LOSS")
+        _e_pending = sum(1 for e in _all_entries if not e.get("result"))
+        _e_wr = round(_e_wins / max(_e_wins + _e_losses, 1) * 100, 1)
+        _e_total_fees = sum(float(e.get("entry_fee") or 0) for e in _all_entries)
+        _e_total_payout = sum(float(e.get("payout") or 0) for e in _e_resolved if e.get("result") == "WIN")
+        _e_pnl = _e_total_payout - _e_total_fees
+
+        st.markdown(
+            get_summary_cards_html(
+                total=_e_total,
+                wins=_e_wins,
+                losses=_e_losses,
+                pushes=sum(1 for e in _e_resolved if e.get("result") == "PUSH"),
+                pending=_e_pending,
+                win_rate=_e_wr,
+            ),
+            unsafe_allow_html=True,
+        )
+
+        _pnl_col1, _pnl_col2, _pnl_col3 = st.columns(3)
+        _pnl_col1.metric("Total Wagered", f"${_e_total_fees:.2f}")
+        _pnl_col2.metric("Total Payouts", f"${_e_total_payout:.2f}")
+        _pnl_col3.metric(
+            "Net P&L", f"${_e_pnl:+.2f}",
+            delta="Profit" if _e_pnl > 0 else ("Break-even" if _e_pnl == 0 else "Loss"),
+            delta_color="normal" if _e_pnl >= 0 else "inverse",
+        )
+
+        st.divider()
+
+        # ── Resolve All Entries button ────────────────────────────────
+        if st.button("🔄 Resolve All Entries", key="resolve_all_entries_btn", type="primary"):
+            _resolved_count = 0
+            for _e in _all_entries:
+                if not _e.get("result"):
+                    _r = resolve_entry_from_legs(_e["entry_id"])
+                    if _r:
+                        _resolved_count += 1
+            if _resolved_count > 0:
+                st.success(f"✅ Resolved {_resolved_count} entries.")
+                st.rerun()
+            else:
+                st.info("No entries resolved — legs may still be pending.")
+
+        st.divider()
+
+        # ── Entry Cards ──────────────────────────────────────────────
+        for _entry in _all_entries:
+            _eid = _entry.get("entry_id", "?")
+            _edate = _entry.get("entry_date", "")
+            _eplat = _entry.get("platform", "?")
+            _etype = _entry.get("entry_type", "parlay")
+            _efee = float(_entry.get("entry_fee") or 0)
+            _epayout = _entry.get("payout")
+            _eresult = _entry.get("result")
+            _epicks = _entry.get("pick_count", 0)
+            _enotes = _entry.get("notes", "")
+
+            # Result styling
+            if _eresult == "WIN":
+                _result_badge = '<span class="result-win">✅ WIN</span>'
+                _border_color = "#00ff9d"
+            elif _eresult == "LOSS":
+                _result_badge = '<span class="result-loss">❌ LOSS</span>'
+                _border_color = "#ff4444"
+            elif _eresult == "PUSH":
+                _result_badge = '<span class="result-push">🔄 PUSH</span>'
+                _border_color = "#b0bec5"
+            else:
+                _result_badge = '<span class="result-pending">⏳ PENDING</span>'
+                _border_color = "#ffcc00"
+
+            _payout_str = f"${_epayout:.2f}" if _epayout is not None else "—"
+
+            with st.expander(
+                f"{'✅' if _eresult == 'WIN' else '❌' if _eresult == 'LOSS' else '⏳'} "
+                f"Entry #{_eid} — {_epicks} legs on {_eplat} ({_edate})"
+                + (f" — {_eresult}" if _eresult else " — Pending"),
+                expanded=not _eresult,
+            ):
+                st.markdown(
+                    f'<div style="border-left:4px solid {_border_color};'
+                    f'background:rgba(13,17,23,0.85);border-radius:10px;padding:14px 18px;'
+                    f'margin-bottom:8px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<div>'
+                    f'<strong style="color:#e8f0ff;font-family:Orbitron,sans-serif;">'
+                    f'🎰 Entry #{_eid}</strong>'
+                    f'<span style="color:#8a9bb8;margin-left:10px;">{_eplat} · {_etype}</span>'
+                    f'</div>'
+                    f'{_result_badge}'
+                    f'</div>'
+                    f'<div style="color:#8a9bb8;font-size:0.82rem;margin-top:6px;">'
+                    f'Fee: <strong>${_efee:.2f}</strong> · '
+                    f'Payout: <strong>{_payout_str}</strong> · '
+                    f'{_epicks} leg(s)'
+                    + (f' · <em>{_enotes}</em>' if _enotes else '')
+                    + f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Show linked legs
+                _legs = get_entry_legs(_eid)
+                if _legs:
+                    st.markdown(f"**Legs ({len(_legs)}):**")
+                    for _leg in _legs:
+                        _leg_result = _leg.get("result") or "Pending"
+                        _leg_icon = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄"}.get(_leg_result, "⏳")
+                        st.markdown(
+                            f"&nbsp;&nbsp;{_leg_icon} **{_leg.get('player_name', '?')}** — "
+                            f"{_leg.get('direction', '')} {_leg.get('prop_line', '')} "
+                            f"{str(_leg.get('stat_type', '')).title()} "
+                            f"({_leg_result})"
+                        )
+                else:
+                    st.caption("No legs linked to this entry.")
+
+                # Delete entry
+                if st.button(
+                    f"🗑️ Delete Entry #{_eid}",
+                    key=f"del_entry_{_eid}",
+                ):
+                    _ok, _msg = delete_entry(_eid)
+                    if _ok:
+                        st.success(_msg)
+                        _reload_bets()
+                        st.rerun()
+                    else:
+                        st.error(_msg)
+
+# ============================================================
+# END SECTION: Parlays Tab
 # ============================================================
 
 

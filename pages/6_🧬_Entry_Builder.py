@@ -710,6 +710,61 @@ if build_button:
                 pass
         # ════ END JOSEPH ENTRY REACTION ════
 
+        # ════ AUTO-LOG ENTRIES TO BET TRACKER (B10) ════
+        # Automatically save each built entry as a parlay in the Bet Tracker
+        # database so users can track multi-leg results from the 🎰 Parlays tab.
+        try:
+            from tracking.database import insert_entry as _eb_insert_entry, insert_bet as _eb_insert_bet, link_bets_to_entry as _eb_link
+            import datetime as _dt_eb
+
+            _today_str = _dt_eb.date.today().isoformat()
+            _logged_count = 0
+
+            for _entry in _show_entries:
+                _ev_result = _entry.get("ev_result", {})
+                _ev_net = _ev_result.get("net_expected_value", 0.0)
+                _picks = _entry.get("picks", [])
+
+                _entry_id = _eb_insert_entry({
+                    "entry_date": _today_str,
+                    "platform": selected_platform,
+                    "entry_type": "parlay",
+                    "entry_fee": float(entry_fee),
+                    "expected_value": _ev_net,
+                    "pick_count": len(_picks),
+                    "notes": f"Auto-logged from Entry Builder",
+                })
+
+                if _entry_id and _picks:
+                    _leg_ids = []
+                    for _pick in _picks:
+                        _bet_id = _eb_insert_bet({
+                            "bet_date": _today_str,
+                            "player_name": _pick.get("player_name", ""),
+                            "team": _pick.get("team", ""),
+                            "stat_type": _pick.get("stat_type", ""),
+                            "prop_line": _pick.get("line", 0.0),
+                            "direction": _pick.get("direction", ""),
+                            "platform": selected_platform,
+                            "confidence_score": _pick.get("confidence_score", 0.0),
+                            "tier": _pick.get("tier", ""),
+                            "edge_percentage": _pick.get("edge_percentage", 0.0),
+                            "player_id": _pick.get("player_id", ""),
+                            "entry_fee": float(entry_fee) / max(len(_picks), 1),
+                        })
+                        if _bet_id:
+                            _leg_ids.append(_bet_id)
+
+                    if _leg_ids:
+                        _eb_link(_leg_ids, _entry_id)
+                        _logged_count += 1
+
+            if _logged_count > 0:
+                st.toast(f"🎰 Auto-logged {_logged_count} entries to the Bet Tracker → Parlays tab.")
+        except Exception as _eb_log_exc:
+            logging.getLogger(__name__).debug(f"[EntryBuilder] Auto-log to tracker: {_eb_log_exc}")
+        # ════ END AUTO-LOG ════
+
     # Feature 5: Session risk summary
     try:
         if calculate_kelly_fraction is not None and get_session_risk_summary is not None and optimal_entries and bankroll_amount > 0:
