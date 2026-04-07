@@ -121,7 +121,7 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
                             if cleaned == header:
                                 continue
                             # Skip rows that look like the title row even after a header was set
-                            if any("Injury Report" in c for c in cleaned) and len(set(cleaned) - {""}) <= 2:
+                            if any("Injury Report" in str(c) for c in cleaned) and len(set(cleaned) - {""}) <= 2:
                                 continue
                             # Handle column count mismatches from merged cells
                             if len(cleaned) < len(header):

@@ -984,8 +984,10 @@ def get_players_for_teams(team_abbrevs: list[str]) -> list[dict]:
     ``team_abbreviation`` is in *team_abbrevs*.
     """
     all_players = get_all_players()
-    if not all_players or not team_abbrevs:
-        return all_players
+    if not all_players:
+        return []
+    if not team_abbrevs:
+        return []
     upper_abbrevs = {a.upper() for a in team_abbrevs}
     return [
         p for p in all_players
