@@ -1007,7 +1007,7 @@ def build_unified_player_card_html(player_name, vitals, props,
     )
 
     return (
-        f'<details class="upc-card">'
+        f'<details class="upc-card" open>'
         f'<summary>'
         f'{header_html}'
         f'<div class="upc-summary-right">'
