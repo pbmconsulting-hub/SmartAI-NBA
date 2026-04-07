@@ -21,6 +21,16 @@ from styles.theme import (
     get_game_report_html,
     get_qds_css,
     get_qds_strategy_table_html,
+    get_team_colors,
+)
+
+from pages.helpers.game_report_helpers import (
+    get_matchup_card_html,
+    get_summary_dashboard_html,
+    get_h2h_bars_html,
+    get_parlay_card_html,
+    get_builder_prop_card_html,
+    get_narrative_card_html,
 )
 
 # Import the new state-of-the-art game prediction engine
@@ -224,8 +234,19 @@ if todays_games:
     with col_meta:
         n_props   = len(analysis_results)
         n_picks   = len([r for r in analysis_results if r.get("confidence_score", 0) >= 70])
-        st.metric("Analysed Props",  n_props)
-        st.metric("High-Conf Picks", n_picks, help="Picks with confidence ≥ 70")
+        avg_safe  = (
+            sum(r.get("confidence_score", 0) for r in analysis_results) / max(n_props, 1)
+        ) if n_props else 0.0
+        # Best pick tonight
+        _best = max(analysis_results, key=lambda r: r.get("confidence_score", 0), default=None) if analysis_results else None
+        _best_label = (
+            f"{_best.get('player_name', '?')} · {_best.get('stat_type', '').title()}"
+            if _best else "—"
+        )
+        st.markdown(
+            get_summary_dashboard_html(n_props, n_picks, avg_safe, _best_label),
+            unsafe_allow_html=True,
+        )
 
     if not analysis_results:
         st.info(
@@ -479,54 +500,26 @@ def _render_game_team_stats(game, game_pred):
         _s1.markdown(f"🏀 **{away}**: {_record_str(_st_away)}", unsafe_allow_html=True)
         _s2.markdown(f"🏀 **{home}**: {_record_str(_st_home)}", unsafe_allow_html=True)
 
-    # ── Head-to-Head Visualization ───────────────────────────────────
+    # ── Head-to-Head Visualization (Dean Oliver Four Factors) ────────
     ht = TEAMS_DATA.get(home, {})
     at = TEAMS_DATA.get(away, {})
     if ht or at:
-        # Numeric stats to visualize
+        # Extended stats: original 3 + Dean Oliver Four Factors
         _h2h_stats = [
-            ("Pace",  float(at.get("pace", 100) or 100), float(ht.get("pace", 100) or 100), 85, 115),
-            ("ORtg",  float(at.get("ortg", 113) or 113), float(ht.get("ortg", 113) or 113), 105, 125),
-            ("DRtg",  float(at.get("drtg", 113) or 113), float(ht.get("drtg", 113) or 113), 105, 125),
+            ("Pace",  float(at.get("pace", 100) or 100), float(ht.get("pace", 100) or 100), 85, 115, False),
+            ("ORtg",  float(at.get("ortg", 113) or 113), float(ht.get("ortg", 113) or 113), 105, 125, False),
+            ("DRtg",  float(at.get("drtg", 113) or 113), float(ht.get("drtg", 113) or 113), 105, 125, True),
+            ("NetRtg",
+             float(at.get("ortg", 113) or 113) - float(at.get("drtg", 113) or 113),
+             float(ht.get("ortg", 113) or 113) - float(ht.get("drtg", 113) or 113),
+             -15, 15, False),
+            ("eFG%",  float(at.get("efg_pct", 52) or 52), float(ht.get("efg_pct", 52) or 52), 45, 60, False),
+            ("TOV%",  float(at.get("tov_pct", 13) or 13), float(ht.get("tov_pct", 13) or 13), 8, 20, True),
+            ("FTRate",float(at.get("ft_rate", 0.25) or 0.25), float(ht.get("ft_rate", 0.25) or 0.25), 0.15, 0.40, False),
         ]
-        _h2h_rows = ""
-        for _h2h_item in _h2h_stats:
-            _label, _av, _hv, _lo, _hi = _h2h_item
-            _rng = max(_hi - _lo, 1)
-            _a_pct = round(max(0, min(100, (_av - _lo) / _rng * 100)))
-            _h_pct = round(max(0, min(100, (_hv - _lo) / _rng * 100)))
-            # For DRtg, lower is better (flip colors)
-            _flip = _label == "DRtg"
-            _a_better = (_av < _hv) if _flip else (_av > _hv)
-            _a_c = "#00ff9d" if _a_better else "#8b949e"
-            _h_c = "#00ff9d" if not _a_better else "#8b949e"
-            _h2h_rows += (
-                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-                f'<div style="width:40px;text-align:right;font-size:0.75rem;color:#8a9bb8;">{html.escape(away)}</div>'
-                f'<div style="flex:1;display:flex;align-items:center;gap:4px;">'
-                f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;position:relative;">'
-                f'<div style="position:absolute;right:0;width:{_a_pct}%;height:10px;background:{_a_c};border-radius:3px;"></div>'
-                f'</div>'
-                f'<div style="width:40px;text-align:center;font-size:0.78rem;font-weight:700;color:#c0d0e8;">{_label}</div>'
-                f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;">'
-                f'<div style="width:{_h_pct}%;height:10px;background:{_h_c};border-radius:3px;"></div>'
-                f'</div>'
-                f'</div>'
-                f'<div style="width:40px;font-size:0.75rem;color:#8a9bb8;">{html.escape(home)}</div>'
-                f'</div>'
-                f'<div style="display:flex;gap:8px;margin-bottom:4px;font-size:0.72rem;color:#8b949e;">'
-                f'<div style="width:40px;text-align:right;color:{_a_c};">{_av:.1f}</div>'
-                f'<div style="flex:1;text-align:center;"></div>'
-                f'<div style="text-align:left;color:{_h_c};">{_hv:.1f}</div>'
-                f'</div>'
-            )
 
         st.markdown(
-            f'<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:14px 18px;margin-top:8px;">'
-            f'<div style="font-size:0.78rem;color:#8a9bb8;font-weight:600;margin-bottom:10px;'
-            f'letter-spacing:0.5px;">⚡ HEAD-TO-HEAD</div>'
-            f'{_h2h_rows}'
-            f'</div>',
+            get_h2h_bars_html(away, home, _h2h_stats),
             unsafe_allow_html=True,
         )
     else:
@@ -622,6 +615,26 @@ with _tab_report:
             expander_label = (
                 f"🏀 {away} @ {home}"
                 + (f" — {n_game_props} props · {n_conf} high-conf" if n_game_props else " — no props analyzed")
+            )
+
+            # ── QDS Matchup Card above expander (with logos + records) ──
+            _standings_map_mc: dict = {}
+            for _s_mc in st.session_state.get("league_standings", []):
+                _standings_map_mc[_s_mc.get("team_abbreviation", "").upper()] = _s_mc
+            _home_sd = _standings_map_mc.get(home, {})
+            _away_sd = _standings_map_mc.get(away, {})
+            _home_rec = f"{_home_sd.get('wins', 0)}-{_home_sd.get('losses', 0)}" if _home_sd else ""
+            _away_rec = f"{_away_sd.get('wins', 0)}-{_away_sd.get('losses', 0)}" if _away_sd else ""
+            st.markdown(
+                get_matchup_card_html(
+                    away_team=away,
+                    home_team=home,
+                    away_record=_away_rec,
+                    home_record=_home_rec,
+                    n_props=n_game_props,
+                    n_high_conf=n_conf,
+                ),
+                unsafe_allow_html=True,
             )
 
             with st.expander(expander_label, expanded=True):
@@ -730,15 +743,13 @@ with _tab_report:
                     if game_strategy:
                         st.markdown("#### 🎯 Suggested Parlays")
                         for _e in game_strategy[:3]:
-                            _picks_str = " + ".join(_e.get("picks", []))
                             st.markdown(
-                                f'<div style="background:#14192b;border-radius:6px;padding:10px 14px;'
-                                f'margin-bottom:8px;border-left:3px solid #ff5e00;">'
-                                f'<span style="color:#ff5e00;font-weight:600;">'
-                                f'{_e.get("combo_type","")}</span>'
-                                f'<span style="color:#8b949e;font-size:0.8rem;margin:0 8px;">SAFE {_e.get("safe_avg","")}/100</span>'
-                                f'<div style="color:#c0d0e8;font-size:0.85rem;margin-top:4px;">{_picks_str}</div>'
-                                f'</div>',
+                                get_parlay_card_html(
+                                    combo_type=_e.get("combo_type", ""),
+                                    picks=_e.get("picks", []),
+                                    safe_avg=_e.get("safe_avg", ""),
+                                    strategy=_e.get("strategy", ""),
+                                ),
                                 unsafe_allow_html=True,
                             )
                         st.divider()
@@ -1204,12 +1215,19 @@ with _tab_builder:
                 over_prob_r = r_gb.get("over_probability", 0.5)
                 direction_r = "OVER" if over_prob_r > 0.5 else "UNDER"
                 conf_r = r_gb.get("confidence_score", 0)
-                tier_r = "💎 Platinum" if conf_r >= 85 else "Gold" if conf_r >= 70 else "🥈 Silver" if conf_r >= 55 else "Bronze"
                 st.markdown(
-                    f"**{r_gb['player_name']}** ({r_gb['team']}) — "
-                    f"{r_gb['stat_type'].upper()} {direction_r} {r_gb['prop_line']} "
-                    f"| Proj: {r_gb['projected']} | {over_prob_r * 100:.1f}% | {tier_r} "
-                    f"| {r_gb['minutes_used']:.0f} min"
+                    get_builder_prop_card_html(
+                        player_name=r_gb["player_name"],
+                        team=r_gb["team"],
+                        stat_type=r_gb["stat_type"],
+                        direction=direction_r,
+                        prop_line=r_gb["prop_line"],
+                        projected=r_gb["projected"],
+                        over_prob=over_prob_r,
+                        confidence=conf_r,
+                        minutes=r_gb["minutes_used"],
+                    ),
+                    unsafe_allow_html=True,
                 )
     elif home_team_gb == away_team_gb:
         st.warning("⚠️ Home and Away teams must be different.")
@@ -1349,6 +1367,14 @@ with _tab_narrative:
             _narr_home = _narr_game.get("home_team", "")
             _narr_away = _narr_game.get("away_team", "")
             with st.expander(f"🏀 {_narr_away} @ {_narr_home}", expanded=True):
+                # QDS-styled narrative card with team-colored accents & watermark logos
+                st.markdown(
+                    get_narrative_card_html(
+                        away_team=_narr_away,
+                        home_team=_narr_home,
+                    ),
+                    unsafe_allow_html=True,
+                )
                 _narrative_text = _generate_game_narrative(_narr_game, analysis_results)
                 st.markdown(_narrative_text)
 
