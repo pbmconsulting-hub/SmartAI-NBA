@@ -2322,6 +2322,13 @@ def fetch_player_game_log(player_id, last_n_games=20):
                 "tov": float(game.get("TOV", 0) or 0),       # Turnovers
                 "fg3m": float(game.get("FG3M", 0) or 0),     # 3-pointers made
                 "ft_pct": float(game.get("FT_PCT", 0) or 0), # Free throw %
+                "ftm": float(game.get("FTM", 0) or 0),       # Free throws made
+                "fta": float(game.get("FTA", 0) or 0),       # Free throws attempted
+                "fgm": float(game.get("FGM", 0) or 0),       # Field goals made
+                "fga": float(game.get("FGA", 0) or 0),       # Field goals attempted
+                "oreb": float(game.get("OREB", 0) or 0),     # Offensive rebounds
+                "dreb": float(game.get("DREB", 0) or 0),     # Defensive rebounds
+                "pf": float(game.get("PF", 0) or 0),         # Personal fouls
             }
             formatted_games.append(formatted_game)
 
