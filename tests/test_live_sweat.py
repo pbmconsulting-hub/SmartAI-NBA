@@ -94,9 +94,10 @@ class TestLiveMathPacing(unittest.TestCase):
         result = self.calc(10, 20, 25)
         expected_keys = {
             "current_stat", "target_stat", "distance", "minutes_played",
-            "minutes_remaining", "pace_per_minute", "projected_final",
-            "pct_of_target", "blowout_risk", "foul_trouble", "on_pace",
-            "cashed", "direction", "is_overtime",
+            "minutes_remaining", "est_total_minutes", "pace_per_minute",
+            "projected_final", "pct_of_target", "blowout_risk",
+            "foul_trouble", "on_pace", "cashed", "direction",
+            "is_overtime", "period_num",
         }
         self.assertEqual(set(result.keys()), expected_keys)
 
@@ -785,8 +786,8 @@ class TestLiveSweatPageFile(unittest.TestCase):
     def test_live_css(self):
         self.assertIn("get_live_sweat_css", self.source)
 
-    def test_balloons_trigger(self):
-        self.assertIn("st.balloons()", self.source)
+    def test_confetti_trigger(self):
+        self.assertIn("render_confetti_html", self.source)
 
     def test_vibe_check_section(self):
         self.assertIn("Vibe Check", self.source)
@@ -809,7 +810,7 @@ class TestLiveSweatPageFile(unittest.TestCase):
         self.assertIn("Refresh Now", self.source)
 
     def test_last_refresh_timestamp(self):
-        self.assertIn("Last refreshed", self.source)
+        self.assertIn("LIVE", self.source)
 
     def test_awaiting_metric(self):
         self.assertIn("Awaiting", self.source)
@@ -1025,6 +1026,502 @@ class TestBuildPlayerList(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0]["name"], "A B")
         self.assertEqual(result[1]["name"], "C D")
+
+
+# ============================================================
+# SECTION 9: New Enhancement Tests
+# ============================================================
+
+class TestSweatScore(unittest.TestCase):
+    """Tests for calculate_sweat_score()."""
+
+    def setUp(self):
+        from engine.live_math import calculate_sweat_score
+        self.score = calculate_sweat_score
+
+    def test_empty_returns_zero(self):
+        self.assertEqual(self.score([]), 0)
+
+    def test_all_cashed_high_score(self):
+        paces = [{"cashed": True, "on_pace": True, "pct_of_target": 120,
+                   "blowout_risk": False, "foul_trouble": False}] * 3
+        result = self.score(paces)
+        self.assertGreaterEqual(result, 90)
+
+    def test_all_behind_low_score(self):
+        paces = [{"cashed": False, "on_pace": False, "pct_of_target": 30,
+                   "blowout_risk": False, "foul_trouble": False}] * 3
+        result = self.score(paces)
+        self.assertLessEqual(result, 30)
+
+    def test_risk_penalty(self):
+        no_risk = [{"cashed": False, "on_pace": True, "pct_of_target": 80,
+                     "blowout_risk": False, "foul_trouble": False}]
+        with_risk = [{"cashed": False, "on_pace": True, "pct_of_target": 80,
+                       "blowout_risk": True, "foul_trouble": False}]
+        self.assertGreater(self.score(no_risk), self.score(with_risk))
+
+    def test_clamped_0_100(self):
+        result = self.score([{"cashed": True, "on_pace": True,
+                              "pct_of_target": 200, "blowout_risk": False,
+                              "foul_trouble": False}])
+        self.assertLessEqual(result, 100)
+        self.assertGreaterEqual(result, 0)
+
+
+class TestEstTotalMinutesAndPeriodNum(unittest.TestCase):
+    """Tests for new return keys in calculate_live_pace()."""
+
+    def setUp(self):
+        from engine.live_math import calculate_live_pace
+        self.calc = calculate_live_pace
+
+    def test_est_total_minutes_present(self):
+        result = self.calc(10, 20, 25, period="2")
+        self.assertIn("est_total_minutes", result)
+        self.assertGreater(result["est_total_minutes"], 0)
+
+    def test_period_num_present(self):
+        result = self.calc(10, 20, 25, period="3")
+        self.assertIn("period_num", result)
+        self.assertEqual(result["period_num"], 3)
+
+    def test_period_num_overtime(self):
+        result = self.calc(20, 40, 30, period="OT1")
+        self.assertEqual(result["period_num"], 5)
+
+    def test_period_num_default(self):
+        result = self.calc(10, 20, 25)
+        self.assertEqual(result["period_num"], 0)
+
+
+class TestNewLiveThemeFunctions(unittest.TestCase):
+    """Tests for new rendering functions in live_theme.py."""
+
+    def test_sparkline_svg(self):
+        from styles.live_theme import render_sparkline_svg
+        svg = render_sparkline_svg([5, 10, 18, 25])
+        self.assertIn("<svg", svg)
+        self.assertIn("polyline", svg)
+        self.assertIn("sparkline-container", svg)
+
+    def test_sparkline_empty(self):
+        from styles.live_theme import render_sparkline_svg
+        self.assertEqual(render_sparkline_svg([]), "")
+        self.assertEqual(render_sparkline_svg([5]), "")
+
+    def test_confetti_html(self):
+        from styles.live_theme import render_confetti_html
+        html = render_confetti_html()
+        self.assertIn("confetti-container", html)
+        self.assertIn("confetti-piece", html)
+        self.assertIn("💰", html)
+
+    def test_victory_lap(self):
+        from styles.live_theme import render_victory_lap
+        html = render_victory_lap("We did it!")
+        self.assertIn("victory-lap-overlay", html)
+        self.assertIn("We did it!", html)
+
+    def test_victory_lap_escapes_html(self):
+        from styles.live_theme import render_victory_lap
+        html = render_victory_lap('<script>x</script>')
+        self.assertNotIn("<script>", html)
+
+    def test_sweat_score_gauge(self):
+        from styles.live_theme import render_sweat_score_gauge
+        html = render_sweat_score_gauge(75)
+        self.assertIn("sweat-score-gauge", html)
+        self.assertIn("75", html)
+        self.assertIn("SWEAT SCORE", html)
+
+    def test_sweat_score_gauge_clamped(self):
+        from styles.live_theme import render_sweat_score_gauge
+        html = render_sweat_score_gauge(150)
+        self.assertIn("100", html)
+
+    def test_joseph_ticker_bar(self):
+        from styles.live_theme import render_joseph_ticker_bar
+        html = render_joseph_ticker_bar(["CASHED IT!", "PANIC MODE!"])
+        self.assertIn("joseph-ticker-bar", html)
+        self.assertIn("CASHED IT!", html)
+        self.assertIn("PANIC MODE!", html)
+
+    def test_joseph_ticker_bar_empty(self):
+        from styles.live_theme import render_joseph_ticker_bar
+        self.assertEqual(render_joseph_ticker_bar([]), "")
+
+    def test_danger_zone(self):
+        from styles.live_theme import render_danger_zone
+        html = render_danger_zone(3.0, 8.2, "points")
+        self.assertIn("danger-zone", html)
+        self.assertIn("3 more", html)
+        self.assertIn("8.2 min", html)
+
+    def test_danger_zone_urgent(self):
+        from styles.live_theme import render_danger_zone
+        html = render_danger_zone(2.0, 3.0, "pts")
+        self.assertIn("danger-zone-urgent", html)
+
+    def test_quarter_breakdown(self):
+        from styles.live_theme import render_quarter_breakdown
+        html = render_quarter_breakdown([5, 12, 18], projected_q4=7.0)
+        self.assertIn("quarter-breakdown", html)
+        self.assertIn("Q1", html)
+        self.assertIn("Q4 (proj)", html)
+
+    def test_quarter_breakdown_empty(self):
+        from styles.live_theme import render_quarter_breakdown
+        self.assertEqual(render_quarter_breakdown([]), "")
+
+    def test_parlay_health(self):
+        from styles.live_theme import render_parlay_health
+        legs = [
+            {"player_name": "A", "stat_type": "points", "pct_of_target": 90,
+             "on_pace": True, "cashed": False},
+            {"player_name": "B", "stat_type": "rebounds", "pct_of_target": 60,
+             "on_pace": False, "cashed": False},
+        ]
+        html = render_parlay_health(legs)
+        self.assertIn("parlay-health-card", html)
+        self.assertIn("Parlay Health", html)
+        self.assertIn("parlay-leg-weakest", html)
+
+    def test_parlay_health_empty(self):
+        from styles.live_theme import render_parlay_health
+        self.assertEqual(render_parlay_health([]), "")
+
+    def test_sound_alerts_js_disabled(self):
+        from styles.live_theme import get_sound_alerts_js
+        self.assertEqual(get_sound_alerts_js(False), "")
+
+    def test_sound_alerts_js_enabled(self):
+        from styles.live_theme import get_sound_alerts_js
+        js = get_sound_alerts_js(True)
+        self.assertIn("<script>", js)
+        self.assertIn("_cashSound", js)
+        self.assertIn("_warningBuzz", js)
+
+    def test_keyboard_shortcuts_js(self):
+        from styles.live_theme import get_keyboard_shortcuts_js
+        js = get_keyboard_shortcuts_js()
+        self.assertIn("<script>", js)
+        self.assertIn("keydown", js)
+        self.assertIn("Escape", js)
+
+    def test_player_headshot_url(self):
+        from styles.live_theme import get_player_headshot_url
+        url = get_player_headshot_url("LeBron James")
+        self.assertIn("cdn.nba.com/headshots", url)
+        self.assertIn("2544", url)
+
+    def test_player_headshot_unknown(self):
+        from styles.live_theme import get_player_headshot_url
+        self.assertEqual(get_player_headshot_url("Unknown Player XYZ"), "")
+
+
+class TestNewCSSClasses(unittest.TestCase):
+    """Tests for new CSS classes in get_live_sweat_css()."""
+
+    @classmethod
+    def setUpClass(cls):
+        from styles.live_theme import get_live_sweat_css
+        cls.css = get_live_sweat_css()
+
+    def test_slide_up_animation(self):
+        self.assertIn("@keyframes slideUp", self.css)
+
+    def test_card_stagger_delays(self):
+        self.assertIn("animation-delay: 100ms", self.css)
+        self.assertIn("animation-delay: 200ms", self.css)
+
+    def test_glow_green_class(self):
+        self.assertIn(".sweat-card.glow-green", self.css)
+
+    def test_glow_red_class(self):
+        self.assertIn(".sweat-card.glow-red", self.css)
+
+    def test_glow_gold_class(self):
+        self.assertIn(".sweat-card.glow-gold", self.css)
+
+    def test_heartbeat_animation(self):
+        self.assertIn("@keyframes heartbeat", self.css)
+        self.assertIn("live-heartbeat-dot", self.css)
+
+    def test_confetti_animation(self):
+        self.assertIn("@keyframes confettiFall", self.css)
+        self.assertIn("confetti-container", self.css)
+
+    def test_victory_lap_css(self):
+        self.assertIn("victory-lap-overlay", self.css)
+        self.assertIn("@keyframes victoryFadeIn", self.css)
+
+    def test_grid_layout(self):
+        self.assertIn("sweat-cards-grid", self.css)
+        self.assertIn("grid-template-columns", self.css)
+        self.assertIn("repeat(auto-fill", self.css)
+
+    def test_sticky_metrics(self):
+        self.assertIn("sticky-metrics-bar", self.css)
+        self.assertIn("position: sticky", self.css)
+
+    def test_headshot_class(self):
+        self.assertIn("sweat-card-headshot", self.css)
+
+    def test_sparkline_class(self):
+        self.assertIn("sparkline-container", self.css)
+
+    def test_sweat_score_gauge(self):
+        self.assertIn("sweat-score-gauge", self.css)
+        self.assertIn("sweat-score-number", self.css)
+
+    def test_emoji_reactions(self):
+        self.assertIn("sweat-reactions", self.css)
+        self.assertIn("sweat-reaction-btn", self.css)
+
+    def test_danger_zone_css(self):
+        self.assertIn("danger-zone", self.css)
+
+    def test_parlay_health_css(self):
+        self.assertIn("parlay-health-card", self.css)
+        self.assertIn("parlay-leg-row", self.css)
+        self.assertIn("parlay-leg-weakest", self.css)
+
+    def test_joseph_avatar_css(self):
+        self.assertIn("joseph-avatar-victory", self.css)
+        self.assertIn("joseph-avatar-panic", self.css)
+        self.assertIn("@keyframes josephBounce", self.css)
+        self.assertIn("@keyframes josephShake", self.css)
+
+    def test_bet_of_the_night_css(self):
+        self.assertIn("bet-of-the-night", self.css)
+        self.assertIn("bet-of-the-night-badge", self.css)
+
+    def test_drama_meltdown_css(self):
+        self.assertIn("drama-meltdown", self.css)
+        self.assertIn("drama-red-tint", self.css)
+        self.assertIn("@keyframes screenShake", self.css)
+
+    def test_joseph_ticker_bar_css(self):
+        self.assertIn("joseph-ticker-bar", self.css)
+        self.assertIn("joseph-ticker-scroll", self.css)
+        self.assertIn("@keyframes josephTickerScroll", self.css)
+
+    def test_defense_badge_css(self):
+        self.assertIn("defense-badge", self.css)
+        self.assertIn("defense-badge-weak", self.css)
+        self.assertIn("defense-badge-strong", self.css)
+
+    def test_minutes_share_css(self):
+        self.assertIn("minutes-share", self.css)
+
+    def test_quarter_breakdown_css(self):
+        self.assertIn("quarter-breakdown", self.css)
+
+    def test_mobile_breakpoints(self):
+        self.assertIn("@media (max-width: 768px)", self.css)
+        self.assertIn("sweat-cards-grid", self.css)
+
+
+class TestSweatCardEnhancements(unittest.TestCase):
+    """Tests for enhanced render_sweat_card parameters."""
+
+    def test_headshot_renders(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="LeBron James", stat_type="points",
+            current_stat=20, target_stat=25.5, projected_final=28.0,
+            pct_of_target=110, color_tier="green",
+        )
+        self.assertIn("sweat-card-headshot", html)
+        self.assertIn("cdn.nba.com/headshots", html)
+
+    def test_unknown_player_no_headshot(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="ZZZ Unknown", stat_type="points",
+            current_stat=10, target_stat=20, projected_final=15,
+            pct_of_target=75, color_tier="orange",
+        )
+        self.assertNotIn("sweat-card-headshot", html)
+
+    def test_sparkline_in_card(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=18, target_stat=25, projected_final=22,
+            pct_of_target=88, color_tier="red",
+            quarter_values=[5, 12, 18],
+        )
+        self.assertIn("sparkline-container", html)
+        self.assertIn("<svg", html)
+
+    def test_glow_green_on_pace(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=25, target_stat=24, projected_final=30,
+            pct_of_target=125, color_tier="green",
+        )
+        self.assertIn("glow-green", html)
+
+    def test_glow_gold_cashed(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=30, target_stat=25, projected_final=35,
+            pct_of_target=140, color_tier="green", cashed=True,
+        )
+        self.assertIn("glow-gold", html)
+
+    def test_glow_red_behind(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=30, projected_final=15,
+            pct_of_target=50, color_tier="red",
+        )
+        self.assertIn("glow-red", html)
+
+    def test_defense_badge_strong(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25, projected_final=20,
+            pct_of_target=80, color_tier="orange",
+            defense_rank=3,
+        )
+        self.assertIn("defense-badge-strong", html)
+        self.assertIn("#3 DEF", html)
+
+    def test_defense_badge_weak(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=10, target_stat=25, projected_final=20,
+            pct_of_target=80, color_tier="orange",
+            defense_rank=28,
+        )
+        self.assertIn("defense-badge-weak", html)
+        self.assertIn("#28 DEF", html)
+
+    def test_bet_of_night_badge(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=22, target_stat=25, projected_final=26,
+            pct_of_target=104, color_tier="green",
+            is_bet_of_night=True,
+        )
+        self.assertIn("bet-of-the-night", html)
+        self.assertIn("BET OF THE NIGHT", html)
+
+    def test_drama_meltdown(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=20, target_stat=25, projected_final=23,
+            pct_of_target=92, color_tier="red",
+            drama_level=3,
+        )
+        self.assertIn("drama-meltdown", html)
+        self.assertIn("drama-red-tint", html)
+
+    def test_minutes_share_indicator(self):
+        from styles.live_theme import render_sweat_card
+        html = render_sweat_card(
+            player_name="Test", stat_type="points",
+            current_stat=15, target_stat=25, projected_final=22,
+            pct_of_target=88, color_tier="red",
+            minutes_played=28, est_total_minutes=36,
+        )
+        self.assertIn("28/36 min projected", html)
+
+
+class TestPageEnhancements(unittest.TestCase):
+    """Verify the Live Sweat page file has new enhancement features."""
+
+    @classmethod
+    def setUpClass(cls):
+        page_path = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "0_💦_Live_Sweat.py",
+        )
+        with open(page_path, "r", encoding="utf-8") as f:
+            cls.source = f.read()
+
+    def test_sweat_score_import(self):
+        self.assertIn("calculate_sweat_score", self.source)
+
+    def test_confetti_import(self):
+        self.assertIn("render_confetti_html", self.source)
+
+    def test_victory_lap_import(self):
+        self.assertIn("render_victory_lap", self.source)
+
+    def test_keyboard_shortcuts(self):
+        self.assertIn("get_keyboard_shortcuts_js", self.source)
+
+    def test_sound_alerts_toggle(self):
+        self.assertIn("Sound Alerts", self.source)
+        self.assertIn("get_sound_alerts_js", self.source)
+
+    def test_heartbeat_indicator(self):
+        self.assertIn("live-heartbeat", self.source)
+        self.assertIn("live-heartbeat-dot", self.source)
+
+    def test_grid_layout(self):
+        self.assertIn("sweat-cards-grid", self.source)
+
+    def test_sticky_metrics(self):
+        self.assertIn("sticky-metrics-bar", self.source)
+
+    def test_parlay_health(self):
+        self.assertIn("render_parlay_health", self.source)
+        self.assertIn("parlay_legs", self.source)
+
+    def test_sweat_score_gauge(self):
+        self.assertIn("render_sweat_score_gauge", self.source)
+
+    def test_joseph_ticker_bar(self):
+        self.assertIn("render_joseph_ticker_bar", self.source)
+
+    def test_danger_zone(self):
+        self.assertIn("render_danger_zone", self.source)
+
+    def test_emoji_reactions(self):
+        self.assertIn("sweat_reactions", self.source)
+        self.assertIn("🔥", self.source)
+        self.assertIn("😰", self.source)
+
+    def test_remove_bet_button(self):
+        self.assertIn("sweat_removed_bets", self.source)
+        self.assertIn("Remove from sweat", self.source)
+
+    def test_lock_more_link(self):
+        self.assertIn("Lock More Bets", self.source)
+        self.assertIn("Prop Scanner", self.source)
+
+    def test_drama_escalation(self):
+        self.assertIn("sweat_drama_counts", self.source)
+        self.assertIn("drama_level", self.source)
+
+    def test_bet_of_the_night(self):
+        self.assertIn("BET OF THE NIGHT", self.source)
+        self.assertIn("_best_bon", self.source)
+
+    def test_joseph_animated_avatar(self):
+        self.assertIn("joseph-avatar", self.source)
+
+    def test_quarter_breakdown_available(self):
+        self.assertIn("render_quarter_breakdown", self.source)
+
+    def test_expander_card_detail(self):
+        self.assertIn("st.expander", self.source)
+        self.assertIn("Details", self.source)
+
+    def test_vibe_check_section(self):
+        self.assertIn("Vibe Check", self.source)
 
 
 if __name__ == "__main__":

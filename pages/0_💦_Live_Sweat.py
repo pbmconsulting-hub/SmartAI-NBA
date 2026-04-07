@@ -64,8 +64,15 @@ from data.live_game_tracker import (
     get_game_for_player,
     match_live_player,
 )
-from engine.live_math import calculate_live_pace, pace_color_tier
-from styles.live_theme import render_sweat_card, render_waiting_card
+from engine.live_math import calculate_live_pace, pace_color_tier, calculate_sweat_score
+from styles.live_theme import (
+    render_sweat_card, render_waiting_card,
+    render_confetti_html, render_victory_lap,
+    render_sweat_score_gauge, render_joseph_ticker_bar,
+    render_danger_zone, render_sparkline_svg,
+    render_quarter_breakdown, render_parlay_health,
+    get_sound_alerts_js, get_keyboard_shortcuts_js,
+)
 from agent.live_persona import get_joseph_live_reaction, stream_joseph_text
 
 # ── Pillar 4 Panic Room imports ──────────────────────────────
@@ -76,6 +83,9 @@ from styles.live_theme import get_panic_room_css, render_panic_room_card
 
 # Inject Panic Room CSS
 st.markdown(get_panic_room_css(), unsafe_allow_html=True)
+
+# ── Keyboard Shortcuts (always active) ───────────────────────
+st.markdown(get_keyboard_shortcuts_js(), unsafe_allow_html=True)
 
 # ============================================================
 # SECTION: Header
@@ -522,15 +532,27 @@ if scoreboard_games:
     st.markdown(_ticker_html, unsafe_allow_html=True)
     st.divider()
 
-# ── Last Refresh Timestamp ────────────────────────────────────
+# ── Live Heartbeat Indicator & Last Refresh ───────────────────
 
 _now = datetime.datetime.now()
-_refresh_col, _btn_col, _ = st.columns([2, 1, 3])
+_refresh_col, _btn_col, _settings_col = st.columns([2, 1, 3])
 with _refresh_col:
-    st.caption(f"🕐 Last refreshed: **{_now.strftime('%I:%M:%S %p')}**")
+    st.markdown(
+        f'<div class="live-heartbeat">'
+        f'<span class="live-heartbeat-dot"></span>'
+        f'<span style="font-size:0.82rem;color:rgba(255,255,255,0.55);">'
+        f'LIVE · {_now.strftime("%I:%M:%S %p")}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
 with _btn_col:
     if st.button("🔄 Refresh Now", key="manual_refresh"):
         st.rerun()
+with _settings_col:
+    _sound_enabled = st.toggle("🔔 Sound Alerts", value=False, key="sweat_sound_toggle")
+
+# Inject sound JS if enabled
+st.markdown(get_sound_alerts_js(_sound_enabled), unsafe_allow_html=True)
 
 if not live_games:
     st.warning(
@@ -545,9 +567,23 @@ tracking_count = 0
 risk_count = 0
 waiting_count = 0
 
-cards_html = ""
+cards_html_parts: list[str] = []
 waiting_html = ""
 vibe_checks: list[tuple[str, dict]] = []  # (player_name, pace_result)
+all_pace_results: list[dict] = []  # for sweat score
+parlay_legs: list[dict] = []  # for parlay health
+
+# ── Drama escalation tracking ────────────────────────────────
+if "sweat_drama_counts" not in st.session_state:
+    st.session_state["sweat_drama_counts"] = {}
+
+# ── Emoji reactions state ────────────────────────────────────
+if "sweat_reactions" not in st.session_state:
+    st.session_state["sweat_reactions"] = {}
+
+# ── Removed / locked-out bets ────────────────────────────────
+if "sweat_removed_bets" not in st.session_state:
+    st.session_state["sweat_removed_bets"] = set()
 
 for bet in active_bets:
     player_name = bet.get("player_name", "")
@@ -556,6 +592,11 @@ for bet in active_bets:
     direction = str(bet.get("direction", "OVER")).upper()
 
     if not player_name or target <= 0:
+        continue
+
+    # Check if bet was removed from session
+    bet_key = f"{player_name}|{stat_type}|{target}|{direction}"
+    if bet_key in st.session_state.get("sweat_removed_bets", set()):
         continue
 
     # Fuzzy-match the player in the live box score
@@ -597,14 +638,47 @@ for bet in active_bets:
     )
 
     color = pace_color_tier(pace["pct_of_target"], direction)
+    all_pace_results.append(pace)
 
     if pace["cashed"]:
         cashed_count += 1
     if pace["blowout_risk"] or pace["foul_trouble"]:
         risk_count += 1
 
+    # ── Drama escalation tracking ────────────────────────────
+    drama_key = f"{player_name}_{stat_type}"
+    drama_counts = st.session_state.get("sweat_drama_counts", {})
+    pct = pace.get("pct_of_target", 0)
+    if 85 <= pct <= 99 and not pace["cashed"]:
+        drama_counts[drama_key] = drama_counts.get(drama_key, 0) + 1
+    else:
+        drama_counts[drama_key] = 0
+    st.session_state["sweat_drama_counts"] = drama_counts
+    drama_level = drama_counts.get(drama_key, 0)
+
+    # ── Quarter values for sparkline (simulated from pace) ───
+    period_num = pace.get("period_num", 0)
+    quarter_values: list[float] = []
+    if period_num >= 1 and pace["current_stat"] > 0:
+        per_q = pace["current_stat"] / max(1, min(period_num, 4))
+        quarter_values = [round(per_q * (i + 1), 1) for i in range(min(period_num, 4))]
+
+    # ── Projected Q4 stat ────────────────────────────────────
+    projected_q4 = 0.0
+    if period_num < 4 and pace["pace_per_minute"] > 0:
+        projected_q4 = pace["pace_per_minute"] * 12  # 12 min quarter
+
+    # Parlay tracking
+    parlay_legs.append({
+        "player_name": player_name,
+        "stat_type": stat_type,
+        "pct_of_target": pace["pct_of_target"],
+        "on_pace": pace["on_pace"],
+        "cashed": pace["cashed"],
+    })
+
     # Render card
-    cards_html += render_sweat_card(
+    cards_html_parts.append(render_sweat_card(
         player_name=player_name,
         stat_type=stat_type,
         current_stat=pace["current_stat"],
@@ -619,35 +693,147 @@ for bet in active_bets:
         direction=direction,
         minutes_remaining=pace["minutes_remaining"],
         is_overtime=pace["is_overtime"],
-    )
+        quarter_values=quarter_values if quarter_values else None,
+        est_total_minutes=pace.get("est_total_minutes", 0),
+        drama_level=drama_level,
+    ))
 
     vibe_checks.append((player_name, pace))
 
-# ── Top-Level Metrics ─────────────────────────────────────────
+cards_html = "".join(cards_html_parts)
 
+# ── Sticky Top-Level Metrics ──────────────────────────────────
+
+st.markdown('<div class="sticky-metrics-bar">', unsafe_allow_html=True)
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("🎯 Active Bets", len(active_bets))
 c2.metric("📡 Tracking Live", tracking_count)
 c3.metric("✅ Cashed", cashed_count)
 c4.metric("🚨 At Risk", risk_count)
 c5.metric("🕐 Awaiting", waiting_count)
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
-# ── Balloons for any cashed bet ───────────────────────────────
+# ── Sweat Score Gauge ─────────────────────────────────────────
+
+if all_pace_results:
+    sweat_score = calculate_sweat_score(all_pace_results)
+    st.markdown(render_sweat_score_gauge(sweat_score), unsafe_allow_html=True)
+
+# ── Confetti + Victory Lap for cashed bets ────────────────────
 
 if cashed_count > 0:
-    st.balloons()
+    # Gold confetti cannon replaces st.balloons()
+    st.markdown(render_confetti_html(), unsafe_allow_html=True)
+    # Play cash sound if sound alerts are enabled
+    if _sound_enabled:
+        st.markdown(
+            '<script>if(window._cashSound) window._cashSound();</script>',
+            unsafe_allow_html=True,
+        )
+    # Victory lap for first cash (show once per session per count)
+    _prev_cashed = st.session_state.get("_prev_cashed_count", 0)
+    if cashed_count > _prev_cashed:
+        from agent.live_persona import _CASHED_BRAGS
+        import random as _rnd_victory
+        victory_quote = _rnd_victory.choice(_CASHED_BRAGS)
+        st.markdown(render_victory_lap(victory_quote), unsafe_allow_html=True)
+    st.session_state["_prev_cashed_count"] = cashed_count
 
-# ── Render all sweat cards ────────────────────────────────────
+# ── Render all sweat cards (Grid Layout) ──────────────────────
 
 if cards_html:
-    st.markdown(cards_html, unsafe_allow_html=True)
+    st.markdown(f'<div class="sweat-cards-grid">{cards_html}</div>', unsafe_allow_html=True)
+
+    # ── Tap-to-Expand Card Details + Emoji Reactions ──────────
+    for i, (player_name, pace) in enumerate(vibe_checks):
+        bet_key = f"{player_name}|{pace.get('target_stat', 0)}"
+        col_card, col_remove = st.columns([10, 1])
+        with col_remove:
+            if st.button("❌", key=f"remove_{i}", help="Remove from sweat"):
+                stat_t = ""
+                for b in active_bets:
+                    if b.get("player_name") == player_name:
+                        stat_t = b.get("stat_type", "")
+                        break
+                rm_key = f"{player_name}|{stat_t}|{pace.get('target_stat', 0)}|{pace.get('direction', 'OVER')}"
+                st.session_state.setdefault("sweat_removed_bets", set()).add(rm_key)
+                st.rerun()
+        with col_card:
+            with st.expander(f"📊 {player_name} — Details", expanded=pace.get("cashed", False)):
+                # Per-quarter pace breakdown
+                period_num = pace.get("period_num", 0)
+                if period_num >= 1 and pace["current_stat"] > 0:
+                    per_q = pace["current_stat"] / max(1, min(period_num, 4))
+                    q_vals = [round(per_q * (i + 1), 1) for i in range(min(period_num, 4))]
+                    proj_q4 = pace["pace_per_minute"] * 12 if period_num < 4 else 0
+                    st.markdown(render_quarter_breakdown(q_vals, proj_q4), unsafe_allow_html=True)
+
+                # Minutes share
+                est_min = pace.get("est_total_minutes", 0)
+                if est_min > 0:
+                    st.caption(
+                        f"⏱️ Minutes: {pace['minutes_played']:.0f} played / "
+                        f"{est_min:.0f} projected total"
+                    )
+
+                # Danger zone timeline (within 10% of target)
+                dist = pace.get("distance", 0)
+                target_val = pace.get("target_stat", 1)
+                if 0 < dist <= target_val * 0.10 and not pace["cashed"]:
+                    stat_t = ""
+                    for b in active_bets:
+                        if b.get("player_name") == player_name:
+                            stat_t = b.get("stat_type", "")
+                            break
+                    st.markdown(
+                        render_danger_zone(dist, pace["minutes_remaining"], stat_t),
+                        unsafe_allow_html=True,
+                    )
+
+                # Pace details
+                st.caption(
+                    f"Pace: **{pace['pace_per_minute']:.2f}** per min · "
+                    f"Projected: **{pace['projected_final']:.1f}** · "
+                    f"Target: **{pace['target_stat']:.1f}**"
+                )
+
+        # Emoji reactions
+        rxn_key = f"rxn_{player_name}"
+        current_rxns = st.session_state.get("sweat_reactions", {}).get(rxn_key, {})
+        rxn_cols = st.columns(8)
+        for j, emoji in enumerate(["🔥", "😰", "💀", "🙏", "💰", "😤", "🎯", "👑"]):
+            count = current_rxns.get(emoji, 0)
+            with rxn_cols[j]:
+                if st.button(
+                    f"{emoji} {count}" if count else emoji,
+                    key=f"rxn_{i}_{j}",
+                ):
+                    rxns = st.session_state.setdefault("sweat_reactions", {})
+                    rxns.setdefault(rxn_key, {})[emoji] = count + 1
+
 elif live_games:
     st.info(
         "📊 No matching box-score data found for your active bets yet. "
         "Stats appear once games tip off and players check in."
     )
+
+# ── "Lock More" Quick Link ────────────────────────────────────
+
+st.markdown(
+    '<div style="text-align:center;margin:12px 0;">'
+    '<a href="/Prop_Scanner" target="_self" '
+    'style="color:#00f0ff;text-decoration:none;font-weight:700;">'
+    '🔒 Lock More Bets → Prop Scanner</a>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+# ── Parlay Health Rollup ──────────────────────────────────────
+
+if len(parlay_legs) >= 2:
+    st.markdown(render_parlay_health(parlay_legs), unsafe_allow_html=True)
 
 # ── Render awaiting tip-off cards ─────────────────────────────
 
@@ -669,8 +855,31 @@ if vibe_checks:
 
     grudge = get_grudge_buffer()
 
+    # ── Collect all headlines for the ticker bar ──────────────
+    _STATE_HEADLINES = {
+        "THE_HOOK":             "DYING ON THE HOOK!",
+        "FREE_THROW_MERCHANT":  "FREE THROW MERCHANT!",
+        "BENCH_SWEAT":          "BENCH SWEAT ALERT!",
+        "USAGE_FREEZE_OUT":     "GIVE HIM THE BALL!",
+        "GARBAGE_TIME_MIRACLE": "GARBAGE TIME MIRACLE!",
+        "LOCKER_ROOM_TRAGEDY":  "INJURY SCARE!",
+        "THE_REF_SHOW":         "BLAME THE REFS!",
+        "THE_CLEAN_CASH":       "CASHED IT!",
+    }
+
+    all_headlines: list[str] = []
     panic_cards_html = ""
-    for player_name, pace in vibe_checks:
+
+    # ── Find "Bet of the Night" — best pace closest to cash ──
+    _best_bon_idx = -1
+    _best_bon_pct = 0.0
+    for _bi, (_bn, _bp) in enumerate(vibe_checks):
+        if not _bp.get("cashed") and _bp.get("on_pace"):
+            if _bp.get("pct_of_target", 0) > _best_bon_pct:
+                _best_bon_pct = _bp["pct_of_target"]
+                _best_bon_idx = _bi
+
+    for _vi, (player_name, pace) in enumerate(vibe_checks):
         # Fast-path fragment reaction (always available offline)
         reaction = get_joseph_live_reaction(pace)
 
@@ -699,18 +908,8 @@ if vibe_checks:
         from agent.response_parser import _STATE_TO_DEFAULT_VIBE
         vibe_status = _STATE_TO_DEFAULT_VIBE.get(game_state, "Sweating")
 
-        # Generate ticker-tape headline from the game state
-        _STATE_HEADLINES = {
-            "THE_HOOK":             "DYING ON THE HOOK!",
-            "FREE_THROW_MERCHANT":  "FREE THROW MERCHANT!",
-            "BENCH_SWEAT":          "BENCH SWEAT ALERT!",
-            "USAGE_FREEZE_OUT":     "GIVE HIM THE BALL!",
-            "GARBAGE_TIME_MIRACLE": "GARBAGE TIME MIRACLE!",
-            "LOCKER_ROOM_TRAGEDY":  "INJURY SCARE!",
-            "THE_REF_SHOW":         "BLAME THE REFS!",
-            "THE_CLEAN_CASH":       "CASHED IT!",
-        }
         headline = _STATE_HEADLINES.get(game_state, "JOSEPH IS SWEATING!")
+        all_headlines.append(f"{player_name}: {headline}")
 
         # Render the panic room card
         panic_cards_html += render_panic_room_card(
@@ -723,6 +922,47 @@ if vibe_checks:
 
         # Push reaction into grudge buffer for anti-repetition
         grudge.add(reaction)
+
+    # ── Joseph's Animated Avatar ─────────────────────────────
+    # Determine overall vibe for avatar expression
+    _cashed_any = any(p.get("cashed") for _, p in vibe_checks)
+    _panic_any = any(
+        p.get("blowout_risk") or p.get("foul_trouble") for _, p in vibe_checks
+    )
+    if _cashed_any:
+        _avatar_cls = "joseph-avatar-victory"
+        _avatar_emoji = "😎"
+    elif _panic_any:
+        _avatar_cls = "joseph-avatar-panic"
+        _avatar_emoji = "😱"
+    else:
+        _avatar_cls = ""
+        _avatar_emoji = "🎙️"
+
+    st.markdown(
+        f'<div class="joseph-avatar-container">'
+        f'<span style="font-size:2rem;" class="{_avatar_cls}">{_avatar_emoji}</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Scrolling Ticker Tape with all headlines ─────────────
+    if all_headlines:
+        st.markdown(render_joseph_ticker_bar(all_headlines), unsafe_allow_html=True)
+
+    # ── Bet of the Night highlight ───────────────────────────
+    if _best_bon_idx >= 0:
+        _bon_name, _bon_pace = vibe_checks[_best_bon_idx]
+        st.markdown(
+            f'<div style="text-align:center;margin:8px 0;">'
+            f'<span style="background:linear-gradient(135deg,#eab308,#f59e0b);'
+            f'color:#1a1a2e;padding:4px 14px;border-radius:6px;'
+            f'font-size:0.85rem;font-weight:800;">🏆 BET OF THE NIGHT: '
+            f'{_html_mod.escape(_bon_name)} — '
+            f'{_bon_pace["pct_of_target"]:.0f}% of target</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # Render all panic room cards
     if panic_cards_html:
