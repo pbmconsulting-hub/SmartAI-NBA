@@ -1528,19 +1528,19 @@ def populate_player_career_stats(
     # Career-stats-specific rate limiter (independent of the global one)
     # to keep concurrent connections low during this bulk fetch.
     _career_lock = threading.Lock()
-    _career_last_call = [0.0]          # mutable so the closure can write it
+    _career_last_call_time = 0.0
 
     def _career_rate_sleep() -> None:
+        nonlocal _career_last_call_time
         with _career_lock:
             now = time.monotonic()
-            elapsed = now - _career_last_call[0]
+            elapsed = now - _career_last_call_time
             if elapsed < _CAREER_RATE_DELAY:
                 time.sleep(_CAREER_RATE_DELAY - elapsed)
-            _career_last_call[0] = time.monotonic()
+            _career_last_call_time = time.monotonic()
 
-    def _fetch_career(pid: int) -> tuple[int, pd.DataFrame | None]:
-        """Fetch career stats for *pid*, returning ``(pid, df | None)``."""
-        _career_rate_sleep()
+    def _fetch_career_df(pid: int) -> pd.DataFrame | None:
+        """Call NBA API for *pid* and return a column-mapped DataFrame or None."""
         try:
             df = _call_with_retries(
                 lambda: PlayerCareerStats(
@@ -1555,11 +1555,16 @@ def populate_player_career_stats(
                 "Failed to fetch career stats for player %d after %d attempts — skipping.",
                 pid, _MAX_RETRIES_PER_PLAYER,
             )
-            return pid, None
+            return None
         if df.empty:
-            return pid, None
+            return None
         available = {k: v for k, v in col_map.items() if k in df.columns}
-        return pid, df[list(available.keys())].rename(columns=available)
+        return df[list(available.keys())].rename(columns=available)
+
+    def _fetch_career(pid: int) -> tuple[int, pd.DataFrame | None]:
+        """Rate-limited wrapper returning ``(pid, df | None)``."""
+        _career_rate_sleep()
+        return pid, _fetch_career_df(pid)
 
     # ── First pass: batched thread-pool fetch ────────────────────────────
     all_rows: list[pd.DataFrame] = []
@@ -1616,21 +1621,10 @@ def populate_player_career_stats(
         recovered = 0
         for pid in failed_pids:
             _career_rate_sleep()
-            try:
-                df = PlayerCareerStats(
-                    player_id=pid,
-                    timeout=_PER_PLAYER_TIMEOUT,
-                ).get_data_frames()[0]
-            except Exception:
-                logger.debug("  Retry failed for player %d — skipping.", pid)
-                continue
-            if df.empty:
-                continue
-            available = {k: v for k, v in col_map.items() if k in df.columns}
-            all_rows.append(
-                df[list(available.keys())].rename(columns=available)
-            )
-            recovered += 1
+            mapped = _fetch_career_df(pid)
+            if mapped is not None:
+                all_rows.append(mapped)
+                recovered += 1
         logger.info(
             "  Retry pass recovered %d / %d players.", recovered, len(failed_pids),
         )
