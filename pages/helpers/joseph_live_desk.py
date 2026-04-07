@@ -9,6 +9,7 @@ import os
 import base64
 import html as _html
 import logging
+import math
 import random
 
 import streamlit as st
@@ -580,7 +581,7 @@ def render_confidence_gauge_svg(
 
     # Donut parameters (SVG circle math)
     radius = 36
-    circumference = 2 * 3.14159265 * radius
+    circumference = 2 * math.pi * radius
     dash = circumference * prob / 100.0
     gap = circumference - dash
 

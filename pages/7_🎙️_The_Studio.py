@@ -11,6 +11,7 @@ import streamlit as st
 import os
 import html as _html
 import logging
+import math
 import random
 
 
@@ -1241,9 +1242,16 @@ elif mode == "🎰 BUILD MY BETS":
                                                 ticket_result.get("correlation_score", 0))
 
                     # Enhancement 5: Confidence gauge SVG
-                    _prob_pct = _safe_float(combined_prob) * 100 if _safe_float(combined_prob) <= 1 else _safe_float(combined_prob)
-                    _ev_bar = max(0, min(100, (_safe_float(ev) + 5) * 10))  # normalize EV to 0-100
-                    _syn_bar = max(0, min(100, _safe_float(synergy) * 100 if _safe_float(synergy) <= 1 else _safe_float(synergy)))
+                    # Normalize metrics to 0-100 scale for the gauge:
+                    # - prob: if <=1 treat as fraction (e.g. 0.65 → 65%), else use as-is
+                    # - ev: EV typically ranges -5 to +5; shift by +5 then scale by 10
+                    # - synergy: if <=1 treat as fraction, else use as-is
+                    _prob_raw = _safe_float(combined_prob)
+                    _prob_pct = _prob_raw * 100 if _prob_raw <= 1 else _prob_raw
+                    _ev_raw = _safe_float(ev)
+                    _ev_bar = max(0, min(100, (_ev_raw + 5) * 10))
+                    _syn_raw = _safe_float(synergy)
+                    _syn_bar = max(0, min(100, _syn_raw * 100 if _syn_raw <= 1 else _syn_raw))
                     _gauge_html = render_confidence_gauge_svg(_prob_pct, _ev_bar, _syn_bar)
 
                     st.markdown(
@@ -1691,17 +1699,17 @@ if _BETS_AVAILABLE:
     _lean_pct_100 = max(0, min(100, lean_pct * 100)) if lean_pct <= 1 else lean_pct
 
     # SVG mini pie for SMASH vs LEAN
-    _smash_dash = 2 * 3.14159265 * 20 * _smash_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
-    _lean_dash = 2 * 3.14159265 * 20 * _lean_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
-    _pie_gap = 2 * 3.14159265 * 20 - _smash_dash - _lean_dash
+    _pie_circ = 2 * math.pi * 20
+    _smash_dash = _pie_circ * _smash_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
+    _lean_dash = _pie_circ * _lean_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
     _pie_svg = (
         f'<svg width="50" height="50" viewBox="0 0 50 50" style="margin:4px auto;display:block">'
         f'<circle cx="25" cy="25" r="20" fill="none" stroke="#1e293b" stroke-width="6"/>'
         f'<circle cx="25" cy="25" r="20" fill="none" stroke="#ff5e00" stroke-width="6" '
-        f'stroke-dasharray="{_smash_dash:.1f} {2 * 3.14159265 * 20 - _smash_dash:.1f}" '
+        f'stroke-dasharray="{_smash_dash:.1f} {_pie_circ - _smash_dash:.1f}" '
         f'transform="rotate(-90 25 25)"/>'
         f'<circle cx="25" cy="25" r="20" fill="none" stroke="#22c55e" stroke-width="6" '
-        f'stroke-dasharray="{_lean_dash:.1f} {2 * 3.14159265 * 20 - _lean_dash:.1f}" '
+        f'stroke-dasharray="{_lean_dash:.1f} {_pie_circ - _lean_dash:.1f}" '
         f'stroke-dashoffset="-{_smash_dash:.1f}" '
         f'transform="rotate(-90 25 25)"/>'
         f'</svg>'
