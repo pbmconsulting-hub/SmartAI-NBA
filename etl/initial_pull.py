@@ -135,14 +135,24 @@ _BULK_ENDPOINT_TIMEOUT = 120         # Seconds for bulk endpoints (LeagueGameLog
 _SEASON_DASHBOARD_TIMEOUT = 60       # Seconds for season-level dashboard endpoints.
 _PER_PLAYER_TIMEOUT = 45             # Seconds for per-player calls.
 _PER_GAME_TIMEOUT = 30               # Seconds for per-game box-score calls.
-_RATE_LIMIT_DELAY = 0.35             # Seconds between API calls (rate-limit).
-_PLAYER_WORKERS = 12                 # Concurrent threads for per-player fetches.
+_RATE_LIMIT_DELAY = 0.45             # Seconds between API calls (rate-limit).
+_PLAYER_WORKERS = 8                  # Concurrent threads for per-player fetches.
 _GAME_WORKERS = 3                    # Concurrent threads for per-game fetches.
 _BOX_SCORE_TYPE_WORKERS = 5          # Concurrent threads for box-score types within one game.
 _ADAPTIVE_COOLDOWN_DELAY = 5         # Seconds to pause every 100 players (adaptive cooldown).
 _POST_ETL_COOLDOWN = 5               # Seconds to pause after full ETL before live API calls.
 _MAX_BACKOFF_DELAY = 30              # Cap on exponential back-off delay (seconds).
 _LOG_PROGRESS_INTERVAL = 50          # Log a progress line every N items.
+
+# Career-stats-specific tuning.  The bulk fetch for all active players
+# (578+) is the heaviest per-player ETL step.  We use conservative
+# concurrency and rate-limiting to avoid triggering NBA API throttling.
+_CAREER_WORKERS = 3                  # Concurrent threads for career-stats fetches.
+_CAREER_RATE_DELAY = 0.75            # Seconds between career-stats API calls.
+_CAREER_BATCH_SIZE = 40              # Players per batch.
+_CAREER_BATCH_COOLDOWN = 8           # Seconds to pause between batches.
+_CAREER_CIRCUIT_THRESHOLD = 15       # Consecutive failures before extended cooldown.
+_CAREER_CIRCUIT_COOLDOWN = 30        # Extended cooldown after circuit breaker triggers.
 
 # Thread-safe rate limiter to avoid triggering 429 / throttling.
 _rate_lock = threading.Lock()
@@ -1477,8 +1487,15 @@ def populate_player_career_stats(
 ) -> None:
     """Fetch and load career stats for all active players.
 
-    Uses a thread pool to fetch multiple players concurrently while
-    respecting the NBA API rate limit via :func:`_rate_limited_sleep`.
+    Uses batched thread-pool processing with a dedicated rate limiter
+    that is more conservative than the global one to avoid triggering
+    NBA API throttling during this heavyweight per-player fetch.
+
+    Each batch of ``_CAREER_BATCH_SIZE`` players is processed with
+    ``_CAREER_WORKERS`` threads, followed by a cooldown.  A circuit
+    breaker pauses longer after ``_CAREER_CIRCUIT_THRESHOLD``
+    consecutive failures.  Players that fail the first pass are
+    retried in a single-threaded second pass.
 
     Args:
         conn: Open SQLite connection.
@@ -1508,8 +1525,22 @@ def populate_player_career_stats(
         "TOV": "tov", "PF": "pf", "PTS": "pts",
     }
 
-    def _fetch_career(pid: int) -> pd.DataFrame | None:
-        _rate_limited_sleep()
+    # Career-stats-specific rate limiter (independent of the global one)
+    # to keep concurrent connections low during this bulk fetch.
+    _career_lock = threading.Lock()
+    _career_last_call = [0.0]          # mutable so the closure can write it
+
+    def _career_rate_sleep() -> None:
+        with _career_lock:
+            now = time.monotonic()
+            elapsed = now - _career_last_call[0]
+            if elapsed < _CAREER_RATE_DELAY:
+                time.sleep(_CAREER_RATE_DELAY - elapsed)
+            _career_last_call[0] = time.monotonic()
+
+    def _fetch_career(pid: int) -> tuple[int, pd.DataFrame | None]:
+        """Fetch career stats for *pid*, returning ``(pid, df | None)``."""
+        _career_rate_sleep()
         try:
             df = _call_with_retries(
                 lambda: PlayerCareerStats(
@@ -1524,32 +1555,85 @@ def populate_player_career_stats(
                 "Failed to fetch career stats for player %d after %d attempts — skipping.",
                 pid, _MAX_RETRIES_PER_PLAYER,
             )
-            return None
+            return pid, None
         if df.empty:
-            return None
+            return pid, None
         available = {k: v for k, v in col_map.items() if k in df.columns}
-        return df[list(available.keys())].rename(columns=available)
+        return pid, df[list(available.keys())].rename(columns=available)
 
+    # ── First pass: batched thread-pool fetch ────────────────────────────
     all_rows: list[pd.DataFrame] = []
+    failed_pids: list[int] = []
     done = 0
+    consecutive_failures = 0
+    total_batches = (len(player_ids) + _CAREER_BATCH_SIZE - 1) // _CAREER_BATCH_SIZE
 
-    with ThreadPoolExecutor(max_workers=_PLAYER_WORKERS) as pool:
-        futures = {pool.submit(_fetch_career, pid): pid for pid in player_ids}
-        for future in as_completed(futures):
-            mapped = future.result()
-            if mapped is not None:
-                all_rows.append(mapped)
-            done += 1
-            if done % _LOG_PROGRESS_INTERVAL == 0:
-                logger.info("  … career stats: %d / %d players processed.", done, len(player_ids))
-            # Adaptive cooldown every 100 players to let API throttling reset
-            if done % 100 == 0 and done < len(player_ids):
-                logger.info("  … adaptive cooldown: pausing %ds after %d players.", _ADAPTIVE_COOLDOWN_DELAY, done)
-                time.sleep(_ADAPTIVE_COOLDOWN_DELAY)
+    for batch_idx, batch_start in enumerate(
+        range(0, len(player_ids), _CAREER_BATCH_SIZE), start=1
+    ):
+        batch = player_ids[batch_start : batch_start + _CAREER_BATCH_SIZE]
+        logger.info(
+            "  Career stats batch %d/%d (%d players) …",
+            batch_idx, total_batches, len(batch),
+        )
 
-    # Final progress log if the last batch wasn't on a log interval boundary
-    if done % _LOG_PROGRESS_INTERVAL != 0:
-        logger.info("  … career stats: %d / %d players processed.", done, len(player_ids))
+        with ThreadPoolExecutor(max_workers=_CAREER_WORKERS) as pool:
+            futures = {pool.submit(_fetch_career, pid): pid for pid in batch}
+            for future in as_completed(futures):
+                pid, mapped = future.result()
+                if mapped is not None:
+                    all_rows.append(mapped)
+                    consecutive_failures = 0
+                else:
+                    failed_pids.append(pid)
+                    consecutive_failures += 1
+                done += 1
+
+        logger.info(
+            "  … progress: %d/%d processed (%d ok, %d failed).",
+            done, len(player_ids), len(all_rows), len(failed_pids),
+        )
+
+        # Cooldown between batches (skip after the last batch).
+        if batch_start + _CAREER_BATCH_SIZE < len(player_ids):
+            if consecutive_failures >= _CAREER_CIRCUIT_THRESHOLD:
+                logger.warning(
+                    "  … circuit breaker: %d consecutive failures, cooling down %ds.",
+                    consecutive_failures, _CAREER_CIRCUIT_COOLDOWN,
+                )
+                time.sleep(_CAREER_CIRCUIT_COOLDOWN)
+                consecutive_failures = 0
+            else:
+                time.sleep(_CAREER_BATCH_COOLDOWN)
+
+    # ── Second pass: retry failed players one-by-one ─────────────────────
+    if failed_pids:
+        logger.info(
+            "  Retrying %d failed players (single-threaded) after %ds cooldown …",
+            len(failed_pids), _CAREER_CIRCUIT_COOLDOWN,
+        )
+        time.sleep(_CAREER_CIRCUIT_COOLDOWN)
+        recovered = 0
+        for pid in failed_pids:
+            _career_rate_sleep()
+            try:
+                df = PlayerCareerStats(
+                    player_id=pid,
+                    timeout=_PER_PLAYER_TIMEOUT,
+                ).get_data_frames()[0]
+            except Exception:
+                logger.debug("  Retry failed for player %d — skipping.", pid)
+                continue
+            if df.empty:
+                continue
+            available = {k: v for k, v in col_map.items() if k in df.columns}
+            all_rows.append(
+                df[list(available.keys())].rename(columns=available)
+            )
+            recovered += 1
+        logger.info(
+            "  Retry pass recovered %d / %d players.", recovered, len(failed_pids),
+        )
 
     if not all_rows:
         logger.info("Player_Career_Stats: no career data retrieved.")
@@ -1560,7 +1644,12 @@ def populate_player_career_stats(
 
     conn.execute("DELETE FROM Player_Career_Stats")
     result.to_sql("Player_Career_Stats", conn, if_exists="append", index=False)
-    logger.info("Player_Career_Stats: inserted %d rows.", len(result))
+    logger.info(
+        "Player_Career_Stats: inserted %d rows for %d/%d players.",
+        len(result),
+        result["player_id"].nunique(),
+        len(player_ids),
+    )
 
 
 
