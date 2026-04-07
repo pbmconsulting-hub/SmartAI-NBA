@@ -412,7 +412,7 @@ def _game_leaders(players: list[dict]) -> dict:
     # Use last name only for compact display
     parts = name.split()
     short = parts[-1] if parts else name
-    first_initial = parts[0][0] + "." if len(parts) > 1 else ""
+    first_initial = parts[0][0] + "." if len(parts) > 1 and parts[0] else ""
     return {
         "name": f"{first_initial} {short}".strip(),
         "pts":  int(float(top.get("pts", 0) or 0)),
@@ -452,8 +452,8 @@ if scoreboard_games:
         if "live" in _status_cls:
             _has_live = True
 
-        _a_cls = "espn-team-winning" if _t_a_pts >= _t_h_pts else "espn-team-losing"
-        _h_cls = "espn-team-winning" if _t_h_pts >= _t_a_pts else "espn-team-losing"
+        _a_cls = "espn-team-winning" if _t_a_pts > _t_h_pts else ("espn-team-losing" if _t_a_pts < _t_h_pts else "espn-team-winning")
+        _h_cls = "espn-team-winning" if _t_h_pts > _t_a_pts else ("espn-team-losing" if _t_h_pts < _t_a_pts else "espn-team-winning")
 
         # Status line with live dot for active games
         _live_dot = '<span class="espn-ticker-live-dot"></span>' if "live" in _status_cls else ""

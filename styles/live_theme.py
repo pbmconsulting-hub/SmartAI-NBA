@@ -232,7 +232,6 @@ def get_live_sweat_css() -> str:
     display: flex;
     animation: espnScroll var(--scroll-duration, 30s) linear infinite;
     gap: 0;
-    will-change: transform;
 }
 .espn-ticker-scroll:hover {
     animation-play-state: paused;
