@@ -1515,9 +1515,106 @@ if current_games and _standings_for_enrich:
 
 if current_games:
     st.subheader(f"🏟️ Tonight's Slate — {len(current_games)} Game(s)")
+
+    # ── ESPN-style Score Ticker at top (Enhancement #4) ──────────
+    _ticker_cards: list[str] = []
+    for _tg in current_games:
+        _t_away = _h.escape(str(_tg.get("away_team", "?")))
+        _t_home = _h.escape(str(_tg.get("home_team", "?")))
+        _aw = _tg.get("away_wins", 0)
+        _al = _tg.get("away_losses", 0)
+        _hw = _tg.get("home_wins", 0)
+        _hl = _tg.get("home_losses", 0)
+        _gt = _tg.get("game_time_et", "")
+        _status_lbl = _h.escape(str(_gt)) if _gt else "SCHEDULED"
+        _ticker_cards.append(
+            f'<div class="espn-game-card">'
+            f'<div class="espn-game-status espn-status-sched">{_status_lbl}</div>'
+            f'<div class="espn-team-row">'
+            f'<span class="espn-team-abbr">{_t_away}</span>'
+            f'<span class="espn-team-score espn-team-winning">({_aw}-{_al})</span></div>'
+            f'<div class="espn-team-row">'
+            f'<span class="espn-team-abbr">{_t_home}</span>'
+            f'<span class="espn-team-score espn-team-winning">({_hw}-{_hl})</span></div>'
+            f'</div>'
+        )
+
+    _ticker_cards_html = ''.join(_ticker_cards)
+    _n_ticker = len(current_games)
+    _scroll_dur = max(15, _n_ticker * 5)
+
+    if _n_ticker >= 3:
+        _ticker_inner = (
+            f'<div class="espn-ticker-scroll" '
+            f'style="--scroll-duration:{_scroll_dur}s;">'
+            f'{_ticker_cards_html}{_ticker_cards_html}</div>'
+        )
+    else:
+        _ticker_inner = f'<div class="espn-ticker-track">{_ticker_cards_html}</div>'
+
+    _ticker_header = f"🏀 TONIGHT'S SLATE — {datetime.date.today().strftime('%b %d, %Y')}"
+    st.markdown(
+        f'<div class="espn-ticker-container">'
+        f'<div class="espn-ticker-header">{_ticker_header}</div>'
+        f'<div class="espn-ticker-track">{_ticker_inner}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("")
 
-    for game in current_games:
+    # ── Quick-Filter / Sort Bar (Enhancement #9) ──────────────────
+    _sort_col, _filter_col = st.columns([1, 2])
+    with _sort_col:
+        _sort_option = st.selectbox(
+            "Sort by",
+            ["Default (API order)", "Time", "Spread (closest)", "Total (highest)", "Total (lowest)"],
+            key="lg_sort_option",
+        )
+    with _filter_col:
+        _filter_options = st.multiselect(
+            "Filter",
+            ["Show only games with injuries", "Show only primetime (after 7 PM ET)"],
+            key="lg_filter_options",
+            default=[],
+        )
+
+    # Apply sorting
+    _display_games = list(current_games)
+    if _sort_option == "Spread (closest)":
+        _display_games.sort(key=lambda g: abs(float(g.get("vegas_spread") or 0)))
+    elif _sort_option == "Total (highest)":
+        _display_games.sort(key=lambda g: float(g.get("game_total") or 220), reverse=True)
+    elif _sort_option == "Total (lowest)":
+        _display_games.sort(key=lambda g: float(g.get("game_total") or 220))
+    elif _sort_option == "Time":
+        _display_games.sort(key=lambda g: str(g.get("game_time_et") or ""))
+
+    # Apply filters
+    _inj_map_filter = st.session_state.get("injury_status_map", {})
+    _inj_statuses_filter = {"Out", "Doubtful", "Injured Reserve", "Game Time Decision"}
+    if "Show only games with injuries" in _filter_options:
+        def _has_injuries(g):
+            for _t in [g.get("home_team", ""), g.get("away_team", "")]:
+                for _p in find_players_by_team(players_data, _t)[:10]:
+                    if _inj_map_filter.get(_p.get("name", ""), {}).get("status", "Active") in _inj_statuses_filter:
+                        return True
+            return False
+        _display_games = [g for g in _display_games if _has_injuries(g)]
+
+    if "Show only primetime (after 7 PM ET)" in _filter_options:
+        def _is_primetime(g):
+            gt = str(g.get("game_time_et") or "")
+            # Check for times like "7:00 PM", "8:30 PM" etc.
+            if "PM" in gt.upper():
+                try:
+                    hour = int(gt.split(":")[0].strip())
+                    return hour >= 7 or hour == 12
+                except (ValueError, IndexError):
+                    pass
+            return False
+        _display_games = [g for g in _display_games if _is_primetime(g)]
+
+    for game in _display_games:
         home = game.get("home_team", "")
         away = game.get("away_team", "")
         home_name = game.get("home_team_name", home)
@@ -1567,16 +1664,17 @@ if current_games:
             if not s:
                 return ""
             if s.startswith("W"):
-                return f'<span class="streak-hot">🔥 {s} streak</span>'
+                return f'<span class="streak-hot">🔥 {s}</span>'
             elif s.startswith("L"):
-                return f'<span class="streak-cold">❄️ {s} streak</span>'
+                return f'<span class="streak-cold">❄️ {s}</span>'
             return f'<span class="streak-neutral">{s}</span>'
 
         # Top 2 players for each team
         home_players = find_players_by_team(players_data, home)[:2]
         away_players = find_players_by_team(players_data, away)[:2]
 
-        def player_line(players):
+        # Enhancement #10: Inline injury badges on player names
+        def player_line_with_injuries(players, team_abbrev):
             if not players:
                 return "<em style='color:#718096'>No data loaded</em>"
             parts = []
@@ -1584,7 +1682,13 @@ if current_games:
                 name_parts = p.get("name", "").split()
                 short_name = f"{name_parts[0][0]}. {' '.join(name_parts[1:])}" if len(name_parts) > 1 else p.get("name", "")
                 pts = p.get("points_avg", "—")
-                parts.append(f"<span class='player-stat'>{short_name} ({pts} PPG)</span>")
+                inj_status = _inj_map_filter.get(p.get("name", ""), {}).get("status", "Active")
+                inj_badge = ""
+                if inj_status in {"Out", "Injured Reserve"}:
+                    inj_badge = '<span class="injury-badge-out">OUT</span>'
+                elif inj_status in {"Doubtful", "Game Time Decision"}:
+                    inj_badge = '<span class="injury-badge-gtd">GTD</span>'
+                parts.append(f"<span class='player-stat'>{_h.escape(short_name)} ({pts} PPG){inj_badge}</span>")
             return " &nbsp;|&nbsp; ".join(parts)
 
         # Spread display
@@ -1632,52 +1736,86 @@ if current_games:
             bk_note = f" <span style='color:#718096;font-size:0.75rem;'>({bk_count} books)</span>"
             ml_line = (
                 f'<div class="game-meta" style="margin-top:4px;">'
-                f'💰 ML: <strong>{away} {ml_away_str}</strong> &nbsp;|&nbsp; '
-                f'<strong>{home} {ml_home_str}</strong>'
+                f'💰 ML: <strong>{_h.escape(away)} {ml_away_str}</strong> &nbsp;|&nbsp; '
+                f'<strong>{_h.escape(home)} {ml_home_str}</strong>'
                 f'{bk_note}</div>'
             )
 
-        # Render card — wrap in an expander so the whole card is clickable
+        # ── Team colors & logos (Enhancement #1, #3) ──────────────
+        away_color, _ = get_team_colors(away)
+        home_color, _ = get_team_colors(home)
+        away_logo_url = f"{_ESPN_LOGO_BASE}/{away.lower()}.png"
+        home_logo_url = f"{_ESPN_LOGO_BASE}/{home.lower()}.png"
+        _logo_onerror = f"onerror=\"this.src='{_NBA_LOGO_FALLBACK}'\""
+
+        def _team_badge_html(abbrev, color, logo_url, is_home=False):
+            return (
+                f'<span class="team-badge" style="background:rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.18);'
+                f'border:1px solid {color}40;">'
+                f'<img class="team-logo" src="{logo_url}" alt="{_h.escape(abbrev)}" {_logo_onerror}>'
+                f'{_h.escape(abbrev)}</span>'
+            )
+
+        # Render card — Enhancement #2: Side-by-side scoreboard layout
         _expander_label = f"🏀  {away} ({away_w}-{away_l}) @ {home} ({home_w}-{home_l})  •  {lines_line.replace('&nbsp;', ' ')}"
         with st.expander(_expander_label, expanded=True):
             card_html = (
-                '<div class="game-card" style="cursor:pointer;">'
-                '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
-                f'<span class="team-badge away-badge">🚌 {away}</span>'
-                f'<span style="color:#a0aec0; font-size:1rem;">{away_name}</span>'
-                f'<span style="color:#718096; font-size:0.9rem;">({away_w}-{away_l})</span>'
+                '<div class="game-card">'
+                '<div class="scoreboard-row">'
+                # Away team (left-aligned when wide, centered when wrapped)
+                '<div class="scoreboard-team away">'
+                f'<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+                f'{_team_badge_html(away, away_color, away_logo_url)}'
+                f'<span style="color:#a0aec0;font-size:0.95rem;">{_h.escape(away_name)}</span>'
+                f'<span style="color:#718096;font-size:0.85rem;">({away_w}-{away_l})</span>'
                 f'{_conf_badge(away_rank, away_conf)}'
                 f'{streak_html(away_streak)}'
                 f'{_l10_badge(away_l10)}'
-                '</div>'
-                '<div class="vs-divider" style="margin:8px 0;">VS</div>'
-                '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
-                f'<span class="team-badge home-badge">🏠 {home}</span>'
-                f'<span style="color:#a0aec0; font-size:1rem;">{home_name}</span>'
-                f'<span style="color:#718096; font-size:0.9rem;">({home_w}-{home_l})</span>'
+                '</div></div>'
+                # Center "@" divider
+                '<div class="scoreboard-at">@</div>'
+                # Home team (right side)
+                '<div class="scoreboard-team home">'
+                f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                f'{_team_badge_html(home, home_color, home_logo_url, is_home=True)}'
+                f'<span style="color:#a0aec0;font-size:0.95rem;">{_h.escape(home_name)}</span>'
+                f'<span style="color:#718096;font-size:0.85rem;">({home_w}-{home_l})</span>'
                 f'{_conf_badge(home_rank, home_conf)}'
                 f'{streak_html(home_streak)}'
                 f'{_l10_badge(home_l10)}'
-                '</div>'
-                + (f'<div class="game-meta">{meta_line}</div>' if meta_line else '')
-                + f'<div class="game-meta" style="margin-top:6px;">📊 {lines_line}</div>'
+                '</div></div>'
+                '</div>'  # end scoreboard-row
+                + (f'<div class="game-meta" style="text-align:center;margin-top:6px;">{meta_line}</div>' if meta_line else '')
+                + f'<div class="game-meta" style="text-align:center;margin-top:4px;">📊 {lines_line}</div>'
                 + ml_line
+                # Enhancement #10: Key players with inline injury badges
                 + '<div class="key-players">'
                 '<div class="key-players-title">Key Players</div>'
                 '<div style="margin-top:6px; display:flex; gap:20px; flex-wrap:wrap;">'
-                f'<div><span style="color:#63b3ed; font-weight:600;">{away}:</span> {player_line(away_players)}</div>'
-                f'<div><span style="color:#68d391; font-weight:600;">{home}:</span> {player_line(home_players)}</div>'
+                f'<div><span style="color:{away_color}; font-weight:600;">{_h.escape(away)}:</span> {player_line_with_injuries(away_players, away)}</div>'
+                f'<div><span style="color:{home_color}; font-weight:600;">{_h.escape(home)}:</span> {player_line_with_injuries(home_players, home)}</div>'
                 '</div></div></div>'
             )
             st.markdown(card_html, unsafe_allow_html=True)
 
-            # ── Game Environment Card ──────────────────────────────────────
+            # ── Game Environment Card (Enhancement #5: Game Attractiveness) ──
             _pace_adj = "Fast 🚀" if total > 230 else ("Slow 🐢" if total < 210 else "Normal ⚖️")
             _blowout_risk = abs(spread)
             _blowout_lbl = "Low" if _blowout_risk < 5 else ("Medium" if _blowout_risk < 10 else "HIGH ⚠️")
             _blowout_clr = "#00ff9d" if _blowout_risk < 5 else ("#ffcc00" if _blowout_risk < 10 else "#ff4444")
             _o_u_lbl = "OVER-Friendly 📈" if total > 225 else ("UNDER-Friendly 📉" if total < 210 else "Neutral")
             _o_u_clr = "#00ff9d" if total > 225 else ("#8b949e" if total < 210 else "#c0d0e8")
+
+            # Enhancement #5: Game Attractiveness composite score
+            _attract_score = 0
+            if total > 225:
+                _attract_score += 2
+            elif total > 215:
+                _attract_score += 1
+            if _blowout_risk < 5:
+                _attract_score += 2
+            elif _blowout_risk < 8:
+                _attract_score += 1
 
             # Injury impact
             _inj_map = st.session_state.get("injury_status_map", {})
@@ -1692,14 +1830,27 @@ if current_games:
                 for p in find_players_by_team(players_data, away)[:10]
                 if _inj_map.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses
             ]
+
+            if not _home_out and not _away_out:
+                _attract_score += 1  # No major injuries = more predictable
+
+            if _attract_score >= 4:
+                _attract_lbl = '🟢 HIGH'
+                _attract_cls = 'signal-high'
+            elif _attract_score >= 2:
+                _attract_lbl = '🟡 MEDIUM'
+                _attract_cls = 'signal-medium'
+            else:
+                _attract_lbl = '🔴 LOW'
+                _attract_cls = 'signal-low'
+
             _inj_txt = ""
             if _home_out:
-                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {home}: {", ".join(_home_out[:3])}</span>&nbsp;&nbsp;'
+                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {_h.escape(home)}: {", ".join(_h.escape(n) for n in _home_out[:3])}</span>&nbsp;&nbsp;'
             if _away_out:
-                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {away}: {", ".join(_away_out[:3])}</span>'
+                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {_h.escape(away)}: {", ".join(_h.escape(n) for n in _away_out[:3])}</span>'
             if not _inj_txt:
                 _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
-
 
             # Bookmaker consensus row (only shown when Odds API data available)
             _bk_count = game.get("bookmaker_count", 0)
@@ -1730,7 +1881,8 @@ if current_games:
                 f'<div style="background:rgba(0,0,0,0.25);border-radius:8px;padding:12px 16px;'
                 f'margin:-4px 0 16px 0;border:1px solid rgba(0,240,255,0.10);">'
                 f'<div style="font-size:0.78rem;color:#8a9bb8;font-weight:600;margin-bottom:8px;'
-                f'letter-spacing:0.5px;">⚙️ GAME ENVIRONMENT</div>'
+                f'letter-spacing:0.5px;">⚙️ GAME ENVIRONMENT'
+                f'<span class="signal-badge {_attract_cls}">{_attract_lbl}</span></div>'
                 f'<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.82rem;">'
                 f'<div><span style="color:#8a9bb8;">Pace:</span> '
                 f'<strong style="color:#c0d0e8;">{_pace_adj}</strong></div>'
@@ -1744,6 +1896,12 @@ if current_games:
                 f'</div>',
                 unsafe_allow_html=True,
             )
+
+            # ── Enhancement #12: Quick Analyze button ─────────────────────
+            _game_id = game.get("game_id", f"{away}_vs_{home}")
+            if st.button(f"⚡ Analyze {away} @ {home}", key=f"analyze_btn_{_game_id}"):
+                st.session_state["quick_analyze_game"] = game
+                st.switch_page("pages/3_⚡_Quantum_Analysis_Matrix.py")
     with st.expander("✏️ Edit Spreads & Totals", expanded=False):
         st.markdown("Adjust Vegas lines for each game:")
         updated_games = []
@@ -1794,19 +1952,36 @@ if current_games:
                 st.rerun()
 
 else:
+    # Enhancement #8: Skeleton / shimmer loading cards
     st.markdown(
         '<div style="background:linear-gradient(135deg,rgba(255,94,0,0.12),rgba(200,0,255,0.08));'
-        'border:1px solid rgba(255,94,0,0.35);border-radius:10px;padding:20px 24px;margin:8px 0;">'
+        'border:1px solid rgba(255,94,0,0.35);border-radius:10px;padding:16px 24px;margin:8px 0 16px 0;">'
         '<div style="font-size:1.1rem;font-weight:700;color:#ff5e00;margin-bottom:6px;">'
         '🚫 No Games Loaded Tonight</div>'
         '<div style="color:#c0d0e8;">'
-        'No NBA games have been loaded yet. Click <strong>🔄 Auto-Load Tonight\'s Games</strong> above to '
+        'No NBA games have been loaded yet. Click <strong>⚡ One-Click Setup</strong> above to '
         'automatically load tonight\'s slate, player stats, injury reports, and props in one click.<br>'
-        '<span style="color:#8b949e;font-size:0.85rem;">Or use the <strong>➕ Manually Add Games</strong> form below.</span>'
+        '<span style="color:#8b949e;font-size:0.85rem;">Or expand <strong>⚙️ Advanced Options</strong> '
+        'to manually add games.</span>'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
     )
+
+    # Shimmer skeleton placeholders
+    _skeleton_html = ""
+    for _ in range(3):
+        _skeleton_html += (
+            '<div class="skeleton-card">'
+            '<div class="skeleton-line wide"></div>'
+            '<div class="skeleton-line medium"></div>'
+            '<div class="skeleton-line narrow"></div>'
+            '<div style="height:8px;"></div>'
+            '<div class="skeleton-line wide"></div>'
+            '<div class="skeleton-line narrow"></div>'
+            '</div>'
+        )
+    st.markdown(_skeleton_html, unsafe_allow_html=True)
 
 st.divider()
 
