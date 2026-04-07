@@ -29,8 +29,8 @@ except ImportError:
     _logger = logging.getLogger(__name__)
 
 # ── ESPN CDN base for team logos ──────────────────────────────
-_ESPN_LOGO_BASE = "https://a.espncdn.com/i/teamlogos/nba/500"
-_NBA_LOGO_FALLBACK = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
+ESPN_LOGO_BASE_URL = "https://a.espncdn.com/i/teamlogos/nba/500"
+NBA_LOGO_FALLBACK_URL = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
 
 # ============================================================
 # SECTION: Page Setup
@@ -1608,7 +1608,7 @@ if current_games:
             if "PM" in gt.upper():
                 try:
                     hour = int(gt.split(":")[0].strip())
-                    return hour >= 7 or hour == 12
+                    return hour >= 7 and hour != 12
                 except (ValueError, IndexError):
                     pass
             return False
@@ -1664,9 +1664,9 @@ if current_games:
             if not s:
                 return ""
             if s.startswith("W"):
-                return f'<span class="streak-hot">🔥 {s}</span>'
+                return f'<span class="streak-hot">🔥 {s} streak</span>'
             elif s.startswith("L"):
-                return f'<span class="streak-cold">❄️ {s}</span>'
+                return f'<span class="streak-cold">❄️ {s} streak</span>'
             return f'<span class="streak-neutral">{s}</span>'
 
         # Top 2 players for each team
@@ -1674,7 +1674,7 @@ if current_games:
         away_players = find_players_by_team(players_data, away)[:2]
 
         # Enhancement #10: Inline injury badges on player names
-        def player_line_with_injuries(players, team_abbrev):
+        def player_line_with_injuries(players):
             if not players:
                 return "<em style='color:#718096'>No data loaded</em>"
             parts = []
@@ -1744,13 +1744,17 @@ if current_games:
         # ── Team colors & logos (Enhancement #1, #3) ──────────────
         away_color, _ = get_team_colors(away)
         home_color, _ = get_team_colors(home)
-        away_logo_url = f"{_ESPN_LOGO_BASE}/{away.lower()}.png"
-        home_logo_url = f"{_ESPN_LOGO_BASE}/{home.lower()}.png"
-        _logo_onerror = f"onerror=\"this.src='{_NBA_LOGO_FALLBACK}'\""
+        away_logo_url = f"{ESPN_LOGO_BASE_URL}/{away.lower()}.png"
+        home_logo_url = f"{ESPN_LOGO_BASE_URL}/{home.lower()}.png"
+        _logo_onerror = f"onerror=\"this.src='{NBA_LOGO_FALLBACK_URL}'\""
 
         def _team_badge_html(abbrev, color, logo_url, is_home=False):
+            try:
+                r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+            except (ValueError, IndexError):
+                r, g, b = 0, 240, 255  # fallback cyan
             return (
-                f'<span class="team-badge" style="background:rgba({int(color[1:3],16)},{int(color[3:5],16)},{int(color[5:7],16)},0.18);'
+                f'<span class="team-badge" style="background:rgba({r},{g},{b},0.18);'
                 f'border:1px solid {color}40;">'
                 f'<img class="team-logo" src="{logo_url}" alt="{_h.escape(abbrev)}" {_logo_onerror}>'
                 f'{_h.escape(abbrev)}</span>'
@@ -1792,8 +1796,8 @@ if current_games:
                 + '<div class="key-players">'
                 '<div class="key-players-title">Key Players</div>'
                 '<div style="margin-top:6px; display:flex; gap:20px; flex-wrap:wrap;">'
-                f'<div><span style="color:{away_color}; font-weight:600;">{_h.escape(away)}:</span> {player_line_with_injuries(away_players, away)}</div>'
-                f'<div><span style="color:{home_color}; font-weight:600;">{_h.escape(home)}:</span> {player_line_with_injuries(home_players, home)}</div>'
+                f'<div><span style="color:{away_color}; font-weight:600;">{_h.escape(away)}:</span> {player_line_with_injuries(away_players)}</div>'
+                f'<div><span style="color:{home_color}; font-weight:600;">{_h.escape(home)}:</span> {player_line_with_injuries(home_players)}</div>'
                 '</div></div></div>'
             )
             st.markdown(card_html, unsafe_allow_html=True)
@@ -1844,13 +1848,20 @@ if current_games:
                 _attract_lbl = '🔴 LOW'
                 _attract_cls = 'signal-low'
 
-            _inj_txt = ""
-            if _home_out:
-                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {_h.escape(home)}: {", ".join(_h.escape(n) for n in _home_out[:3])}</span>&nbsp;&nbsp;'
-            if _away_out:
-                _inj_txt += f'<span style="color:#ff6b6b;">🏥 {_h.escape(away)}: {", ".join(_h.escape(n) for n in _away_out[:3])}</span>'
-            if not _inj_txt:
-                _inj_txt = '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
+            def _format_injury_text(team_abbrev, out_players):
+                if not out_players:
+                    return ""
+                escaped = ", ".join(_h.escape(n) for n in out_players[:3])
+                return f'<span style="color:#ff6b6b;">🏥 {_h.escape(team_abbrev)}: {escaped}</span>'
+
+            _inj_txt_parts = []
+            _home_inj_html = _format_injury_text(home, _home_out)
+            _away_inj_html = _format_injury_text(away, _away_out)
+            if _home_inj_html:
+                _inj_txt_parts.append(_home_inj_html)
+            if _away_inj_html:
+                _inj_txt_parts.append(_away_inj_html)
+            _inj_txt = "&nbsp;&nbsp;".join(_inj_txt_parts) if _inj_txt_parts else '<span style="color:#00ff9d;">✅ No major injuries reported</span>'
 
             # Bookmaker consensus row (only shown when Odds API data available)
             _bk_count = game.get("bookmaker_count", 0)
@@ -1901,7 +1912,10 @@ if current_games:
             _game_id = game.get("game_id", f"{away}_vs_{home}")
             if st.button(f"⚡ Analyze {away} @ {home}", key=f"analyze_btn_{_game_id}"):
                 st.session_state["quick_analyze_game"] = game
-                st.switch_page("pages/3_⚡_Quantum_Analysis_Matrix.py")
+                try:
+                    st.switch_page("pages/3_⚡_Quantum_Analysis_Matrix.py")
+                except Exception:
+                    st.info("Navigate to ⚡ Quantum Analysis Matrix to view this matchup.")
     with st.expander("✏️ Edit Spreads & Totals", expanded=False):
         st.markdown("Adjust Vegas lines for each game:")
         updated_games = []
