@@ -12,6 +12,7 @@ import logging as _logging
 import hashlib as _hashlib
 import io as _io
 import csv as _csv
+import re as _re
 from datetime import datetime as _datetime
 
 try:
@@ -866,12 +867,17 @@ def _render_sim_card(sim_result: dict):
                     seen.add(note)
                     unique_notes.append(note)
             # Convert markdown-style bold **text** to <strong>text</strong>
-            import re as _re_corr
             _formatted = []
             for n in unique_notes[:5]:
-                _safe = _html.escape(n)
-                _safe = _re_corr.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', _safe)
-                _formatted.append(_safe)
+                # Apply bold conversion before escaping, then escape the non-bold parts
+                _parts = _re.split(r'\*\*(.+?)\*\*', n)
+                _built = ""
+                for _pi, _part in enumerate(_parts):
+                    if _pi % 2 == 0:
+                        _built += _html.escape(_part)
+                    else:
+                        _built += f"<strong>{_html.escape(_part)}</strong>"
+                _formatted.append(_built)
             st.markdown(
                 '<div style="background:rgba(0,255,213,0.06);border-radius:6px;padding:10px 14px;'
                 'margin-bottom:12px;border-left:3px solid #00ffd5;font-size:0.84rem;color:#c0d0e8;">'
@@ -951,49 +957,53 @@ if run_sim and selected_names:
     try:
         # Enhancement 4: Animated progress bar per player + per stat
         _all_sim_results = []
-        _total_work = len(selected_names) * len(_STAT_TYPES)
-        _work_done = 0
+        _total_players = len(selected_names)
+        _players_done = 0
         _progress_bar = st.progress(0, text="🏀 Initializing simulation…")
 
         for _p_idx, pname in enumerate(selected_names):
             pdata = next((p for p in tonight_players if p.get("name") == pname), None)
             if pdata is None:
                 st.warning(f"⚠️ Could not find data for **{pname}**.")
-                _work_done += len(_STAT_TYPES)
+                _players_done += 1
                 continue
 
             # Enhancement 7: Check cache before simulating
             _player_id_for_cache = pdata.get("player_id", pname)
-            _scenario_hash = _hashlib.md5(
+            _scenario_hash = _hashlib.sha256(
                 str(sorted((_scenario_overrides or {}).items())).encode()
-            ).hexdigest()[:8] if _scenario_mode else "std"
+            ).hexdigest()[:16] if _scenario_mode else "std"
             _cache_key = (_player_id_for_cache, sim_depth, _scenario_hash)
 
             if _cache_key in st.session_state.get("sim_cache", {}):
                 _all_sim_results.append(st.session_state["sim_cache"][_cache_key])
-                _work_done += len(_STAT_TYPES)
+                _players_done += 1
                 _progress_bar.progress(
-                    min(_work_done / max(_total_work, 1), 1.0),
+                    min(_players_done / max(_total_players, 1), 1.0),
                     text=f"🏀 {pname} — loaded from cache",
                 )
                 continue
 
-            # Update progress per stat during simulation
-            for _s_idx, _sname in enumerate(_STAT_TYPES):
-                _work_done += 1
-                _progress_bar.progress(
-                    min(_work_done / max(_total_work, 1), 1.0),
-                    text=f"🏀 Simulating {pname} — {_sname} ({_s_idx + 1}/{len(_STAT_TYPES)} stats)…",
-                )
+            # Enhancement 4: Show per-stat progress during simulation
+            _progress_bar.progress(
+                min((_players_done + 0.5) / max(_total_players, 1), 0.99),
+                text=f"🏀 Simulating {pname} ({_p_idx + 1}/{_total_players} players)…",
+            )
 
             sim_result = _simulate_player(
                 pdata, sim_depth, todays_games,
                 scenario_overrides=_scenario_overrides if _scenario_mode else None,
             )
             _all_sim_results.append(sim_result)
+            _players_done += 1
 
             # Enhancement 7: Store in cache
             st.session_state.setdefault("sim_cache", {})[_cache_key] = sim_result
+
+            _progress_bar.progress(
+                min(_players_done / max(_total_players, 1), 1.0),
+                text=f"🏀 {pname} — complete ✓",
+            )
 
         _progress_bar.empty()
 
@@ -1051,6 +1061,7 @@ if run_sim and selected_names:
 
                 _radar_colors = ["#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b",
                                  "#8a9bb8", "#c0d0e8", "#e066ff", "#66ccff", "#ff9966"]
+                _labels_closed = _radar_labels + [_radar_labels[0]] if _radar_labels else _radar_labels
                 fig_radar = _go.Figure()
                 for _ri, _r in enumerate(_all_sim_results):
                     _r_vals = [
@@ -1059,7 +1070,6 @@ if run_sim and selected_names:
                     ]
                     # Close the polygon
                     _r_vals_closed = _r_vals + [_r_vals[0]] if _r_vals else _r_vals
-                    _labels_closed = _radar_labels + [_radar_labels[0]] if _radar_labels else _radar_labels
                     fig_radar.add_trace(_go.Scatterpolar(
                         r=_r_vals_closed,
                         theta=_labels_closed,
