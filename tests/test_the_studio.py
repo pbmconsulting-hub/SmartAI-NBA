@@ -544,5 +544,552 @@ class TestGameAnalysisWithDictTeamsData(unittest.TestCase):
         self.assertIsInstance(result, dict)
 
 
+class TestStudioEnhancement1Avatar(unittest.TestCase):
+    """Enhancement 1: Avatar image in hero banner."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_hero_uses_avatar_b64(self):
+        """Hero banner should use get_joseph_avatar_b64()."""
+        self.assertIn("_hero_avatar_b64", self.source)
+
+    def test_hero_avatar_img_tag(self):
+        """Hero should render actual <img> tag with avatar."""
+        self.assertIn("studio-avatar-lg", self.source)
+        self.assertIn('data:image/png;base64', self.source)
+
+    def test_hero_avatar_fallback(self):
+        """Hero should have emoji fallback when avatar is not available."""
+        self.assertIn("🎙️", self.source)
+
+
+class TestStudioEnhancement2OnAir(unittest.TestCase):
+    """Enhancement 2: Animated ON AIR indicator."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_on_air_badge_class(self):
+        self.assertIn("studio-on-air", self.source)
+
+    def test_on_air_dot_class(self):
+        self.assertIn("studio-on-air-dot", self.source)
+
+    def test_on_air_pulse_animation(self):
+        self.assertIn("studioOnAirPulse", self.source)
+
+    def test_on_air_dot_pulse_animation(self):
+        self.assertIn("studioOnAirDotPulse", self.source)
+
+    def test_on_air_text_in_hero(self):
+        self.assertIn("ON AIR", self.source)
+
+
+class TestStudioEnhancement3ModeCards(unittest.TestCase):
+    """Enhancement 3: Styled tab cards for mode selection."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_mode_cards_css(self):
+        self.assertIn("studio-mode-cards", self.source)
+
+    def test_mode_card_class(self):
+        self.assertIn("studio-mode-card", self.source)
+
+    def test_mode_card_active_class(self):
+        self.assertIn("studio-mode-card.active", self.source)
+
+    def test_mode_card_meta(self):
+        """Each mode should have icon, title, and tagline."""
+        self.assertIn("studio-mode-icon", self.source)
+        self.assertIn("studio-mode-title", self.source)
+        self.assertIn("studio-mode-tag", self.source)
+
+    def test_mode_taglines_present(self):
+        self.assertIn("Full game breakdowns", self.source)
+        self.assertIn("Deep dive into any player", self.source)
+        self.assertIn("Build optimal parlay tickets", self.source)
+
+
+class TestStudioEnhancement4GameCards(unittest.TestCase):
+    """Enhancement 4 + 19: Game cards with team colors."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_game_card_class_used(self):
+        """The .studio-game-card class should be used for game rendering."""
+        # Should appear in both CSS definition and usage
+        count = self.source.count("studio-game-card")
+        self.assertGreaterEqual(count, 3, "studio-game-card should be in CSS + used in rendering")
+
+    def test_team_badge_class(self):
+        self.assertIn("team-badge", self.source)
+
+    def test_both_team_colors(self):
+        """Both home and away team colors should be fetched."""
+        self.assertIn("a_pri, a_sec", self.source)
+        self.assertIn("h_pri, h_sec", self.source)
+
+
+class TestStudioEnhancement5ConfidenceGauge(unittest.TestCase):
+    """Enhancement 5: Ticket card confidence gauge."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_confidence_gauge_called(self):
+        self.assertIn("render_confidence_gauge_svg", self.source)
+
+    def test_gauge_in_ticket_card(self):
+        self.assertIn("_gauge_html", self.source)
+
+
+class TestStudioEnhancement6TrackRecordCharts(unittest.TestCase):
+    """Enhancement 6: Mini charts in Track Record."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_pie_svg(self):
+        """SMASH vs LEAN pie chart SVG should exist."""
+        self.assertIn("_pie_svg", self.source)
+
+    def test_win_rate_progress_bar(self):
+        """Win rate should have a progress bar."""
+        self.assertIn("_wr_pct", self.source)
+
+
+class TestStudioEnhancement7OutcomeBadges(unittest.TestCase):
+    """Enhancement 7: Bet history outcome badges."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_outcome_badge_called(self):
+        self.assertIn("render_outcome_badge", self.source)
+
+    def test_outcome_badge_in_bet_history(self):
+        self.assertIn("_badge_html", self.source)
+
+
+class TestStudioEnhancement8CSSVars(unittest.TestCase):
+    """Enhancement 8: CSS custom properties."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_css_custom_properties_defined(self):
+        self.assertIn("--studio-muted", self.source)
+        self.assertIn("--studio-accent", self.source)
+        self.assertIn("--studio-text", self.source)
+        self.assertIn("--studio-bg-deep", self.source)
+        self.assertIn("--studio-bg-card", self.source)
+        self.assertIn("--studio-green", self.source)
+        self.assertIn("--studio-cyan", self.source)
+        self.assertIn("--studio-red", self.source)
+        self.assertIn("--studio-yellow", self.source)
+
+    def test_css_vars_used_in_rendering(self):
+        """CSS vars should be used in inline styles."""
+        self.assertIn("var(--studio-muted)", self.source)
+        self.assertIn("var(--studio-accent)", self.source)
+
+
+class TestStudioEnhancement9PersistMode(unittest.TestCase):
+    """Enhancement 9: Persist selected mode in session state."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_mode_stored_in_session_state(self):
+        self.assertIn('"studio_mode"', self.source)
+
+    def test_mode_radio_has_key(self):
+        self.assertIn("studio_mode_radio", self.source)
+
+    def test_mode_session_state_write(self):
+        self.assertIn('st.session_state["studio_mode"]', self.source)
+
+
+class TestStudioEnhancement10PlayerGrouping(unittest.TestCase):
+    """Enhancement 10: Players grouped by team."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_sort_by_team_then_name(self):
+        self.assertIn("group by team", self.source)
+
+
+class TestStudioEnhancement11TicketComparison(unittest.TestCase):
+    """Enhancement 11: Side-by-side ticket comparison."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_tickets_stored_in_session(self):
+        self.assertIn('"studio_tickets"', self.source)
+
+    def test_compare_expander(self):
+        self.assertIn("Compare Previous Tickets", self.source)
+
+
+class TestStudioEnhancement12ClipboardExport(unittest.TestCase):
+    """Enhancement 12: Copy ticket to clipboard."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_clipboard_lines_built(self):
+        self.assertIn("_clipboard_lines", self.source)
+
+    def test_copy_caption(self):
+        self.assertIn("Copy the ticket above", self.source)
+
+
+class TestStudioEnhancement14DateRangeFilter(unittest.TestCase):
+    """Enhancement 14: Track record date range filter."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_date_range_options(self):
+        self.assertIn("All Time", self.source)
+        self.assertIn("Last 7 Days", self.source)
+        self.assertIn("Last 30 Days", self.source)
+        self.assertIn("This Season", self.source)
+
+    def test_date_range_key(self):
+        self.assertIn("studio_track_record_range", self.source)
+
+
+class TestStudioEnhancement15EmptyStates(unittest.TestCase):
+    """Enhancement 15: Styled empty-state cards."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_render_empty_state_used(self):
+        count = self.source.count("render_empty_state")
+        self.assertGreaterEqual(count, 5, "render_empty_state should replace most plain st.info calls")
+
+
+class TestStudioEnhancement16QuickNav(unittest.TestCase):
+    """Enhancement 16: Quick navigation links."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_quick_nav_class(self):
+        self.assertIn("studio-quick-nav", self.source)
+
+    def test_jump_links(self):
+        self.assertIn("Tonight's Bets", self.source)
+        self.assertIn("Dawg Board", self.source)
+        self.assertIn("Track Record", self.source)
+        self.assertIn("Bet History", self.source)
+
+
+class TestStudioEnhancement17VerdictHeatmap(unittest.TestCase):
+    """Enhancement 17: Verdict heatmap on Build My Bets."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_heatmap_called(self):
+        self.assertIn("render_verdict_heatmap_html", self.source)
+
+
+class TestStudioEnhancement18HelperExtraction(unittest.TestCase):
+    """Enhancement 18: Inline HTML templates extracted to helpers."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_render_avatar_commentary_used(self):
+        count = self.source.count("render_avatar_commentary")
+        self.assertGreaterEqual(count, 3, "Should use render_avatar_commentary multiple times")
+
+    def test_render_nerd_stats_used(self):
+        count = self.source.count("render_nerd_stats")
+        self.assertGreaterEqual(count, 3, "Should use render_nerd_stats for all 3 expanders")
+
+
+class TestStudioEnhancement20NerdStatsConsolidation(unittest.TestCase):
+    """Enhancement 20: Consolidated nerd stats helper."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_render_nerd_stats_imported(self):
+        self.assertIn("render_nerd_stats", self.source)
+
+    def test_custom_keys_per_mode(self):
+        """Each mode should pass specific keys."""
+        self.assertIn("_game_nerd_keys", self.source)
+        self.assertIn("_scout_nerd_keys", self.source)
+        self.assertIn("_ticket_nerd_keys", self.source)
+
+
+class TestHelperFunctionsExist(unittest.TestCase):
+    """Verify new helper functions exist in joseph_live_desk.py."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "helpers", "joseph_live_desk.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_render_nerd_stats_defined(self):
+        self.assertIn("def render_nerd_stats(", self.source)
+
+    def test_render_avatar_commentary_defined(self):
+        self.assertIn("def render_avatar_commentary(", self.source)
+
+    def test_render_confidence_gauge_svg_defined(self):
+        self.assertIn("def render_confidence_gauge_svg(", self.source)
+
+    def test_render_outcome_badge_defined(self):
+        self.assertIn("def render_outcome_badge(", self.source)
+
+    def test_render_empty_state_defined(self):
+        self.assertIn("def render_empty_state(", self.source)
+
+    def test_render_verdict_heatmap_html_defined(self):
+        self.assertIn("def render_verdict_heatmap_html(", self.source)
+
+
+class TestHelperFunctionsWork(unittest.TestCase):
+    """Unit tests for the new helper functions."""
+
+    def test_render_nerd_stats_default(self):
+        from pages.helpers.joseph_live_desk import render_nerd_stats
+        result = render_nerd_stats({"edge": 5.0, "confidence": 80})
+        self.assertIn("edge", result)
+        self.assertIn("5.0", result)
+
+    def test_render_nerd_stats_custom_keys(self):
+        from pages.helpers.joseph_live_desk import render_nerd_stats
+        result = render_nerd_stats(
+            {"gravity": 3.5, "trend": "up", "other": "ignored"},
+            keys=["gravity", "trend"],
+        )
+        self.assertIn("gravity", result)
+        self.assertIn("trend", result)
+        self.assertNotIn("other", result)
+
+    def test_render_nerd_stats_empty(self):
+        from pages.helpers.joseph_live_desk import render_nerd_stats
+        result = render_nerd_stats({})
+        self.assertEqual(result, "")
+
+    def test_render_avatar_commentary(self):
+        from pages.helpers.joseph_live_desk import render_avatar_commentary
+        result = render_avatar_commentary("Test commentary")
+        self.assertIn("Test commentary", result)
+        self.assertIn("display:flex", result)
+
+    def test_render_avatar_commentary_escapes_html(self):
+        from pages.helpers.joseph_live_desk import render_avatar_commentary
+        result = render_avatar_commentary("<script>alert(1)</script>")
+        self.assertNotIn("<script>", result)
+        self.assertIn("&lt;script&gt;", result)
+
+    def test_render_confidence_gauge_svg_basic(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        result = render_confidence_gauge_svg(75.0, 50.0, 60.0)
+        self.assertIn("<svg", result)
+        self.assertIn("75%", result)
+
+    def test_render_confidence_gauge_svg_green(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        result = render_confidence_gauge_svg(80.0)
+        self.assertIn("#22c55e", result)  # green
+
+    def test_render_confidence_gauge_svg_orange(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        result = render_confidence_gauge_svg(50.0)
+        self.assertIn("#f59e0b", result)  # orange
+
+    def test_render_confidence_gauge_svg_red(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        result = render_confidence_gauge_svg(20.0)
+        self.assertIn("#ef4444", result)  # red
+
+    def test_render_confidence_gauge_svg_clamp(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        result = render_confidence_gauge_svg(150.0)
+        self.assertIn("100%", result)
+        result2 = render_confidence_gauge_svg(-10.0)
+        self.assertIn("0%", result2)
+
+    def test_render_outcome_badge_win(self):
+        from pages.helpers.joseph_live_desk import render_outcome_badge
+        result = render_outcome_badge("win")
+        self.assertIn("✅", result)
+        self.assertIn("WIN", result)
+        self.assertIn("#34d399", result)
+
+    def test_render_outcome_badge_loss(self):
+        from pages.helpers.joseph_live_desk import render_outcome_badge
+        result = render_outcome_badge("loss")
+        self.assertIn("❌", result)
+        self.assertIn("LOSS", result)
+        self.assertIn("#fca5a5", result)
+
+    def test_render_outcome_badge_pending(self):
+        from pages.helpers.joseph_live_desk import render_outcome_badge
+        result = render_outcome_badge("pending")
+        self.assertIn("⏳", result)
+        self.assertIn("PENDING", result)
+
+    def test_render_outcome_badge_push(self):
+        from pages.helpers.joseph_live_desk import render_outcome_badge
+        result = render_outcome_badge("push")
+        self.assertIn("⏳", result)
+
+    def test_render_empty_state_message(self):
+        from pages.helpers.joseph_live_desk import render_empty_state
+        result = render_empty_state("Nothing here yet")
+        self.assertIn("Nothing here yet", result)
+        self.assertIn("📭", result)
+
+    def test_render_empty_state_with_cta(self):
+        from pages.helpers.joseph_live_desk import render_empty_state
+        result = render_empty_state("No data", cta_text="Go →", cta_page="/live")
+        self.assertIn("Go →", result)
+        self.assertIn("/live", result)
+        self.assertIn("<a", result)
+
+    def test_render_empty_state_without_cta(self):
+        from pages.helpers.joseph_live_desk import render_empty_state
+        result = render_empty_state("No data")
+        self.assertNotIn("<a", result)
+
+    def test_render_empty_state_escapes_html(self):
+        from pages.helpers.joseph_live_desk import render_empty_state
+        result = render_empty_state("<script>bad</script>")
+        self.assertNotIn("<script>", result)
+
+    def test_render_verdict_heatmap_html_basic(self):
+        from pages.helpers.joseph_live_desk import render_verdict_heatmap_html
+        results = [
+            {"verdict": "SMASH"},
+            {"verdict": "SMASH"},
+            {"verdict": "LEAN"},
+            {"verdict": "FADE"},
+        ]
+        html = render_verdict_heatmap_html(results)
+        self.assertIn("SMASH", html)
+        self.assertIn("LEAN", html)
+        self.assertIn("FADE", html)
+        self.assertIn("VERDICT DISTRIBUTION", html)
+        self.assertIn("50%", html)  # SMASH is 2/4 = 50%
+        self.assertIn("25%", html)  # LEAN/FADE are each 1/4
+
+    def test_render_verdict_heatmap_html_empty(self):
+        from pages.helpers.joseph_live_desk import render_verdict_heatmap_html
+        self.assertEqual(render_verdict_heatmap_html([]), "")
+
+    def test_render_verdict_heatmap_html_no_verdicts(self):
+        from pages.helpers.joseph_live_desk import render_verdict_heatmap_html
+        self.assertEqual(render_verdict_heatmap_html([{"edge": 5}]), "")
+
+
 if __name__ == "__main__":
     unittest.main()

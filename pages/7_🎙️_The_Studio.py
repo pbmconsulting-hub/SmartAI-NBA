@@ -11,6 +11,7 @@ import streamlit as st
 import os
 import html as _html
 import logging
+import math
 import random
 
 
@@ -144,6 +145,12 @@ try:
         render_dawg_board,
         render_override_report,
         render_broadcast_segment,
+        render_nerd_stats,
+        render_avatar_commentary,
+        render_confidence_gauge_svg,
+        render_outcome_badge,
+        render_empty_state,
+        render_verdict_heatmap_html,
     )
     _DESK_AVAILABLE = True
 except ImportError:
@@ -173,14 +180,59 @@ except ImportError:
             f'</div>'
         )
 
+    def render_nerd_stats(result, keys=None):
+        parts = []
+        for k in (keys or list(result.keys())):
+            v = result.get(k)
+            if v is not None:
+                parts.append(f"**{k}:** {str(v)[:500]}")
+        return "\n".join(parts)
+
+    def render_avatar_commentary(text, size=48):
+        return (
+            f'<div style="display:flex;align-items:flex-start;gap:12px;margin:10px 0">'
+            f'<span style="font-size:{size // 2}px">🎙️</span>'
+            f'<div style="color:#e2e8f0;font-size:0.92rem;line-height:1.6">'
+            f'{_html.escape(str(text))}</div></div>'
+        )
+
+    def render_confidence_gauge_svg(prob, ev=0.0, synergy=0.0):
+        return ""
+
+    def render_outcome_badge(result_str):
+        return _html.escape(str(result_str))
+
+    def render_empty_state(msg, cta_text=None, cta_page=None):
+        return (
+            f'<div style="text-align:center;padding:24px;color:var(--studio-muted,#94a3b8)">'
+            f'{_html.escape(str(msg))}</div>'
+        )
+
+    def render_verdict_heatmap_html(results):
+        return ""
+
 
 # ── Inject desk CSS ──────────────────────────────────────────
 st.markdown(render_live_desk_css(), unsafe_allow_html=True)
 
 # ── Studio-specific supplemental CSS ─────────────────────────
 _STUDIO_CSS = """<style>
+/* ── CSS Custom Properties ── */
+:root{
+    --studio-muted:#94a3b8;
+    --studio-accent:#ff5e00;
+    --studio-accent-secondary:#ff9e00;
+    --studio-text:#e2e8f0;
+    --studio-bg-deep:rgba(7,10,19,0.88);
+    --studio-bg-card:rgba(15,23,42,0.75);
+    --studio-border:rgba(148,163,184,0.18);
+    --studio-green:#22c55e;
+    --studio-cyan:#00f0ff;
+    --studio-red:#ff4444;
+    --studio-yellow:#eab308;
+}
 .studio-hero{
-    background:rgba(7,10,19,0.88);
+    background:var(--studio-bg-deep);
     backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
     border:1px solid rgba(255,94,0,0.35);
     border-radius:18px;padding:32px 24px;
@@ -207,14 +259,37 @@ _STUDIO_CSS = """<style>
 }
 .studio-hero-title{
     font-family:'Orbitron',sans-serif;font-size:1.8rem;
-    color:#ff5e00;font-weight:700;margin:14px 0 6px;
+    color:var(--studio-accent);font-weight:700;margin:14px 0 6px;
     letter-spacing:1px;
     text-shadow:0 0 20px rgba(255,94,0,0.3),0 0 40px rgba(255,94,0,0.1);
 }
 .studio-hero-subtitle{
-    color:#94a3b8;font-size:0.95rem;
+    color:var(--studio-muted);font-size:0.95rem;
     font-family:'Montserrat',sans-serif;
     letter-spacing:0.3px;
+}
+/* ── ON AIR badge ── */
+.studio-on-air{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 14px;border-radius:20px;
+    background:rgba(255,32,32,0.15);border:1px solid rgba(255,32,32,0.4);
+    font-family:'Orbitron',sans-serif;font-size:0.7rem;
+    font-weight:700;color:#ff2020;letter-spacing:1px;
+    margin:10px auto 4px;
+    animation:studioOnAirPulse 2s ease-in-out infinite;
+}
+.studio-on-air-dot{
+    width:8px;height:8px;border-radius:50%;background:#ff2020;
+    box-shadow:0 0 6px rgba(255,32,32,0.6);
+    animation:studioOnAirDotPulse 1.4s ease-in-out infinite;
+}
+@keyframes studioOnAirPulse{
+    0%,100%{box-shadow:0 0 8px rgba(255,32,32,0.2)}
+    50%{box-shadow:0 0 16px rgba(255,32,32,0.4)}
+}
+@keyframes studioOnAirDotPulse{
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:0.4;transform:scale(0.8)}
 }
 .studio-avatar-lg{
     width:120px;height:120px;border-radius:50%;
@@ -227,11 +302,48 @@ _STUDIO_CSS = """<style>
     0%,100%{box-shadow:0 0 24px rgba(255,94,0,0.3),0 0 48px rgba(255,94,0,0.12)}
     50%{box-shadow:0 0 32px rgba(255,94,0,0.5),0 0 64px rgba(255,94,0,0.2)}
 }
+/* ── Mode selector cards ── */
+.studio-mode-cards{
+    display:flex;gap:12px;margin:8px 0 20px;flex-wrap:wrap;
+    justify-content:center;
+}
+.studio-mode-card{
+    flex:1;min-width:180px;max-width:280px;
+    background:var(--studio-bg-card);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    border:2px solid var(--studio-border);
+    border-radius:14px;padding:18px 16px;text-align:center;
+    cursor:pointer;transition:all 0.25s ease;
+    position:relative;overflow:hidden;
+}
+.studio-mode-card:hover{
+    border-color:rgba(255,94,0,0.4);
+    box-shadow:0 4px 20px rgba(255,94,0,0.1);
+    transform:translateY(-2px);
+}
+.studio-mode-card.active{
+    border-color:var(--studio-accent);
+    box-shadow:0 0 24px rgba(255,94,0,0.15);
+}
+.studio-mode-card.active::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,var(--studio-accent),transparent);
+}
+.studio-mode-icon{font-size:1.6rem;margin-bottom:6px}
+.studio-mode-title{
+    font-family:'Orbitron',sans-serif;font-size:0.82rem;
+    color:var(--studio-accent);font-weight:700;
+    letter-spacing:0.3px;margin-bottom:4px;
+}
+.studio-mode-tag{
+    color:var(--studio-muted);font-size:0.72rem;
+    font-family:'Montserrat',sans-serif;
+}
 .studio-game-card{
-    background:rgba(15,23,42,0.75);
+    background:var(--studio-bg-card);
     backdrop-filter:blur(8px);
     -webkit-backdrop-filter:blur(8px);
-    border:1px solid rgba(148,163,184,0.18);
+    border:1px solid var(--studio-border);
     border-left:3px solid rgba(255,94,0,0.4);
     border-radius:12px;padding:16px 20px;
     cursor:pointer;transition:all 0.25s ease;
@@ -242,8 +354,13 @@ _STUDIO_CSS = """<style>
     box-shadow:0 4px 24px rgba(255,94,0,0.12);
     transform:translateY(-1px);
 }
+.studio-game-card .team-badge{
+    display:inline-block;padding:2px 8px;border-radius:4px;
+    font-family:'Orbitron',sans-serif;font-size:0.72rem;
+    font-weight:700;letter-spacing:0.5px;margin-right:4px;
+}
 .studio-ticket-card{
-    background:rgba(7,10,19,0.8);
+    background:var(--studio-bg-deep);
     backdrop-filter:blur(12px);
     -webkit-backdrop-filter:blur(12px);
     border:1px solid rgba(255,94,0,0.3);
@@ -258,13 +375,13 @@ _STUDIO_CSS = """<style>
 }
 .studio-ticket-header{
     font-family:'Orbitron',sans-serif;
-    color:#ff5e00;font-size:1.15rem;
+    color:var(--studio-accent);font-size:1.15rem;
     font-weight:700;margin-bottom:12px;
     text-shadow:0 0 8px rgba(255,94,0,0.2);
 }
 .studio-ticket-leg{
     padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.08);
-    color:#e2e8f0;font-size:0.9rem;
+    color:var(--studio-text);font-size:0.9rem;
     font-family:'Montserrat',sans-serif;
     transition:background 0.15s ease;
 }
@@ -272,7 +389,7 @@ _STUDIO_CSS = """<style>
 .studio-ticket-leg:hover{background:rgba(255,94,0,0.03);border-radius:4px}
 .studio-section-title{
     font-family:'Orbitron',sans-serif;
-    color:#ff5e00;font-size:1.2rem;font-weight:700;
+    color:var(--studio-accent);font-size:1.2rem;font-weight:700;
     margin:28px 0 14px;letter-spacing:0.5px;
     text-shadow:0 0 10px rgba(255,94,0,0.15);
     padding-left:12px;
@@ -283,7 +400,7 @@ _STUDIO_CSS = """<style>
 }
 .studio-metric-card{
     flex:1;min-width:140px;
-    background:rgba(15,23,42,0.7);
+    background:var(--studio-bg-card);
     border:1px solid rgba(255,94,0,0.2);
     border-radius:10px;padding:14px 18px;
     text-align:center;
@@ -303,13 +420,29 @@ _STUDIO_CSS = """<style>
 .studio-metric-value{
     font-family:'JetBrains Mono',monospace;
     font-variant-numeric:tabular-nums;
-    font-size:1.4rem;color:#ff5e00;font-weight:700;
+    font-size:1.4rem;color:var(--studio-accent);font-weight:700;
     text-shadow:0 0 8px rgba(255,94,0,0.2);
 }
 .studio-metric-label{
-    color:#94a3b8;font-size:0.78rem;
+    color:var(--studio-muted);font-size:0.78rem;
     margin-top:4px;font-family:'Montserrat',sans-serif;
     text-transform:uppercase;letter-spacing:0.5px;
+}
+/* ── Quick-nav jump buttons ── */
+.studio-quick-nav{
+    display:flex;gap:8px;flex-wrap:wrap;
+    justify-content:center;margin:14px 0 6px;
+}
+.studio-quick-nav a{
+    padding:6px 16px;border-radius:20px;font-size:0.78rem;
+    font-family:'Orbitron',sans-serif;font-weight:600;
+    color:var(--studio-accent);background:rgba(255,94,0,0.08);
+    border:1px solid rgba(255,94,0,0.25);text-decoration:none;
+    transition:all 0.2s ease;letter-spacing:0.3px;
+}
+.studio-quick-nav a:hover{
+    background:rgba(255,94,0,0.15);
+    box-shadow:0 0 12px rgba(255,94,0,0.1);
 }
 .studio-payout-table{
     width:100%;border-collapse:separate;border-spacing:0;
@@ -317,30 +450,46 @@ _STUDIO_CSS = """<style>
     margin:12px 0;
 }
 .studio-payout-table th{
-    background:rgba(255,94,0,0.1);color:#ff5e00;
+    background:rgba(255,94,0,0.1);color:var(--studio-accent);
     padding:8px 12px;text-align:center;
     font-family:'Orbitron',sans-serif;font-size:0.72rem;
     letter-spacing:0.4px;
     border-bottom:1px solid rgba(255,94,0,0.2);
 }
 .studio-payout-table td{
-    padding:6px 12px;text-align:center;color:#e2e8f0;
-    border-bottom:1px solid rgba(148,163,184,0.08);
+    padding:6px 12px;text-align:center;color:var(--studio-text);
+    border-bottom:1px solid var(--studio-border);
     font-family:'JetBrains Mono',monospace;
     font-variant-numeric:tabular-nums;
 }
-.studio-payout-table td.highlight{color:#22c55e;font-weight:700}
+.studio-payout-table td.highlight{color:var(--studio-green);font-weight:700}
 </style>"""
 st.markdown(_STUDIO_CSS, unsafe_allow_html=True)
 
 
 # ═════════════════════════════════════════════════════════════
-# HERO BANNER
+# HERO BANNER  (Enhancement 1: avatar image, Enhancement 2: ON AIR badge)
 # ═════════════════════════════════════════════════════════════
+
+_hero_avatar_b64 = get_joseph_avatar_b64()
+if _hero_avatar_b64:
+    _hero_avatar_html = (
+        f'<img src="data:image/png;base64,{_hero_avatar_b64}" '
+        f'class="studio-avatar-lg" alt="Joseph M. Smith">'
+    )
+else:
+    _hero_avatar_html = (
+        '<div class="studio-avatar-lg" style="background:#1e293b;'
+        'display:flex;align-items:center;justify-content:center;'
+        'font-size:2.5rem">🎙️</div>'
+    )
 
 st.markdown(
     f'<div class="studio-hero">'
-    f'<div class="studio-hero-title">🎙️ THE STUDIO — Joseph M. Smith</div>'
+    f'{_hero_avatar_html}'
+    f'<div class="studio-on-air">'
+    f'<span class="studio-on-air-dot"></span>ON AIR</div>'
+    f'<div class="studio-hero-title">THE STUDIO — Joseph M. Smith</div>'
     f'<div class="studio-hero-subtitle">'
     f'God-Mode Analyst • Live Commentator • Your Betting Edge'
     f'</div></div>',
@@ -377,18 +526,65 @@ with st.expander("📖 How to Use The Studio", expanded=False):
 
 # Helper for small inline avatar (defined early so all modes can use it)
 def _avatar_inline(size=48):
+    b64 = get_joseph_avatar_b64()
+    if b64:
+        css_cls = "joseph-avatar-sm" if size <= 48 else "joseph-avatar"
+        return (
+            f'<img src="data:image/png;base64,{b64}" class="{css_cls}" '
+            f'alt="Joseph" style="width:{size}px;height:{size}px">'
+        )
     return f'<span style="font-size:{size // 2}px">🎙️</span>'
 
 
 # ═════════════════════════════════════════════════════════════
-# THREE INTERACTIVE MODES
+# THREE INTERACTIVE MODES  (Enhancement 3: card UI, Enhancement 9: persist)
 # ═════════════════════════════════════════════════════════════
+
+# Persist mode in session state (Enhancement 9)
+_MODE_OPTIONS = ["🏀 GAMES TONIGHT", "👤 SCOUT A PLAYER", "🎰 BUILD MY BETS"]
+_MODE_META = {
+    "🏀 GAMES TONIGHT": ("🏀", "GAMES TONIGHT", "Full game breakdowns & takes"),
+    "👤 SCOUT A PLAYER": ("👤", "SCOUT A PLAYER", "Deep dive into any player"),
+    "🎰 BUILD MY BETS": ("🎰", "BUILD MY BETS", "Build optimal parlay tickets"),
+}
+
+if "studio_mode" not in st.session_state:
+    st.session_state["studio_mode"] = _MODE_OPTIONS[0]
+
+# Render styled mode cards as visual preview
+_mode_cards_html = '<div class="studio-mode-cards">'
+for _m in _MODE_OPTIONS:
+    _icon, _title, _tag = _MODE_META[_m]
+    _active = "active" if _m == st.session_state["studio_mode"] else ""
+    _mode_cards_html += (
+        f'<div class="studio-mode-card {_active}">'
+        f'<div class="studio-mode-icon">{_icon}</div>'
+        f'<div class="studio-mode-title">{_title}</div>'
+        f'<div class="studio-mode-tag">{_tag}</div>'
+        f'</div>'
+    )
+_mode_cards_html += '</div>'
+st.markdown(_mode_cards_html, unsafe_allow_html=True)
 
 mode = st.radio(
     "Choose your mode",
-    ["🏀 GAMES TONIGHT", "👤 SCOUT A PLAYER", "🎰 BUILD MY BETS"],
+    _MODE_OPTIONS,
+    index=_MODE_OPTIONS.index(st.session_state["studio_mode"]),
     horizontal=True,
     label_visibility="collapsed",
+    key="studio_mode_radio",
+)
+st.session_state["studio_mode"] = mode
+
+# Quick navigation links (Enhancement 16)
+st.markdown(
+    '<div class="studio-quick-nav">'
+    '<a href="#joseph-s-bets-tonight">🎯 Tonight\'s Bets</a>'
+    '<a href="#the-dawg-board">🐕 Dawg Board</a>'
+    '<a href="#joseph-s-track-record">📊 Track Record</a>'
+    '<a href="#joseph-s-bet-history">📜 Bet History</a>'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 # ── Joseph's Platform Preference ──────────────────────────────
@@ -451,7 +647,14 @@ if mode == "🏀 GAMES TONIGHT":
     todays_games = st.session_state.get("todays_games", [])
 
     if not todays_games:
-        st.info("📡 Load games on **📡 Live Games** first!")
+        st.markdown(
+            render_empty_state(
+                "No games loaded yet.",
+                cta_text="Go to 📡 Live Games →",
+                cta_page="/📡_Live_Games",
+            ),
+            unsafe_allow_html=True,
+        )
     else:
         st.markdown(
             '<div class="studio-section-title">Tonight\'s Games</div>',
@@ -465,17 +668,37 @@ if mode == "🏀 GAMES TONIGHT":
             total = game.get("total", "—")
             game_time = game.get("time", game.get("commence_time", ""))
 
-            # Team colors
+            # Team colors (Enhancement 4)
             try:
                 h_pri, h_sec = get_team_colors(home)
             except Exception:
                 h_pri, h_sec = "#ff5e00", "#1e293b"
+            try:
+                a_pri, a_sec = get_team_colors(away)
+            except Exception:
+                a_pri, a_sec = "#ff5e00", "#1e293b"
 
-            label = f"{away} @ {home} | Spread: {spread} | Total: {total}"
-            if game_time:
-                label += f" | {game_time}"
+            # Render styled game card HTML (Enhancement 4 + 19)
+            _time_str = f' • {_html.escape(str(game_time))}' if game_time else ''
+            st.markdown(
+                f'<div class="studio-game-card" style="border-left-color:{h_pri}">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center">'
+                f'<div>'
+                f'<span class="team-badge" style="background:{a_pri};color:{a_sec}">'
+                f'{_html.escape(away)}</span>'
+                f' <span style="color:var(--studio-muted);font-size:0.85rem">@</span> '
+                f'<span class="team-badge" style="background:{h_pri};color:{h_sec}">'
+                f'{_html.escape(home)}</span>'
+                f'</div>'
+                f'<div style="color:var(--studio-muted);font-size:0.78rem;'
+                f'font-family:\'JetBrains Mono\',monospace">'
+                f'Spread: {_html.escape(str(spread))} | O/U: {_html.escape(str(total))}'
+                f'{_time_str}</div>'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
 
-            if st.button(label, key=f"studio_game_{g_idx}", use_container_width=True):
+            if st.button(f"Analyze {away} @ {home}", key=f"studio_game_{g_idx}", use_container_width=True):
                 if not _BRAIN_AVAILABLE:
                     st.warning("Joseph's brain module is not available.")
                 else:
@@ -487,7 +710,7 @@ if mode == "🏀 GAMES TONIGHT":
                             result = {}
 
                     if result:
-                        # Avatar + commentary
+                        # Avatar + commentary (Enhancement 18: use helper)
                         try:
                             commentary = joseph_commentary(
                                 [result], "analysis_results"
@@ -495,15 +718,11 @@ if mode == "🏀 GAMES TONIGHT":
                         except Exception:
                             commentary = ""
 
-                        st.markdown(
-                            f'<div style="display:flex;align-items:flex-start;gap:14px;'
-                            f'margin:16px 0">'
-                            f'{_avatar_inline(48)}'
-                            f'<div style="color:#e2e8f0;font-size:0.92rem;'
-                            f'line-height:1.6">{_html.escape(commentary)}</div>'
-                            f'</div>',
-                            unsafe_allow_html=True,
-                        )
+                        if commentary:
+                            st.markdown(
+                                render_avatar_commentary(commentary),
+                                unsafe_allow_html=True,
+                            )
 
                         # Game narrative
                         narrative = result.get("game_narrative", "")
@@ -610,22 +829,26 @@ if mode == "🏀 GAMES TONIGHT":
                                 unsafe_allow_html=True,
                             )
 
-                        # Nerd stats
+                        # Nerd stats (Enhancement 20: consolidated helper)
                         with st.expander("📊 Nerd Stats"):
-                            nerd_keys = [
+                            _game_nerd_keys = [
                                 "pace_take", "scheme_analysis", "blowout_risk",
                                 "game_narrative", "total_opinion", "joseph_game_total_take",
                                 "spread_opinion", "joseph_spread_take",
                                 "betting_angle", "risk_warning",
                             ]
-                            for nk in nerd_keys:
-                                nv = result.get(nk)
-                                if nv:
-                                    st.markdown(
-                                        f"**{nk}:** {_html.escape(str(nv)[:500])}"
-                                    )
+                            _nerd_html = render_nerd_stats(result, keys=_game_nerd_keys)
+                            if _nerd_html:
+                                st.markdown(_nerd_html, unsafe_allow_html=True)
                     else:
-                        st.info("Joseph couldn't analyze this game — data may be limited.")
+                        st.markdown(
+                            render_empty_state(
+                                "Joseph couldn't analyze this game — data may be limited.",
+                                cta_text="Run ⚡ Neural Analysis →",
+                                cta_page="/⚡_Quantum_Analysis_Matrix",
+                            ),
+                            unsafe_allow_html=True,
+                        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -657,10 +880,20 @@ elif mode == "👤 SCOUT A PLAYER":
             pass
 
     if not player_options:
-        st.info("No players available. Run **⚡ Neural Analysis** or check data.")
+        st.markdown(
+            render_empty_state(
+                "No players available yet.",
+                cta_text="Run ⚡ Neural Analysis →",
+                cta_page="/⚡_Quantum_Analysis_Matrix",
+            ),
+            unsafe_allow_html=True,
+        )
     else:
-        # Sort by team, then name
-        player_options.sort(key=lambda x: x[0])
+        # Sort by team, then name (Enhancement 10: grouped by team)
+        player_options.sort(key=lambda x: (
+            x[1].get("team", "ZZZ"),  # group by team
+            x[0],                     # then by name
+        ))
 
         selected_label = st.selectbox(
             "Select a player to scout",
@@ -686,17 +919,13 @@ elif mode == "👤 SCOUT A PLAYER":
                         result = {}
 
                 if result:
-                    # Avatar + scouting report
+                    # Avatar + scouting report (Enhancement 18: use helper)
                     report = result.get("scouting_report", "")
-                    st.markdown(
-                        f'<div style="display:flex;align-items:flex-start;gap:14px;'
-                        f'margin:16px 0">'
-                        f'{_avatar_inline(48)}'
-                        f'<div style="color:#e2e8f0;font-size:0.92rem;'
-                        f'line-height:1.6">{_html.escape(str(report))}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
+                    if report:
+                        st.markdown(
+                            render_avatar_commentary(report),
+                            unsafe_allow_html=True,
+                        )
 
                     # Archetype badge + letter grade
                     archetype = result.get("archetype", "")
@@ -712,7 +941,7 @@ elif mode == "👤 SCOUT A PLAYER":
                             )
                         if grade:
                             grade_color = "#22c55e" if grade in ("A+", "A", "A-") else (
-                                "#eab308" if grade.startswith("B") else "#94a3b8"
+                                "#eab308" if grade.startswith("B") else "var(--studio-muted,#94a3b8)"
                             )
                             badge_parts.append(
                                 f'<span style="background:rgba(15,23,42,0.8);'
@@ -825,27 +1054,24 @@ elif mode == "👤 SCOUT A PLAYER":
                                 unsafe_allow_html=True,
                             )
 
-                    # Nerd Stats expander
+                    # Nerd Stats expander (Enhancement 20: consolidated helper)
                     with st.expander("📊 Nerd Stats"):
-                        display_keys = [
+                        _scout_nerd_keys = [
                             "gravity", "trend", "grade", "archetype",
                             "scouting_report", "matchup_take",
+                            "narrative_tags",
                         ]
-                        tags = result.get("narrative_tags", [])
-                        if tags:
-                            st.markdown(
-                                f"**narrative_tags:** "
-                                f"{_html.escape(', '.join(str(t) for t in tags))}"
-                            )
-                        for dk in display_keys:
-                            dv = result.get(dk)
-                            if dv is not None:
-                                st.markdown(
-                                    f"**{dk}:** {_html.escape(str(dv)[:500])}"
-                                )
+                        _nerd_html = render_nerd_stats(result, keys=_scout_nerd_keys)
+                        if _nerd_html:
+                            st.markdown(_nerd_html, unsafe_allow_html=True)
                 else:
-                    st.info(
-                        "Joseph couldn't scout this player — data may be limited."
+                    st.markdown(
+                        render_empty_state(
+                            "Joseph couldn't scout this player — data may be limited.",
+                            cta_text="Run ⚡ Neural Analysis →",
+                            cta_page="/⚡_Quantum_Analysis_Matrix",
+                        ),
+                        unsafe_allow_html=True,
                     )
 
 
@@ -863,17 +1089,35 @@ elif mode == "🎰 BUILD MY BETS":
             _platform_props = st.session_state.get("platform_props", [])
             if _platform_props:
                 _bets_data = _platform_props
-                st.info(
-                    f"📡 Using **{len(_platform_props)}** live props from "
-                    f"betting platforms. For full analysis, run **⚡ Neural Analysis** first."
+                st.markdown(
+                    render_broadcast_segment({
+                        "title": "📡 LIVE PROPS LOADED",
+                        "body": (
+                            f"Using <strong>{len(_platform_props)}</strong> live props "
+                            f"from betting platforms. For full analysis, run "
+                            f"<strong>⚡ Neural Analysis</strong> first."
+                        ),
+                    }),
+                    unsafe_allow_html=True,
                 )
             else:
-                st.info(
-                    "📡 Load games on **📡 Live Games** and get live props, "
-                    "or run **⚡ Neural Analysis** to populate data for bet building!"
+                st.markdown(
+                    render_empty_state(
+                        "Load games and get live props, or run Neural Analysis to populate data for bet building!",
+                        cta_text="Go to 📡 Live Games →",
+                        cta_page="/📡_Live_Games",
+                    ),
+                    unsafe_allow_html=True,
                 )
 
         if _bets_data:
+            # Enhancement 17: Verdict heatmap before entry size selection
+            _existing_joseph = st.session_state.get("joseph_results", [])
+            if _existing_joseph:
+                _heatmap_html = render_verdict_heatmap_html(_existing_joseph)
+                if _heatmap_html:
+                    st.markdown(_heatmap_html, unsafe_allow_html=True)
+
             st.markdown(
                 '<div class="studio-section-title">Choose Your Entry Size</div>',
                 unsafe_allow_html=True,
@@ -896,8 +1140,8 @@ elif mode == "🎰 BUILD MY BETS":
             platform = joseph_platform
 
             st.markdown(
-                f'<div style="color:#94a3b8;font-size:0.82rem;margin:4px 0 8px 0">'
-                f'Building bets for <strong style="color:#ff5e00">{platform}</strong></div>',
+                f'<div style="color:var(--studio-muted);font-size:0.82rem;margin:4px 0 8px 0">'
+                f'Building bets for <strong style="color:var(--studio-accent)">{_html.escape(platform)}</strong></div>',
                 unsafe_allow_html=True,
             )
 
@@ -934,7 +1178,12 @@ elif mode == "🎰 BUILD MY BETS":
                         ticket_result = {}
 
                 if ticket_result and ticket_result.get("legs"):
-                    # Inline reaction
+                    # Store ticket in session state for comparison (Enhancement 11)
+                    if "studio_tickets" not in st.session_state:
+                        st.session_state["studio_tickets"] = {}
+                    st.session_state["studio_tickets"][selected_legs] = ticket_result
+
+                    # Inline reaction (Enhancement 18: use helper)
                     try:
                         reaction = joseph_commentary([ticket_result], "ticket_generated")
                     except Exception:
@@ -942,12 +1191,7 @@ elif mode == "🎰 BUILD MY BETS":
 
                     if reaction:
                         st.markdown(
-                            f'<div style="display:flex;align-items:flex-start;gap:12px;'
-                            f'margin:14px 0">'
-                            f'{_avatar_inline(40)}'
-                            f'<div style="color:#e2e8f0;font-size:0.9rem;'
-                            f'line-height:1.5;font-style:italic">'
-                            f'{_html.escape(reaction)}</div></div>',
+                            render_avatar_commentary(reaction, size=40),
                             unsafe_allow_html=True,
                         )
 
@@ -958,6 +1202,7 @@ elif mode == "🎰 BUILD MY BETS":
                     pitch = ticket_result.get("rant", ticket_result.get("pitch", ""))
 
                     legs_html = ""
+                    _clipboard_lines = []  # for copy-to-clipboard (Enhancement 12)
                     for leg in ticket_result.get("legs", []):
                         l_player = _html.escape(str(leg.get("player_name", leg.get("player", ""))))
                         l_dir = _html.escape(str(leg.get("direction", "")))
@@ -978,9 +1223,14 @@ elif mode == "🎰 BUILD MY BETS":
                             f'{_html.escape(l_emoji)} '
                             f'<strong>{l_player}</strong> '
                             f'{l_stat} {l_dir} {_html.escape(str(l_line))} '
-                            f'<span style="color:#94a3b8;font-size:0.82rem">'
+                            f'<span style="color:var(--studio-muted);font-size:0.82rem">'
                             f'— {l_oneliner}</span>'
                             f'</div>'
+                        )
+                        _clipboard_lines.append(
+                            f"{leg.get('player_name', leg.get('player', ''))} "
+                            f"{leg.get('stat_type', leg.get('prop', ''))} "
+                            f"{leg.get('direction', '')} {l_line}"
                         )
 
                     # Combined stats
@@ -991,32 +1241,54 @@ elif mode == "🎰 BUILD MY BETS":
                     synergy = ticket_result.get("synergy_score",
                                                 ticket_result.get("correlation_score", 0))
 
+                    # Enhancement 5: Confidence gauge SVG
+                    # Normalize metrics to 0-100 scale for the gauge:
+                    # - prob: if <=1 treat as fraction (e.g. 0.65 → 65%), else use as-is
+                    # - ev: EV typically ranges -5 to +5; shift by +5 then scale by 10
+                    # - synergy: if <=1 treat as fraction, else use as-is
+                    _prob_raw = _safe_float(combined_prob)
+                    _prob_pct = _prob_raw * 100 if _prob_raw <= 1 else _prob_raw
+                    _ev_raw = _safe_float(ev)
+                    _ev_bar = max(0, min(100, (_ev_raw + 5) * 10))
+                    _syn_raw = _safe_float(synergy)
+                    _syn_bar = max(0, min(100, _syn_raw * 100 if _syn_raw <= 1 else _syn_raw))
+                    _gauge_html = render_confidence_gauge_svg(_prob_pct, _ev_bar, _syn_bar)
+
                     st.markdown(
                         f'<div class="studio-ticket-card">'
                         f'<div class="studio-ticket-header">'
                         f'🎫 {_html.escape(str(ticket_name))}</div>'
-                        f'<div style="color:#94a3b8;font-size:0.88rem;margin-bottom:14px">'
+                        f'<div style="color:var(--studio-muted);font-size:0.88rem;margin-bottom:14px">'
                         f'{_html.escape(str(pitch))}</div>'
                         f'{legs_html}'
                         f'<div style="display:flex;gap:20px;margin-top:14px;'
-                        f'padding-top:12px;border-top:1px solid rgba(148,163,184,0.12)">'
-                        f'<div><span style="color:#94a3b8;font-size:0.78rem">'
+                        f'padding-top:12px;border-top:1px solid rgba(148,163,184,0.12);'
+                        f'align-items:flex-start">'
+                        f'<div style="flex:1">'
+                        f'<div><span style="color:var(--studio-muted);font-size:0.78rem">'
                         f'Combined Prob</span><br>'
-                        f'<span style="color:#22c55e;font-family:\'JetBrains Mono\','
+                        f'<span style="color:var(--studio-green);font-family:\'JetBrains Mono\','
                         f'monospace;font-weight:600">'
                         f'{combined_prob:.1%}</span></div>'
-                        f'<div><span style="color:#94a3b8;font-size:0.78rem">EV</span><br>'
-                        f'<span style="color:#ff5e00;font-family:\'JetBrains Mono\','
+                        f'<div style="margin-top:8px"><span style="color:var(--studio-muted);font-size:0.78rem">EV</span><br>'
+                        f'<span style="color:var(--studio-accent);font-family:\'JetBrains Mono\','
                         f'monospace;font-weight:600">'
                         f'{ev:+.2f}</span></div>'
-                        f'<div><span style="color:#94a3b8;font-size:0.78rem">'
+                        f'<div style="margin-top:8px"><span style="color:var(--studio-muted);font-size:0.78rem">'
                         f'Synergy</span><br>'
-                        f'<span style="color:#00f0ff;font-family:\'JetBrains Mono\','
+                        f'<span style="color:var(--studio-cyan);font-family:\'JetBrains Mono\','
                         f'monospace;font-weight:600">'
                         f'{synergy:.2f}</span></div>'
+                        f'</div>'
+                        f'<div>{_gauge_html}</div>'
                         f'</div></div>',
                         unsafe_allow_html=True,
                     )
+
+                    # Enhancement 12: Copy ticket to clipboard
+                    _clip_text = f"{ticket_name}\n" + "\n".join(_clipboard_lines)
+                    st.code(_clip_text, language=None)
+                    st.caption("📋 Copy the ticket above to share with your betting platform.")
 
                     # "Why These Connect:" narrative
                     why = ticket_result.get("why_these_legs",
@@ -1036,30 +1308,28 @@ elif mode == "🎰 BUILD MY BETS":
                         "All picks carry risk. Bet responsibly. Past performance does not guarantee future results.",
                     )
                     st.markdown(
-                        f'<div style="color:#94a3b8;font-size:0.78rem;'
+                        f'<div style="color:var(--studio-muted);font-size:0.78rem;'
                         f'margin:10px 0;font-style:italic">'
                         f'⚠️ {_html.escape(str(disclaimer))}</div>',
                         unsafe_allow_html=True,
                     )
 
-                    # Nerd Stats expander
+                    # Nerd Stats expander (Enhancement 20: consolidated helper)
                     nerd = ticket_result.get("nerd_stats", {})
                     with st.expander("📊 Nerd Stats"):
                         if isinstance(nerd, dict) and nerd:
-                            for nk, nv in nerd.items():
-                                st.markdown(
-                                    f"**{_html.escape(str(nk))}:** "
-                                    f"{_html.escape(str(nv)[:500])}"
-                                )
+                            _nerd_html = render_nerd_stats(nerd)
+                            if _nerd_html:
+                                st.markdown(_nerd_html, unsafe_allow_html=True)
                         else:
-                            for key in ("combined_probability", "expected_value",
-                                        "synergy_score", "correlation_score",
-                                        "total_ev", "joseph_confidence"):
-                                val = ticket_result.get(key)
-                                if val is not None:
-                                    st.markdown(
-                                        f"**{key}:** {_html.escape(str(val))}"
-                                    )
+                            _ticket_nerd_keys = [
+                                "combined_probability", "expected_value",
+                                "synergy_score", "correlation_score",
+                                "total_ev", "joseph_confidence",
+                            ]
+                            _nerd_html = render_nerd_stats(ticket_result, keys=_ticket_nerd_keys)
+                            if _nerd_html:
+                                st.markdown(_nerd_html, unsafe_allow_html=True)
 
                     # Regenerate button
                     if st.button("🔄 Regenerate", key="studio_regen"):
@@ -1089,7 +1359,7 @@ elif mode == "🎰 BUILD MY BETS":
                                     )
                                     if alt_pitch:
                                         st.markdown(
-                                            f'<div style="color:#94a3b8;font-size:0.85rem;'
+                                            f'<div style="color:var(--studio-muted,#94a3b8);font-size:0.85rem;'
                                             f'margin-bottom:8px">'
                                             f'{_html.escape(str(alt_pitch))}</div>',
                                             unsafe_allow_html=True,
@@ -1146,9 +1416,35 @@ elif mode == "🎰 BUILD MY BETS":
                                 unsafe_allow_html=True,
                             )
                 else:
-                    st.warning(
-                        "Joseph couldn't build a ticket — not enough qualifying picks."
+                    st.markdown(
+                        render_empty_state(
+                            "Joseph couldn't build a ticket — not enough qualifying picks.",
+                            cta_text="Run ⚡ Neural Analysis →",
+                            cta_page="/⚡_Quantum_Analysis_Matrix",
+                        ),
+                        unsafe_allow_html=True,
                     )
+
+            # Enhancement 11: Side-by-side ticket comparison
+            _stored_tickets = st.session_state.get("studio_tickets", {})
+            if len(_stored_tickets) > 1:
+                with st.expander("🔀 Compare Previous Tickets"):
+                    _comp_cols = st.columns(len(_stored_tickets))
+                    for _ci, (_legs, _tk) in enumerate(sorted(_stored_tickets.items())):
+                        with _comp_cols[_ci]:
+                            _tk_name = _tk.get("ticket_name", TICKET_NAMES.get(_legs, "TICKET"))
+                            st.markdown(
+                                f'<div style="font-family:\'Orbitron\',sans-serif;'
+                                f'color:var(--studio-accent);font-size:0.85rem;'
+                                f'font-weight:700;margin-bottom:6px">'
+                                f'🎫 {_html.escape(str(_tk_name))}</div>',
+                                unsafe_allow_html=True,
+                            )
+                            for _cl in _tk.get("legs", []):
+                                _cl_name = _html.escape(str(_cl.get("player_name", _cl.get("player", ""))))
+                                _cl_stat = _html.escape(str(_cl.get("stat_type", _cl.get("prop", ""))))
+                                _cl_dir = _html.escape(str(_cl.get("direction", "")))
+                                st.markdown(f"• {_cl_name} {_cl_stat} {_cl_dir}")
 
 
 # ═════════════════════════════════════════════════════════════
@@ -1234,9 +1530,13 @@ if not joseph_results and _BRAIN_AVAILABLE:
 if joseph_results:
     render_dawg_board(joseph_results)
 else:
-    st.info(
-        "📡 Load games on **📡 Live Games** and get live props, "
-        "or run **⚡ Neural Analysis** to populate Joseph's Dawg Board!"
+    st.markdown(
+        render_empty_state(
+            "Load games and get live props, or run Neural Analysis to populate Joseph's Dawg Board!",
+            cta_text="Go to 📡 Live Games →",
+            cta_page="/📡_Live_Games",
+        ),
+        unsafe_allow_html=True,
     )
 
 # ── Joseph's Tonight's Bets ──────────────────────────────────
@@ -1328,9 +1628,19 @@ if joseph_results:
             except ImportError:
                 pass
     else:
-        st.info("Joseph hasn't locked any SMASH or LEAN bets yet tonight.")
+        st.markdown(
+            render_empty_state("Joseph hasn't locked any SMASH or LEAN bets yet tonight."),
+            unsafe_allow_html=True,
+        )
 else:
-    st.info("Run Neural Analysis to generate Joseph's bet picks.")
+    st.markdown(
+        render_empty_state(
+            "Run Neural Analysis to generate Joseph's bet picks.",
+            cta_text="Run ⚡ Neural Analysis →",
+            cta_page="/⚡_Quantum_Analysis_Matrix",
+        ),
+        unsafe_allow_html=True,
+    )
 
 # ── Override Report ──────────────────────────────────────────
 st.markdown(
@@ -1341,7 +1651,7 @@ if joseph_results:
     render_override_report(joseph_results)
 else:
     st.markdown(
-        '<p style="color:#94a3b8;font-style:italic">No overrides tonight.</p>',
+        render_empty_state("No overrides tonight — Joseph and the Quantum Matrix Engine agree across the board."),
         unsafe_allow_html=True,
     )
 
@@ -1351,6 +1661,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 if _BETS_AVAILABLE:
+    # Enhancement 14: Date range filter
+    _tr_filter_col1, _tr_filter_col2 = st.columns([3, 1])
+    with _tr_filter_col2:
+        _tr_range = st.selectbox(
+            "Time range",
+            ["All Time", "Last 7 Days", "Last 30 Days", "This Season"],
+            label_visibility="collapsed",
+            key="studio_track_record_range",
+        )
+
     try:
         track = joseph_get_track_record()
     except Exception as exc:
@@ -1373,6 +1693,28 @@ if _BETS_AVAILABLE:
     smash_pct = by_verdict.get("SMASH", {}).get("pct", 0)
     lean_pct = by_verdict.get("LEAN", {}).get("pct", 0)
 
+    # Enhancement 6: Win-rate sparkline SVG + SMASH/LEAN pie chart
+    _wr_pct = max(0, min(100, win_rate * 100)) if win_rate <= 1 else win_rate
+    _smash_pct_100 = max(0, min(100, smash_pct * 100)) if smash_pct <= 1 else smash_pct
+    _lean_pct_100 = max(0, min(100, lean_pct * 100)) if lean_pct <= 1 else lean_pct
+
+    # SVG mini pie for SMASH vs LEAN
+    _pie_circ = 2 * math.pi * 20
+    _smash_dash = _pie_circ * _smash_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
+    _lean_dash = _pie_circ * _lean_pct_100 / max(_smash_pct_100 + _lean_pct_100, 1)
+    _pie_svg = (
+        f'<svg width="50" height="50" viewBox="0 0 50 50" style="margin:4px auto;display:block">'
+        f'<circle cx="25" cy="25" r="20" fill="none" stroke="#1e293b" stroke-width="6"/>'
+        f'<circle cx="25" cy="25" r="20" fill="none" stroke="#ff5e00" stroke-width="6" '
+        f'stroke-dasharray="{_smash_dash:.1f} {_pie_circ - _smash_dash:.1f}" '
+        f'transform="rotate(-90 25 25)"/>'
+        f'<circle cx="25" cy="25" r="20" fill="none" stroke="#22c55e" stroke-width="6" '
+        f'stroke-dasharray="{_lean_dash:.1f} {_pie_circ - _lean_dash:.1f}" '
+        f'stroke-dashoffset="-{_smash_dash:.1f}" '
+        f'transform="rotate(-90 25 25)"/>'
+        f'</svg>'
+    )
+
     st.markdown(
         f'<div class="studio-metric-row">'
         f'<div class="studio-metric-card">'
@@ -1380,23 +1722,50 @@ if _BETS_AVAILABLE:
         f'<div class="studio-metric-label">Total Bets</div></div>'
         f'<div class="studio-metric-card">'
         f'<div class="studio-metric-value">{win_rate:.1%}</div>'
-        f'<div class="studio-metric-label">Win Rate</div></div>'
+        f'<div class="studio-metric-label">Win Rate</div>'
+        # win-rate progress bar
+        f'<div style="margin-top:6px;height:4px;background:#1e293b;border-radius:2px">'
+        f'<div style="height:4px;width:{_wr_pct:.0f}%;background:var(--studio-green);border-radius:2px"></div></div>'
+        f'</div>'
         f'<div class="studio-metric-card">'
         f'<div class="studio-metric-value">{smash_pct:.1%}</div>'
         f'<div class="studio-metric-label">SMASH Accuracy</div></div>'
         f'<div class="studio-metric-card">'
         f'<div class="studio-metric-value">{lean_pct:.1%}</div>'
         f'<div class="studio-metric-label">LEAN Accuracy</div></div>'
+        f'<div class="studio-metric-card">'
+        f'{_pie_svg}'
+        f'<div class="studio-metric-label">SMASH vs LEAN</div></div>'
         f'</div>',
         unsafe_allow_html=True,
     )
+
+    # Additional stats row
+    if wins or losses or pending or streak:
+        st.markdown(
+            f'<div class="studio-metric-row">'
+            f'<div class="studio-metric-card">'
+            f'<div class="studio-metric-value" style="color:var(--studio-green)">{wins}</div>'
+            f'<div class="studio-metric-label">Wins</div></div>'
+            f'<div class="studio-metric-card">'
+            f'<div class="studio-metric-value" style="color:var(--studio-red)">{losses}</div>'
+            f'<div class="studio-metric-label">Losses</div></div>'
+            f'<div class="studio-metric-card">'
+            f'<div class="studio-metric-value" style="color:var(--studio-yellow)">{pending}</div>'
+            f'<div class="studio-metric-label">Pending</div></div>'
+            f'<div class="studio-metric-card">'
+            f'<div class="studio-metric-value">{streak:+d}</div>'
+            f'<div class="studio-metric-label">Streak</div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     # Override accuracy
     try:
         override_acc = joseph_get_override_accuracy()
         if isinstance(override_acc, dict) and override_acc.get("overrides_total", 0) > 0:
             st.markdown(
-                f'<div style="color:#00f0ff;font-size:0.88rem;margin:8px 0">'
+                f'<div style="color:var(--studio-cyan);font-size:0.88rem;margin:8px 0">'
                 f'🔄 <strong>Override Accuracy:</strong> '
                 f'{override_acc.get("override_accuracy", 0):.1%} '
                 f'({override_acc.get("overrides_correct", 0)}/'
@@ -1406,7 +1775,10 @@ if _BETS_AVAILABLE:
     except Exception:
         pass
 else:
-    st.info("Bet tracking module not available.")
+    st.markdown(
+        render_empty_state("Bet tracking module not available."),
+        unsafe_allow_html=True,
+    )
 
 # ── Joseph's Bet History ─────────────────────────────────────
 st.markdown(
@@ -1448,23 +1820,37 @@ if _bets_loaded and joseph_bets:
     for bet in joseph_bets[:20]:
         card_html = get_bet_card_html(bet)
         if card_html:
-            st.markdown(card_html, unsafe_allow_html=True)
+            # Enhancement 7: Append outcome badge to card
+            _bet_result = str(bet.get("result", bet.get("outcome", "pending")))
+            _badge_html = render_outcome_badge(_bet_result)
+            st.markdown(card_html + f' {_badge_html}', unsafe_allow_html=True)
         else:
             player_name = _html.escape(str(bet.get("player", "Unknown")))
             stat = _html.escape(str(bet.get("stat_type", "")))
             direction = _html.escape(str(bet.get("direction", "")))
-            result_val = _html.escape(str(bet.get("result", "pending")))
+            result_val = str(bet.get("result", bet.get("outcome", "pending")))
+            _badge_html = render_outcome_badge(result_val)
             st.markdown(
                 f'<div class="joseph-segment">'
                 f'<strong>{player_name}</strong> — {stat} {direction} '
-                f'| Result: {result_val}'
+                f'| {_badge_html}'
                 f'</div>',
                 unsafe_allow_html=True,
             )
 elif _bets_loaded:
-    st.info("No bets logged by Joseph yet. Run analysis to start tracking!")
+    st.markdown(
+        render_empty_state(
+            "No bets logged by Joseph yet. Run analysis to start tracking!",
+            cta_text="Run ⚡ Neural Analysis →",
+            cta_page="/⚡_Quantum_Analysis_Matrix",
+        ),
+        unsafe_allow_html=True,
+    )
 else:
-    st.info("Bet history module not available.")
+    st.markdown(
+        render_empty_state("Bet history module not available."),
+        unsafe_allow_html=True,
+    )
 
 
 # ═════════════════════════════════════════════════════════════
@@ -1485,14 +1871,14 @@ if _BRAIN_AVAILABLE:
 
 signoff = _html.escape(closer_text)
 if catchphrase_text:
-    signoff += f' <em style="color:#ff9e00">{_html.escape(catchphrase_text)}</em>'
+    signoff += f' <em style="color:var(--studio-accent-secondary)">{_html.escape(catchphrase_text)}</em>'
 
 st.markdown(
     f'<div style="text-align:center;margin:24px 0">'
     f'{_avatar_inline(64)}'
-    f'<div style="color:#ff5e00;font-family:\'Orbitron\',sans-serif;'
+    f'<div style="color:var(--studio-accent);font-family:\'Orbitron\',sans-serif;'
     f'font-size:1rem;margin-top:12px">{signoff}</div>'
-    f'<div style="color:#94a3b8;font-size:0.8rem;margin-top:4px">'
+    f'<div style="color:var(--studio-muted);font-size:0.8rem;margin-top:4px">'
     f'— Joseph M. Smith, The Studio</div>'
     f'</div>',
     unsafe_allow_html=True,
