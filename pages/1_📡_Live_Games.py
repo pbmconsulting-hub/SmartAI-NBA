@@ -13,6 +13,7 @@ import time
 
 from data.data_manager import load_teams_data, get_all_team_abbreviations, find_players_by_team, load_players_data
 from data.nba_data_service import get_todays_games, get_todays_players, get_all_todays_data
+from styles.theme import get_team_colors, _TEAM_COLORS
 
 try:
     from data.nba_data_service import refresh_from_etl as _lg_refresh_etl, full_refresh_from_etl as _lg_full_refresh_etl
@@ -26,6 +27,10 @@ try:
 except ImportError:
     import logging
     _logger = logging.getLogger(__name__)
+
+# ── ESPN CDN base for team logos ──────────────────────────────
+_ESPN_LOGO_BASE = "https://a.espncdn.com/i/teamlogos/nba/500"
+_NBA_LOGO_FALLBACK = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
 
 # ============================================================
 # SECTION: Page Setup
@@ -48,6 +53,10 @@ st.session_state["joseph_page_context"] = "page_live_games"
 inject_joseph_floating()
 
 # ─── Custom CSS ────────────────────────────────────────────
+# Import ESPN ticker CSS from live_theme.py so we can reuse it
+from styles.live_theme import get_live_sweat_css as _get_ticker_css
+st.markdown(_get_ticker_css(), unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 /* Game card wrapper — enhanced dark glass with cyan glow */
@@ -68,21 +77,26 @@ st.markdown("""
     transform: translateY(-3px);
     transition: all 0.2s ease;
 }
-/* Team badge */
+/* Team badge — dynamic team-color driven via inline style */
 .team-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 4px 10px;
     border-radius: 6px;
     font-weight: 700;
     font-size: 1.1rem;
     letter-spacing: 1px;
     color: #ffffff;
-    background: rgba(0,240,255,0.12);
-    border: 1px solid rgba(0,240,255,0.25);
     margin-right: 6px;
 }
-.home-badge { background: rgba(0,240,255,0.12); border-color: rgba(0,240,255,0.25); }
-.away-badge { background: rgba(200,0,255,0.12); border-color: rgba(200,0,255,0.25); }
+/* Team logo inside badge */
+.team-badge img.team-logo {
+    width: 24px; height: 24px;
+    object-fit: contain;
+    vertical-align: middle;
+    border-radius: 2px;
+}
 /* Record text */
 .record-text { color: #8a9bb8; font-size: 0.9rem; }
 /* Streak positive/negative */
@@ -91,24 +105,94 @@ st.markdown("""
 .streak-neutral { color: rgba(255,255,255,0.85); font-weight: 600; }
 /* Game meta info */
 .game-meta { color: #8a9bb8; font-size: 0.85rem; margin-top: 4px; }
-/* Divider */
-.vs-divider {
-    text-align: center;
-    font-size: 1.5rem;
-    color: #ff5e00;
+/* Side-by-side scoreboard layout */
+.scoreboard-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.scoreboard-team {
+    flex: 1 1 0;
+    min-width: 180px;
+}
+.scoreboard-team.away { text-align: right; }
+.scoreboard-team.home { text-align: left; }
+.scoreboard-at {
+    font-size: 1.3rem;
     font-weight: 800;
-    padding: 0 10px;
+    color: #ff5e00;
     text-shadow: 0 0 10px rgba(255,94,0,0.6);
+    flex-shrink: 0;
 }
 /* Key players row */
 .key-players { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,240,255,0.12); }
 .key-players-title { color: #8a9bb8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
 .player-stat { color: rgba(255,255,255,0.85); font-size: 0.9rem; }
+/* Injury inline badges */
+.injury-badge-out { display:inline-block; background:#ff4444; color:#fff; font-size:0.65rem;
+    font-weight:700; padding:1px 5px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+.injury-badge-gtd { display:inline-block; background:#ffcc00; color:#000; font-size:0.65rem;
+    font-weight:700; padding:1px 5px; border-radius:3px; margin-left:4px; vertical-align:middle; }
+/* Game attractiveness badges */
+.signal-badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.72rem;
+    font-weight:700; letter-spacing:0.5px; margin-left:8px; }
+.signal-high { background:rgba(0,255,100,0.18); color:#00ff64; border:1px solid rgba(0,255,100,0.3); }
+.signal-medium { background:rgba(255,200,0,0.15); color:#ffcc00; border:1px solid rgba(255,200,0,0.3); }
+.signal-low { background:rgba(255,68,68,0.15); color:#ff6b6b; border:1px solid rgba(255,68,68,0.3); }
+/* Skeleton / shimmer loading cards */
+@keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+.skeleton-card {
+    background: linear-gradient(135deg, rgba(13,18,40,0.95) 0%, rgba(11,18,35,0.98) 100%);
+    border: 1px solid rgba(0,240,255,0.10);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 18px;
+}
+.skeleton-line {
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, rgba(0,240,255,0.06) 25%, rgba(0,240,255,0.12) 50%, rgba(0,240,255,0.06) 75%);
+    background-size: 400px 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    margin-bottom: 10px;
+}
+.skeleton-line.wide { width: 80%; }
+.skeleton-line.medium { width: 55%; }
+.skeleton-line.narrow { width: 35%; height: 10px; }
+/* Status dashboard */
+.status-dash { display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 10px 0; }
+.status-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+    border-radius:6px; font-size:0.78rem; font-weight:600; }
+.status-pill.ok { background:rgba(0,255,100,0.12); color:#00ff64; border:1px solid rgba(0,255,100,0.2); }
+.status-pill.empty { background:rgba(255,94,0,0.12); color:#ff5e00; border:1px solid rgba(255,94,0,0.2); }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("📡 Live Games")
 st.markdown(f"**{datetime.date.today().strftime('%A, %B %d, %Y')}** — Tonight's NBA Slate")
+
+# ── Auto-Refresh Toggle (Enhancement #6) ─────────────────────
+_auto_ref_col, _auto_ref_info = st.columns([1, 3])
+with _auto_ref_col:
+    _auto_refresh_on = st.toggle("🔄 Auto-Refresh", value=False, key="lg_auto_refresh_toggle",
+                                  help="Automatically refresh the page every 90 seconds to keep data current")
+with _auto_ref_info:
+    if _auto_refresh_on:
+        st.caption("🟢 Auto-refresh **ON** — page reloads every 90 seconds")
+    else:
+        st.caption("Auto-refresh is off. Toggle on to keep live data current.")
+
+if _auto_refresh_on:
+    try:
+        from streamlit_autorefresh import st_autorefresh
+        st_autorefresh(interval=90_000, key="live_games_auto_refresh")
+    except ImportError:
+        st.caption("⚠️ `streamlit-autorefresh` not installed. Auto-refresh unavailable.")
 
 with st.expander("📖 How to Use This Page", expanded=False):
     st.markdown("""
@@ -133,25 +217,35 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Props from both sources are merged — no data is lost
     """)
 
+# ── Status Dashboard (Enhancement #7) ────────────────────────
+_lg_games_count = len(st.session_state.get("todays_games", []))
+_lg_players_count = len(load_players_data())
+_lg_props_count = len(st.session_state.get("current_props", []))
+
+_status_pills = []
+if _lg_games_count:
+    _status_pills.append(f'<span class="status-pill ok">✅ Games: {_lg_games_count}</span>')
+else:
+    _status_pills.append('<span class="status-pill empty">⚠️ Games: 0</span>')
+if _lg_players_count:
+    _status_pills.append(f'<span class="status-pill ok">✅ Players: {_lg_players_count:,}</span>')
+else:
+    _status_pills.append('<span class="status-pill empty">⚠️ Players: 0</span>')
+if _lg_props_count:
+    _status_pills.append(f'<span class="status-pill ok">✅ Props: {_lg_props_count:,}</span>')
+else:
+    _status_pills.append('<span class="status-pill empty">⚠️ Props: 0</span>')
+
+st.markdown(f'<div class="status-dash">{"".join(_status_pills)}</div>', unsafe_allow_html=True)
+
 # ============================================================
-# SECTION: Action Buttons — Two Independent Workflows
+# SECTION: Action Buttons — Unified Flow (Enhancement #7)
 # ─────────────────────────────────────────────────────────────
-# BUTTON 1 — Auto-Load Tonight's Games:
-#   Retrieves the schedule, rosters, player/team stats from API-NBA API,
-#   and enriches with Odds API consensus lines. Use this as a first step
-#   or to refresh data.
-#
-# BUTTON 2 — Get Platform Props & Analyze (INDEPENDENT):
-#   Retrieves REAL live prop lines from all major sportsbooks, runs them
-#   through Neural Analysis, and shows the best bets grouped by
-#   platform. Does NOT depend on Auto-Load.
-#
-# BUTTON 3 — ⚡ One-Click Setup (COMBINED):
-#   Runs BOTH Auto-Load AND Get Platform Props in one click.
-#   This is the recommended action for new sessions.
+# PRIMARY CTA: ⚡ One-Click Setup
+# ADVANCED OPTIONS: Auto-Load, Load Players Only, ETL, Platform Props
 # ============================================================
 
-# ── ⚡ One-Click Setup — Combined Button (recommended) ─────────────────────
+# ── ⚡ One-Click Setup — Primary CTA ─────────────────────────
 st.markdown("""
 <div style="background:linear-gradient(135deg,rgba(0,240,255,0.10),rgba(200,0,255,0.08));
             border:2px solid rgba(0,240,255,0.35);border-radius:12px;
@@ -181,227 +275,226 @@ with _one_click_info:
         "Best choice for a fresh session — everything in one click."
     )
 
-st.markdown("---")
+# ── Advanced Options (collapsed by default) ─────────────────
+with st.expander("⚙️ Advanced Options — Individual Data Pipelines", expanded=False):
+    st.markdown("""
+    <div style="background:linear-gradient(90deg,rgba(0,240,255,0.06),rgba(200,0,255,0.04));
+                border:1px solid rgba(0,240,255,0.14);border-radius:10px;
+                padding:12px 18px;margin-bottom:14px;">
+      <span style="color:#00f0ff;font-weight:700;font-size:0.95rem;">
+        ⚡ Two independent data pipelines — choose based on your goal:
+      </span><br>
+      <span style="color:#8a9bb8;font-size:0.84rem;">
+        <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
+        <strong style="color:#e8f0ff;">📊 Get Platform Props</strong> = <em>real live lines</em> from all major sportsbooks → Neural Analysis
+      </span>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ── Visual separator card ───────────────────────────────────────────────────
-st.markdown("""
-<div style="background:linear-gradient(90deg,rgba(0,240,255,0.06),rgba(200,0,255,0.04));
-            border:1px solid rgba(0,240,255,0.14);border-radius:10px;
-            padding:12px 18px;margin-bottom:14px;">
-  <span style="color:#00f0ff;font-weight:700;font-size:0.95rem;">
-    ⚡ Two independent data pipelines — choose based on your goal:
-  </span><br>
-  <span style="color:#8a9bb8;font-size:0.84rem;">
-    <strong style="color:#e8f0ff;">🔄 Auto-Load</strong> = tonight's schedule + rosters + stats &nbsp;|&nbsp;
-    <strong style="color:#e8f0ff;">📊 Get Platform Props</strong> = <em>real live lines</em> from all major sportsbooks → Neural Analysis
-  </span>
-</div>
-""", unsafe_allow_html=True)
+    auto_col, load_col, info_col = st.columns([1, 1, 2])
 
-auto_col, load_col, info_col = st.columns([1, 1, 2])
-
-with auto_col:
-    auto_load_clicked = st.button(
-        "🔄 Auto-Load Tonight's Games",
-        width="stretch",
-        type="primary",
-        help="ONE CLICK: load tonight's games + current rosters + player stats + team stats",
-    )
-
-with load_col:
-    load_players_clicked = st.button(
-        "⚡ Load Players Only",
-        width="stretch",
-        help="Re-load player stats for tonight's teams (games must already be loaded)",
-    )
-
-with info_col:
-    st.caption(
-        "**Auto-Load** = games + rosters + stats. "
-        "**Load Players Only** = refresh player data only."
-    )
-
-# ── Platform Selector + Get Platform Props button ────────────────────────
-st.markdown("---")
-
-# Platform Props row — visually distinct section
-st.markdown("""
-<div style="margin-bottom:6px;">
-  <span style="color:#c800ff;font-size:1.05rem;font-weight:800;font-family:'Orbitron',sans-serif;
-               text-shadow:0 0 10px rgba(200,0,255,0.5);">
-    📊 Get Live Platform Props & Analyze
-  </span>
-  <span style="color:#8a9bb8;font-size:0.82rem;margin-left:10px;">
-    — Retrieves <em>real</em> prop lines from live data, not season-average estimates
-  </span>
-</div>
-""", unsafe_allow_html=True)
-
-_pp_col, _ud_col, _dk_col, _load_btn_col = st.columns([1, 1, 1, 2])
-
-with _pp_col:
-    _include_pp = st.checkbox("🟢 PrizePicks", value=True, key="platform_pp_checkbox")
-with _ud_col:
-    _include_ud = st.checkbox("🟡 Underdog Fantasy", value=True, key="platform_ud_checkbox")
-with _dk_col:
-    _include_dk = st.checkbox("🔵 DraftKings Pick6", value=True, key="platform_dk_checkbox")
-
-# Smart Filter controls (collapsible)
-with st.expander("🧠 Smart Filter Settings", expanded=False):
-    _sf_col1, _sf_col2, _sf_col3 = st.columns(3)
-    with _sf_col1:
-        _smart_filter_on = st.toggle(
-            "🧠 Smart Filter",
-            value=True,
-            key="smart_filter_toggle",
-            help="Deduplicate cross-platform props, filter to tonight's players, remove injured players, and cap props per player.",
+    with auto_col:
+        auto_load_clicked = st.button(
+            "🔄 Auto-Load Tonight's Games",
+            width="stretch",
+            type="primary",
+            help="ONE CLICK: load tonight's games + current rosters + player stats + team stats",
         )
-    with _sf_col2:
-        _max_per_player = st.slider(
-            "Max props per player",
-            min_value=1, max_value=15, value=5,
-            key="smart_filter_max_per_player",
-            help="Cap the number of stat types analyzed per player.",
+
+    with load_col:
+        load_players_clicked = st.button(
+            "⚡ Load Players Only",
+            width="stretch",
+            help="Re-load player stats for tonight's teams (games must already be loaded)",
         )
-    with _sf_col3:
-        _all_stat_types = [
-            "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
-            "ftm",
-            "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
-            "blocks_steals", "fantasy_score", "double_double", "triple_double",
-        ]
-        _selected_stats = st.multiselect(
-            "Stat types to include",
-            options=_all_stat_types,
-            default=[
+
+    with info_col:
+        st.caption(
+            "**Auto-Load** = games + rosters + stats. "
+            "**Load Players Only** = refresh player data only."
+        )
+
+    # ── Platform Selector + Get Platform Props button ────────────────
+    st.markdown("---")
+
+    # Platform Props row — visually distinct section
+    st.markdown("""
+    <div style="margin-bottom:6px;">
+      <span style="color:#c800ff;font-size:1.05rem;font-weight:800;font-family:'Orbitron',sans-serif;
+                   text-shadow:0 0 10px rgba(200,0,255,0.5);">
+        📊 Get Live Platform Props & Analyze
+      </span>
+      <span style="color:#8a9bb8;font-size:0.82rem;margin-left:10px;">
+        — Retrieves <em>real</em> prop lines from live data, not season-average estimates
+      </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _pp_col, _ud_col, _dk_col, _load_btn_col = st.columns([1, 1, 1, 2])
+
+    with _pp_col:
+        _include_pp = st.checkbox("🟢 PrizePicks", value=True, key="platform_pp_checkbox")
+    with _ud_col:
+        _include_ud = st.checkbox("🟡 Underdog Fantasy", value=True, key="platform_ud_checkbox")
+    with _dk_col:
+        _include_dk = st.checkbox("🔵 DraftKings Pick6", value=True, key="platform_dk_checkbox")
+
+    # Smart Filter controls (collapsible)
+    with st.expander("🧠 Smart Filter Settings", expanded=False):
+        _sf_col1, _sf_col2, _sf_col3 = st.columns(3)
+        with _sf_col1:
+            _smart_filter_on = st.toggle(
+                "🧠 Smart Filter",
+                value=True,
+                key="smart_filter_toggle",
+                help="Deduplicate cross-platform props, filter to tonight's players, remove injured players, and cap props per player.",
+            )
+        with _sf_col2:
+            _max_per_player = st.slider(
+                "Max props per player",
+                min_value=1, max_value=15, value=5,
+                key="smart_filter_max_per_player",
+                help="Cap the number of stat types analyzed per player.",
+            )
+        with _sf_col3:
+            _all_stat_types = [
                 "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
                 "ftm",
                 "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
-                "blocks_steals", "fantasy_score",
-            ],
-            key="smart_filter_stat_types",
-            help="Only analyze these stat types. Deselect to include all.",
-        )
+                "blocks_steals", "fantasy_score", "double_double", "triple_double",
+            ]
+            _selected_stats = st.multiselect(
+                "Stat types to include",
+                options=_all_stat_types,
+                default=[
+                    "points", "rebounds", "assists", "threes", "steals", "blocks", "turnovers",
+                    "ftm",
+                    "points_rebounds_assists", "points_rebounds", "points_assists", "rebounds_assists",
+                    "blocks_steals", "fantasy_score",
+                ],
+                key="smart_filter_stat_types",
+                help="Only analyze these stat types. Deselect to include all.",
+            )
 
-# ── Platform Preference ──────────────────────────────────────
-with st.expander("⚙️ Platform Settings", expanded=False):
-    _PLATFORM_OPTIONS = [
-        "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
-    ]
-    if "joseph_preferred_platform" not in st.session_state:
-        st.session_state["joseph_preferred_platform"] = "PrizePicks"
+    # ── Platform Preference ──────────────────────────────────────
+    with st.expander("⚙️ Platform Settings", expanded=False):
+        _PLATFORM_OPTIONS = [
+            "PrizePicks", "Underdog Fantasy", "DraftKings Pick6",
+        ]
+        if "joseph_preferred_platform" not in st.session_state:
+            st.session_state["joseph_preferred_platform"] = "PrizePicks"
 
-    st.markdown(
-        '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
-        'What betting app are you using tonight?</span>',
-        unsafe_allow_html=True,
-    )
-    _lg_platform = st.radio(
-        "Preferred betting platform",
-        _PLATFORM_OPTIONS,
-        index=_PLATFORM_OPTIONS.index(st.session_state["joseph_preferred_platform"]),
-        horizontal=True,
-        label_visibility="collapsed",
-        key="lg_platform_radio",
-    )
-    st.session_state["joseph_preferred_platform"] = _lg_platform
-
-with _load_btn_col:
-    _any_platform_selected = _include_pp or _include_ud or _include_dk
-    platform_props_clicked = st.button(
-        "📊 Get Live Props & Analyze",
-        width="stretch",
-        type="primary",
-        help="Get REAL live prop lines from selected platforms, then run full Neural Analysis. Works independently — no need to Auto-Load first.",
-        disabled=not _any_platform_selected,
-        key="platform_props_btn",
-    )
-
-st.markdown("---")
-
-# ── ETL Data Pull Section ────────────────────────────────────────────────
-if _ETL_AVAILABLE_LG:
-    with st.expander("🗄️ ETL Data Pull — Fresh Stats from Local Database", expanded=False):
         st.markdown(
-            '<span style="color:#8a9bb8;font-size:0.84rem;">'
-            'Pull the latest player stats into your local database before loading games. '
-            '<strong style="color:#e8f0ff;">Smart Update</strong> fetches only new data (~30s). '
-            '<strong style="color:#e8f0ff;">Full Pull</strong> refreshes the entire season (~60s).'
-            '</span>',
+            '<span style="color:#e2e8f0;font-size:0.88rem;font-family:Montserrat,sans-serif">'
+            'What betting app are you using tonight?</span>',
             unsafe_allow_html=True,
         )
-        _etl_col1, _etl_col2, _etl_col3 = st.columns([1, 1, 2])
-        with _etl_col1:
-            _etl_smart_clicked = st.button(
-                "⚡ Smart ETL Update",
-                key="lg_etl_smart_btn",
-                help="Incremental update — fetches only new games since the last stored date (~30 seconds)",
+        _lg_platform = st.radio(
+            "Preferred betting platform",
+            _PLATFORM_OPTIONS,
+            index=_PLATFORM_OPTIONS.index(st.session_state["joseph_preferred_platform"]),
+            horizontal=True,
+            label_visibility="collapsed",
+            key="lg_platform_radio",
+        )
+        st.session_state["joseph_preferred_platform"] = _lg_platform
+
+    with _load_btn_col:
+        _any_platform_selected = _include_pp or _include_ud or _include_dk
+        platform_props_clicked = st.button(
+            "📊 Get Live Props & Analyze",
+            width="stretch",
+            type="primary",
+            help="Get REAL live prop lines from selected platforms, then run full Neural Analysis. Works independently — no need to Auto-Load first.",
+            disabled=not _any_platform_selected,
+            key="platform_props_btn",
+        )
+
+    st.markdown("---")
+
+    # ── ETL Data Pull Section ────────────────────────────────────────────────
+    if _ETL_AVAILABLE_LG:
+        with st.expander("🗄️ ETL Data Pull — Fresh Stats from Local Database", expanded=False):
+            st.markdown(
+                '<span style="color:#8a9bb8;font-size:0.84rem;">'
+                'Pull the latest player stats into your local database before loading games. '
+                '<strong style="color:#e8f0ff;">Smart Update</strong> fetches only new data (~30s). '
+                '<strong style="color:#e8f0ff;">Full Pull</strong> refreshes the entire season (~60s).'
+                '</span>',
+                unsafe_allow_html=True,
             )
-        with _etl_col2:
-            _etl_full_clicked = st.button(
-                "🔄 Full ETL Pull",
-                key="lg_etl_full_btn",
-                help="Re-pull entire season from nba_api and repopulate db/smartpicks.db (~60 seconds)",
-            )
-        with _etl_col3:
-            st.caption(
-                "Run ETL **before** Auto-Load for the freshest stats. "
-                "One-Click Setup now includes a Smart ETL Update automatically."
-            )
+            _etl_col1, _etl_col2, _etl_col3 = st.columns([1, 1, 2])
+            with _etl_col1:
+                _etl_smart_clicked = st.button(
+                    "⚡ Smart ETL Update",
+                    key="lg_etl_smart_btn",
+                    help="Incremental update — fetches only new games since the last stored date (~30 seconds)",
+                )
+            with _etl_col2:
+                _etl_full_clicked = st.button(
+                    "🔄 Full ETL Pull",
+                    key="lg_etl_full_btn",
+                    help="Re-pull entire season from nba_api and repopulate db/smartpicks.db (~60 seconds)",
+                )
+            with _etl_col3:
+                st.caption(
+                    "Run ETL **before** Auto-Load for the freshest stats. "
+                    "One-Click Setup now includes a Smart ETL Update automatically."
+                )
 
-        if _etl_smart_clicked:
-            _etl_bar = st.progress(0, text="Starting Smart ETL Update…")
-            _etl_status = st.empty()
-            try:
-                def _lg_etl_progress(current, total, message):
-                    frac = current / max(total, 1)
-                    _etl_bar.progress(frac, text=message)
-                    _etl_status.caption(message)
+            if _etl_smart_clicked:
+                _etl_bar = st.progress(0, text="Starting Smart ETL Update…")
+                _etl_status = st.empty()
+                try:
+                    def _lg_etl_progress(current, total, message):
+                        frac = current / max(total, 1)
+                        _etl_bar.progress(frac, text=message)
+                        _etl_status.caption(message)
 
-                result = _lg_refresh_etl(progress_callback=_lg_etl_progress)
-                _etl_bar.progress(1.0, text="Done!")
-                ng = result.get("new_games", 0)
-                nl = result.get("new_logs", 0)
-                err = result.get("error")
-                if err:
-                    st.error(f"❌ Smart ETL Update failed: {err}")
-                else:
-                    st.success(f"✅ Smart ETL Update complete! **{ng}** new game(s) · **{nl}** new log row(s).")
-                _etl_bar.empty()
-                _etl_status.empty()
-            except Exception as _etl_err:
-                _etl_bar.empty()
-                _etl_status.empty()
-                st.error(f"❌ Smart ETL Update failed: {_etl_err}")
+                    result = _lg_refresh_etl(progress_callback=_lg_etl_progress)
+                    _etl_bar.progress(1.0, text="Done!")
+                    ng = result.get("new_games", 0)
+                    nl = result.get("new_logs", 0)
+                    err = result.get("error")
+                    if err:
+                        st.error(f"❌ Smart ETL Update failed: {err}")
+                    else:
+                        st.success(f"✅ Smart ETL Update complete! **{ng}** new game(s) · **{nl}** new log row(s).")
+                    _etl_bar.empty()
+                    _etl_status.empty()
+                except Exception as _etl_err:
+                    _etl_bar.empty()
+                    _etl_status.empty()
+                    st.error(f"❌ Smart ETL Update failed: {_etl_err}")
 
-        if _etl_full_clicked:
-            _etl_bar = st.progress(0, text="Starting Full ETL Pull…")
-            _etl_status = st.empty()
-            try:
-                def _lg_etl_full_progress(current, total, message):
-                    frac = current / max(total, 1)
-                    _etl_bar.progress(frac, text=message)
-                    _etl_status.caption(message)
+            if _etl_full_clicked:
+                _etl_bar = st.progress(0, text="Starting Full ETL Pull…")
+                _etl_status = st.empty()
+                try:
+                    def _lg_etl_full_progress(current, total, message):
+                        frac = current / max(total, 1)
+                        _etl_bar.progress(frac, text=message)
+                        _etl_status.caption(message)
 
-                result = _lg_full_refresh_etl(progress_callback=_lg_etl_full_progress)
-                _etl_bar.progress(1.0, text="Done!")
-                np_ = result.get("players_inserted", 0)
-                ng = result.get("games_inserted", 0)
-                nl = result.get("logs_inserted", 0)
-                err = result.get("error")
-                if err:
-                    st.error(f"❌ Full ETL Pull failed: {err}")
-                else:
-                    st.success(
-                        f"✅ Full ETL Pull complete! "
-                        f"**{np_}** players · **{ng}** games · **{nl}** logs inserted."
-                    )
-                _etl_bar.empty()
-                _etl_status.empty()
-            except Exception as _etl_err:
-                _etl_bar.empty()
-                _etl_status.empty()
-                st.error(f"❌ Full ETL Pull failed: {_etl_err}")
+                    result = _lg_full_refresh_etl(progress_callback=_lg_etl_full_progress)
+                    _etl_bar.progress(1.0, text="Done!")
+                    np_ = result.get("players_inserted", 0)
+                    ng = result.get("games_inserted", 0)
+                    nl = result.get("logs_inserted", 0)
+                    err = result.get("error")
+                    if err:
+                        st.error(f"❌ Full ETL Pull failed: {err}")
+                    else:
+                        st.success(
+                            f"✅ Full ETL Pull complete! "
+                            f"**{np_}** players · **{ng}** games · **{nl}** logs inserted."
+                        )
+                    _etl_bar.empty()
+                    _etl_status.empty()
+                except Exception as _etl_err:
+                    _etl_bar.empty()
+                    _etl_status.empty()
+                    st.error(f"❌ Full ETL Pull failed: {_etl_err}")
 
 st.markdown("---")
 
