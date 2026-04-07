@@ -60,6 +60,9 @@ NBA_API_TIMEOUT = 60       # seconds — increased from default 30 to handle slo
 _BACKOFF_BASE = 1.2        # initial delay in seconds between API attempts
 _BACKOFF_INCREMENT = 0.8   # additional seconds per retry (1.2s, 2.0s, 2.8s)
 
+# Tolerance for declaring a bet result as PUSH (exact tie within float epsilon)
+PUSH_THRESHOLD_EPSILON = 0.01
+
 # ============================================================
 # END SECTION: Valid Values for Validation
 # ============================================================
@@ -384,7 +387,7 @@ def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
 
 def _fetch_all_boxscores_bbref(date_str: str) -> dict:
     """
-    TIER 2 FALLBACK: Fetch all player box scores via the own Basketball Reference scraper.
+    TIER 3 FALLBACK: Fetch all player box scores via the own Basketball Reference scraper.
 
     Uses ``engine.scrapers.basketball_ref_scraper.get_player_box_scores_for_date``
     which replaced the removed ``basketball_reference_web_scraper`` package.
@@ -399,16 +402,188 @@ def _fetch_all_boxscores_bbref(date_str: str) -> dict:
         lookup = get_player_box_scores_for_date(date_str)
         return lookup if lookup else {}
     except Exception as exc:
-        _logger.warning(f"[BetTracker] Tier 2 (bbref scraper) failed: {exc}")
+        _logger.warning(f"[BetTracker] Tier 3 (bbref scraper) failed: {exc}")
+        return {}
+
+
+def _fetch_all_boxscores_espn(date_str: str) -> dict:
+    """
+    TIER 2: Fetch all player box scores for a date via ESPN's public API.
+
+    Uses the ESPN scoreboard endpoint to find game/event IDs, then fetches
+    the ``/summary`` endpoint for each game to extract player-level box
+    scores.  This is a reliable fallback when ``nba_api`` is rate-limited
+    or unavailable.
+
+    Args:
+        date_str: ISO date string "YYYY-MM-DD".
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, stl, blk, tov, fg3m, ...}}
+              Empty dict on any failure.
+    """
+    try:
+        import requests
+        import time as _time
+
+        try:
+            from utils.headers import get_espn_headers
+            _headers = get_espn_headers()
+        except ImportError:
+            _headers = {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+            }
+
+        # Convert "YYYY-MM-DD" → "YYYYMMDD" for ESPN
+        espn_date = date_str.replace("-", "")
+        scoreboard_url = (
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+            f"?dates={espn_date}"
+        )
+        resp = requests.get(scoreboard_url, headers=_headers, timeout=NBA_API_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+
+        events = data.get("events", [])
+        if not events:
+            return {}
+
+        lookup: dict = {}
+
+        for event in events:
+            event_id = event.get("id")
+            if not event_id:
+                continue
+            # Only process Final games (status type 3) for resolution accuracy
+            status_type = (
+                event.get("status", {}).get("type", {}).get("id", "")
+            )
+            if str(status_type) != "3":
+                # Not final — skip; we only want completed games for resolution
+                continue
+
+            try:
+                _time.sleep(0.4)  # gentle rate limiting between game calls
+                summary_url = (
+                    "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+                    f"?event={event_id}"
+                )
+                summary_resp = requests.get(
+                    summary_url, headers=_headers, timeout=NBA_API_TIMEOUT
+                )
+                summary_resp.raise_for_status()
+                summary_data = summary_resp.json()
+
+                boxscore = summary_data.get("boxscore", {})
+                players_sections = boxscore.get("players", [])
+
+                for team_section in players_sections:
+                    statistics = team_section.get("statistics", [])
+                    if not statistics:
+                        continue
+
+                    # Find the main stat category (usually the first one)
+                    stat_block = statistics[0]
+                    stat_labels = [
+                        lbl.lower() for lbl in stat_block.get("labels", [])
+                    ]
+                    athletes = stat_block.get("athletes", [])
+
+                    for athlete_entry in athletes:
+                        if athlete_entry.get("didNotPlay", False):
+                            continue
+                        athlete = athlete_entry.get("athlete", {})
+                        pname = str(
+                            athlete.get("displayName", "")
+                        ).lower().strip()
+                        if not pname:
+                            continue
+
+                        stats_list = athlete_entry.get("stats", [])
+                        if not stats_list or len(stats_list) != len(stat_labels):
+                            continue
+
+                        stat_dict = dict(zip(stat_labels, stats_list))
+
+                        # Parse MIN field: ESPN gives "MM:SS" or "M" or "0"
+                        min_raw = str(stat_dict.get("min", "0"))
+                        try:
+                            mins = (
+                                float(min_raw.split(":")[0])
+                                if ":" in min_raw
+                                else float(min_raw)
+                            )
+                        except (ValueError, TypeError):
+                            mins = 0.0
+
+                        # Parse FG field "M-A" to fgm/fga
+                        fg_raw = str(stat_dict.get("fg", "0-0"))
+                        fg_parts = fg_raw.split("-")
+                        fgm = float(fg_parts[0]) if fg_parts else 0.0
+                        fga = float(fg_parts[1]) if len(fg_parts) >= 2 else 0.0
+
+                        # Parse 3PT field "M-A" to fg3m/fg3a
+                        fg3_raw = str(stat_dict.get("3pt", "0-0"))
+                        fg3_parts = fg3_raw.split("-")
+                        fg3m = float(fg3_parts[0]) if fg3_parts else 0.0
+                        fg3a = float(fg3_parts[1]) if len(fg3_parts) >= 2 else 0.0
+
+                        # Parse FT field "M-A" to ftm/fta
+                        ft_raw = str(stat_dict.get("ft", "0-0"))
+                        ft_parts = ft_raw.split("-")
+                        ftm = float(ft_parts[0]) if ft_parts else 0.0
+                        fta = float(ft_parts[1]) if len(ft_parts) >= 2 else 0.0
+
+                        def _safe_float(val):
+                            try:
+                                return float(val)
+                            except (ValueError, TypeError):
+                                return 0.0
+
+                        reb_val = _safe_float(stat_dict.get("reb", 0))
+                        oreb_val = _safe_float(stat_dict.get("oreb", 0))
+                        dreb_val = _safe_float(stat_dict.get("dreb", 0))
+
+                        lookup[pname] = {
+                            "pts":     _safe_float(stat_dict.get("pts", 0)),
+                            "reb":     reb_val,
+                            "ast":     _safe_float(stat_dict.get("ast", 0)),
+                            "stl":     _safe_float(stat_dict.get("stl", 0)),
+                            "blk":     _safe_float(stat_dict.get("blk", 0)),
+                            "tov":     _safe_float(stat_dict.get("to", 0)),
+                            "fg3m":    fg3m,
+                            "fg3a":    fg3a,
+                            "fgm":     fgm,
+                            "fga":     fga,
+                            "ftm":     ftm,
+                            "fta":     fta,
+                            "oreb":    oreb_val,
+                            "dreb":    dreb_val,
+                            "pf":      _safe_float(stat_dict.get("pf", 0)),
+                            "minutes": mins,
+                        }
+
+            except Exception as _game_exc:
+                _logger.warning(
+                    f"[BetTracker] Tier 2 (ESPN): summary fetch failed for "
+                    f"event {event_id}: {_game_exc}"
+                )
+                continue
+
+        return lookup
+
+    except Exception as exc:
+        _logger.warning(f"[BetTracker] Tier 2 (ESPN) failed: {exc}")
         return {}
 
 
 def _fetch_bulk_boxscores(date_str: str) -> dict:
     """
-    Orchestrator: Try Tier 1 (nba_api BoxScore), then Tier 2 (bbref).
+    Orchestrator: Try Tier 1 (nba_api BoxScore), Tier 2 (ESPN), then Tier 3 (bbref).
 
-    Returns the first non-empty lookup dict, or {} if both tiers fail
-    (callers then fall through to the legacy Tier 3 per-player path).
+    Returns the first non-empty lookup dict, or {} if all tiers fail
+    (callers then fall through to the legacy Tier 4 per-player path).
 
     Returns:
         dict: {player_name_lower: {pts, reb, ast, ...}} or {}
@@ -423,19 +598,31 @@ def _fetch_bulk_boxscores(date_str: str) -> dict:
 
     _logger.info(
         f"[BetTracker] Tier 1 (nba_api BoxScore) empty/failed for {date_str}, "
-        f"trying Tier 2 (bbref)..."
+        f"trying Tier 2 (ESPN)..."
     )
-    lookup = _fetch_all_boxscores_bbref(date_str)
+    lookup = _fetch_all_boxscores_espn(date_str)
     if lookup:
         _logger.info(
-            f"[BetTracker] Tier 2 (bbref) succeeded for {date_str}: "
+            f"[BetTracker] Tier 2 (ESPN) succeeded for {date_str}: "
             f"{len(lookup)} players"
         )
         return lookup
 
     _logger.info(
-        f"[BetTracker] Tier 2 (bbref) also failed for {date_str}, "
-        f"falling through to Tier 3 (legacy per-player path)"
+        f"[BetTracker] Tier 2 (ESPN) empty/failed for {date_str}, "
+        f"trying Tier 3 (bbref)..."
+    )
+    lookup = _fetch_all_boxscores_bbref(date_str)
+    if lookup:
+        _logger.info(
+            f"[BetTracker] Tier 3 (bbref) succeeded for {date_str}: "
+            f"{len(lookup)} players"
+        )
+        return lookup
+
+    _logger.info(
+        f"[BetTracker] All bulk tiers failed for {date_str}, "
+        f"falling through to legacy per-player path"
     )
     return {}
 
@@ -803,7 +990,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
     if not analysis_results:
         return 0
 
-    today_str = _dt.date.today().isoformat()
+    today_str = _nba_today_et().isoformat()
 
     # Build today-scoped deduplication set using a direct, date-filtered query
     # to avoid loading the entire bet history.
@@ -826,7 +1013,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
     # Bronze qualifies only with edge >= 8% AND confidence score >= 60/100.
     AUTO_LOG_TIERS = {"Gold", "Platinum", "Silver", "Bronze"}
     # Silver picks only need 3% edge; Gold/Platinum use the minimum_edge parameter
-    SILVER_MIN_EDGE = 5.0
+    SILVER_MIN_EDGE = 3.0
     BRONZE_MIN_EDGE = 8.0
     BRONZE_MIN_CONFIDENCE = 60.0  # out of 100
 
@@ -1135,7 +1322,7 @@ def auto_resolve_bet_results(date_str=None):
                 actual_value = float(matching_log.get(stat_col, 0) or 0)
 
             # Determine WIN / LOSS / PUSH
-            if actual_value == prop_line:
+            if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                 result = "PUSH"
             elif direction == "OVER":
                 result = "WIN" if actual_value > prop_line else "LOSS"
@@ -1162,9 +1349,6 @@ def auto_resolve_bet_results(date_str=None):
 # ============================================================
 # END SECTION: Auto-Resolve
 # ============================================================
-
-# Tolerance for declaring a bet result as PUSH (exact tie within float epsilon)
-PUSH_THRESHOLD_EPSILON = 0.01
 
 
 def resolve_todays_bets():
@@ -1229,9 +1413,32 @@ def resolve_todays_bets():
     except ImportError:
         _lookup_pid = None
 
-    # ── Check live scores for finished games ──────
+    # ── Check live scores for finished games via ESPN ──────
     _scoreboard_available = False
     has_final_games = False
+    try:
+        import requests
+        try:
+            from utils.headers import get_espn_headers
+            _sb_headers = get_espn_headers()
+        except ImportError:
+            _sb_headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+        _espn_date = today_str.replace("-", "")
+        _sb_url = (
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+            f"?dates={_espn_date}"
+        )
+        _sb_resp = requests.get(_sb_url, headers=_sb_headers, timeout=10)
+        _sb_resp.raise_for_status()
+        _sb_data = _sb_resp.json()
+        _sb_events = _sb_data.get("events", [])
+        _scoreboard_available = True
+        has_final_games = any(
+            str(ev.get("status", {}).get("type", {}).get("id", "")) == "3"
+            for ev in _sb_events
+        )
+    except Exception as _sb_exc:
+        _logger.debug(f"[BetTracker] ESPN scoreboard check failed: {_sb_exc}")
 
     # Short-circuit: if the scoreboard responded but no games are Final yet,
     # skip the expensive per-player API calls and tell the user clearly.
@@ -1352,15 +1559,19 @@ def resolve_todays_bets():
                     result = "WIN" if actual_value > prop_line else "LOSS"
                 else:  # UNDER
                     result = "WIN" if actual_value < prop_line else "LOSS"
-                update_bet_result(bet_id, result, actual_value)
-                summary["resolved"] += 1
-                _tier12_resolved += 1
-                if result == "WIN":
-                    summary["wins"] += 1
-                elif result == "LOSS":
-                    summary["losses"] += 1
+                success, _msg = update_bet_result(bet_id, result, actual_value)
+                if success:
+                    summary["resolved"] += 1
+                    _tier12_resolved += 1
+                    if result == "WIN":
+                        summary["wins"] += 1
+                    elif result == "LOSS":
+                        summary["losses"] += 1
+                    else:
+                        summary["pushes"] += 1
                 else:
-                    summary["pushes"] += 1
+                    summary["errors"].append(f"#{bet_id} {player_name}: DB update failed — {_msg}")
+                    summary["pending"] += 1
                 continue  # Skip Tier 3 for this bet
 
             # ── Tier 3: Legacy per-player game log path ───────────────
@@ -1413,14 +1624,18 @@ def resolve_todays_bets():
             else:  # UNDER
                 result = "WIN" if actual_value < prop_line else "LOSS"
 
-            update_bet_result(bet_id, result, actual_value)
-            summary["resolved"] += 1
-            if result == "WIN":
-                summary["wins"] += 1
-            elif result == "LOSS":
-                summary["losses"] += 1
+            success, _msg = update_bet_result(bet_id, result, actual_value)
+            if success:
+                summary["resolved"] += 1
+                if result == "WIN":
+                    summary["wins"] += 1
+                elif result == "LOSS":
+                    summary["losses"] += 1
+                else:
+                    summary["pushes"] += 1
             else:
-                summary["pushes"] += 1
+                summary["errors"].append(f"#{bet_id} {player_name}: DB update failed — {_msg}")
+                summary["pending"] += 1
 
         except Exception as exc:
             summary["errors"].append(f"{player_name}: {exc}")
@@ -1812,7 +2027,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
         # be final yet.  When the user explicitly asks for a date (even
         # today) we trust them and proceed.  The `include_today` flag
         # allows callers (e.g. an explicit "Resolve All" button) to opt in.
-        should_skip_today = date_str is None and not include_today and target_date >= _dt.date.today()
+        should_skip_today = date_str is None and not include_today and target_date >= _nba_today_et()
         if should_skip_today:
             summary["pending"] += len(picks)
             continue
@@ -2002,9 +2217,116 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
     return summary
 
 
+def _fetch_espn_live_boxscores() -> dict:
+    """Fetch live/in-progress player box scores from ESPN scoreboard + summary.
+
+    Returns:
+        dict: {player_name_lower: {pts, reb, ast, ..., is_live, is_final}}
+              Empty dict on any failure.
+    """
+    try:
+        import requests
+
+        try:
+            from utils.headers import get_espn_headers
+            _headers = get_espn_headers()
+        except ImportError:
+            _headers = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
+
+        # Today's scoreboard
+        today_str = _nba_today_et().isoformat().replace("-", "")
+        scoreboard_url = (
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+            f"?dates={today_str}"
+        )
+        resp = requests.get(scoreboard_url, headers=_headers, timeout=NBA_API_TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+
+        events = data.get("events", [])
+        if not events:
+            return {}
+
+        lookup: dict = {}
+
+        for event in events:
+            event_id = event.get("id")
+            if not event_id:
+                continue
+
+            status_obj = event.get("status", {}).get("type", {})
+            status_id = str(status_obj.get("id", ""))
+            # ESPN status: 1=Scheduled, 2=In Progress, 3=Final
+            is_live = status_id == "2"
+            is_final = status_id == "3"
+
+            if not is_live and not is_final:
+                continue  # Skip scheduled games
+
+            try:
+                import time as _time
+                _time.sleep(0.3)
+                summary_url = (
+                    "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
+                    f"?event={event_id}"
+                )
+                summary_resp = requests.get(
+                    summary_url, headers=_headers, timeout=NBA_API_TIMEOUT
+                )
+                summary_resp.raise_for_status()
+                summary_data = summary_resp.json()
+
+                boxscore = summary_data.get("boxscore", {})
+                for team_section in boxscore.get("players", []):
+                    statistics = team_section.get("statistics", [])
+                    if not statistics:
+                        continue
+                    stat_block = statistics[0]
+                    stat_labels = [lbl.lower() for lbl in stat_block.get("labels", [])]
+                    for athlete_entry in stat_block.get("athletes", []):
+                        if athlete_entry.get("didNotPlay", False):
+                            continue
+                        athlete = athlete_entry.get("athlete", {})
+                        pname = str(athlete.get("displayName", "")).lower().strip()
+                        if not pname:
+                            continue
+                        stats_list = athlete_entry.get("stats", [])
+                        if not stats_list or len(stats_list) != len(stat_labels):
+                            continue
+                        sd = dict(zip(stat_labels, stats_list))
+
+                        def _sf(val):
+                            try:
+                                return float(val)
+                            except (ValueError, TypeError):
+                                return 0.0
+
+                        lookup[pname] = {
+                            "pts":      _sf(sd.get("pts", 0)),
+                            "reb":      _sf(sd.get("reb", 0)),
+                            "ast":      _sf(sd.get("ast", 0)),
+                            "stl":      _sf(sd.get("stl", 0)),
+                            "blk":      _sf(sd.get("blk", 0)),
+                            "tov":      _sf(sd.get("to", 0)),
+                            "fg3m":     _sf(str(sd.get("3pt", "0-0")).split("-")[0]),
+                            "ftm":      _sf(str(sd.get("ft", "0-0")).split("-")[0]),
+                            "is_live":  is_live,
+                            "is_final": is_final,
+                        }
+            except Exception as _exc:
+                _logger.debug(f"[BetTracker] ESPN live box fetch error for event {event_id}: {_exc}")
+                continue
+
+        return lookup
+
+    except Exception as exc:
+        _logger.warning(f"[BetTracker] ESPN live box score fetch failed: {exc}")
+        return {}
+
+
 def get_live_bet_status(bets_list):
     """
-    Check live box scores for today's pending bets via API-NBA live scores.
+    Check live box scores for today's pending bets via ESPN live scores.
 
     Args:
         bets_list (list[dict]): Today's pending bets from the database.
@@ -2017,8 +2339,8 @@ def get_live_bet_status(bets_list):
     """
     augmented = []
 
-    # Retrieve live box scores
-    live_box: dict = {}  # player_name_lower → current stat totals
+    # Retrieve live box scores from ESPN
+    live_box = _fetch_espn_live_boxscores()
 
     STAT_TO_BOX = {
         "points": "pts",
@@ -2049,13 +2371,13 @@ def get_live_bet_status(bets_list):
             if box_key:
                 current_value = box_entry.get(box_key, 0.0)
             elif stat_type == "points_rebounds":
-                current_value = box_entry["pts"] + box_entry["reb"]
+                current_value = box_entry.get("pts", 0.0) + box_entry.get("reb", 0.0)
             elif stat_type == "points_assists":
-                current_value = box_entry["pts"] + box_entry["ast"]
+                current_value = box_entry.get("pts", 0.0) + box_entry.get("ast", 0.0)
             elif stat_type == "rebounds_assists":
-                current_value = box_entry["reb"] + box_entry["ast"]
+                current_value = box_entry.get("reb", 0.0) + box_entry.get("ast", 0.0)
             elif stat_type == "points_rebounds_assists":
-                current_value = box_entry["pts"] + box_entry["reb"] + box_entry["ast"]
+                current_value = box_entry.get("pts", 0.0) + box_entry.get("reb", 0.0) + box_entry.get("ast", 0.0)
             else:
                 current_value = None
 
@@ -2212,7 +2534,7 @@ def log_props_to_tracker(props_list, direction="OVER"):
 
     import datetime as _dt
 
-    today_str = _dt.date.today().isoformat()
+    today_str = _nba_today_et().isoformat()
 
     # Load existing bets to detect duplicates
     existing_bets = load_all_bets(limit=2000)
