@@ -240,20 +240,22 @@ class TestNeuralAnalysisSummaryDfs(unittest.TestCase):
     """Verify DFS aggregate metrics are present in Neural Analysis page."""
 
     def test_summary_has_dfs_flex_edge(self):
-        page_path = os.path.join(
+        # The literal string lives in the extracted helper module
+        helper_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
+            "pages", "helpers", "quantum_analysis_helpers.py",
         )
-        with open(page_path, "r") as f:
+        with open(helper_path, "r") as f:
             content = f.read()
         self.assertIn("DFS FLEX EDGE", content)
 
     def test_summary_counts_beats_breakeven(self):
-        page_path = os.path.join(
+        # The literal string lives in the extracted helper module
+        helper_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "3_⚡_Quantum_Analysis_Matrix.py",
+            "pages", "helpers", "quantum_analysis_helpers.py",
         )
-        with open(page_path, "r") as f:
+        with open(helper_path, "r") as f:
             content = f.read()
         self.assertIn("legs beat breakeven", content)
 

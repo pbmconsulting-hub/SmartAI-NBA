@@ -5328,6 +5328,14 @@ QUANTUM_CARD_MATRIX_CSS = """
    ═══════════════════════════════════════════════════════════ */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
 
+/* Container query context — cards adapt to their container,
+   not the viewport.  Critical for iframe-embedded rendering. */
+.qcm-grid-container {
+    container-type: inline-size;
+    container-name: qcm;
+    width: 100%;
+}
+
 .qcm-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -5866,8 +5874,10 @@ QUANTUM_CARD_MATRIX_CSS = """
     flex: 0 0 200px;
 }
 
-/* Responsive stacking */
-@media (max-width: 900px) {
+/* Responsive stacking — Container Queries (preferred).
+   Cards adapt to their container width, not the viewport.
+   This is critical when rendered inside a self-resizing iframe. */
+@container qcm (max-width: 900px) {
     .qcm-h-top {
         flex-direction: column;
     }
@@ -5878,12 +5888,35 @@ QUANTUM_CARD_MATRIX_CSS = """
         flex: 1;
     }
 }
-@media (max-width: 640px) {
+@container qcm (max-width: 640px) {
     .qcm-grid {
         grid-template-columns: 1fr;
     }
     .qcm-forces {
         flex-direction: column;
+    }
+}
+
+/* Fallback for browsers without container query support */
+@supports not (container-type: inline-size) {
+    @media (max-width: 900px) {
+        .qcm-h-top {
+            flex-direction: column;
+        }
+        .qcm-h-bottom {
+            flex-direction: column;
+        }
+        .qcm-h-col-narrow {
+            flex: 1;
+        }
+    }
+    @media (max-width: 640px) {
+        .qcm-grid {
+            grid-template-columns: 1fr;
+        }
+        .qcm-forces {
+            flex-direction: column;
+        }
     }
 }
 """
