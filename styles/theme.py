@@ -4427,6 +4427,8 @@ _BET_CARD_CSS = """
     box-shadow: 0 2px 18px rgba(0,0,0,0.45);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
     border-left: 4px solid rgba(0,240,255,0.35);
+    position: relative;
+    overflow: hidden;
 }
 .bet-card:hover {
     transform: translateY(-2px);
@@ -4456,6 +4458,20 @@ _BET_CARD_CSS = """
     50%      { box-shadow: 0 0 22px rgba(255,200,0,0.28); }
 }
 
+/* ─── Result shimmer reveal animation ─────────────────────── */
+.bet-card-win::after, .bet-card-loss::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+    animation: cardRevealShimmer 1.2s ease-out forwards;
+    pointer-events: none;
+}
+@keyframes cardRevealShimmer {
+    0%   { left: -100%; opacity: 1; }
+    100% { left: 100%; opacity: 0; }
+}
+
 /* ─── Tier-specific card glows ────────────────────────────── */
 .bet-card-tier-platinum { box-shadow: 0 0 22px rgba(0,240,255,0.18), 0 2px 18px rgba(0,0,0,0.45); }
 .bet-card-tier-gold     { box-shadow: 0 0 22px rgba(255,170,0,0.18), 0 2px 18px rgba(0,0,0,0.45); }
@@ -4481,6 +4497,16 @@ _BET_CARD_CSS = """
     margin: 10px 0;
 }
 
+/* ─── Player headshot thumbnail ───────────────────────────── */
+.bet-card-headshot {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(0,240,255,0.25);
+    background: #0d1117;
+    flex-shrink: 0;
+}
+
 /* ─── Direction ───────────────────────────────────────────── */
 .direction-over {
     color: #00ff9d;
@@ -4495,7 +4521,24 @@ _BET_CARD_CSS = """
     text-shadow: 0 0 8px rgba(255,107,107,0.5);
 }
 
-/* ─── Confidence Bar ──────────────────────────────────────── */
+/* ─── Confidence Gauge (SVG arc) ──────────────────────────── */
+.confidence-gauge-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 4px 0;
+}
+.confidence-gauge-label {
+    font-size: 0.75rem;
+    color: #8a9bb8;
+}
+.confidence-gauge-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #e8f0ff;
+}
+
+/* ─── Confidence Bar (fallback for non-gauge) ─────────────── */
 .confidence-bar-wrap { margin: 10px 0 6px 0; }
 .confidence-bar-track {
     height: 8px;
@@ -4594,13 +4637,34 @@ _BET_CARD_CSS = """
 .live-status-final   { color: #8a9bb8; font-weight: 600; }
 .live-status-not-started { color: #5a6880; font-weight: 600; }
 
-/* ─── Summary Cards Row ───────────────────────────────────── */
+/* ─── Summary Cards Row (Glassmorphism Dashboard) ─────────── */
+.summary-dashboard {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
 .summary-card {
-    background: linear-gradient(135deg, #0d1117, #0f1923);
+    background: linear-gradient(135deg,
+        rgba(13,17,23,0.85) 0%,
+        rgba(15,25,35,0.80) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(0,240,255,0.18);
     border-radius: 12px;
     padding: 16px;
     text-align: center;
+    flex: 1;
+    min-width: 130px;
+    position: relative;
+    overflow: hidden;
+}
+.summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,240,255,0.4), transparent);
 }
 .summary-card-value {
     font-size: 1.8rem;
@@ -4609,6 +4673,19 @@ _BET_CARD_CSS = """
     color: #00f0ff;
     text-shadow: 0 0 12px rgba(0,240,255,0.4);
 }
+/* Animated count-up effect */
+@keyframes countUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.summary-card-value {
+    animation: countUp 0.5s ease-out both;
+}
+.summary-card:nth-child(2) .summary-card-value { animation-delay: 0.08s; }
+.summary-card:nth-child(3) .summary-card-value { animation-delay: 0.16s; }
+.summary-card:nth-child(4) .summary-card-value { animation-delay: 0.24s; }
+.summary-card:nth-child(5) .summary-card-value { animation-delay: 0.32s; }
+.summary-card:nth-child(6) .summary-card-value { animation-delay: 0.40s; }
 .summary-card-label {
     font-size: 0.75rem;
     color: #8a9bb8;
@@ -4616,6 +4693,29 @@ _BET_CARD_CSS = """
     letter-spacing: 0.06em;
     margin-top: 4px;
 }
+
+/* Win rate card pulsing glow */
+.summary-card-wr-green { box-shadow: 0 0 18px rgba(0,255,157,0.20); border-color: rgba(0,255,157,0.30); }
+.summary-card-wr-green::before { background: linear-gradient(90deg, transparent, rgba(0,255,157,0.5), transparent); }
+.summary-card-wr-red   { box-shadow: 0 0 18px rgba(255,68,68,0.20); border-color: rgba(255,68,68,0.30); }
+.summary-card-wr-red::before   { background: linear-gradient(90deg, transparent, rgba(255,68,68,0.5), transparent); }
+.summary-card-wr-gold  { box-shadow: 0 0 18px rgba(255,204,0,0.20); border-color: rgba(255,204,0,0.30); }
+.summary-card-wr-gold::before  { background: linear-gradient(90deg, transparent, rgba(255,204,0,0.5), transparent); }
+
+@keyframes wrPulse {
+    0%,100% { box-shadow: inherit; }
+    50%     { box-shadow: 0 0 28px rgba(0,240,255,0.35); }
+}
+.summary-card-wr-green, .summary-card-wr-red, .summary-card-wr-gold {
+    animation: wrPulse 3s ease-in-out infinite;
+}
+
+/* ─── Mini Sparkline ──────────────────────────────────────── */
+.summary-card-sparkline {
+    margin-top: 6px;
+    opacity: 0.7;
+}
+.summary-card-sparkline svg { display: block; margin: 0 auto; }
 
 /* ─── Filter Pills ────────────────────────────────────────── */
 .filter-pill {
@@ -4659,6 +4759,88 @@ _BET_CARD_CSS = """
     padding: 12px 16px;
     margin-bottom: 10px;
 }
+
+/* ─── Calendar Heatmap ────────────────────────────────────── */
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    max-width: 420px;
+}
+.heatmap-cell {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+    position: relative;
+}
+.heatmap-cell:hover { transform: scale(1.3); z-index: 2; }
+.heatmap-cell-empty { background: rgba(255,255,255,0.03); }
+.heatmap-cell-green-1 { background: rgba(0,255,157,0.15); }
+.heatmap-cell-green-2 { background: rgba(0,255,157,0.35); }
+.heatmap-cell-green-3 { background: rgba(0,255,157,0.55); }
+.heatmap-cell-green-4 { background: rgba(0,255,157,0.80); }
+.heatmap-cell-red-1 { background: rgba(255,68,68,0.15); }
+.heatmap-cell-red-2 { background: rgba(255,68,68,0.35); }
+.heatmap-cell-red-3 { background: rgba(255,68,68,0.55); }
+.heatmap-cell-red-4 { background: rgba(255,68,68,0.80); }
+.heatmap-cell-neutral { background: rgba(255,204,0,0.20); }
+.heatmap-day-label {
+    font-size: 0.65rem;
+    color: #5a6880;
+    text-align: center;
+    padding-bottom: 2px;
+}
+
+/* ─── Achievement Progress Rings ──────────────────────────── */
+.achievement-ring-wrap {
+    text-align: center;
+    padding: 12px 8px;
+}
+.achievement-ring-label {
+    color: #e8f4ff;
+    font-weight: 700;
+    font-size: 0.82rem;
+    margin-top: 6px;
+}
+.achievement-ring-desc {
+    color: #8a9bb8;
+    font-size: 0.70rem;
+}
+.achievement-ring-progress {
+    font-size: 0.68rem;
+    color: #5a6880;
+    margin-top: 2px;
+}
+.badge-locked {
+    filter: grayscale(1) opacity(0.45);
+}
+.badge-earned {
+    animation: badgeEarned 0.6s ease-out;
+}
+@keyframes badgeEarned {
+    0%   { transform: scale(0.5); opacity: 0; }
+    60%  { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ─── Level System ────────────────────────────────────────── */
+.level-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+.level-rookie  { background: rgba(138,155,184,0.15); color: #8a9bb8; border: 1px solid rgba(138,155,184,0.3); }
+.level-starter { background: rgba(0,240,255,0.10); color: #00f0ff; border: 1px solid rgba(0,240,255,0.3); }
+.level-allstar { background: rgba(255,170,0,0.10); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
+.level-mvp     { background: rgba(0,255,157,0.10); color: #00ff9d; border: 1px solid rgba(0,255,157,0.3); }
+.level-goat    { background: linear-gradient(90deg, rgba(255,215,0,0.15), rgba(0,255,157,0.15)); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
 </style>
 """
 
@@ -4753,25 +4935,37 @@ def get_bet_card_html(bet, show_live_status=False):
     tier_emoji = tier_emojis.get(tier_lower, "🏅")
     tier_html = f'<span class="tier-badge-{tier_lower}">{tier_emoji} {_h.escape(tier)}</span>'
 
-    # Confidence bar
+    # Confidence gauge (SVG semi-circular arc)
     conf_pct = max(0.0, min(100.0, confidence))
     if conf_pct >= 80:
-        bar_color = "linear-gradient(90deg,#00ffd5,#00f0ff)"
+        gauge_color = "#00ffd5"
     elif conf_pct >= 65:
-        bar_color = "linear-gradient(90deg,#ff9d00,#ffcc00)"
+        gauge_color = "#ffcc00"
     elif conf_pct >= 50:
-        bar_color = "linear-gradient(90deg,#2196f3,#00b4ff)"
+        gauge_color = "#2196f3"
     else:
-        bar_color = "linear-gradient(90deg,#5a6880,#8a9bb8)"
+        gauge_color = "#5a6880"
 
+    # SVG arc gauge — 180° semicircle
+    _gauge_radius = 28
+    _gauge_cx = 35
+    _gauge_cy = 32
+    _arc_length = _math.pi * _gauge_radius  # half circumference
+    _dash = _arc_length * (conf_pct / 100.0)
+    _gap = _arc_length - _dash
     conf_bar = (
-        f'<div class="confidence-bar-wrap">'
-        f'<div class="confidence-bar-label">'
-        f'<span>Confidence</span><span style="color:#e8f0ff;font-weight:700;">{conf_pct:.0f}%</span>'
-        f'</div>'
-        f'<div class="confidence-bar-track">'
-        f'<div class="confidence-bar-fill" style="width:{conf_pct}%;background:{bar_color};"></div>'
-        f'</div>'
+        f'<div class="confidence-gauge-wrap">'
+        f'<svg width="70" height="40" viewBox="0 0 70 40">'
+        f'<path d="M 7 32 A {_gauge_radius} {_gauge_radius} 0 0 1 63 32" '
+        f'fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="5" stroke-linecap="round"/>'
+        f'<path d="M 7 32 A {_gauge_radius} {_gauge_radius} 0 0 1 63 32" '
+        f'fill="none" stroke="{gauge_color}" stroke-width="5" stroke-linecap="round" '
+        f'stroke-dasharray="{_dash:.1f} {_gap:.1f}"/>'
+        f'<text x="{_gauge_cx}" y="{_gauge_cy}" text-anchor="middle" '
+        f'font-size="11" font-weight="800" fill="{gauge_color}" '
+        f'font-family="Orbitron,sans-serif">{conf_pct:.0f}%</text>'
+        f'</svg>'
+        f'<span class="confidence-gauge-label">Confidence</span>'
         f'</div>'
     )
 
@@ -4861,11 +5055,24 @@ def get_bet_card_html(bet, show_live_status=False):
             f'{demon_img} Demon</span>'
         )
 
+    # Player headshot thumbnail (NBA CDN)
+    player_id = bet.get("player_id") or ""
+    headshot_html = ""
+    if player_id:
+        headshot_html = (
+            f'<img class="bet-card-headshot" '
+            f'src="https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png" '
+            f'alt="" onerror="this.style.display=\'none\'" loading="lazy"/>'
+        )
+
     return (
         f'<div class="{card_class}" style="border-left-color:{platform_border_color};">'
         f'<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;">'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'{headshot_html}'
         f'<div>'
         f'<span class="bet-card-player">🏀 {player}</span>{team_display}'
+        f'</div>'
         f'</div>'
         f'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">'
         f'{result_html}'
@@ -4892,7 +5099,7 @@ def get_bet_card_html(bet, show_live_status=False):
 
 
 def get_summary_cards_html(total, wins, losses, pushes, pending, win_rate, streak=0, best_platform=""):
-    """Render the summary metrics row at the top of the Bet Tracker."""
+    """Render the glassmorphism summary metrics dashboard at the top of the Bet Tracker."""
     import html as _h
 
     streak_label = (
@@ -4903,18 +5110,26 @@ def get_summary_cards_html(total, wins, losses, pushes, pending, win_rate, strea
     streak_color = "#00ff9d" if streak > 0 else "#ff4444" if streak < 0 else "#8a9bb8"
     win_color = "#00ff9d" if win_rate >= 55 else "#ff4444" if win_rate < 45 else "#ffcc00"
 
-    def _card(value, label, color="#00f0ff"):
+    # Win rate card glow class
+    wr_glow = (
+        "summary-card-wr-green" if win_rate >= 55
+        else "summary-card-wr-red" if win_rate < 45
+        else "summary-card-wr-gold"
+    )
+
+    def _card(value, label, color="#00f0ff", extra_class=""):
         v = _h.escape(str(value))
         l = _h.escape(str(label))
+        cls = f"summary-card {extra_class}" if extra_class else "summary-card"
         return (
-            f'<div class="summary-card" style="flex:1;min-width:130px;">'
+            f'<div class="{cls}" style="flex:1;min-width:130px;">'
             f'<div class="summary-card-value" style="color:{color};">{v}</div>'
             f'<div class="summary-card-label">{l}</div>'
             f'</div>'
         )
 
     cards = (
-        _card(f"{win_rate:.1f}%", "Win Rate", win_color)
+        _card(f"{win_rate:.1f}%", "Win Rate", win_color, wr_glow)
         + _card(total, "Total Bets")
         + _card(f"✅{wins} ❌{losses}", "W / L")
         + _card(streak_label, "Streak", streak_color)
@@ -4924,7 +5139,7 @@ def get_summary_cards_html(total, wins, losses, pushes, pending, win_rate, strea
         cards += _card(_h.escape(best_platform), "Best Platform", "#7c4dff")
 
     return (
-        f'<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">{cards}</div>'
+        f'<div class="summary-dashboard">{cards}</div>'
     )
 
 

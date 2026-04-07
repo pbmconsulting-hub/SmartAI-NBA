@@ -18,6 +18,7 @@
 import datetime
 import json
 import logging
+import time as _time
 import os
 
 import streamlit as st
@@ -47,6 +48,18 @@ from tracking.database import (
     load_all_analysis_picks,
     load_analysis_picks_for_date,
     get_analysis_pick_dates,
+    delete_bet,
+    update_bet_fields,
+    search_bets_by_player,
+    load_bets_by_date_range,
+    export_bets_csv,
+    insert_entry,
+    load_all_entries,
+    update_entry_result,
+    link_bets_to_entry,
+    get_entry_legs,
+    resolve_entry_from_legs,
+    delete_entry,
 )
 from styles.theme import (
     get_global_css,
@@ -85,6 +98,12 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(get_bet_card_css(), unsafe_allow_html=True)
 
+from pages.helpers.bet_tracker_helpers import (
+    get_calendar_heatmap_html,
+    get_achievement_ring_html,
+    get_level_badge_html,
+)
+
 # ── Joseph M. Smith Floating Widget ───────────────────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
 render_joseph_hero_banner()
@@ -100,6 +119,16 @@ if not premium_gate("Bet Tracker"):
 # Ensure DB is initialised
 initialize_database()
 
+# ── Cached bets — loaded once and shared across all tabs (C14) ──
+# Avoids 8+ redundant load_all_bets() calls per page render.
+@st.cache_data(ttl=30)
+def _cached_load_all_bets(limit=10000):
+    return load_all_bets(limit=limit)
+
+def _reload_bets():
+    """Clear the bet cache so the next access returns fresh data."""
+    _cached_load_all_bets.clear()
+
 # Auto-resolve past bets AND today's completed bets on page load (best-effort, silent).
 # Guarded by a session-state flag so this runs at most once per browser session,
 # preventing repeated blocking API calls on every Streamlit rerun.
@@ -108,7 +137,7 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
     with st.spinner("🤖 Auto-resolving pending bets..."):
         try:
             _today_str = datetime.date.today().isoformat()
-            _all_bets_check = load_all_bets()
+            _all_bets_check = _cached_load_all_bets()
 
             # Resolve past pending bets (yesterday and older)
             _pending_old = [
@@ -231,26 +260,75 @@ if _check_now_btn:
 
 st.divider()
 
-platform_filter = st.radio(
-    "Filter by Platform",
-    ["🏠 All Platforms", "🟢 PrizePicks", "🟣 Underdog Fantasy", "🔵 DraftKings Pick6"],
-    horizontal=True,
-    label_visibility="collapsed",
-)
+# ── Enhanced Filter Bar (B12) ─────────────────────────────────────────
+_filter_col1, _filter_col2, _filter_col3, _filter_col4 = st.columns([2, 2, 2, 1])
 
-# Map radio selection to DB platform string(s)
+with _filter_col1:
+    platform_filter_selections = st.multiselect(
+        "Filter by Platform",
+        ["🟢 PrizePicks", "🟣 Underdog Fantasy", "🔵 DraftKings Pick6"],
+        default=[],
+        key="platform_multi_filter",
+        help="Select platforms to filter. Leave empty for all platforms.",
+    )
+
+with _filter_col2:
+    _player_search = st.text_input(
+        "🔍 Search Player",
+        placeholder="e.g., LeBron James",
+        key="player_search_input",
+        help="Search bets by player name across all tabs.",
+    )
+
+with _filter_col3:
+    _date_range = st.date_input(
+        "📅 Date Range",
+        value=[],
+        key="date_range_filter",
+        help="Filter bets by date range. Leave empty for all dates.",
+    )
+
+with _filter_col4:
+    _direction_filter = st.selectbox(
+        "Direction",
+        ["All", "OVER", "UNDER"],
+        key="direction_filter",
+        help="Filter by bet direction.",
+    )
+
+
+# Map multi-select platform filter to a filter function
 def _platform_filter_fn(bet):
-    """Return True if this bet matches the selected platform filter."""
+    """Return True if this bet matches the selected platform filter(s)."""
+    if not platform_filter_selections:
+        return True  # Empty = show all
     plat = str(bet.get("platform") or "").lower()
-    if platform_filter == "🏠 All Platforms":
-        return True
-    elif platform_filter == "🟢 PrizePicks":
-        return "prizepicks" in plat
-    elif platform_filter == "🟣 Underdog Fantasy":
-        return "underdog" in plat
-    elif platform_filter == "🔵 DraftKings Pick6":
-        return "draftkings" in plat or "pick6" in plat or plat == "dk"
-    return True
+    for sel in platform_filter_selections:
+        if sel == "🟢 PrizePicks" and "prizepicks" in plat:
+            return True
+        elif sel == "🟣 Underdog Fantasy" and "underdog" in plat:
+            return True
+        elif sel == "🔵 DraftKings Pick6" and ("draftkings" in plat or "pick6" in plat or plat == "dk"):
+            return True
+    return False
+
+
+def _apply_global_filters(bets):
+    """Apply player search, date range, and direction filters."""
+    filtered = bets
+    # Player search
+    if _player_search and _player_search.strip():
+        _q = _player_search.strip().lower()
+        filtered = [b for b in filtered if _q in str(b.get("player_name", "")).lower()]
+    # Date range
+    if _date_range and len(_date_range) == 2:
+        _start = _date_range[0].isoformat()
+        _end = _date_range[1].isoformat()
+        filtered = [b for b in filtered if _start <= b.get("bet_date", "") <= _end]
+    # Direction
+    if _direction_filter and _direction_filter != "All":
+        filtered = [b for b in filtered if str(b.get("direction", "")).upper() == _direction_filter]
+    return filtered
 
 st.divider()
 
@@ -270,20 +348,22 @@ st.divider()
     tab_auto_resolve,
     tab_bets,
     tab_log,
+    tab_parlays,
     tab_predict,
     tab_history,
     tab_achievements,
 ) = st.tabs([
-    "📊 Model Health",
-    "📊 AI Picks",
+    "📊 Health",
+    "🤖 AI Picks",
     "📋 All Picks",
-    "🎙️ Joseph's Bets",
-    "🤖 Auto-Resolve",
+    "🎙️ Joseph",
+    "⚡ Resolve",
     "📋 My Bets",
-    "➕ Log a Bet",
-    "🔮 Predictor",
+    "➕ Log Bet",
+    "🎰 Parlays",
+    "🔮 Predict",
     "📅 History",
-    "🏆 Achievements",
+    "🏆 Awards",
 ])
 
 # ============================================================
@@ -292,6 +372,11 @@ st.divider()
 
 # Shared result emoji map
 _RESULT_EMOJI = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄", None: "⏳", "": "⏳"}
+
+# DFS payout ratio (standard: $0.909 profit per $1 risked on a winning bet)
+_DFS_PAYOUT_RATIO = 0.909
+# Win rate required to break even at this payout ratio: 1 / (1 + 0.909) ≈ 52.38%
+_BREAKEVEN_WIN_RATE = 52.38
 
 # ============================================================
 # SECTION: Model Health Tab
@@ -313,8 +398,8 @@ with tab_model_health:
         """
     ), unsafe_allow_html=True)
 
-    all_bets_for_health = load_all_bets()
-    filtered_health = [b for b in all_bets_for_health if _platform_filter_fn(b)]
+    all_bets_for_health = _cached_load_all_bets()
+    filtered_health = _apply_global_filters([b for b in all_bets_for_health if _platform_filter_fn(b)])
     resolved_health = [b for b in filtered_health if b.get("result") in ("WIN", "LOSS", "PUSH")]
     wins_h   = sum(1 for b in resolved_health if b.get("result") == "WIN")
     losses_h = sum(1 for b in resolved_health if b.get("result") == "LOSS")
@@ -366,6 +451,50 @@ with tab_model_health:
             "📝 No resolved bets found. Use **➕ Log a Bet** to start tracking your picks! "
             "After logging bets and recording results you'll see performance stats here."
         )
+
+    # ── Notifications & Alerts (B11) ──────────────────────────────────
+    if total_h > 0:
+        # Tilt detection: 3+ consecutive losses
+        _recent_resolved = sorted(
+            resolved_health, key=lambda b: b.get("bet_date", ""), reverse=True
+        )
+        _consec_losses = 0
+        for _rb in _recent_resolved:
+            if _rb.get("result") == "LOSS":
+                _consec_losses += 1
+            else:
+                break
+        if _consec_losses >= 3:
+            st.warning(
+                f"🧊 **Tilt Alert** — You've hit **{_consec_losses} consecutive losses**. "
+                "Consider taking a break or reducing your unit size for the next few bets. "
+                "Disciplined bankroll management is key to long-term profitability."
+            )
+
+        # Streak alert: 5+ consecutive wins
+        _consec_wins = 0
+        for _rb in _recent_resolved:
+            if _rb.get("result") == "WIN":
+                _consec_wins += 1
+            else:
+                break
+        if _consec_wins >= 5:
+            st.success(
+                f"🔥 **Hot Streak Alert** — You're on a **{_consec_wins}-game win streak**! "
+                "Consider locking in profits by reducing your next bet sizing slightly."
+            )
+
+        # Model drift alert: win rate below 50% for last 20 bets
+        _last_20 = _recent_resolved[:20]
+        if len(_last_20) >= 20:
+            _l20_wins = sum(1 for b in _last_20 if b.get("result") == "WIN")
+            _l20_wr = _l20_wins / 20 * 100
+            if _l20_wr < 50:
+                st.error(
+                    f"📉 **Model Drift Warning** — Win rate over the last 20 bets is "
+                    f"**{_l20_wr:.0f}%** (below breakeven). The model may need recalibration. "
+                    "Check the tier performance below to identify which tiers are underperforming."
+                )
 
     if total_h > 0:
         st.divider()
@@ -575,14 +704,14 @@ with tab_ai_picks:
         "or the Platform Props & Analyze pipeline."
     )
 
-    all_bets_for_ai = load_all_bets()
+    all_bets_for_ai = _cached_load_all_bets()
     ai_bets_raw = [
         b for b in all_bets_for_ai
         if b.get("platform", "") in ("SmartAI-Auto", "PrizePicks", "Underdog Fantasy", "DraftKings Pick6")
         or str(b.get("notes", "")).startswith("Auto-logged")
         or int(b.get("auto_logged", 0) or 0) == 1
     ]
-    ai_bets = [b for b in ai_bets_raw if _platform_filter_fn(b)]
+    ai_bets = _apply_global_filters([b for b in ai_bets_raw if _platform_filter_fn(b)])
 
     # ── Tier Filter & Bet Classification Filter ───────────────────────────
     _ai_filter_col1, _ai_filter_col2 = st.columns(2)
@@ -597,7 +726,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard"],
+            ["Standard", "Goblin", "Normal"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -606,7 +735,8 @@ with tab_ai_picks:
         _ai_tier_names = [t.split(" ")[0] for t in _ai_tier_filter]
         ai_bets = [b for b in ai_bets if b.get("tier") in _ai_tier_names]
     if _ai_bet_type_filter:
-        ai_bets = [b for b in ai_bets if b.get("bet_type", "standard") == "standard"]
+        _bt_filter_set = {bt.lower() for bt in _ai_bet_type_filter}
+        ai_bets = [b for b in ai_bets if (b.get("bet_type") or "standard").lower() in _bt_filter_set]
 
     if not ai_bets:
         st.info(
@@ -900,7 +1030,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard"],
+            ["Standard", "Goblin", "Normal"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -912,7 +1042,8 @@ with tab_all_picks:
         _ap_tier_names = [t.split(" ")[0] for t in _ap_tier_filter]
         all_picks_data = [p for p in all_picks_data if p.get("tier") in _ap_tier_names]
     if _ap_bet_type_filter:
-        all_picks_data = [p for p in all_picks_data if p.get("bet_type", "standard") == "standard"]
+        _ap_bt_filter_set = {bt.lower() for bt in _ap_bet_type_filter}
+        all_picks_data = [p for p in all_picks_data if (p.get("bet_type") or "standard").lower() in _ap_bt_filter_set]
 
     if not all_picks_data:
         st.info(
@@ -995,11 +1126,22 @@ with tab_all_picks:
             )
 
         # Secondary pick-quality metrics (Avg Edge + Avg Confidence + direction counts)
-        _apc1, _apc2, _apc3, _apc4 = st.columns(4)
+        _apc1, _apc2, _apc3, _apc4, _apc5 = st.columns([1, 1, 1, 1, 1])
         _apc1.metric("⬆️ OVER", sum(1 for p in all_picks_data if p.get("direction") == "OVER"))
         _apc2.metric("⬇️ UNDER", sum(1 for p in all_picks_data if p.get("direction") == "UNDER"))
         _apc3.metric("Avg Edge", f"{_ap_avg_edge:.1f}%")
         _apc4.metric("Avg Confidence", f"{_ap_avg_conf:.0f}/100")
+        with _apc5:
+            if all_picks_data:
+                _csv_picks = export_bets_csv(all_picks_data)
+                st.download_button(
+                    "📥 Export CSV",
+                    data=_csv_picks,
+                    file_name=f"smartai_all_picks_{datetime.date.today().isoformat()}.csv",
+                    mime="text/csv",
+                    key="export_all_picks_csv",
+                    help="Download all picks as a CSV file.",
+                )
 
         st.divider()
 
@@ -1225,7 +1367,7 @@ with tab_joseph_bets:
     )
 
     try:
-        _jbt_all = load_all_bets()
+        _jbt_all = _cached_load_all_bets()
         _jbt_joseph = []
         for b in _jbt_all:
             _plat = b.get("platform", "").lower()
@@ -1331,7 +1473,7 @@ with tab_auto_resolve:
 
     # ── Live Status Section ────────────────────────────────────────────
     st.markdown("### 🔄 Live Bet Status — Today's Picks")
-    _today_bets_all = load_all_bets()
+    _today_bets_all = _cached_load_all_bets()
     _today_str_ar = datetime.date.today().isoformat()
     _today_bets = [
         b for b in _today_bets_all
@@ -1375,29 +1517,43 @@ with tab_auto_resolve:
         st.info("No bets logged for today yet.")
 
     if auto_refresh:
-        import time as _time
-        _time.sleep(60)
-        # Attempt to resolve any new Final games before refreshing the display
-        try:
-            from tracking.bet_tracker import resolve_todays_bets as _rtr
-            _rtr_result = _rtr()
-            if _rtr_result.get("resolved", 0) > 0:
-                st.toast(
-                    f"🔄 Auto-resolved {_rtr_result['resolved']} bet(s) "
-                    f"({_rtr_result['wins']}W / {_rtr_result['losses']}L)"
-                )
-            if _rtr_result.get("errors"):
-                for _rtr_err in _rtr_result["errors"]:
-                    logging.getLogger(__name__).warning(f"[BetTrackerPage] resolve: {_rtr_err}")
-        except Exception as _exc:
-            logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
-        st.rerun()
+        # Use a short countdown instead of blocking time.sleep(60) which
+        # freezes the entire Streamlit app. st.empty + rerun achieves the
+        # same periodic refresh without blocking the event loop.
+        _refresh_placeholder = st.empty()
+        _refresh_placeholder.info("🔄 Auto-refresh enabled — page will refresh in ~60 seconds. Uncheck to stop.")
+        _refresh_start = _time.time()
+        # Non-blocking: check every 5 seconds if 60s has elapsed
+        # This allows Streamlit to remain responsive to user interactions
+        if st.session_state.get("_auto_refresh_ts", 0) == 0:
+            st.session_state["_auto_refresh_ts"] = _time.time()
+        _elapsed = _time.time() - st.session_state.get("_auto_refresh_ts", _time.time())
+        if _elapsed >= 60:
+            st.session_state["_auto_refresh_ts"] = _time.time()
+            # Attempt to resolve any new Final games before refreshing
+            try:
+                from tracking.bet_tracker import resolve_todays_bets as _rtr
+                _rtr_result = _rtr()
+                if _rtr_result.get("resolved", 0) > 0:
+                    _reload_bets()
+                    st.toast(
+                        f"🔄 Auto-resolved {_rtr_result['resolved']} bet(s) "
+                        f"({_rtr_result['wins']}W / {_rtr_result['losses']}L)"
+                    )
+                if _rtr_result.get("errors"):
+                    for _rtr_err in _rtr_result["errors"]:
+                        logging.getLogger(__name__).warning(f"[BetTrackerPage] resolve: {_rtr_err}")
+            except Exception as _exc:
+                logging.getLogger(__name__).warning(f"[BetTrackerPage] Unexpected error: {_exc}")
+            st.rerun()
+    else:
+        st.session_state.pop("_auto_refresh_ts", None)
 
     st.divider()
 
     # ── Resolve Past Bets ─────────────────────────────────────────────
     st.markdown("### 🗓️ Resolve Past Bets")
-    all_bets_for_resolve = load_all_bets()
+    all_bets_for_resolve = _cached_load_all_bets()
     pending_all = [
         b for b in all_bets_for_resolve
         if not b.get("result") and b.get("bet_date", "") < _today_str_ar and _platform_filter_fn(b)
@@ -1505,8 +1661,8 @@ with tab_auto_resolve:
 with tab_bets:
     st.subheader("📋 My Bets")
 
-    all_bets_raw = load_all_bets()
-    all_bets = [b for b in all_bets_raw if _platform_filter_fn(b)]
+    all_bets_raw = _cached_load_all_bets()
+    all_bets = _apply_global_filters([b for b in all_bets_raw if _platform_filter_fn(b)])
 
     if not all_bets:
         st.info("No bets logged yet. Use **➕ Log a Bet** to add your first bet.")
@@ -1522,7 +1678,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard"],
+            ["Standard", "Goblin", "Normal"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1541,7 +1697,8 @@ with tab_bets:
 
         filtered_bets = _apply_filter(all_bets, filter_choice)
         if _bets_bet_type_filter:
-            filtered_bets = [b for b in filtered_bets if b.get("bet_type", "standard") == "standard"]
+            _bets_bt_filter_set = {bt.lower() for bt in _bets_bet_type_filter}
+            filtered_bets = [b for b in filtered_bets if (b.get("bet_type") or "standard").lower() in _bets_bt_filter_set]
 
         # ── Summary Cards ─────────────────────────────────────────────
         _res_bets = [b for b in all_bets if b.get("result") in ("WIN", "LOSS", "PUSH")]
@@ -1559,6 +1716,92 @@ with tab_bets:
         )
 
         st.markdown(f"**Showing {len(filtered_bets)} bet(s)** (filter: {filter_choice})")
+
+        # ── Export CSV & Edit/Delete buttons ──────────────────────────
+        _export_col, _edit_col, _delete_col = st.columns([1, 1, 1])
+        with _export_col:
+            if filtered_bets:
+                _csv_data = export_bets_csv(filtered_bets)
+                st.download_button(
+                    "📥 Export to CSV",
+                    data=_csv_data,
+                    file_name=f"smartai_bets_{datetime.date.today().isoformat()}.csv",
+                    mime="text/csv",
+                    key="export_my_bets_csv",
+                    help="Download filtered bets as a CSV file.",
+                )
+
+        with _edit_col:
+            # Edit bet
+            _all_bet_labels = {
+                b.get("id", b.get("bet_id", idx)): (
+                    f"#{b.get('id', b.get('bet_id', idx))} — {b.get('player_name', '?')} "
+                    f"{b.get('direction', '')} {b.get('prop_line', '')} {str(b.get('stat_type', '')).title()}"
+                )
+                for idx, b in enumerate(filtered_bets)
+            }
+            if _all_bet_labels:
+                with st.expander("✏️ Edit a Bet", expanded=False):
+                    with st.form("edit_bet_form_bt"):
+                        _edit_bet_id = st.selectbox(
+                            "Select Bet to Edit",
+                            options=list(_all_bet_labels.keys()),
+                            format_func=lambda x: _all_bet_labels[x],
+                            key="edit_bet_select",
+                        )
+                        _edit_line = st.number_input("New Line", min_value=0.0, max_value=200.0, value=0.0, step=0.5, key="edit_line")
+                        _edit_dir = st.selectbox("New Direction", ["—", "OVER", "UNDER"], key="edit_dir")
+                        _edit_plat = st.selectbox(
+                            "New Platform",
+                            ["—", "PrizePicks", "Underdog Fantasy", "DraftKings Pick6"],
+                            key="edit_plat",
+                        )
+                        _edit_notes = st.text_input("New Notes", key="edit_notes")
+                        _edit_submit = st.form_submit_button("💾 Save Changes", type="primary")
+
+                    if _edit_submit and _edit_bet_id:
+                        _updates = {}
+                        if _edit_line > 0:
+                            _updates["prop_line"] = _edit_line
+                        if _edit_dir != "—":
+                            _updates["direction"] = _edit_dir
+                        if _edit_plat != "—":
+                            _updates["platform"] = _edit_plat
+                        if _edit_notes.strip():
+                            _updates["notes"] = _edit_notes.strip()
+                        if _updates:
+                            _ok, _msg = update_bet_fields(_edit_bet_id, _updates)
+                            if _ok:
+                                st.success(f"✅ {_msg}")
+                                _reload_bets()
+                                st.rerun()
+                            else:
+                                st.error(f"❌ {_msg}")
+                        else:
+                            st.warning("No fields to update. Enter at least one new value.")
+
+        with _delete_col:
+            if _all_bet_labels:
+                with st.expander("🗑️ Delete a Bet", expanded=False):
+                    with st.form("delete_bet_form_bt"):
+                        _del_bet_id = st.selectbox(
+                            "Select Bet to Delete",
+                            options=list(_all_bet_labels.keys()),
+                            format_func=lambda x: _all_bet_labels[x],
+                            key="delete_bet_select",
+                        )
+                        st.warning("⚠️ This action cannot be undone. An audit record will be saved.")
+                        _del_submit = st.form_submit_button("🗑️ Confirm Delete", type="primary")
+
+                    if _del_submit and _del_bet_id:
+                        _ok, _msg = delete_bet(_del_bet_id)
+                        if _ok:
+                            st.success(f"✅ {_msg}")
+                            _reload_bets()
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {_msg}")
+
         st.divider()
 
         # ── Mark a Result ─────────────────────────────────────────────
@@ -1828,6 +2071,247 @@ with tab_log:
 
 
 # ============================================================
+# SECTION: Parlays Tab — Multi-Leg Entry Tracker
+# ============================================================
+
+with tab_parlays:
+    st.subheader("🎰 Parlay / Entry Tracker")
+    st.markdown(
+        "Track multi-leg entries as parlays. Group bets into entries and see parlay-level results. "
+        "All legs must hit for a parlay WIN."
+    )
+
+    # ── Create New Parlay ─────────────────────────────────────────────
+    with st.expander("➕ Create New Parlay Entry", expanded=False):
+        with st.form("create_parlay_form"):
+            _parlay_cols = st.columns([1, 1, 1])
+            with _parlay_cols[0]:
+                _parlay_date = st.date_input(
+                    "Entry Date", value=datetime.date.today(),
+                    key="parlay_date_input",
+                )
+            with _parlay_cols[1]:
+                _parlay_platform = st.selectbox(
+                    "Platform",
+                    ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6", "Other"],
+                    key="parlay_platform_input",
+                )
+            with _parlay_cols[2]:
+                _parlay_fee = st.number_input(
+                    "Entry Fee ($)", min_value=0.0, max_value=5000.0,
+                    value=10.0, step=5.0, key="parlay_fee_input",
+                )
+
+            _parlay_type = st.selectbox(
+                "Entry Type",
+                ["Parlay (All Must Hit)", "Flex Play (Some Can Miss)", "Power Play"],
+                key="parlay_type_input",
+            )
+
+            # Select bets to include as legs
+            _available_bets = _cached_load_all_bets()
+            _unlinked_bets = [
+                b for b in _available_bets
+                if not b.get("entry_id")
+                and b.get("bet_date", "") == _parlay_date.isoformat()
+            ]
+            _bet_labels = {
+                b.get("bet_id", b.get("id", idx)): (
+                    f"#{b.get('bet_id', b.get('id', idx))} — "
+                    f"{b.get('player_name', '?')} "
+                    f"{b.get('direction', '')} {b.get('prop_line', '')} "
+                    f"{str(b.get('stat_type', '')).title()} "
+                    f"({b.get('result') or 'Pending'})"
+                )
+                for idx, b in enumerate(_unlinked_bets)
+            }
+            _selected_legs = st.multiselect(
+                "Select Legs (bets from same day)",
+                options=list(_bet_labels.keys()),
+                format_func=lambda x: _bet_labels.get(x, str(x)),
+                key="parlay_legs_select",
+                help="Pick 2+ bets to form a parlay. Only unlinked bets from the selected date are shown.",
+            )
+
+            _parlay_notes = st.text_input("Notes (optional)", key="parlay_notes_input")
+            _parlay_submit = st.form_submit_button("🎰 Create Entry", type="primary")
+
+        if _parlay_submit:
+            if len(_selected_legs) < 2:
+                st.warning("⚠️ Select at least 2 legs to create a parlay.")
+            else:
+                _entry_id = insert_entry({
+                    "entry_date": _parlay_date.isoformat(),
+                    "platform": _parlay_platform,
+                    "entry_type": _parlay_type.split(" ")[0].lower(),
+                    "entry_fee": _parlay_fee,
+                    "expected_value": 0.0,
+                    "pick_count": len(_selected_legs),
+                    "notes": _parlay_notes,
+                })
+                if _entry_id:
+                    _linked = link_bets_to_entry(_selected_legs, _entry_id)
+                    # Auto-resolve if possible
+                    resolve_entry_from_legs(_entry_id)
+                    _reload_bets()
+                    st.success(
+                        f"✅ Created entry #{_entry_id} with {_linked} leg(s) on {_parlay_platform}."
+                    )
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to create entry.")
+
+    st.divider()
+
+    # ── Existing Entries ──────────────────────────────────────────────
+    _all_entries = load_all_entries()
+
+    if not _all_entries:
+        st.info(
+            "📭 No parlay entries yet. Use the form above to group your bets into multi-leg entries, "
+            "or build an entry in the **🧬 Entry Builder** page to auto-log it here."
+        )
+    else:
+        # Summary
+        _e_total = len(_all_entries)
+        _e_resolved = [e for e in _all_entries if e.get("result") in ("WIN", "LOSS", "PUSH")]
+        _e_wins = sum(1 for e in _e_resolved if e.get("result") == "WIN")
+        _e_losses = sum(1 for e in _e_resolved if e.get("result") == "LOSS")
+        _e_pending = sum(1 for e in _all_entries if not e.get("result"))
+        _e_wr = round(_e_wins / max(_e_wins + _e_losses, 1) * 100, 1)
+        _e_total_fees = sum(float(e.get("entry_fee") or 0) for e in _all_entries)
+        _e_total_payout = sum(float(e.get("payout") or 0) for e in _e_resolved if e.get("result") == "WIN")
+        _e_pnl = _e_total_payout - _e_total_fees
+
+        st.markdown(
+            get_summary_cards_html(
+                total=_e_total,
+                wins=_e_wins,
+                losses=_e_losses,
+                pushes=sum(1 for e in _e_resolved if e.get("result") == "PUSH"),
+                pending=_e_pending,
+                win_rate=_e_wr,
+            ),
+            unsafe_allow_html=True,
+        )
+
+        _pnl_col1, _pnl_col2, _pnl_col3 = st.columns(3)
+        _pnl_col1.metric("Total Wagered", f"${_e_total_fees:.2f}")
+        _pnl_col2.metric("Total Payouts", f"${_e_total_payout:.2f}")
+        _pnl_col3.metric(
+            "Net P&L", f"${_e_pnl:+.2f}",
+            delta="Profit" if _e_pnl > 0 else ("Break-even" if _e_pnl == 0 else "Loss"),
+            delta_color="normal" if _e_pnl >= 0 else "inverse",
+        )
+
+        st.divider()
+
+        # ── Resolve All Entries button ────────────────────────────────
+        if st.button("🔄 Resolve All Entries", key="resolve_all_entries_btn", type="primary"):
+            _resolved_count = 0
+            for _e in _all_entries:
+                if not _e.get("result"):
+                    _r = resolve_entry_from_legs(_e["entry_id"])
+                    if _r:
+                        _resolved_count += 1
+            if _resolved_count > 0:
+                st.success(f"✅ Resolved {_resolved_count} entries.")
+                st.rerun()
+            else:
+                st.info("No entries resolved — legs may still be pending.")
+
+        st.divider()
+
+        # ── Entry Cards ──────────────────────────────────────────────
+        for _entry in _all_entries:
+            _eid = _entry.get("entry_id", "?")
+            _edate = _entry.get("entry_date", "")
+            _eplat = _entry.get("platform", "?")
+            _etype = _entry.get("entry_type", "parlay")
+            _efee = float(_entry.get("entry_fee") or 0)
+            _epayout = _entry.get("payout")
+            _eresult = _entry.get("result")
+            _epicks = _entry.get("pick_count", 0)
+            _enotes = _entry.get("notes", "")
+
+            # Result styling
+            if _eresult == "WIN":
+                _result_badge = '<span class="result-win">✅ WIN</span>'
+                _border_color = "#00ff9d"
+            elif _eresult == "LOSS":
+                _result_badge = '<span class="result-loss">❌ LOSS</span>'
+                _border_color = "#ff4444"
+            elif _eresult == "PUSH":
+                _result_badge = '<span class="result-push">🔄 PUSH</span>'
+                _border_color = "#b0bec5"
+            else:
+                _result_badge = '<span class="result-pending">⏳ PENDING</span>'
+                _border_color = "#ffcc00"
+
+            _payout_str = f"${_epayout:.2f}" if _epayout is not None else "—"
+
+            with st.expander(
+                f"{'✅' if _eresult == 'WIN' else '❌' if _eresult == 'LOSS' else '⏳'} "
+                f"Entry #{_eid} — {_epicks} legs on {_eplat} ({_edate})"
+                + (f" — {_eresult}" if _eresult else " — Pending"),
+                expanded=not _eresult,
+            ):
+                st.markdown(
+                    f'<div style="border-left:4px solid {_border_color};'
+                    f'background:rgba(13,17,23,0.85);border-radius:10px;padding:14px 18px;'
+                    f'margin-bottom:8px;">'
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                    f'<div>'
+                    f'<strong style="color:#e8f0ff;font-family:Orbitron,sans-serif;">'
+                    f'🎰 Entry #{_eid}</strong>'
+                    f'<span style="color:#8a9bb8;margin-left:10px;">{_eplat} · {_etype}</span>'
+                    f'</div>'
+                    f'{_result_badge}'
+                    f'</div>'
+                    f'<div style="color:#8a9bb8;font-size:0.82rem;margin-top:6px;">'
+                    f'Fee: <strong>${_efee:.2f}</strong> · '
+                    f'Payout: <strong>{_payout_str}</strong> · '
+                    f'{_epicks} leg(s)'
+                    + (f' · <em>{_enotes}</em>' if _enotes else '')
+                    + f'</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Show linked legs
+                _legs = get_entry_legs(_eid)
+                if _legs:
+                    st.markdown(f"**Legs ({len(_legs)}):**")
+                    for _leg in _legs:
+                        _leg_result = _leg.get("result") or "Pending"
+                        _leg_icon = {"WIN": "✅", "LOSS": "❌", "PUSH": "🔄"}.get(_leg_result, "⏳")
+                        st.markdown(
+                            f"&nbsp;&nbsp;{_leg_icon} **{_leg.get('player_name', '?')}** — "
+                            f"{_leg.get('direction', '')} {_leg.get('prop_line', '')} "
+                            f"{str(_leg.get('stat_type', '')).title()} "
+                            f"({_leg_result})"
+                        )
+                else:
+                    st.caption("No legs linked to this entry.")
+
+                # Delete entry
+                if st.button(
+                    f"🗑️ Delete Entry #{_eid}",
+                    key=f"del_entry_{_eid}",
+                ):
+                    _ok, _msg = delete_entry(_eid)
+                    if _ok:
+                        st.success(_msg)
+                        _reload_bets()
+                        st.rerun()
+                    else:
+                        st.error(_msg)
+
+# ============================================================
+# END SECTION: Parlays Tab
+# ============================================================
+
+
+# ============================================================
 # SECTION: Performance Predictor Tab
 # ============================================================
 
@@ -1991,6 +2475,20 @@ with tab_history:
     rolling_stats = get_rolling_stats(days=14)
     snapshots = rolling_stats.get("snapshots", [])
 
+    # ── Calendar Heatmap (A4) ──────────────────────────────────────────
+    _heatmap_bets = _cached_load_all_bets()
+    _heatmap_bets = _apply_global_filters([b for b in _heatmap_bets if _platform_filter_fn(b)])
+    _heatmap_by_date: dict = {}
+    for _hb in _heatmap_bets:
+        _heatmap_by_date.setdefault(_hb.get("bet_date", "Unknown"), []).append(_hb)
+    if _heatmap_by_date:
+        with st.expander("🟩 Win Rate Heatmap (last 6 weeks)", expanded=True):
+            st.markdown(
+                get_calendar_heatmap_html(_heatmap_by_date, num_days=42),
+                unsafe_allow_html=True,
+            )
+            st.caption("Hover over cells to see daily stats. Green = winning days, Red = losing days.")
+
     # ── Rolling Summary Bar ────────────────────────────────────────────
     if rolling_stats.get("total_bets", 0) > 0:
         streak_val = rolling_stats.get("streak", 0)
@@ -2015,7 +2513,7 @@ with tab_history:
     # ── Cumulative ROI Time-Series Chart ───────────────────────────────
     # Build a cumulative P&L series from all resolved bets over the
     # last 14 days to visualize the strategy's trend.
-    _all_hist_bets = load_all_bets(limit=1000)
+    _all_hist_bets = _cached_load_all_bets()
     _resolved_bets = [
         b for b in _all_hist_bets
         if b.get("result") in ("WIN", "LOSS", "PUSH")
@@ -2025,35 +2523,55 @@ with tab_history:
 
     if len(_resolved_bets) >= 3:
         with st.expander("📈 Cumulative P&L Curve (resolved bets)", expanded=True):
-            _HIST_PAYOUT = 0.909
+            _HIST_PAYOUT = _DFS_PAYOUT_RATIO
             _cum_pnl = 0.0
+            _total_dollar_pnl = 0.0  # B9: actual dollar P&L
             _pnl_vals = []
             _pnl_labels = []
             _daily_pnl: dict = {}  # date → cumulative at end of day
+            _max_pnl = 0.0  # For drawdown tracking
             for _rb in _resolved_bets:
                 _res = _rb.get("result", "")
+                _fee = float(_rb.get("entry_fee") or 0)
                 if _res == "WIN":
                     _cum_pnl += _HIST_PAYOUT
+                    _total_dollar_pnl += _fee * _HIST_PAYOUT if _fee > 0 else 0
                 elif _res == "LOSS":
                     _cum_pnl -= 1.0
+                    _total_dollar_pnl -= _fee if _fee > 0 else 0
                 # PUSH: no change
                 _pnl_vals.append(round(_cum_pnl, 2))
                 _pnl_labels.append(_rb.get("bet_date", ""))
                 _daily_pnl[_rb.get("bet_date", "")] = round(_cum_pnl, 2)
+                _max_pnl = max(_max_pnl, _cum_pnl)
 
             _wins_total = sum(1 for b in _resolved_bets if b.get("result") == "WIN")
             _losses_total = sum(1 for b in _resolved_bets if b.get("result") == "LOSS")
             _wr_total = _wins_total / max(_wins_total + _losses_total, 1) * 100
 
-            _roi_cols = st.columns(4)
+            # Drawdown calculation
+            _drawdown = _max_pnl - _cum_pnl if _max_pnl > 0 else 0
+            _drawdown_pct = (_drawdown / max(_max_pnl, 0.01)) * 100 if _max_pnl > 0 else 0
+
+            _roi_cols = st.columns(5)
             _roi_cols[0].metric("Resolved Bets", len(_resolved_bets))
             _roi_cols[1].metric("Win Rate", f"{_wr_total:.1f}%",
-                                delta=f"{_wr_total - 52.38:+.1f}% vs breakeven")
-            _roi_cols[2].metric("Total P&L", f"{_cum_pnl:+.2f} units")
-            _roi_cols[3].metric(
-                "ROI/bet",
-                f"{_cum_pnl / max(len(_resolved_bets), 1):+.3f}u",
-                delta="positive = profitable" if _cum_pnl > 0 else "negative = losing"
+                                delta=f"{_wr_total - _BREAKEVEN_WIN_RATE:+.1f}% vs breakeven")
+            _roi_cols[2].metric("Unit P&L", f"{_cum_pnl:+.2f}u")
+            if _total_dollar_pnl != 0:
+                _roi_cols[3].metric("Dollar P&L", f"${_total_dollar_pnl:+.2f}",
+                                    delta="positive = profitable" if _total_dollar_pnl > 0 else "negative = losing")
+            else:
+                _roi_cols[3].metric(
+                    "ROI/bet",
+                    f"{_cum_pnl / max(len(_resolved_bets), 1):+.3f}u",
+                    delta="positive = profitable" if _cum_pnl > 0 else "negative = losing"
+                )
+            _roi_cols[4].metric(
+                "Drawdown",
+                f"{_drawdown_pct:.1f}%",
+                delta=f"{_drawdown:+.2f}u from peak" if _drawdown > 0 else "At peak",
+                delta_color="inverse" if _drawdown > 0 else "normal",
             )
 
             # Line chart of cumulative P&L
@@ -2084,7 +2602,7 @@ with tab_history:
     # ── Day-by-Day Timeline ────────────────────────────────────────────
     if not snapshots:
         # No snapshot data yet — fall back to grouping raw bets by date
-        all_bets_hist = load_all_bets()
+        all_bets_hist = _cached_load_all_bets()
         all_bets_hist = [b for b in all_bets_hist if _platform_filter_fn(b)]
         _by_date_hist: dict = {}
         for _b in all_bets_hist:
@@ -2144,7 +2662,7 @@ with tab_history:
                             st.caption(f"*{len(_show_bets)} bets shown for {_date}.*")
     else:
         # Use daily_snapshots for summaries + load individual bets for expansion
-        all_bets_hist = load_all_bets(limit=1000)
+        all_bets_hist = _cached_load_all_bets()
         all_bets_hist = [b for b in all_bets_hist if _platform_filter_fn(b)]
         _bets_by_date: dict = {}
         for _b in all_bets_hist:
@@ -2312,67 +2830,134 @@ with tab_achievements:
 
         st.divider()
 
-        # ── Achievement badges ────────────────────────────────────
-        st.markdown("### 🎖️ Earned Badges")
+        # ── Level System (A5) ──────────────────────────────────────
+        st.markdown("### 🎮 Your Level")
+        st.markdown(
+            get_level_badge_html(total_bets, overall_wr),
+            unsafe_allow_html=True,
+        )
 
-        _badges: list[dict] = []
+        st.divider()
 
-        # Volume badges
-        if total_bets >= 100:
-            _badges.append({"icon": "💯", "name": "Century Club", "desc": "100+ resolved bets"})
-        elif total_bets >= 50:
-            _badges.append({"icon": "🥈", "name": "Fifty Strong", "desc": "50+ resolved bets"})
-        elif total_bets >= 10:
-            _badges.append({"icon": "🎯", "name": "Getting Serious", "desc": "10+ resolved bets"})
+        # ── Achievement badges with Progress Rings (A5) ───────────
+        st.markdown("### 🎖️ Achievements")
+
+        # Define all possible badges with thresholds
+        _all_badges: list[dict] = []
+
+        # Volume badges (progressive)
+        _vol_thresholds = [
+            (10, "🎯", "Getting Serious", "10+ resolved bets"),
+            (50, "🥈", "Fifty Strong", "50+ resolved bets"),
+            (100, "💯", "Century Club", "100+ resolved bets"),
+            (250, "🏅", "Quarter Thousand", "250+ resolved bets"),
+            (500, "🌟", "500 Club", "500+ resolved bets"),
+        ]
+        for _thresh, _icon, _name, _desc in _vol_thresholds:
+            _progress = min(total_bets / _thresh, 1.0)
+            _earned = total_bets >= _thresh
+            _all_badges.append({
+                "icon": _icon, "name": _name, "desc": _desc,
+                "progress": _progress, "earned": _earned,
+                "remaining": f"{max(_thresh - total_bets, 0)} more bets" if not _earned else "",
+            })
 
         # Win rate badges
-        if overall_wr >= 70 and total_bets >= 20:
-            _badges.append({"icon": "👑", "name": "Elite Picker", "desc": f"{overall_wr:.0f}% win rate (20+ bets)"})
-        elif overall_wr >= 60 and total_bets >= 10:
-            _badges.append({"icon": "⭐", "name": "Sharp", "desc": f"{overall_wr:.0f}% win rate (10+ bets)"})
-        elif overall_wr >= 55 and total_bets >= 10:
-            _badges.append({"icon": "✅", "name": "Consistent", "desc": f"{overall_wr:.0f}% win rate"})
+        if total_bets >= 10:
+            for _wr_thresh, _icon, _name, _desc in [
+                (55, "✅", "Consistent", f"{overall_wr:.0f}% win rate"),
+                (60, "⭐", "Sharp", f"{overall_wr:.0f}% win rate (10+ bets)"),
+                (70, "👑", "Elite Picker", f"{overall_wr:.0f}% win rate (20+ bets)"),
+            ]:
+                _progress = min(overall_wr / _wr_thresh, 1.0) if _wr_thresh > 0 else 0.0
+                _earned = overall_wr >= _wr_thresh and (total_bets >= 20 if _wr_thresh >= 70 else total_bets >= 10)
+                _all_badges.append({
+                    "icon": _icon, "name": _name, "desc": _desc,
+                    "progress": _progress, "earned": _earned,
+                    "remaining": f"Need {_wr_thresh:.0f}% WR" if not _earned else "",
+                })
 
         # Streak badges
-        if _longest_win >= 10:
-            _badges.append({"icon": "🔥🔥", "name": "On Fire", "desc": f"{_longest_win}-game win streak"})
-        elif _longest_win >= 5:
-            _badges.append({"icon": "🔥", "name": "Hot Streak", "desc": f"{_longest_win}-game win streak"})
-        elif _longest_win >= 3:
-            _badges.append({"icon": "⚡", "name": "Warming Up", "desc": f"{_longest_win}-game win streak"})
+        for _streak_thresh, _icon, _name, _desc in [
+            (3, "⚡", "Warming Up", f"{_longest_win}-game win streak"),
+            (5, "🔥", "Hot Streak", f"{_longest_win}-game win streak"),
+            (10, "🔥🔥", "On Fire", f"{_longest_win}-game win streak"),
+        ]:
+            _progress = min(_longest_win / _streak_thresh, 1.0)
+            _earned = _longest_win >= _streak_thresh
+            _all_badges.append({
+                "icon": _icon, "name": _name, "desc": _desc,
+                "progress": _progress, "earned": _earned,
+                "remaining": f"{max(_streak_thresh - _longest_win, 0)} more wins" if not _earned else "",
+            })
 
-        # Stat mastery badges
-        if _best_stat and _best_stat_wr >= 65:
-            _badges.append({
+        # Stat mastery
+        if _best_stat and _best_stat_wr >= 50:
+            _progress = min(_best_stat_wr / 65, 1.0)
+            _earned = _best_stat_wr >= 65
+            _all_badges.append({
                 "icon": "🏆",
                 "name": f"{_best_stat.replace('_',' ').title()} Master",
                 "desc": f"{_best_stat_wr:.0f}% win rate on {_best_stat}",
+                "progress": _progress, "earned": _earned,
+                "remaining": f"Need 65% WR on {_best_stat}" if not _earned else "",
             })
 
-        # Resilience badge
-        if _longest_loss >= 5 and overall_wr >= 55:
-            _badges.append({"icon": "💪", "name": "Resilient", "desc": "Bounced back from 5+ loss streak"})
+        # Resilience
+        if _longest_loss >= 5:
+            _earned = _longest_loss >= 5 and overall_wr >= 55
+            _all_badges.append({
+                "icon": "💪", "name": "Resilient",
+                "desc": "Bounced back from 5+ loss streak",
+                "progress": min(overall_wr / 55, 1.0) if not _earned else 1.0,
+                "earned": _earned,
+                "remaining": "Need 55%+ WR after 5+ loss streak" if not _earned else "",
+            })
 
-        # Current streak badge
-        if _cur_streak_type == "WIN" and _cur_streak >= 5:
-            _badges.append({"icon": "🌶️", "name": "White Hot", "desc": f"Current {_cur_streak}-game win streak!"})
+        # Current streak
+        if _cur_streak_type == "WIN" and _cur_streak >= 3:
+            _progress = min(_cur_streak / 5, 1.0)
+            _earned = _cur_streak >= 5
+            _all_badges.append({
+                "icon": "🌶️", "name": "White Hot",
+                "desc": f"Current {_cur_streak}-game win streak!",
+                "progress": _progress, "earned": _earned,
+                "remaining": f"{max(5 - _cur_streak, 0)} more wins" if not _earned else "",
+            })
 
-        if not _badges:
-            st.info("No badges earned yet. Keep logging bets to unlock achievements!")
+        if not _all_badges:
+            st.info("No badges available yet. Keep logging bets to unlock achievements!")
         else:
-            _badge_cols = st.columns(min(len(_badges), 4))
-            for _bi, _badge in enumerate(_badges):
-                with _badge_cols[_bi % 4]:
-                    st.markdown(
-                        f'<div style="background:rgba(0,240,255,0.06);border:1px solid rgba(0,240,255,0.18);'
-                        f'border-radius:10px;padding:12px 10px;text-align:center;min-height:90px;">'
-                        f'<div style="font-size:1.8rem;">{_badge["icon"]}</div>'
-                        f'<div style="color:#e8f4ff;font-weight:700;font-size:0.82rem;margin:4px 0 2px;">'
-                        f'{_badge["name"]}</div>'
-                        f'<div style="color:#8a9bb8;font-size:0.70rem;">{_badge["desc"]}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True,
-                    )
+            # Show earned badges first, then locked ones
+            _earned_badges = [b for b in _all_badges if b["earned"]]
+            _locked_badges = [b for b in _all_badges if not b["earned"]]
+
+            if _earned_badges:
+                st.markdown(f"**🏅 Earned ({len(_earned_badges)})**")
+                _badge_cols = st.columns(min(len(_earned_badges), 4))
+                for _bi, _badge in enumerate(_earned_badges):
+                    with _badge_cols[_bi % 4]:
+                        st.markdown(
+                            get_achievement_ring_html(
+                                _badge["icon"], _badge["name"], _badge["desc"],
+                                _badge["progress"], _badge["earned"],
+                            ),
+                            unsafe_allow_html=True,
+                        )
+
+            if _locked_badges:
+                st.markdown(f"**🔒 Locked ({len(_locked_badges)})**")
+                _locked_cols = st.columns(min(len(_locked_badges), 4))
+                for _bi, _badge in enumerate(_locked_badges):
+                    with _locked_cols[_bi % 4]:
+                        st.markdown(
+                            get_achievement_ring_html(
+                                _badge["icon"], _badge["name"],
+                                _badge.get("remaining", _badge["desc"]),
+                                _badge["progress"], _badge["earned"],
+                            ),
+                            unsafe_allow_html=True,
+                        )
 
         st.divider()
 

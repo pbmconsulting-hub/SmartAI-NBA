@@ -15,6 +15,8 @@
 # Standard library imports only
 import sqlite3    # Built-in SQLite database (no install needed!)
 import json       # For serializing/deserializing analysis session data
+import csv        # For CSV export
+import io         # For in-memory CSV buffer
 import os         # For file path operations
 import time       # For retry backoff delays
 import datetime   # For timestamps in analysis session persistence
@@ -279,6 +281,19 @@ CREATE TABLE IF NOT EXISTS player_game_logs (
 );
 """
 
+# SQL to create the bet audit log table.
+# Tracks all edit/delete operations on bets for accountability.
+CREATE_BET_AUDIT_LOG_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS bet_audit_log (
+    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bet_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    old_values TEXT,
+    new_values TEXT,
+    changed_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -345,6 +360,7 @@ def initialize_database():
             cursor.execute(CREATE_ANALYSIS_SESSIONS_TABLE_SQL)    # analysis session persistence
             cursor.execute(CREATE_BACKTEST_RESULTS_TABLE_SQL)     # historical backtesting results
             cursor.execute(CREATE_PLAYER_GAME_LOGS_TABLE_SQL)     # Feature 12: game log persistence
+            cursor.execute(CREATE_BET_AUDIT_LOG_TABLE_SQL)         # Bet edit/delete audit log
 
             # ── Indexes for performance ───────────────────────────────
             _TRACKING_INDEXES = (
@@ -449,6 +465,14 @@ def initialize_database():
                 )
             except sqlite3.OperationalError:
                 pass
+
+            # ── entry_id column migration (link bets to parlay entries) ──
+            try:
+                cursor.execute(
+                    "ALTER TABLE bets ADD COLUMN entry_id INTEGER"
+                )
+            except sqlite3.OperationalError:
+                pass  # Column already exists — safe to ignore
 
             # ── Rename retrieved_at column in player_game_logs ──
             # Older databases have the column named with old terminology; new schema
@@ -610,6 +634,373 @@ def update_bet_result(bet_id, result, actual_value):
             _logger.error(f"Error updating bet result: {database_error}")
             return False
     return False
+
+
+def delete_bet(bet_id):
+    """
+    Delete a bet from the database and log the deletion in the audit table.
+
+    Args:
+        bet_id (int): The bet's database ID.
+
+    Returns:
+        tuple[bool, str]: (success, message)
+    """
+    # First, fetch the bet for audit purposes
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM bets WHERE bet_id = ?", (bet_id,)).fetchone()
+            if not row:
+                return False, f"Bet #{bet_id} not found."
+            bet_snapshot = dict(row)
+    except sqlite3.Error as err:
+        _logger.error(f"delete_bet: lookup error: {err}")
+        return False, f"Error looking up bet: {err}"
+
+    # Delete the bet
+    cursor = _execute_write(
+        "DELETE FROM bets WHERE bet_id = ?", (bet_id,), caller="delete_bet"
+    )
+    if cursor is None or cursor.rowcount == 0:
+        return False, f"Failed to delete bet #{bet_id}."
+
+    # Log audit record
+    _execute_write(
+        """INSERT INTO bet_audit_log (bet_id, action, old_values, new_values, changed_at)
+           VALUES (?, 'DELETE', ?, NULL, datetime('now'))""",
+        (bet_id, json.dumps(bet_snapshot, default=str)),
+        caller="delete_bet_audit",
+    )
+    return True, f"Bet #{bet_id} deleted successfully."
+
+
+def update_bet_fields(bet_id, updates):
+    """
+    Update editable fields of a bet (line, direction, platform, notes, tier).
+
+    Args:
+        bet_id (int): The bet's database ID.
+        updates (dict): Key-value pairs to update. Only whitelisted fields are
+            accepted: prop_line, direction, platform, notes, tier, stat_type.
+
+    Returns:
+        tuple[bool, str]: (success, message)
+    """
+    ALLOWED_FIELDS = {"prop_line", "direction", "platform", "notes", "tier", "stat_type"}
+    filtered = {k: v for k, v in updates.items() if k in ALLOWED_FIELDS}
+    if not filtered:
+        return False, "No valid fields to update."
+
+    # Fetch old values for audit
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM bets WHERE bet_id = ?", (bet_id,)).fetchone()
+            if not row:
+                return False, f"Bet #{bet_id} not found."
+            old_values = {k: dict(row).get(k) for k in filtered}
+    except sqlite3.Error as err:
+        _logger.error(f"update_bet_fields: lookup error: {err}")
+        return False, f"Error looking up bet: {err}"
+
+    # Build SET clause
+    set_parts = [f"{k} = ?" for k in filtered]
+    values = list(filtered.values()) + [bet_id]
+    sql = f"UPDATE bets SET {', '.join(set_parts)} WHERE bet_id = ?"
+
+    cursor = _execute_write(sql, tuple(values), caller="update_bet_fields")
+    if cursor is None or cursor.rowcount == 0:
+        return False, f"Failed to update bet #{bet_id}."
+
+    # Log audit record
+    _execute_write(
+        """INSERT INTO bet_audit_log (bet_id, action, old_values, new_values, changed_at)
+           VALUES (?, 'EDIT', ?, ?, datetime('now'))""",
+        (bet_id, json.dumps(old_values, default=str), json.dumps(filtered, default=str)),
+        caller="update_bet_fields_audit",
+    )
+    return True, f"Bet #{bet_id} updated: {', '.join(filtered.keys())}."
+
+
+def search_bets_by_player(query, limit=200):
+    """
+    Search bets by player name substring (case-insensitive).
+
+    Args:
+        query (str): Player name search string.
+        limit (int): Maximum results.
+
+    Returns:
+        list[dict]: Matching bet records.
+    """
+    if not query or not query.strip():
+        return []
+    sql = """
+    SELECT * FROM bets
+    WHERE LOWER(player_name) LIKE ?
+    ORDER BY created_at DESC
+    LIMIT ?
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, (f"%{query.strip().lower()}%", limit)).fetchall()
+            return [dict(r) for r in rows]
+    except sqlite3.Error as err:
+        _logger.error(f"search_bets_by_player error: {err}")
+        return []
+
+
+def load_bets_by_date_range(start_date, end_date, limit=10000):
+    """
+    Load bets within a date range (inclusive).
+
+    Args:
+        start_date (str): Start date in ISO format (YYYY-MM-DD).
+        end_date (str): End date in ISO format (YYYY-MM-DD).
+        limit (int): Maximum results.
+
+    Returns:
+        list[dict]: Matching bet records.
+    """
+    sql = """
+    SELECT * FROM bets
+    WHERE bet_date >= ? AND bet_date <= ?
+    ORDER BY created_at DESC
+    LIMIT ?
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, (start_date, end_date, limit)).fetchall()
+            return [dict(r) for r in rows]
+    except sqlite3.Error as err:
+        _logger.error(f"load_bets_by_date_range error: {err}")
+        return []
+
+
+def export_bets_csv(bets):
+    """
+    Convert a list of bet dicts to CSV string.
+
+    Args:
+        bets (list[dict]): Bet records.
+
+    Returns:
+        str: CSV-formatted string.
+    """
+    if not bets:
+        return ""
+
+    columns = [
+        "bet_id", "bet_date", "player_name", "team", "stat_type",
+        "prop_line", "direction", "platform", "confidence_score",
+        "tier", "result", "actual_value", "edge_percentage", "notes",
+    ]
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=columns, extrasaction="ignore")
+    writer.writeheader()
+    for bet in bets:
+        writer.writerow(bet)
+    return buffer.getvalue()
+
+
+# ============================================================
+# SECTION: Parlay / Entry CRUD
+# ============================================================
+
+def insert_entry(entry_data):
+    """
+    Save a new parlay/entry to the database.
+
+    Args:
+        entry_data (dict): Entry information with keys:
+            entry_date, platform, entry_type, entry_fee,
+            expected_value, pick_count, notes
+
+    Returns:
+        int or None: The new entry's ID, or None if error
+    """
+    insert_sql = """
+    INSERT INTO entries (
+        entry_date, platform, entry_type, entry_fee,
+        expected_value, pick_count, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    values = (
+        entry_data.get("entry_date", ""),
+        entry_data.get("platform", ""),
+        entry_data.get("entry_type", "parlay"),
+        entry_data.get("entry_fee", 0.0),
+        entry_data.get("expected_value", 0.0),
+        entry_data.get("pick_count", 0),
+        entry_data.get("notes", ""),
+    )
+    cursor = _execute_write(insert_sql, values, caller="insert_entry")
+    if cursor is not None:
+        return cursor.lastrowid
+    return None
+
+
+def load_all_entries(limit=500):
+    """
+    Load recent parlay entries from the database.
+
+    Returns:
+        list of dict: Entry rows as dictionaries
+    """
+    select_sql = """
+    SELECT * FROM entries
+    ORDER BY created_at DESC
+    LIMIT ?
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(select_sql, (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as database_error:
+        _logger.error(f"Error loading entries: {database_error}")
+        return []
+
+
+def update_entry_result(entry_id, result, payout=None):
+    """
+    Update a parlay entry with its result.
+
+    Args:
+        entry_id (int): The entry's database ID
+        result (str): 'WIN', 'LOSS', or 'PUSH'
+        payout (float, optional): Actual payout amount
+
+    Returns:
+        bool: True if updated successfully
+    """
+    update_sql = """
+    UPDATE entries
+    SET result = ?, payout = ?
+    WHERE entry_id = ?
+    """
+    cursor = _execute_write(
+        update_sql, (result, payout, entry_id), caller="update_entry_result"
+    )
+    return cursor is not None and cursor.rowcount > 0
+
+
+def link_bets_to_entry(bet_ids, entry_id):
+    """
+    Link a list of bet IDs to a parlay entry.
+
+    Args:
+        bet_ids (list[int]): Bet IDs to link
+        entry_id (int): Entry ID to link to
+
+    Returns:
+        int: Number of bets linked
+    """
+    linked = 0
+    for bet_id in bet_ids:
+        cursor = _execute_write(
+            "UPDATE bets SET entry_id = ? WHERE bet_id = ?",
+            (entry_id, bet_id),
+            caller="link_bets_to_entry",
+        )
+        if cursor is not None and cursor.rowcount > 0:
+            linked += 1
+    return linked
+
+
+def get_entry_legs(entry_id):
+    """
+    Get all bets (legs) linked to a parlay entry.
+
+    Args:
+        entry_id (int): The entry ID
+
+    Returns:
+        list of dict: Bet rows linked to this entry
+    """
+    select_sql = """
+    SELECT * FROM bets
+    WHERE entry_id = ?
+    ORDER BY created_at ASC
+    """
+    try:
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(select_sql, (entry_id,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+    except sqlite3.Error as database_error:
+        _logger.error(f"Error loading entry legs: {database_error}")
+        return []
+
+
+def resolve_entry_from_legs(entry_id):
+    """
+    Compute and update an entry's result from its linked legs.
+    All legs must be WIN for the entry to be WIN.
+    If any leg is LOSS, entry is LOSS.
+    If all legs resolved and none lost, it's WIN.
+
+    Returns:
+        str or None: The computed result, or None if still pending
+    """
+    legs = get_entry_legs(entry_id)
+    if not legs:
+        return None
+
+    results = [leg.get("result") for leg in legs]
+
+    # If any leg is LOSS, the whole entry is LOSS
+    if "LOSS" in results:
+        update_entry_result(entry_id, "LOSS", payout=0.0)
+        return "LOSS"
+
+    # If all legs have results and none are LOSS
+    if all(r in ("WIN", "PUSH") for r in results):
+        if all(r == "WIN" for r in results):
+            # All legs won — entry is a WIN
+            update_entry_result(entry_id, "WIN")
+            return "WIN"
+        if all(r == "PUSH" for r in results):
+            # All legs pushed — entry is a full PUSH (fee returned)
+            update_entry_result(entry_id, "PUSH", payout=0.0)
+            return "PUSH"
+        # Mix of WIN and PUSH — standard rule: pushed legs are removed,
+        # payout adjusts to lower leg count. Mark as PUSH for manual review.
+        update_entry_result(entry_id, "PUSH", payout=0.0)
+        return "PUSH"
+
+    # Some legs still pending
+    return None
+
+
+def delete_entry(entry_id):
+    """
+    Delete a parlay entry and unlink its legs.
+
+    Returns:
+        tuple[bool, str]: (success, message)
+    """
+    # Unlink legs first
+    _execute_write(
+        "UPDATE bets SET entry_id = NULL WHERE entry_id = ?",
+        (entry_id,),
+        caller="delete_entry_unlink",
+    )
+    cursor = _execute_write(
+        "DELETE FROM entries WHERE entry_id = ?",
+        (entry_id,),
+        caller="delete_entry",
+    )
+    if cursor is not None and cursor.rowcount > 0:
+        return True, f"Entry #{entry_id} deleted."
+    return False, f"Entry #{entry_id} not found."
 
 
 def load_all_bets(limit=10000):
