@@ -280,6 +280,9 @@ _NBA_API_ABBREV_TO_OURS_FALLBACK: dict[str, str] = {
     "PHX": "PHX",  # Phoenix Suns (same)
     "UTA": "UTA",  # Utah Jazz (same)
     "MEM": "MEM",  # Memphis Grizzlies (same)
+    # ESPN aliases
+    "UTAH": "UTA", # ESPN uses UTAH for Utah Jazz
+    "WSH": "WAS",  # ESPN uses WSH for Washington Wizards
 }
 
 
@@ -513,8 +516,51 @@ def _fetch_team_records():
               home_record, away_record, conf_rank}.
               Returns empty dict if all sources fail.
     """
-    # ── nba_api ──────────────────────────────────────────────
     team_records = {}
+
+    # ── DB first ──────────────────────────────────────────────
+    try:
+        from data.etl_data_service import _get_conn
+        conn = _get_conn()
+        if conn is not None:
+            try:
+                rows = conn.execute(
+                    "SELECT t.abbreviation, s.wins, s.losses, "
+                    "       s.str_current_streak, s.home, s.road, "
+                    "       s.playoff_rank "
+                    "FROM Standings s "
+                    "JOIN Teams t ON t.team_id = s.team_id"
+                ).fetchall()
+                for r in rows:
+                    abbrev = str(r["abbreviation"] or "")
+                    if not abbrev:
+                        continue
+                    streak_raw = str(r["str_current_streak"] or "")
+                    if streak_raw and len(streak_raw) >= 2:
+                        streak_dir = streak_raw[0]
+                        streak_num = streak_raw[1:].strip()
+                        streak_display = f"{streak_dir}{streak_num}"
+                    else:
+                        streak_display = ""
+                    home_w, home_l = _parse_win_loss_record(r["home"] or "0-0")
+                    away_w, away_l = _parse_win_loss_record(r["road"] or "0-0")
+                    team_records[abbrev] = {
+                        "wins": int(r["wins"] or 0),
+                        "losses": int(r["losses"] or 0),
+                        "streak": streak_display,
+                        "home_record": f"{home_w}-{home_l}",
+                        "away_record": f"{away_w}-{away_l}",
+                        "conf_rank": int(r["playoff_rank"] or 0),
+                    }
+                if team_records:
+                    _logger.info("_fetch_team_records: loaded %d teams from DB.", len(team_records))
+                    return team_records
+            finally:
+                conn.close()
+    except Exception as db_err:
+        _logger.debug("_fetch_team_records DB fallback failed: %s", db_err)
+
+    # ── nba_api (live API fallback) ───────────────────────────
     try:
         from nba_api.stats.endpoints import leaguestandingsv3
         standings_endpoint = leaguestandingsv3.LeagueStandingsV3(
