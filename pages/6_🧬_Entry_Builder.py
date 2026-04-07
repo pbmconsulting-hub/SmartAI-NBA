@@ -10,6 +10,7 @@ import streamlit as st  # Main UI framework
 import logging
 import html as _html_eb  # HTML escaping – single import for the whole file
 import datetime as _dt
+import math as _math_eb
 
 # Import our entry optimizer engine
 from engine.entry_optimizer import (
@@ -190,8 +191,8 @@ if len(_top_picks) >= 2:
     _PARLAY_CONFIGS = [
         (2, "⭐ Best 2-Leg Parlay"),
         (3, "⭐⭐ Best 3-Leg Parlay"),
-        (4, "⭐⭐ Best 4-Leg Parlay"),
-        (5, "⭐⭐⭐ Best 5-Leg Parlay"),
+        (4, "⭐⭐⭐ Best 4-Leg Parlay"),
+        (5, "⭐⭐⭐⭐ Best 5-Leg Parlay"),
     ]
     for _n, _lbl in _PARLAY_CONFIGS:
         if len(_top_picks) < _n:
@@ -501,12 +502,11 @@ if selected_picks:
             _gauge_val = max(-50, min(50, _ev_roi_raw))
             _gauge_color = "#00ff9d" if _gauge_val >= 0 else "#ff4444"
             # Simple SVG radial gauge
-            import math as _math_gauge
             _angle_min, _angle_max = -135, 135  # sweep range
             _needle_angle = _angle_min + (_gauge_val + 50) / 100 * (_angle_max - _angle_min)
-            _rad = _math_gauge.radians(_needle_angle)
-            _nx = 100 + 60 * _math_gauge.cos(_rad - _math_gauge.pi / 2)
-            _ny = 110 + 60 * _math_gauge.sin(_rad - _math_gauge.pi / 2)
+            _rad = _math_eb.radians(_needle_angle)
+            _nx = 100 + 60 * _math_eb.cos(_rad - _math_eb.pi / 2)
+            _ny = 110 + 60 * _math_eb.sin(_rad - _math_eb.pi / 2)
             st.markdown(
                 f'<div style="text-align:center;margin:8px 0;">'
                 f'<svg width="200" height="130" viewBox="0 0 200 140">'
@@ -787,7 +787,7 @@ if build_button:
         for _he_entry in _show_entries:
             _he_ev_d = format_ev_display(_he_entry["ev_result"], entry_fee)
             st.session_state["entry_history"].append({
-                "timestamp": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "timestamp": _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M"),
                 "legs": _he_entry["picks"],
                 "ev_label": _he_ev_d["ev_label"],
                 "platform": selected_platform,
