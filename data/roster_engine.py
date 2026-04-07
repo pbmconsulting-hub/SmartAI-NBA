@@ -716,25 +716,32 @@ class RosterEngine:
             """Build 'First Last' from a DB player dict."""
             return f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
 
-        # ── DB-first: try loading rosters from the ETL database ──
-        teams_needing_api = list(team_abbrevs or [])
+        # Import DB roster helper once — used in both the bulk pre-check
+        # and the per-team API-failure fallback below.
         try:
             from data.etl_data_service import get_rosters_for_teams as _db_rosters
-            db_result = _db_rosters(teams_needing_api)
-            if db_result:
-                for abbrev_key, players in db_result.items():
-                    abbrev_upper = abbrev_key.upper()
-                    names = [_player_full_name(p) for p in players]
-                    names = [n for n in names if n]
-                    if names:
-                        self._full_rosters[abbrev_upper] = names
-                        _logger.info(f"  RosterEngine DB: {abbrev_upper} → {len(names)} players")
-                teams_needing_api = [
-                    a for a in teams_needing_api
-                    if a.upper() not in self._full_rosters
-                ]
-        except Exception as db_exc:
-            _logger.debug(f"  RosterEngine DB roster lookup failed: {db_exc}")
+        except ImportError:
+            _db_rosters = None  # type: ignore[assignment]
+
+        # ── DB-first: try loading rosters from the ETL database ──
+        teams_needing_api = list(team_abbrevs or [])
+        if _db_rosters is not None:
+            try:
+                db_result = _db_rosters(teams_needing_api)
+                if db_result:
+                    for abbrev_key, players in db_result.items():
+                        abbrev_upper = abbrev_key.upper()
+                        names = [_player_full_name(p) for p in players]
+                        names = [n for n in names if n]
+                        if names:
+                            self._full_rosters[abbrev_upper] = names
+                            _logger.info(f"  RosterEngine DB: {abbrev_upper} → {len(names)} players")
+                    teams_needing_api = [
+                        a for a in teams_needing_api
+                        if a.upper() not in self._full_rosters
+                    ]
+            except Exception as db_exc:
+                _logger.debug(f"  RosterEngine DB roster lookup failed: {db_exc}")
 
         if not teams_needing_api:
             return
@@ -788,17 +795,17 @@ class RosterEngine:
             except Exception as exc:
                 _logger.warning(f"  RosterEngine nba_api error for {abbrev}: {exc}")
                 # ── Final fallback: try DB for this specific team ──
-                try:
-                    from data.etl_data_service import get_rosters_for_teams as _db_rosters_fb
-                    db_fb = _db_rosters_fb([abbrev])
-                    for abbr_key, players in db_fb.items():
-                        names = [_player_full_name(p) for p in players]
-                        names = [n for n in names if n]
-                        if names:
-                            self._full_rosters[abbr_key.upper()] = names
-                            _logger.info(f"  RosterEngine DB fallback: {abbr_key} → {len(names)} players")
-                except Exception as db_fb_exc:
-                    _logger.debug(f"  RosterEngine DB fallback for {abbrev} failed: {db_fb_exc}")
+                if _db_rosters is not None:
+                    try:
+                        db_fb = _db_rosters([abbrev])
+                        for abbr_key, players in db_fb.items():
+                            names = [_player_full_name(p) for p in players]
+                            names = [n for n in names if n]
+                            if names:
+                                self._full_rosters[abbr_key.upper()] = names
+                                _logger.info(f"  RosterEngine DB fallback: {abbr_key} → {len(names)} players")
+                    except Exception as db_fb_exc:
+                        _logger.debug(f"  RosterEngine DB fallback for {abbrev} failed: {db_fb_exc}")
 
     # ----------------------------------------------------------
     # get_team_roster: convenience wrapper for CommonTeamRoster
