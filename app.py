@@ -33,7 +33,7 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 
 # ─── App Logo — Smart Pick Pro ───────────────────────────────
 # Logo is rendered per-page only on key pages (Neural Analysis, Studio,
-# Live Games, Live Scores & Props, Bet Tracker) instead of globally.
+# Live Games, Live Sweat, Bet Tracker) instead of globally.
 _ROOT_LOGO_PATH   = os.path.join(os.path.dirname(__file__), "Smart_Pick_Pro_Logo.png")
 _ASSETS_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
 _LOGO_PATH = _ROOT_LOGO_PATH if os.path.exists(_ROOT_LOGO_PATH) else _ASSETS_LOGO_PATH

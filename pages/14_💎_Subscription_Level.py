@@ -494,7 +494,7 @@ with col_compare:
   </thead>
   <tbody>
     <tr>
-      <td>🏆 Live Scores</td>
+      <td>💦 Live Sweat</td>
       <td><span class="check-yes">✓</span></td>
       <td><span class="check-yes">✓</span></td>
     </tr>

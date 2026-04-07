@@ -750,13 +750,13 @@ class TestLiveSweatPageFile(unittest.TestCase):
     def setUpClass(cls):
         page_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "pages", "5_💦_Live_Sweat.py",
+            "pages", "0_💦_Live_Sweat.py",
         )
         with open(page_path, "r", encoding="utf-8") as f:
             cls.source = f.read()
 
     def test_valid_python_syntax(self):
-        compile(self.source, "5_💦_Live_Sweat.py", "exec")
+        compile(self.source, "0_💦_Live_Sweat.py", "exec")
 
     def test_page_config_present(self):
         self.assertIn("set_page_config", self.source)
