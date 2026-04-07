@@ -50,7 +50,8 @@ def build_news_alert_html(news_item: dict) -> str:
 
     Returns
     -------
-    str   HTML string or empty string if *title* is missing.
+    str
+        HTML string or empty string if *title* is missing.
     """
     title = news_item.get("title", "")
     if not title:
