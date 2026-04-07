@@ -901,3 +901,93 @@ def get_db_counts() -> dict:
         return counts
     finally:
         conn.close()
+
+
+# ── Standings ─────────────────────────────────────────────────────────────────
+
+
+def get_standings() -> list[dict]:
+    """
+    Read current NBA standings from the Standings table.
+
+    Returns a list of dicts with keys: team_abbreviation, conference,
+    conference_rank, wins, losses, win_pct, streak, last_10.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT t.abbreviation AS team_abbreviation,
+                   s.conference,
+                   s.playoff_rank AS conference_rank,
+                   s.wins,
+                   s.losses,
+                   s.win_pct,
+                   s.str_current_streak AS streak,
+                   s.l10 AS last_10
+            FROM Standings s
+            JOIN Teams t ON t.team_id = s.team_id
+            """
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.warning("get_standings failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+# ── Roster helpers ────────────────────────────────────────────────────────────
+
+
+def get_rosters_for_teams(team_abbrevs: list[str]) -> dict[str, list[dict]]:
+    """
+    Return rosters from Team_Roster + Players for the given team abbreviations.
+
+    Returns ``{team_abbrev: [player_dict, ...]}``.
+    Each player_dict has: player_id, first_name, last_name,
+    team_abbreviation, position.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        result: dict[str, list[dict]] = {}
+        for abbrev in (team_abbrevs or []):
+            rows = conn.execute(
+                """
+                SELECT p.player_id, p.first_name, p.last_name,
+                       p.team_abbreviation, p.position
+                FROM Team_Roster tr
+                JOIN Players p ON p.player_id = tr.player_id
+                JOIN Teams   t ON t.team_id   = tr.team_id
+                WHERE t.abbreviation = ?
+                """,
+                (abbrev.upper(),),
+            ).fetchall()
+            result[abbrev.upper()] = _rows_to_dicts(rows)
+        return result
+    except Exception as exc:
+        _logger.warning("get_rosters_for_teams failed: %s", exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_players_for_teams(team_abbrevs: list[str]) -> list[dict]:
+    """
+    Return players (with season averages) filtered to only the given teams.
+
+    Same schema as :func:`get_all_players` but limited to players whose
+    ``team_abbreviation`` is in *team_abbrevs*.
+    """
+    all_players = get_all_players()
+    if not all_players or not team_abbrevs:
+        return all_players
+    upper_abbrevs = {a.upper() for a in team_abbrevs}
+    return [
+        p for p in all_players
+        if (p.get("team_abbreviation") or "").upper() in upper_abbrevs
+    ]

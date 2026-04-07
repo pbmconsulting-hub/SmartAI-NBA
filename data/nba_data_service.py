@@ -103,11 +103,121 @@ from data.live_data_fetcher import (
 
 
 # ============================================================
-# Public API — name-compatible wrappers around live_data_fetcher
+# ETL DB helpers — DB-first, API-fallback
+# ============================================================
+
+try:
+    from data.etl_data_service import is_db_available as _is_db_available
+except ImportError:
+    def _is_db_available():          # type: ignore[misc]
+        return False
+
+# Build a reverse lookup: abbreviation → team full name
+_ABBREVIATION_TO_TEAM_NAME: dict[str, str] = {
+    v: k for k, v in TEAM_NAME_TO_ABBREVIATION.items()
+}
+
+
+def _normalize_db_games(db_games: list[dict]) -> list[dict]:
+    """
+    Convert ETL DB game dicts to the format Streamlit pages expect.
+
+    DB format:  {game_id, game_date, matchup, home_score, away_score}
+    App format: {game_id, game_date, home_team, away_team,
+                 home_team_name, away_team_name, vegas_spread, game_total, ...}
+    """
+    normalised: list[dict] = []
+    for g in (db_games or []):
+        matchup = g.get("matchup", "") or ""
+        away_team = ""
+        home_team = ""
+
+        # Parse matchup: "ATL vs. NYK" or "ATL @ NYK"
+        for sep in (" vs. ", " vs ", " @ "):
+            if sep in matchup:
+                parts = matchup.split(sep, 1)
+                away_team = parts[0].strip()
+                home_team = parts[1].strip()
+                break
+
+        normalised.append({
+            "game_id":        str(g.get("game_id", "")),
+            "game_date":      str(g.get("game_date", "")),
+            "home_team":      home_team,
+            "away_team":      away_team,
+            "home_team_name": _ABBREVIATION_TO_TEAM_NAME.get(home_team, home_team),
+            "away_team_name": _ABBREVIATION_TO_TEAM_NAME.get(away_team, away_team),
+            "matchup":        matchup,
+            "home_score":     g.get("home_score", 0),
+            "away_score":     g.get("away_score", 0),
+            "vegas_spread":   g.get("vegas_spread", DEFAULT_VEGAS_SPREAD),
+            "game_total":     g.get("game_total", DEFAULT_GAME_TOTAL),
+        })
+    return normalised
+
+
+def _normalize_db_player(p: dict) -> dict:
+    """
+    Convert an ETL DB player dict to the CSV-format keys the engine expects.
+
+    DB keys:  first_name, last_name, team_abbreviation, ppg, rpg, apg, …
+    App keys: name, team, points_avg, rebounds_avg, assists_avg, …
+    """
+    return {
+        "player_id":       p.get("player_id"),
+        "name":            f"{p.get('first_name', '')} {p.get('last_name', '')}".strip(),
+        "team":            p.get("team_abbreviation", ""),
+        "position":        p.get("position") or "",
+        "gp":              p.get("gp", 0),
+        # Season averages
+        "points_avg":      p.get("ppg", 0.0),
+        "rebounds_avg":    p.get("rpg", 0.0),
+        "assists_avg":     p.get("apg", 0.0),
+        "steals_avg":      p.get("spg", 0.0),
+        "blocks_avg":      p.get("bpg", 0.0),
+        "turnovers_avg":   p.get("topg", 0.0),
+        "minutes_avg":     p.get("mpg", 0.0),
+        "threes_avg":      p.get("fg3_avg", 0.0),
+        "ftm_avg":         p.get("ftm_avg", 0.0),
+        "fta_avg":         p.get("fta_avg", 0.0),
+        "ft_pct":          p.get("ft_pct_avg", 0.0),
+        "fgm_avg":         p.get("fgm_avg", 0.0),
+        "fga_avg":         p.get("fga_avg", 0.0),
+        "fg_pct":          p.get("fg_pct_avg", 0.0),
+        "oreb_avg":        p.get("oreb_avg", 0.0),
+        "dreb_avg":        p.get("dreb_avg", 0.0),
+        "pf_avg":          p.get("pf_avg", 0.0),
+        "plus_minus_avg":  p.get("plus_minus_avg", 0.0),
+        # Standard deviations — pass through
+        "points_std":      p.get("points_std", 0.0),
+        "rebounds_std":    p.get("rebounds_std", 0.0),
+        "assists_std":     p.get("assists_std", 0.0),
+        "threes_std":      p.get("threes_std", 0.0),
+        "steals_std":      p.get("steals_std", 0.0),
+        "blocks_std":      p.get("blocks_std", 0.0),
+        "turnovers_std":   p.get("turnovers_std", 0.0),
+        "ftm_std":         p.get("ftm_std", 0.0),
+        "oreb_std":        p.get("oreb_std", 0.0),
+        "plus_minus_std":  p.get("plus_minus_std", 0.0),
+    }
+
+
+# ============================================================
+# Public API — DB-first, API-fallback wrappers
 # ============================================================
 
 def get_todays_games():
-    """Retrieve tonight's NBA games via nba_api."""
+    """Retrieve tonight's NBA games — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.etl_data_service import get_todays_games as _db_get_games
+            db_result = _db_get_games()
+            if db_result:
+                _logger.info("get_todays_games: loaded %d game(s) from DB", len(db_result))
+                return _normalize_db_games(db_result)
+        except Exception as exc:
+            _logger.debug("get_todays_games DB path failed: %s", exc)
+
     result = _ldf_fetch_todays_games()
     if not result:
         _logger.warning("get_todays_games: all sources returned no games")
@@ -116,7 +226,30 @@ def get_todays_games():
 
 def get_todays_players(todays_games, progress_callback=None,
                        precomputed_injury_map=None):
-    """Retrieve players for tonight's games via nba_api."""
+    """Retrieve players for tonight's games — DB first, then live API."""
+    if _is_db_available() and todays_games:
+        try:
+            from data.etl_data_service import get_players_for_teams as _db_get_players
+
+            team_abbrevs = set()
+            for g in todays_games:
+                for key in ("home_team", "away_team"):
+                    t = str(g.get(key, "")).upper().strip()
+                    if t:
+                        team_abbrevs.add(t)
+
+            if team_abbrevs:
+                db_players = _db_get_players(list(team_abbrevs))
+                if db_players:
+                    normalised = [_normalize_db_player(p) for p in db_players]
+                    _logger.info(
+                        "get_todays_players: loaded %d player(s) from DB for %d team(s)",
+                        len(normalised), len(team_abbrevs),
+                    )
+                    return normalised
+        except Exception as exc:
+            _logger.debug("get_todays_players DB path failed: %s", exc)
+
     return _ldf_fetch_todays_players(
         todays_games,
         progress_callback=progress_callback,
@@ -133,17 +266,48 @@ def get_player_recent_form(player_id, last_n_games=10):
 
 
 def get_player_stats(progress_callback=None):
-    """Retrieve all active player season stats via nba_api."""
+    """Retrieve all active player season stats — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.etl_data_service import get_all_players as _db_get_all
+            db_players = _db_get_all()
+            if db_players:
+                normalised = [_normalize_db_player(p) for p in db_players]
+                _logger.info("get_player_stats: loaded %d player(s) from DB", len(normalised))
+                return normalised
+        except Exception as exc:
+            _logger.debug("get_player_stats DB path failed: %s", exc)
+
     return _ldf_fetch_player_stats(progress_callback=progress_callback)
 
 
 def get_team_stats(progress_callback=None):
-    """Retrieve team-level stats via nba_api."""
+    """Retrieve team-level stats — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.etl_data_service import get_all_teams as _db_get_teams
+            db_teams = _db_get_teams()
+            if db_teams:
+                _logger.info("get_team_stats: loaded %d team(s) from DB", len(db_teams))
+                return db_teams
+        except Exception as exc:
+            _logger.debug("get_team_stats DB path failed: %s", exc)
+
     return _ldf_fetch_team_stats(progress_callback=progress_callback)
 
 
 def get_defensive_ratings(force=False, progress_callback=None):
-    """Retrieve defensive ratings via nba_api."""
+    """Retrieve defensive ratings — DB first, then live API."""
+    if not force and _is_db_available():
+        try:
+            from data.etl_data_service import get_all_defense_vs_position as _db_get_dvp
+            db_dvp = _db_get_dvp()
+            if db_dvp:
+                _logger.info("get_defensive_ratings: loaded %d row(s) from DB", len(db_dvp))
+                return db_dvp
+        except Exception as exc:
+            _logger.debug("get_defensive_ratings DB path failed: %s", exc)
+
     return _ldf_fetch_defensive_ratings(
         force=force, progress_callback=progress_callback,
     )
@@ -167,12 +331,23 @@ def get_all_data(progress_callback=None, targeted=False, todays_games=None):
 
 
 def get_all_todays_data(progress_callback=None):
-    """One-click: retrieve games → players → props for tonight."""
+    """One-click: retrieve games → players → props for tonight (DB-first sub-calls)."""
     return _ldf_fetch_all_todays_data(progress_callback=progress_callback)
 
 
 def get_active_rosters(team_abbrevs=None, progress_callback=None):
-    """Retrieve active rosters for specified teams via nba_api."""
+    """Retrieve active rosters — DB first, then live API."""
+    if _is_db_available() and team_abbrevs:
+        try:
+            from data.etl_data_service import get_rosters_for_teams as _db_get_rosters
+            db_rosters = _db_get_rosters(list(team_abbrevs))
+            if db_rosters and any(db_rosters.values()):
+                _logger.info("get_active_rosters: loaded rosters for %d team(s) from DB",
+                             sum(1 for v in db_rosters.values() if v))
+                return db_rosters
+        except Exception as exc:
+            _logger.debug("get_active_rosters DB path failed: %s", exc)
+
     return _ldf_fetch_active_rosters(
         team_abbrevs=team_abbrevs,
         progress_callback=progress_callback,
@@ -186,13 +361,25 @@ def get_active_rosters(team_abbrevs=None, progress_callback=None):
 
 def get_standings(progress_callback=None) -> list:
     """
-    Retrieve current NBA standings.
+    Retrieve current NBA standings — DB first, then live API.
 
-    Tries nba_api LeagueStandingsV3.
     Returns an empty list on failure.
     """
     if progress_callback:
         progress_callback(0, 10, "Retrieving NBA standings…")
+
+    # ── DB first ─────────────────────────────────────────────
+    if _is_db_available():
+        try:
+            from data.etl_data_service import get_standings as _db_get_standings
+            db_standings = _db_get_standings()
+            if db_standings:
+                _logger.info("get_standings: loaded %d row(s) from DB", len(db_standings))
+                if progress_callback:
+                    progress_callback(10, 10, f"Standings loaded ({len(db_standings)} teams).")
+                return db_standings
+        except Exception as exc:
+            _logger.debug("get_standings DB path failed: %s", exc)
 
     # ── nba_api ──────────────────────────────────────────────
     try:
