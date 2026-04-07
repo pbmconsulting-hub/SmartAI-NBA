@@ -105,7 +105,8 @@ def _parse_game_date(raw: str):
     data source supplied the log row.
 
     Returns:
-        ``datetime.date`` on success, ``None`` on failure.
+        ``datetime.date`` on success, ``None`` when *raw* is empty/None
+        or does not match any known format.
     """
     if not raw:
         return None
