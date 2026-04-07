@@ -125,8 +125,8 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
 
     # Primary extraction produced a merged-header format (e.g. 2 columns
     # named "Injury Report: …") or no data at all.  Try alternative strategies.
-    for strategy_label, settings in [
-        ("text-based", _fallback_settings),
+    for settings in [
+        _fallback_settings,
     ]:
         fb_header: list | None = None
         fb_rows: list[list] = []
