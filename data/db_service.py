@@ -953,6 +953,9 @@ _NBA_API_ABBREV_TO_OURS_FALLBACK: dict[str, str] = {
     "PHX": "PHX",
     "UTA": "UTA",
     "MEM": "MEM",
+    # ESPN aliases
+    "UTAH": "UTA",
+    "WSH": "WAS",
 }
 
 

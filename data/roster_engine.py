@@ -261,6 +261,8 @@ class RosterEngine:
         'ORL': '1610612753', 'PHI': '1610612755', 'PHX': '1610612756',
         'POR': '1610612757', 'SAC': '1610612758', 'SAS': '1610612759',
         'TOR': '1610612761', 'UTA': '1610612762', 'WAS': '1610612764',
+        # ESPN aliases
+        'UTAH': '1610612762', 'WSH': '1610612764',
     }
 
     def __init__(self):
@@ -498,7 +500,11 @@ class RosterEngine:
         def _cdn_fetch():
             resp = _requests.get(
                 "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
-                headers=_CDN_HEADERS,
+                headers={
+                    **_CDN_HEADERS,
+                    "Origin": "https://www.nba.com",
+                    "Referer": "https://www.nba.com/",
+                },
                 timeout=10,
             )
             resp.raise_for_status()
@@ -526,20 +532,30 @@ class RosterEngine:
         # ── Source 2: stats.nba.com leagueinjuries (with circuit breaker) ────
         def _stats_fetch():
             _current_season = _current_nba_season()
-            _url = f"https://stats.nba.com/stats/leagueinjuries?LeagueID=00&Season={_current_season}"
-            resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
-            resp2.raise_for_status()
-            data2 = resp2.json()
-            injured_list2 = (
-                data2.get("resultSets", [{}])[0].get("rowSet", [])
-                if data2.get("resultSets")
-                else data2.get("players", [])
-            )
-            if data2.get("resultSets") and data2["resultSets"][0].get("headers"):
-                headers = data2["resultSets"][0]["headers"]
-                rows    = data2["resultSets"][0].get("rowSet", [])
-                injured_list2 = [dict(zip(headers, row)) for row in rows]
-            return _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
+            # Try the known URL variants
+            urls = [
+                f"https://stats.nba.com/stats/leagueinjuries?LeagueID=00&Season={_current_season}",
+                f"https://stats.nba.com/stats/playerindex?LeagueID=00&Season={_current_season}&InjuredOnly=Y",
+            ]
+            last_exc = None
+            for _url in urls:
+                try:
+                    resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
+                    resp2.raise_for_status()
+                    data2 = resp2.json()
+                    injured_list2 = (
+                        data2.get("resultSets", [{}])[0].get("rowSet", [])
+                        if data2.get("resultSets")
+                        else data2.get("players", [])
+                    )
+                    if data2.get("resultSets") and data2["resultSets"][0].get("headers"):
+                        headers = data2["resultSets"][0]["headers"]
+                        rows    = data2["resultSets"][0].get("rowSet", [])
+                        injured_list2 = [dict(zip(headers, row)) for row in rows]
+                    return _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
+                except Exception as _url_exc:
+                    last_exc = _url_exc
+            raise last_exc  # re-raise so the outer handler catches it
 
         try:
             if _stats_circuit is not None:
@@ -578,6 +594,8 @@ class RosterEngine:
                 if result3:
                     _logger.info(f"  RosterEngine._fetch_nba_api_injuries: nba_api source returned {len(result3)} players")
                     return result3
+        except ImportError:
+            _logger.debug("  nba_api injuries endpoint not available in this version")
         except Exception as exc3:
             _logger.info(f"  RosterEngine._fetch_nba_api_injuries nba_api: {exc3}")
 
@@ -661,7 +679,13 @@ class RosterEngine:
                         _logger.debug("  RosterEngine._fetch_nba_api_injuries: Injury_Status table not found")
                     else:
                         _inj_rows = _db.execute(
-                            "SELECT player_name, status, injury, team FROM Injury_Status"
+                            "SELECT p.full_name  AS player_name, "
+                            "       i.status, "
+                            "       i.reason     AS injury, "
+                            "       t.abbreviation AS team "
+                            "FROM Injury_Status i "
+                            "JOIN Players p ON p.player_id = i.player_id "
+                            "LEFT JOIN Teams t ON t.team_id = i.team_id"
                         ).fetchall()
                         if _inj_rows:
                             result6: dict = {}
@@ -702,6 +726,55 @@ class RosterEngine:
         on two-way contracts who are on G-League assignment are flagged
         as inactive so they are excluded from tonight's active roster.
         """
+        # ── DB first ──────────────────────────────────────────
+        db_hit = False
+        try:
+            from data.etl_data_service import _get_conn
+            conn = _get_conn()
+            if conn is not None:
+                try:
+                    for abbrev in (team_abbrevs or []):
+                        rows = conn.execute(
+                            "SELECT p.full_name, tr.is_two_way "
+                            "FROM Team_Roster tr "
+                            "JOIN Players p ON p.player_id = tr.player_id "
+                            "JOIN Teams  t ON t.team_id   = tr.team_id "
+                            "WHERE t.abbreviation = ? "
+                            "  AND tr.effective_end_date IS NULL",
+                            (abbrev.upper(),),
+                        ).fetchall()
+                        if rows:
+                            all_players = []
+                            for r in rows:
+                                name = str(r["full_name"] or "")
+                                if not name:
+                                    continue
+                                all_players.append(name)
+                                if r["is_two_way"]:
+                                    key = _normalize_name(name)
+                                    existing = self._injury_map.get(key, {})
+                                    if _severity(existing.get("status", "Active")) < _severity("G League - Two-Way"):
+                                        self._injury_map[key] = {
+                                            "status":      "G League - Two-Way",
+                                            "injury":      "Two-way contract",
+                                            "team":        abbrev.upper(),
+                                            "return_date": "",
+                                            "source":      "db-roster",
+                                        }
+                            self._full_rosters[abbrev.upper()] = all_players
+                            db_hit = True
+                            _logger.info("  RosterEngine DB: %s → %d players", abbrev, len(all_players))
+                finally:
+                    conn.close()
+            if db_hit and all(
+                a.upper() in self._full_rosters for a in (team_abbrevs or [])
+            ):
+                _logger.info("RosterEngine: all %d teams loaded from DB.", len(team_abbrevs or []))
+                return
+        except Exception as db_err:
+            _logger.debug("RosterEngine DB roster fallback failed: %s", db_err)
+
+        # ── Live API fallback ─────────────────────────────────
         try:
             from nba_api.stats.endpoints import CommonTeamRoster
             from nba_api.stats.static import teams as nba_static_teams

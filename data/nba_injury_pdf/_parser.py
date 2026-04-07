@@ -93,6 +93,9 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
                     if header is None:
                         # First non-empty row across the whole document = header
                         if any(cleaned):
+                            # Check if this is a title row (new format) rather than the real header
+                            if len(cleaned) <= 2 and any("Injury Report" in c for c in cleaned):
+                                continue  # Skip the title row, wait for the real header
                             header = cleaned
                     else:
                         # Skip repeated header rows
@@ -115,12 +118,20 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
 
 
 def validate_columns(df: pd.DataFrame) -> bool:
-    """Check that all expected columns are present in the DataFrame.
+    """Check that expected columns are present in the DataFrame.
+
+    Returns ``True`` if **all** expected columns are present, or at least
+    the critical subset (Team, Player Name, Current Status) is present so
+    the parser can degrade gracefully when the NBA adds/removes columns.
 
     Args:
         df: The DataFrame to validate.
 
     Returns:
-        ``True`` if all ``EXPECTED_COLUMNS`` are present; ``False`` otherwise.
+        ``True`` if columns are sufficient; ``False`` otherwise.
     """
-    return all(col in df.columns for col in EXPECTED_COLUMNS)
+    if all(col in df.columns for col in EXPECTED_COLUMNS):
+        return True
+    # Degrade gracefully: accept if the critical columns are present
+    critical = {"Team", "Player Name", "Current Status"}
+    return critical.issubset(set(df.columns))
