@@ -539,8 +539,10 @@ def compile_card_matrix(results, max_cards=None):
     # Join into a single master HTML string with CSS Grid wrapper
     master_html = (
         f"<style>{QUANTUM_CARD_MATRIX_CSS}</style>"
+        f'<div class="qcm-grid-container">'
         f'<div class="qcm-grid">'
         f'{"".join(card_strings)}'
+        f"</div>"
         f"</div>"
     )
 
@@ -1001,7 +1003,9 @@ def build_unified_player_card_html(player_name, vitals, props,
     card_strings = [_build_single_card_html(p, i) for i, p in enumerate(props)]
     body_html = (
         f'<div class="upc-body">'
+        f'<div class="qcm-grid-container">'
         f'<div class="qcm-grid">{"".join(card_strings)}</div>'
+        f'</div>'
         f'{joseph_html}'
         f'</div>'
     )
