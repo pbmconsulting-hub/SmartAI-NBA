@@ -139,6 +139,8 @@ _RATE_LIMIT_DELAY = 0.35             # Seconds between API calls (rate-limit).
 _PLAYER_WORKERS = 12                 # Concurrent threads for per-player fetches.
 _GAME_WORKERS = 3                    # Concurrent threads for per-game fetches.
 _BOX_SCORE_TYPE_WORKERS = 5          # Concurrent threads for box-score types within one game.
+_ADAPTIVE_COOLDOWN_DELAY = 5         # Seconds to pause every 100 players (adaptive cooldown).
+_POST_ETL_COOLDOWN = 5               # Seconds to pause after full ETL before live API calls.
 _MAX_BACKOFF_DELAY = 30              # Cap on exponential back-off delay (seconds).
 _LOG_PROGRESS_INTERVAL = 50          # Log a progress line every N items.
 
@@ -1542,9 +1544,8 @@ def populate_player_career_stats(
                 logger.info("  … career stats: %d / %d players processed.", done, len(player_ids))
             # Adaptive cooldown every 100 players to let API throttling reset
             if done % 100 == 0 and done < len(player_ids):
-                _cooldown = 5
-                logger.info("  … adaptive cooldown: pausing %ds after %d players.", _cooldown, done)
-                time.sleep(_cooldown)
+                logger.info("  … adaptive cooldown: pausing %ds after %d players.", _ADAPTIVE_COOLDOWN_DELAY, done)
+                time.sleep(_ADAPTIVE_COOLDOWN_DELAY)
 
     # Final progress log if the last batch wasn't on a log interval boundary
     if done % _LOG_PROGRESS_INTERVAL != 0:
@@ -2077,7 +2078,7 @@ def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> dict:
             p_count, g_count, l_count,
         )
         # Allow NBA API rate-limit window to reset before the app makes live calls
-        time.sleep(5)
+        time.sleep(_POST_ETL_COOLDOWN)
         return {
             "players_inserted": p_count,
             "games_inserted": g_count,

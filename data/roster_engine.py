@@ -555,7 +555,9 @@ class RosterEngine:
                     return _parse_injured_list(injured_list2, "nba-stats-leagueinjuries")
                 except Exception as _url_exc:
                     last_exc = _url_exc
-            raise last_exc  # re-raise so the outer handler catches it
+            if last_exc is not None:
+                raise last_exc
+            raise RuntimeError("No stats.nba.com injury URLs configured")
 
         try:
             if _stats_circuit is not None:

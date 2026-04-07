@@ -93,7 +93,8 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
                     if header is None:
                         # First non-empty row across the whole document = header
                         if any(cleaned):
-                            # Check if this is a title row (new format) rather than the real header
+                            # New NBA format uses ≤2 merged columns for the report title
+                            # (e.g. "Injury Report: 04/07/26 05:00 PM") — skip to real header
                             if len(cleaned) <= 2 and any("Injury Report" in c for c in cleaned):
                                 continue  # Skip the title row, wait for the real header
                             header = cleaned
