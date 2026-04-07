@@ -8,37 +8,361 @@ and directional force analysis. All math is built from scratch — no external l
 
 ---
 
+## 🐍 Supported Python Versions
+
+| Python Version | Status |
+|----------------|--------|
+| **3.11** | ✅ Fully supported — **recommended** |
+| **3.12** | ✅ Fully supported |
+| **3.13** | ✅ Supported |
+| **3.14+** | ❌ **Not supported** — many packages (pandas, numpy, catboost, etc.) do not have pre-built wheels yet. You will get build errors. |
+| **3.9 and below** | ❌ Not supported — missing required language features |
+
+> **⚠️ If you are on Python 3.14:** You MUST downgrade. See [Step 1](#step-1-install-python) below.
+
+---
+
 ## 🚀 Quick Start (Complete Beginner Guide)
 
-### Step 1: Make Sure Python is Installed
+Follow every step below **in order**. Do not skip any steps.
 
-1. Open your terminal (Mac: search "Terminal", Windows: search "Command Prompt" or "PowerShell")
-2. Type: `python --version` and press Enter
-3. You should see something like `Python 3.10.x` or higher
-4. If you see an error, download Python from [python.org](https://python.org) and install it
+### Step 1: Install Python
 
-### Step 2: Navigate to the App Folder
+You need **Python 3.11 or 3.12** (recommended). Python 3.13 also works. **Do NOT use Python 3.14** — it will fail.
 
-In your terminal, type:
+#### How to check if Python is already installed
+
+Open a terminal and try **all three** commands below. At least one should work:
+
+| Command | When it works |
+|---------|---------------|
+| `python --version` | Most Windows installs, some Mac/Linux |
+| `python3 --version` | Most Mac and Linux installs |
+| `py --version` | Windows Python Launcher (installed with Python on Windows) |
+
+You should see output like `Python 3.11.9` or `Python 3.12.4`.
+
+> **💡 Which command worked for you?** Remember it — you'll use that same command prefix throughout this guide.
+> For example, if `python3 --version` worked, you'll use `python3` everywhere below.
+
+#### If Python is not installed (or you need to downgrade from 3.14)
+
+<details>
+<summary><strong>🪟 Windows</strong></summary>
+
+1. Go to [python.org/downloads](https://www.python.org/downloads/)
+2. Download **Python 3.12.x** (click the yellow "Download Python 3.12.x" button)
+3. Run the installer
+4. **✅ IMPORTANT:** Check the box that says **"Add python.exe to PATH"** at the bottom of the first screen
+5. Click **"Install Now"**
+6. After installation, **close and reopen** your terminal (PowerShell or Command Prompt)
+7. Verify: run `python --version` or `py --version` — you should see `Python 3.12.x`
+
+> **Already have Python 3.14 installed?** You can install 3.12 alongside it. Use `py -3.12` to specifically use Python 3.12:
+> ```powershell
+> py -3.12 --version       # Should show Python 3.12.x
+> py -3.12 -m venv .venv   # Create venv with Python 3.12
+> ```
+
+</details>
+
+<details>
+<summary><strong>🍎 macOS</strong></summary>
+
+**Option A — Homebrew (recommended if you have Homebrew):**
 ```bash
-cd path/to/SmartAI-NBA
+brew install python@3.12
 ```
 
-Replace `path/to/SmartAI-NBA` with the actual folder path (e.g., `cd ~/Downloads/SmartAI-NBA`).
+**Option B — Official installer:**
+1. Go to [python.org/downloads](https://www.python.org/downloads/)
+2. Download **Python 3.12.x** for macOS
+3. Run the `.pkg` installer
+4. After installation, close and reopen your terminal
+5. Verify: `python3 --version` should show `Python 3.12.x`
 
-### Step 3: Install Dependencies
+</details>
 
+<details>
+<summary><strong>🐧 Linux (Ubuntu / Debian)</strong></summary>
+
+```bash
+sudo apt update
+sudo apt install python3.12 python3.12-venv python3-pip
+```
+
+Verify: `python3.12 --version` should show `Python 3.12.x`
+
+</details>
+
+---
+
+### Step 2: Open a Terminal
+
+| Operating System | How to open a terminal |
+|------------------|------------------------|
+| **Windows** | Press `Win + R`, type `powershell`, press Enter. Or search "PowerShell" in the Start menu. |
+| **macOS** | Press `Cmd + Space`, type `Terminal`, press Enter. |
+| **Linux** | Press `Ctrl + Alt + T`, or search "Terminal" in your applications. |
+
+---
+
+### Step 3: Navigate to the App Folder
+
+Use the `cd` command to go to the folder where you downloaded/extracted SmartAI-NBA.
+
+**Windows examples:**
+```powershell
+cd C:\Users\YourName\Downloads\SmartAI-NBA
+# or
+cd "$env:USERPROFILE\Documents\SmartAI-NBA"
+```
+
+**Mac / Linux examples:**
+```bash
+cd ~/Downloads/SmartAI-NBA
+# or
+cd ~/Documents/SmartAI-NBA
+```
+
+> **💡 Tip:** You can drag the folder from File Explorer / Finder into the terminal window to paste the full path.
+
+---
+
+### Step 4: Create a Virtual Environment (Recommended)
+
+A virtual environment keeps this project's packages separate from your system Python. This prevents version conflicts.
+
+Pick the command that matches your system:
+
+**Windows (PowerShell) — using `python`:**
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+**Windows (PowerShell) — using `py`:**
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+**Windows (Command Prompt) — using `python`:**
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+**Windows (Command Prompt) — using `py`:**
+```cmd
+py -3.12 -m venv .venv
+.venv\Scripts\activate.bat
+```
+
+**macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+> **✅ How to tell it worked:** Your terminal prompt should now start with `(.venv)`.
+> Example: `(.venv) PS C:\Users\YourName\SmartAI-NBA>`
+
+> **⚠️ PowerShell execution policy error?** If you see "running scripts is disabled on this system", run this first:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+> Then try the activate command again.
+
+> **📌 Every time you open a new terminal** to work on this project, you must activate the virtual environment again using the same activate command above.
+
+---
+
+### Step 5: Install Dependencies
+
+With your virtual environment activated (you should see `(.venv)` in your prompt), run:
+
+**Windows (PowerShell or CMD):**
+```powershell
+pip install -r requirements.txt
+```
+
+**macOS / Linux:**
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 4: Run the App
+> **💡 If `pip` is not found**, try one of these instead:
+> ```bash
+> python -m pip install -r requirements.txt
+> python3 -m pip install -r requirements.txt
+> py -m pip install -r requirements.txt
+> ```
+
+This will install all 22 packages needed by the app. It may take 2–5 minutes.
+
+#### ❌ Common installation errors and fixes
+
+<details>
+<summary><strong>ERROR: "metadata-generation-failed" for pandas / numpy / catboost</strong></summary>
+
+This means pip is trying to **build from source** because no pre-built wheel exists for your Python version.
+
+**Fix:** You are on Python 3.14 (or another unsupported version). You MUST use Python 3.11 or 3.12.
+
+Check your version:
+```bash
+python --version
+```
+
+If it says 3.14, go back to [Step 1](#step-1-install-python) and install Python 3.12. Then recreate the virtual environment:
+
+```powershell
+# Delete old venv and recreate with the right Python
+# Windows:
+rmdir /s /q .venv
+py -3.12 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# Mac/Linux:
+rm -rf .venv
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>ERROR: "Could not find vswhere.exe" / Meson build error</strong></summary>
+
+Same root cause as above — pip is trying to compile C code because there's no pre-built wheel for your Python version.
+
+**Fix:** Switch to Python 3.11 or 3.12 (see steps above). You do NOT need to install Visual Studio Build Tools.
+
+</details>
+
+<details>
+<summary><strong>ERROR: "pip: command not found" or "'pip' is not recognized"</strong></summary>
+
+**Fix:** Use the module form of pip instead:
+```bash
+python -m pip install -r requirements.txt
+# or
+python3 -m pip install -r requirements.txt
+# or (Windows)
+py -m pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>ERROR: "Permission denied" on Mac/Linux</strong></summary>
+
+**Do NOT use `sudo pip install`**. Instead, make sure you're in a virtual environment (see Step 4).
+
+If you're in a venv and still getting permission errors:
+```bash
+pip install --user -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>WARNING: "running scripts is disabled" in PowerShell</strong></summary>
+
+Run this once and then retry:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+</details>
+
+---
+
+### Step 6: First-Run Setup (Bootstrap the Database)
+
+Before launching the app for the first time, run the bootstrap script to pull NBA data and build the local database:
+
+```bash
+python bootstrap.py
+```
+
+> **💡** This script pulls the full 2025-26 season data and builds the prediction pipeline. It may take 10-20 minutes on the first run. Let it finish — don't close the terminal.
+
+> **💡** If `python` doesn't work, use `python3` or `py` — whichever worked in Step 1.
+
+---
+
+### Step 7: Run the App
 
 ```bash
 streamlit run app.py
 ```
 
-Your browser will automatically open to `http://localhost:8501` with the app running!
+> **💡** If `streamlit` is not recognized, try:
+> ```bash
+> python -m streamlit run app.py
+> python3 -m streamlit run app.py
+> py -m streamlit run app.py
+> ```
+
+Your browser will automatically open to **http://localhost:8501** with the app running! 🎉
+
+---
+
+### Step 8: Load Live Data
+
+Once the app is running:
+
+1. Go to the **⚙️ Settings** page (page 13) and enter your API keys (if you have them)
+2. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
+3. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
+4. Go to **⚡ Quantum Analysis Matrix** (page 3) and click **Run Analysis**
+
+---
+
+## 🔁 Daily Workflow (After Initial Setup)
+
+Every time you want to use the app:
+
+```bash
+# 1. Open a terminal and navigate to the project folder
+cd path/to/SmartAI-NBA
+
+# 2. Activate the virtual environment
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Windows CMD:
+.venv\Scripts\activate.bat
+# Mac/Linux:
+source .venv/bin/activate
+
+# 3. Run the app
+streamlit run app.py
+```
+
+Then in the browser:
+1. Click **📡 Live Games** → **⚡ One-Click Setup**
+2. Click **⚡ Quantum Analysis Matrix** → **Run Analysis**
+3. Review your picks!
+
+---
+
+## 🐳 Docker (Alternative Setup)
+
+If you have Docker installed, you can skip all Python setup:
+
+```bash
+# Clone the repo and cd into it, then:
+cp .env.example .env
+# Edit .env with your API keys
+
+docker compose up --build
+```
+
+The app will be available at **http://localhost:8501** and the API at **http://localhost:8000**.
 
 ---
 
@@ -300,19 +624,16 @@ prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
 
 ### Setup
 
-1. Install all dependencies:
-```bash
-pip install -r requirements.txt
-```
-2. Run the app: `streamlit run app.py`
-
-**Alternative — file-based keys (persistent across sessions):**
-```bash
-cp .streamlit/secrets.toml.example .streamlit/secrets.toml
-# Edit .streamlit/secrets.toml and replace the placeholder values with your real keys
-```
-4. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
-5. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
+1. Install all dependencies (see [Quick Start](#-quick-start-complete-beginner-guide) above)
+2. Run `python bootstrap.py` to build the local database
+3. Run `streamlit run app.py`
+4. Optionally configure API keys:
+   ```bash
+   cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+   # Edit .streamlit/secrets.toml and replace the placeholder values with your real keys
+   ```
+5. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
+6. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
 
 ### When to Update
 
@@ -330,15 +651,6 @@ cp .streamlit/secrets.toml.example .streamlit/secrets.toml
 | Tonight's games + spreads/totals | API-NBA API + Odds API | Session state |
 | Live prop lines | The Odds API (15+ books) | Session state |
 | Defensive ratings by position | Calculated from team DRTG | `data/defensive_ratings.csv` |
-
-### Live Data
-
-The app is designed to work with live data pulled from real APIs.
-On first run, no player data will be loaded — go to **📡 Data Feed** and click
-**Smart Update** to pull tonight's rosters and stats.
-
-After running an update, the CSVs are written with real data.
-The home page shows a banner indicating whether live data has been loaded.
 
 ---
 
@@ -358,33 +670,72 @@ Go to **🔬 Prop Scanner** (page 2) and either:
 
 ## 🔧 Troubleshooting
 
-### "streamlit: command not found"
-Run: `pip install streamlit` first.
+### Python command not found / wrong version
 
-### "ModuleNotFoundError: No module named 'streamlit'"
-Run: `pip install streamlit` and make sure you're using the right Python version.
+The Python command varies by operating system and installation method. Try **all** of these:
 
-### "ModuleNotFoundError: No module named 'nba_api'"
-The app primarily uses API-NBA API and The Odds API now.
-Run `pip install -r requirements.txt` to install all dependencies.
+```bash
+python --version       # Most common on Windows
+python3 --version      # Most common on Mac/Linux
+py --version           # Windows Python Launcher
+py -3.12 --version     # Specific version on Windows
+```
 
-### Live data update takes too long
-This is normal! The fetcher adds a 1.5-second delay between API calls to avoid
-being blocked by the NBA's servers. A full update (all players + game logs) can
-take 5-15 minutes. Let it run — don't close the tab.
+Use whichever one shows a version between 3.11 and 3.13.
+
+### `pip install` fails with "metadata-generation-failed" or "Meson build error"
+
+**Cause:** You're using Python 3.14 (or another version without pre-built wheels).
+
+**Fix:** Install Python 3.11 or 3.12 and recreate your virtual environment. See [Step 1](#step-1-install-python).
+
+### "streamlit: command not found" / "'streamlit' is not recognized"
+
+**Fix A** — Make sure you're in your virtual environment (you should see `(.venv)` in your prompt).
+
+**Fix B** — Use the module form:
+```bash
+python -m streamlit run app.py
+```
+
+### "ModuleNotFoundError: No module named '...'"
+
+**Fix:** Run `pip install -r requirements.txt` inside your activated virtual environment.
+
+If you're not sure which pip goes with which Python:
+```bash
+python -m pip install -r requirements.txt
+```
 
 ### "Port 8501 is already in use"
+
 Another Streamlit app is running. Close it, or run on a different port:
 ```bash
 streamlit run app.py --server.port 8502
 ```
 
+### "running scripts is disabled on this system" (PowerShell)
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+Then retry the activate command.
+
+### Live data update takes too long
+
+This is normal! The fetcher adds a 1.5-second delay between API calls to avoid
+being blocked by the NBA's servers. A full update (all players + game logs) can
+take 5–15 minutes. Let it run — don't close the tab.
+
 ### App shows "No props loaded"
-Go to **📥 Import Props** and click "Load Props from CSV" or enter your own.
+
+Go to **🔬 Prop Scanner** (page 2) and either enter props manually, upload a CSV, or use **📡 Live Games** → **⚡ One-Click Setup** to fetch live lines.
 
 ### Analysis results seem off
+
 Check that you have:
-1. Games configured on **🏀 Today's Games** page
+1. Games configured on **📡 Live Games** (page 1) — use **⚡ One-Click Setup**
 2. Run a **Smart Update** on the **📡 Data Feed** page to load live player data
 3. Stat types are lowercase: `points`, `rebounds`, `assists`, `threes`, etc.
 
@@ -474,6 +825,17 @@ The engine also uses Python's standard library extensively:
 4. **Set `SMARTAI_PRODUCTION=true`** — this enforces Stripe subscription gates.
 5. **Set `APP_URL`** — your deployed app URL (e.g., `https://your-app.streamlit.app`).
 
+### Docker Deployment
+
+```bash
+cp .env.example .env
+# Edit .env with your real API keys and Stripe keys
+
+docker compose up --build -d
+```
+
+This starts the Streamlit UI (port 8501), the FastAPI backend (port 8000), and Caddy reverse proxy (ports 80/443).
+
 ### Environment Variables Checklist
 
 | Variable | Required | Description |
@@ -505,6 +867,16 @@ The engine also uses Python's standard library extensively:
 - [ ] Run `python -m pytest tests/` to confirm all tests pass
 - [ ] SQLite database initialized (first run auto-creates it)
 - [ ] Stripe webhook endpoint registered and tested with Stripe CLI
+
+---
+
+## 🧪 Running Tests
+
+```bash
+# Make sure you're in the virtual environment first
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q
+```
 
 ---
 
