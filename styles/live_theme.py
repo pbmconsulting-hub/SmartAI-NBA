@@ -184,43 +184,169 @@ def get_live_sweat_css() -> str:
     opacity: 0.7;
 }
 
-/* ── Score Ticker (Live Sweat scoreboard) ────────────────── */
-.sweat-ticker-wrap {
-    overflow-x: auto;
-    white-space: nowrap;
-    padding: 8px 0 12px 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(0,240,255,0.3) transparent;
-    -webkit-overflow-scrolling: touch;
+/* ── Score Ticker — ESPN-style with auto-scroll ──────────── */
+.espn-ticker-container {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(180deg, rgba(8,12,24,0.98) 0%, rgba(13,18,40,0.95) 100%);
+    border: 1px solid rgba(0,240,255,0.15);
+    border-radius: 12px;
+    padding: 0;
+    margin-bottom: 16px;
 }
-.sweat-ticker-wrap::-webkit-scrollbar { height: 4px; }
-.sweat-ticker-wrap::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.3); border-radius: 4px; }
-.sweat-ticker-card {
-    display: inline-block;
-    vertical-align: top;
-    background: rgba(13,18,40,0.95);
-    border: 1px solid rgba(0,240,255,0.18);
-    border-radius: 10px;
-    padding: 10px 16px;
-    margin-right: 10px;
-    min-width: 140px;
-    text-align: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-.sweat-ticker-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,240,255,0.2);
-}
-.sweat-ticker-status { font-size: 0.7rem; color: #8a9bb8; margin-bottom: 4px; }
-.sweat-ticker-teams { text-align: left; }
-.sweat-ticker-row {
+.espn-ticker-header {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 2px 0;
+    gap: 8px;
+    padding: 8px 16px;
+    background: linear-gradient(90deg, rgba(0,240,255,0.12), transparent);
+    border-bottom: 1px solid rgba(0,240,255,0.10);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #00f0ff;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
 }
-.sweat-ticker-abbr { color: #c0d0e8; font-weight: 700; font-size: 0.9rem; }
-.sweat-ticker-score { font-weight: 900; font-size: 1.1rem; min-width: 30px; text-align: right; }
+.espn-ticker-live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ff3b30;
+    animation: espnPulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+}
+@keyframes espnPulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px #ff3b30; }
+    50% { opacity: 0.4; box-shadow: none; }
+}
+.espn-ticker-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0;
+    padding: 0;
+}
+.espn-ticker-track::-webkit-scrollbar { display: none; }
+/* Auto-scroll animation */
+.espn-ticker-scroll {
+    display: flex;
+    animation: espnScroll var(--scroll-duration, 30s) linear infinite;
+    gap: 0;
+}
+.espn-ticker-scroll:hover {
+    animation-play-state: paused;
+}
+@keyframes espnScroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+/* Individual game card */
+.espn-game-card {
+    flex-shrink: 0;
+    width: 240px;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    padding: 12px 16px 10px;
+    background: transparent;
+    transition: background 0.2s;
+    cursor: default;
+}
+.espn-game-card:hover {
+    background: rgba(0,240,255,0.04);
+}
+.espn-game-status {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.espn-status-live { color: #ff3b30; }
+.espn-status-final { color: #8a9bb8; }
+.espn-status-sched { color: #00f0ff; }
+/* Team row */
+.espn-team-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 0;
+    gap: 8px;
+}
+.espn-team-abbr {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #c0d0e8;
+    min-width: 40px;
+}
+.espn-team-score {
+    font-weight: 900;
+    font-size: 1.15rem;
+    min-width: 32px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.espn-team-winning { color: #ffffff; }
+.espn-team-losing { color: #6b7a94; }
+/* Leaders section */
+.espn-leaders {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.espn-leader-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.68rem;
+    color: #8a9bb8;
+    padding: 1px 0;
+}
+.espn-leader-name {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.espn-leader-stat {
+    font-weight: 700;
+    color: #00ff9d;
+    font-variant-numeric: tabular-nums;
+}
+/* Arrow navigation buttons */
+.espn-ticker-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    background: rgba(13,18,40,0.92);
+    border: 1px solid rgba(0,240,255,0.25);
+    color: #00f0ff;
+    border-radius: 50%;
+    width: 28px; height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.espn-ticker-container:hover .espn-ticker-nav { opacity: 0.85; }
+.espn-ticker-nav:hover { opacity: 1 !important; background: rgba(0,240,255,0.15); }
+.espn-ticker-nav-left { left: 4px; }
+.espn-ticker-nav-right { right: 4px; }
+/* Responsive */
+@media (max-width: 768px) {
+    .espn-game-card { width: 200px; padding: 10px 12px 8px; }
+    .espn-ticker-nav { display: none; }
+}
+@media (max-width: 480px) {
+    .espn-game-card { width: 180px; }
+    .espn-team-abbr { font-size: 0.82rem; }
+    .espn-team-score { font-size: 1rem; }
+}
 </style>"""
 
 

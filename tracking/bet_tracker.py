@@ -95,7 +95,7 @@ def _nba_today_et():
 
 
 # Ordered list of date formats returned by upstream APIs.
-# BDL → "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS…" ([:10] works).
+# "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS…" ([:10] works).
 # nba_api PlayerGameLog → "MMM DD, YYYY" (e.g. "MAR 05, 2026").
 _GAME_DATE_FORMATS = ["%Y-%m-%d", "%b %d, %Y", "%B %d, %Y"]
 
@@ -202,7 +202,7 @@ def _is_segment_prop(stat_type: str) -> bool:
 
 # ============================================================
 # SECTION: Per-Player Game Log Fetcher for Bet Resolution
-# Uses ETL database first, nba_api as fallback. BDL is NOT used.
+# Uses ETL database first, nba_api as fallback.
 # ============================================================
 
 def _parse_minutes(raw) -> float:
@@ -221,9 +221,9 @@ def _parse_minutes(raw) -> float:
 def _fetch_resolve_game_log(player_id, last_n: int = 10) -> list[dict]:
     """Fetch game log for bet resolution — ETL primary, nba_api fallback.
 
-    BallDontLie is intentionally skipped.  The ETL database is fast
-    and already populated by the ETL pipeline; ``nba_api.PlayerGameLog``
-    is the online fallback when the ETL DB has no data.
+    The ETL database is fast and already populated by the ETL pipeline;
+    ``nba_api.PlayerGameLog`` is the online fallback when the ETL DB
+    has no data.
 
     Returns a list of dicts with lowercase stat keys
     (``pts``, ``reb``, ``ast``, ``minutes``, ``fg3m``, ``ftm``, …)
@@ -251,7 +251,7 @@ def _fetch_resolve_game_log(player_id, last_n: int = 10) -> list[dict]:
             player_id, _etl_exc,
         )
 
-    # ── Source 2: nba_api PlayerGameLog (online, no BDL) ──────────────
+    # ── Source 2: nba_api PlayerGameLog (online) ──────────────
     try:
         from nba_api.stats.endpoints import playergamelog
         game_log_endpoint = playergamelog.PlayerGameLog(

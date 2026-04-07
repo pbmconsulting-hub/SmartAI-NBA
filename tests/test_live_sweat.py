@@ -435,27 +435,27 @@ class TestLiveThemeCSS(unittest.TestCase):
         css = get_live_sweat_css()
         self.assertIn(".progress-pct-label", css)
 
-    # ── Score ticker CSS tests ───────────────────────────────
+    # ── Score ticker CSS tests (ESPN-style) ────────────────────
 
-    def test_ticker_wrap_class(self):
+    def test_ticker_container_class(self):
         from styles.live_theme import get_live_sweat_css
         css = get_live_sweat_css()
-        self.assertIn(".sweat-ticker-wrap", css)
+        self.assertIn(".espn-ticker-container", css)
 
-    def test_ticker_card_class(self):
+    def test_ticker_game_card_class(self):
         from styles.live_theme import get_live_sweat_css
         css = get_live_sweat_css()
-        self.assertIn(".sweat-ticker-card", css)
+        self.assertIn(".espn-game-card", css)
 
-    def test_ticker_score_class(self):
+    def test_ticker_team_score_class(self):
         from styles.live_theme import get_live_sweat_css
         css = get_live_sweat_css()
-        self.assertIn(".sweat-ticker-score", css)
+        self.assertIn(".espn-team-score", css)
 
-    def test_ticker_row_class(self):
+    def test_ticker_team_row_class(self):
         from styles.live_theme import get_live_sweat_css
         css = get_live_sweat_css()
-        self.assertIn(".sweat-ticker-row", css)
+        self.assertIn(".espn-team-row", css)
 
 
 class TestRenderProgressBar(unittest.TestCase):
@@ -837,11 +837,11 @@ class TestLiveSweatPageFile(unittest.TestCase):
 
     def test_scoreboard_section_present(self):
         """Page should have a scoreboard section showing game scores."""
-        self.assertIn("Today's Scoreboard", self.source)
-        self.assertIn("sweat-ticker-card", self.source)
+        self.assertIn("ESPN-Style Ticker", self.source)
+        self.assertIn("espn-game-card", self.source)
 
-    def test_status_badge_function(self):
-        self.assertIn("def _status_badge", self.source)
+    def test_status_class_function(self):
+        self.assertIn("def _status_class_and_label", self.source)
 
     def test_get_all_todays_games_function(self):
         self.assertIn("def _get_all_todays_games", self.source)

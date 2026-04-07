@@ -442,7 +442,6 @@ SmartAI-NBA/
 │   ├── predict/                       # Prediction engine
 │   │   └── predictor.py
 │   └── scrapers/                      # External data scrapers
-│       ├── balldontlie_client.py
 │       ├── basketball_ref_scraper.py
 │       ├── cbs_injuries_scraper.py
 │       └── transactions_scraper.py
@@ -457,7 +456,6 @@ SmartAI-NBA/
 │   ├── sportsbook_service.py          # Multi-platform prop fetcher
 │   ├── platform_fetcher.py            # Async platform line fetcher
 │   ├── live_game_tracker.py           # Live game score tracker
-│   ├── bdl_bridge.py                  # BallDontLie API bridge
 │   ├── player_profile_service.py      # Player context & headshots
 │   ├── player_id_cache.py             # Player ID resolution cache
 │   ├── roster_engine.py               # Active roster & injury engine

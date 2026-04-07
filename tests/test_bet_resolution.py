@@ -143,37 +143,6 @@ class TestGameLogStatFields(unittest.TestCase):
             self.assertIn(field, formatted,
                           f"Game log missing required field '{field}'")
 
-    def test_bdl_bridge_has_all_fields(self):
-        """BDL game log entries should contain all resolution stat fields."""
-        # A BDL stat row after formatting through bdl_bridge
-        from data.bdl_bridge import _safe_float, _parse_min
-        mock_stat = {
-            "pts": 25, "reb": 8, "ast": 6, "stl": 2, "blk": 1,
-            "turnover": 3, "fg3m": 4, "ft_pct": 0.85, "min": "32:10",
-            "ftm": 5, "fta": 6, "fgm": 10, "fga": 18,
-            "oreb": 2, "dreb": 6, "pf": 3,
-        }
-        formatted = {
-            "minutes": _parse_min(mock_stat.get("min", 0)),
-            "pts": _safe_float(mock_stat.get("pts")),
-            "reb": _safe_float(mock_stat.get("reb")),
-            "ast": _safe_float(mock_stat.get("ast")),
-            "stl": _safe_float(mock_stat.get("stl")),
-            "blk": _safe_float(mock_stat.get("blk")),
-            "tov": _safe_float(mock_stat.get("turnover", mock_stat.get("tov", 0))),
-            "fg3m": _safe_float(mock_stat.get("fg3m")),
-            "ftm": _safe_float(mock_stat.get("ftm")),
-            "fta": _safe_float(mock_stat.get("fta")),
-            "fgm": _safe_float(mock_stat.get("fgm")),
-            "fga": _safe_float(mock_stat.get("fga")),
-            "oreb": _safe_float(mock_stat.get("oreb")),
-            "dreb": _safe_float(mock_stat.get("dreb")),
-            "pf": _safe_float(mock_stat.get("pf")),
-        }
-        for field in self._REQUIRED_FIELDS:
-            self.assertIn(field, formatted,
-                          f"BDL game log missing required field '{field}'")
-
 
 class TestResolveAllPendingDateParsing(unittest.TestCase):
     """resolve_all_pending_bets Tier 3 should handle nba_api date format."""
@@ -213,19 +182,17 @@ class TestResolveAllPendingDateParsing(unittest.TestCase):
                     mock_record.assert_called_once_with(99, "WIN", 25.0)
 
 
-class TestFetchResolveGameLogNoBDL(unittest.TestCase):
-    """_fetch_resolve_game_log should NOT use BallDontLie."""
+class TestFetchResolveGameLogSourceCheck(unittest.TestCase):
+    """_fetch_resolve_game_log should use ETL DB + nba_api only."""
 
-    def test_no_bdl_import_in_resolve_path(self):
-        """The resolve game log function must not import from bdl_bridge."""
+    def test_no_external_api_import_in_resolve_path(self):
+        """The resolve game log function must not import from external API bridges."""
         import inspect
         import tracking.bet_tracker as bt
         source = inspect.getsource(bt._fetch_resolve_game_log)
-        # Check that no BDL import statement exists in the function body
-        self.assertNotIn("bdl_bridge", source,
-                         "_fetch_resolve_game_log must not import from bdl_bridge")
+        # Check that no external API bridge import exists in the function body
         self.assertNotIn("nba_data_service", source,
-                         "_fetch_resolve_game_log must not route through nba_data_service (which uses BDL)")
+                         "_fetch_resolve_game_log must not route through nba_data_service")
 
     def test_etl_is_primary_source(self):
         """ETL database should be tried before nba_api."""
