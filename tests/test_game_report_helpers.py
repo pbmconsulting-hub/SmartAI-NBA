@@ -284,9 +284,9 @@ class TestGetBuilderPropCardHtml:
         assert "qds-na-metrics-grid" in result
 
     def test_safe_score_display(self):
-        # confidence=78.5, SAFE score = 78.5/10 = 7.8
+        # confidence=78.5, SAFE score = 78.5/10 = 7.85, rendered as 7.8 (one decimal)
         result = self._sample_card(confidence=78.5)
-        assert "7.8" in result or "7.9" in result  # rounding
+        assert "7.8" in result
 
     def test_platinum_tier(self):
         result = self._sample_card(confidence=90)
@@ -326,32 +326,32 @@ class TestGetBuilderPropCardHtml:
 
 class TestGetNarrativeCardHtml:
     def test_returns_string(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         assert isinstance(result, str)
 
     def test_contains_team_logos(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         assert f"{ESPN_NBA}/bos.png" in result
         assert f"{ESPN_NBA}/lal.png" in result
 
     def test_contains_team_colors_in_borders(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         # BOS primary: #007A33, LAL primary: #552583
         assert "#552583" in result  # LAL home = border-left
         assert "#007A33" in result  # BOS away = border-right
 
     def test_watermark_logos_present(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         assert "opacity:0.06" in result  # watermark opacity
 
     def test_at_symbol_in_header(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         assert ">@<" in result
 
     def test_escapes_html_in_teams(self):
-        result = get_narrative_card_html("", "<script>", "LAL")
+        result = get_narrative_card_html("<script>", "LAL")
         assert "<script>" not in result
 
     def test_fallback_for_logos(self):
-        result = get_narrative_card_html("", "BOS", "LAL")
+        result = get_narrative_card_html("BOS", "LAL")
         assert NBA_LOGO_FALLBACK in result

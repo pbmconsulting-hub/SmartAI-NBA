@@ -1370,7 +1370,6 @@ with _tab_narrative:
                 # QDS-styled narrative card with team-colored accents & watermark logos
                 st.markdown(
                     get_narrative_card_html(
-                        narrative_md="",  # card is visual wrapper only
                         away_team=_narr_away,
                         home_team=_narr_home,
                     ),

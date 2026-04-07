@@ -273,7 +273,7 @@ def get_parlay_card_html(combo_type: str, picks: list, safe_avg: str, strategy: 
 
     return (
         f'<div style="background:rgba(20,25,43,0.85);border-radius:10px;padding:14px 16px;'
-        f'margin-bottom:10px;border-left:3px solid {accent};'
+        f'margin-bottom:10px;'
         f'border:1px solid rgba(255,255,255,0.06);border-left:3px solid {accent};'
         f'transition:transform 0.2s ease,box-shadow 0.2s ease;"'
         f' onmouseenter="this.style.transform=\'translateY(-2px)\';'
@@ -419,15 +419,12 @@ def get_builder_prop_card_html(
 # ============================================================
 
 def get_narrative_card_html(
-    narrative_md: str,
     away_team: str,
     home_team: str,
 ) -> str:
     """Wrap a game narrative in a QDS-styled card with team-colored accents.
 
     Args:
-        narrative_md: Markdown-formatted narrative text (pre-rendered to HTML
-            by the caller, or we can pass it through as inner HTML).
         away_team: Away team abbreviation.
         home_team: Home team abbreviation.
 
