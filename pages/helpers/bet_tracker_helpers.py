@@ -4,6 +4,7 @@
 #          Extracted from pages/11_📈_Bet_Tracker.py to reduce page size.
 # ============================================================
 import logging
+import math
 
 _logger = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ def get_achievement_ring_html(icon: str, name: str, desc: str, progress: float, 
     import html as _h
 
     radius = 30
-    circumference = 2 * 3.14159 * radius
+    circumference = 2 * math.pi * radius
     dash = circumference * min(progress, 1.0)
     gap = circumference - dash
 

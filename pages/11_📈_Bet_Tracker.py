@@ -18,6 +18,7 @@
 import datetime
 import json
 import logging
+import time as _time
 import os
 
 import streamlit as st
@@ -1507,7 +1508,6 @@ with tab_auto_resolve:
         # same periodic refresh without blocking the event loop.
         _refresh_placeholder = st.empty()
         _refresh_placeholder.info("🔄 Auto-refresh enabled — page will refresh in ~60 seconds. Uncheck to stop.")
-        import time as _time
         _refresh_start = _time.time()
         # Non-blocking: check every 5 seconds if 60s has elapsed
         # This allows Streamlit to remain responsive to user interactions
@@ -2270,7 +2270,7 @@ with tab_history:
         with st.expander("📈 Cumulative P&L Curve (resolved bets)", expanded=True):
             _HIST_PAYOUT = 0.909
             _cum_pnl = 0.0
-            _cum_dollar_pnl = 0.0  # B9: actual dollar P&L
+            _total_dollar_pnl = 0.0  # B9: actual dollar P&L
             _pnl_vals = []
             _pnl_labels = []
             _daily_pnl: dict = {}  # date → cumulative at end of day
@@ -2280,10 +2280,10 @@ with tab_history:
                 _fee = float(_rb.get("entry_fee") or 0)
                 if _res == "WIN":
                     _cum_pnl += _HIST_PAYOUT
-                    _cum_dollar_pnl += _fee * _HIST_PAYOUT if _fee > 0 else 0
+                    _total_dollar_pnl += _fee * _HIST_PAYOUT if _fee > 0 else 0
                 elif _res == "LOSS":
                     _cum_pnl -= 1.0
-                    _cum_dollar_pnl -= _fee if _fee > 0 else 0
+                    _total_dollar_pnl -= _fee if _fee > 0 else 0
                 # PUSH: no change
                 _pnl_vals.append(round(_cum_pnl, 2))
                 _pnl_labels.append(_rb.get("bet_date", ""))
@@ -2303,9 +2303,9 @@ with tab_history:
             _roi_cols[1].metric("Win Rate", f"{_wr_total:.1f}%",
                                 delta=f"{_wr_total - 52.38:+.1f}% vs breakeven")
             _roi_cols[2].metric("Unit P&L", f"{_cum_pnl:+.2f}u")
-            if _cum_dollar_pnl != 0:
-                _roi_cols[3].metric("Dollar P&L", f"${_cum_dollar_pnl:+.2f}",
-                                    delta="positive = profitable" if _cum_dollar_pnl > 0 else "negative = losing")
+            if _total_dollar_pnl != 0:
+                _roi_cols[3].metric("Dollar P&L", f"${_total_dollar_pnl:+.2f}",
+                                    delta="positive = profitable" if _total_dollar_pnl > 0 else "negative = losing")
             else:
                 _roi_cols[3].metric(
                     "ROI/bet",

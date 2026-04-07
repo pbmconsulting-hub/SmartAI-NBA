@@ -15,6 +15,8 @@
 # Standard library imports only
 import sqlite3    # Built-in SQLite database (no install needed!)
 import json       # For serializing/deserializing analysis session data
+import csv        # For CSV export
+import io         # For in-memory CSV buffer
 import os         # For file path operations
 import time       # For retry backoff delays
 import datetime   # For timestamps in analysis session persistence
@@ -656,11 +658,10 @@ def delete_bet(bet_id):
         return False, f"Failed to delete bet #{bet_id}."
 
     # Log audit record
-    import json as _json
     _execute_write(
         """INSERT INTO bet_audit_log (bet_id, action, old_values, new_values, changed_at)
            VALUES (?, 'DELETE', ?, NULL, datetime('now'))""",
-        (bet_id, _json.dumps(bet_snapshot, default=str)),
+        (bet_id, json.dumps(bet_snapshot, default=str)),
         caller="delete_bet_audit",
     )
     return True, f"Bet #{bet_id} deleted successfully."
@@ -705,11 +706,10 @@ def update_bet_fields(bet_id, updates):
         return False, f"Failed to update bet #{bet_id}."
 
     # Log audit record
-    import json as _json
     _execute_write(
         """INSERT INTO bet_audit_log (bet_id, action, old_values, new_values, changed_at)
            VALUES (?, 'EDIT', ?, ?, datetime('now'))""",
-        (bet_id, _json.dumps(old_values, default=str), _json.dumps(filtered, default=str)),
+        (bet_id, json.dumps(old_values, default=str), json.dumps(filtered, default=str)),
         caller="update_bet_fields_audit",
     )
     return True, f"Bet #{bet_id} updated: {', '.join(filtered.keys())}."
@@ -782,9 +782,6 @@ def export_bets_csv(bets):
     Returns:
         str: CSV-formatted string.
     """
-    import csv
-    import io
-
     if not bets:
         return ""
 
