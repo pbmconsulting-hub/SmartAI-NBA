@@ -712,6 +712,10 @@ class RosterEngine:
         on two-way contracts who are on G-League assignment are flagged
         as inactive so they are excluded from tonight's active roster.
         """
+        def _player_full_name(p: dict) -> str:
+            """Build 'First Last' from a DB player dict."""
+            return f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
+
         # ── DB-first: try loading rosters from the ETL database ──
         teams_needing_api = list(team_abbrevs or [])
         try:
@@ -720,10 +724,7 @@ class RosterEngine:
             if db_result:
                 for abbrev_key, players in db_result.items():
                     abbrev_upper = abbrev_key.upper()
-                    names = [
-                        f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
-                        for p in players
-                    ]
+                    names = [_player_full_name(p) for p in players]
                     names = [n for n in names if n]
                     if names:
                         self._full_rosters[abbrev_upper] = names
@@ -791,10 +792,7 @@ class RosterEngine:
                     from data.etl_data_service import get_rosters_for_teams as _db_rosters_fb
                     db_fb = _db_rosters_fb([abbrev])
                     for abbr_key, players in db_fb.items():
-                        names = [
-                            f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
-                            for p in players
-                        ]
+                        names = [_player_full_name(p) for p in players]
                         names = [n for n in names if n]
                         if names:
                             self._full_rosters[abbr_key.upper()] = names

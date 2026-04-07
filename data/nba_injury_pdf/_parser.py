@@ -12,6 +12,9 @@ import requests
 from data.nba_injury_pdf._constants import EXPECTED_COLUMNS, REQUEST_HEADERS
 from data.nba_injury_pdf._exceptions import DataValidationError, URLRetrievalError
 
+# Pattern used to detect merged report headers in newer NBA PDFs.
+_MERGED_HEADER_PATTERN = "Injury Report:"
+
 # Wrap pdfplumber import so the app degrades gracefully if the package is absent.
 try:
     import pdfplumber as _pdfplumber
@@ -137,7 +140,7 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
                     for row in table:
                         cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
                         # Skip rows that look like a merged report header
-                        if any("Injury Report:" in c for c in cleaned):
+                        if any(_MERGED_HEADER_PATTERN in c for c in cleaned):
                             # Check if a real 7-column header follows later
                             continue
                         if fb_header is None:
@@ -169,7 +172,7 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
                 continue
             for row in table:
                 cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
-                if any("Injury Report:" in c for c in cleaned):
+                if any(_MERGED_HEADER_PATTERN in c for c in cleaned):
                     continue
                 if sg_header is None:
                     if any(cleaned):
