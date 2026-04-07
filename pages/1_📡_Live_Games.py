@@ -1681,7 +1681,7 @@ if current_games:
             for p in players:
                 name_parts = p.get("name", "").split()
                 short_name = f"{name_parts[0][0]}. {' '.join(name_parts[1:])}" if len(name_parts) > 1 else p.get("name", "")
-                pts = p.get("points_avg", "—")
+                pts = _h.escape(str(p.get("points_avg", "—")))
                 inj_status = _inj_map_filter.get(p.get("name", ""), {}).get("status", "Active")
                 inj_badge = ""
                 if inj_status in {"Out", "Injured Reserve"}:
@@ -1744,18 +1744,27 @@ if current_games:
         # ── Team colors & logos (Enhancement #1, #3) ──────────────
         away_color, _ = get_team_colors(away)
         home_color, _ = get_team_colors(home)
-        away_logo_url = f"{ESPN_LOGO_BASE_URL}/{away.lower()}.png"
-        home_logo_url = f"{ESPN_LOGO_BASE_URL}/{home.lower()}.png"
-        _logo_onerror = f"onerror=\"this.src='{NBA_LOGO_FALLBACK_URL}'\""
+        away_logo_url = _h.escape(f"{ESPN_LOGO_BASE_URL}/{away.lower()}.png")
+        home_logo_url = _h.escape(f"{ESPN_LOGO_BASE_URL}/{home.lower()}.png")
+        _logo_onerror = f"onerror=\"this.src='{_h.escape(NBA_LOGO_FALLBACK_URL)}'\""
+
+        _BADGE_FALLBACK_RGB = (0, 240, 255)  # cyan fallback
+
+        def _hex_to_rgb(hex_color):
+            """Convert '#RRGGBB' hex to (r, g, b) tuple, with fallback."""
+            try:
+                if len(hex_color) >= 7:
+                    return int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+            except (ValueError, IndexError, TypeError):
+                pass
+            return _BADGE_FALLBACK_RGB
 
         def _team_badge_html(abbrev, color, logo_url, is_home=False):
-            try:
-                r, g, b = int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
-            except (ValueError, IndexError):
-                r, g, b = 0, 240, 255  # fallback cyan
+            r, g, b = _hex_to_rgb(color)
+            safe_color = _h.escape(color) if color else "#00f0ff"
             return (
                 f'<span class="team-badge" style="background:rgba({r},{g},{b},0.18);'
-                f'border:1px solid {color}40;">'
+                f'border:1px solid {safe_color}40;">'
                 f'<img class="team-logo" src="{logo_url}" alt="{_h.escape(abbrev)}" {_logo_onerror}>'
                 f'{_h.escape(abbrev)}</span>'
             )
