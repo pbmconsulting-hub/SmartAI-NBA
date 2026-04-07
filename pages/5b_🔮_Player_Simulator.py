@@ -41,6 +41,12 @@ try:
 except ImportError:
     _CROSS_STAT_CORRELATIONS = {}
 
+# Shared color palette for Plotly charts
+_CHART_COLORS = [
+    "#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b",
+    "#8a9bb8", "#c0d0e8", "#e066ff", "#66ccff", "#ff9966",
+]
+
 # ─── Page config ────────────────────────────────────────────
 st.set_page_config(
     page_title="Player Simulator — SmartBetPro NBA",
@@ -914,7 +920,7 @@ def _render_sim_card(sim_result: dict):
                 margin=dict(l=40, r=20, t=40, b=30),
                 height=300,
             )
-            st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_{player_id}_{id(sim_result)}")
+            st.plotly_chart(fig_bar, use_container_width=True, key=f"bar_{player_id}_{team}")
 
             # Distribution histograms per stat (using raw sim data)
             _hist_stats = [
@@ -923,13 +929,12 @@ def _render_sim_card(sim_result: dict):
             ]
             if _hist_stats:
                 fig_hist = _go.Figure()
-                _colors = ["#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b", "#8a9bb8", "#c0d0e8"]
                 for i, stat in enumerate(_hist_stats):
                     fig_hist.add_trace(_go.Histogram(
                         x=stats[stat]["sim_raw"],
                         name=stat.title(),
                         opacity=0.65,
-                        marker_color=_colors[i % len(_colors)],
+                        marker_color=_CHART_COLORS[i % len(_CHART_COLORS)],
                         nbinsx=25,
                     ))
                 fig_hist.update_layout(
@@ -944,7 +949,7 @@ def _render_sim_card(sim_result: dict):
                     xaxis_title="Stat Value",
                     yaxis_title="Frequency",
                 )
-                st.plotly_chart(fig_hist, use_container_width=True, key=f"hist_{player_id}_{id(sim_result)}")
+                st.plotly_chart(fig_hist, use_container_width=True, key=f"hist_{player_id}_{team}")
         except Exception as _plot_err:
             _logger.debug("Plotly chart rendering failed: %s", _plot_err)
 
@@ -1059,8 +1064,6 @@ if run_sim and selected_names:
                     _mx = max(r["stats"].get(s, {}).get("projected", 0) for r in _all_sim_results)
                     _radar_maxes.append(_mx if _mx > 0 else 1.0)
 
-                _radar_colors = ["#ff5e00", "#00ff9d", "#00ffd5", "#ffd700", "#ff6b6b",
-                                 "#8a9bb8", "#c0d0e8", "#e066ff", "#66ccff", "#ff9966"]
                 _labels_closed = _radar_labels + [_radar_labels[0]] if _radar_labels else _radar_labels
                 fig_radar = _go.Figure()
                 for _ri, _r in enumerate(_all_sim_results):
@@ -1076,7 +1079,7 @@ if run_sim and selected_names:
                         fill="toself",
                         name=_r["player"].get("name", ""),
                         opacity=0.6,
-                        line=dict(color=_radar_colors[_ri % len(_radar_colors)]),
+                        line=dict(color=_CHART_COLORS[_ri % len(_CHART_COLORS)]),
                     ))
                 fig_radar.update_layout(
                     polar=dict(
