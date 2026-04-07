@@ -8,6 +8,8 @@
 
 import streamlit as st  # Main UI framework
 import logging
+import html as _html_eb  # HTML escaping – single import for the whole file
+import datetime as _dt
 
 # Import our entry optimizer engine
 from engine.entry_optimizer import (
@@ -127,17 +129,38 @@ if not analysis_results:
     )
     st.stop()  # Stop rendering the rest of the page
 
+# ── Adjustable Edge / Confidence Threshold Sliders (#14) ──────
+_thresh_c1, _thresh_c2 = st.columns(2)
+with _thresh_c1:
+    _edge_threshold = st.slider(
+        "Min Edge Threshold (%)",
+        min_value=0.0, max_value=15.0,
+        value=st.session_state.get("eb_edge_threshold", 3.0),
+        step=0.5,
+        key="eb_edge_threshold",
+        help="Only include picks with absolute edge ≥ this value.",
+    )
+with _thresh_c2:
+    _conf_threshold = st.slider(
+        "Min Confidence Threshold",
+        min_value=0, max_value=90,
+        value=int(st.session_state.get("eb_conf_threshold", 40)),
+        step=5,
+        key="eb_conf_threshold",
+        help="Only include picks with confidence ≥ this value.",
+    )
+
 # Filter to only non-avoided picks with meaningful edge
 qualifying_picks = [
     r for r in analysis_results
-    if abs(r.get("edge_percentage", 0)) >= 3.0
+    if abs(r.get("edge_percentage", 0)) >= _edge_threshold
     and not r.get("should_avoid", False)
-    and r.get("confidence_score", 0) >= 40
+    and r.get("confidence_score", 0) >= _conf_threshold
 ]
 
 st.info(
     f"📋 **{len(qualifying_picks)} qualifying picks** available "
-    f"(from {len(analysis_results)} total analyzed, filtered for meaningful edge)"
+    f"(from {len(analysis_results)} total analyzed, edge ≥ {_edge_threshold}%, confidence ≥ {_conf_threshold})"
 )
 
 if len(qualifying_picks) < 2:
@@ -164,10 +187,10 @@ if len(_top_picks) >= 2:
         '</div>',
         unsafe_allow_html=True,
     )
-    import html as _html_eb
     _PARLAY_CONFIGS = [
         (2, "⭐ Best 2-Leg Parlay"),
         (3, "⭐⭐ Best 3-Leg Parlay"),
+        (4, "⭐⭐ Best 4-Leg Parlay"),
         (5, "⭐⭐⭐ Best 5-Leg Parlay"),
     ]
     for _n, _lbl in _PARLAY_CONFIGS:
@@ -212,7 +235,7 @@ if len(_top_picks) >= 2:
 
 st.subheader("⚙️ Entry Settings")
 
-settings_col1, settings_col2, settings_col3, settings_col4, settings_col5 = st.columns(5)
+settings_col1, settings_col2, settings_col3 = st.columns([2, 1, 1])
 
 with settings_col1:
     selected_platform = st.selectbox(
@@ -237,6 +260,8 @@ with settings_col3:
         step=5.0,
         help="How much are you betting per entry?",
     )
+
+settings_col4, settings_col5 = st.columns([1, 1])
 
 with settings_col4:
     session_budget = st.number_input(
@@ -379,28 +404,57 @@ if selected_picks:
     else:
         selected_picks_sorted = sorted(_filtered_picks, key=lambda x: abs(x.get("edge_percentage", 0)), reverse=True)
     
-    # Show picks as checkboxes
+    # Show picks as styled mini-cards (#3)
+    _tier_badge_colors = {
+        "Platinum": "#00f0ff", "Gold": "#ffd700",
+        "Silver": "#c0c0c0", "Bronze": "#cd7f32",
+    }
     picks_to_include = []
     for i, pick in enumerate(selected_picks_sorted):
         direction = pick.get("direction", "OVER")
         prob = pick.get("probability_over", 0.5)
         display_prob = (1.0 - prob) * 100 if direction == "UNDER" else prob * 100
         tier_emoji = pick.get("tier_emoji", "🥉")
+        tier_name = pick.get("tier", "Bronze")
         pick_team = pick.get("player_team", pick.get("team", ""))
-        pick_bet_type_emoji = pick.get("bet_type_emoji", "")
-        team_suffix = f" ({pick_team})" if pick_team else ""
+        pick_edge = pick.get("edge_percentage", 0)
+        pick_conf = pick.get("confidence_score", 50)
+        _badge_c = _tier_badge_colors.get(tier_name, "#cd7f32")
+        _dir_arrow = "⬆️" if direction == "OVER" else "⬇️"
+        _prob_c = "#00ff9d" if display_prob >= 60 else ("#ffcc00" if display_prob >= 55 else "#ff6b6b")
+        _conf_pct = min(pick_conf, 100)
+        _conf_bar = f'<div style="background:rgba(255,255,255,0.06);border-radius:3px;height:6px;width:80px;display:inline-block;vertical-align:middle;">' \
+                    f'<div style="background:{_prob_c};height:100%;border-radius:3px;width:{_conf_pct}%;"></div></div>'
 
-        col_check, col_info = st.columns([0.1, 0.9])
+        col_check, col_card = st.columns([0.06, 0.94])
         with col_check:
             include = st.checkbox("", value=True, key=f"pick_check_{i}_{pick.get('player_name','')}")
-        with col_info:
+        with col_card:
             st.markdown(
-                f"**{pick.get('player_name','')}{team_suffix}** — "
-                f"{pick.get('stat_type','').capitalize()} {direction} {pick.get('line',0)} "
-                f"| {tier_emoji} {pick.get('tier','')} "
-                + (f"| {pick_bet_type_emoji} " if pick_bet_type_emoji else "")
-                + f"| {display_prob:.0f}% "
-                f"| Edge: {pick.get('edge_percentage',0):.1f}%"
+                f'<div style="background:#14192b;border-radius:10px;padding:10px 14px;margin-bottom:4px;'
+                f'border-left:4px solid {_badge_c};display:flex;justify-content:space-between;'
+                f'align-items:center;flex-wrap:wrap;gap:6px;">'
+                # Left: player + team + stat
+                f'<div style="flex:1;min-width:180px;">'
+                f'<span style="color:#e2e8f0;font-weight:700;font-size:0.92rem;">'
+                f'{_html_eb.escape(pick.get("player_name",""))}</span>'
+                f'<span style="color:#64748b;font-size:0.76rem;margin-left:6px;">{_html_eb.escape(pick_team)}</span><br>'
+                f'<span style="color:#94a3b8;font-size:0.82rem;">'
+                f'{_dir_arrow} {direction} {pick.get("line",0)} {pick.get("stat_type","").title()}</span>'
+                f'</div>'
+                # Middle: tier badge
+                f'<div style="text-align:center;">'
+                f'<span style="background:{_badge_c};color:#0a0f1a;padding:2px 8px;border-radius:4px;'
+                f'font-size:0.72rem;font-weight:700;">{tier_emoji} {tier_name}</span>'
+                f'</div>'
+                # Right: prob + edge + confidence gauge
+                f'<div style="text-align:right;min-width:120px;">'
+                f'<span style="color:{_prob_c};font-weight:700;font-size:0.92rem;">{display_prob:.0f}%</span>'
+                f'<span style="color:#8a9bb8;font-size:0.76rem;margin-left:6px;">Edge {pick_edge:+.1f}%</span><br>'
+                f'{_conf_bar}'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
             )
         
         if include:
@@ -442,6 +496,41 @@ if selected_picks:
                     combined_prob *= p
                 st.metric("All-Hit Probability", f"{combined_prob*100:.1f}%")
 
+            # ── EV Gauge / Speedometer (#4) ─────────────────────────
+            _ev_roi_raw = quick_ev.get("return_on_investment", 0) * 100  # as percentage
+            _gauge_val = max(-50, min(50, _ev_roi_raw))
+            _gauge_color = "#00ff9d" if _gauge_val >= 0 else "#ff4444"
+            # Simple SVG radial gauge
+            import math as _math_gauge
+            _angle_min, _angle_max = -135, 135  # sweep range
+            _needle_angle = _angle_min + (_gauge_val + 50) / 100 * (_angle_max - _angle_min)
+            _rad = _math_gauge.radians(_needle_angle)
+            _nx = 100 + 60 * _math_gauge.cos(_rad - _math_gauge.pi / 2)
+            _ny = 110 + 60 * _math_gauge.sin(_rad - _math_gauge.pi / 2)
+            st.markdown(
+                f'<div style="text-align:center;margin:8px 0;">'
+                f'<svg width="200" height="130" viewBox="0 0 200 140">'
+                # Background arc
+                f'<path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="#1e293b" stroke-width="14" stroke-linecap="round"/>'
+                # Red zone (-50% to 0)
+                f'<path d="M 20 110 A 80 80 0 0 1 100 30" fill="none" stroke="rgba(255,68,68,0.3)" stroke-width="14" stroke-linecap="round"/>'
+                # Green zone (0 to +50%)
+                f'<path d="M 100 30 A 80 80 0 0 1 180 110" fill="none" stroke="rgba(0,255,157,0.3)" stroke-width="14" stroke-linecap="round"/>'
+                # Needle
+                f'<line x1="100" y1="110" x2="{_nx:.1f}" y2="{_ny:.1f}" stroke="{_gauge_color}" stroke-width="3" stroke-linecap="round"/>'
+                f'<circle cx="100" cy="110" r="5" fill="{_gauge_color}"/>'
+                # Labels
+                f'<text x="18" y="130" fill="#ff6b6b" font-size="9" font-family="JetBrains Mono,monospace">-50%</text>'
+                f'<text x="90" y="22" fill="#94a3b8" font-size="9" font-family="JetBrains Mono,monospace">0%</text>'
+                f'<text x="165" y="130" fill="#00ff9d" font-size="9" font-family="JetBrains Mono,monospace">+50%</text>'
+                # Value
+                f'<text x="100" y="100" fill="{_gauge_color}" font-size="16" font-weight="800" text-anchor="middle"'
+                f' font-family="JetBrains Mono,monospace">{_gauge_val:+.1f}%</text>'
+                f'<text x="100" y="115" fill="#64748b" font-size="8" text-anchor="middle" font-family="Inter,sans-serif">EV ROI</text>'
+                f'</svg></div>',
+                unsafe_allow_html=True,
+            )
+
             # Phase 3: DFS Flex Breakeven Thresholds
             _eb_n_picks = len(picks_to_include)
             _eb_dfs_results = [p for p in picks_to_include if p.get("dfs_parlay_ev")]
@@ -477,13 +566,140 @@ if selected_picks:
             if corr_risk.get("warnings"):
                 for w in corr_risk["warnings"]:
                     st.warning(w)
-            
-            # Weakest link
+
+            # ── Correlation Matrix Heatmap (#11) ──────────────────────
+            _corr_matrix = corr_risk.get("correlation_matrix")
+            _game_groups = corr_risk.get("game_groups", {})
+            if _game_groups and len(picks_to_include) >= 2:
+                _n_p = len(picks_to_include)
+                _p_names = [p.get("player_name", "?")[:10] for p in picks_to_include]
+                # Build simple pairwise matrix (same-game = 1.0, diff-game = 0.0)
+                if _corr_matrix and len(_corr_matrix) == _n_p:
+                    _cm = _corr_matrix
+                else:
+                    _cm = [[0.0] * _n_p for _ in range(_n_p)]
+                    _game_lookup = {}
+                    for gk, pnames in _game_groups.items():
+                        for pn in pnames:
+                            _game_lookup[pn] = gk
+                    for _ri in range(_n_p):
+                        for _ci in range(_n_p):
+                            if _ri == _ci:
+                                _cm[_ri][_ci] = 1.0
+                            else:
+                                _rn = picks_to_include[_ri].get("player_name", "")
+                                _cn = picks_to_include[_ci].get("player_name", "")
+                                if _game_lookup.get(_rn) and _game_lookup.get(_rn) == _game_lookup.get(_cn):
+                                    _cm[_ri][_ci] = 0.7
+                with st.expander("🔥 Correlation Heatmap", expanded=False):
+                    _hm_size = max(180, _n_p * 44)
+                    _cell = _hm_size // (_n_p + 1)
+                    _svg_rects = ""
+                    for _ri in range(_n_p):
+                        for _ci in range(_n_p):
+                            _v = _cm[_ri][_ci]
+                            _fill = f"rgba(255,94,0,{min(_v, 1.0):.2f})" if _v > 0.1 else "rgba(148,163,184,0.06)"
+                            if _ri == _ci:
+                                _fill = "rgba(0,255,157,0.2)"
+                            _rx = (_ci + 1) * _cell
+                            _ry = (_ri + 1) * _cell
+                            _svg_rects += (
+                                f'<rect x="{_rx}" y="{_ry}" width="{_cell-2}" height="{_cell-2}" '
+                                f'rx="3" fill="{_fill}"/>'
+                                f'<text x="{_rx + _cell//2}" y="{_ry + _cell//2 + 4}" '
+                                f'fill="#c0d0e8" font-size="9" text-anchor="middle" '
+                                f'font-family="JetBrains Mono,monospace">{_v:.1f}</text>'
+                            )
+                    # Labels
+                    _svg_labels = ""
+                    for _li, _ln in enumerate(_p_names):
+                        _lx = (_li + 1) * _cell + _cell // 2
+                        _svg_labels += f'<text x="{_lx}" y="{_cell - 4}" fill="#94a3b8" font-size="8" text-anchor="middle" font-family="Inter,sans-serif">{_html_eb.escape(_ln)}</text>'
+                        _ly = (_li + 1) * _cell + _cell // 2 + 3
+                        _svg_labels += f'<text x="{_cell - 4}" y="{_ly}" fill="#94a3b8" font-size="8" text-anchor="end" font-family="Inter,sans-serif">{_html_eb.escape(_ln)}</text>'
+                    _total_svg = (_n_p + 1) * _cell + 4
+                    st.markdown(
+                        f'<div style="overflow-x:auto;"><svg width="{_total_svg}" height="{_total_svg}">{_svg_labels}{_svg_rects}</svg></div>',
+                        unsafe_allow_html=True,
+                    )
+
+            # Weakest link + Swap button (#12)
             weakest = identify_weakest_link(picks_to_include)
             if weakest:
                 weakest_prob = weakest.get("probability_over", 0.5) if weakest.get("direction") == "OVER" else 1.0 - weakest.get("probability_over", 0.5)
                 if weakest_prob < 0.60:
-                    st.warning(f"⚠️ Weakest leg: **{weakest.get('player_name','')}** ({weakest_prob*100:.0f}%) — consider swapping this pick")
+                    _swap_candidate = suggest_swap(weakest, qualifying_picks, picks_to_include)
+                    _swap_msg = f"⚠️ Weakest leg: **{weakest.get('player_name','')}** ({weakest_prob*100:.0f}%)"
+                    if _swap_candidate:
+                        _swap_msg += f" — {_swap_candidate.get('swap_reason', '')}"
+                    st.warning(_swap_msg)
+                    if _swap_candidate:
+                        if st.button(
+                            f"🔄 Swap Now: Replace with {_swap_candidate.get('player_name','')}",
+                            key="swap_weakest_btn",
+                        ):
+                            _new_picks = [
+                                _swap_candidate if p.get("player_name") == weakest.get("player_name") and p.get("stat_type") == weakest.get("stat_type")
+                                else p
+                                for p in st.session_state.get("selected_picks", [])
+                            ]
+                            st.session_state["selected_picks"] = _new_picks
+                            st.rerun()
+
+            # ── Live Ticket Preview (#2) ──────────────────────────────
+            _live_legs = ""
+            for _lp in picks_to_include:
+                _lp_dir = _lp.get("direction", "OVER")
+                _lp_name = _html_eb.escape(str(_lp.get("player_name", "?")))
+                _lp_team = _html_eb.escape(str(_lp.get("player_team", _lp.get("team", ""))))
+                _lp_stat = _html_eb.escape(str(_lp.get("stat_type", "")).title())
+                _lp_line = _lp.get("line", 0)
+                _lp_tier = _lp.get("tier", "Bronze")
+                _lp_edge = _lp.get("edge_percentage", 0)
+                _lp_prob = _lp.get("probability_over", 0.5)
+                _lp_prob_dir = (_lp_prob if _lp_dir == "OVER" else 1.0 - _lp_prob) * 100
+                _lp_tc = _tier_badge_colors.get(_lp_tier, "#94a3b8")
+                _lp_pc = "#00ff9d" if _lp_prob_dir >= 60 else ("#ffcc00" if _lp_prob_dir >= 55 else "#ff6b6b")
+                _live_legs += (
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                    f'padding:6px 12px;border-bottom:1px solid rgba(148,163,184,0.08);">'
+                    f'<div><span style="color:#e2e8f0;font-weight:600;font-size:0.82rem;">{_lp_name}</span>'
+                    f'<span style="color:#64748b;font-size:0.70rem;margin-left:6px;">{_lp_team}</span><br>'
+                    f'<span style="color:#94a3b8;font-size:0.74rem;">{_lp_stat} '
+                    f'<span style="color:{"#00f0ff" if _lp_dir == "OVER" else "#ff5e00"};">'
+                    f'{"MORE" if _lp_dir == "OVER" else "LESS"}</span> {_lp_line}</span></div>'
+                    f'<div style="text-align:right;">'
+                    f'<span style="color:{_lp_tc};font-size:0.70rem;font-weight:700;">{_lp_tier}</span>'
+                    f'<span style="color:{_lp_pc};font-size:0.78rem;font-weight:700;margin-left:6px;">{_lp_prob_dir:.0f}%</span></div></div>'
+                )
+            _live_ev_val = quick_ev.get("return_on_investment", 0) * 100
+            _live_ev_c = "#00ff9d" if _live_ev_val >= 0 else "#ff5e00"
+            _live_ev_s = "+" if _live_ev_val > 0 else ""
+            _combined_prob_live = 1.0
+            for _sp in selected_probs:
+                _combined_prob_live *= _sp
+            st.markdown(
+                f'<div style="background:#070A13;border:2px solid #0F172A;border-radius:12px;'
+                f'overflow:hidden;max-width:480px;margin:16px auto;box-shadow:0 4px 24px rgba(0,0,0,0.4);">'
+                f'<div style="background:linear-gradient(135deg,#0F172A,#1e293b);'
+                f'padding:10px 16px;border-bottom:2px solid rgba(0,255,157,0.15);">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="color:#00ff9d;font-weight:800;font-size:0.92rem;font-family:Inter,sans-serif;">'
+                f'🎫 LIVE PREVIEW · {len(picks_to_include)}-LEG SLIP</span>'
+                f'<span style="color:#64748b;font-size:0.70rem;">{quick_platform}</span>'
+                f'</div></div>'
+                f'<div style="padding:2px 0;">{_live_legs}</div>'
+                f'<div style="background:#0F172A;padding:10px 16px;border-top:1px solid rgba(148,163,184,0.08);">'
+                f'<div style="display:flex;justify-content:space-between;align-items:baseline;">'
+                f'<div><span style="color:#64748b;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;">EV ROI</span><br>'
+                f'<span style="color:{_live_ev_c};font-size:1.1rem;font-weight:900;'
+                f'font-family:\'JetBrains Mono\',monospace;">{_live_ev_s}{_live_ev_val:.1f}%</span></div>'
+                f'<div style="text-align:right;"><span style="color:#64748b;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.08em;">ALL-HIT PROB</span><br>'
+                f'<span style="color:#e2e8f0;font-size:0.95rem;font-weight:700;'
+                f'font-family:\'JetBrains Mono\',monospace;">{_combined_prob_live*100:.1f}%</span></div>'
+                f'</div></div></div>',
+                unsafe_allow_html=True,
+            )
         
         if st.button("🗑️ Clear All Selected Picks", key="clear_selected"):
             st.session_state["selected_picks"] = []
@@ -540,20 +756,42 @@ build_button = st.button(
 )
 
 if build_button:
-    with st.spinner("Building optimal entries..."):
-        optimal_entries = build_optimal_entries(
-            analyzed_picks=qualifying_picks,
-            platform=selected_platform,
-            entry_size=int(entry_size),
-            entry_fee=float(entry_fee),
-            max_entries_to_show=int(max_entries),
-        )
+    import time as _time_eb
+    _build_progress = st.progress(0, text="Evaluating combinations…")
+    _time_eb.sleep(0.15)
+    _build_progress.progress(20, text="Checking correlations…")
+    _time_eb.sleep(0.15)
+    _build_progress.progress(40, text="Ranking by EV…")
+    optimal_entries = build_optimal_entries(
+        analyzed_picks=qualifying_picks,
+        platform=selected_platform,
+        entry_size=int(entry_size),
+        entry_fee=float(entry_fee),
+        max_entries_to_show=int(max_entries),
+    )
+    _build_progress.progress(80, text="Applying Kelly sizing…")
+    _time_eb.sleep(0.15)
+    _build_progress.progress(100, text="✅ Done!")
+    _time_eb.sleep(0.3)
+    _build_progress.empty()
 
     if optimal_entries:
         _effective_max = int(session_budget // entry_fee) if session_budget > 0 else len(optimal_entries)
         _show_entries = optimal_entries[:_effective_max] if session_budget > 0 else optimal_entries
         st.success(f"✅ Built {len(_show_entries)} optimal entries!"
                    + (f" (budget-limited to {_effective_max})" if session_budget > 0 and _effective_max < len(optimal_entries) else ""))
+
+        # ── Record to Entry History (#8) ──────────────────────────
+        if "entry_history" not in st.session_state:
+            st.session_state["entry_history"] = []
+        for _he_entry in _show_entries:
+            _he_ev_d = format_ev_display(_he_entry["ev_result"], entry_fee)
+            st.session_state["entry_history"].append({
+                "timestamp": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "legs": _he_entry["picks"],
+                "ev_label": _he_ev_d["ev_label"],
+                "platform": selected_platform,
+            })
 
         for entry_rank, entry in enumerate(_show_entries, start=1):
             picks = entry["picks"]
@@ -582,7 +820,6 @@ if build_button:
                 _is_locked = _pname in st.session_state.get("locked_legs", set())
                 _lock_badge = ' <span style="background:#c800ff;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.68rem;">🔒 LOCKED</span>' if _is_locked else ""
                 _prob_color = "#00ff9d" if _pdisp_prob >= 60 else ("#ffcc00" if _pdisp_prob >= 55 else "#ff6b6b")
-                import html as _html_eb
                 _pick_cells += (
                     f'<div style="flex:1;min-width:120px;background:rgba(0,0,0,0.3);border-radius:8px;'
                     f'padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.08);">'
@@ -597,7 +834,6 @@ if build_button:
                     f'</div>'
                 )
 
-            import html as _html_eb2
             st.markdown(
                 f'<div style="background:#14192b;border-radius:10px;padding:16px 20px;'
                 f'margin-bottom:16px;border-top:3px solid {_card_border};">'
@@ -605,8 +841,8 @@ if build_button:
                 f'<div style="font-family:Orbitron,sans-serif;font-size:1rem;color:{_card_border};font-weight:700;">'
                 f'Entry #{entry_rank}</div>'
                 f'<div style="display:flex;gap:16px;font-size:0.85rem;">'
-                f'<span style="color:{_card_border};font-weight:700;">EV: {_html_eb2.escape(ev_label)}</span>'
-                f'<span style="color:#8a9bb8;">ROI: {_html_eb2.escape(roi_label)}</span>'
+                f'<span style="color:{_card_border};font-weight:700;">EV: {_html_eb.escape(ev_label)}</span>'
+                f'<span style="color:#8a9bb8;">ROI: {_html_eb.escape(roi_label)}</span>'
                 f'<span style="color:#8a9bb8;">Confidence: {confidence:.0f}/100</span>'
                 f'</div></div>'
                 f'<div style="display:flex;gap:8px;flex-wrap:wrap;">{_pick_cells}</div>'
@@ -624,7 +860,7 @@ if build_button:
                 discount_pct = round((1.0 - corr_risk.get("discount_multiplier", 1.0)) * 100)
                 st.caption(f"📉 Correlation discount applied: −{discount_pct}% EV adjustment")
 
-            # Weakest link warning + swap suggestion
+            # Weakest link warning + swap suggestion + Swap button (#12)
             weakest = entry.get("weakest_link")
             weakest_label = entry.get("weakest_link_label", "")
             weakest_prob = entry.get("weakest_link_probability", 0.5)
@@ -635,6 +871,17 @@ if build_button:
                         f"⚠️ **Weakest leg:** {weakest_label} — "
                         f"consider swapping: {swap.get('swap_reason', '')}"
                     )
+                    if st.button(
+                        f"🔄 Swap: Replace with {swap.get('player_name','')}",
+                        key=f"swap_built_{entry_rank}",
+                    ):
+                        _new_picks = [
+                            swap if (p.get("player_name") == weakest.get("player_name") and p.get("stat_type") == weakest.get("stat_type"))
+                            else p
+                            for p in st.session_state.get("selected_picks", [])
+                        ]
+                        st.session_state["selected_picks"] = _new_picks
+                        st.rerun()
                 else:
                     st.caption(f"⚠️ Weakest leg: {weakest_label}")
 
@@ -691,6 +938,40 @@ if build_button:
                         )
             except Exception as _exc:
                 logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
+
+            # ── One-Click "Log to Bet Tracker" (#9) ──────────────────
+            if st.button(f"📋 Log Entry #{entry_rank} to Bet Tracker", key=f"log_entry_{entry_rank}"):
+                try:
+                    from tracking.database import insert_bet as _insert_bet_eb
+                    _today_str = _dt.date.today().isoformat()
+                    _logged_count = 0
+                    for _lp in picks:
+                        _bet_data = {
+                            "bet_date": _today_str,
+                            "player_name": _lp.get("player_name", ""),
+                            "team": _lp.get("player_team", _lp.get("team", "")),
+                            "stat_type": _lp.get("stat_type", ""),
+                            "prop_line": float(_lp.get("line", 0)),
+                            "direction": _lp.get("direction", "OVER"),
+                            "platform": selected_platform,
+                            "confidence_score": float(_lp.get("confidence_score", 0)),
+                            "probability_over": float(_lp.get("probability_over", 0.5)),
+                            "edge_percentage": float(_lp.get("edge_percentage", 0)),
+                            "tier": _lp.get("tier", "Bronze"),
+                            "entry_type": "parlay",
+                            "entry_fee": float(entry_fee),
+                            "notes": f"Entry #{entry_rank} ({entry_size}-pick, EV: {ev_label})",
+                            "auto_logged": 1,
+                        }
+                        _row_id = _insert_bet_eb(_bet_data)
+                        if _row_id:
+                            _logged_count += 1
+                    if _logged_count:
+                        st.success(f"✅ Logged {_logged_count} leg(s) from Entry #{entry_rank} to Bet Tracker!")
+                    else:
+                        st.error("Failed to log entry. Check database connection.")
+                except Exception as _log_exc:
+                    st.error(f"Error logging entry: {_log_exc}")
 
             st.markdown("---")
 
@@ -768,6 +1049,33 @@ selected_pick_labels = st.multiselect(
     options=available_pick_options,
     help="Choose 2-6 picks to build a custom entry",
 )
+
+# ── Color-Coded Tier Badges (#7) ─────────────────────────────
+if selected_pick_labels:
+    _custom_tier_colors = {
+        "Platinum": "#00f0ff", "Gold": "#ffd700",
+        "Silver": "#c0c0c0", "Bronze": "#cd7f32",
+    }
+    _chips_html = ""
+    for _cl in selected_pick_labels:
+        _parts = _cl.split(" | ")
+        _c_tier = _parts[-1].strip() if len(_parts) >= 5 else "Bronze"
+        # Extract tier name from emoji+name
+        for _tn in _custom_tier_colors:
+            if _tn in _c_tier:
+                _c_bg = _custom_tier_colors[_tn]
+                break
+        else:
+            _c_bg = "#cd7f32"
+        _chips_html += (
+            f'<span style="display:inline-block;background:{_c_bg};color:#0a0f1a;'
+            f'padding:3px 10px;border-radius:14px;font-size:0.76rem;font-weight:700;'
+            f'margin:2px 4px;">{_html_eb.escape(_cl)}</span>'
+        )
+    st.markdown(
+        f'<div style="margin:6px 0 12px;line-height:2;">{_chips_html}</div>',
+        unsafe_allow_html=True,
+    )
 
 if len(selected_pick_labels) >= 2:
     # Find the corresponding results
@@ -863,10 +1171,23 @@ _generate_clicked = st.button(
 if _generate_clicked:
     from engine.odds_engine import generate_optimal_slip, implied_probability_to_american_odds, calculate_fractional_kelly, calculate_dfs_ev
     from engine.math_helpers import clamp_probability
-    import html as _ehtml
+
+    # ── Locked legs integration (#13): force locked picks into Auto-Slip ──
+    _locked_names = st.session_state.get("locked_legs", set())
+    _locked_picks_for_slip = [p for p in qualifying_picks if p.get("player_name", "") in _locked_names] if _locked_names else []
 
     with st.spinner("🔬 Running combinatorial optimizer..."):
         _slips = generate_optimal_slip(qualifying_picks, platform=_opt_platform)
+
+    # If locked legs exist, force them into every slip
+    if _locked_picks_for_slip and _slips:
+        _locked_player_set = {p.get("player_name", "") for p in _locked_picks_for_slip}
+        for _s in _slips:
+            _existing_names = {p.get("player_name", "") for p in _s.get("picks", [])}
+            for _lp in _locked_picks_for_slip:
+                if _lp.get("player_name", "") not in _existing_names:
+                    _s["picks"].append(_lp)
+                    _s["slip_size"] = len(_s["picks"])
 
     if not _slips:
         st.warning("Not enough qualifying picks to generate an optimal slip.")
@@ -975,8 +1296,8 @@ if _generate_clicked:
         _dfs_edges = _best.get("dfs_leg_edges", [])
         _legs_html = ""
         for _idx, _pk in enumerate(_picks, 1):
-            _pk_name = _ehtml.escape(str(_pk.get("player_name", "?")))
-            _pk_stat = _ehtml.escape(str(_pk.get("stat_type", "")).title())
+            _pk_name = _html_eb.escape(str(_pk.get("player_name", "?")))
+            _pk_stat = _html_eb.escape(str(_pk.get("stat_type", "")).title())
             _pk_dir = _pk.get("direction", "OVER")
             _pk_line = _pk.get("line", 0)
             _pk_prob = _pk.get("probability_over", 0.5)
@@ -984,7 +1305,7 @@ if _generate_clicked:
             _pk_conf = _pk.get("confidence_score", 50)
             _pk_tier = _pk.get("tier", "Bronze")
             _pk_edge = _pk.get("edge_percentage", 0)
-            _pk_team = _ehtml.escape(str(_pk.get("player_team", _pk.get("team", ""))))
+            _pk_team = _html_eb.escape(str(_pk.get("player_team", _pk.get("team", ""))))
 
             _tier_colors = {
                 "Platinum": "#00f0ff", "Gold": "#ffd700", "Silver": "#c0c0c0",
@@ -1149,6 +1470,19 @@ if _generate_clicked:
 
         st.markdown(_ticket_html, unsafe_allow_html=True)
 
+        # ── Export Slip to Image (#15) ────────────────────────────
+        st.download_button(
+            label="📸 Export Slip as HTML",
+            data=(
+                '<!DOCTYPE html><html><head><meta charset="utf-8">'
+                '<style>body{background:#070A13;margin:20px;font-family:Inter,system-ui,sans-serif;}</style>'
+                '</head><body>' + _ticket_html + '</body></html>'
+            ),
+            file_name="optimal_slip.html",
+            mime="text/html",
+            key="export_slip_html",
+        )
+
         # Show runner-up slips
         if len(_slips) > 1:
             with st.expander(f"📊 {len(_slips)-1} Alternative Slips", expanded=False):
@@ -1159,7 +1493,7 @@ if _generate_clicked:
                     _alt_odds = _alt["fair_odds"]
                     _alt_penalty = _alt["correlation_penalty"]
                     _alt_names = ", ".join(
-                        _ehtml.escape(str(p.get("player_name", "?"))) for p in _alt["picks"]
+                        _html_eb.escape(str(p.get("player_name", "?"))) for p in _alt["picks"]
                     )
                     _alt_ev_c = "#00ff9d" if _alt_ev > 0 else "#ff5e00"
                     _alt_s = "+" if _alt_ev > 0 else ""
@@ -1186,4 +1520,110 @@ if _generate_clicked:
 
 # ============================================================
 # END SECTION: Auto-Slip Optimizer
+# ============================================================
+
+# ============================================================
+# SECTION: Cross-Platform EV Comparison (#10)
+# ============================================================
+
+st.divider()
+
+with st.expander("🔀 Cross-Platform EV Comparison", expanded=False):
+    st.markdown(
+        '<p style="color:#94a3b8;font-size:0.84rem;margin:0 0 12px;">'
+        'See how the same entry&#39;s EV compares across platforms.</p>',
+        unsafe_allow_html=True,
+    )
+    # Use top qualifying picks for comparison
+    _cmp_picks = qualifying_picks[:min(int(entry_size), len(qualifying_picks))]
+    if len(_cmp_picks) >= 2:
+        _cmp_probs = [
+            p.get("probability_over", 0.5) if p.get("direction") == "OVER"
+            else 1.0 - p.get("probability_over", 0.5)
+            for p in _cmp_picks
+        ]
+        _cmp_platforms = ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
+        _cmp_rows = ""
+        for _cp in _cmp_platforms:
+            _cp_table = PLATFORM_FLEX_TABLES.get(_cp, SPORTSBOOK_PARLAY_TABLE)
+            _cp_payout = _cp_table.get(len(_cmp_picks), {})
+            if _cp_payout:
+                _cp_ev = calculate_entry_expected_value(_cmp_probs, _cp_payout, float(entry_fee))
+                _cp_display = format_ev_display(_cp_ev, float(entry_fee))
+                _cp_color = "#00ff9d" if _cp_display["is_positive_ev"] else "#ff5e00"
+                _cmp_rows += (
+                    f'<div style="display:flex;justify-content:space-between;align-items:center;'
+                    f'padding:8px 14px;border-bottom:1px solid rgba(148,163,184,0.06);">'
+                    f'<span style="color:#c0d0e8;font-weight:600;font-size:0.85rem;">{_html_eb.escape(_cp)}</span>'
+                    f'<div>'
+                    f'<span style="color:{_cp_color};font-weight:700;font-size:0.9rem;'
+                    f'font-family:\'JetBrains Mono\',monospace;">{_html_eb.escape(_cp_display["ev_label"])}</span>'
+                    f'<span style="color:#8a9bb8;font-size:0.76rem;margin-left:10px;">'
+                    f'ROI: {_html_eb.escape(_cp_display["roi_label"])}</span>'
+                    f'</div></div>'
+                )
+            else:
+                _cmp_rows += (
+                    f'<div style="padding:6px 14px;border-bottom:1px solid rgba(148,163,184,0.06);">'
+                    f'<span style="color:#64748b;font-size:0.82rem;">{_html_eb.escape(_cp)}: No {len(_cmp_picks)}-pick payout table</span></div>'
+                )
+        _cmp_names = ", ".join(_html_eb.escape(p.get("player_name", "?")) for p in _cmp_picks)
+        st.markdown(
+            f'<div style="background:#0a0f1a;border-radius:10px;overflow:hidden;'
+            f'border:1px solid rgba(0,255,157,0.12);">'
+            f'<div style="background:#0F172A;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,0.08);">'
+            f'<span style="color:#00ff9d;font-weight:700;font-size:0.85rem;">📊 {len(_cmp_picks)}-Leg Entry</span>'
+            f'<span style="color:#64748b;font-size:0.72rem;margin-left:8px;">{_cmp_names}</span></div>'
+            f'{_cmp_rows}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("Need at least 2 qualifying picks for comparison.")
+
+# ============================================================
+# END SECTION: Cross-Platform EV Comparison
+# ============================================================
+
+
+# ============================================================
+# SECTION: Entry History Persistence (#8)
+# ============================================================
+
+st.divider()
+
+with st.expander("📜 Entry History", expanded=False):
+    if "entry_history" not in st.session_state:
+        st.session_state["entry_history"] = []
+
+    _history = st.session_state["entry_history"]
+
+    if _history:
+        for _hi, _he in enumerate(reversed(_history), 1):
+            _he_time = _he.get("timestamp", "")
+            _he_legs = _he.get("legs", [])
+            _he_ev = _he.get("ev_label", "N/A")
+            _he_plat = _he.get("platform", "")
+            _he_leg_names = ", ".join(_html_eb.escape(l.get("player_name", "?")) for l in _he_legs)
+            st.markdown(
+                f'<div style="background:#14192b;border-radius:8px;padding:10px 14px;'
+                f'margin-bottom:6px;border-left:3px solid #00ff9d;">'
+                f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+                f'<span style="color:#c0d0e8;font-weight:600;font-size:0.84rem;">'
+                f'Entry #{_hi} · {len(_he_legs)} legs</span>'
+                f'<span style="color:#64748b;font-size:0.72rem;">{_html_eb.escape(_he_time)} · {_html_eb.escape(_he_plat)}</span>'
+                f'</div>'
+                f'<div style="color:#8a9bb8;font-size:0.78rem;margin-top:4px;">{_he_leg_names}</div>'
+                f'<div style="color:#00ff9d;font-size:0.82rem;font-weight:700;margin-top:2px;">EV: {_html_eb.escape(_he_ev)}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        if st.button("🗑️ Clear History", key="clear_entry_history"):
+            st.session_state["entry_history"] = []
+            st.rerun()
+    else:
+        st.caption("No entries built yet this session. Build an entry above to start tracking.")
+
+# ============================================================
+# END SECTION: Entry History Persistence
 # ============================================================
