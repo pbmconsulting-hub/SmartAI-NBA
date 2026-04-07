@@ -719,16 +719,40 @@ if run_analysis:
         # ── Filter to only players on real betting platforms ───────────────
         # If live platform props have been loaded, drop synthetic-only props
         # for players who don't appear on any real betting app today.
+        # EXCEPTION: Players who already have active bets are never filtered out.
         _live_platform_props = st.session_state.get("platform_props", [])
         if _live_platform_props:
-            before_plat_filter = len(props_to_analyze)
-            props_to_analyze = filter_props_to_platform_players(props_to_analyze, _live_platform_props)
-            plat_players_skipped = before_plat_filter - len(props_to_analyze)
+            # Build set of players with active bets — these should always be analyzed
+            _active_bet_names = set()
+            for _ab in st.session_state.get("active_bets", []):
+                _abn = (_ab.get("player_name") or "").strip().lower()
+                if _abn:
+                    _active_bet_names.add(_abn)
+            for _ab in st.session_state.get("analysis_results", []):
+                _abn = (_ab.get("player_name") or "").strip().lower()
+                if _abn:
+                    _active_bet_names.add(_abn)
+
+            # First apply the platform filter
+            _filtered = filter_props_to_platform_players(props_to_analyze, _live_platform_props)
+
+            # Then re-add any props for players with active bets that were dropped
+            if _active_bet_names:
+                _filtered_names = {(p.get("player_name") or "").strip().lower() for p in _filtered}
+                _rescued = [
+                    p for p in props_to_analyze
+                    if (p.get("player_name") or "").strip().lower() in _active_bet_names
+                    and (p.get("player_name") or "").strip().lower() not in _filtered_names
+                ]
+                _filtered.extend(_rescued)
+
+            plat_players_skipped = len(props_to_analyze) - len(_filtered)
+            props_to_analyze = _filtered
             if plat_players_skipped > 0:
                 st.info(
                     f"ℹ️ Skipping **{plat_players_skipped}** prop(s) for players not found on "
-                    f"all major sportsbooks today. "
-                    f"Only platform-verified players are shown. ({len(props_to_analyze)} remaining)"
+                    f"any sportsbook today. "
+                    f"Players with active bets are always included. ({len(props_to_analyze)} remaining)"
                 )
 
         # ── Filter to selected platforms (from ⚙️ Settings) ──────────────

@@ -13,6 +13,15 @@ import html as _html
 import logging
 import random
 
+
+def _safe_float(val, default=0.0):
+    """Convert *val* to float, returning *default* on failure."""
+    try:
+        return float(val) if val is not None else default
+    except (TypeError, ValueError):
+        return default
+
+
 # ── Styles ───────────────────────────────────────────────────
 try:
     from styles.theme import (
@@ -1229,6 +1238,99 @@ else:
         "📡 Load games on **📡 Live Games** and get live props, "
         "or run **⚡ Neural Analysis** to populate Joseph's Dawg Board!"
     )
+
+# ── Joseph's Tonight's Bets ──────────────────────────────────
+st.markdown(
+    '<div class="studio-section-title">🎯 JOSEPH\'S BETS TONIGHT</div>',
+    unsafe_allow_html=True,
+)
+
+if joseph_results:
+    # Filter to SMASH and LEAN verdicts — Joseph's actual bets
+    _joseph_bets_tonight = [
+        r for r in joseph_results
+        if r.get("verdict") in ("SMASH", "LEAN")
+    ]
+
+    if _joseph_bets_tonight:
+        st.markdown(
+            f'<div style="color:#8a9bb8;font-size:0.84rem;margin-bottom:10px;">'
+            f'Joseph has <strong style="color:#00f0ff;">{len(_joseph_bets_tonight)}</strong> '
+            f'active bets tonight (SMASH + LEAN picks).</div>',
+            unsafe_allow_html=True,
+        )
+
+        _jbt_rows = ""
+        for _jb in sorted(_joseph_bets_tonight, key=lambda x: abs(x.get("edge", 0)), reverse=True):
+            _jb_name = _html.escape(str(_jb.get("player", _jb.get("name", "Unknown"))))
+            _jb_prop = _html.escape(str(_jb.get("prop", _jb.get("stat_type", ""))))
+            _jb_dir = _html.escape(str(_jb.get("direction", "")))
+            _jb_line = _jb.get("line", "")
+            _jb_verdict = _jb.get("verdict", "")
+            _jb_emoji = _jb.get("verdict_emoji", "")
+            _jb_edge = _jb.get("edge", 0)
+            _jb_team = _html.escape(str(_jb.get("team", "")))
+
+            _jb_v_clr = "#ff4444" if _jb_verdict == "SMASH" else "#00ff9d"
+            _jb_edge_clr = "#00ff9d" if _jb_edge > 0 else "#ff6b6b"
+
+            _jbt_rows += (
+                f'<tr>'
+                f'<td><strong>{_jb_name}</strong>'
+                f'<span style="color:#718096;font-size:0.75rem;margin-left:6px">{_jb_team}</span></td>'
+                f'<td style="color:#c0d0e8">{_jb_dir} {_jb_line} {_jb_prop}</td>'
+                f'<td style="color:{_jb_v_clr};font-weight:700">{_html.escape(str(_jb_emoji))} {_html.escape(_jb_verdict)}</td>'
+                f'<td style="color:{_jb_edge_clr};font-weight:700">{_jb_edge:+.1f}%</td>'
+                f'</tr>'
+            )
+
+        st.markdown(
+            '<table class="joseph-dawg-table">'
+            '<thead><tr>'
+            '<th>Player</th><th>Bet</th><th>Verdict</th><th>Edge</th>'
+            '</tr></thead>'
+            f'<tbody>{_jbt_rows}</tbody>'
+            '</table>',
+            unsafe_allow_html=True,
+        )
+
+        # Auto-save Joseph's bets to the bet tracker
+        if _BETS_AVAILABLE:
+            try:
+                from tracking.database import insert_bet as _insert_joseph_bet
+                import datetime as _dt_jb
+                _saved_key = "joseph_bets_saved_today"
+                if not st.session_state.get(_saved_key):
+                    _saved_count = 0
+                    _today_str = _dt_jb.date.today().strftime("%Y-%m-%d")
+                    for _jb in _joseph_bets_tonight:
+                        try:
+                            _insert_joseph_bet({
+                                "bet_date": _today_str,
+                                "player_name": _jb.get("player", _jb.get("name", "")),
+                                "team": _jb.get("team", ""),
+                                "stat_type": _jb.get("prop", _jb.get("stat_type", "")),
+                                "prop_line": _safe_float(_jb.get("line", 0)),
+                                "direction": _jb.get("direction", "OVER"),
+                                "platform": "Joseph M. Smith",
+                                "confidence_score": _safe_float(_jb.get("confidence", 50)),
+                                "edge_percentage": _safe_float(_jb.get("edge", 0)),
+                                "tier": _jb.get("verdict", ""),
+                                "notes": f"Joseph {_jb.get('verdict', '')} pick — edge {_safe_float(_jb.get('edge', 0)):+.1f}%",
+                                "auto_logged": 1,
+                            })
+                            _saved_count += 1
+                        except Exception:
+                            pass
+                    st.session_state[_saved_key] = True
+                    if _saved_count > 0:
+                        st.caption(f"📝 Auto-saved {_saved_count} bet(s) to the Bet Tracker.")
+            except ImportError:
+                pass
+    else:
+        st.info("Joseph hasn't locked any SMASH or LEAN bets yet tonight.")
+else:
+    st.info("Run Neural Analysis to generate Joseph's bet picks.")
 
 # ── Override Report ──────────────────────────────────────────
 st.markdown(

@@ -15,6 +15,12 @@ from data.data_manager import load_teams_data, get_all_team_abbreviations, find_
 from data.nba_data_service import get_todays_games, get_todays_players, get_all_todays_data
 
 try:
+    from data.nba_data_service import refresh_from_etl as _lg_refresh_etl, full_refresh_from_etl as _lg_full_refresh_etl
+    _ETL_AVAILABLE_LG = True
+except ImportError:
+    _ETL_AVAILABLE_LG = False
+
+try:
     from utils.logger import get_logger
     _logger = get_logger(__name__)
 except ImportError:
@@ -313,11 +319,109 @@ with _load_btn_col:
 
 st.markdown("---")
 
+# ── ETL Data Pull Section ────────────────────────────────────────────────
+if _ETL_AVAILABLE_LG:
+    with st.expander("🗄️ ETL Data Pull — Fresh Stats from Local Database", expanded=False):
+        st.markdown(
+            '<span style="color:#8a9bb8;font-size:0.84rem;">'
+            'Pull the latest player stats into your local database before loading games. '
+            '<strong style="color:#e8f0ff;">Smart Update</strong> fetches only new data (~30s). '
+            '<strong style="color:#e8f0ff;">Full Pull</strong> refreshes the entire season (~60s).'
+            '</span>',
+            unsafe_allow_html=True,
+        )
+        _etl_col1, _etl_col2, _etl_col3 = st.columns([1, 1, 2])
+        with _etl_col1:
+            _etl_smart_clicked = st.button(
+                "⚡ Smart ETL Update",
+                key="lg_etl_smart_btn",
+                help="Incremental update — fetches only new games since the last stored date (~30 seconds)",
+            )
+        with _etl_col2:
+            _etl_full_clicked = st.button(
+                "🔄 Full ETL Pull",
+                key="lg_etl_full_btn",
+                help="Re-pull entire season from nba_api and repopulate db/smartpicks.db (~60 seconds)",
+            )
+        with _etl_col3:
+            st.caption(
+                "Run ETL **before** Auto-Load for the freshest stats. "
+                "One-Click Setup now includes a Smart ETL Update automatically."
+            )
+
+        if _etl_smart_clicked:
+            _etl_bar = st.progress(0, text="Starting Smart ETL Update…")
+            _etl_status = st.empty()
+            try:
+                def _lg_etl_progress(current, total, message):
+                    frac = current / max(total, 1)
+                    _etl_bar.progress(frac, text=message)
+                    _etl_status.caption(message)
+
+                result = _lg_refresh_etl(progress_callback=_lg_etl_progress)
+                _etl_bar.progress(1.0, text="Done!")
+                ng = result.get("new_games", 0)
+                nl = result.get("new_logs", 0)
+                err = result.get("error")
+                if err:
+                    st.error(f"❌ Smart ETL Update failed: {err}")
+                else:
+                    st.success(f"✅ Smart ETL Update complete! **{ng}** new game(s) · **{nl}** new log row(s).")
+                _etl_bar.empty()
+                _etl_status.empty()
+            except Exception as _etl_err:
+                _etl_bar.empty()
+                _etl_status.empty()
+                st.error(f"❌ Smart ETL Update failed: {_etl_err}")
+
+        if _etl_full_clicked:
+            _etl_bar = st.progress(0, text="Starting Full ETL Pull…")
+            _etl_status = st.empty()
+            try:
+                def _lg_etl_full_progress(current, total, message):
+                    frac = current / max(total, 1)
+                    _etl_bar.progress(frac, text=message)
+                    _etl_status.caption(message)
+
+                result = _lg_full_refresh_etl(progress_callback=_lg_etl_full_progress)
+                _etl_bar.progress(1.0, text="Done!")
+                np_ = result.get("players_inserted", 0)
+                ng = result.get("games_inserted", 0)
+                nl = result.get("logs_inserted", 0)
+                err = result.get("error")
+                if err:
+                    st.error(f"❌ Full ETL Pull failed: {err}")
+                else:
+                    st.success(
+                        f"✅ Full ETL Pull complete! "
+                        f"**{np_}** players · **{ng}** games · **{nl}** logs inserted."
+                    )
+                _etl_bar.empty()
+                _etl_status.empty()
+            except Exception as _etl_err:
+                _etl_bar.empty()
+                _etl_status.empty()
+                st.error(f"❌ Full ETL Pull failed: {_etl_err}")
+
+st.markdown("---")
+
 if auto_load_clicked:
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     try:
+        # ── ETL Step: Refresh local DB before loading games ──────────
+        if _ETL_AVAILABLE_LG:
+            status_text.text("⏳ Step 0/3 — Running Smart ETL Update for fresh stats…")
+            progress_bar.progress(2)
+            try:
+                _al_etl_result = _lg_refresh_etl()
+                _al_etl_ng = _al_etl_result.get("new_games", 0)
+                _al_etl_nl = _al_etl_result.get("new_logs", 0)
+                _logger.info("Auto-Load ETL step: %d new games, %d new logs", _al_etl_ng, _al_etl_nl)
+            except Exception as _al_etl_err:
+                _logger.warning("Auto-Load ETL step failed (non-fatal): %s", _al_etl_err)
+
         status_text.text("⏳ Step 1/3 — Loading tonight's games...")
         progress_bar.progress(5)
         games = get_todays_games()
@@ -1144,8 +1248,20 @@ if one_click_setup_clicked:
     _oc_status = st.empty()
 
     try:
+        # ── Phase 0: ETL Update for fresh local DB stats ──────────────
+        if _ETL_AVAILABLE_LG:
+            _oc_status.text("⏳ Phase 0/4 — Running Smart ETL Update for fresh stats…")
+            _oc_bar.progress(2)
+            try:
+                _oc_etl_result = _lg_refresh_etl()
+                _oc_etl_ng = _oc_etl_result.get("new_games", 0)
+                _oc_etl_nl = _oc_etl_result.get("new_logs", 0)
+                _logger.info("One-Click ETL step: %d new games, %d new logs", _oc_etl_ng, _oc_etl_nl)
+            except Exception as _oc_etl_err:
+                _logger.warning("One-Click ETL step failed (non-fatal): %s", _oc_etl_err)
+
         # ── Phase 1: Auto-Load Tonight's Games ────────────────────────
-        _oc_status.text("⏳ Phase 1/3 — Auto-loading tonight's games, rosters & stats…")
+        _oc_status.text("⏳ Phase 1/4 — Auto-loading tonight's games, rosters & stats…")
         _oc_bar.progress(5)
         from data.nba_data_service import (
             get_todays_games as _oc_get_games,
@@ -1167,7 +1283,7 @@ if one_click_setup_clicked:
             _oc_games = st.session_state.get("todays_games", [])
 
         _oc_bar.progress(25)
-        _oc_status.text(f"⏳ Phase 1/3 — {len(_oc_games)} game(s) loaded. Loading player data…")
+        _oc_status.text(f"⏳ Phase 1/4 — {len(_oc_games)} game(s) loaded. Loading player data…")
 
         _oc_players_ok = _oc_get_players(_oc_games) if _oc_games else False
         _oc_bar.progress(40)
@@ -1181,7 +1297,7 @@ if one_click_setup_clicked:
             pass
 
         # ── Phase 2: Load team stats & standings ─────────────────────
-        _oc_status.text("⏳ Phase 2/3 — Loading team stats & standings…")
+        _oc_status.text("⏳ Phase 2/4 — Loading team stats & standings…")
         _oc_bar.progress(50)
 
         try:
@@ -1199,7 +1315,7 @@ if one_click_setup_clicked:
         _oc_bar.progress(60)
 
         # ── Phase 3: Get Live Platform Props ────────────────────────
-        _oc_status.text("⏳ Phase 3/3 — Retrieving live prop lines from all platforms…")
+        _oc_status.text("⏳ Phase 3/4 — Retrieving live prop lines from all platforms…")
 
         try:
             from data.sportsbook_service import get_all_sportsbook_props as _oc_get_sportsbook_props
@@ -1335,6 +1451,11 @@ if current_games:
                 return f'<span style="color:#8a9bb8;font-size:0.75rem;">#{rank} {conf}</span>'
             return ""
 
+        def _l10_badge(l10):
+            if l10:
+                return f'<span style="color:#718096;font-size:0.75rem;">L10: {l10}</span>'
+            return ""
+
         game_time = game.get("game_time_et", "")
         arena = game.get("arena", "")
         try:
@@ -1426,37 +1547,35 @@ if current_games:
         # Render card — wrap in an expander so the whole card is clickable
         _expander_label = f"🏀  {away} ({away_w}-{away_l}) @ {home} ({home_w}-{home_l})  •  {lines_line.replace('&nbsp;', ' ')}"
         with st.expander(_expander_label, expanded=True):
-            card_html = f"""
-<div class="game-card" style="cursor:pointer;">
-  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <span class="team-badge away-badge">🚌 {away}</span>
-    <span style="color:#a0aec0; font-size:1rem;">{away_name}</span>
-    <span style="color:#718096; font-size:0.9rem;">({away_w}-{away_l})</span>
-    {_conf_badge(away_rank, away_conf)}
-    {streak_html(away_streak)}
-    {f'<span style="color:#718096;font-size:0.75rem;">L10: {away_l10}</span>' if away_l10 else ''}
-  </div>
-  <div class="vs-divider" style="margin:8px 0;">VS</div>
-  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-    <span class="team-badge home-badge">🏠 {home}</span>
-    <span style="color:#a0aec0; font-size:1rem;">{home_name}</span>
-    <span style="color:#718096; font-size:0.9rem;">({home_w}-{home_l})</span>
-    {_conf_badge(home_rank, home_conf)}
-    {streak_html(home_streak)}
-    {f'<span style="color:#718096;font-size:0.75rem;">L10: {home_l10}</span>' if home_l10 else ''}
-  </div>
-  {f'<div class="game-meta">{meta_line}</div>' if meta_line else ''}
-  <div class="game-meta" style="margin-top:6px;">📊 {lines_line}</div>
-  {ml_line}
-  <div class="key-players">
-    <div class="key-players-title">Key Players</div>
-    <div style="margin-top:6px; display:flex; gap:20px; flex-wrap:wrap;">
-      <div><span style="color:#63b3ed; font-weight:600;">{away}:</span> {player_line(away_players)}</div>
-      <div><span style="color:#68d391; font-weight:600;">{home}:</span> {player_line(home_players)}</div>
-    </div>
-  </div>
-</div>
-"""
+            card_html = (
+                '<div class="game-card" style="cursor:pointer;">'
+                '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
+                f'<span class="team-badge away-badge">🚌 {away}</span>'
+                f'<span style="color:#a0aec0; font-size:1rem;">{away_name}</span>'
+                f'<span style="color:#718096; font-size:0.9rem;">({away_w}-{away_l})</span>'
+                f'{_conf_badge(away_rank, away_conf)}'
+                f'{streak_html(away_streak)}'
+                f'{_l10_badge(away_l10)}'
+                '</div>'
+                '<div class="vs-divider" style="margin:8px 0;">VS</div>'
+                '<div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">'
+                f'<span class="team-badge home-badge">🏠 {home}</span>'
+                f'<span style="color:#a0aec0; font-size:1rem;">{home_name}</span>'
+                f'<span style="color:#718096; font-size:0.9rem;">({home_w}-{home_l})</span>'
+                f'{_conf_badge(home_rank, home_conf)}'
+                f'{streak_html(home_streak)}'
+                f'{_l10_badge(home_l10)}'
+                '</div>'
+                + (f'<div class="game-meta">{meta_line}</div>' if meta_line else '')
+                + f'<div class="game-meta" style="margin-top:6px;">📊 {lines_line}</div>'
+                + ml_line
+                + '<div class="key-players">'
+                '<div class="key-players-title">Key Players</div>'
+                '<div style="margin-top:6px; display:flex; gap:20px; flex-wrap:wrap;">'
+                f'<div><span style="color:#63b3ed; font-weight:600;">{away}:</span> {player_line(away_players)}</div>'
+                f'<div><span style="color:#68d391; font-weight:600;">{home}:</span> {player_line(home_players)}</div>'
+                '</div></div></div>'
+            )
             st.markdown(card_html, unsafe_allow_html=True)
 
             # ── Game Environment Card ──────────────────────────────────────
