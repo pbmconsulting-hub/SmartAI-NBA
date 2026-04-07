@@ -976,4 +976,8 @@ if vibe_checks:
     for player_name, pace in vibe_checks:
         reaction = get_joseph_live_reaction(pace)
         with st.expander(f"🎙️ {player_name}", expanded=pace.get("cashed", False)):
-            st.write_stream(stream_joseph_text(reaction))
+            try:
+                st.write_stream(stream_joseph_text(reaction))
+            except Exception:
+                # Fallback when WebSocket closes mid-stream (e.g. auto-refresh)
+                st.write(reaction)
