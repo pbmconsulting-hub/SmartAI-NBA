@@ -89,16 +89,16 @@ def _fetch_logs_for_range(
         "Fetching %s logs from %s to %s …", kind, str_from, str_to
     )
 
-    endpoint = LeagueGameLog(
-        player_or_team_abbreviation=player_or_team,
-        season=SEASON,
-        season_type_all_star="Regular Season",
-        date_from_nullable=str_from,
-        date_to_nullable=str_to,
-    )
     initial_pull._rate_limited_sleep()
     df = initial_pull._call_with_retries(
-        lambda: endpoint.get_data_frames()[0],
+        lambda: LeagueGameLog(
+            player_or_team_abbreviation=player_or_team,
+            season=SEASON,
+            season_type_all_star="Regular Season",
+            date_from_nullable=str_from,
+            date_to_nullable=str_to,
+            timeout=initial_pull._BULK_ENDPOINT_TIMEOUT,
+        ).get_data_frames()[0],
         description=f"LeagueGameLog({kind}, {str_from}–{str_to})",
     )
     logger.info("%s-level API returned %d rows.", kind.capitalize(), len(df))
@@ -269,7 +269,10 @@ def sync_todays_games(conn: sqlite3.Connection) -> int:
 
     try:
         def _fetch_scoreboard():
-            sb = ScoreboardV2(game_date=today_str)
+            sb = ScoreboardV2(
+                game_date=today_str,
+                timeout=initial_pull._SEASON_DASHBOARD_TIMEOUT,
+            )
             return sb.game_header.get_data_frame(), sb.line_score.get_data_frame()
 
         initial_pull._rate_limited_sleep()
@@ -401,8 +404,9 @@ def run_update(db_path: str = DB_PATH) -> int:
 
     1. Opens the database and queries for the most recent ``game_date`` in
        the ``Games`` table.
-    2. If no date is found the database is empty — logs a warning and returns
-       0 (run ``initial_pull.py`` first).
+    2. If no date is found the database is empty — automatically runs the
+       initial pull to seed the database, then returns the number of log
+       rows inserted.
     3. Fetches all player game logs between ``last_date + 1 day`` and
        yesterday using the NBA API.
     4. De-duplicates and appends new rows to Players, Games,
@@ -429,10 +433,18 @@ def run_update(db_path: str = DB_PATH) -> int:
     try:
         last_date = _get_last_game_date(conn)
         if last_date is None:
-            logger.warning(
-                "Games table is empty. Run initial_pull.py first to seed the database."
+            logger.info(
+                "Games table is empty — running initial pull to seed the database."
             )
-            return 0
+            conn.close()
+            result = initial_pull.run_initial_pull(db_path)
+            count = (result or {}).get("logs_inserted", 0)
+            # Re-open so the finally block can close it cleanly.
+            conn = sqlite3.connect(db_path)
+            logger.info(
+                "=== Initial seed complete. %d log records loaded. ===", count
+            )
+            return count
 
         yesterday = date.today() - timedelta(days=1)
         date_from = last_date + timedelta(days=1)
