@@ -908,7 +908,7 @@ class TestJosephGetAmbientContextImplementation(unittest.TestCase):
         self.assertEqual(kwargs, {})
 
     def test_page_context_all_pages(self):
-        """All 18 page context keys should be recognized."""
+        """All 17 page context keys should be recognized."""
         from engine.joseph_brain import joseph_get_ambient_context
         page_keys = [
             "page_home", "page_live_games",
