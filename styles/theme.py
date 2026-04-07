@@ -1730,6 +1730,111 @@ input:focus, textarea:focus, select:focus,
     }
     /* Stack metrics in fewer columns on small screens */
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
+
+    /* ─── Mobile Sidebar — overlay with proper collapse ──── */
+    [data-testid="stSidebar"] {
+        min-width: 0 !important;
+        width: 280px !important;
+        max-width: 85vw !important;
+        z-index: 9999 !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100vh !important;
+        transition: transform 0.3s cubic-bezier(0.4,0,0.2,1),
+                    visibility 0.3s !important;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.6) !important;
+    }
+    /* When Streamlit collapses the sidebar, slide it off-screen */
+    [data-testid="stSidebar"][aria-expanded="false"] {
+        transform: translateX(-100%) !important;
+        visibility: hidden !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"][aria-expanded="true"] {
+        transform: translateX(0) !important;
+        visibility: visible !important;
+    }
+    /* Hamburger toggle button — always visible & touch-friendly */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        position: fixed !important;
+        top: 10px !important;
+        left: 10px !important;
+        z-index: 10000 !important;
+        background: rgba(13,18,40,0.92) !important;
+        border: 1px solid rgba(0,240,255,0.30) !important;
+        border-radius: 10px !important;
+        padding: 8px 10px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] svg,
+    [data-testid="collapsedControl"] svg {
+        width: 22px !important;
+        height: 22px !important;
+        color: #00f0ff !important;
+    }
+    /* Sidebar nav links — tall touch targets */
+    [data-testid="stSidebar"] .stPageLink,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 10px 16px !important;
+        font-size: 0.95rem !important;
+        border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+    }
+    /* Hide "Powered by" footer on mobile to save space */
+    [data-testid="stSidebar"]::after {
+        display: none !important;
+    }
+    /* Ensure main content doesn't shift under the overlay sidebar */
+    section[data-testid="stMain"] {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    /* Main block padding reduced on mobile */
+    .main .block-container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        padding-top: 56px !important;
+        max-width: 100% !important;
+    }
+    /* Close button inside sidebar */
+    [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {
+        position: absolute !important;
+        top: 8px !important;
+        right: 8px !important;
+        z-index: 10001 !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+}
+
+/* ─── Extra-small screens (phones in portrait) ───────────── */
+@media (max-width: 480px) {
+    [data-testid="stSidebar"] {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        border-right: none !important;
+    }
+    .main .block-container {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+    /* Stack Streamlit columns vertically on very small screens */
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
 }
 
 /* ─── Premium animated gradient border — Neural Header ─── */
