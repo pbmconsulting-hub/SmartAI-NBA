@@ -212,7 +212,13 @@ def _normalize_db_player(p: dict) -> dict:
 # ============================================================
 
 def get_todays_games():
-    """Retrieve tonight's NBA games from the local DB only."""
+    """Retrieve tonight's NBA games.
+
+    Tries the local DB first (for games already played today).  If the DB
+    has no rows for today — the common case for *scheduled* games that
+    haven't tipped off yet — falls back to the live fetcher which queries
+    ScoreboardV3 / ESPN / Live Scoreboard.
+    """
     if _is_db_available():
         try:
             from data.etl_data_service import get_todays_games as _db_get_games
@@ -223,13 +229,28 @@ def get_todays_games():
         except Exception as exc:
             _logger.debug("get_todays_games DB path failed: %s", exc)
 
-    _logger.warning("get_todays_games: no games in DB — returning empty list")
+    # DB has no games for today — fall back to live fetcher
+    # (scheduled games won't be in the Games table until they're played)
+    try:
+        live_games = _ldf_fetch_todays_games()
+        if live_games:
+            _logger.info("get_todays_games: loaded %d game(s) from live fetcher", len(live_games))
+            return live_games
+    except Exception as exc:
+        _logger.warning("get_todays_games live fetcher failed: %s", exc)
+
+    _logger.warning("get_todays_games: no games from DB or live — returning empty list")
     return []
 
 
 def get_todays_players(todays_games, progress_callback=None,
                        precomputed_injury_map=None):
-    """Retrieve players for tonight's games from the local DB only."""
+    """Retrieve players for tonight's games.
+
+    Tries the local DB first.  Falls back to the live fetcher (which
+    writes players.csv and returns a bool) when the DB has no player
+    data for the teams playing tonight.
+    """
     if _is_db_available() and todays_games:
         try:
             from data.etl_data_service import get_players_for_teams as _db_get_players
@@ -253,7 +274,21 @@ def get_todays_players(todays_games, progress_callback=None,
         except Exception as exc:
             _logger.debug("get_todays_players DB path failed: %s", exc)
 
-    _logger.warning("get_todays_players: no players in DB — returning empty list")
+    # DB has no player data — fall back to live fetcher
+    if todays_games:
+        try:
+            result = _ldf_fetch_todays_players(
+                todays_games,
+                progress_callback=progress_callback,
+                precomputed_injury_map=precomputed_injury_map,
+            )
+            if result:
+                _logger.info("get_todays_players: live fetcher succeeded")
+                return result
+        except Exception as exc:
+            _logger.warning("get_todays_players live fetcher failed: %s", exc)
+
+    _logger.warning("get_todays_players: no players from DB or live — returning empty")
     return []
 
 
