@@ -14,7 +14,7 @@ import logging
 
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.nba_data_service import load_last_updated
-from tracking.database import initialize_database, load_user_settings
+from tracking.database import initialize_database, load_user_settings, load_page_state
 from styles.theme import get_global_css
 
 # ============================================================
@@ -275,6 +275,17 @@ _persisted = load_user_settings()  # {} on first run or on error
 for _key, _val in _persisted.items():
     if _key not in st.session_state:
         st.session_state[_key] = _val
+
+# ── Restore page state from database ──────────────────────────────────
+# Critical page data (analysis results, picks, games, props, etc.) is
+# persisted to SQLite so that an idle session timeout doesn't wipe
+# the user's work.  Restore once on a fresh session.
+if not st.session_state.get("_page_state_restored"):
+    st.session_state["_page_state_restored"] = True
+    _page_state = load_page_state()  # {} on first run or on error
+    for _key, _val in _page_state.items():
+        if _key not in st.session_state:
+            st.session_state[_key] = _val
 
 if "simulation_depth" not in st.session_state:
     st.session_state["simulation_depth"] = 1000
