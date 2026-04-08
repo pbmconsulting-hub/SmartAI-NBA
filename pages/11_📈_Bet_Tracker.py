@@ -2732,8 +2732,28 @@ with tab_achievements:
         "Track your betting streaks, unlock milestones, and review your personal bests."
     )
 
-    # ── Load all resolved bets ─────────────────────────────────────
-    _ach_all_bets = load_all_analysis_picks() + load_all_bets()
+    # ── Load all resolved bets (deduplicated) ─────────────────────
+    # Analysis picks and bets may overlap (auto_log_analysis_bets copies
+    # qualifying picks into the bets table while insert_analysis_picks
+    # stores them in all_analysis_picks).  Deduplicate by a composite key
+    # so the same pick is never counted twice.
+    _ach_raw = load_all_analysis_picks() + load_all_bets()
+    _ach_seen_keys: set = set()
+    _ach_all_bets: list = []
+    for _ab in _ach_raw:
+        # all_analysis_picks uses "prop_line" and "pick_date";
+        # bets table uses "prop_line" and "bet_date".  Fall back to
+        # alternate field names ("line", "pick_date") for compatibility.
+        _ak = (
+            str(_ab.get("player_name", "")).lower(),
+            str(_ab.get("stat_type", "")).lower(),
+            str(_ab.get("prop_line") or _ab.get("line", "")),
+            str(_ab.get("direction", "")).upper(),
+            str(_ab.get("bet_date") or _ab.get("pick_date", "")),
+        )
+        if _ak not in _ach_seen_keys:
+            _ach_seen_keys.add(_ak)
+            _ach_all_bets.append(_ab)
     _ach_resolved = [
         b for b in _ach_all_bets
         if b.get("result") in ("WIN", "LOSS", "PUSH")
