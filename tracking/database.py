@@ -306,6 +306,19 @@ CREATE TABLE IF NOT EXISTS user_settings (
 );
 """
 
+# SQL to create the page_state table.
+# Persists critical page data (analysis results, selected picks, today's
+# games, props, etc.) so they survive Streamlit session resets that occur
+# when the browser tab is idle for an extended period.  A single row
+# (state_id=1) stores the latest values as a JSON blob.
+CREATE_PAGE_STATE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS page_state (
+    state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
+    state_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -374,6 +387,7 @@ def initialize_database():
             cursor.execute(CREATE_PLAYER_GAME_LOGS_TABLE_SQL)     # Feature 12: game log persistence
             cursor.execute(CREATE_BET_AUDIT_LOG_TABLE_SQL)         # Bet edit/delete audit log
             cursor.execute(CREATE_USER_SETTINGS_TABLE_SQL)        # User settings persistence
+            cursor.execute(CREATE_PAGE_STATE_TABLE_SQL)             # Page state persistence
 
             # ── Indexes for performance ───────────────────────────────
             _TRACKING_INDEXES = (
@@ -2397,6 +2411,113 @@ def load_user_settings():
 
 # ============================================================
 # END SECTION: User Settings Persistence
+# ============================================================
+
+# ============================================================
+# SECTION: Page State Persistence
+# ============================================================
+# Saves and restores critical page data (analysis results, selected
+# picks, today's games, props, injury map, etc.) so a session reset
+# caused by an idle WebSocket timeout doesn't wipe the user's work.
+# ============================================================
+
+# Page state keys that should be persisted across session resets.
+_PERSISTED_PAGE_STATE_KEYS = (
+    "analysis_results",
+    "selected_picks",
+    "todays_games",
+    "current_props",
+    "session_props",
+    "loaded_live_picks",
+    "injury_status_map",
+    "league_standings",
+    "analysis_timestamp",
+    "line_snapshots",
+)
+
+
+def save_page_state(session_dict):
+    """Persist critical page state to SQLite.
+
+    Only the keys listed in ``_PERSISTED_PAGE_STATE_KEYS`` are stored.
+    Uses INSERT OR REPLACE on a single-row table (state_id=1).
+
+    This is designed to be called frequently (every page render) so
+    that the latest data is always available for restoration.  Empty
+    containers are skipped during save so that a page that hasn't
+    populated a key yet doesn't wipe previously saved data for that
+    key.  The function merges new non-empty values into any existing
+    saved state before writing.
+
+    Args:
+        session_dict (dict): Mapping of state names to values.
+            Typically ``st.session_state`` or a subset of it.
+
+    Returns:
+        bool: True on success, False on error.
+    """
+    try:
+        initialize_database()
+        # Filter to only the keys we want to persist and that have content
+        filtered = {}
+        for k, v in session_dict.items():
+            if k not in _PERSISTED_PAGE_STATE_KEYS:
+                continue
+            # Skip empty containers so we don't overwrite previously
+            # saved non-empty values for keys that haven't been populated
+            # in the current page context.
+            if isinstance(v, (list, dict)) and not v:
+                continue
+            filtered[k] = v
+        if not filtered:
+            return True  # Nothing to save
+        # Merge with existing saved state so keys from other pages
+        # that aren't present in this render are preserved.
+        existing = load_page_state()
+        merged = {**existing, **filtered}
+        _state_json = json.dumps(merged, default=str)
+        _execute_write(
+            """INSERT OR REPLACE INTO page_state (state_id, state_json, updated_at)
+               VALUES (1, ?, datetime('now'))""",
+            (_state_json,),
+            caller="save_page_state",
+        )
+        return True
+    except Exception as _err:
+        _logger.warning("save_page_state error (non-fatal): %s", _err)
+        return False
+
+
+def load_page_state():
+    """Load the most recently saved page state from SQLite.
+
+    Returns:
+        dict: Mapping of state names to values (only keys in
+            ``_PERSISTED_PAGE_STATE_KEYS``).  Returns an empty dict
+            if no state has been saved or on error.
+    """
+    try:
+        initialize_database()
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            row = conn.execute(
+                "SELECT state_json FROM page_state WHERE state_id = 1"
+            ).fetchone()
+            if not row or not row[0]:
+                return {}
+            raw = json.loads(row[0])
+            # Only return recognised keys to avoid injecting stale/unknown state
+            return {
+                k: v for k, v in raw.items()
+                if k in _PERSISTED_PAGE_STATE_KEYS
+            }
+    except Exception as _err:
+        _logger.warning("load_page_state error (non-fatal): %s", _err)
+        return {}
+
+
+# ============================================================
+# END SECTION: Page State Persistence
 # ============================================================
 
 # ============================================================

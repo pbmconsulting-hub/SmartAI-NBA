@@ -14,6 +14,7 @@ font = "sans serif"
 [server]
 headless = true
 maxMessageSize = 1000
+enableWebsocketCompression = true
 
 [browser]
 gatherUsageStats = false

@@ -142,8 +142,15 @@ def inject_joseph_floating():
 
     Delegates to :func:`utils.joseph_widget.render_joseph_floating_widget`
     so the widget appears on every page that calls this helper.
-    Also renders the responsible gambling disclaimer in the sidebar.
+    Also renders the responsible gambling disclaimer in the sidebar,
+    injects the session keep-alive script, and auto-saves/restores
+    critical page state.
     """
+    # ── Keep session alive & restore/save page state ──────────
+    _inject_session_keepalive()
+    _auto_restore_page_state()
+    _auto_save_page_state()
+
     try:
         from utils.joseph_widget import render_joseph_floating_widget
         render_joseph_floating_widget()
@@ -151,6 +158,81 @@ def inject_joseph_floating():
         _components_logger.debug("inject_joseph_floating failed: %s", exc)
     # Show the disclaimer on every page that calls this helper
     render_sidebar_disclaimer()
+
+
+# ── Session Keep-Alive & Page State Persistence ──────────────────
+
+def _inject_session_keepalive():
+    """Inject JavaScript that keeps the Streamlit WebSocket alive.
+
+    Prevents session resets when the app tab is left open but idle
+    for an extended period.  Uses periodic health-check fetches and
+    visibility-change handlers to maintain the connection.
+    """
+    if st.session_state.get("_keepalive_injected"):
+        return
+    st.session_state["_keepalive_injected"] = True
+    st.markdown(
+        """
+        <script>
+        (function() {
+            if (window.__stKeepalive) return;
+            window.__stKeepalive = true;
+
+            /* Periodic ping — keeps proxies / load-balancers from
+               closing the idle connection.  90 s is well under
+               typical 5-min proxy idle timeouts. */
+            var _ping = function() {
+                fetch('./_stcore/health').catch(function(){});
+            };
+            setInterval(_ping, 90000);
+
+            /* When the user returns to the tab after it was hidden,
+               fire an immediate ping to re-establish activity. */
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) _ping();
+            });
+        })();
+        </script>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _auto_restore_page_state():
+    """Restore persisted page state from SQLite on a fresh session.
+
+    Called once per session (guarded by ``_page_state_restored`` flag).
+    Only populates keys that are not already present in session state,
+    so it never overwrites data the user has generated in this session.
+    """
+    if st.session_state.get("_page_state_restored"):
+        return
+    st.session_state["_page_state_restored"] = True
+    try:
+        from tracking.database import load_page_state
+        saved = load_page_state()
+        for key, value in saved.items():
+            if key not in st.session_state:
+                st.session_state[key] = value
+            elif isinstance(st.session_state[key], (list, dict)) and not st.session_state[key] and value:
+                # Replace empty defaults with saved non-empty data
+                st.session_state[key] = value
+    except Exception as exc:
+        _components_logger.debug("_auto_restore_page_state failed: %s", exc)
+
+
+def _auto_save_page_state():
+    """Persist critical page state to SQLite on every render.
+
+    This is lightweight (single SQLite upsert) and ensures the latest
+    data is always available for restoration after a session reset.
+    """
+    try:
+        from tracking.database import save_page_state
+        save_page_state(st.session_state)
+    except Exception as exc:
+        _components_logger.debug("_auto_save_page_state failed: %s", exc)
 
 
 def render_sidebar_disclaimer():
