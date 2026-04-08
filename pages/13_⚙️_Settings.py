@@ -2,12 +2,15 @@
 # FILE: pages/13_⚙️_Settings.py
 # PURPOSE: Configure the SmartBetPro NBA engine settings:
 #          simulation depth, edge thresholds, platform selection,
-#          and entry fee defaults. All settings persist in session state.
+#          and entry fee defaults. Settings persist in session state
+#          AND are saved to the database so they survive browser
+#          reloads.
 # CONNECTS TO: All engine pages use settings from session state
 # CONCEPTS COVERED: Session state, configuration, settings UI
 # ============================================================
 
 import streamlit as st  # Main UI framework
+from tracking.database import save_user_settings
 
 # ============================================================
 # SECTION: Page Setup
@@ -125,6 +128,7 @@ for _ci, (_pname, _pdata) in enumerate(_PROFILES.items()):
             for _k, _v in _pdata.items():
                 if _k != "description":
                     st.session_state[_k] = _v
+            save_user_settings(st.session_state)
             st.success(f"✅ {_pname} profile applied!")
             st.rerun()
 
@@ -384,6 +388,7 @@ with st.expander("Advanced Adjustment Factors"):
         st.session_state["blowout_sensitivity"] = 1.0
         st.session_state["fatigue_sensitivity"] = 1.0
         st.session_state["pace_sensitivity"] = 1.0
+        save_user_settings(st.session_state)
         st.success("Advanced settings reset to defaults!")
         st.rerun()
 
@@ -425,8 +430,15 @@ if st.button("🔄 Reset ALL Settings to Defaults", type="secondary"):
     for key in settings_keys_to_clear:
         if key in st.session_state:
             del st.session_state[key]
+    # Persist the cleared (default) state to DB
+    save_user_settings(st.session_state)
     st.success("All settings reset to defaults! Refresh the page to see changes.")
     st.rerun()
+
+# ── Auto-save settings to database on every render ────────────────
+# Streamlit re-runs the page script on every widget interaction.
+# By saving at the bottom we capture whatever the user just changed.
+save_user_settings(st.session_state)
 
 # ============================================================
 # END SECTION: Display Current Settings Summary

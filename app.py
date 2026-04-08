@@ -14,7 +14,7 @@ import logging
 
 from data.data_manager import load_players_data, load_props_data, load_teams_data
 from data.nba_data_service import load_last_updated
-from tracking.database import initialize_database
+from tracking.database import initialize_database, load_user_settings
 from styles.theme import get_global_css
 
 # ============================================================
@@ -265,6 +265,16 @@ with st.sidebar:
             f'</div>',
             unsafe_allow_html=True,
         )
+
+# ── Restore user settings from database before applying defaults ───────
+# On a fresh browser reload st.session_state is empty.  We read the
+# user's last-saved settings from SQLite so they don't have to
+# reconfigure everything.  Keys not in the DB fall through to the
+# hard-coded defaults below.
+_persisted = load_user_settings()  # {} on first run or on error
+for _key, _val in _persisted.items():
+    if _key not in st.session_state:
+        st.session_state[_key] = _val
 
 if "simulation_depth" not in st.session_state:
     st.session_state["simulation_depth"] = 1000

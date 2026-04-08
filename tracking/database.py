@@ -294,6 +294,18 @@ CREATE TABLE IF NOT EXISTS bet_audit_log (
 );
 """
 
+# SQL to create the user_settings table.
+# Persists user-configurable settings (simulation depth, edge threshold,
+# platform selections, tuning sliders, bankroll, etc.) so they survive
+# browser reloads.  A single row (settings_id=1) stores the latest values.
+CREATE_USER_SETTINGS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS user_settings (
+    settings_id INTEGER PRIMARY KEY CHECK (settings_id = 1),
+    settings_json TEXT NOT NULL,
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
 # ============================================================
 # END SECTION: Database Configuration
 # ============================================================
@@ -361,6 +373,7 @@ def initialize_database():
             cursor.execute(CREATE_BACKTEST_RESULTS_TABLE_SQL)     # historical backtesting results
             cursor.execute(CREATE_PLAYER_GAME_LOGS_TABLE_SQL)     # Feature 12: game log persistence
             cursor.execute(CREATE_BET_AUDIT_LOG_TABLE_SQL)         # Bet edit/delete audit log
+            cursor.execute(CREATE_USER_SETTINGS_TABLE_SQL)        # User settings persistence
 
             # ── Indexes for performance ───────────────────────────────
             _TRACKING_INDEXES = (
@@ -2276,6 +2289,96 @@ def is_game_log_cache_stale(player_id, max_age_hours=24):
 
 # ============================================================
 # END SECTION: Player Game Logs Persistence
+# ============================================================
+
+# ============================================================
+# SECTION: User Settings Persistence
+# ============================================================
+# Saves and restores user-configurable settings (simulation depth,
+# edge threshold, platforms, tuning sliders, etc.) so a browser
+# reload restores the user's previous configuration.
+# ============================================================
+
+# Settings keys that should be persisted across browser reloads.
+_PERSISTED_SETTINGS_KEYS = (
+    "simulation_depth",
+    "minimum_edge_threshold",
+    "entry_fee",
+    "total_bankroll",
+    "kelly_multiplier",
+    "selected_platforms",
+    "home_court_boost",
+    "blowout_sensitivity",
+    "fatigue_sensitivity",
+    "pace_sensitivity",
+)
+
+
+def save_user_settings(settings_dict):
+    """Persist user settings to SQLite.
+
+    Only the keys listed in ``_PERSISTED_SETTINGS_KEYS`` are stored.
+    Uses INSERT OR REPLACE on a single-row table (settings_id=1).
+
+    Args:
+        settings_dict (dict): Mapping of setting names to values.
+            Typically ``st.session_state`` or a subset of it.
+
+    Returns:
+        bool: True on success, False on error.
+    """
+    try:
+        initialize_database()
+        # Filter to only the keys we want to persist
+        filtered = {
+            k: v for k, v in settings_dict.items()
+            if k in _PERSISTED_SETTINGS_KEYS
+        }
+        if not filtered:
+            return True  # Nothing to save
+        _settings_json = json.dumps(filtered, default=str)
+        _execute_write(
+            """INSERT OR REPLACE INTO user_settings (settings_id, settings_json, updated_at)
+               VALUES (1, ?, datetime('now'))""",
+            (_settings_json,),
+            caller="save_user_settings",
+        )
+        return True
+    except Exception as _err:
+        _logger.warning("save_user_settings error (non-fatal): %s", _err)
+        return False
+
+
+def load_user_settings():
+    """Load the most recently saved user settings from SQLite.
+
+    Returns:
+        dict: Mapping of setting names to values (only keys in
+            ``_PERSISTED_SETTINGS_KEYS``).  Returns an empty dict
+            if no settings have been saved or on error.
+    """
+    try:
+        initialize_database()
+        with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as conn:
+            conn.execute("PRAGMA journal_mode=WAL")
+            row = conn.execute(
+                "SELECT settings_json FROM user_settings WHERE settings_id = 1"
+            ).fetchone()
+            if not row or not row[0]:
+                return {}
+            raw = json.loads(row[0])
+            # Only return recognised keys to avoid injecting stale/unknown state
+            return {
+                k: v for k, v in raw.items()
+                if k in _PERSISTED_SETTINGS_KEYS
+            }
+    except Exception as _err:
+        _logger.warning("load_user_settings error (non-fatal): %s", _err)
+        return {}
+
+
+# ============================================================
+# END SECTION: User Settings Persistence
 # ============================================================
 
 # ============================================================
