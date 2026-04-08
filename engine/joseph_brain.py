@@ -158,6 +158,35 @@ except ImportError:
     def load_teams_data():
         return []
 
+# ── Supreme DB Integration — Joseph's Knowledge Base ──────────
+# These give Joseph direct access to deep historical & analytical data
+# from the local SQLite database for supreme-level analysis.
+try:
+    from data.db_service import (
+        get_player_last_n_games as _db_last_n_games,
+        get_player_averages as _db_player_averages,
+        get_player_game_logs as _db_player_game_logs,
+        get_player_splits as _db_player_splits,
+        get_player_career_stats_from_db as _db_career_stats,
+        get_player_clutch_stats_from_db as _db_clutch_stats,
+        get_player_estimated_metrics as _db_estimated_metrics,
+        get_defense_vs_position as _db_defense_vs_position,
+        get_team_recent_stats as _db_team_recent_stats,
+        get_team_game_logs as _db_team_game_logs,
+        get_box_score_usage_from_db as _db_box_score_usage,
+        get_box_score_advanced_from_db as _db_box_score_advanced,
+        get_hustle_box_score_from_db as _db_hustle_box_score,
+        get_tracking_box_score_from_db as _db_tracking_box_score,
+        get_shot_chart_from_db as _db_shot_chart,
+        get_schedule_from_db as _db_schedule,
+        get_league_leaders_from_db as _db_league_leaders,
+        get_box_score_four_factors_from_db as _db_four_factors,
+        get_injured_players as _db_injured_players,
+    )
+    _DB_KNOWLEDGE_AVAILABLE = True
+except ImportError:
+    _DB_KNOWLEDGE_AVAILABLE = False
+
 try:
     from data.advanced_metrics import (
         enrich_player_data,
@@ -258,6 +287,196 @@ _used_fragments: dict = {}      # keyed by pool name → set of used IDs
 _used_ambient: dict = {}        # keyed by context → set of used indices
 _used_commentary: dict = {}     # keyed by context_type → set of used indices
 
+
+# ═══════════════════════════════════════════════════════════════
+# DB-POWERED KNOWLEDGE HELPERS — Joseph's Supreme Data Layer
+# ═══════════════════════════════════════════════════════════════
+
+def _get_player_db_intel(player: dict) -> dict:
+    """Pull comprehensive DB intel on a player for supreme analysis.
+
+    Returns a dict with ``recent_games``, ``splits``, ``clutch_stats``,
+    ``career_stats``, and ``estimated_metrics`` — all from the local DB.
+    Degrades gracefully if the DB module is not available or data is missing.
+    """
+    intel = {
+        "recent_games": [],
+        "splits": {},
+        "clutch_stats": {},
+        "career_stats": [],
+        "estimated_metrics": {},
+        "available": False,
+    }
+    if not _DB_KNOWLEDGE_AVAILABLE:
+        return intel
+    player_id = int(player.get("player_id", player.get("id", 0)) or 0)
+    if player_id <= 0:
+        return intel
+    try:
+        intel["recent_games"] = _db_last_n_games(player_id, 10) or []
+    except Exception:
+        pass
+    try:
+        intel["splits"] = _db_player_splits(player_id) or {}
+    except Exception:
+        pass
+    try:
+        all_clutch = _db_clutch_stats() or []
+        for c in all_clutch:
+            if int(c.get("PLAYER_ID", 0) or 0) == player_id:
+                intel["clutch_stats"] = c
+                break
+    except Exception:
+        pass
+    try:
+        intel["career_stats"] = _db_career_stats(player_id) or []
+    except Exception:
+        pass
+    try:
+        all_est = _db_estimated_metrics() or []
+        for e in all_est:
+            if int(e.get("PLAYER_ID", 0) or 0) == player_id:
+                intel["estimated_metrics"] = e
+                break
+    except Exception:
+        pass
+    intel["available"] = bool(intel["recent_games"] or intel["splits"])
+    return intel
+
+
+def _get_team_db_intel(team_id: int | str) -> dict:
+    """Pull team-level DB intel for game analysis."""
+    intel = {
+        "recent_stats": [],
+        "defense_vs_pos": {},
+        "available": False,
+    }
+    if not _DB_KNOWLEDGE_AVAILABLE:
+        return intel
+    team_id = int(team_id or 0)
+    if team_id <= 0:
+        return intel
+    try:
+        intel["recent_stats"] = _db_team_recent_stats(team_id, 10) or []
+    except Exception:
+        pass
+    intel["available"] = bool(intel["recent_stats"])
+    return intel
+
+
+def _compute_recent_trend(games: list, stat_key: str = "PTS") -> dict:
+    """Compute trend data from recent game logs.
+
+    Returns ``{'last_3_avg', 'last_5_avg', 'last_10_avg', 'trend',
+    'hit_rate_vs', 'hot_streak', 'cold_streak', 'consistency'}``.
+    """
+    if not games:
+        return {"trend": "unknown", "last_3_avg": 0.0, "last_5_avg": 0.0,
+                "last_10_avg": 0.0, "hit_rate_vs": 0.0, "hot_streak": 0,
+                "cold_streak": 0, "consistency": "unknown"}
+
+    vals = []
+    for g in games:
+        v = _safe_float(g.get(stat_key, g.get(stat_key.lower(), 0)))
+        vals.append(v)
+
+    last_3 = vals[:3] if len(vals) >= 3 else vals
+    last_5 = vals[:5] if len(vals) >= 5 else vals
+    last_10 = vals[:10]
+
+    l3 = sum(last_3) / max(1, len(last_3))
+    l5 = sum(last_5) / max(1, len(last_5))
+    l10 = sum(last_10) / max(1, len(last_10))
+
+    if l10 > 0:
+        if l3 > l10 * 1.15:
+            trend = "surging"
+        elif l3 > l10 * 1.05:
+            trend = "trending_up"
+        elif l3 < l10 * 0.85:
+            trend = "slumping"
+        elif l3 < l10 * 0.95:
+            trend = "trending_down"
+        else:
+            trend = "stable"
+    else:
+        trend = "unknown"
+
+    # Hot/cold streak detection
+    hot_streak = 0
+    cold_streak = 0
+    if l10 > 0:
+        for v in vals:
+            if v > l10 * 1.1:
+                hot_streak += 1
+            else:
+                break
+        for v in vals:
+            if v < l10 * 0.9:
+                cold_streak += 1
+            else:
+                break
+
+    # Consistency (coefficient of variation)
+    if l10 > 0 and len(vals) >= 3:
+        variance = sum((v - l10) ** 2 for v in vals) / len(vals)
+        std = variance ** 0.5
+        cv = std / l10
+        if cv < 0.15:
+            consistency = "elite"
+        elif cv < 0.25:
+            consistency = "consistent"
+        elif cv < 0.40:
+            consistency = "moderate"
+        else:
+            consistency = "volatile"
+    else:
+        consistency = "unknown"
+
+    return {
+        "last_3_avg": round(l3, 1),
+        "last_5_avg": round(l5, 1),
+        "last_10_avg": round(l10, 1),
+        "trend": trend,
+        "hit_rate_vs": 0.0,
+        "hot_streak": hot_streak,
+        "cold_streak": cold_streak,
+        "consistency": consistency,
+    }
+
+
+def _compute_hit_rate(games: list, stat_key: str, line: float) -> float:
+    """Compute how often a player clears a line in recent games (0-100%)."""
+    if not games or line <= 0:
+        return 0.0
+    hits = 0
+    for g in games:
+        v = _safe_float(g.get(stat_key, g.get(stat_key.lower(), 0)))
+        if v > line:
+            hits += 1
+    return round(hits / len(games) * 100.0, 1)
+
+
+def _extract_home_away_splits(splits: dict) -> dict:
+    """Extract home/away performance from splits dict."""
+    result = {"home_ppg": 0.0, "away_ppg": 0.0, "home_boost": 0.0}
+    if not splits:
+        return result
+    # Splits may vary in format, check for common patterns
+    location = splits.get("Location", splits.get("location", {}))
+    if isinstance(location, dict):
+        home = location.get("Home", {})
+        away = location.get("Road", location.get("Away", {}))
+        if home and away:
+            result["home_ppg"] = _safe_float(home.get("PTS", home.get("pts", 0)))
+            result["away_ppg"] = _safe_float(away.get("PTS", away.get("pts", 0)))
+            if result["away_ppg"] > 0:
+                result["home_boost"] = round(
+                    (result["home_ppg"] - result["away_ppg"]) / result["away_ppg"] * 100, 1
+                )
+    return result
+
+
 # ═══════════════════════════════════════════════════════════════
 # A) FRAGMENT POOLS — For combinatorial rant builder
 # ═══════════════════════════════════════════════════════════════
@@ -278,6 +497,16 @@ OPENER_POOL = [
     {"id": "opener_13", "text": "I've been watching this game since I was TWELVE years old..."},
     {"id": "opener_14", "text": "People keep asking me about this, so let me ADDRESS it..."},
     {"id": "opener_15", "text": "I sat down. I looked at the numbers. And I said to myself..."},
+    {"id": "opener_16", "text": "I pulled up the game logs, the shot charts, the matchup data — ALL of it..."},
+    {"id": "opener_17", "text": "You know what the FILM shows? Let me TELL you what the film shows..."},
+    {"id": "opener_18", "text": "I just finished going through EVERY game log from the last two weeks..."},
+    {"id": "opener_19", "text": "The numbers don't LIE — and I've got the RECEIPTS to prove it..."},
+    {"id": "opener_20", "text": "I stayed up LATE crunching the splits, the trends, the matchup history..."},
+    {"id": "opener_21", "text": "Let me break this down the way a REAL analyst breaks it down..."},
+    {"id": "opener_22", "text": "I looked at the last TEN games. I looked at the splits. I looked at EVERYTHING..."},
+    {"id": "opener_23", "text": "STOP scrolling and LISTEN because this analysis is backed by REAL data..."},
+    {"id": "opener_24", "text": "I don't just give you OPINIONS — I give you ANALYSIS backed by NUMBERS..."},
+    {"id": "opener_25", "text": "I've been studying the matchup data and the shot distribution ALL day..."},
 ]
 
 PIVOT_POOL = [
@@ -291,6 +520,11 @@ PIVOT_POOL = [
     {"id": "pivot_08", "text": "That being said..."},
     {"id": "pivot_09", "text": "BUT HERE'S WHAT NOBODY IS TALKING ABOUT..."},
     {"id": "pivot_10", "text": "Having said ALL of that..."},
+    {"id": "pivot_11", "text": "Now the GAME LOGS tell a different story and you NEED to hear it..."},
+    {"id": "pivot_12", "text": "But when I dig into the SPLITS — and I ALWAYS dig into the splits..."},
+    {"id": "pivot_13", "text": "The MATCHUP data paints a different picture though..."},
+    {"id": "pivot_14", "text": "But let me pull up the RECEIPTS on the other side of this argument..."},
+    {"id": "pivot_15", "text": "NOW — before you go placing that bet, consider THIS..."},
 ]
 
 CLOSER_POOL = [
@@ -304,6 +538,11 @@ CLOSER_POOL = [
     {"id": "closer_08", "text": "That's not an OPINION — that's a FACT!"},
     {"id": "closer_09", "text": "And I don't want to hear NOTHING about it!"},
     {"id": "closer_10", "text": "PERIOD. End of DISCUSSION!"},
+    {"id": "closer_11", "text": "The DATA has spoken. Joseph M. Smith has spoken. It is DONE!"},
+    {"id": "closer_12", "text": "I've shown you the numbers, I've shown you the trends — the rest is on YOU!"},
+    {"id": "closer_13", "text": "That's not a GUESS — that's an analysis backed by EVERY available data point!"},
+    {"id": "closer_14", "text": "The game logs DON'T LIE. The splits DON'T LIE. Joseph M. Smith DOESN'T LIE!"},
+    {"id": "closer_15", "text": "I've done the HOMEWORK. Now it's time to CASH the ticket!"},
 ]
 
 CATCHPHRASE_POOL = [
@@ -320,6 +559,11 @@ CATCHPHRASE_POOL = [
     {"id": "catch_11", "text": "TRAVESTY!"},
     {"id": "catch_12", "text": "With all DUE respect — and I mean that SINCERELY..."},
     {"id": "catch_13", "text": "He's a FIRST-BALLOT Hall of Famer in my book!"},
+    {"id": "catch_14", "text": "The ANALYTICS department just called — they AGREE with me!"},
+    {"id": "catch_15", "text": "I've got game logs, shot charts, AND the eye test — what do YOU have?"},
+    {"id": "catch_16", "text": "Don't bring me NARRATIVES — bring me NUMBERS!"},
+    {"id": "catch_17", "text": "I've been doing this since BEFORE analytics was COOL!"},
+    {"id": "catch_18", "text": "The FILM doesn't lie and neither does Joseph M. Smith!"},
 ]
 
 # Placeholders used in templates: {player}, {stat}, {line}, {edge}, {prob}
@@ -358,6 +602,39 @@ BODY_TEMPLATES = {
         "This is where HUMAN intelligence beats artificial intelligence. {player} at {line} {stat}? The engine is WRONG!",
         "OVERRIDE ALERT! The numbers say {edge}% but my eyes tell me DIFFERENT on {player} {stat}. Trust the EYE TEST!",
         "The computer doesn't watch the GAMES. I DO. And I'm telling you — {player} {line} {stat} needs an OVERRIDE!",
+    ],
+}
+
+# Data-driven sentence templates — populated by _build_data_sentences()
+# Placeholders: {player}, {stat}, {line}, {edge}, {prob}, {l3_avg}, {l5_avg},
+# {l10_avg}, {hit_rate}, {trend_word}, {consistency}, {season_avg}, {home_away_note}
+DATA_BODY_TEMPLATES = {
+    "trend_hot": [
+        "{player} is averaging {l3_avg} {stat} over the last 3 games — that's ABOVE the {l10_avg} ten-game average. The trend is your FRIEND!",
+        "The last THREE games? {l3_avg} {stat} per game. The last TEN? {l10_avg}. {player} is getting HOTTER and the line hasn't caught up!",
+        "{player} is SURGING — {l3_avg} {stat} in the last 3, {l5_avg} over 5. The books are slow to ADJUST and that's YOUR edge!",
+    ],
+    "trend_cold": [
+        "{player} has dipped to {l3_avg} {stat} over the last 3 — down from {l10_avg} over 10. The slump is REAL and the line hasn't moved.",
+        "CAUTION — {player} is trending DOWN. {l3_avg} {stat} lately versus {l10_avg} on the season stretch. The cold streak MATTERS.",
+        "The recent form says {l3_avg} {stat} over the last 3 games. The trend is NOT your friend on {player} right now.",
+    ],
+    "hit_rate": [
+        "{player} has cleared {line} {stat} in {hit_rate}% of the last 10 games. That's not an OPINION — that's a FACT from the game logs!",
+        "The HIT RATE on {player} over {line} {stat}? {hit_rate}% in the last 10 outings. The data speaks LOUDER than any analyst!",
+        "I pulled the RECEIPTS — {player} has gone over {line} {stat} in {hit_rate}% of recent games. The numbers don't LIE!",
+    ],
+    "consistency": [
+        "{player} has been {consistency} with {stat} production — and that MATTERS for prop betting. You want PREDICTABLE outcomes!",
+        "The consistency rating on {player} for {stat} is '{consistency}'. That tells me the FLOOR and CEILING are well-defined.",
+    ],
+    "home_away": [
+        "{player} is a DIFFERENT player on the road versus at home. {home_away_note}. Context is KING!",
+        "The home/away split on {player} is SIGNIFICANT. {home_away_note}. You HAVE to factor that in!",
+    ],
+    "season_vs_line": [
+        "{player} averages {season_avg} {stat} on the season and the line is set at {line}. That's a {edge}% edge and the math is SIMPLE!",
+        "Season average: {season_avg} {stat}. Line: {line}. The GAP between those numbers is where the MONEY lives!",
     ],
 }
 
