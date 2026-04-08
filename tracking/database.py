@@ -512,6 +512,39 @@ def initialize_database():
             except sqlite3.OperationalError:
                 pass  # Column already renamed or doesn't exist
 
+            # ── Unique index on all_analysis_picks to prevent duplicate rows ──
+            # Covers the natural key (pick_date, player_name, stat_type,
+            # prop_line, direction) that insert_analysis_picks already
+            # deduplicates in application code.  The index makes the DB
+            # enforce uniqueness even if the app-level check is bypassed.
+            try:
+                cursor.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_aap_unique_pick "
+                    "ON all_analysis_picks "
+                    "(pick_date, player_name, stat_type, prop_line, direction)"
+                )
+            except sqlite3.OperationalError:
+                # May fail if existing data already has duplicates.
+                # Clean up duplicates first, then retry.
+                try:
+                    cursor.execute(
+                        """
+                        DELETE FROM all_analysis_picks
+                        WHERE pick_id NOT IN (
+                            SELECT MIN(pick_id)
+                            FROM all_analysis_picks
+                            GROUP BY pick_date, player_name, stat_type, prop_line, direction
+                        )
+                        """
+                    )
+                    cursor.execute(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS idx_aap_unique_pick "
+                        "ON all_analysis_picks "
+                        "(pick_date, player_name, stat_type, prop_line, direction)"
+                    )
+                except sqlite3.OperationalError:
+                    pass  # Best-effort — app-level dedup still protects
+
             # Save the changes
             connection.commit()
 
@@ -1761,7 +1794,7 @@ def insert_analysis_picks(analysis_results):
                         continue
                     conn.execute(
                         """
-                        INSERT INTO all_analysis_picks
+                        INSERT OR IGNORE INTO all_analysis_picks
                             (pick_date, player_name, team, stat_type, prop_line,
                              direction, platform, confidence_score, probability_over,
                              edge_percentage, tier, result, actual_value, notes,
