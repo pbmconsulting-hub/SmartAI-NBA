@@ -992,17 +992,24 @@ with tab_all_picks:
 
     # ── Build combined dataset for aggregate metrics ───────────────────
     # Deduplicate by (player_name, stat_type, prop_line, direction, pick_date).
-    # Session picks lack "pick_date", so default to today's date (ET)
-    # to match the DB rows inserted by insert_analysis_picks().
+    # Session picks lack "pick_date", so default to today's date to match
+    # the DB rows inserted by insert_analysis_picks().
     _today_str = datetime.date.today().isoformat()
     _seen_keys: set = set()
     _combined_picks: list = []
+
+    def _safe_line_str(pick):
+        """Normalise prop_line / line to a rounded string for dedup keys."""
+        try:
+            return str(round(float(pick.get("prop_line") or pick.get("line") or 0), 2))
+        except (ValueError, TypeError):
+            return "0"
 
     def _dedup_key(pick):
         return (
             (pick.get("player_name") or "").strip().lower(),
             (pick.get("stat_type") or "").strip().lower(),
-            str(round(float(pick.get("prop_line") or pick.get("line") or 0), 2)),
+            _safe_line_str(pick),
             (pick.get("direction") or "").strip().upper(),
             pick.get("pick_date") or _today_str,
         )
@@ -2749,10 +2756,14 @@ with tab_achievements:
         # alternate field names ("line", "pick_date") for compatibility.
         # Normalize values (lowercase, rounded line, uppercase direction)
         # to ensure consistent dedup across both tables.
+        try:
+            _line_val = str(round(float(_ab.get("prop_line") or _ab.get("line") or 0), 2))
+        except (ValueError, TypeError):
+            _line_val = "0"
         _ak = (
             str(_ab.get("player_name", "")).strip().lower(),
             str(_ab.get("stat_type", "")).strip().lower(),
-            str(round(float(_ab.get("prop_line") or _ab.get("line") or 0), 2)),
+            _line_val,
             str(_ab.get("direction", "")).strip().upper(),
             str(_ab.get("bet_date") or _ab.get("pick_date", "")),
         )
