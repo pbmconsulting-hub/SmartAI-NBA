@@ -292,7 +292,7 @@ class TestBannerHeaders(unittest.TestCase):
     def test_gold_tier_banner(self):
         html = render_gold_tier_banner_html()
         self.assertIn("Gold Tier Picks", html)
-        self.assertIn("#ffd700", html)
+        self.assertIn("qam-gold-banner", html)
 
     def test_best_single_bets_header(self):
         html = render_best_single_bets_header_html()
