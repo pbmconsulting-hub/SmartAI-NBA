@@ -1414,9 +1414,11 @@ def save_daily_snapshot(date_str=None):
         conn = get_database_connection()
         cursor = conn.cursor()
 
-        # Retrieve all bets for that date
+        # Retrieve all bets for that date, excluding parlay legs
+        # (entry_id IS NOT NULL means the bet is linked to a parlay entry
+        # and should not be double-counted alongside the entry itself).
         cursor.execute(
-            "SELECT * FROM bets WHERE bet_date = ?",
+            "SELECT * FROM bets WHERE bet_date = ? AND (entry_id IS NULL)",
             (date_str,),
         )
         rows = cursor.fetchall()
