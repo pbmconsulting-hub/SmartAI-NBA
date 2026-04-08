@@ -1601,6 +1601,7 @@ def populate_player_career_stats(
         mapped = df[list(available.keys())].rename(columns=available)
         # Keep only current + previous season rows.
         if "season_id" in mapped.columns:
+            mapped["season_id"] = mapped["season_id"].astype(str)
             mapped = mapped[mapped["season_id"].isin(_keep_season_ids)]
         return mapped if not mapped.empty else None
 
