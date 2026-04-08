@@ -268,10 +268,36 @@ def get_global_css():
    PILLAR 1 — Streamlit Chrome Obliteration
    ═══════════════════════════════════════════════════════════ */
 #MainMenu { visibility: hidden !important; }
-header[data-testid="stHeader"] { display: none !important; }
 footer { display: none !important; }
 .stDeployButton { display: none !important; }
 .block-container { padding-top: 1rem !important; }
+
+/* Hide the Streamlit header bar but keep sidebar toggle accessible.
+   On desktop (>768px) — full hide is safe because sidebar is always visible.
+   On mobile (≤768px) — make header invisible yet allow its children
+   (especially the sidebar toggle / hamburger button) to render. */
+@media (min-width: 769px) {
+    header[data-testid="stHeader"] { display: none !important; }
+}
+@media (max-width: 768px) {
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        overflow: visible !important;
+        pointer-events: none !important;
+    }
+    /* Re-enable pointer events on the sidebar toggle so it's tappable */
+    header[data-testid="stHeader"] button,
+    header[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"],
+    header[data-testid="stHeader"] [data-testid="collapsedControl"] {
+        pointer-events: auto !important;
+    }
+}
 
 /* ─── Base / Body ─────────────────────────────────────────── */
 html, body, [class*="css"] {
@@ -1717,16 +1743,23 @@ input:focus, textarea:focus, select:focus,
     }
 }
 
+/* ─── Mobile Viewport — ensure proper scaling on phones ──── */
+/* (Streamlit sets the viewport meta, but we reinforce touch behaviour) */
+
 /* ─── Responsive — Mobile Touch-Ups ──────────────────────── */
 @media (max-width: 768px) {
     html, body, [class*="css"] { font-size: 14px !important; }
     .neural-header-title { font-size: 1.4rem !important; }
     .smartai-card, .premium-metric-card { padding: 14px 16px !important; }
     .nba-stat-number { font-size: 1.7rem !important; }
-    /* Larger touch targets for buttons */
+    /* Larger touch targets for buttons — Apple HIG recommends 44px min */
     button, .stButton > button {
         min-height: 44px !important;
         padding: 10px 16px !important;
+    }
+    /* All interactive elements get a proper tap target */
+    input, select, textarea, [role="button"], .stSelectbox > div {
+        min-height: 44px !important;
     }
     /* Stack metrics in fewer columns on small screens */
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
@@ -1741,6 +1774,7 @@ input:focus, textarea:focus, select:focus,
         top: 0 !important;
         left: 0 !important;
         height: 100vh !important;
+        height: 100dvh !important;
         transition: transform 0.3s cubic-bezier(0.4,0,0.2,1),
                     visibility 0.3s !important;
         box-shadow: 4px 0 24px rgba(0,0,0,0.6) !important;
@@ -1755,10 +1789,17 @@ input:focus, textarea:focus, select:focus,
         transform: translateX(0) !important;
         visibility: visible !important;
     }
-    /* Hamburger toggle button — always visible & touch-friendly */
+
+    /* ─── Hamburger toggle button — ALWAYS visible & touch-friendly ──── */
+    /* This is the critical fix: the button must be visible even when
+       the sidebar is collapsed so the user can re-open the menu. */
     [data-testid="stSidebarCollapsedControl"],
-    [data-testid="collapsedControl"] {
+    [data-testid="collapsedControl"],
+    button[kind="header"],
+    [data-testid="stHeader"] button {
         display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
         position: fixed !important;
         top: 10px !important;
         left: 10px !important;
@@ -1769,15 +1810,24 @@ input:focus, textarea:focus, select:focus,
         padding: 8px 10px !important;
         min-width: 44px !important;
         min-height: 44px !important;
+        width: 44px !important;
+        height: 44px !important;
         cursor: pointer !important;
         box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important;
+        -webkit-tap-highlight-color: rgba(0,240,255,0.15) !important;
+        touch-action: manipulation !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
     [data-testid="stSidebarCollapsedControl"] svg,
-    [data-testid="collapsedControl"] svg {
+    [data-testid="collapsedControl"] svg,
+    button[kind="header"] svg,
+    [data-testid="stHeader"] button svg {
         width: 22px !important;
         height: 22px !important;
         color: #00f0ff !important;
     }
+
     /* Sidebar nav links — tall touch targets */
     [data-testid="stSidebar"] .stPageLink,
     [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {
@@ -1788,8 +1838,9 @@ input:focus, textarea:focus, select:focus,
         font-size: 0.95rem !important;
         border-bottom: 1px solid rgba(255,255,255,0.04) !important;
     }
-    /* Hide "Powered by" footer on mobile to save space */
-    [data-testid="stSidebar"]::after {
+    /* Hide "Powered by" footer & branding on mobile to save space */
+    [data-testid="stSidebar"]::after,
+    [data-testid="stSidebar"]::before {
         display: none !important;
     }
     /* Ensure main content doesn't shift under the overlay sidebar */
@@ -1804,14 +1855,55 @@ input:focus, textarea:focus, select:focus,
         padding-top: 56px !important;
         max-width: 100% !important;
     }
-    /* Close button inside sidebar */
-    [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {
+    /* Close button inside sidebar — enlarged for easy tapping */
+    [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebar"] button[kind="header"] {
         position: absolute !important;
         top: 8px !important;
         right: 8px !important;
         z-index: 10001 !important;
-        min-width: 40px !important;
-        min-height: 40px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+
+    /* ─── Mobile overflow prevention ─────────────────────── */
+    .stApp, section[data-testid="stMain"] {
+        overflow-x: hidden !important;
+    }
+    /* Make tables horizontally scrollable rather than blowing out layout */
+    .stDataFrame, [data-testid="stDataFrame"],
+    .comp-table, .qds-strategy-table {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-width: 100% !important;
+    }
+
+    /* ─── Mobile-optimised popover (Settings gear, etc.) ──── */
+    [data-testid="stPopover"] > div {
+        max-width: 92vw !important;
+        max-height: 80vh !important;
+        overflow-y: auto !important;
+    }
+
+    /* ─── Mobile-optimised expanders ─────────────────────── */
+    [data-testid="stExpander"] summary {
+        min-height: 44px !important;
+        padding: 10px 14px !important;
+    }
+
+    /* ─── Tabs — horizontally scrollable on mobile ────────── */
+    [data-testid="stTabs"] [role="tablist"] {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        flex-wrap: nowrap !important;
+        gap: 4px !important;
+    }
+    [data-testid="stTabs"] button[role="tab"] {
+        min-height: 44px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        padding: 8px 14px !important;
+        font-size: 0.85rem !important;
     }
 }
 
@@ -1835,6 +1927,19 @@ input:focus, textarea:focus, select:focus,
         width: 100% !important;
         flex: 1 1 100% !important;
     }
+    /* Cards need tighter padding on small phones */
+    .pillar-card-inner { padding: 20px 16px !important; }
+    .proof-card { padding: 20px 14px !important; }
+    .joseph-welcome-card { padding: 20px 16px !important; flex-direction: column !important; align-items: center !important; text-align: center !important; }
+    .joseph-welcome-avatar { width: 60px !important; height: 60px !important; }
+    /* Comparison table: force horizontal scroll */
+    .comp-table { display: block !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+    /* Pipeline row: stack vertically on phones */
+    .pipeline-row { flex-direction: column !important; }
+    .pipeline-connector { width: 100% !important; height: 24px !important; }
+    .pipeline-connector::before { width: 2px !important; height: 100% !important; }
+    /* Section headers smaller */
+    .section-header { font-size: 1.1rem !important; }
 }
 
 /* ─── Premium animated gradient border — Neural Header ─── */

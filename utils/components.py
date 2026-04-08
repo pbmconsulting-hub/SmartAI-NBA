@@ -163,11 +163,16 @@ def inject_joseph_floating():
 # ── Session Keep-Alive & Page State Persistence ──────────────────
 
 def _inject_session_keepalive():
-    """Inject JavaScript that keeps the Streamlit WebSocket alive.
+    """Inject JavaScript that keeps the Streamlit WebSocket alive and
+    ensures the mobile sidebar toggle button is always accessible.
 
     Prevents session resets when the app tab is left open but idle
     for an extended period.  Uses periodic health-check fetches and
     visibility-change handlers to maintain the connection.
+
+    Also injects a viewport meta tag (if missing) for proper mobile
+    rendering and a MutationObserver that ensures the sidebar toggle
+    button remains visible on mobile after the sidebar is closed.
     """
     if st.session_state.get("_keepalive_injected"):
         return
@@ -179,9 +184,15 @@ def _inject_session_keepalive():
             if (window.__stKeepalive) return;
             window.__stKeepalive = true;
 
-            /* Periodic ping — keeps proxies / load-balancers from
-               closing the idle connection.  90 s is well under
-               typical 5-min proxy idle timeouts. */
+            /* ── Viewport meta — ensure proper mobile scaling ────── */
+            if (!document.querySelector('meta[name="viewport"]')) {
+                var meta = document.createElement('meta');
+                meta.name = 'viewport';
+                meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover';
+                document.head.appendChild(meta);
+            }
+
+            /* ── Periodic ping — keeps proxies / load-balancers ──── */
             var _ping = function() {
                 fetch('./_stcore/health').catch(function(){});
             };
@@ -192,6 +203,54 @@ def _inject_session_keepalive():
             document.addEventListener('visibilitychange', function() {
                 if (!document.hidden) _ping();
             });
+
+            /* ── Mobile sidebar toggle fix ────────────────────────
+               Streamlit sometimes hides the sidebar toggle button
+               or nests it inside an invisible parent. This observer
+               ensures the toggle button is always visible and
+               tappable on mobile (≤768px). */
+            function ensureSidebarToggle() {
+                if (window.innerWidth > 768) return;
+                var selectors = [
+                    '[data-testid="stSidebarCollapsedControl"]',
+                    '[data-testid="collapsedControl"]'
+                ];
+                selectors.forEach(function(sel) {
+                    var btn = document.querySelector(sel);
+                    if (btn) {
+                        btn.style.display = 'flex';
+                        btn.style.visibility = 'visible';
+                        btn.style.opacity = '1';
+                        btn.style.pointerEvents = 'auto';
+                    }
+                });
+            }
+            /* Run once and observe DOM mutations — scoped to the
+               header element for performance (avoids monitoring the
+               entire body subtree). Falls back to body childList-only
+               if the header is not yet rendered. */
+            ensureSidebarToggle();
+            var headerEl = document.querySelector('header[data-testid="stHeader"]');
+            if (headerEl) {
+                var obs = new MutationObserver(function() { ensureSidebarToggle(); });
+                obs.observe(headerEl, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-expanded'] });
+            } else {
+                /* Header not yet in DOM — watch body childList only
+                   (lightweight) until we can scope to the header. */
+                var bodyObs = new MutationObserver(function() {
+                    var h = document.querySelector('header[data-testid="stHeader"]');
+                    if (h) {
+                        bodyObs.disconnect();
+                        var obs2 = new MutationObserver(function() { ensureSidebarToggle(); });
+                        obs2.observe(h, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-expanded'] });
+                    }
+                    ensureSidebarToggle();
+                });
+                bodyObs.observe(document.body, { childList: true, subtree: true });
+            }
+
+            /* Also run on resize in case the user rotates their phone */
+            window.addEventListener('resize', ensureSidebarToggle);
         })();
         </script>
         """,
