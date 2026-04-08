@@ -24,7 +24,11 @@ class XGBoostModel(BaseModel):
         self._model = None
 
     def train(self, X, y) -> None:
-        """Train XGBoost model.
+        """Train XGBoost model with early stopping when possible.
+
+        Holds out the last 20% of data for early stopping evaluation
+        to prevent overfitting.  Falls back to full-data training when
+        the dataset is too small.
 
         Args:
             X: Feature matrix.
@@ -34,15 +38,36 @@ class XGBoostModel(BaseModel):
             _logger.warning("xgboost not available; XGBoostModel.train is a no-op")
             return
         try:
+            import numpy as np
+            n = len(X)
+            split = int(n * 0.8)
+            use_early_stop = split >= 10 and (n - split) >= 5
+
             self._model = xgb.XGBRegressor(
                 n_estimators=self.n_estimators,
                 max_depth=self.max_depth,
                 learning_rate=self.learning_rate,
                 random_state=42,
                 verbosity=0,
+                early_stopping_rounds=20 if use_early_stop else None,
             )
-            self._model.fit(X, y)
-            _logger.info("XGBoostModel trained on %d samples", len(y))
+
+            if use_early_stop:
+                X_train, X_es = np.array(X[:split]), np.array(X[split:])
+                y_train, y_es = np.array(y[:split]), np.array(y[split:])
+                self._model.fit(
+                    X_train, y_train,
+                    eval_set=[(X_es, y_es)],
+                    verbose=False,
+                )
+                best = getattr(self._model, "best_iteration", self.n_estimators)
+                _logger.info(
+                    "XGBoostModel trained on %d samples (early stop @ %d rounds)",
+                    n, best,
+                )
+            else:
+                self._model.fit(X, y)
+                _logger.info("XGBoostModel trained on %d samples (no early stop)", n)
         except Exception as exc:
             _logger.error("XGBoostModel.train failed: %s", exc)
 

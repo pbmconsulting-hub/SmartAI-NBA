@@ -22,25 +22,51 @@ class ModelEnsemble(BaseModel):
         self._weights: dict = {}
         self._variances: dict = {}
 
-    def train(self, X, y) -> None:
+    def train(self, X, y, X_val=None, y_val=None) -> None:
         """Train all sub-models and compute inverse-variance weights.
 
+        Weights are computed from *validation* data when provided, so the
+        ensemble rewards generalisation rather than memorisation.
+
         Args:
-            X: Feature matrix.
-            y: Target vector.
+            X: Training feature matrix.
+            y: Training target vector.
+            X_val: Optional validation feature matrix for weight computation.
+            y_val: Optional validation target vector.
         """
+        # If no explicit validation set, hold out the last 20 % of X/y
+        # so weights never use training error (which rewards overfitting).
+        if X_val is None or y_val is None:
+            try:
+                import numpy as np
+                n = len(X)
+                split = int(n * 0.8)
+                if split < 5 or n - split < 2:
+                    # Too little data to split — fall back to training eval
+                    X_train, y_train = X, y
+                    X_eval, y_eval = X, y
+                else:
+                    X_train, y_train = X[:split], y[:split]
+                    X_eval, y_eval = X[split:], y[split:]
+            except Exception:
+                X_train, y_train = X, y
+                X_eval, y_eval = X, y
+        else:
+            X_train, y_train = X, y
+            X_eval, y_eval = X_val, y_val
+
         for model in self.models:
             try:
-                model.train(X, y)
-                metrics = model.evaluate(X, y)
+                model.train(X_train, y_train)
+                metrics = model.evaluate(X_eval, y_eval)
                 variance = metrics["rmse"] ** 2 if metrics["rmse"] > 0 else 1e-6
                 self._variances[model.name] = variance
-                _logger.info("Trained %s → RMSE=%.4f", model.name, metrics["rmse"])
+                _logger.info("Trained %s → val RMSE=%.4f", model.name, metrics["rmse"])
             except Exception as exc:
                 _logger.error("Ensemble train failed for %s: %s", model.name, exc)
                 self._variances[model.name] = 1.0
 
-        # Compute inverse-variance weights
+        # Compute inverse-variance weights from validation performance
         total_inv = sum(1.0 / v for v in self._variances.values() if v > 0)
         if total_inv > 0:
             self._weights = {
@@ -52,7 +78,7 @@ class ModelEnsemble(BaseModel):
             n = len(self.models)
             self._weights = {m.name: 1.0 / n for m in self.models}
 
-        _logger.info("Ensemble weights: %s", self._weights)
+        _logger.info("Ensemble weights (val-based): %s", self._weights)
 
         # Log weights to model_performance tracker
         try:
