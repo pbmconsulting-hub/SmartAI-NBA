@@ -134,6 +134,7 @@ _MAX_RETRIES_PER_PLAYER = 3          # Retries for per-player endpoints.
 _BULK_ENDPOINT_TIMEOUT = 120         # Seconds for bulk endpoints (LeagueGameLog etc.).
 _SEASON_DASHBOARD_TIMEOUT = 60       # Seconds for season-level dashboard endpoints.
 _PER_PLAYER_TIMEOUT = 45             # Seconds for per-player calls.
+_CAREER_TIMEOUT = 20                 # Shorter timeout for career-stats (fail fast when throttled).
 _PER_GAME_TIMEOUT = 30               # Seconds for per-game box-score calls.
 _RATE_LIMIT_DELAY = 0.45             # Seconds between API calls (rate-limit).
 _PLAYER_WORKERS = 8                  # Concurrent threads for per-player fetches.
@@ -1485,14 +1486,16 @@ def populate_standings(
 def populate_player_career_stats(
     conn: sqlite3.Connection, season: str = SEASON
 ) -> None:
-    """Fetch and load career stats for all active players.
+    """Fetch and load career stats for active players (incremental).
+
+    Only the **current season** and the **previous season** are kept —
+    older historical rows are discarded to minimise storage and speed up
+    queries.  On subsequent runs most players already have data; only
+    those **missing** from ``Player_Career_Stats`` or who have **played
+    in the last 3 days** are re-fetched.
 
     Uses batched thread-pool processing with a dedicated rate limiter
-    that is more conservative than the global one to avoid triggering
-    NBA API throttling during this heavyweight per-player fetch.
-
-    Each batch of ``_CAREER_BATCH_SIZE`` players is processed with
-    ``_CAREER_WORKERS`` threads, followed by a cooldown.  A circuit
+    and progressive cooldowns to avoid NBA API throttling.  A circuit
     breaker pauses longer after ``_CAREER_CIRCUIT_THRESHOLD``
     consecutive failures.  Players that fail the first pass are
     retried in a single-threaded second pass.
@@ -1501,16 +1504,52 @@ def populate_player_career_stats(
         conn: Open SQLite connection.
         season: NBA season string (used to filter to current-season players).
     """
-    player_ids = pd.read_sql(
+    # Compute which two seasons to keep.  The NBA API encodes season_id as
+    # e.g. "22025" for the 2025-26 season (prefix '2' + start year).
+    _start_year = int(season.split("-")[0])
+    _keep_season_ids = {f"2{_start_year}", f"2{_start_year - 1}"}
+    all_active = pd.read_sql(
         "SELECT DISTINCT player_id FROM Players WHERE is_active = 1",
         conn,
     )["player_id"].tolist()
 
-    if not player_ids:
+    if not all_active:
         logger.info("Player_Career_Stats: no active players found.")
         return
 
-    logger.info("Fetching career stats for %d players …", len(player_ids))
+    # ── Incremental: determine which players actually need fetching ───────
+    # 1. Players with NO rows at all in Player_Career_Stats.
+    existing_pids = set(
+        pd.read_sql(
+            "SELECT DISTINCT player_id FROM Player_Career_Stats",
+            conn,
+        )["player_id"].tolist()
+    )
+    missing_pids = [p for p in all_active if p not in existing_pids]
+
+    # 2. Players who played a game in the last 3 days (stats may have changed).
+    recently_active = set(
+        pd.read_sql(
+            "SELECT DISTINCT player_id FROM Player_Game_Logs "
+            "WHERE game_date >= date('now', '-3 days')",
+            conn,
+        )["player_id"].tolist()
+    )
+    stale_pids = [p for p in all_active if p in recently_active and p in existing_pids]
+
+    player_ids = list(dict.fromkeys(missing_pids + stale_pids))  # dedupe, preserve order
+
+    if not player_ids:
+        logger.info(
+            "Player_Career_Stats: all %d active players already up-to-date — nothing to fetch.",
+            len(all_active),
+        )
+        return
+
+    logger.info(
+        "Fetching career stats for %d players (%d missing, %d recently active) …",
+        len(player_ids), len(missing_pids), len(stale_pids),
+    )
 
     col_map = {
         "PLAYER_ID": "player_id", "SEASON_ID": "season_id",
@@ -1545,7 +1584,7 @@ def populate_player_career_stats(
             df = _call_with_retries(
                 lambda: PlayerCareerStats(
                     player_id=pid,
-                    timeout=_PER_PLAYER_TIMEOUT,
+                    timeout=_CAREER_TIMEOUT,
                 ).get_data_frames()[0],
                 description=f"PlayerCareerStats(player={pid})",
                 max_retries=_MAX_RETRIES_PER_PLAYER,
@@ -1559,7 +1598,12 @@ def populate_player_career_stats(
         if df.empty:
             return None
         available = {k: v for k, v in col_map.items() if k in df.columns}
-        return df[list(available.keys())].rename(columns=available)
+        mapped = df[list(available.keys())].rename(columns=available)
+        # Keep only current + previous season rows.
+        if "season_id" in mapped.columns:
+            mapped["season_id"] = mapped["season_id"].astype(str)
+            mapped = mapped[mapped["season_id"].isin(_keep_season_ids)]
+        return mapped if not mapped.empty else None
 
     def _fetch_career(pid: int) -> tuple[int, pd.DataFrame | None]:
         """Rate-limited wrapper returning ``(pid, df | None)``."""
@@ -1609,7 +1653,15 @@ def populate_player_career_stats(
                 time.sleep(_CAREER_CIRCUIT_COOLDOWN)
                 consecutive_failures = 0
             else:
-                time.sleep(_CAREER_BATCH_COOLDOWN)
+                # Progressive cooldown: increase delay as we go deeper
+                # to reduce likelihood of NBA API throttling.
+                progress_ratio = done / len(player_ids)
+                cooldown = _CAREER_BATCH_COOLDOWN
+                if progress_ratio > 0.75:
+                    cooldown = _CAREER_BATCH_COOLDOWN * 3
+                elif progress_ratio > 0.5:
+                    cooldown = _CAREER_BATCH_COOLDOWN * 2
+                time.sleep(cooldown)
 
     # ── Second pass: retry failed players one-by-one ─────────────────────
     if failed_pids:
@@ -1636,13 +1688,23 @@ def populate_player_career_stats(
     result = pd.concat(all_rows, ignore_index=True)
     result = result.drop_duplicates(subset=["player_id", "season_id", "team_id"])
 
-    conn.execute("DELETE FROM Player_Career_Stats")
+    # Delete only the rows for players we re-fetched, then insert fresh data.
+    fetched_pids = result["player_id"].unique().tolist()
+    if fetched_pids:
+        placeholders = ",".join("?" * len(fetched_pids))
+        conn.execute(
+            f"DELETE FROM Player_Career_Stats WHERE player_id IN ({placeholders})",
+            fetched_pids,
+        )
     result.to_sql("Player_Career_Stats", conn, if_exists="append", index=False)
+
+    total_rows = conn.execute("SELECT COUNT(*) FROM Player_Career_Stats").fetchone()[0]
+    total_players = conn.execute(
+        "SELECT COUNT(DISTINCT player_id) FROM Player_Career_Stats"
+    ).fetchone()[0]
     logger.info(
-        "Player_Career_Stats: inserted %d rows for %d/%d players.",
-        len(result),
-        result["player_id"].nunique(),
-        len(player_ids),
+        "Player_Career_Stats: upserted %d rows for %d players (table total: %d rows, %d players).",
+        len(result), len(fetched_pids), total_rows, total_players,
     )
 
 
