@@ -137,7 +137,7 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
     with st.spinner("🤖 Auto-resolving pending bets..."):
         try:
             _today_str = datetime.date.today().isoformat()
-            _all_bets_check = _cached_load_all_bets()
+            _all_bets_check = load_all_bets(exclude_linked=False)
 
             # Resolve past pending bets (yesterday and older)
             _pending_old = [
@@ -1473,7 +1473,7 @@ with tab_auto_resolve:
 
     # ── Live Status Section ────────────────────────────────────────────
     st.markdown("### 🔄 Live Bet Status — Today's Picks")
-    _today_bets_all = _cached_load_all_bets()
+    _today_bets_all = load_all_bets(exclude_linked=False)
     _today_str_ar = datetime.date.today().isoformat()
     _today_bets = [
         b for b in _today_bets_all
@@ -1553,7 +1553,7 @@ with tab_auto_resolve:
 
     # ── Resolve Past Bets ─────────────────────────────────────────────
     st.markdown("### 🗓️ Resolve Past Bets")
-    all_bets_for_resolve = _cached_load_all_bets()
+    all_bets_for_resolve = load_all_bets(exclude_linked=False)
     pending_all = [
         b for b in all_bets_for_resolve
         if not b.get("result") and b.get("bet_date", "") < _today_str_ar and _platform_filter_fn(b)

@@ -58,7 +58,7 @@ def joseph_auto_log_bets(joseph_results: list) -> tuple:
 
         # Build dedup set from today's existing bets
         today_str = datetime.date.today().isoformat()
-        all_today = load_all_bets()
+        all_today = load_all_bets(exclude_linked=False)
         existing_keys: set = set()
         for b in all_today:
             bet_date = str(b.get("bet_date", ""))
