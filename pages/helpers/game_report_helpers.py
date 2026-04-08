@@ -40,8 +40,14 @@ def get_matchup_card_html(
     home_record: str = "",
     n_props: int = 0,
     n_high_conf: int = 0,
+    game_time: str = "",
+    away_seed: str = "",
+    home_seed: str = "",
+    away_streak: str = "",
+    home_streak: str = "",
 ) -> str:
-    """Render a QDS-styled matchup card with team logos, colors, and records.
+    """Render a QDS-styled matchup card with team logos, colors, records,
+    conference seed, streak, and game time.
 
     Args:
         away_team: Away team abbreviation (e.g. "BOS").
@@ -50,6 +56,11 @@ def get_matchup_card_html(
         home_record: Win-loss record string for home team (e.g. "38-22").
         n_props: Number of analyzed props for this game.
         n_high_conf: Number of high-confidence picks (≥70).
+        game_time: Game time string (e.g. "7:30 PM ET").
+        away_seed: Conference seed for away team (e.g. "#2 E").
+        home_seed: Conference seed for home team (e.g. "#5 W").
+        away_streak: Current streak for away team (e.g. "W3").
+        home_streak: Current streak for home team (e.g. "L2").
 
     Returns:
         HTML string for the matchup card.
@@ -63,6 +74,27 @@ def get_matchup_card_html(
     safe_home = _html.escape(str(home_team))
     safe_away_rec = _html.escape(str(away_record)) if away_record else ""
     safe_home_rec = _html.escape(str(home_record)) if home_record else ""
+
+    def _streak_badge(streak_str):
+        """Return a colored streak badge HTML or empty string."""
+        if not streak_str:
+            return ""
+        s = _html.escape(str(streak_str))
+        if s.startswith("W"):
+            return (f'<span style="color:#00ff9d;font-size:0.68rem;font-weight:600;">'
+                    f'🔥 {s}</span>')
+        if s.startswith("L"):
+            return (f'<span style="color:#ff6b6b;font-size:0.68rem;font-weight:600;">'
+                    f'❄️ {s}</span>')
+        return f'<span style="color:#8a9bb8;font-size:0.68rem;">{s}</span>'
+
+    def _seed_badge(seed_str):
+        """Return a small seed/rank badge or empty string."""
+        if not seed_str:
+            return ""
+        return (f'<span style="background:rgba(0,180,255,0.12);color:#63b3ed;'
+                f'padding:1px 6px;border-radius:8px;font-size:0.65rem;'
+                f'font-weight:600;">{_html.escape(str(seed_str))}</span>')
 
     props_badge = ""
     if n_props:
@@ -82,31 +114,51 @@ def get_matchup_card_html(
             f'color:#8a9bb8;">No props analyzed yet</div>'
         )
 
+    # Game time badge (centered above the matchup)
+    time_html = ""
+    if game_time:
+        time_html = (
+            f'<div style="text-align:center;margin-bottom:8px;">'
+            f'<span style="background:rgba(0,240,255,0.08);color:#8a9bb8;'
+            f'padding:2px 10px;border-radius:10px;font-size:0.70rem;'
+            f'font-weight:600;letter-spacing:0.5px;">'
+            f'🕐 {_html.escape(str(game_time))}</span></div>'
+        )
+
     return (
         f'<div style="background:linear-gradient(135deg,rgba(0,255,213,0.04) 0%,rgba(0,180,255,0.04) 100%);'
         f'border:1px solid rgba(0,255,213,0.12);border-radius:12px;padding:14px 20px;'
         f'margin-bottom:6px;">'
-        f'<div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;">'
+        + time_html
+        + f'<div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;">'
         # Away team
-        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:80px;">'
+        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:90px;">'
         f'<img src="{away_logo}" onerror="this.src=\'{NBA_LOGO_FALLBACK}\'" '
         f'style="width:44px;height:44px;object-fit:contain;'
         f'filter:drop-shadow(0 0 6px rgba(0,180,255,0.4));" alt="{safe_away}">'
         f'<div style="font-family:\'Orbitron\',sans-serif;font-weight:700;font-size:0.95rem;'
         f'color:{away_color};">{safe_away}</div>'
         + (f'<div style="font-size:0.72rem;color:#8a9bb8;">{safe_away_rec}</div>' if safe_away_rec else "")
+        + f'<div style="display:flex;gap:6px;align-items:center;">'
+        + _seed_badge(away_seed)
+        + _streak_badge(away_streak)
+        + f'</div>'
         + f'</div>'
         # @ divider
         f'<div style="font-family:\'Orbitron\',sans-serif;font-size:0.85rem;color:#8a9bb8;'
         f'padding:4px 12px;background:rgba(0,180,255,0.08);border-radius:20px;">@</div>'
         # Home team
-        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:80px;">'
+        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:90px;">'
         f'<img src="{home_logo}" onerror="this.src=\'{NBA_LOGO_FALLBACK}\'" '
         f'style="width:44px;height:44px;object-fit:contain;'
         f'filter:drop-shadow(0 0 6px rgba(0,180,255,0.4));" alt="{safe_home}">'
         f'<div style="font-family:\'Orbitron\',sans-serif;font-weight:700;font-size:0.95rem;'
         f'color:{home_color};">{safe_home}</div>'
         + (f'<div style="font-size:0.72rem;color:#8a9bb8;">{safe_home_rec}</div>' if safe_home_rec else "")
+        + f'<div style="display:flex;gap:6px;align-items:center;">'
+        + _seed_badge(home_seed)
+        + _streak_badge(home_streak)
+        + f'</div>'
         + f'</div>'
         f'</div>'
         + props_badge

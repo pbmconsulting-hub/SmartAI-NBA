@@ -265,6 +265,7 @@ elif not todays_games and not analysis_results:
         "Go to **📡 Live Games** to load tonight's NBA slate, "
         "then run **⚡ Neural Analysis** to generate prop predictions."
     )
+    st.page_link("pages/1_📡_Live_Games.py", label="📡 Go to Live Games", icon="🏀")
 
 # ============================================================
 # END SECTION: Matchup Selector
@@ -396,9 +397,9 @@ def _build_all_picks_table(results):
         results: List of analysis result dicts from Neural Analysis engine.
 
     Returns:
-        list[dict]: Rows with Player, Stat, Dir, Line, SAFE, Edge%, Tier.
-        Includes every analyzed prop (no edge threshold) so the user can
-        see the full picture.
+        list[dict]: Rows with Player, Team, Stat, Dir, Line, Projected,
+        SAFE, Edge%, Tier.  Includes every analyzed prop (no edge threshold)
+        so the user can see the full picture.
     """
     all_picks = sorted(
         [r for r in results if not r.get("player_is_out", False)],
@@ -409,12 +410,14 @@ def _build_all_picks_table(results):
     for r in all_picks:
         rows.append({
             "Player": r.get("player_name", "?"),
-            "Stat": r.get("stat_type", "").title(),
-            "Dir": r.get("direction", ""),
-            "Line": r.get("line", 0),
-            "SAFE": round(r.get("confidence_score", 0), 1),
-            "Edge%": round(r.get("edge_percentage", 0), 1),
-            "Tier": r.get("tier", ""),
+            "Team":   r.get("player_team", r.get("team", "")),
+            "Stat":   r.get("stat_type", "").title(),
+            "Dir":    r.get("direction", ""),
+            "Line":   r.get("line", 0),
+            "Proj":   round(r.get("projected_value", r.get("projection", 0)), 1),
+            "SAFE":   round(r.get("confidence_score", 0), 1),
+            "Edge%":  round(r.get("edge_percentage", 0), 1),
+            "Tier":   r.get("tier", ""),
         })
     return rows
 
@@ -669,6 +672,18 @@ with _tab_report:
             if _away_sd and not game.get("away_wins"):
                 game["away_wins"] = _away_sd.get("wins", 0)
                 game["away_losses"] = _away_sd.get("losses", 0)
+
+            # Extract conference seed, streak, and game time for the matchup card
+            _home_rank = _home_sd.get("conference_rank", game.get("home_conference_rank", 0))
+            _home_conf_ltr = (_home_sd.get("conference") or game.get("home_conference") or "")[:1].upper()
+            _away_rank = _away_sd.get("conference_rank", game.get("away_conference_rank", 0))
+            _away_conf_ltr = (_away_sd.get("conference") or game.get("away_conference") or "")[:1].upper()
+            _home_seed_str = f"#{_home_rank} {_home_conf_ltr}" if _home_rank else ""
+            _away_seed_str = f"#{_away_rank} {_away_conf_ltr}" if _away_rank else ""
+            _home_streak_str = _home_sd.get("streak") or game.get("home_streak") or ""
+            _away_streak_str = _away_sd.get("streak") or game.get("away_streak") or ""
+            _game_time_str = game.get("game_time_et") or ""
+
             st.markdown(
                 get_matchup_card_html(
                     away_team=away,
@@ -677,6 +692,11 @@ with _tab_report:
                     home_record=_home_rec,
                     n_props=n_game_props,
                     n_high_conf=n_conf,
+                    game_time=_game_time_str,
+                    away_seed=_away_seed_str,
+                    home_seed=_home_seed_str,
+                    away_streak=_away_streak_str,
+                    home_streak=_home_streak_str,
                 ),
                 unsafe_allow_html=True,
             )
@@ -782,6 +802,79 @@ with _tab_report:
                 st.divider()
 
                 if game_results:
+                    # ── Top Value Picks (best edge%) ──────────────────
+                    _value_picks = sorted(
+                        [r for r in game_results
+                         if not r.get("should_avoid", False)
+                         and abs(r.get("edge_percentage", 0)) >= 3.0],
+                        key=lambda r: abs(r.get("edge_percentage", 0)),
+                        reverse=True,
+                    )[:3]
+                    if _value_picks:
+                        st.markdown("#### 💎 Top Value Picks (Highest Edge)")
+                        _vp_cols = st.columns(min(3, len(_value_picks)))
+                        for _vc, _vp in zip(_vp_cols, _value_picks):
+                            _vp_edge = _vp.get("edge_percentage", 0)
+                            _vp_dir = _vp.get("direction", "OVER")
+                            _edge_color = "#00ff9d" if _vp_edge > 0 else "#ff6b6b"
+                            _dir_icon = "📈" if _vp_dir == "OVER" else "📉"
+                            _vc.markdown(
+                                f'<div style="background:rgba(0,255,213,0.05);'
+                                f'border:1px solid {_edge_color}30;border-radius:10px;'
+                                f'padding:12px;text-align:center;">'
+                                f'<div style="font-weight:700;color:#c0d0e8;font-size:0.9rem;">'
+                                f'{_vp.get("player_name", "?")}</div>'
+                                f'<div style="color:#8a9bb8;font-size:0.78rem;margin:4px 0;">'
+                                f'{_dir_icon} {_vp_dir} {_vp.get("line", 0)} {_vp.get("stat_type", "").title()}</div>'
+                                f'<div style="color:{_edge_color};font-weight:700;font-size:1.1rem;">'
+                                f'{_vp_edge:+.1f}% Edge</div>'
+                                f'<div style="color:#8a9bb8;font-size:0.72rem;margin-top:4px;">'
+                                f'SAFE: {_vp.get("confidence_score", 0):.0f}/100</div>'
+                                f'</div>',
+                                unsafe_allow_html=True,
+                            )
+                        st.divider()
+
+                    # ── Injury Impact Summary ─────────────────────────
+                    _inj_map_gr = st.session_state.get("injury_status_map", {})
+                    _inj_statuses_gr = {"Out", "Doubtful", "Injured Reserve", "Game Time Decision"}
+                    _home_players_gr = PLAYERS_BY_TEAM.get(home, [])
+                    _away_players_gr = PLAYERS_BY_TEAM.get(away, [])
+                    _home_out_gr = [
+                        p.get("name", "?")
+                        for p in _home_players_gr[:12]
+                        if _inj_map_gr.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses_gr
+                    ]
+                    _away_out_gr = [
+                        p.get("name", "?")
+                        for p in _away_players_gr[:12]
+                        if _inj_map_gr.get(p.get("name", ""), {}).get("status", "Active") in _inj_statuses_gr
+                    ]
+                    if _home_out_gr or _away_out_gr:
+                        st.markdown("#### 🏥 Injury Impact")
+                        _inj_c1, _inj_c2 = st.columns(2)
+                        with _inj_c1:
+                            if _away_out_gr:
+                                st.markdown(
+                                    f"**{away}**: " + ", ".join(
+                                        f"🚫 {html.escape(n)}" for n in _away_out_gr[:4]
+                                    ),
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                st.markdown(f"**{away}**: ✅ No major injuries")
+                        with _inj_c2:
+                            if _home_out_gr:
+                                st.markdown(
+                                    f"**{home}**: " + ", ".join(
+                                        f"🚫 {html.escape(n)}" for n in _home_out_gr[:4]
+                                    ),
+                                    unsafe_allow_html=True,
+                                )
+                            else:
+                                st.markdown(f"**{home}**: ✅ No major injuries")
+                        st.divider()
+
                     # ── All Props & Picks for this game ───────────────
                     all_picks_rows = _build_all_picks_table(game_results)
                     if all_picks_rows:
@@ -792,6 +885,7 @@ with _tab_report:
                             hide_index=True,
                             column_config={
                                 "Line": st.column_config.NumberColumn(format="%.1f"),
+                                "Proj": st.column_config.NumberColumn(format="%.1f"),
                                 "SAFE": st.column_config.NumberColumn(format="%.1f"),
                                 "Edge%": st.column_config.NumberColumn(format="%.1f"),
                             },
@@ -858,6 +952,7 @@ with _tab_report:
                 hide_index=True,
                 column_config={
                     "Line": st.column_config.NumberColumn(format="%.1f"),
+                    "Proj": st.column_config.NumberColumn(format="%.1f"),
                     "SAFE": st.column_config.NumberColumn(format="%.1f"),
                     "Edge%": st.column_config.NumberColumn(format="%.1f"),
                 },
@@ -880,6 +975,7 @@ with _tab_report:
         st.info(
             "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."
         )
+        st.page_link("pages/1_📡_Live_Games.py", label="📡 Go to Live Games", icon="🏀")
 
     # ════ JOSEPH COMMENTS ON GAME REPORT ════
     if analysis_results and st.session_state.get("joseph_enabled", True):

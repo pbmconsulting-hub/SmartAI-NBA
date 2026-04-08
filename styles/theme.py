@@ -3496,6 +3496,45 @@ def get_game_report_html(game=None, analysis_results=None):
     home_pbadges = _player_badges(home_players, home_color)
     away_pbadges = _player_badges(away_players, away_color)
 
+    # ── Pick Distribution Summary ─────────────────────────────
+    _n_plat = sum(1 for r in all_picks if r.get("confidence_score", 0) >= 85)
+    _n_gold = sum(1 for r in all_picks if 70 <= r.get("confidence_score", 0) < 85)
+    _n_silv = sum(1 for r in all_picks if 55 <= r.get("confidence_score", 0) < 70)
+    _n_brnz = sum(1 for r in all_picks if r.get("confidence_score", 0) < 55)
+    _n_over = sum(1 for r in all_picks if r.get("direction", "") == "OVER")
+    _n_under = len(all_picks) - _n_over
+    _avg_edge = (
+        sum(abs(r.get("edge_percentage", 0)) for r in all_picks) / max(len(all_picks), 1)
+    )
+
+    dist_summary_html = (
+        f'<div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;margin-bottom:12px;">'
+        f'<div style="text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#00ffd5;">{_n_plat}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">Platinum</div></div>'
+        f'<div style="text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#ffcc00;">{_n_gold}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">Gold</div></div>'
+        f'<div style="text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#00b4ff;">{_n_silv}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">Silver</div></div>'
+        f'<div style="text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#a0b4d0;">{_n_brnz}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">Bronze</div></div>'
+        f'<div style="border-left:1px solid rgba(255,255,255,0.08);'
+        f'padding-left:16px;text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#69f0ae;">{_n_over}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">OVER</div></div>'
+        f'<div style="text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#ff6b6b;">{_n_under}</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">UNDER</div></div>'
+        f'<div style="border-left:1px solid rgba(255,255,255,0.08);'
+        f'padding-left:16px;text-align:center;min-width:60px;">'
+        f'<div style="font-size:1.4rem;font-weight:700;color:#c0d0e8;">{_avg_edge:.1f}%</div>'
+        f'<div style="font-size:0.68rem;color:#8a9bb8;">Avg Edge</div></div>'
+        f'</div>'
+    )
+
     # ── Final Word ────────────────────────────────────────────
     pick_summaries = []
     for p in top_picks[:3]:
@@ -3626,6 +3665,24 @@ def get_game_report_html(game=None, analysis_results=None):
             and use the Strategy Matrix below to build optimal multi-leg combinations.
           </p>
         </div>
+      </div>
+    </div>
+
+    <!-- ── Pick Distribution Summary ── -->
+    <div class="qds-collapsible open" id="qdsDist">
+      <div class="qds-collapsible-header" onclick="qdsToggle('qdsDist')">
+        <h2 class="qds-collapsible-title">
+          <i class="fas fa-chart-pie"></i> PICK DISTRIBUTION SUMMARY
+        </h2>
+        <i class="fas fa-chevron-down qds-collapsible-icon"></i>
+      </div>
+      <div class="qds-collapsible-content">
+        {dist_summary_html}
+        <p class="qds-matchup-text" style="margin-top:8px;font-size:0.78rem;text-align:center;">
+          {len(all_picks)} total props analyzed &middot;
+          Focus on <strong style="color:#00ffd5;">Platinum</strong> and
+          <strong style="color:#ffcc00;">Gold</strong> tiers for highest confidence entries.
+        </p>
       </div>
     </div>
 
