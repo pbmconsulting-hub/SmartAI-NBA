@@ -43,6 +43,9 @@ class XGBoostModel(BaseModel):
             split = int(n * 0.8)
             use_early_stop = split >= 10 and (n - split) >= 5
 
+            # early_stopping_rounds=20: stop if validation metric does not
+            # improve for 20 consecutive rounds — balances between giving
+            # the model enough iterations and cutting off overfitting early.
             self._model = xgb.XGBRegressor(
                 n_estimators=self.n_estimators,
                 max_depth=self.max_depth,

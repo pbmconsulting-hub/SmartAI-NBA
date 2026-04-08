@@ -49,6 +49,7 @@ def _add_player_metrics(df):
                 mp = float(r.get(mp_col) or 0)
                 if mp <= 0:
                     return 0.0
+                # 0.44 is the standard FTA coefficient in NBA usage rate formulas
                 return (float(r.get("fga") or 0)
                         + 0.44 * float(r.get("fta") or 0)
                         + float(r.get("tov") or 0)) / mp

@@ -41,6 +41,8 @@ class ModelEnsemble(BaseModel):
                 import numpy as np
                 n = len(X)
                 split = int(n * 0.8)
+                # Minimum 5 training and 2 validation samples to compute
+                # meaningful RMSE for weight calibration.
                 if split < 5 or n - split < 2:
                     # Too little data to split — fall back to training eval
                     X_train, y_train = X, y

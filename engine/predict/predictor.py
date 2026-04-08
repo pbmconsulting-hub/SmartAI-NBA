@@ -202,7 +202,9 @@ def _get_regime_adjustment(game_logs, stat_type):
 
         # Ratio of recent performance vs season (capped to prevent extremes)
         raw_ratio = recent_avg / season_avg if season_avg > 0 else 1.0
-        # Dampen the adjustment by confidence
+        # Dampen the adjustment by confidence.  The 0.5 factor means we
+        # apply at most half of the raw regime shift — a conservative blend
+        # that avoids overcorrecting on noisy short-window signals.
         multiplier = 1.0 + (raw_ratio - 1.0) * confidence * 0.5
 
         # Cap the multiplier
@@ -266,7 +268,6 @@ def _get_career_prior(player_name):
             if gp <= 0:
                 return {}
 
-            # Convert totals to per-game if gp is sensible (> 50 implies totals)
             # Player_Career_Stats stores per-game averages for standard box stats
             return {
                 "career_ppg": float(prior.get("pts", 0) or 0),
