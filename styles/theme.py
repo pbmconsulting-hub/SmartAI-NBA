@@ -3973,9 +3973,11 @@ _QDS_NA_CSS = """
   margin-bottom:3px;display:flex;justify-content:space-between;}
 .qds-na-conf-bar-track{height:10px;background:rgba(255,255,255,0.08);
   border-radius:5px;overflow:hidden;}
+@keyframes qds-conf-bar-expand{from{width:0%}}
 .qds-na-conf-bar-fill{height:100%;border-radius:5px;
   background:linear-gradient(90deg,var(--qds-primary),var(--qds-accent));
-  transition:width 0.5s ease;}
+  transition:width 0.5s ease;
+  animation:qds-conf-bar-expand 0.6s ease-out both;}
 .qds-na-bonus-item{display:flex;align-items:flex-start;gap:8px;
   font-size:0.82rem;color:var(--qds-text-light);margin-bottom:5px;}
 .qds-na-bonus-icon{color:var(--qds-success);margin-top:2px;flex-shrink:0;}
@@ -5800,6 +5802,22 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qcm-tier-silver   { background: rgba(192, 192, 192, 0.15); color: #C0C0C0; border: 1px solid rgba(192, 192, 192, 0.30); }
 .qcm-tier-bronze   { background: rgba(205, 127, 50, 0.15); color: #CD7F32; border: 1px solid rgba(205, 127, 50, 0.30); }
 
+/* ── Animated Tier-Glow Borders ──────────────────────────── */
+@keyframes qcm-platinum-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(200, 0, 255, 0.2); }
+    50%      { box-shadow: 0 0 18px rgba(200, 0, 255, 0.4); }
+}
+@keyframes qcm-gold-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.15); }
+    50%      { box-shadow: 0 0 18px rgba(255, 215, 0, 0.3); }
+}
+.qcm-card.qcm-card-platinum {
+    animation: qcm-platinum-pulse 2s ease-in-out infinite;
+}
+.qcm-card.qcm-card-gold {
+    animation: qcm-gold-pulse 2s ease-in-out infinite;
+}
+
 .qcm-stat-type {
     font-size: 0.78rem;
     color: #94A3B8;
@@ -6098,10 +6116,14 @@ QUANTUM_CARD_MATRIX_CSS = """
     border-radius: 3px;
     overflow: hidden;
 }
+@keyframes qcm-conf-bar-expand {
+    from { width: 0%; }
+}
 .qcm-conf-bar-fill {
     height: 100%;
     border-radius: 3px;
     transition: width 0.5s ease;
+    animation: qcm-conf-bar-expand 0.6s ease-out both;
 }
 
 /* ── Context Metrics Grid (Situational / Matchup / Form / Edge) ── */
@@ -6277,6 +6299,18 @@ QUANTUM_CARD_MATRIX_CSS = """
     flex: 0 0 200px;
 }
 
+/* ── Responsive Grid Breakpoints ─────────────────────────── */
+@media (min-width: 1200px) {
+    .qcm-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .qcm-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Responsive stacking — Container Queries (preferred).
    Cards adapt to their container width, not the viewport.
    This is critical when rendered inside a self-resizing iframe. */
@@ -6321,6 +6355,516 @@ QUANTUM_CARD_MATRIX_CSS = """
             flex-direction: column;
         }
     }
+}
+
+/* ── QAM Helper Card Classes ─────────────────────────────── */
+.qam-dfs-edge {
+    background: linear-gradient(135deg, #0f1424, #14192b);
+    border: 1px solid rgba(0, 255, 157, 0.2);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 6px 0;
+}
+.qam-dfs-edge-label {
+    color: #64748b;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.qam-dfs-edge-sub {
+    color: #475569;
+    font-size: 0.68rem;
+    margin-left: 8px;
+}
+.qam-dfs-edge-val {
+    font-size: 0.82rem;
+    font-weight: 800;
+    margin-left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+.qam-tier-dist {
+    background: linear-gradient(135deg, #0f1424, #14192b);
+    border: 1px solid rgba(255, 94, 0, 0.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 8px 0 14px;
+}
+.qam-tier-dist-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e0e7ef;
+    margin-bottom: 6px;
+}
+.qam-tier-dist-bar {
+    font-size: 0.85rem;
+}
+.qam-best-pick {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(255, 94, 0, 0.08);
+    border-radius: 6px;
+    border-left: 3px solid #ff5e00;
+}
+.qam-best-pick-label {
+    color: #ff5e00;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.qam-best-pick-detail {
+    color: #e0e7ef;
+    font-weight: 600;
+}
+.qam-best-pick-conf {
+    color: #00f0ff;
+    font-weight: 700;
+    margin-left: 10px;
+}
+.qam-news-alert {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+.qam-news-alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-news-alert-title {
+    color: #e0e7ef;
+    font-weight: 700;
+}
+.qam-news-alert-badge {
+    color: #000;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.qam-news-alert-meta {
+    color: #8b949e;
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+.qam-news-alert-body {
+    color: #a0b4d0;
+    font-size: 0.82rem;
+    margin-top: 6px;
+}
+.qam-market-move {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+.qam-market-move-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-market-move-player {
+    color: #e0e7ef;
+    font-weight: 700;
+}
+.qam-market-move-signal {
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.qam-market-move-detail {
+    color: #8b949e;
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+.qam-uncertain-header {
+    background: rgba(255, 193, 7, 0.10);
+    border: 2px solid #ffc107;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+}
+.qam-uncertain-card {
+    background: rgba(255, 193, 7, 0.06);
+    border: 1px solid rgba(255, 193, 7, 0.35);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.qam-uncertain-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-uncertain-name {
+    color: #ffc107;
+    font-weight: 700;
+}
+.qam-uncertain-team-badge {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffe082;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-left: 7px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+.qam-uncertain-flag-type {
+    background: #ffc107;
+    color: #333;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-left: 8px;
+}
+.qam-uncertain-prop {
+    color: #ffe082;
+    font-size: 0.85rem;
+}
+.qam-uncertain-edge {
+    color: #ffc107;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.qam-uncertain-flags {
+    margin-top: 8px;
+}
+.qam-uncertain-flags-label {
+    color: #ffc107;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.qam-uncertain-flags ul {
+    margin: 4px 0 0 16px;
+    padding: 0;
+}
+.qam-uncertain-flags li {
+    color: #ffe082;
+    font-size: 0.82rem;
+}
+.qam-gold-banner {
+    background: linear-gradient(135deg, #1a1200, #231800);
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 4px;
+}
+.qam-section-header {
+    background: linear-gradient(135deg, #0f1a2e, #14192b);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+.qam-section-header-single { border: 2px solid #00f0ff; }
+.qam-section-header-parlay { border: 2px solid #ff5e00; }
+.qam-parlay-card {
+    background: #14192b;
+    border-radius: 8px;
+    padding: 15px 18px;
+    margin-bottom: 14px;
+    border-left: 4px solid #ff5e00;
+}
+.qam-parlay-card-glow {
+    box-shadow: 0 0 14px rgba(255, 94, 0, 0.45);
+}
+.qam-parlay-pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.qam-parlay-pick-name {
+    color: #ff5e00;
+    font-weight: 600;
+}
+.qam-parlay-pick-detail {
+    color: #c0d0e8;
+}
+.qam-parlay-reason {
+    margin-top: 10px;
+    padding: 7px 10px;
+    background: rgba(20, 25, 43, 0.7);
+    border-radius: 4px;
+}
+.qam-parlay-reason-text {
+    color: #00c8ff;
+    font-size: 0.82rem;
+}
+.qam-parlay-stats {
+    display: flex;
+    gap: 18px;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #c0d0e8;
+}
+
+/* ── Tier count colors ────────────────────────────────────── */
+.qam-tier-platinum { color: #c800ff; font-weight: 700; }
+.qam-tier-gold     { color: #ffd700; font-weight: 600; }
+.qam-tier-silver   { color: #b0bec5; }
+.qam-tier-bronze   { color: #b0bec5; }
+.qam-avg-edge      { color: #00f0ff; }
+.qam-news-alert-player { color: #c0d0e8; }
+.qam-detail-value  { color: #c0d0e8; }
+
+/* ── Uncertain header inner ─────────────────────────────── */
+.qam-uncertain-header-title { color: #ffc107; font-size: 1.0rem; }
+.qam-uncertain-header-desc  { color: #ffe082; font-size: 0.85rem; }
+.qam-uncertain-card-right   { text-align: right; }
+
+/* ── Banner & section header inner text ─────────────────── */
+.qam-gold-banner h3 { color: #ffd700; font-family: Orbitron, sans-serif; margin: 0 0 4px; }
+.qam-gold-banner p  { color: #ffe082; font-size: 0.85rem; margin: 0; }
+.qam-section-header-single h3 { color: #00f0ff; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
+.qam-section-header-parlay h3 { color: #ff5e00; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
+.qam-section-header p { color: #a0b4d0; font-size: 0.85rem; margin: 0; }
+
+/* ── Parlay card header row ─────────────────────────────── */
+.qam-parlay-header {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 10px;
+}
+.qam-parlay-header h4 { color: #ff5e00; margin: 0; font-family: Orbitron, sans-serif; }
+.qam-parlay-safe-badge {
+    background: #ff5e00; color: #0a0f1a; padding: 3px 10px;
+    border-radius: 4px; font-size: 0.8rem; font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NEURAL ANALYSIS HELPERS — CSS Classes (Item 2)
+   Replaces inline style= strings in neural_analysis_helpers.py
+   ═══════════════════════════════════════════════════════════ */
+
+/* Distribution row cells */
+.nah-dist-row      { display: flex; gap: 4px; margin-top: 10px; margin-bottom: 8px; }
+.nah-dist-cell     { text-align: center; padding: 5px 4px;
+                     background: rgba(15, 23, 42, 0.60); border-radius: 5px;
+                     border: 1px solid rgba(255, 255, 255, 0.04);
+                     flex: 1; min-width: 48px; }
+.nah-dist-val      { font-size: 0.82rem; font-weight: 700;
+                     font-family: 'JetBrains Mono', monospace;
+                     font-variant-numeric: tabular-nums; }
+.nah-dist-val-p10  { color: #c0d0e8; }
+.nah-dist-val-med  { color: #00f0ff; }
+.nah-dist-val-p90  { color: #c0d0e8; }
+.nah-dist-val-std  { color: #ffffff; }
+.nah-dist-val-proj { color: #ff5e00; }
+.nah-dist-label    { font-size: 0.58rem; color: #64748b;
+                     text-transform: uppercase; letter-spacing: 0.06em; margin-top: 1px; }
+
+/* Force columns */
+.nah-forces-row    { display: flex; gap: 5px; margin-bottom: 8px; }
+.nah-force-col     { flex: 1; padding: 7px 9px; border-radius: 5px;
+                     font-family: 'JetBrains Mono', monospace; min-height: 36px; }
+.nah-force-col-over  { background: rgba(0, 240, 255, 0.04); border: 1px solid rgba(0, 240, 255, 0.12); }
+.nah-force-col-under { background: rgba(255, 94, 0, 0.04); border: 1px solid rgba(255, 94, 0, 0.12); }
+.nah-force-heading { font-weight: 700; font-size: 0.65rem; text-transform: uppercase;
+                     letter-spacing: 0.06em; margin-bottom: 3px; }
+.nah-force-heading-over  { color: #00f0ff; }
+.nah-force-heading-under { color: #ff5e00; }
+.nah-force-item    { color: #c0d0e8; font-size: 0.7rem; line-height: 1.35; margin-bottom: 1px; }
+.nah-force-none    { color: #475569; font-size: 0.7rem; font-style: italic; }
+
+/* Score breakdown bars */
+.nah-breakdown     { margin-top: 2px; }
+.nah-bkd-row       { display: flex; align-items: center; gap: 5px; margin-bottom: 4px;
+                     font-family: 'JetBrains Mono', monospace; }
+.nah-bkd-label     { font-size: 0.62rem; color: #94A3B8; width: 62px; flex-shrink: 0;
+                     text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nah-bkd-score     { font-size: 0.62rem; font-weight: 600;
+                     width: 22px; flex-shrink: 0; text-align: right; }
+.nah-bkd-track     { flex: 1; height: 4px; background: rgba(26, 32, 53, 0.80);
+                     border-radius: 2px; overflow: hidden; }
+.nah-bkd-fill      { height: 4px; border-radius: 2px; }
+
+/* Kelly wager row */
+.nah-kelly-row     { display: flex; align-items: center; gap: 6px; margin-top: 8px;
+                     padding: 6px 10px;
+                     background: linear-gradient(135deg, #070A13, #0F172A);
+                     border: 1px solid rgba(0, 198, 255, 0.20); border-radius: 6px; }
+.nah-kelly-label   { color: #64748b; font-size: 0.62rem; text-transform: uppercase;
+                     letter-spacing: 0.06em; flex-shrink: 0; }
+.nah-kelly-amount  { color: #00C6FF; font-size: 0.92rem; font-weight: 800;
+                     font-family: 'JetBrains Mono', monospace;
+                     font-variant-numeric: tabular-nums; }
+.nah-kelly-pct     { color: #475569; font-size: 0.58rem; margin-left: auto; }
+
+/* DFS flex EV section */
+.nah-dfs-wrap      { background: linear-gradient(135deg, #070A13, #0F172A);
+                     border: 1px solid rgba(0, 255, 157, 0.2); border-radius: 8px;
+                     padding: 8px 12px; margin: 6px 0; }
+.nah-dfs-header    { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.nah-dfs-label     { color: #64748b; font-size: 0.7rem; text-transform: uppercase;
+                     letter-spacing: 0.08em; }
+.nah-dfs-platform  { color: #475569; font-size: 0.65rem; margin-left: 6px; }
+.nah-dfs-prob      { color: #00f0ff; font-size: 0.65rem; margin-left: auto;
+                     font-family: 'JetBrains Mono', monospace; }
+.nah-dfs-pills     { display: flex; gap: 6px; margin-top: 4px; }
+.nah-dfs-pill      { flex: 1; min-width: 68px; text-align: center; padding: 4px 6px;
+                     border-radius: 6px; }
+.nah-dfs-pill-label { font-size: 0.68rem; font-weight: 700;
+                      font-family: 'JetBrains Mono', monospace; }
+.nah-dfs-pill-edge  { font-size: 0.78rem; font-weight: 800;
+                      font-family: 'JetBrains Mono', monospace;
+                      font-variant-numeric: tabular-nums; }
+.nah-dfs-pill-be    { color: #475569; font-size: 0.58rem; }
+.nah-dfs-kelly      { color: #475569; font-size: 0.62rem; margin-top: 3px; }
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 13: Sticky Summary Dashboard
+   ═══════════════════════════════════════════════════════════ */
+.qam-sticky-summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(180deg, #0b1120 0%, rgba(11, 17, 32, 0.97) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 8px 0 6px;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-bottom: 1px solid rgba(0, 198, 255, 0.10);
+    transition: box-shadow 0.25s ease;
+}
+.qam-sticky-summary:hover {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 14: Quick Filter Chips
+   ═══════════════════════════════════════════════════════════ */
+.qam-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0 12px;
+    align-items: center;
+}
+.qam-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(15, 20, 36, 0.7);
+    color: #94A3B8;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+.qam-filter-chip:hover {
+    border-color: rgba(0, 198, 255, 0.35);
+    color: #e0e7ef;
+    background: rgba(0, 198, 255, 0.06);
+}
+.qam-filter-chip-active {
+    border-color: #00C6FF;
+    color: #00C6FF;
+    background: rgba(0, 198, 255, 0.12);
+    box-shadow: 0 0 8px rgba(0, 198, 255, 0.15);
+}
+.qam-filter-chip-platinum.qam-filter-chip-active {
+    border-color: #c800ff;
+    color: #c800ff;
+    background: rgba(200, 0, 255, 0.10);
+    box-shadow: 0 0 8px rgba(200, 0, 255, 0.2);
+}
+.qam-filter-chip-gold.qam-filter-chip-active {
+    border-color: #ffd700;
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.10);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+}
+.qam-filter-chip-edge.qam-filter-chip-active {
+    border-color: #00ff9d;
+    color: #00ff9d;
+    background: rgba(0, 255, 157, 0.10);
+    box-shadow: 0 0 8px rgba(0, 255, 157, 0.2);
+}
+.qam-filter-chip-form.qam-filter-chip-active {
+    border-color: #ff5e00;
+    color: #ff5e00;
+    background: rgba(255, 94, 0, 0.10);
+    box-shadow: 0 0 8px rgba(255, 94, 0, 0.2);
+}
+.qam-filter-chip-avoid.qam-filter-chip-active {
+    border-color: #ff4444;
+    color: #ff4444;
+    background: rgba(255, 68, 68, 0.10);
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 15: Sort Controls
+   ═══════════════════════════════════════════════════════════ */
+.qam-sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+.qam-sort-bar-label {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: #475569;
+    margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 16: Collapsible Game Groups
+   ═══════════════════════════════════════════════════════════ */
+.qam-game-group {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    background: rgba(11, 17, 32, 0.4);
+}
+.qam-game-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(15, 20, 36, 0.9), rgba(20, 25, 43, 0.8));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+.qam-game-group-header:hover {
+    background: linear-gradient(135deg, rgba(20, 28, 50, 0.95), rgba(25, 32, 55, 0.9));
+}
+.qam-game-group-matchup {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #e0e7ef;
+}
+.qam-game-group-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-left: auto;
+}
+.qam-game-group-badge {
+    font-size: 0.7rem;
+    color: #00C6FF;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0, 198, 255, 0.08);
+    border: 1px solid rgba(0, 198, 255, 0.15);
+}
+.qam-game-group-body {
+    padding: 4px 0;
 }
 """
 
@@ -6477,9 +7021,15 @@ UNIFIED_PLAYER_CARD_CSS = """
 }
 
 /* ── Expanded body ──────────────────────────────────────── */
+/* Lazy-load: content-visibility:auto lets the browser skip
+   layout/paint for collapsed card bodies until the user opens
+   them.  contain-intrinsic-size gives a size hint so the
+   scrollbar doesn't jump. */
 .upc-body {
     padding: 0 20px 18px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 400px;
 }
 .upc-body .qcm-grid {
     padding-top: 14px;

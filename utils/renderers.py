@@ -29,7 +29,7 @@ except ImportError:
     import logging as _logging
     _logger = _logging.getLogger(__name__)
 
-from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors
+from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors, get_force_bar_html
 
 try:
     from data.player_profile_service import get_headshot_url as _get_headshot_url
@@ -326,10 +326,22 @@ def _build_single_card_html(result, index=0):
         f'</div>'
     )
 
-    # ── Forces HTML (individual force lists) ─────────────────────
+    # ── Forces HTML (visual bar + individual force lists) ────────
     forces = result.get("forces", {}) or {}
     over_forces = forces.get("over_forces", []) or []
     under_forces = forces.get("under_forces", []) or []
+
+    # Compute total strengths for the proportional force bar
+    _over_strength = sum(
+        float(f.get("strength", 1)) for f in over_forces if isinstance(f, dict)
+    )
+    _under_strength = sum(
+        float(f.get("strength", 1)) for f in under_forces if isinstance(f, dict)
+    )
+    force_bar_html = get_force_bar_html(
+        _over_strength, _under_strength,
+        len(over_forces), len(under_forces),
+    )
 
     def _force_items(force_list):
         if not force_list:
@@ -345,7 +357,8 @@ def _build_single_card_html(result, index=0):
         return "".join(parts) if parts else '<span class="qcm-force-none">None</span>'
 
     forces_html = (
-        '<div class="qcm-forces">'
+        force_bar_html
+        + '<div class="qcm-forces">'
         '<div class="qcm-forces-col qcm-forces-over">'
         '<div class="qcm-forces-label">▲ OVER</div>'
         f'{_force_items(over_forces)}'
@@ -446,7 +459,8 @@ def _build_single_card_html(result, index=0):
             f'</div>'
         )
 
-    return f"""<div class="qcm-card" style="animation-delay:{delay_ms}ms;">
+    _tier_glow_cls = f" qcm-card-{tier_lower}" if tier_lower in ("platinum", "gold") else ""
+    return f"""<div class="qcm-card{_tier_glow_cls}" style="animation-delay:{delay_ms}ms;">
   <div class="qcm-card-header">
     <span class="qcm-stat-type">{_escape(stat_type.replace('_', ' '))} <span class="qcm-team">· {team}</span> <span class="qcm-platform">· {platform}</span></span>
     <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
@@ -708,6 +722,18 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     over_forces = forces.get("over_forces", []) or []
     under_forces = forces.get("under_forces", []) or []
 
+    # Compute total strengths for the proportional force bar
+    _over_strength = sum(
+        float(f.get("strength", 1)) for f in over_forces if isinstance(f, dict)
+    )
+    _under_strength = sum(
+        float(f.get("strength", 1)) for f in under_forces if isinstance(f, dict)
+    )
+    h_force_bar_html = get_force_bar_html(
+        _over_strength, _under_strength,
+        len(over_forces), len(under_forces),
+    )
+
     def _force_items(force_list):
         if not force_list:
             return '<span class="qcm-force-none">None</span>'
@@ -857,6 +883,7 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
         f'</div>'
         # Col 2: Forces
         f'<div class="qcm-h-col">'
+        f'{h_force_bar_html}'
         f'<div class="qcm-forces" style="margin-bottom:6px;">'
         f'<div class="qcm-forces-col qcm-forces-over">'
         f'<div class="qcm-forces-label">▲ OVER</div>'
@@ -907,6 +934,8 @@ def _build_unified_player_header(player_name, vitals):
     """
     safe_name = _escape(player_name)
     headshot = _escape(vitals.get("headshot_url", "") or "")
+    if not headshot:
+        headshot = _escape(_get_headshot_url(player_name) or "")
     position = _escape(vitals.get("position", "N/A"))
     team = _escape(vitals.get("team", "N/A"))
     opponent = _escape(vitals.get("next_opponent", "TBD"))

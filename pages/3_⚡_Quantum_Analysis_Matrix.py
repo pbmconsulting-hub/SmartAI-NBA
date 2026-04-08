@@ -13,6 +13,8 @@ import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 import time             # For elapsed-time measurement
 import os               # For logo path resolution
+import hashlib          # For content-hash caching of simulation results
+import concurrent.futures  # For parallel prop analysis
 
 try:
     from utils.logger import get_logger
@@ -195,6 +197,24 @@ _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ass
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
 
 
+# ── Change 10: Content-Hash Cache for Simulation Results ─────────────────────
+# When a user re-runs analysis with the same prop pool, unchanged props return
+# instantly from this session-state cache.  Only new/modified props are
+# re-computed.  Cache is keyed on (player_name, stat_type, line, sim_depth).
+def _prop_cache_key(player_name: str, stat_type: str, line: float,
+                    sim_depth: int) -> str:
+    """Return a deterministic hash key for a prop's simulation cache."""
+    raw = f"{player_name.strip().lower()}|{stat_type.strip().lower()}|{line:.1f}|{sim_depth}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _get_sim_cache() -> dict:
+    """Return the mutable simulation cache dict from session state."""
+    if "_sim_result_cache" not in st.session_state:
+        st.session_state["_sim_result_cache"] = {}
+    return st.session_state["_sim_result_cache"]
+
+
 # ── Iframe card renderer ─────────────────────────────────────────────────────
 # Renders the unified card matrix inside a self-resizing <iframe> via
 # streamlit.components.v1.html() instead of st.markdown(unsafe_allow_html=True).
@@ -213,6 +233,11 @@ _MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (expand
 _HEIGHT_PER_PLAYER = 800       # px — expanded card ≈ header + prop cards (~400px each)
 _MAX_IFRAME_HEIGHT = 12000     # px — generous cap before ResizeObserver takes over
 _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
+_LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
+_MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
+
+# Tier → emoji mapping used in incremental rendering feedback
+_TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
 # Auto-resize JavaScript injected into every card-matrix iframe.
 # Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
@@ -629,12 +654,32 @@ with st.expander("📖 How Neural Analysis Works — Framework Logic"):
 # All available props are sent to the engine — no stat-type filtering or
 # intake cap.  The analysis loop will process every prop until all are
 # exhausted, outputting as many high-confidence bets as possible.
-final_props = list(current_props)
+
+# ── Change 9: Smart Prop De-duplication Before Analysis ──────
+# If a user loads props from multiple sources (Prop Scanner + Live Games),
+# duplicate player/stat/line combos will be analyzed twice.  De-dup on
+# (player_name, stat_type, line, platform) before sending to the engine.
+_seen_keys: set = set()
+_deduped_props: list = []
+for _p in current_props:
+    _dedup_key = (
+        (_p.get("player_name") or "").strip().lower(),
+        (_p.get("stat_type") or "").strip().lower(),
+        round(float(_p.get("line", 0) or 0), 1),
+        (_p.get("platform") or "").strip(),
+    )
+    if _dedup_key not in _seen_keys:
+        _seen_keys.add(_dedup_key)
+        _deduped_props.append(_p)
+_dedup_removed = len(current_props) - len(_deduped_props)
+final_props = _deduped_props
 
 st.metric(
     label="⚡ PROPS IN POOL",
     value=f"{len(final_props):,}",
 )
+if _dedup_removed > 0:
+    st.caption(f"🔁 Removed **{_dedup_removed}** duplicate prop(s) across sources.")
 
 # ============================================================
 # END SECTION: Prop Pool
@@ -663,10 +708,25 @@ with show_col:
         index=0,
     )
 
+# ── Feature 14: Quick Filter Chips ──────────────────────────────
+# Initialise session-state keys for filter chips (persist across reruns).
+for _chip_key in ("chip_platinum", "chip_gold_plus", "chip_high_edge",
+                  "chip_hot_form", "chip_show_avoids"):
+    if _chip_key not in st.session_state:
+        st.session_state[_chip_key] = False
+
+# ── Feature 15: Sort selector ───────────────────────────────────
+if "qam_sort_key" not in st.session_state:
+    st.session_state["qam_sort_key"] = "Confidence Score ↓"
+
 if run_analysis:
     _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
+
+    # ── Change 8: Incremental rendering placeholder ──────────────
+    # Render each card as it completes instead of waiting for all to finish.
+    _incremental_container = st.container()
 
     # Clear stale Joseph results so fresh ones are generated after this run.
     st.session_state.pop("joseph_results", None)
@@ -888,12 +948,69 @@ if run_analysis:
 
         # ── Analysis proceeds with all available props (no cap) ────
 
+        # ── Change 7: Parallel data pre-fetching ────────────────────
+        # Pre-fetch player bios in parallel so the main loop doesn't
+        # block on I/O for each unmatched player.  Each prop's
+        # simulation is independent, but the loop body accesses
+        # Streamlit session state (not thread-safe), so we parallelise
+        # the pure-I/O pre-fetch step instead of the whole loop.
+        _prefetched_bios: dict = {}
+        _names_to_prefetch = list({
+            p.get("player_name", "") for p in props_to_analyze
+            if p.get("player_name") and not find_player_by_name(players_data, p.get("player_name", ""))
+        })
+        if _names_to_prefetch:
+            try:
+                from data.player_profile_service import get_player_bio as _get_bio
+                _max_workers = min(_MAX_BIO_PREFETCH_WORKERS, len(_names_to_prefetch))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=_max_workers) as _pool:
+                    _bio_futures = {
+                        _pool.submit(_get_bio, name): name
+                        for name in _names_to_prefetch
+                    }
+                    for _fut in concurrent.futures.as_completed(_bio_futures):
+                        _fname = _bio_futures[_fut]
+                        try:
+                            _prefetched_bios[_fname] = _fut.result()
+                        except Exception:
+                            pass
+            except ImportError:
+                pass  # player_profile_service not available
+
+        # ── Change 10: Initialize simulation result cache ─────────────
+        _sim_cache = _get_sim_cache()
+        _cache_hits = 0
+
         for prop_index, prop in enumerate(props_to_analyze):
             progress_fraction = (prop_index + 1) / total_props_count
             progress_bar.progress(
                 progress_fraction,
                 text=f"Analyzing {prop.get('player_name', 'Player')}… ({prop_index + 1}/{total_props_count})"
             )
+
+            # ── Change 10: Check cache for unchanged props ────────────
+            _cache_k = _prop_cache_key(
+                prop.get("player_name", ""),
+                prop.get("stat_type", ""),
+                float(prop.get("line", 0) or 0),
+                simulation_depth,
+            )
+            _cached_result = _sim_cache.get(_cache_k)
+            if _cached_result is not None:
+                analysis_results_list.append(_cached_result)
+                _cache_hits += 1
+                # ── Change 8: Stream cached result immediately ────────
+                with _incremental_container:
+                    _tier = _cached_result.get("tier", "Bronze")
+                    _pn = _cached_result.get("player_name", "")
+                    _dir = _cached_result.get("direction", "OVER")
+                    _ln = _cached_result.get("line", 0)
+                    _conf = _cached_result.get("confidence_score", 0)
+                    st.caption(
+                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
+                        f"**{_pn}** — {_dir} {_ln} — SAFE: {_conf:.0f} *(cached)*"
+                    )
+                continue
 
             try:
                 player_name = prop.get("player_name", "")
@@ -981,8 +1098,11 @@ if run_analysis:
                     #     shrinkage toward league priors would move estimates away from it.
                     _pos = "SF"  # default when position is unknown
                     try:
-                        from data.player_profile_service import get_player_bio
-                        _bio = get_player_bio(player_name)
+                        # Use prefetched bio when available (Change 7: parallel pre-fetch)
+                        _bio = _prefetched_bios.get(player_name)
+                        if _bio is None:
+                            from data.player_profile_service import get_player_bio
+                            _bio = get_player_bio(player_name)
                         if _bio.get("position"):
                             _bio_pos = _bio["position"].split("-")[0].strip()
                             _BIO_POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
@@ -1792,6 +1912,21 @@ if run_analysis:
                     full_result["win_score_label"] = "Error"
 
                 analysis_results_list.append(full_result)
+
+                # ── Change 10: Store in simulation cache ──────────────
+                _sim_cache[_cache_k] = full_result
+
+                # ── Change 8: Stream result immediately ───────────────
+                with _incremental_container:
+                    _tier = full_result.get("tier", "Bronze")
+                    _pn = full_result.get("player_name", "")
+                    _dir_s = full_result.get("direction", "OVER")
+                    _ln_s = full_result.get("line", 0)
+                    _conf_s = full_result.get("confidence_score", 0)
+                    st.caption(
+                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
+                        f"**{_pn}** — {_dir_s} {_ln_s} — SAFE: {_conf_s:.0f}"
+                    )
             except Exception as _prop_loop_err:
                 _logger.warning(
                     "Prop #%d (%s/%s) analysis failed — skipped: %s",
@@ -1918,9 +2053,10 @@ if run_analysis:
             pass  # Non-fatal — session state still has results
         progress_bar.empty()
         _analysis_elapsed = time.time() - _analysis_start_time
+        _cache_msg = f" ({_cache_hits} cached)" if _cache_hits > 0 else ""
         st.success(
             f"✅ Analysis complete! Analyzed and displaying **{len(_selected_active)}** picks "
-            f"(+ {len(_out_results)} out) in **{_analysis_elapsed:.1f}s**."
+            f"(+ {len(_out_results)} out) in **{_analysis_elapsed:.1f}s**{_cache_msg}."
         )
 
         # ── Store ALL picks to all_analysis_picks table ──────────────
@@ -2046,7 +2182,68 @@ if analysis_results:
     else:
         displayed_results = analysis_results
 
-    # ── Tier Filter & Bet Classification Filter ──────────────────────────
+    # ── Feature 14: Quick Filter Chips ──────────────────────────────
+    # Render filter chips as Streamlit columns of toggle buttons.
+    _chip_col1, _chip_col2, _chip_col3, _chip_col4, _chip_col5 = st.columns(5)
+    with _chip_col1:
+        st.session_state["chip_platinum"] = st.toggle(
+            "💎 Platinum Only", value=st.session_state.get("chip_platinum", False),
+            key="_chip_platinum_toggle",
+        )
+    with _chip_col2:
+        st.session_state["chip_gold_plus"] = st.toggle(
+            "🥇 Gold+", value=st.session_state.get("chip_gold_plus", False),
+            key="_chip_gold_plus_toggle",
+        )
+    with _chip_col3:
+        st.session_state["chip_high_edge"] = st.toggle(
+            "⚡ High Edge (≥10%)", value=st.session_state.get("chip_high_edge", False),
+            key="_chip_high_edge_toggle",
+        )
+    with _chip_col4:
+        st.session_state["chip_hot_form"] = st.toggle(
+            "🔥 Hot Form", value=st.session_state.get("chip_hot_form", False),
+            key="_chip_hot_form_toggle",
+        )
+    with _chip_col5:
+        st.session_state["chip_show_avoids"] = st.toggle(
+            "❌ Show Avoids", value=st.session_state.get("chip_show_avoids", False),
+            key="_chip_show_avoids_toggle",
+        )
+
+    # Apply chip filters (chips are additive — if multiple are active
+    # the result is the union so the user can combine Platinum + High Edge).
+    _any_tier_chip = (
+        st.session_state.get("chip_platinum", False)
+        or st.session_state.get("chip_gold_plus", False)
+    )
+    if _any_tier_chip:
+        _allowed_tiers: set = set()
+        if st.session_state.get("chip_platinum"):
+            _allowed_tiers.add("Platinum")
+        if st.session_state.get("chip_gold_plus"):
+            _allowed_tiers.update({"Platinum", "Gold"})
+        displayed_results = [
+            r for r in displayed_results if r.get("tier") in _allowed_tiers
+        ]
+    if st.session_state.get("chip_high_edge"):
+        displayed_results = [
+            r for r in displayed_results
+            if abs(r.get("edge_percentage", 0)) >= 10.0
+        ]
+    if st.session_state.get("chip_hot_form"):
+        displayed_results = [
+            r for r in displayed_results
+            if (r.get("recent_form_ratio") or 0) >= 1.05
+        ]
+    if not st.session_state.get("chip_show_avoids"):
+        # Default: hide avoids. When toggled ON, show them.
+        displayed_results = [
+            r for r in displayed_results
+            if not r.get("should_avoid", False)
+        ]
+
+    # ── Legacy tier multiselect (still useful for multi-tier combos) ──
     _na_filter_col1, _na_filter_col2 = st.columns(2)
     with _na_filter_col1:
         _na_tier_filter = st.multiselect(
@@ -2057,16 +2254,37 @@ if analysis_results:
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
         )
     with _na_filter_col2:
-        pass  # Bet Classification filter removed (tier system removed)
+        # ── Feature 15: Sort Controls ────────────────────────────────
+        _sort_options = [
+            "Confidence Score ↓",
+            "Edge % ↓",
+            "Composite Win Score ↓",
+            "Alphabetical (A→Z)",
+        ]
+        _qam_sort_key = st.selectbox(
+            "Sort by",
+            _sort_options,
+            index=_sort_options.index(
+                st.session_state.get("qam_sort_key", "Confidence Score ↓")
+            ),
+            key="_qam_sort_select",
+            help="Choose how to order the analysis results.",
+        )
+        st.session_state["qam_sort_key"] = _qam_sort_key
+
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
 
-    # Sort by confidence score descending
-    displayed_results.sort(
-        key=lambda r: r.get("confidence_score", 0),
-        reverse=True,
-    )
+    # ── Feature 15: Apply sort ───────────────────────────────────────
+    if _qam_sort_key == "Confidence Score ↓":
+        displayed_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
+    elif _qam_sort_key == "Edge % ↓":
+        displayed_results.sort(key=lambda r: abs(r.get("edge_percentage", 0)), reverse=True)
+    elif _qam_sort_key == "Composite Win Score ↓":
+        displayed_results.sort(key=lambda r: r.get("composite_win_score", 0), reverse=True)
+    elif _qam_sort_key == "Alphabetical (A→Z)":
+        displayed_results.sort(key=lambda r: r.get("player_name", "").lower())
 
     # ── Deduplicate by (player_name, stat_type, line, direction) ──
     # Prevents duplicate player cards and duplicate Streamlit element keys
@@ -2113,6 +2331,11 @@ if analysis_results:
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
 
+    # ── Feature 13: Sticky Summary Dashboard ────────────────────
+    # Wrap the DFS Edge + Tier Distribution into a sticky container
+    # so they remain visible while scrolling through results.
+    st.markdown('<div class="qam-sticky-summary">', unsafe_allow_html=True)
+
     # Phase 3: DFS Edge row (only shown when DFS metrics exist)
     if _dfs_results:
         _avg_dfs_edge = sum(
@@ -2142,6 +2365,8 @@ if analysis_results:
         ),
         unsafe_allow_html=True,
     )
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close .qam-sticky-summary
 
     # ── Quick-select buttons ───────────────────────────────────
     _qb_col1, _qb_col2, _qb_col3 = st.columns([1, 1, 2])
@@ -2504,8 +2729,54 @@ if analysis_results:
         except ImportError:
             _logger.debug("joseph_brain not available for card opinions")
 
-        _unified_html = _compile_unified_matrix(_grouped, _joseph_opinions)
-        _render_card_iframe(_unified_html, len(_grouped))
+        # ── Feature 16: Collapsible Game Groups ──────────────────
+        # Build team → game-matchup label mapping from todays_games.
+        _team_to_game: dict[str, str] = {}
+        for _g in (todays_games or []):
+            _ht = (_g.get("home_team") or "").upper().strip()
+            _at = (_g.get("away_team") or "").upper().strip()
+            if _ht and _at:
+                _matchup_label = f"{_at} @ {_ht}"
+                _team_to_game[_ht] = _matchup_label
+                _team_to_game[_at] = _matchup_label
+
+        # Group players by their game matchup.
+        _game_groups: dict[str, dict[str, dict]] = {}  # matchup → {player: data}
+        _no_game = "Other"
+        for _pname, _pdata in _grouped.items():
+            # Determine team from vitals or first prop result
+            _pteam = (
+                (_pdata.get("vitals") or {}).get("team", "")
+                or (_pdata["props"][0].get("player_team", "") if _pdata.get("props") else "")
+                or (_pdata["props"][0].get("team", "") if _pdata.get("props") else "")
+            ).upper().strip()
+            _game_label = _team_to_game.get(_pteam, _no_game)
+            _game_groups.setdefault(_game_label, {})[_pname] = _pdata
+
+        # Render each game group as a collapsible Streamlit expander
+        for _game_idx, (_game_label, _game_players) in enumerate(_game_groups.items()):
+            _gp_count = len(_game_players)
+            _gp_prop_count = sum(len(d.get("props", [])) for d in _game_players.values())
+            _expander_label = (
+                f"🏀 {_game_label} — {_gp_count} player{'s' if _gp_count != 1 else ''}"
+                f", {_gp_prop_count} prop{'s' if _gp_prop_count != 1 else ''}"
+            )
+
+            with st.expander(_expander_label, expanded=(_game_idx == 0)):
+                _game_opinions = {k: _joseph_opinions[k] for k in _game_players if k in _joseph_opinions}
+                _game_html = _compile_unified_matrix(_game_players, _game_opinions)
+
+                # Apply lazy-chunk logic within each game group
+                _gp_keys = list(_game_players.keys())
+                if len(_gp_keys) <= _LAZY_CHUNK_SIZE:
+                    _render_card_iframe(_game_html, len(_game_players))
+                else:
+                    for _ci in range(0, len(_gp_keys), _LAZY_CHUNK_SIZE):
+                        _chunk_keys = _gp_keys[_ci : _ci + _LAZY_CHUNK_SIZE]
+                        _chunk_data = {k: _game_players[k] for k in _chunk_keys}
+                        _chunk_opinions = {k: _game_opinions[k] for k in _chunk_keys if k in _game_opinions}
+                        _chunk_html = _compile_unified_matrix(_chunk_data, _chunk_opinions)
+                        _render_card_iframe(_chunk_html, len(_chunk_data))
 
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]

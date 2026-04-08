@@ -292,7 +292,7 @@ class TestBannerHeaders(unittest.TestCase):
     def test_gold_tier_banner(self):
         html = render_gold_tier_banner_html()
         self.assertIn("Gold Tier Picks", html)
-        self.assertIn("#ffd700", html)
+        self.assertIn("qam-gold-banner", html)
 
     def test_best_single_bets_header(self):
         html = render_best_single_bets_header_html()
@@ -325,8 +325,8 @@ class TestParlayCard(unittest.TestCase):
         self.assertIn("45.2%", html)
         self.assertIn("+8.5%", html)
         self.assertIn("82/100", html)
-        # First card gets glow
-        self.assertIn("box-shadow", html)
+        # First card gets glow (now via CSS class instead of inline style)
+        self.assertIn("qam-parlay-card-glow", html)
 
     def test_no_glow_for_third_card(self):
         entry = {
@@ -338,7 +338,7 @@ class TestParlayCard(unittest.TestCase):
             "safe_avg": "—",
         }
         html = render_parlay_card_html(entry, card_index=2)
-        self.assertNotIn("box-shadow:0 0 14px", html)
+        self.assertNotIn("qam-parlay-card-glow", html)
 
     def test_xss_in_picks(self):
         entry = {

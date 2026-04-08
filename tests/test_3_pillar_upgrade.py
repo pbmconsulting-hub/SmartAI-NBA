@@ -157,11 +157,11 @@ class TestPreAnalysisFunnel(unittest.TestCase):
         self.assertNotIn("_QME_MIN_OUTPUT_BETS", source)
 
     def test_all_props_passed_directly(self):
-        """Neural Analysis should pass all current_props directly as final_props."""
+        """Neural Analysis should de-dup current_props and assign to final_props."""
         import pathlib
         na_path = pathlib.Path(__file__).parent.parent / "pages" / "3_⚡_Quantum_Analysis_Matrix.py"
         source = na_path.read_text(encoding="utf-8")
-        self.assertIn("final_props = list(current_props)", source)
+        self.assertIn("final_props = _deduped_props", source)
 
     def test_smart_filter_wired_in_runner(self):
         """The analysis runner should call smart_filter_props without stat_type restriction."""

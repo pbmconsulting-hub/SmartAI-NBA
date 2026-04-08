@@ -183,23 +183,13 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
         proj_d = "—"
 
     # ── distribution row ─────────────────────────────────────────
-    _cell_css = (
-        "text-align:center;padding:5px 4px;background:rgba(15,23,42,0.60);"
-        "border-radius:5px;border:1px solid rgba(255,255,255,0.04);"
-        "flex:1;min-width:48px;"
-    )
-    _val_css = (
-        "font-size:0.82rem;font-weight:700;font-family:'JetBrains Mono',monospace;"
-        "font-variant-numeric:tabular-nums;"
-    )
-    _lbl_css = "font-size:0.58rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;margin-top:1px;"
     dist_html = (
-        '<div style="display:flex;gap:4px;margin-top:10px;margin-bottom:8px;">'
-        f'<div style="{_cell_css}"><div style="{_val_css}color:#c0d0e8;">{p10_d}</div><div style="{_lbl_css}">P10</div></div>'
-        f'<div style="{_cell_css}"><div style="{_val_css}color:#00f0ff;">{p50_d}</div><div style="{_lbl_css}">MED</div></div>'
-        f'<div style="{_cell_css}"><div style="{_val_css}color:#c0d0e8;">{p90_d}</div><div style="{_lbl_css}">P90</div></div>'
-        f'<div style="{_cell_css}"><div style="{_val_css}color:#ffffff;">{std_d}</div><div style="{_lbl_css}">σ</div></div>'
-        f'<div style="{_cell_css}"><div style="{_val_css}color:#ff5e00;">{proj_d}</div><div style="{_lbl_css}">Proj</div></div>'
+        '<div class="nah-dist-row">'
+        f'<div class="nah-dist-cell"><div class="nah-dist-val nah-dist-val-p10">{p10_d}</div><div class="nah-dist-label">P10</div></div>'
+        f'<div class="nah-dist-cell"><div class="nah-dist-val nah-dist-val-med">{p50_d}</div><div class="nah-dist-label">MED</div></div>'
+        f'<div class="nah-dist-cell"><div class="nah-dist-val nah-dist-val-p90">{p90_d}</div><div class="nah-dist-label">P90</div></div>'
+        f'<div class="nah-dist-cell"><div class="nah-dist-val nah-dist-val-std">{std_d}</div><div class="nah-dist-label">σ</div></div>'
+        f'<div class="nah-dist-cell"><div class="nah-dist-val nah-dist-val-proj">{proj_d}</div><div class="nah-dist-label">Proj</div></div>'
         '</div>'
     )
 
@@ -212,7 +202,7 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
 
         def _force_items(flist):
             if not flist:
-                return '<span style="color:#475569;font-size:0.7rem;font-style:italic;">None</span>'
+                return '<span class="nah-force-none">None</span>'
             parts = []
             for f in flist:
                 if not isinstance(f, dict):
@@ -221,25 +211,18 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
                 stars = "⭐" * strength
                 name = _html.escape(str(f.get("name", "") or ""))
                 parts.append(
-                    f'<div style="color:#c0d0e8;font-size:0.7rem;line-height:1.35;margin-bottom:1px;">'
-                    f'{stars} {name}</div>'
+                    f'<div class="nah-force-item">{stars} {name}</div>'
                 )
-            return "".join(parts) if parts else '<span style="color:#475569;font-size:0.7rem;font-style:italic;">None</span>'
+            return "".join(parts) if parts else '<span class="nah-force-none">None</span>'
 
-        _fcol_css = (
-            "flex:1;padding:7px 9px;border-radius:5px;"
-            "font-family:'JetBrains Mono',monospace;min-height:36px;"
-        )
         forces_html = (
-            '<div style="display:flex;gap:5px;margin-bottom:8px;">'
-            f'<div style="{_fcol_css}background:rgba(0,240,255,0.04);border:1px solid rgba(0,240,255,0.12);">'
-            '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#00f0ff;margin-bottom:3px;">▲ MORE</div>'
+            '<div class="nah-forces-row">'
+            '<div class="nah-force-col nah-force-col-over">'
+            '<div class="nah-force-heading nah-force-heading-over">▲ MORE</div>'
             f'{_force_items(over_forces)}'
             '</div>'
-            f'<div style="{_fcol_css}background:rgba(255,94,0,0.04);border:1px solid rgba(255,94,0,0.12);">'
-            '<div style="font-weight:700;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.06em;'
-            'color:#ff5e00;margin-bottom:3px;">▼ LESS</div>'
+            '<div class="nah-force-col nah-force-col-under">'
+            '<div class="nah-force-heading nah-force-heading-under">▼ LESS</div>'
             f'{_force_items(under_forces)}'
             '</div>'
             '</div>'
@@ -266,18 +249,15 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
             else:
                 bar_c = "#ff4444"
             bars.append(
-                '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;'
-                "font-family:'JetBrains Mono',monospace;\">"
-                f'<span style="font-size:0.62rem;color:#94A3B8;width:62px;flex-shrink:0;'
-                f'text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{label}</span>'
-                f'<span style="font-size:0.62rem;color:{accent_color};font-weight:600;'
-                f'width:22px;flex-shrink:0;text-align:right;">{score_f:.0f}</span>'
-                f'<div style="flex:1;height:4px;background:rgba(26,32,53,0.80);border-radius:2px;overflow:hidden;">'
-                f'<div style="height:4px;width:{bar_w:.1f}%;background:{bar_c};border-radius:2px;"></div>'
+                f'<div class="nah-bkd-row">'
+                f'<span class="nah-bkd-label">{label}</span>'
+                f'<span class="nah-bkd-score" style="color:{accent_color};">{score_f:.0f}</span>'
+                f'<div class="nah-bkd-track">'
+                f'<div class="nah-bkd-fill" style="width:{bar_w:.1f}%;background:{bar_c};"></div>'
                 '</div></div>'
             )
         if bars:
-            breakdown_html = '<div style="margin-top:2px;">' + "".join(bars) + '</div>'
+            breakdown_html = '<div class="nah-breakdown">' + "".join(bars) + '</div>'
 
     # ── Kelly TARGET ALLOCATION row ──────────────────────────────
     kelly_html = ""
@@ -298,16 +278,10 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
         if _wager > 0:
             _fk_pct = _kelly["fractional_kelly"] * 100
             kelly_html = (
-                '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;'
-                'padding:6px 10px;background:linear-gradient(135deg,#070A13,#0F172A);'
-                'border:1px solid rgba(0,198,255,0.20);border-radius:6px;">'
-                '<span style="color:#64748b;font-size:0.62rem;text-transform:uppercase;'
-                'letter-spacing:0.06em;flex-shrink:0;">🎯 WAGER</span>'
-                f'<span style="color:#00C6FF;font-size:0.92rem;font-weight:800;'
-                f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
-                f'">${_wager:,.2f}</span>'
-                f'<span style="color:#475569;font-size:0.58rem;margin-left:auto;">'
-                f'{_fk_pct:.1f}% of ${_bankroll:,.0f}</span>'
+                '<div class="nah-kelly-row">'
+                '<span class="nah-kelly-label">🎯 WAGER</span>'
+                f'<span class="nah-kelly-amount">${_wager:,.2f}</span>'
+                f'<span class="nah-kelly-pct">{_fk_pct:.1f}% of ${_bankroll:,.0f}</span>'
                 '</div>'
             )
     except Exception:
@@ -364,15 +338,12 @@ def _build_dfs_metrics_html(result):
             border = "rgba(100,116,139,0.25)"
             color = "#64748b"
         pill = (
-            f'<div style="flex:1;min-width:68px;text-align:center;padding:4px 6px;'
-            f'background:{bg};border:1px solid {border};border-radius:6px;">'
-            f'<div style="color:{color};font-size:0.68rem;font-weight:700;'
-            f"font-family:'JetBrains Mono',monospace;\">"
+            f'<div class="nah-dfs-pill" style="background:{bg};border:1px solid {border};">'
+            f'<div class="nah-dfs-pill-label" style="color:{color};">'
             f'{n}-Pick{"  ★" if is_best else ""}</div>'
-            f'<div style="color:{color};font-size:0.78rem;font-weight:800;'
-            f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+            f'<div class="nah-dfs-pill-edge" style="color:{color};">'
             f'{edge:+.1f}%</div>'
-            f'<div style="color:#475569;font-size:0.58rem;">BE {be_prob:.0f}%</div>'
+            f'<div class="nah-dfs-pill-be">BE {be_prob:.0f}%</div>'
             f'</div>'
         )
         tier_pills.append(pill)
@@ -381,29 +352,27 @@ def _build_dfs_metrics_html(result):
         return ""
 
     pills_html = (
-        '<div style="display:flex;gap:6px;margin-top:4px;">'
+        '<div class="nah-dfs-pills">'
         + "".join(tier_pills)
         + '</div>'
     )
 
     # Header line with platform + target probability
-    header_parts = [f'<span style="color:#64748b;font-size:0.7rem;text-transform:uppercase;'
-                     f'letter-spacing:0.08em;">📈 DFS FLEX EV</span>']
+    header_parts = ['<span class="nah-dfs-label">📈 DFS FLEX EV</span>']
     if platform:
         header_parts.append(
-            f'<span style="color:#475569;font-size:0.65rem;margin-left:6px;">'
+            f'<span class="nah-dfs-platform">'
             f'({_html.escape(str(platform))})</span>'
         )
     if prob_target is not None and target_line is not None:
         _pt_pct = float(prob_target) * 100
         header_parts.append(
-            f'<span style="color:#00f0ff;font-size:0.65rem;margin-left:auto;'
-            f"font-family:'JetBrains Mono',monospace;\">"
+            f'<span class="nah-dfs-prob">'
             f'P(hit {float(target_line):.1f}) = {_pt_pct:.0f}%</span>'
         )
 
     header_html = (
-        '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">'
+        '<div class="nah-dfs-header">'
         + "".join(header_parts)
         + '</div>'
     )
@@ -413,15 +382,14 @@ def _build_dfs_metrics_html(result):
     if best_tier and kelly_frac > 0:
         kelly_pct = kelly_frac * 100
         kelly_html = (
-            f'<div style="color:#475569;font-size:0.62rem;margin-top:3px;">'
+            f'<div class="nah-dfs-kelly">'
             f'Kelly: {kelly_pct:.2f}% · Best: {best_tier}-Pick Flex</div>'
         )
 
     return (
-        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);'
-        f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:8px 12px;margin:6px 0;">'
+        '<div class="nah-dfs-wrap">'
         + header_html + pills_html + kelly_html +
-        f'</div>'
+        '</div>'
     )
 
 
