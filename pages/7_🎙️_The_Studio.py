@@ -1220,7 +1220,7 @@ st.divider()
 
 # ── Dawg Board ───────────────────────────────────────────────
 st.markdown(
-    '<div class="studio-section-title">🐕 THE DAWG BOARD</div>',
+    '<div id="the-dawg-board" class="studio-section-title">🐕 THE DAWG BOARD</div>',
     unsafe_allow_html=True,
 )
 joseph_results = st.session_state.get("joseph_results", [])
@@ -1311,7 +1311,7 @@ else:
 
 # ── Joseph's Tonight's Bets ──────────────────────────────────
 st.markdown(
-    '<div class="studio-section-title">🎯 JOSEPH\'S BETS TONIGHT</div>',
+    '<div id="joseph-s-bets-tonight" class="studio-section-title">🎯 JOSEPH\'S BETS TONIGHT</div>',
     unsafe_allow_html=True,
 )
 
@@ -1431,7 +1431,7 @@ else:
 def _render_track_record_section():
     """Track Record fragment — only this section re-renders on filter change."""
     st.markdown(
-        '<div class="studio-section-title">📊 JOSEPH\'S TRACK RECORD</div>',
+        '<div id="joseph-s-track-record" class="studio-section-title">📊 JOSEPH\'S TRACK RECORD</div>',
         unsafe_allow_html=True,
     )
     if not _BETS_AVAILABLE:
@@ -1560,7 +1560,7 @@ _render_track_record_section()
 
 # ── Joseph's Bet History ─────────────────────────────────────
 st.markdown(
-    '<div class="studio-section-title">📜 JOSEPH\'S BET HISTORY</div>',
+    '<div id="joseph-s-bet-history" class="studio-section-title">📜 JOSEPH\'S BET HISTORY</div>',
     unsafe_allow_html=True,
 )
 
