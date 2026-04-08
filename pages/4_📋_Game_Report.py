@@ -315,14 +315,15 @@ def _is_fantasy_score_stat(stat_type: str) -> bool:
 
 
 def _build_entry_strategy(results):
-    """Build entry strategy matrix entries from analysis results.
+    """Build entry strategy matrix parlay combos from analysis results.
 
-    Returns two lists:
-    1. Parlay combo entries (2-leg, 3-leg, 5-leg) with unique-player constraint
-    2. Individual pick entries for every analyzed prop in the game
+    Args:
+        results: List of analysis result dicts from Neural Analysis engine.
 
-    Fantasy-score composite stat types are excluded from parlay legs
-    so legs stay comparable across sportsbooks.
+    Returns:
+        list[dict]: Parlay combo entries (2-leg, 3-leg, 5-leg) with
+        unique-player constraint.  Fantasy-score composite stat types
+        are excluded so legs stay comparable across sportsbooks.
     """
     top = [
         r for r in results
@@ -391,10 +392,13 @@ def _build_entry_strategy(results):
 def _build_all_picks_table(results):
     """Build a sorted list of all individual picks for display.
 
-    Returns list of dicts with: player_name, stat_type, direction, line,
-    confidence_score, edge_percentage, tier.
-    Includes *every* analysed prop (no edge threshold) so the user can
-    see the full picture.
+    Args:
+        results: List of analysis result dicts from Neural Analysis engine.
+
+    Returns:
+        list[dict]: Rows with Player, Stat, Dir, Line, SAFE, Edge%, Tier.
+        Includes every analyzed prop (no edge threshold) so the user can
+        see the full picture.
     """
     all_picks = sorted(
         [r for r in results if not r.get("player_is_out", False)],

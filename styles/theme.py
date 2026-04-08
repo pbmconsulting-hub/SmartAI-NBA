@@ -3125,7 +3125,7 @@ def get_game_report_html(game=None, analysis_results=None):
         reverse=True,
     )
     top_picks = results[:3]
-    all_picks = results  # render prop cards for every analysed pick
+    all_picks = results  # render prop cards for every analyzed pick
     today_str = _datetime.date.today().strftime("%B %d, %Y")
 
     # ── Game Data ─────────────────────────────────────────────
