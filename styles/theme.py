@@ -3447,7 +3447,8 @@ def get_game_report_html(game=None, analysis_results=None):
 
         for combo, icon, color_name, picks, strategy, avg_ss in matrix:
             picks_html = ""
-            for j, p in enumerate(picks[:3]):
+            display_picks = picks[:3]  # Show at most 3 picks in strategy preview
+            for j, p in enumerate(display_picks):
                 pname = _html.escape(p.get("player_name", ""))
                 pstat = p.get("stat_type", "").capitalize()
                 pline = p.get("line", 0)
@@ -3461,7 +3462,7 @@ def get_game_report_html(game=None, analysis_results=None):
                     f' {pname}</span>'
                     f'<span class="qds-strategy-prop">{pdir} {pline} {pstat}</span></div>'
                 )
-                if j < len(picks[:3]) - 1:
+                if j < len(display_picks) - 1:
                     picks_html += '<span style="color:var(--qds-text-muted);font-size:0.85rem;padding:3px 0;display:block;">+</span>'
             strategy_rows += (
                 f'<tr>'
