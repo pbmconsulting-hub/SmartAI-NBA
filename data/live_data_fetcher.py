@@ -205,7 +205,10 @@ def _safe_get_first_dataframe(endpoint, default=None):
     """Safely extract the first DataFrame from an nba_api endpoint.
 
     Guards against empty or missing results that would otherwise raise
-    an ``IndexError`` when accessing ``get_data_frames()[0]``.
+    an ``IndexError`` when accessing ``get_data_frames()[0]``.  Any
+    exception raised by ``get_data_frames()`` (network errors, JSON
+    parse failures, etc.) is caught, logged at DEBUG level, and
+    *default* is returned instead.
 
     Args:
         endpoint: An nba_api endpoint instance that supports
