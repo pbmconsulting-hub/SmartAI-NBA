@@ -138,19 +138,103 @@ def render_global_settings():
     render_sidebar_disclaimer()
 
 
-def inject_joseph_floating():
+# ── Global Broadcast Ticker ──────────────────────────────────────
+
+_TICKER_CSS = """<style>
+.joseph-broadcast-ticker{
+    position:relative;overflow:hidden;
+    background:rgba(7,10,19,0.92);
+    border-bottom:2px solid rgba(255,94,0,0.35);
+    height:32px;margin-bottom:12px;
+    font-family:'Montserrat',sans-serif;
+}
+.joseph-broadcast-ticker::before{
+    content:'🎙️ JOSEPH M. SMITH — LIVE';
+    position:absolute;left:0;top:0;z-index:2;
+    background:linear-gradient(90deg,#ff5e00,#ff9e00);
+    color:#070a13;font-weight:700;font-size:0.7rem;
+    letter-spacing:0.5px;padding:7px 14px;
+    white-space:nowrap;
+}
+.joseph-ticker-track{
+    display:flex;animation:tickerScroll 45s linear infinite;
+    padding-left:260px;height:100%;align-items:center;
+}
+.joseph-ticker-item{
+    white-space:nowrap;color:#e2e8f0;font-size:0.78rem;
+    padding:0 28px;flex-shrink:0;
+}
+.joseph-ticker-sep{
+    color:#ff5e00;padding:0 4px;flex-shrink:0;font-size:0.65rem;
+}
+@keyframes tickerScroll{
+    0%{transform:translateX(0)}
+    100%{transform:translateX(-50%)}
+}
+</style>"""
+
+
+def _render_broadcast_ticker():
+    """Render Joseph's global broadcast ticker at the top of the page.
+
+    Shows a scrolling marquee with ambient Joseph lines — only once
+    per session to avoid duplicate injection on re-runs.
+    """
+    if st.session_state.get("_ticker_injected"):
+        return
+    st.session_state["_ticker_injected"] = True
+
+    # Build ticker items from analysis results or defaults
+    ticker_items = []
+    analysis = st.session_state.get("analysis_results", [])
+    if analysis:
+        for r in analysis[:8]:
+            player = r.get("player_name", r.get("player", ""))
+            verdict = r.get("verdict", "")
+            stat = r.get("stat_type", "")
+            if player and verdict:
+                ticker_items.append(f"{player} — {stat} {verdict}")
+    if not ticker_items:
+        ticker_items = [
+            "Joseph M. Smith is watching EVERY line on the board tonight",
+            "The models are LOADED and the analysis is READY",
+            "Trust the PROCESS — Joseph doesn't miss",
+            "Stay locked in for LIVE updates throughout the night",
+        ]
+
+    # Duplicate for seamless loop
+    items_html = ""
+    for item in ticker_items * 2:
+        items_html += (
+            f'<span class="joseph-ticker-item">{item}</span>'
+            f'<span class="joseph-ticker-sep">◆</span>'
+        )
+
+    st.markdown(_TICKER_CSS, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="joseph-broadcast-ticker">'
+        f'<div class="joseph-ticker-track">{items_html}</div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
     """Render the Joseph M. Smith floating widget in the main content area.
 
     Delegates to :func:`utils.joseph_widget.render_joseph_floating_widget`
     so the widget appears on every page that calls this helper.
     Also renders the responsible gambling disclaimer in the sidebar,
-    injects the session keep-alive script, and auto-saves/restores
-    critical page state.
+    injects the session keep-alive script, auto-saves/restores
+    critical page state, and shows the broadcast ticker.
     """
     # ── Keep session alive & restore/save page state ──────────
     _inject_session_keepalive()
     _auto_restore_page_state()
     _auto_save_page_state()
+
+    # ── Global Broadcast Ticker ───────────────────────────────
+    try:
+        _render_broadcast_ticker()
+    except Exception as exc:
+        _components_logger.debug("broadcast ticker failed: %s", exc)
 
     try:
         from utils.joseph_widget import render_joseph_floating_widget

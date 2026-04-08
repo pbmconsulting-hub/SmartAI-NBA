@@ -262,6 +262,59 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ═════════════════════════════════════════════════════════════
+# JOSEPH'S MONOLOGUE OF THE NIGHT — auto-generated broadcast opener
+# ═════════════════════════════════════════════════════════════
+
+_MONOLOGUE_OPENERS = [
+    "Good evening, LADIES and GENTLEMEN — this is Joseph M. Smith and you are LIVE in The Studio.",
+    "Welcome back to The Studio. I've been looking at the numbers ALL day and I have THINGS to say.",
+    "The Studio is OPEN and Joseph M. Smith is ON THE MIC. Let's get into it.",
+    "You're tuned in to the ONLY show that matters. This is The Studio with Joseph M. Smith.",
+    "Another night, another chance to prove the DOUBTERS wrong. Joseph M. Smith, LIVE from The Studio.",
+]
+
+_MONOLOGUE_MIDDLES = [
+    "Tonight's slate has some FASCINATING matchups and I've already identified the plays that MATTER.",
+    "I've been grinding the data since this morning and let me tell you — there are GEMS hiding in plain sight.",
+    "The sharps are moving early and I can SMELL the value from a mile away.",
+    "My models are LOCKED, my instincts are SHARP, and my conviction is at an ALL-TIME HIGH.",
+    "The line movement tells me Vegas is WORRIED — and when Vegas is worried, Joseph M. Smith EATS.",
+]
+
+_MONOLOGUE_CLOSERS = [
+    "Buckle up — it's going to be a WILD night.",
+    "Stay locked in. Joseph M. Smith doesn't miss.",
+    "Let's build some WINNING tickets, shall we?",
+    "The Studio is YOUR edge. Let's get to WORK.",
+    "This is NOT a drill. This is ANALYSIS at the highest level.",
+]
+
+
+def _generate_monologue() -> str:
+    """Generate Joseph's Monologue of the Night — a 2-3 sentence broadcast opener."""
+    opener = random.choice(_MONOLOGUE_OPENERS)
+    middle = random.choice(_MONOLOGUE_MIDDLES)
+    closer = random.choice(_MONOLOGUE_CLOSERS)
+    return f"{opener} {middle} {closer}"
+
+
+# Only show monologue once per session to avoid annoyance on re-runs
+if "studio_monologue_shown" not in st.session_state:
+    st.session_state["studio_monologue_shown"] = True
+    _monologue = _generate_monologue()
+    st.markdown(
+        f'<div style="background:rgba(255,94,0,0.06);border:1px solid rgba(255,94,0,0.2);'
+        f'border-radius:12px;padding:16px 20px;margin:0 0 20px 0;position:relative">'
+        f'<div style="color:#ff5e00;font-family:\'Orbitron\',sans-serif;font-size:0.75rem;'
+        f'font-weight:700;letter-spacing:1px;margin-bottom:8px">'
+        f'🎙️ JOSEPH\'S MONOLOGUE OF THE NIGHT</div>'
+        f'<div style="color:#e2e8f0;font-size:0.92rem;line-height:1.65;'
+        f'font-family:\'Montserrat\',sans-serif;font-style:italic">'
+        f'{_html.escape(_monologue)}</div></div>',
+        unsafe_allow_html=True,
+    )
+
 with st.expander("📖 How to Use The Studio", expanded=False):
     st.markdown("""
     ### The Studio — Joseph M. Smith's Analysis Desk
@@ -341,6 +394,111 @@ mode = st.radio(
     key="studio_mode_radio",
 )
 st.session_state["studio_mode"] = mode
+
+# ── Hot Take Mode Toggle ─────────────────────────────────────
+# When enabled, Joseph gives a contrarian pick that goes AGAINST the model's math
+if "joseph_hot_take_mode" not in st.session_state:
+    st.session_state["joseph_hot_take_mode"] = False
+
+_hot_take_cols = st.columns([3, 1])
+with _hot_take_cols[1]:
+    _hot_take_on = st.toggle(
+        "🔥 Hot Take Mode",
+        value=st.session_state["joseph_hot_take_mode"],
+        key="studio_hot_take_toggle",
+        help="When ON, Joseph gives a contrarian pick that goes against the model's math",
+    )
+    st.session_state["joseph_hot_take_mode"] = _hot_take_on
+
+if st.session_state["joseph_hot_take_mode"]:
+    _hot_take_lines = [
+        "🔥 HOT TAKE MODE is ON! Joseph is going AGAINST the math tonight — pure INSTINCT!",
+        "🔥 The model says one thing, but Joseph's GUT says ANOTHER. Trust the man, not the machine!",
+        "🔥 HOT TAKE MODE ACTIVATED! When has the math EVER captured the HEART of the game?!",
+    ]
+    st.markdown(
+        f'<div style="background:rgba(255,68,68,0.08);border:1px solid rgba(255,68,68,0.3);'
+        f'border-radius:8px;padding:10px 14px;margin-bottom:12px;'
+        f'color:#ff4444;font-size:0.85rem;font-family:\'Montserrat\',sans-serif;font-weight:600">'
+        f'{random.choice(_hot_take_lines)}</div>',
+        unsafe_allow_html=True,
+    )
+
+# ── Voice-to-Text Input (browser Web Speech API) ─────────────
+# Uses browser-native speech recognition so users can ask Joseph questions verbally
+st.markdown(
+    '<div style="margin:8px 0 12px 0">'
+    '<details>'
+    '<summary style="color:#ff5e00;font-family:\'Montserrat\',sans-serif;'
+    'font-size:0.85rem;cursor:pointer;font-weight:600">'
+    '🎤 Ask Joseph a question (voice or text)</summary>'
+    '</details></div>',
+    unsafe_allow_html=True,
+)
+_voice_question = st.text_input(
+    "Ask Joseph a question",
+    placeholder="Type or use the mic button below to ask Joseph anything...",
+    label_visibility="collapsed",
+    key="studio_voice_question",
+)
+# Inject browser-native Web Speech API for voice input
+st.markdown(
+    """<script>
+    (function() {
+        if (window.__josephVoiceInit) return;
+        window.__josephVoiceInit = true;
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return;
+        var inputs = window.parent.document.querySelectorAll('input[aria-label="Ask Joseph a question"]');
+        if (!inputs.length) return;
+        var input = inputs[inputs.length - 1];
+        var btn = document.createElement('button');
+        btn.textContent = '🎤 Speak';
+        btn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);'
+            + 'background:#ff5e00;color:#fff;border:none;border-radius:6px;padding:4px 10px;'
+            + 'font-size:0.75rem;cursor:pointer;font-family:Montserrat,sans-serif;z-index:10';
+        btn.onclick = function(e) {
+            e.preventDefault();
+            var rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.onresult = function(ev) {
+                var txt = ev.results[0][0].transcript;
+                var nativeSet = Object.getOwnPropertyDescriptor(
+                    window.HTMLInputElement.prototype, 'value').set;
+                nativeSet.call(input, txt);
+                input.dispatchEvent(new Event('input', {bubbles: true}));
+            };
+            rec.start();
+            btn.textContent = '🔴 Listening...';
+            rec.onend = function() { btn.textContent = '🎤 Speak'; };
+        };
+        if (input.parentElement) {
+            input.parentElement.style.position = 'relative';
+            input.parentElement.appendChild(btn);
+        }
+    })();
+    </script>""",
+    unsafe_allow_html=True,
+)
+
+# Handle voice/text question
+if _voice_question and _voice_question.strip():
+    _q = _voice_question.strip()
+    if _BRAIN_AVAILABLE:
+        try:
+            _voice_answer = joseph_quick_take(
+                analysis_results,
+                teams_data,
+                context=f"user_question: {_q}",
+            )
+        except Exception:
+            _voice_answer = f"Joseph heard your question about '{_q}' — give me a second to pull up the data!"
+    else:
+        _voice_answer = f"Joseph heard you ask about '{_q}' — the brain module is warming up!"
+    st.markdown(
+        render_avatar_commentary(_voice_answer),
+        unsafe_allow_html=True,
+    )
 
 # Quick navigation links (Enhancement 16)
 st.markdown(

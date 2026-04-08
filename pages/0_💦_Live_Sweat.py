@@ -36,6 +36,13 @@ st.markdown(get_global_css(), unsafe_allow_html=True)
 from styles.live_theme import get_live_sweat_css
 st.markdown(get_live_sweat_css(), unsafe_allow_html=True)
 
+# ── Live Mode Avatar CSS (pulsing orange glow) ────────────────
+try:
+    from styles.live_theme import get_live_mode_avatar_css
+    st.markdown(get_live_mode_avatar_css(), unsafe_allow_html=True)
+except ImportError:
+    pass
+
 # ── Joseph M. Smith Floating Widget ──────────────────────────
 
 try:
