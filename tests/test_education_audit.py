@@ -26,7 +26,7 @@ _PAGE_FILES = [
     ("pages/9_📡_Data_Feed.py", "📖 How to Use"),
     ("pages/10_🗺️_Correlation_Matrix.py", "📖 How to Use"),
     ("pages/11_📈_Bet_Tracker.py", "📖 How to Use"),
-    ("pages/12_📊_Backtester.py", "📖 How to Use"),
+    ("pages/12_📊_Proving_Grounds.py", "📖 How to Use"),
     ("pages/13_⚙️_Settings.py", "📖 How to Use"),
     ("pages/14_💎_Subscription_Level.py", "📖 How"),
 ]

@@ -1844,7 +1844,7 @@ _nav_r3 = st.columns(6)
 _nav_row3 = [
     ("💦", "Live Sweat", "Track bets in real-time", "pages/0_💦_Live_Sweat.py"),
     ("📈", "Bet Tracker", "Log results, track ROI", "pages/11_📈_Bet_Tracker.py"),
-    ("📊", "Backtester", "Validate model accuracy", "pages/12_📊_Backtester.py"),
+    ("📊", "Proving Grounds", "Validate model accuracy", "pages/12_📊_Proving_Grounds.py"),
     ("📡", "Data Feed", "Update player/team data", "pages/9_📡_Data_Feed.py"),
     ("⚙️", "Settings", "Tune engine parameters", "pages/13_⚙️_Settings.py"),
     ("💎", "Premium", "Unlock everything", "pages/14_💎_Subscription_Level.py"),
