@@ -1515,20 +1515,22 @@ def populate_player_career_stats(
 
     # ── Incremental: determine which players actually need fetching ───────
     # 1. Players with NO rows at all in Player_Career_Stats.
-    existing_pids_rows = pd.read_sql(
-        "SELECT DISTINCT player_id FROM Player_Career_Stats",
-        conn,
+    existing_pids = set(
+        pd.read_sql(
+            "SELECT DISTINCT player_id FROM Player_Career_Stats",
+            conn,
+        )["player_id"].tolist()
     )
-    existing_pids = set(existing_pids_rows["player_id"].tolist()) if not existing_pids_rows.empty else set()
     missing_pids = [p for p in all_active if p not in existing_pids]
 
     # 2. Players who played a game in the last 3 days (stats may have changed).
-    recently_active_rows = pd.read_sql(
-        "SELECT DISTINCT player_id FROM Player_Game_Logs "
-        "WHERE game_date >= date('now', '-3 days')",
-        conn,
+    recently_active = set(
+        pd.read_sql(
+            "SELECT DISTINCT player_id FROM Player_Game_Logs "
+            "WHERE game_date >= date('now', '-3 days')",
+            conn,
+        )["player_id"].tolist()
     )
-    recently_active = set(recently_active_rows["player_id"].tolist()) if not recently_active_rows.empty else set()
     stale_pids = [p for p in all_active if p in recently_active and p in existing_pids]
 
     player_ids = list(dict.fromkeys(missing_pids + stale_pids))  # dedupe, preserve order
