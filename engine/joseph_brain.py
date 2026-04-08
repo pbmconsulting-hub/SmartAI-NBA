@@ -292,6 +292,13 @@ _used_commentary: dict = {}     # keyed by context_type → set of used indices
 # DB-POWERED KNOWLEDGE HELPERS — Joseph's Supreme Data Layer
 # ═══════════════════════════════════════════════════════════════
 
+# Stat type → DB column key mapping (single source of truth)
+_STAT_DB_KEY_MAP = {
+    "points": "PTS", "rebounds": "REB", "assists": "AST",
+    "steals": "STL", "blocks": "BLK", "threes": "FG3M",
+    "fg3m": "FG3M", "turnovers": "TOV",
+}
+
 def _get_player_db_intel(player: dict) -> dict:
     """Pull comprehensive DB intel on a player for supreme analysis.
 
@@ -1777,11 +1784,7 @@ def joseph_generate_independent_picks(props, players_lookup, todays_games,
             continue
 
         # ── DB-powered trend refinement ──────────────────────
-        _stat_db_key = {
-            "points": "PTS", "rebounds": "REB", "assists": "AST",
-            "steals": "STL", "blocks": "BLK", "threes": "FG3M",
-            "fg3m": "FG3M", "turnovers": "TOV",
-        }.get(stat_type, "PTS")
+        _stat_db_key = _STAT_DB_KEY_MAP.get(stat_type, "PTS")
 
         db_intel = _get_player_db_intel(p_data)
         trend_bonus = 0.0
@@ -2276,14 +2279,10 @@ def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
         return []
 
     sentences = []
-    stat = prop.get("stat", prop.get("stat_type", "points")).lower()
+    stat = str(prop.get("stat", prop.get("stat_type", "points")) or "points").lower()
     line = prop.get("line", 0)
     edge = prop.get("edge", "")
-    _stat_db_key = {
-        "points": "PTS", "rebounds": "REB", "assists": "AST",
-        "steals": "STL", "blocks": "BLK", "threes": "FG3M",
-        "fg3m": "FG3M", "turnovers": "TOV",
-    }.get(stat, "PTS")
+    _stat_db_key = _STAT_DB_KEY_MAP.get(stat, "PTS")
 
     recent = db_intel.get("recent_games", [])
     max_data_sentences = {"low": 1, "medium": 1, "high": 2, "nuclear": 3}.get(energy, 1)
@@ -2361,9 +2360,9 @@ def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
             pool = DATA_BODY_TEMPLATES.get("home_away", [])
             if pool:
                 if ha["home_boost"] > 0:
-                    note = f"He scores {ha['home_ppg']:.1f} at home versus {ha['away_ppg']:.1f} on the road"
+                    note = f"He averages {ha['home_ppg']:.1f} PPG at home versus {ha['away_ppg']:.1f} on the road"
                 else:
-                    note = f"He actually scores BETTER on the road — {ha['away_ppg']:.1f} away vs {ha['home_ppg']:.1f} at home"
+                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} PPG away vs {ha['home_ppg']:.1f} at home"
                 tmpl = random.choice(pool)
                 try:
                     sentences.append(tmpl.format(
@@ -2401,17 +2400,13 @@ def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: li
         A counter-argument sentence grounded in data.
     """
     player_name = player.get("name", player.get("player_name", "This player"))
-    stat = prop_data.get("stat", prop_data.get("stat_type", "points")).lower()
+    stat = str(prop_data.get("stat", prop_data.get("stat_type", "points")) or "points").lower()
     line = _safe_float(prop_data.get("line", 0))
 
     # DB-powered counter-arguments when data is available
     if db_intel and db_intel.get("available"):
         recent = db_intel.get("recent_games", [])
-        _stat_db_key = {
-            "points": "PTS", "rebounds": "REB", "assists": "AST",
-            "steals": "STL", "blocks": "BLK", "threes": "FG3M",
-            "fg3m": "FG3M", "turnovers": "TOV",
-        }.get(stat, "PTS")
+        _stat_db_key = _STAT_DB_KEY_MAP.get(stat, "PTS")
 
         if recent and line > 0:
             trend = _compute_recent_trend(recent, _stat_db_key)
@@ -2539,11 +2534,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
 
         # ── Supreme DB Knowledge Pull ─────────────────────────
         db_intel = _get_player_db_intel(player)
-        _stat_db_key = {
-            "points": "PTS", "rebounds": "REB", "assists": "AST",
-            "steals": "STL", "blocks": "BLK", "threes": "FG3M",
-            "fg3m": "FG3M", "turnovers": "TOV",
-        }.get(stat_type.lower(), "PTS")
+        _stat_db_key = _STAT_DB_KEY_MAP.get(str(stat_type).lower(), "PTS")
 
         trend_data = {}
         hit_rate = 0.0
@@ -3192,9 +3183,14 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
 
         # DB-powered scoring breakdown
         if pts_trend.get("last_10_avg", 0) > 0:
+            stat_parts = [f"{pts_trend['last_10_avg']} points"]
+            if reb_trend.get("last_10_avg", 0) > 0:
+                stat_parts.append(f"{reb_trend['last_10_avg']} rebounds")
+            if ast_trend.get("last_10_avg", 0) > 0:
+                stat_parts.append(f"{ast_trend['last_10_avg']} assists")
             scouting_parts.append(
-                f"Over the last 10 games he's averaging {pts_trend['last_10_avg']} points, "
-                f"{reb_trend.get('last_10_avg', 0)} rebounds, and {ast_trend.get('last_10_avg', 0)} assists."
+                f"Over the last 10 games he's averaging {', '.join(stat_parts[:-1])}"
+                + (f", and {stat_parts[-1]}." if len(stat_parts) > 1 else ".")
             )
             if pts_trend.get("last_3_avg", 0) > 0:
                 diff = pts_trend["last_3_avg"] - pts_trend["last_10_avg"]
@@ -3291,9 +3287,11 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         if "blowout_risk" in narrative_tags:
             risk_factors.append("Blowout risk — potential minutes reduction")
         if trend == "trending_down":
-            risk_factors.append(
-                f"Recent form trending down (last 3 avg: {pts_trend.get('last_3_avg', 'N/A')} pts)"
-            )
+            l3 = pts_trend.get("last_3_avg", 0)
+            if l3 > 0:
+                risk_factors.append(f"Recent form trending down (last 3 avg: {l3} pts)")
+            else:
+                risk_factors.append("Recent form trending downward")
         if consistency == "volatile":
             risk_factors.append("High variance — volatile stat production")
         if pts_trend.get("cold_streak", 0) >= 3:
