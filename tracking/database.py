@@ -1019,13 +1019,19 @@ def load_all_bets(limit=10000, exclude_linked=True):
     Returns:
         list of dict: Bet rows as dictionaries
     """
-    where_clause = "WHERE entry_id IS NULL" if exclude_linked else ""
-    select_sql = f"""
-    SELECT * FROM bets
-    {where_clause}
-    ORDER BY created_at DESC
-    LIMIT ?
-    """
+    if exclude_linked:
+        select_sql = """
+        SELECT * FROM bets
+        WHERE entry_id IS NULL
+        ORDER BY created_at DESC
+        LIMIT ?
+        """
+    else:
+        select_sql = """
+        SELECT * FROM bets
+        ORDER BY created_at DESC
+        LIMIT ?
+        """
 
     try:
         with sqlite3.connect(str(DB_FILE_PATH), check_same_thread=False) as connection:
