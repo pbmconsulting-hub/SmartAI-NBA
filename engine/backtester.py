@@ -127,7 +127,10 @@ EDGE_BUCKETS = [
 PAYOUT_AT_MINUS_110 = 0.909
 
 
-def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_by_player=None):
+def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None,
+                 game_logs_by_player=None, progress_callback=None,
+                 number_of_simulations=500, start_date=None, end_date=None,
+                 selected_players=None):
     """
     Run a historical backtest.
 
@@ -138,6 +141,15 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
         tier_filter (str or None): If set, only include picks of this tier
         game_logs_by_player (dict or None): {player_name: [game_log_dicts]}
             If None, returns an empty result (no data available).
+        progress_callback (callable or None): Called with (current_idx, total, message)
+            to report simulation progress to the UI.
+        number_of_simulations (int): Number of Monte Carlo simulations per prop.
+            Defaults to 500. Wire to Settings page "Simulation Depth" for user control.
+        start_date (str or None): ISO date string (e.g. "2024-10-22"). Only include
+            game logs on or after this date.
+        end_date (str or None): ISO date string (e.g. "2025-04-08"). Only include
+            game logs on or before this date.
+        selected_players (list or None): If provided, only backtest these player names.
 
     Returns:
         dict: BacktestResult with full metrics
@@ -147,6 +159,16 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
 
     if run_quantum_matrix_simulation is None:
         return _empty_result("Simulation engine not available.")
+
+    # Filter to selected players if specified
+    if selected_players:
+        _sel_lower = {p.lower().strip() for p in selected_players}
+        game_logs_by_player = {
+            k: v for k, v in game_logs_by_player.items()
+            if k.lower().strip() in _sel_lower
+        }
+        if not game_logs_by_player:
+            return _empty_result("No game logs found for the selected players.")
 
     total_picks = 0
     wins = 0
@@ -160,14 +182,23 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
     }
     results_by_stat = {st: {"picks": 0, "wins": 0} for st in stat_types}
     results_by_edge_bucket = {label: {"picks": 0, "wins": 0} for _, _, label in EDGE_BUCKETS}
+    results_by_player = {}  # per-player aggregation
 
     pick_log = []
 
     _archive_cache = {}
 
-    for player_name, game_logs in game_logs_by_player.items():
+    _player_names = list(game_logs_by_player.keys())
+    _total_players = len(_player_names)
+
+    for _player_idx, player_name in enumerate(_player_names):
+        game_logs = game_logs_by_player[player_name]
         if not game_logs:
             continue
+
+        # Report progress to the UI
+        if progress_callback:
+            progress_callback(_player_idx + 1, _total_players, f"Simulating {player_name}…")
 
         # Sort by game date ascending
         sorted_logs = sorted(game_logs, key=lambda g: g.get("GAME_DATE", g.get("game_date", "")))
@@ -175,6 +206,12 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
         for i, game in enumerate(sorted_logs):
             game_date = game.get("GAME_DATE", game.get("game_date", ""))
             if not game_date or i < 5:  # Need at least 5 prior games for meaningful avg
+                continue
+
+            # Date range filtering
+            if start_date and game_date < start_date:
+                continue
+            if end_date and game_date > end_date:
                 continue
 
             for stat_type in stat_types:
@@ -212,7 +249,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                         projected_stat_average=season_avg,
                         stat_standard_deviation=season_std,
                         prop_line=prop_line,
-                        number_of_simulations=500,
+                        number_of_simulations=number_of_simulations,
                         blowout_risk_factor=0.0,
                         pace_adjustment_factor=1.0,
                         matchup_adjustment_factor=1.0,
@@ -281,6 +318,25 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
                     results_by_stat[stat_type]["picks"] += 1
                     if correct:
                         results_by_stat[stat_type]["wins"] += 1
+
+                # Update by-player stats
+                if player_name not in results_by_player:
+                    results_by_player[player_name] = {
+                        "picks": 0, "wins": 0, "pnl": 0.0,
+                        "stat_wins": {}, "stat_picks": {},
+                    }
+                results_by_player[player_name]["picks"] += 1
+                results_by_player[player_name]["pnl"] += pick_pnl
+                if correct:
+                    results_by_player[player_name]["wins"] += 1
+                # Track per-stat per-player
+                results_by_player[player_name]["stat_picks"][stat_type] = (
+                    results_by_player[player_name]["stat_picks"].get(stat_type, 0) + 1
+                )
+                if correct:
+                    results_by_player[player_name]["stat_wins"][stat_type] = (
+                        results_by_player[player_name]["stat_wins"].get(stat_type, 0) + 1
+                    )
 
                 # Update by-edge-bucket stats
                 for lo, hi, label in EDGE_BUCKETS:
@@ -352,6 +408,37 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
     # test of whether the model generalizes to new situations.
     oos_metrics = _calculate_oos_metrics(pick_log)
 
+    # ---- Per-player win rates ----
+    player_win_rates = {}
+    for pname, pdata in results_by_player.items():
+        p = pdata["picks"]
+        w = pdata["wins"]
+        p_pnl = pdata["pnl"]
+        # Find best and worst stat for this player
+        best_stat, worst_stat = "", ""
+        best_wr, worst_wr = -1.0, 2.0
+        for st_name, st_picks in pdata["stat_picks"].items():
+            st_wins = pdata["stat_wins"].get(st_name, 0)
+            st_wr = st_wins / st_picks if st_picks > 0 else 0.0
+            if st_wr > best_wr:
+                best_wr = st_wr
+                best_stat = st_name
+            if st_wr < worst_wr:
+                worst_wr = st_wr
+                worst_stat = st_name
+        player_win_rates[pname] = {
+            "picks": p,
+            "wins": w,
+            "win_rate": round(w / p, 4) if p > 0 else 0.0,
+            "roi": round(p_pnl / p, 4) if p > 0 else 0.0,
+            "pnl": round(p_pnl, 2),
+            "best_stat": best_stat.capitalize() if best_stat else "N/A",
+            "worst_stat": worst_stat.capitalize() if worst_stat else "N/A",
+        }
+
+    # ---- Win/Loss Streak Tracking ----
+    streaks = _calculate_streaks(pick_log)
+
     return {
         "status": "ok",
         "message": f"Backtest complete: {total_picks} picks analyzed",
@@ -368,9 +455,12 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None, game_logs_
         "tier_win_rates": tier_win_rates,
         "stat_win_rates": stat_win_rates,
         "edge_win_rates": edge_win_rates,
+        "player_win_rates": player_win_rates,
         "sharpe_ratio": sharpe_ratio,
         "max_drawdown": max_drawdown,
         "oos_metrics": oos_metrics,
+        "longest_win_streak": streaks["longest_win_streak"],
+        "longest_loss_streak": streaks["longest_loss_streak"],
         "pick_log": pick_log[-200:],  # Keep last 200 for display
     }
 
@@ -493,6 +583,43 @@ def _calculate_oos_metrics(pick_log):
     }
 
 
+def _calculate_streaks(pick_log):
+    """
+    Calculate longest win streak and longest loss streak from the pick log.
+
+    BEGINNER NOTE: Streaks measure the worst and best consecutive runs.
+    A long loss streak means higher bankroll risk. A long win streak shows
+    the model can sustain momentum. Both are important for risk assessment.
+
+    Args:
+        pick_log (list of dict): Each dict has 'correct' (bool) field.
+
+    Returns:
+        dict: {'longest_win_streak': int, 'longest_loss_streak': int}
+    """
+    if not pick_log:
+        return {"longest_win_streak": 0, "longest_loss_streak": 0}
+
+    max_win = 0
+    max_loss = 0
+    cur_win = 0
+    cur_loss = 0
+
+    for p in pick_log:
+        if p["correct"]:
+            cur_win += 1
+            cur_loss = 0
+            if cur_win > max_win:
+                max_win = cur_win
+        else:
+            cur_loss += 1
+            cur_win = 0
+            if cur_loss > max_loss:
+                max_loss = cur_loss
+
+    return {"longest_win_streak": max_win, "longest_loss_streak": max_loss}
+
+
 def _empty_result(message):
     """Return an empty BacktestResult dict."""
     return {
@@ -507,8 +634,11 @@ def _empty_result(message):
         "tier_win_rates": {},
         "stat_win_rates": {},
         "edge_win_rates": {},
+        "player_win_rates": {},
         "sharpe_ratio": 0.0,
         "max_drawdown": 0.0,
         "oos_metrics": {},
+        "longest_win_streak": 0,
+        "longest_loss_streak": 0,
         "pick_log": [],
     }
