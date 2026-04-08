@@ -156,6 +156,16 @@ DEFAULT_GAME_TOTAL = 220.0   # Typical NBA over/under baseline used as placehold
 # Timeout for the ESPN public scoreboard HTTP request (seconds)
 ESPN_API_TIMEOUT_SECONDS = 10
 
+# ── nba_api request timeouts (seconds) ───────────────────────
+# Without explicit timeouts, nba_api calls can hang indefinitely
+# and freeze the entire Streamlit app.  These are shorter than the
+# ETL constants (etl/initial_pull.py) because live-page fetches
+# must stay responsive.
+NBA_API_BULK_TIMEOUT = 30        # LeagueDashPlayerStats, LeagueDashTeamStats
+NBA_API_SCOREBOARD_TIMEOUT = 15  # ScoreboardV3
+NBA_API_STANDINGS_TIMEOUT = 15   # LeagueStandingsV3
+NBA_API_GAMELOG_TIMEOUT = 15     # PlayerGameLog
+
 # Injury status values that indicate a player is unavailable.
 # Used by fetch_todays_players_only() and fetch_player_stats() to
 # filter out inactive players before writing to CSV.
@@ -189,6 +199,33 @@ GTD_INJURY_STATUSES = frozenset({
 # ============================================================
 # END SECTION: File Path Constants
 # ============================================================
+
+
+def _safe_get_first_dataframe(endpoint, default=None):
+    """Safely extract the first DataFrame from an nba_api endpoint.
+
+    Guards against empty or missing results that would otherwise raise
+    an ``IndexError`` when accessing ``get_data_frames()[0]``.  Any
+    exception raised by ``get_data_frames()`` (network errors, JSON
+    parse failures, etc.) is caught, logged at DEBUG level, and
+    *default* is returned instead.
+
+    Args:
+        endpoint: An nba_api endpoint instance that supports
+            ``get_data_frames()``.
+        default: Value to return when no DataFrame is available
+            (default ``None``).
+
+    Returns:
+        pandas.DataFrame or *default*.
+    """
+    try:
+        dfs = endpoint.get_data_frames()
+        if dfs and len(dfs) > 0 and not dfs[0].empty:
+            return dfs[0]
+    except Exception as exc:
+        _logger.debug("_safe_get_first_dataframe: %s", exc)
+    return default
 
 
 def _nba_today_et():
@@ -566,8 +603,12 @@ def _fetch_team_records():
         standings_endpoint = leaguestandingsv3.LeagueStandingsV3(
             season=_current_season(),
             season_type="Regular Season",
+            timeout=NBA_API_STANDINGS_TIMEOUT,
         )
-        standings_data = standings_endpoint.get_data_frames()[0].to_dict("records")
+        _standings_df = _safe_get_first_dataframe(standings_endpoint)
+        if _standings_df is None:
+            raise RuntimeError("LeagueStandingsV3 returned no data")
+        standings_data = _standings_df.to_dict("records")
         time.sleep(API_DELAY_SECONDS)
 
         for row in standings_data:
@@ -671,10 +712,11 @@ def _build_formatted_game(home_abbrev, away_abbrev, home_team_name, away_team_na
 
 def _fetch_games_layer1_scoreboard_v2(team_records):
     """
-    Layer 1: Fetch today's games via the NBA Stats ScoreboardV2 endpoint.
+    Layer 1: Fetch today's games via the NBA Stats ScoreboardV3 endpoint.
 
-    ScoreboardV2 is the most reliable source — it uses the same NBA Stats
-    API as the rest of nba_api and returns a clean GameHeader data frame.
+    ScoreboardV3 replaces the deprecated ScoreboardV2 and is fully backward
+    compatible.  It exposes ``game_header`` and ``line_score`` DataSets whose
+    DataFrames use camelCase column names.
 
     Args:
         team_records (dict): Pre-fetched standings data from _fetch_team_records().
@@ -683,68 +725,78 @@ def _fetch_games_layer1_scoreboard_v2(team_records):
         list of dict: Formatted game records, or empty list on failure.
     """
     try:
-        from nba_api.stats.endpoints import scoreboardv2
-        from nba_api.stats.static import teams as nba_teams_static
+        from nba_api.stats.endpoints import scoreboardv3
 
-        # Build team_id → abbreviation and name mapping
-        all_nba_teams = nba_teams_static.get_teams()
-        team_id_to_abbrev = {}
-        team_id_to_info = {}
-        for t in all_nba_teams:
-            abbrev = t.get("abbreviation", "")
-            abbrev = NBA_API_ABBREV_TO_OURS.get(abbrev, abbrev)
-            tid = t.get("id")
-            team_id_to_abbrev[tid] = abbrev
-            team_id_to_info[tid] = {
-                "city": t.get("city", ""),
-                "name": t.get("nickname", ""),
-            }
-
-        today_str = _nba_today_et().strftime("%m/%d/%Y")
-        sb = scoreboardv2.ScoreboardV2(game_date=today_str, day_offset=0)
-        dfs = sb.get_data_frames()
+        today_str = _nba_today_et().strftime("%Y-%m-%d")  # V3 uses YYYY-MM-DD
+        sb = scoreboardv3.ScoreboardV3(
+            game_date=today_str,
+            timeout=NBA_API_SCOREBOARD_TIMEOUT,
+        )
         time.sleep(API_DELAY_SECONDS)
 
-        if not dfs:
+        # ── Game headers (gameId, gameStatusText, …) ────────
+        try:
+            game_header_df = sb.game_header.get_data_frame()
+        except Exception:
+            game_header_df = None
+        if game_header_df is None or game_header_df.empty:
             return []
 
-        game_header_df = dfs[0]  # First frame is GameHeader
-        if game_header_df.empty:
-            return []
+        # ── Line scores contain team info per game ──────────
+        try:
+            line_score_df = sb.line_score.get_data_frame()
+        except Exception:
+            line_score_df = None
+
+        # Build gameId → {home_*, away_*} mapping from line scores.
+        # Each game has two rows (one per team); the second row is
+        # typically the home team, but we use index position to be safe.
+        game_teams: dict = {}
+        if line_score_df is not None and not line_score_df.empty:
+            for gid, grp in line_score_df.groupby("gameId"):
+                rows = grp.to_dict("records")
+                if len(rows) >= 2:
+                    away_row, home_row = rows[0], rows[1]
+                    away_tc = NBA_API_ABBREV_TO_OURS.get(
+                        away_row.get("teamTricode", ""),
+                        away_row.get("teamTricode", ""),
+                    )
+                    home_tc = NBA_API_ABBREV_TO_OURS.get(
+                        home_row.get("teamTricode", ""),
+                        home_row.get("teamTricode", ""),
+                    )
+                    game_teams[str(gid)] = {
+                        "home_abbrev": home_tc,
+                        "away_abbrev": away_tc,
+                        "home_team_name": f"{home_row.get('teamCity', '')} {home_row.get('teamName', '')}".strip(),
+                        "away_team_name": f"{away_row.get('teamCity', '')} {away_row.get('teamName', '')}".strip(),
+                    }
 
         formatted_games = []
         for row in game_header_df.to_dict("records"):
-            home_team_id = row.get("HOME_TEAM_ID")
-            away_team_id = row.get("VISITOR_TEAM_ID")
+            gid = str(row.get("gameId") or "")
+            info = game_teams.get(gid, {})
 
-            home_abbrev = team_id_to_abbrev.get(home_team_id, "")
-            away_abbrev = team_id_to_abbrev.get(away_team_id, "")
-
+            home_abbrev = info.get("home_abbrev", "")
+            away_abbrev = info.get("away_abbrev", "")
             if not home_abbrev or not away_abbrev:
                 continue
 
-            # GAME_STATUS_TEXT shows "7:30 pm ET" for scheduled games
-            game_time_et = str(row.get("GAME_STATUS_TEXT", "") or "").strip()
-
-            home_info = team_id_to_info.get(home_team_id, {})
-            away_info = team_id_to_info.get(away_team_id, {})
-            home_team_name = f"{home_info.get('city', '')} {home_info.get('name', '')}".strip()
-            away_team_name = f"{away_info.get('city', '')} {away_info.get('name', '')}".strip()
-
-            nba_game_id = str(row.get("GAME_ID") or "")
+            game_time_et = str(row.get("gameStatusText", "") or "").strip()
 
             formatted_games.append(_build_formatted_game(
                 home_abbrev, away_abbrev,
-                home_team_name, away_team_name,
+                info.get("home_team_name", ""),
+                info.get("away_team_name", ""),
                 game_time_et, "",
                 team_records,
-                game_id=nba_game_id,
+                game_id=gid,
             ))
 
         return formatted_games
 
     except Exception as error:
-        _logger.warning(f"Layer 1 (ScoreboardV2) failed: {error}")
+        _logger.warning(f"Layer 1 (ScoreboardV3) failed: {error}")
         return []
 
 
@@ -833,7 +885,7 @@ def _fetch_games_layer3_live_scoreboard(team_records):
     Layer 3: Fetch today's games via the nba_api live ScoreBoard endpoint.
 
     This is the original single-source implementation, retained as the
-    final fallback when both ScoreboardV2 and the ESPN API are unavailable.
+    final fallback when both ScoreboardV3 and the ESPN API are unavailable.
 
     Args:
         team_records (dict): Pre-fetched standings data from _fetch_team_records().
@@ -925,7 +977,7 @@ def fetch_todays_games():
     fails or returns no games.
 
     Layers:
-        1. ScoreboardV2        — NBA Stats API
+        1. ScoreboardV3        — NBA Stats API
         2. ESPN Public API     — free unauthenticated endpoint (fallback)
         3. Live ScoreBoard     — nba_api live endpoint (final fallback)
 
@@ -939,9 +991,9 @@ def fetch_todays_games():
     team_records = _fetch_team_records()
 
     # --------------------------------------------------------
-    # Layer 1: ScoreboardV2
+    # Layer 1: ScoreboardV3
     # --------------------------------------------------------
-    _logger.info("Trying Layer 1: ScoreboardV2...")
+    _logger.info("Trying Layer 1: ScoreboardV3...")
     layer1_games = _fetch_games_layer1_scoreboard_v2(team_records)
 
     if layer1_games:
@@ -1133,9 +1185,13 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                 per_mode_detailed="PerGame",
                 season=_current_season(),
                 season_type_all_star="Regular Season",
+                timeout=NBA_API_BULK_TIMEOUT,
             )
             time.sleep(API_DELAY_SECONDS)
-            for row in stats_ep.get_data_frames()[0].to_dict("records"):
+            _bulk_df = _safe_get_first_dataframe(stats_ep)
+            if _bulk_df is None:
+                raise RuntimeError("LeagueDashPlayerStats returned no data")
+            for row in _bulk_df.to_dict("records"):
                 pid = row.get("PLAYER_ID")
                 if pid:
                     bulk_stats[int(pid)] = row
@@ -1386,8 +1442,12 @@ def fetch_player_recent_form(player_id, last_n_games=10):
         game_log_endpoint = playergamelog.PlayerGameLog(
             player_id=player_id,
             season_type_all_star="Regular Season",
+            timeout=NBA_API_GAMELOG_TIMEOUT,
         )
-        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+        _gl_df = _safe_get_first_dataframe(game_log_endpoint)
+        if _gl_df is None:
+            return {}
+        game_log_data = _gl_df.to_dict("records")
         time.sleep(API_DELAY_SECONDS)
 
         recent = game_log_data[:last_n_games]
@@ -1512,6 +1572,7 @@ def fetch_player_stats(progress_callback=None):
             per_mode_detailed="PerGame",      # We want per-game averages
             season=_current_season(),
             season_type_all_star="Regular Season",  # Only regular season
+            timeout=NBA_API_BULK_TIMEOUT,
         )
 
         # Wait a moment before the next call
@@ -1522,7 +1583,11 @@ def fetch_player_stats(progress_callback=None):
         # .get_data_frames() converts it to a list of DataFrames.
         # [0] gets the first (and only) DataFrame.
         # .to_dict('records') converts rows to a list of dicts.
-        player_stats_list = stats_endpoint.get_data_frames()[0].to_dict("records")
+        _stats_df = _safe_get_first_dataframe(stats_endpoint)
+        if _stats_df is None:
+            _logger.error("LeagueDashPlayerStats returned no data")
+            return False
+        player_stats_list = _stats_df.to_dict("records")
 
         if progress_callback:
             progress_callback(2, 10, f"Got stats for {len(player_stats_list)} players. Calculating standard deviations...")
@@ -1643,10 +1708,12 @@ def fetch_player_stats(progress_callback=None):
                         game_log_endpoint = playergamelog.PlayerGameLog(
                             player_id=player_id,        # Which player
                             season_type_all_star="Regular Season",  # Only regular season
+                            timeout=NBA_API_GAMELOG_TIMEOUT,
                         )
 
                         # Get the game log data
-                        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+                        _gl_df = _safe_get_first_dataframe(game_log_endpoint)
+                        game_log_data = _gl_df.to_dict("records") if _gl_df is not None else []
                         if _RATE_LIMITER_AVAILABLE and _rate_limiter:
                             _rate_limiter.record_request()
 
@@ -1897,10 +1964,15 @@ def fetch_team_stats(progress_callback=None):
             per_mode_detailed="PerGame",          # Get per-game stats
             season=_current_season(),
             season_type_all_star="Regular Season",
+            timeout=NBA_API_BULK_TIMEOUT,
         )
 
         # Get the data
-        team_stats_list = team_stats_endpoint.get_data_frames()[0].to_dict("records")
+        _ts_df = _safe_get_first_dataframe(team_stats_endpoint)
+        if _ts_df is None:
+            _logger.error("LeagueDashTeamStats returned no data")
+            return False
+        team_stats_list = _ts_df.to_dict("records")
 
         time.sleep(API_DELAY_SECONDS)  # Be polite — wait between calls
 
@@ -1918,9 +1990,15 @@ def fetch_team_stats(progress_callback=None):
             measure_type_detailed_defense="Advanced",  # Advanced stats mode
             season=_current_season(),
             season_type_all_star="Regular Season",
+            timeout=NBA_API_BULK_TIMEOUT,
         )
 
-        advanced_list = advanced_endpoint.get_data_frames()[0].to_dict("records")
+        _adv_df = _safe_get_first_dataframe(advanced_endpoint)
+        if _adv_df is None:
+            _logger.warning("LeagueDashTeamStats (advanced) returned no data; continuing without advanced stats")
+            advanced_list = []
+        else:
+            advanced_list = _adv_df.to_dict("records")
 
         time.sleep(API_DELAY_SECONDS)
 
@@ -2282,10 +2360,16 @@ def fetch_player_game_log(player_id, last_n_games=20):
         game_log_endpoint = playergamelog.PlayerGameLog(
             player_id=player_id,
             season_type_all_star="Regular Season",
+            timeout=NBA_API_GAMELOG_TIMEOUT,
         )
 
         # Convert to list of dicts
-        game_log_data = game_log_endpoint.get_data_frames()[0].to_dict("records")
+        _gl_df = _safe_get_first_dataframe(game_log_endpoint)
+        if _gl_df is None:
+            if _RATE_LIMITER_AVAILABLE and _rate_limiter:
+                _rate_limiter.record_request()
+            return []
+        game_log_data = _gl_df.to_dict("records")
         if _RATE_LIMITER_AVAILABLE and _rate_limiter:
             _rate_limiter.record_request()
 
