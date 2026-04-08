@@ -6761,9 +6761,15 @@ UNIFIED_PLAYER_CARD_CSS = """
 }
 
 /* ── Expanded body ──────────────────────────────────────── */
+/* Change 11: Lazy-load — use content-visibility:auto so the
+   browser skips layout/paint for collapsed card bodies until
+   the user opens them.  contain-intrinsic-size gives a size
+   hint so the scrollbar doesn't jump. */
 .upc-body {
     padding: 0 20px 18px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
+    content-visibility: auto;
+    contain-intrinsic-size: auto 400px;
 }
 .upc-body .qcm-grid {
     padding-top: 14px;

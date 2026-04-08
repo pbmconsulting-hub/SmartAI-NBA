@@ -13,6 +13,8 @@ import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
 import time             # For elapsed-time measurement
 import os               # For logo path resolution
+import hashlib          # For content-hash caching of simulation results
+import concurrent.futures  # For parallel prop analysis
 
 try:
     from utils.logger import get_logger
@@ -132,6 +134,24 @@ from utils.player_modal import show_player_spotlight as _show_spotlight
 _ASSETS_DIR      = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
 # Legacy logo paths disabled – branding removed from UI
 _GOLD_LOGO_PATH   = os.path.join(_ASSETS_DIR, "NewGold_Logo.png")
+
+
+# ── Change 10: Content-Hash Cache for Simulation Results ─────────────────────
+# When a user re-runs analysis with the same prop pool, unchanged props return
+# instantly from this session-state cache.  Only new/modified props are
+# re-computed.  Cache is keyed on (player_name, stat_type, line, sim_depth).
+def _prop_cache_key(player_name: str, stat_type: str, line: float,
+                    sim_depth: int) -> str:
+    """Return a deterministic hash key for a prop's simulation cache."""
+    raw = f"{player_name.strip().lower()}|{stat_type.strip().lower()}|{line:.1f}|{sim_depth}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
+def _get_sim_cache() -> dict:
+    """Return the mutable simulation cache dict from session state."""
+    if "_sim_result_cache" not in st.session_state:
+        st.session_state["_sim_result_cache"] = {}
+    return st.session_state["_sim_result_cache"]
 
 
 # ── Iframe card renderer ─────────────────────────────────────────────────────
@@ -568,12 +588,32 @@ with st.expander("📖 How Neural Analysis Works — Framework Logic"):
 # All available props are sent to the engine — no stat-type filtering or
 # intake cap.  The analysis loop will process every prop until all are
 # exhausted, outputting as many high-confidence bets as possible.
-final_props = list(current_props)
+
+# ── Change 9: Smart Prop De-duplication Before Analysis ──────
+# If a user loads props from multiple sources (Prop Scanner + Live Games),
+# duplicate player/stat/line combos will be analyzed twice.  De-dup on
+# (player_name, stat_type, line, platform) before sending to the engine.
+_seen_keys: set = set()
+_deduped_props: list = []
+for _p in current_props:
+    _dk = (
+        (_p.get("player_name") or "").strip().lower(),
+        (_p.get("stat_type") or "").strip().lower(),
+        round(float(_p.get("line", 0) or 0), 1),
+        (_p.get("platform") or "").strip(),
+    )
+    if _dk not in _seen_keys:
+        _seen_keys.add(_dk)
+        _deduped_props.append(_p)
+_dedup_removed = len(current_props) - len(_deduped_props)
+final_props = _deduped_props
 
 st.metric(
     label="⚡ PROPS IN POOL",
     value=f"{len(final_props):,}",
 )
+if _dedup_removed > 0:
+    st.caption(f"🔁 Removed **{_dedup_removed}** duplicate prop(s) across sources.")
 
 # ============================================================
 # END SECTION: Prop Pool
@@ -606,6 +646,10 @@ if run_analysis:
     _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
+
+    # ── Change 8: Incremental rendering placeholder ──────────────
+    # Render each card as it completes instead of waiting for all to finish.
+    _incremental_container = st.container()
 
     # Clear stale Joseph results so fresh ones are generated after this run.
     st.session_state.pop("joseph_results", None)
@@ -827,12 +871,69 @@ if run_analysis:
 
         # ── Analysis proceeds with all available props (no cap) ────
 
+        # ── Change 7: Parallel data pre-fetching ────────────────────
+        # Pre-fetch player bios in parallel so the main loop doesn't
+        # block on I/O for each unmatched player.  Each prop's
+        # simulation is independent, but the loop body accesses
+        # Streamlit session state (not thread-safe), so we parallelise
+        # the pure-I/O pre-fetch step instead of the whole loop.
+        _prefetched_bios: dict = {}
+        _names_to_prefetch = list({
+            p.get("player_name", "") for p in props_to_analyze
+            if p.get("player_name") and not find_player_by_name(players_data, p.get("player_name", ""))
+        })
+        if _names_to_prefetch:
+            try:
+                from data.player_profile_service import get_player_bio as _get_bio
+                _max_workers = min(8, len(_names_to_prefetch))
+                with concurrent.futures.ThreadPoolExecutor(max_workers=_max_workers) as _pool:
+                    _bio_futures = {
+                        _pool.submit(_get_bio, name): name
+                        for name in _names_to_prefetch
+                    }
+                    for _fut in concurrent.futures.as_completed(_bio_futures):
+                        _fname = _bio_futures[_fut]
+                        try:
+                            _prefetched_bios[_fname] = _fut.result()
+                        except Exception:
+                            pass
+            except ImportError:
+                pass  # player_profile_service not available
+
+        # ── Change 10: Initialize simulation result cache ─────────────
+        _sim_cache = _get_sim_cache()
+        _cache_hits = 0
+
         for prop_index, prop in enumerate(props_to_analyze):
             progress_fraction = (prop_index + 1) / total_props_count
             progress_bar.progress(
                 progress_fraction,
                 text=f"Analyzing {prop.get('player_name', 'Player')}… ({prop_index + 1}/{total_props_count})"
             )
+
+            # ── Change 10: Check cache for unchanged props ────────────
+            _cache_k = _prop_cache_key(
+                prop.get("player_name", ""),
+                prop.get("stat_type", ""),
+                float(prop.get("line", 0) or 0),
+                simulation_depth,
+            )
+            _cached_result = _sim_cache.get(_cache_k)
+            if _cached_result is not None:
+                analysis_results_list.append(_cached_result)
+                _cache_hits += 1
+                # ── Change 8: Stream cached result immediately ────────
+                with _incremental_container:
+                    _tier = _cached_result.get("tier", "Bronze")
+                    _pn = _cached_result.get("player_name", "")
+                    _dir = _cached_result.get("direction", "OVER")
+                    _ln = _cached_result.get("line", 0)
+                    _conf = _cached_result.get("confidence_score", 0)
+                    st.caption(
+                        f"{'💎' if _tier == 'Platinum' else '🥇' if _tier == 'Gold' else '🥈' if _tier == 'Silver' else '🥉'} "
+                        f"**{_pn}** — {_dir} {_ln} — SAFE: {_conf:.0f} *(cached)*"
+                    )
+                continue
 
             try:
                 player_name = prop.get("player_name", "")
@@ -920,8 +1021,11 @@ if run_analysis:
                     #     shrinkage toward league priors would move estimates away from it.
                     _pos = "SF"  # default when position is unknown
                     try:
-                        from data.player_profile_service import get_player_bio
-                        _bio = get_player_bio(player_name)
+                        # Use prefetched bio when available (Change 7: parallel pre-fetch)
+                        _bio = _prefetched_bios.get(player_name)
+                        if _bio is None:
+                            from data.player_profile_service import get_player_bio
+                            _bio = get_player_bio(player_name)
                         if _bio.get("position"):
                             _bio_pos = _bio["position"].split("-")[0].strip()
                             _BIO_POS_ALIAS = {"Guard": "PG", "Forward": "SF", "Center": "C"}
@@ -1730,6 +1834,21 @@ if run_analysis:
                     full_result["win_score_label"] = "Error"
 
                 analysis_results_list.append(full_result)
+
+                # ── Change 10: Store in simulation cache ──────────────
+                _sim_cache[_cache_k] = full_result
+
+                # ── Change 8: Stream result immediately ───────────────
+                with _incremental_container:
+                    _tier = full_result.get("tier", "Bronze")
+                    _pn = full_result.get("player_name", "")
+                    _dir_s = full_result.get("direction", "OVER")
+                    _ln_s = full_result.get("line", 0)
+                    _conf_s = full_result.get("confidence_score", 0)
+                    st.caption(
+                        f"{'💎' if _tier == 'Platinum' else '🥇' if _tier == 'Gold' else '🥈' if _tier == 'Silver' else '🥉'} "
+                        f"**{_pn}** — {_dir_s} {_ln_s} — SAFE: {_conf_s:.0f}"
+                    )
             except Exception as _prop_loop_err:
                 _logger.warning(
                     "Prop #%d (%s/%s) analysis failed — skipped: %s",
@@ -1856,9 +1975,10 @@ if run_analysis:
             pass  # Non-fatal — session state still has results
         progress_bar.empty()
         _analysis_elapsed = time.time() - _analysis_start_time
+        _cache_msg = f" ({_cache_hits} cached)" if _cache_hits > 0 else ""
         st.success(
             f"✅ Analysis complete! Analyzed and displaying **{len(_selected_active)}** picks "
-            f"(+ {len(_out_results)} out) in **{_analysis_elapsed:.1f}s**."
+            f"(+ {len(_out_results)} out) in **{_analysis_elapsed:.1f}s**{_cache_msg}."
         )
 
         # ── Store ALL picks to all_analysis_picks table ──────────────
