@@ -1426,11 +1426,21 @@ else:
     )
 
 # ── Joseph's Track Record ───────────────────────────────────
-st.markdown(
-    '<div class="studio-section-title">📊 JOSEPH\'S TRACK RECORD</div>',
-    unsafe_allow_html=True,
-)
-if _BETS_AVAILABLE:
+
+@st.fragment
+def _render_track_record_section():
+    """Track Record fragment — only this section re-renders on filter change."""
+    st.markdown(
+        '<div class="studio-section-title">📊 JOSEPH\'S TRACK RECORD</div>',
+        unsafe_allow_html=True,
+    )
+    if not _BETS_AVAILABLE:
+        st.markdown(
+            render_empty_state("Bet tracking module not available."),
+            unsafe_allow_html=True,
+        )
+        return
+
     # Enhancement 14: Date range filter
     _tr_filter_col1, _tr_filter_col2 = st.columns([3, 1])
     with _tr_filter_col2:
@@ -1544,11 +1554,9 @@ if _BETS_AVAILABLE:
             )
     except Exception:
         pass
-else:
-    st.markdown(
-        render_empty_state("Bet tracking module not available."),
-        unsafe_allow_html=True,
-    )
+
+
+_render_track_record_section()
 
 # ── Joseph's Bet History ─────────────────────────────────────
 st.markdown(
