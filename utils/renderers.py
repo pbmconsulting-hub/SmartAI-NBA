@@ -47,11 +47,13 @@ def _get_joseph_avatar_b64() -> str:
     global _JOSEPH_AVATAR_B64
     if _JOSEPH_AVATAR_B64 is not None:
         return _JOSEPH_AVATAR_B64
-    _candidates = [
-        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "Joseph M Smith Avatar.png"),
-        _os.path.join(_os.getcwd(), "Joseph M Smith Avatar.png"),
-        _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "assets", "Joseph M Smith Avatar.png"),
-    ]
+    _candidates = []
+    for name in ("Joseph M Smith Avatar Victory.png", "Joseph M Smith Avatar.png"):
+        _candidates.extend([
+            _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", name),
+            _os.path.join(_os.getcwd(), name),
+            _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "assets", name),
+        ])
     for path in _candidates:
         norm = _os.path.normpath(path)
         if _os.path.isfile(norm):

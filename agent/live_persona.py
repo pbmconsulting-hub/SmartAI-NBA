@@ -98,6 +98,48 @@ _OVERTIME_ALERT = [
     "🔄 OT! The game won't end and neither will the STRESS!",
 ]
 
+_REDEMPTION_ARC = [
+    "🔁 Joseph was WRONG last time, but that was the right call at the WRONG time! Doubling DOWN!",
+    "🎯 Yesterday's miss? A FLUKE. The process was PERFECT — the basketball gods just weren't listening!",
+    "💪 I missed ONE call and the trolls come out. Watch me REDEEM myself RIGHT NOW!",
+    "🗣️ You think one miss defines Joseph M. Smith? I've been RIGHT more times than you've been ALIVE!",
+    "🔥 The REDEMPTION ARC starts NOW! Yesterday's L is fuel for today's W!",
+    "📈 WRONG once doesn't mean wrong TWICE! The data corrected and so does JOSEPH!",
+]
+
+_RECORD_CHASE = [
+    "📊 RECORD WATCH! He needs just {remaining} more {stat} to hit a SEASON MILESTONE!",
+    "🏆 MILESTONE ALERT! We are {remaining} {stat} away from HISTORY — the narrative is WRITING ITSELF!",
+    "🔥 {remaining} {stat} from a career milestone and the ENTIRE building knows it! FEED HIM!",
+    "📢 The record chase is ON! Only {remaining} {stat} to go — PRESSURE creates DIAMONDS!",
+    "🎯 {remaining} {stat} away from the record! Every possession is a CHANCE at immortality!",
+]
+
+_QUARTER_VOICE = {
+    "Q1": [
+        "📋 First quarter — settling in. Let's see how the matchup develops before I get LOUD.",
+        "🧐 Q1 intel: cautiously optimistic. The game script hasn't revealed itself yet.",
+        "⏳ We're early. The numbers will tell us MORE by halftime — patience is a VIRTUE.",
+    ],
+    "Q2": [
+        "📈 Second quarter — trends are forming. I'm starting to see the PATTERN!",
+        "🔍 Q2 and the rotations are settling. NOW we're getting real data to work with!",
+        "⚡ First half winding down — the stat line is telling us EXACTLY where this is headed!",
+    ],
+    "Q3": [
+        "🔥 Third quarter — THIS is where games are WON or LOST! Let's GO!",
+        "📊 Q3 adjustments are in. The coaching changes tell me EVERYTHING I need to know!",
+        "💪 Second half started and the intensity is UP! The stat line needs to MOVE!",
+    ],
+    "Q4": [
+        "🚨 FOURTH QUARTER! Full PANIC mode! Every possession COUNTS!",
+        "😱 Q4 and I am SWEATING! The clock is the ENEMY now!",
+        "⏰ Final quarter — it's NOW or NEVER! The math says we need a MIRACLE!",
+        "🔴 CRUNCH — I mean, CRITICAL quarter! Do or — I mean, this is IT!",
+        "💀 Fourth quarter and my HEART can't take this! SOMEBODY DO SOMETHING!",
+    ],
+}
+
 
 # ============================================================
 # SECTION: Pillar 4 — LIVE_JOSEPH_PROMPT
@@ -106,7 +148,7 @@ _OVERTIME_ALERT = [
 # ============================================================
 
 # Sub-vibe emotional angles for the roulette
-SUB_VIBE_OPTIONS = ("Rage", "Conspiracy", "Delusional Hype", "Deep Depression")
+SUB_VIBE_OPTIONS = ("Rage", "Conspiracy", "Delusional Hype", "Deep Depression", "Redemption Arc")
 
 LIVE_JOSEPH_PROMPT = """You are Joseph M. Smith — the world's most legendary, \
 unhinged, and PASSIONATE NBA betting analyst. You are commentating LIVE on a \
@@ -191,6 +233,14 @@ SPECIFIC game situation.
    - UNDER: Same energy. "The stat line fell SHORT and the UNDER \
      cashes! BOW DOWN to the KING of props!"
 
+9. **RECORD_CHASE** (player needs X more stats for a season milestone)
+   - OVER: Feed the narrative! "This man is chasing HISTORY and \
+     you think he's going to STOP NOW?! The record is within \
+     REACH and NOTHING can stop destiny!"
+   - UNDER: Narrative concern. "Everyone wants the milestone story \
+     but what if the defense SELLS OUT to stop it? Record chases \
+     create PRESSURE and pressure creates BRICKS!"
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎰 SUB-VIBE EMOTIONAL ROULETTE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -203,6 +253,9 @@ angles and commit to it fully:
   to ever live and nothing can stop them.
 - **Deep Depression**: All hope is lost. The universe is cruel. \
   Your bankroll is doomed.
+- **Redemption Arc**: Joseph was WRONG last time, but he doubles \
+  down claiming it was the right call at the wrong time. Turn the \
+  miss into motivation and come back STRONGER.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 OUTPUT FORMAT (STRICT JSON)
@@ -295,9 +348,32 @@ def get_joseph_live_reaction(pace_result: dict) -> str:
     on_pace = pace_result.get("on_pace", False)
     direction = str(pace_result.get("direction", "OVER")).upper()
     is_ot = pace_result.get("is_overtime", False)
+    record_chase = pace_result.get("record_chase", False)
+    record_remaining = pace_result.get("record_remaining", 0)
+    record_stat = pace_result.get("record_stat", "stats")
+    quarter = str(pace_result.get("quarter", "")).upper().strip()
+    is_redemption = pace_result.get("is_redemption", False)
 
     # OT notice (prepend to reaction if in overtime)
     ot_prefix = random.choice(_OVERTIME_ALERT) + " " if is_ot else ""
+
+    # Quarter-specific voice prefix (Q1 = cautious, Q4 = full panic)
+    quarter_prefix = ""
+    if quarter in _QUARTER_VOICE and not cashed and not is_ot:
+        quarter_prefix = random.choice(_QUARTER_VOICE[quarter]) + " "
+
+    # Redemption arc — Joseph doubles down after a miss
+    if is_redemption and not cashed:
+        return quarter_prefix + random.choice(_REDEMPTION_ARC)
+
+    # Record chase state — narrative urgency
+    if record_chase and not cashed:
+        template = random.choice(_RECORD_CHASE)
+        try:
+            msg = template.format(remaining=record_remaining, stat=record_stat)
+        except (KeyError, IndexError):
+            msg = template
+        return quarter_prefix + msg
 
     # Priority order: cashed > blowout > foul > on_pace > behind
     if cashed:
@@ -306,21 +382,21 @@ def get_joseph_live_reaction(pace_result: dict) -> str:
     if direction == "UNDER":
         if blowout:
             # Blowout is actually GOOD for under bets (starters pulled)
-            return ot_prefix + random.choice(_UNDER_ON_PACE_VIBES)
+            return ot_prefix + quarter_prefix + random.choice(_UNDER_ON_PACE_VIBES)
         if foul:
-            return ot_prefix + random.choice(_UNDER_ON_PACE_VIBES)
+            return ot_prefix + quarter_prefix + random.choice(_UNDER_ON_PACE_VIBES)
         if on_pace:
-            return ot_prefix + random.choice(_UNDER_ON_PACE_VIBES)
-        return ot_prefix + random.choice(_UNDER_LOSING_WORRY)
+            return ot_prefix + quarter_prefix + random.choice(_UNDER_ON_PACE_VIBES)
+        return ot_prefix + quarter_prefix + random.choice(_UNDER_LOSING_WORRY)
 
     # OVER direction
     if blowout:
-        return ot_prefix + random.choice(_BLOWOUT_SCREAMS)
+        return ot_prefix + quarter_prefix + random.choice(_BLOWOUT_SCREAMS)
     if foul:
-        return ot_prefix + random.choice(_FOUL_RANTS)
+        return ot_prefix + quarter_prefix + random.choice(_FOUL_RANTS)
     if on_pace:
-        return ot_prefix + random.choice(_ON_PACE_VIBES)
-    return ot_prefix + random.choice(_BEHIND_PACE_WORRY)
+        return ot_prefix + quarter_prefix + random.choice(_ON_PACE_VIBES)
+    return ot_prefix + quarter_prefix + random.choice(_BEHIND_PACE_WORRY)
 
 
 # ── Typing delay (seconds per character) for st.write_stream ──
