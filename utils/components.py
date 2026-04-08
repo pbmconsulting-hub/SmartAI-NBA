@@ -225,12 +225,29 @@ def _inject_session_keepalive():
                     }
                 });
             }
-            /* Run once and observe DOM mutations */
+            /* Run once and observe DOM mutations — scoped to the
+               header element for performance (avoids monitoring the
+               entire body subtree). Falls back to body childList-only
+               if the header is not yet rendered. */
             ensureSidebarToggle();
-            var obs = new MutationObserver(function() {
-                ensureSidebarToggle();
-            });
-            obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-expanded'] });
+            var headerEl = document.querySelector('header[data-testid="stHeader"]');
+            if (headerEl) {
+                var obs = new MutationObserver(function() { ensureSidebarToggle(); });
+                obs.observe(headerEl, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-expanded'] });
+            } else {
+                /* Header not yet in DOM — watch body childList only
+                   (lightweight) until we can scope to the header. */
+                var bodyObs = new MutationObserver(function() {
+                    var h = document.querySelector('header[data-testid="stHeader"]');
+                    if (h) {
+                        bodyObs.disconnect();
+                        var obs2 = new MutationObserver(function() { ensureSidebarToggle(); });
+                        obs2.observe(h, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'aria-expanded'] });
+                    }
+                    ensureSidebarToggle();
+                });
+                bodyObs.observe(document.body, { childList: true, subtree: true });
+            }
 
             /* Also run on resize in case the user rotates their phone */
             window.addEventListener('resize', ensureSidebarToggle);
