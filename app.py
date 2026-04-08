@@ -52,31 +52,96 @@ def _load_logo_b64(path: str) -> str:
 st.markdown("""
 <style>
 /* ═══════════════════════════════════════════════════════════
+   LANDING PAGE — Master Animations
+   ═══════════════════════════════════════════════════════════ */
+@keyframes lpFadeInUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes lpSlideInLeft {
+    from { opacity: 0; transform: translateX(-24px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes amberPulse {
+    0%, 100% { border-color: rgba(255,165,0,0.18); box-shadow: 0 0 12px rgba(255,165,0,0.04); }
+    50%      { border-color: rgba(255,165,0,0.55); box-shadow: 0 0 22px rgba(255,165,0,0.12); }
+}
+@keyframes breatheGlow {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,240,255,0.18), 0 0 60px rgba(0,240,255,0.05); }
+    50%      { box-shadow: 0 0 35px rgba(0,240,255,0.35), 0 0 80px rgba(0,240,255,0.10); }
+}
+@keyframes goldBreathe {
+    0%, 100% { box-shadow: 0 0 14px rgba(255,215,0,0.20); }
+    50%      { box-shadow: 0 0 28px rgba(255,215,0,0.45); }
+}
+@keyframes numberGlow {
+    0%, 100% { text-shadow: 0 0 8px rgba(0,240,255,0.30); }
+    50%      { text-shadow: 0 0 20px rgba(0,240,255,0.60), 0 0 40px rgba(0,240,255,0.20); }
+}
+@keyframes connectorFlow {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+@keyframes scanLine {
+    0%   { top: -2px; }
+    100% { top: 100%; }
+}
+
+/* ── Staggered entrance helper classes ────────────────────── */
+.lp-anim { animation: lpFadeInUp 0.6s cubic-bezier(0.22,1,0.36,1) both; }
+.lp-anim-d1 { animation-delay: 0.08s; }
+.lp-anim-d2 { animation-delay: 0.16s; }
+.lp-anim-d3 { animation-delay: 0.24s; }
+.lp-anim-d4 { animation-delay: 0.32s; }
+.lp-anim-d5 { animation-delay: 0.40s; }
+.lp-anim-d6 { animation-delay: 0.48s; }
+
+/* ═══════════════════════════════════════════════════════════
+   Gradient Divider (replaces plain st.divider)
+   ═══════════════════════════════════════════════════════════ */
+.lp-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,240,255,0.18) 20%, rgba(200,0,255,0.12) 80%, transparent);
+    border: none;
+    margin: 32px 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
    Hero HUD: Glassmorphic, Responsive Flexbox
    ═══════════════════════════════════════════════════════════ */
 .hero-hud {
-    background: rgba(15,23,42,0.50);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 16px;
-    padding: 32px 40px;
-    margin-bottom: 24px;
-    box-shadow: 0 0 40px rgba(0,240,255,0.06), 0 8px 32px rgba(0,0,0,0.45);
+    background: linear-gradient(135deg, rgba(15,23,42,0.60) 0%, rgba(10,15,30,0.70) 100%);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 20px;
+    padding: 36px 44px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 50px rgba(0,240,255,0.06), 0 12px 40px rgba(0,0,0,0.50);
     position: relative;
     overflow: hidden;
     display: flex;
     align-items: center;
-    gap: 28px;
+    gap: 32px;
 }
-/* Rainbow accent bar at top */
+/* Animated rainbow accent bar */
 .hero-hud::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #00f0ff, #00ff9d, #FFD700, #c800ff, #00f0ff);
-    background-size: 200% 100%;
-    animation: headerShimmer 4s ease infinite;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #FFD700, #c800ff, #ff5e00, #00f0ff);
+    background-size: 300% 100%;
+    animation: headerShimmer 6s ease infinite;
+}
+/* Subtle scan line overlay */
+.hero-hud::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,240,255,0.06), transparent);
+    animation: scanLine 4s linear infinite;
+    pointer-events: none;
 }
 .hero-hud-text { flex: 1; min-width: 0; }
 .hero-tagline {
@@ -87,19 +152,20 @@ st.markdown("""
     letter-spacing: 0.04em;
     margin: 0;
     line-height: 1.3;
+    text-shadow: 0 0 30px rgba(0,240,255,0.15);
 }
 .hero-subtext {
-    font-size: clamp(0.82rem, 1.2vw, 0.95rem);
-    color: rgba(255,255,255,0.80);
+    font-size: clamp(0.85rem, 1.3vw, 1rem);
+    color: rgba(255,255,255,0.82);
     font-family: 'Inter', -apple-system, sans-serif;
-    letter-spacing: 0.02em;
-    margin-top: 10px;
-    line-height: 1.5;
+    letter-spacing: 0.015em;
+    margin-top: 12px;
+    line-height: 1.55;
 }
 .hero-date {
     font-size: 0.82rem;
-    color: rgba(148,163,184,0.80);
-    margin-top: 10px;
+    color: rgba(148,163,184,0.75);
+    margin-top: 12px;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.03em;
@@ -110,15 +176,20 @@ st.markdown("""
     height: auto;
     object-fit: contain;
     border-radius: 50%;
-    box-shadow: 0 0 18px rgba(0,240,255,0.30);
+    box-shadow: 0 0 24px rgba(0,240,255,0.30);
     flex-shrink: 0;
+    animation: breatheGlow 3s ease-in-out infinite;
 }
 /* Responsive: stack on mobile */
 @media (max-width: 640px) {
-    .hero-hud { flex-direction: column; text-align: center; padding: 24px 20px; }
+    .hero-hud { flex-direction: column; text-align: center; padding: 28px 20px; gap: 20px; }
     .spp-hero-logo { width: 88px !important; max-width: 100%; }
+    .hero-tagline { font-size: 1.3rem; }
 }
-/* Status card — dark glass panel */
+
+/* ═══════════════════════════════════════════════════════════
+   Status card — dark glass panel
+   ═══════════════════════════════════════════════════════════ */
 .status-card {
     background: rgba(15,23,42,0.50);
     border: 1px solid rgba(255,255,255,0.05);
@@ -128,12 +199,12 @@ st.markdown("""
     box-shadow: 0 0 16px rgba(0,240,255,0.04), 0 4px 16px rgba(0,0,0,0.30);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .status-card:hover {
-    border-color: rgba(0,240,255,0.20);
-    transform: translateY(-3px);
-    box-shadow: 0 0 24px rgba(0,240,255,0.10), 0 6px 20px rgba(0,0,0,0.40);
+    border-color: rgba(0,240,255,0.22);
+    transform: translateY(-4px);
+    box-shadow: 0 0 28px rgba(0,240,255,0.12), 0 8px 24px rgba(0,0,0,0.45);
 }
 .status-card-value {
     font-size: 2rem;
@@ -150,7 +221,10 @@ st.markdown("""
     margin-top: 4px;
     font-family: 'Inter', sans-serif;
 }
-/* Tonight's slate team chips */
+
+/* ═══════════════════════════════════════════════════════════
+   Team chips + badges
+   ═══════════════════════════════════════════════════════════ */
 .team-chip {
     display: inline-block;
     background: rgba(0,240,255,0.05);
@@ -164,7 +238,6 @@ st.markdown("""
     transition: border-color 0.2s ease;
 }
 .team-chip:hover { border-color: rgba(0,240,255,0.25); }
-/* LIVE badge with "The Pulse" dot built in */
 .live-badge {
     display: inline-flex;
     align-items: center;
@@ -199,102 +272,132 @@ st.markdown("""
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Joseph Welcome Card
+   Joseph Welcome Card — with gold accent glow
    ═══════════════════════════════════════════════════════════ */
 .joseph-welcome-card {
-    background: rgba(15,23,42,0.55);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px;
-    padding: 24px 28px;
-    margin: 12px 0 24px 0;
-    box-shadow: 0 0 30px rgba(0,240,255,0.05), 0 6px 24px rgba(0,0,0,0.35);
+    background: linear-gradient(135deg, rgba(20,15,8,0.65) 0%, rgba(15,23,42,0.55) 100%);
+    backdrop-filter: blur(22px);
+    -webkit-backdrop-filter: blur(22px);
+    border: 1px solid rgba(255,215,0,0.10);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin: 8px 0 20px 0;
+    box-shadow: 0 0 40px rgba(255,215,0,0.04), 0 8px 28px rgba(0,0,0,0.40);
     display: flex;
     align-items: flex-start;
-    gap: 20px;
+    gap: 22px;
     position: relative;
     overflow: hidden;
 }
 .joseph-welcome-card::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, #FFD700, #ff5e00, #c800ff);
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, transparent, #FFD700 30%, #ff5e00 70%, transparent);
     background-size: 200% 100%;
     animation: headerShimmer 5s ease infinite;
 }
 .joseph-welcome-avatar {
-    width: 56px; height: 56px;
+    width: 64px; height: 64px;
     border-radius: 50%;
     object-fit: cover;
-    box-shadow: 0 0 12px rgba(255,215,0,0.25);
+    box-shadow: 0 0 18px rgba(255,215,0,0.30);
     flex-shrink: 0;
+    border: 2px solid rgba(255,215,0,0.25);
+    animation: goldBreathe 3s ease-in-out infinite;
 }
 .joseph-welcome-text {
     flex: 1;
     min-width: 0;
 }
 .joseph-welcome-name {
-    font-size: 0.78rem;
+    font-size: 0.72rem;
     color: #FFD700;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 6px;
-    font-family: 'Inter', sans-serif;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
 }
 .joseph-welcome-msg {
     font-size: 0.95rem;
     color: rgba(255,255,255,0.88);
-    line-height: 1.6;
+    line-height: 1.65;
     font-style: italic;
     font-family: 'Inter', -apple-system, sans-serif;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Pillar Cards (Three-column feature cards)
+   Pillar Cards — color-coded top accents
    ═══════════════════════════════════════════════════════════ */
 .pillar-card {
     background: rgba(15,23,42,0.55);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
     border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 14px;
-    padding: 28px 24px;
-    box-shadow: 0 0 24px rgba(0,240,255,0.04), 0 6px 20px rgba(0,0,0,0.35);
-    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+    border-radius: 16px;
+    padding: 0;
+    box-shadow: 0 0 28px rgba(0,240,255,0.04), 0 8px 24px rgba(0,0,0,0.38);
+    transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
     height: 100%;
+    overflow: hidden;
+    position: relative;
 }
 .pillar-card:hover {
-    border-color: rgba(0,240,255,0.18);
-    transform: translateY(-4px);
-    box-shadow: 0 0 32px rgba(0,240,255,0.08), 0 8px 28px rgba(0,0,0,0.45);
+    transform: translateY(-6px);
+    box-shadow: 0 0 40px rgba(0,240,255,0.10), 0 12px 36px rgba(0,0,0,0.50);
+}
+.pillar-card .pillar-accent {
+    height: 4px;
+    width: 100%;
+}
+.pillar-card.accent-cyan .pillar-accent  { background: linear-gradient(90deg, #00f0ff, #00c8ff); }
+.pillar-card.accent-cyan:hover           { border-color: rgba(0,240,255,0.25); }
+.pillar-card.accent-green .pillar-accent { background: linear-gradient(90deg, #00ff9d, #00d4ff); }
+.pillar-card.accent-green:hover          { border-color: rgba(0,255,157,0.25); }
+.pillar-card.accent-gold .pillar-accent  { background: linear-gradient(90deg, #FFD700, #ff5e00); }
+.pillar-card.accent-gold:hover           { border-color: rgba(255,215,0,0.25); }
+.pillar-card-inner {
+    padding: 28px 24px;
 }
 .pillar-icon {
-    font-size: 2rem;
-    margin-bottom: 10px;
-}
-.pillar-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #00f0ff;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
+    font-size: 2.2rem;
     margin-bottom: 12px;
+    display: inline-block;
+}
+.pillar-icon-halo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    margin-bottom: 14px;
+}
+.accent-cyan .pillar-icon-halo  { background: rgba(0,240,255,0.08); }
+.accent-green .pillar-icon-halo { background: rgba(0,255,157,0.08); }
+.accent-gold .pillar-icon-halo  { background: rgba(255,215,0,0.08); }
+.pillar-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 10px;
     font-family: 'JetBrains Mono', monospace;
 }
+.accent-cyan .pillar-title  { color: #00f0ff; }
+.accent-green .pillar-title { color: #00ff9d; }
+.accent-gold .pillar-title  { color: #FFD700; }
 .pillar-subtitle {
     font-size: 1.1rem;
     font-weight: 700;
-    color: rgba(255,255,255,0.92);
-    margin-bottom: 14px;
+    color: rgba(255,255,255,0.94);
+    margin-bottom: 16px;
     line-height: 1.35;
 }
 .pillar-body {
-    font-size: 0.85rem;
-    color: rgba(255,255,255,0.72);
-    line-height: 1.65;
+    font-size: 0.84rem;
+    color: rgba(255,255,255,0.70);
+    line-height: 1.7;
 }
 .pillar-body ul {
     list-style: none;
@@ -302,7 +405,7 @@ st.markdown("""
     margin: 10px 0;
 }
 .pillar-body ul li {
-    padding: 3px 0;
+    padding: 4px 0;
     color: rgba(255,255,255,0.78);
 }
 .pillar-body ul li::before {
@@ -311,92 +414,146 @@ st.markdown("""
     font-weight: 700;
 }
 .pillar-footer {
-    font-size: 0.78rem;
-    color: #94A3B8;
-    margin-top: 16px;
-    padding-top: 12px;
+    font-size: 0.76rem;
+    color: rgba(148,163,184,0.70);
+    margin-top: 18px;
+    padding-top: 14px;
     border-top: 1px solid rgba(255,255,255,0.05);
     font-style: italic;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Metric Proof Cards
+   Metric Proof Cards — animated number glow
    ═══════════════════════════════════════════════════════════ */
 .proof-card {
     background: rgba(15,23,42,0.50);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 20px 16px;
+    border-radius: 14px;
+    padding: 24px 16px;
     text-align: center;
-    box-shadow: 0 0 16px rgba(0,240,255,0.04), 0 4px 16px rgba(0,0,0,0.30);
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    box-shadow: 0 0 20px rgba(0,240,255,0.04), 0 6px 20px rgba(0,0,0,0.32);
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+    overflow: hidden;
 }
+.proof-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+}
+.proof-card:nth-child(1)::before { background: linear-gradient(90deg, #00f0ff, #0088ff); }
+.proof-card:nth-child(2)::before { background: linear-gradient(90deg, #c800ff, #ff5e00); }
+.proof-card:nth-child(3)::before { background: linear-gradient(90deg, #00ff9d, #00f0ff); }
+.proof-card:nth-child(4)::before { background: linear-gradient(90deg, #FFD700, #ff5e00); }
+.proof-card:nth-child(5)::before { background: linear-gradient(90deg, #ff5e00, #c800ff); }
 .proof-card:hover {
-    border-color: rgba(0,240,255,0.18);
-    transform: translateY(-3px);
+    border-color: rgba(0,240,255,0.20);
+    transform: translateY(-5px);
+    box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 8px 28px rgba(0,0,0,0.42);
 }
 .proof-card-number {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     font-weight: 800;
     color: #00f0ff;
     font-family: 'Orbitron', 'JetBrains Mono', monospace;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
+    animation: numberGlow 3s ease-in-out infinite;
 }
 .proof-card-label {
-    font-size: 0.72rem;
+    font-size: 0.70rem;
     color: #94A3B8;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    line-height: 1.4;
+    letter-spacing: 1.1px;
+    line-height: 1.45;
     font-family: 'Inter', sans-serif;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Pipeline Steps
+   Pipeline Steps — connected flow
    ═══════════════════════════════════════════════════════════ */
+.pipeline-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 8px 0;
+}
 .pipeline-step {
-    background: rgba(15,23,42,0.45);
+    background: rgba(15,23,42,0.50);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 16px 14px;
+    border-radius: 14px;
+    padding: 18px 16px;
     text-align: center;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    flex: 1;
+    min-width: 0;
 }
 .pipeline-step.done {
     border-color: rgba(0,255,157,0.30);
-    box-shadow: 0 0 18px rgba(0,255,157,0.08);
+    box-shadow: 0 0 22px rgba(0,255,157,0.08);
 }
 .pipeline-step.pending {
-    border-color: rgba(255,165,0,0.30);
-    box-shadow: 0 0 18px rgba(255,165,0,0.06);
-    animation: amberPulse 2s ease-in-out infinite;
+    border-color: rgba(255,165,0,0.25);
+    animation: amberPulse 2.5s ease-in-out infinite;
 }
-@keyframes amberPulse {
-    0%, 100% { border-color: rgba(255,165,0,0.20); }
-    50% { border-color: rgba(255,165,0,0.50); }
+.pipeline-step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    font-size: 0.78rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
 }
-.pipeline-step-icon {
-    font-size: 1.4rem;
-    margin-bottom: 6px;
+.pipeline-step.done .pipeline-step-num {
+    background: rgba(0,255,157,0.12);
+    color: #00ff9d;
+    border: 1px solid rgba(0,255,157,0.30);
+}
+.pipeline-step.pending .pipeline-step-num {
+    background: rgba(255,165,0,0.10);
+    color: #FFA500;
+    border: 1px solid rgba(255,165,0,0.25);
 }
 .pipeline-step-label {
     font-size: 0.72rem;
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.88);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.8px;
 }
 .pipeline-step-status {
     font-size: 0.72rem;
-    margin-top: 6px;
+    margin-top: 8px;
     font-family: 'JetBrains Mono', monospace;
 }
 .pipeline-step-status.green { color: #00ff9d; }
 .pipeline-step-status.amber { color: #FFA500; }
+.pipeline-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    flex-shrink: 0;
+    position: relative;
+}
+.pipeline-connector::before {
+    content: '';
+    width: 100%;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0px, rgba(255,255,255,0.10) 4px, transparent 4px, transparent 8px);
+}
+.pipeline-connector.active::before {
+    background: linear-gradient(90deg, rgba(0,255,157,0.40), rgba(0,240,255,0.40));
+    background-size: 200% 100%;
+    animation: connectorFlow 2s linear infinite;
+}
+/* Compat: keep old class for arrow fallback */
 .pipeline-arrow {
     display: flex;
     align-items: center;
@@ -407,147 +564,236 @@ st.markdown("""
 }
 
 /* ═══════════════════════════════════════════════════════════
-   How It Works Pipeline
+   How It Works Pipeline — horizontal flow
    ═══════════════════════════════════════════════════════════ */
 .hiw-stage {
-    background: rgba(15,23,42,0.40);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(15,23,42,0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 18px 14px;
+    border-radius: 14px;
+    padding: 22px 16px;
     text-align: center;
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+.hiw-stage::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, rgba(0,240,255,0.20), rgba(200,0,255,0.15));
 }
 .hiw-stage:hover {
-    border-color: rgba(0,240,255,0.15);
-    transform: translateY(-2px);
+    border-color: rgba(0,240,255,0.18);
+    transform: translateY(-4px);
+    box-shadow: 0 0 24px rgba(0,240,255,0.08);
 }
-.hiw-stage-icon { font-size: 1.6rem; margin-bottom: 8px; }
+.hiw-stage-icon { font-size: 1.8rem; margin-bottom: 10px; }
 .hiw-stage-title {
-    font-size: 0.7rem;
+    font-size: 0.68rem;
     font-weight: 700;
     color: #00f0ff;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-bottom: 8px;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
     font-family: 'JetBrains Mono', monospace;
 }
 .hiw-stage-desc {
     font-size: 0.78rem;
-    color: rgba(255,255,255,0.70);
+    color: rgba(255,255,255,0.68);
     line-height: 1.55;
+}
+.hiw-connector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+.hiw-connector::before {
+    content: '';
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(0,240,255,0.15), rgba(200,0,255,0.10));
+    background-size: 200% 100%;
+    animation: connectorFlow 3s linear infinite;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   App Map Nav Cards
+   App Map Nav Cards — category colored
    ═══════════════════════════════════════════════════════════ */
 .nav-card {
     background: rgba(15,23,42,0.50);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 12px;
-    padding: 16px 14px;
+    border-radius: 14px;
+    padding: 18px 14px;
     text-align: center;
     cursor: pointer;
-    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.22,1,0.36,1);
     height: 100%;
+    position: relative;
+    overflow: hidden;
 }
+.nav-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+}
+.nav-card.cat-workflow::before { background: linear-gradient(90deg, #00f0ff, #0088ff); }
+.nav-card.cat-analysis::before { background: linear-gradient(90deg, #c800ff, #ff5e00); }
+.nav-card.cat-manage::before  { background: linear-gradient(90deg, #00ff9d, #00d4ff); }
 .nav-card:hover {
-    border-color: rgba(0,240,255,0.25);
-    transform: translateY(-3px);
-    box-shadow: 0 0 20px rgba(0,240,255,0.08);
+    border-color: rgba(0,240,255,0.22);
+    transform: translateY(-5px) scale(1.02);
+    box-shadow: 0 0 24px rgba(0,240,255,0.10), 0 8px 24px rgba(0,0,0,0.40);
 }
-.nav-card-icon { font-size: 1.5rem; margin-bottom: 8px; }
+.nav-card-icon {
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    transition: transform 0.3s ease;
+}
+.nav-card:hover .nav-card-icon { transform: scale(1.15); }
 .nav-card-title {
     font-size: 0.82rem;
     font-weight: 700;
-    color: rgba(255,255,255,0.90);
+    color: rgba(255,255,255,0.92);
     margin-bottom: 6px;
 }
 .nav-card-desc {
     font-size: 0.70rem;
     color: #94A3B8;
-    line-height: 1.4;
+    line-height: 1.45;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Section Headers
+   Section Headers — with accent line
    ═══════════════════════════════════════════════════════════ */
 .section-header {
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    font-size: clamp(1.15rem, 2.2vw, 1.6rem);
     font-weight: 800;
-    color: rgba(255,255,255,0.92);
+    color: rgba(255,255,255,0.94);
     font-family: 'Orbitron', 'Inter', sans-serif;
-    margin: 36px 0 8px 0;
+    margin: 40px 0 6px 0;
     letter-spacing: 0.03em;
+    position: relative;
+    padding-bottom: 12px;
+}
+.section-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 48px; height: 3px;
+    background: linear-gradient(90deg, #00f0ff, #c800ff);
+    border-radius: 2px;
 }
 .section-subheader {
     font-size: 0.88rem;
     color: #94A3B8;
-    margin-bottom: 20px;
-    line-height: 1.5;
+    margin-bottom: 24px;
+    line-height: 1.55;
+    margin-top: 4px;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Comparison Table
+   Comparison Table — highlight SPP column
    ═══════════════════════════════════════════════════════════ */
 .comp-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    background: rgba(15,23,42,0.40);
-    border-radius: 12px;
+    background: rgba(15,23,42,0.45);
+    border-radius: 14px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.05);
-    margin: 16px 0 24px 0;
+    border: 1px solid rgba(255,255,255,0.06);
+    margin: 20px 0 24px 0;
 }
 .comp-table th {
-    background: rgba(0,240,255,0.06);
-    color: rgba(255,255,255,0.90);
-    font-size: 0.72rem;
+    color: rgba(255,255,255,0.92);
+    font-size: 0.70rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    padding: 12px 14px;
+    letter-spacing: 1.1px;
+    padding: 14px 16px;
     text-align: left;
     font-family: 'JetBrains Mono', monospace;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 2px solid rgba(255,255,255,0.06);
+}
+.comp-table th:nth-child(1) { background: rgba(0,240,255,0.05); }
+.comp-table th:nth-child(2),
+.comp-table th:nth-child(3) { background: rgba(255,255,255,0.02); }
+.comp-table th:nth-child(4) {
+    background: linear-gradient(135deg, rgba(0,255,157,0.08), rgba(0,240,255,0.06));
+    color: #00ff9d;
 }
 .comp-table td {
-    padding: 10px 14px;
+    padding: 11px 16px;
     font-size: 0.80rem;
-    color: rgba(255,255,255,0.78);
+    color: rgba(255,255,255,0.72);
     border-bottom: 1px solid rgba(255,255,255,0.03);
     vertical-align: top;
+}
+.comp-table tr:nth-child(even) td {
+    background: rgba(255,255,255,0.015);
+}
+.comp-table tr:hover td {
+    background: rgba(0,240,255,0.03);
 }
 .comp-table tr:last-child td { border-bottom: none; }
 .comp-table .spp-col {
     color: #00ff9d;
     font-weight: 600;
+    background: rgba(0,255,157,0.03);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   Matchup card (enhanced slate)
+   Matchup chips — enhanced
    ═══════════════════════════════════════════════════════════ */
 .matchup-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    background: rgba(15,23,42,0.50);
+    gap: 8px;
+    background: rgba(15,23,42,0.55);
     border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 10px 16px;
+    border-radius: 12px;
+    padding: 12px 18px;
     margin: 4px;
-    transition: border-color 0.2s ease;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
 }
-.matchup-chip:hover { border-color: rgba(0,240,255,0.20); }
+.matchup-chip::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, rgba(200,0,255,0.30), rgba(0,240,255,0.30));
+}
+.matchup-chip:hover {
+    border-color: rgba(0,240,255,0.20);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+}
 .matchup-meta {
     font-size: 0.70rem;
     color: #94A3B8;
-    margin-top: 2px;
+    margin-top: 3px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Category label for nav rows
+   ═══════════════════════════════════════════════════════════ */
+.nav-row-label {
+    font-size: 0.70rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 20px 0 10px 4px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.nav-row-label.workflow { color: #00f0ff; }
+.nav-row-label.analysis { color: #c800ff; }
+.nav-row-label.manage   { color: #00ff9d; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -712,7 +958,7 @@ _logo_img_tag = (
 )
 
 st.markdown(f"""
-<div class="hero-hud ss-fade-in-up">
+<div class="hero-hud lp-anim">
   {_logo_img_tag}
   <div class="hero-hud-text">
     <div class="hero-tagline">THE SMARTEST NBA PLAYER PROP ENGINE ONLINE</div>
@@ -846,7 +1092,7 @@ else:
     )
 
 st.markdown(f"""
-<div class="joseph-welcome-card ss-fade-in-up">
+<div class="joseph-welcome-card lp-anim lp-anim-d1">
   {_joseph_avatar_tag}
   <div class="joseph-welcome-text">
     <div class="joseph-welcome-name">🎙️ Joseph M. Smith — AI Analyst</div>
@@ -864,7 +1110,7 @@ st.markdown(f"""
 # ============================================================
 
 st.markdown("""
-<div class="section-header">Most Prop Tools Give You a Number. We Give You the Proof.</div>
+<div class="section-header lp-anim lp-anim-d2">Most Prop Tools Give You a Number. We Give You the Proof.</div>
 <div class="section-subheader">Three things no other prop tool on the internet can match.</div>
 """, unsafe_allow_html=True)
 
@@ -873,83 +1119,92 @@ _p1, _p2, _p3 = st.columns(3)
 
 with _p1:
     st.markdown("""
-    <div class="pillar-card">
-      <div class="pillar-icon">🎲</div>
-      <div class="pillar-title">Quantum Matrix Engine</div>
-      <div class="pillar-subtitle">Thousands of Simulated Games Per Prop</div>
-      <div class="pillar-body">
-        Every prop runs through thousands of simulated game scenarios — randomized
-        minutes, game flow, momentum swings, and real-world chaos.
-        <br><br>
-        The result: a probability distribution built from YOUR player in TONIGHT'S
-        specific matchup — not a generic average.
-        <br><br>
-        <strong>You choose the depth:</strong>
-        <ul>
-          <li>⚡ Fast (seconds)</li>
-          <li>🎯 Standard (recommended)</li>
-          <li>🔬 Deep Scan (maximum accuracy)</li>
-        </ul>
-        <ul>
-          <li>Percentile ranges (10th–90th)</li>
-          <li>Probability gauges</li>
-          <li>Confidence intervals</li>
-          <li>Distribution histograms</li>
-        </ul>
+    <div class="pillar-card accent-cyan lp-anim lp-anim-d2">
+      <div class="pillar-accent"></div>
+      <div class="pillar-card-inner">
+        <div class="pillar-icon-halo"><span class="pillar-icon">🎲</span></div>
+        <div class="pillar-title">Quantum Matrix Engine</div>
+        <div class="pillar-subtitle">Thousands of Simulated Games Per Prop</div>
+        <div class="pillar-body">
+          Every prop runs through thousands of simulated game scenarios — randomized
+          minutes, game flow, momentum swings, and real-world chaos.
+          <br><br>
+          The result: a probability distribution built from YOUR player in TONIGHT'S
+          specific matchup — not a generic average.
+          <br><br>
+          <strong>You choose the depth:</strong>
+          <ul>
+            <li>⚡ Fast (seconds)</li>
+            <li>🎯 Standard (recommended)</li>
+            <li>🔬 Deep Scan (maximum accuracy)</li>
+          </ul>
+          <ul>
+            <li>Percentile ranges (10th–90th)</li>
+            <li>Probability gauges</li>
+            <li>Confidence intervals</li>
+            <li>Distribution histograms</li>
+          </ul>
+        </div>
+        <div class="pillar-footer">Other tools: one number. No context.</div>
       </div>
-      <div class="pillar-footer">Other tools: one number. No context.</div>
     </div>
     """, unsafe_allow_html=True)
 
 with _p2:
     st.markdown("""
-    <div class="pillar-card">
-      <div class="pillar-icon">🔬</div>
-      <div class="pillar-title">Force Analysis</div>
-      <div class="pillar-subtitle">Every Pick Tells You WHY</div>
-      <div class="pillar-body">
-        Every prop shows the exact factors pushing performance UP or DOWN:
-        <br><br>
-        ✅ Matchup quality<br>
-        ✅ Game environment &amp; pace<br>
-        ✅ Rest &amp; fatigue impact<br>
-        ✅ Blowout / garbage time risk<br>
-        ✅ Market consensus signals<br>
-        ✅ Trend &amp; regression detection
-        <br><br>
-        Plus our proprietary <strong>Trap Line Detection</strong> system that catches lines
-        designed to bait public money on the wrong side.
-        <br><br>
-        You see OVER forces vs UNDER forces, each with a strength rating.
-        No black box. Full transparency.
+    <div class="pillar-card accent-green lp-anim lp-anim-d3">
+      <div class="pillar-accent"></div>
+      <div class="pillar-card-inner">
+        <div class="pillar-icon-halo"><span class="pillar-icon">🔬</span></div>
+        <div class="pillar-title">Force Analysis</div>
+        <div class="pillar-subtitle">Every Pick Tells You WHY</div>
+        <div class="pillar-body">
+          Every prop shows the exact factors pushing performance UP or DOWN:
+          <br><br>
+          ✅ Matchup quality<br>
+          ✅ Game environment &amp; pace<br>
+          ✅ Rest &amp; fatigue impact<br>
+          ✅ Blowout / garbage time risk<br>
+          ✅ Market consensus signals<br>
+          ✅ Trend &amp; regression detection
+          <br><br>
+          Plus our proprietary <strong>Trap Line Detection</strong> system that catches lines
+          designed to bait public money on the wrong side.
+          <br><br>
+          You see OVER forces vs UNDER forces, each with a strength rating.
+          No black box. Full transparency.
+        </div>
+        <div class="pillar-footer">Other tools: "63% confidence." That's it.</div>
       </div>
-      <div class="pillar-footer">Other tools: "63% confidence." That's it.</div>
     </div>
     """, unsafe_allow_html=True)
 
 with _p3:
     st.markdown("""
-    <div class="pillar-card">
-      <div class="pillar-icon">🏆</div>
-      <div class="pillar-title">SAFE Score™</div>
-      <div class="pillar-subtitle">Institutional-Grade Scoring</div>
-      <div class="pillar-body">
-        <em>Statistical Analysis of Force &amp; Edge</em>
-        <br><br>
-        A proprietary 0–100 composite score that weighs multiple independent signals
-        — probability, edge quality, matchup, consistency, momentum, and more —
-        into one actionable number.
-        <br><br>
-        <strong>Built-in safeguards</strong> prevent the engine from being overconfident:
-        <br><br>
-        🛡️ Automatic tier demotion triggers<br>
-        🛡️ Variance-aware scoring<br>
-        🛡️ Sample-size adjustments<br>
-        🛡️ Tier distribution enforcement
-        <br><br>
-        💎 Platinum · 🥇 Gold · 🥈 Silver · 🥉 Bronze · ⛔ Avoid
+    <div class="pillar-card accent-gold lp-anim lp-anim-d4">
+      <div class="pillar-accent"></div>
+      <div class="pillar-card-inner">
+        <div class="pillar-icon-halo"><span class="pillar-icon">🏆</span></div>
+        <div class="pillar-title">SAFE Score™</div>
+        <div class="pillar-subtitle">Institutional-Grade Scoring</div>
+        <div class="pillar-body">
+          <em>Statistical Analysis of Force &amp; Edge</em>
+          <br><br>
+          A proprietary 0–100 composite score that weighs multiple independent signals
+          — probability, edge quality, matchup, consistency, momentum, and more —
+          into one actionable number.
+          <br><br>
+          <strong>Built-in safeguards</strong> prevent the engine from being overconfident:
+          <br><br>
+          🛡️ Automatic tier demotion triggers<br>
+          🛡️ Variance-aware scoring<br>
+          🛡️ Sample-size adjustments<br>
+          🛡️ Tier distribution enforcement
+          <br><br>
+          💎 Platinum · 🥇 Gold · 🥈 Silver · 🥉 Bronze · ⛔ Avoid
+        </div>
+        <div class="pillar-footer">Other tools: one number, no safeguards.</div>
       </div>
-      <div class="pillar-footer">Other tools: one number, no safeguards.</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1031,17 +1286,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-st.divider()
-
-# ============================================================
-# END SECTION 3: The Competitive Kill Shot
-# ============================================================
+st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # SECTION 4: The Proof Points — Animated Metric Cards
 # ============================================================
 
-st.markdown('<div class="section-header">The Numbers Speak</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header lp-anim lp-anim-d3">The Numbers Speak</div>', unsafe_allow_html=True)
 
 _proof_cols = st.columns(5)
 
@@ -1053,11 +1304,15 @@ _proof_data = [
     ("REAL TIME", "Live Props"),
 ]
 
+_proof_colors = ["#00f0ff", "#c800ff", "#00ff9d", "#FFD700", "#ff5e00"]
+
 for i, (_num, _label) in enumerate(_proof_data):
     with _proof_cols[i]:
+        _color = _proof_colors[i]
+        _delay_cls = f"lp-anim-d{i + 2}"
         st.markdown(f"""
-        <div class="proof-card">
-          <div class="proof-card-number">{_num}</div>
+        <div class="proof-card lp-anim {_delay_cls}">
+          <div class="proof-card-number" style="color:{_color};">{_num}</div>
           <div class="proof-card-label">{_label}</div>
         </div>
         """, unsafe_allow_html=True)
@@ -1075,7 +1330,7 @@ try:
 except Exception:
     pass
 
-st.divider()
+st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION 4: The Proof Points
@@ -1085,7 +1340,7 @@ st.divider()
 # SECTION 5: Session Readiness Pipeline
 # ============================================================
 
-st.markdown('<div class="section-header">Your Session</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-header lp-anim lp-anim-d2">Your Session</div>', unsafe_allow_html=True)
 
 _sess_games = len(st.session_state.get("todays_games", []))
 _sess_props = len(st.session_state.get("current_props", []))
@@ -1095,60 +1350,42 @@ _sess_entries = len(st.session_state.get("selected_picks", []))
 def _step_class(done: bool) -> str:
     return "done" if done else "pending"
 
-def _step_icon(done: bool) -> str:
-    return "✅" if done else "⏳"
-
 _s1_done = _sess_games > 0
 _s2_done = _sess_props > 0
 _s3_done = _sess_analysis > 0
 _s4_done = _sess_entries > 0
 
-_pc1, _pa1, _pc2, _pa2, _pc3, _pa3, _pc4 = st.columns([3, 1, 3, 1, 3, 1, 3])
+_steps_data = [
+    ("1", "Load Games", _s1_done,
+     f"✅ {_sess_games} game{'s' if _sess_games != 1 else ''}" if _s1_done else f"⏳ {_sess_games} game{'s' if _sess_games != 1 else ''}"),
+    ("2", "Load Props", _s2_done,
+     f"✅ {_sess_props} prop{'s' if _sess_props != 1 else ''}" if _s2_done else f"⏳ {_sess_props} prop{'s' if _sess_props != 1 else ''}"),
+    ("3", "Run Engine", _s3_done,
+     f"✅ {_sess_analysis}" if _s3_done else "⏳ Not run"),
+    ("4", "Build Entries", _s4_done,
+     f"✅ {_sess_entries}" if _s4_done else "⏳ —"),
+]
 
-with _pc1:
-    st.markdown(f"""
-    <div class="pipeline-step {_step_class(_s1_done)}">
-      <div class="pipeline-step-icon">①</div>
-      <div class="pipeline-step-label">Load Games</div>
-      <div class="pipeline-step-status {'green' if _s1_done else 'amber'}">{_step_icon(_s1_done)} {_sess_games} game{'s' if _sess_games != 1 else ''}</div>
-    </div>
-    """, unsafe_allow_html=True)
+# Build an HTML-based connected pipeline for visual consistency
+_pipeline_html_parts = []
+for idx, (num, label, done, status_text) in enumerate(_steps_data):
+    _cls = "done" if done else "pending"
+    _status_cls = "green" if done else "amber"
+    _pipeline_html_parts.append(
+        f'<div class="pipeline-step {_cls}">'
+        f'  <div class="pipeline-step-num">{num}</div>'
+        f'  <div class="pipeline-step-label">{label}</div>'
+        f'  <div class="pipeline-step-status {_status_cls}">{status_text}</div>'
+        f'</div>'
+    )
+    if idx < 3:
+        _active_cls = "active" if done else ""
+        _pipeline_html_parts.append(f'<div class="pipeline-connector {_active_cls}"></div>')
 
-with _pa1:
-    st.markdown('<div class="pipeline-arrow">→</div>', unsafe_allow_html=True)
-
-with _pc2:
-    st.markdown(f"""
-    <div class="pipeline-step {_step_class(_s2_done)}">
-      <div class="pipeline-step-icon">②</div>
-      <div class="pipeline-step-label">Load Props</div>
-      <div class="pipeline-step-status {'green' if _s2_done else 'amber'}">{_step_icon(_s2_done)} {_sess_props} prop{'s' if _sess_props != 1 else ''}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with _pa2:
-    st.markdown('<div class="pipeline-arrow">→</div>', unsafe_allow_html=True)
-
-with _pc3:
-    st.markdown(f"""
-    <div class="pipeline-step {_step_class(_s3_done)}">
-      <div class="pipeline-step-icon">③</div>
-      <div class="pipeline-step-label">Run Engine</div>
-      <div class="pipeline-step-status {'green' if _s3_done else 'amber'}">{_step_icon(_s3_done)} {_sess_analysis if _sess_analysis else 'Not run'}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with _pa3:
-    st.markdown('<div class="pipeline-arrow">→</div>', unsafe_allow_html=True)
-
-with _pc4:
-    st.markdown(f"""
-    <div class="pipeline-step {_step_class(_s4_done)}">
-      <div class="pipeline-step-icon">④</div>
-      <div class="pipeline-step-label">Build Entries</div>
-      <div class="pipeline-step-status {'green' if _s4_done else 'amber'}">{_step_icon(_s4_done)} {_sess_entries if _sess_entries else '—'}</div>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown(
+    '<div class="pipeline-row lp-anim lp-anim-d3">' + ''.join(_pipeline_html_parts) + '</div>',
+    unsafe_allow_html=True,
+)
 
 # ── Consolidated warnings (stale data / validation) — single amber banner ──
 _consolidated_warnings = []
@@ -1209,7 +1446,7 @@ if _consolidated_warnings:
         for _w in _consolidated_warnings:
             st.warning(_w)
 
-st.divider()
+st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION 5: Session Readiness Pipeline
@@ -1220,7 +1457,7 @@ st.divider()
 # ============================================================
 
 st.markdown("""
-<div class="section-header">How It Works</div>
+<div class="section-header lp-anim lp-anim-d2">How It Works</div>
 <div class="section-subheader">Five stages. Full transparency on what happens. Zero implementation details exposed.</div>
 """, unsafe_allow_html=True)
 
@@ -1242,7 +1479,7 @@ for idx, (icon, title, desc) in enumerate(_hiw_stages):
     col_idx = idx * 2
     with _hiw_cols[col_idx]:
         st.markdown(f"""
-        <div class="hiw-stage">
+        <div class="hiw-stage lp-anim lp-anim-d{min(idx + 2, 6)}">
           <div class="hiw-stage-icon">{icon}</div>
           <div class="hiw-stage-title">{title}</div>
           <div class="hiw-stage-desc">{desc}</div>
@@ -1250,7 +1487,7 @@ for idx, (icon, title, desc) in enumerate(_hiw_stages):
         """, unsafe_allow_html=True)
     if idx < 4:
         with _hiw_cols[col_idx + 1]:
-            st.markdown('<div class="pipeline-arrow" style="height:100%;display:flex;align-items:center;justify-content:center;">→</div>', unsafe_allow_html=True)
+            st.markdown('<div class="hiw-connector" style="height:100%;">&#8203;</div>', unsafe_allow_html=True)
 
 with st.expander("📖 How to Use Smart Pick Pro", expanded=False):
     st.markdown("""
@@ -1265,7 +1502,7 @@ with st.expander("📖 How to Use Smart Pick Pro", expanded=False):
     Then head straight to ⚡ Quantum Analysis to run the engine.
     """)
 
-st.divider()
+st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION 6: How It Works
@@ -1276,12 +1513,12 @@ st.divider()
 # ============================================================
 
 st.markdown("""
-<div class="section-header">🗺️ Your Toolkit — 15 Pages of Analysis</div>
+<div class="section-header lp-anim lp-anim-d2">🗺️ Your Toolkit — 15 Pages of Analysis</div>
 <div class="section-subheader">Every tool you need, from data loading to bet tracking.</div>
 """, unsafe_allow_html=True)
 
 # Row 1 — Tonight's Workflow
-st.markdown("**Tonight's Workflow**")
+st.markdown('<div class="nav-row-label workflow">⚡ Tonight\'s Workflow</div>', unsafe_allow_html=True)
 _nav_r1 = st.columns(4)
 _nav_row1 = [
     ("📡", "Live Games", "Load tonight's slate in one click", "pages/1_📡_Live_Games.py"),
@@ -1292,7 +1529,7 @@ _nav_row1 = [
 for i, (icon, name, desc, page) in enumerate(_nav_row1):
     with _nav_r1[i]:
         st.markdown(f"""
-        <div class="nav-card">
+        <div class="nav-card cat-workflow lp-anim lp-anim-d{i + 2}">
           <div class="nav-card-icon">{icon}</div>
           <div class="nav-card-title">{name}</div>
           <div class="nav-card-desc">{desc}</div>
@@ -1301,7 +1538,7 @@ for i, (icon, name, desc, page) in enumerate(_nav_row1):
         st.page_link(page, label=f"Open {name}", icon=icon)
 
 # Row 2 — Deep Analysis
-st.markdown("**Deep Analysis**")
+st.markdown('<div class="nav-row-label analysis">🔬 Deep Analysis</div>', unsafe_allow_html=True)
 _nav_r2 = st.columns(5)
 _nav_row2 = [
     ("📋", "Game Report", "Full game breakdowns", "pages/4_📋_Game_Report.py"),
@@ -1313,7 +1550,7 @@ _nav_row2 = [
 for i, (icon, name, desc, page) in enumerate(_nav_row2):
     with _nav_r2[i]:
         st.markdown(f"""
-        <div class="nav-card">
+        <div class="nav-card cat-analysis lp-anim lp-anim-d{min(i + 2, 6)}">
           <div class="nav-card-icon">{icon}</div>
           <div class="nav-card-title">{name}</div>
           <div class="nav-card-desc">{desc}</div>
@@ -1322,7 +1559,7 @@ for i, (icon, name, desc, page) in enumerate(_nav_row2):
         st.page_link(page, label=f"Open {name}", icon=icon)
 
 # Row 3 — Track & Manage
-st.markdown("**Track & Manage**")
+st.markdown('<div class="nav-row-label manage">📊 Track &amp; Manage</div>', unsafe_allow_html=True)
 _nav_r3 = st.columns(6)
 _nav_row3 = [
     ("💦", "Live Sweat", "Track bets in real-time", "pages/0_💦_Live_Sweat.py"),
@@ -1335,7 +1572,7 @@ _nav_row3 = [
 for i, (icon, name, desc, page) in enumerate(_nav_row3):
     with _nav_r3[i]:
         st.markdown(f"""
-        <div class="nav-card">
+        <div class="nav-card cat-manage lp-anim lp-anim-d{min(i + 2, 6)}">
           <div class="nav-card-icon">{icon}</div>
           <div class="nav-card-title">{name}</div>
           <div class="nav-card-desc">{desc}</div>
@@ -1343,7 +1580,7 @@ for i, (icon, name, desc, page) in enumerate(_nav_row3):
         """, unsafe_allow_html=True)
         st.page_link(page, label=f"Open {name}", icon=icon)
 
-st.divider()
+st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION 7: App Map
@@ -1354,7 +1591,7 @@ st.divider()
 # ============================================================
 
 if todays_games:
-    st.markdown('<div class="section-header">🏟️ Tonight\'s Slate</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header lp-anim lp-anim-d2">🏟️ Tonight\'s Slate</div>', unsafe_allow_html=True)
 
     chips_html = ""
     for game in todays_games:
@@ -1390,7 +1627,7 @@ if todays_games:
         )
 
     st.markdown(f'<div style="margin:8px 0 12px 0;display:flex;flex-wrap:wrap;gap:8px;">{chips_html}</div>', unsafe_allow_html=True)
-    st.divider()
+    st.markdown('<div class="lp-divider"></div>', unsafe_allow_html=True)
 
 # ============================================================
 # END SECTION 8: Tonight's Slate
