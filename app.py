@@ -25,7 +25,7 @@ st.set_page_config(
     page_title="Smart Pick Pro — NBA Edition",
     page_icon="🏀",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 # ─── Inject Global CSS Theme ──────────────────────────────────
