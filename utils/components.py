@@ -219,5 +219,5 @@ def _persist_settings():
     try:
         from tracking.database import save_user_settings
         save_user_settings(st.session_state)
-    except Exception:
-        pass  # Non-fatal — settings will still work in session
+    except Exception as exc:
+        _components_logger.debug("_persist_settings failed (non-fatal): %s", exc)
