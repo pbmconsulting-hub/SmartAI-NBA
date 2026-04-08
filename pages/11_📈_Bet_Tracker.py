@@ -991,28 +991,31 @@ with tab_all_picks:
     db_all_picks = load_all_analysis_picks(days=30)
 
     # ── Build combined dataset for aggregate metrics ───────────────────
-    # Deduplicate by (player_name, stat_type, prop_line, direction, pick_date)
+    # Deduplicate by (player_name, stat_type, prop_line, direction, pick_date).
+    # Session picks lack "pick_date", so default to today's date (ET)
+    # to match the DB rows inserted by insert_analysis_picks().
+    _today_str = datetime.date.today().isoformat()
     _seen_keys: set = set()
     _combined_picks: list = []
-    for _cp in db_all_picks:
-        _key = (
-            _cp.get("player_name", ""),
-            _cp.get("stat_type", ""),
-            str(_cp.get("prop_line") or _cp.get("line", "")),
-            _cp.get("direction", ""),
-            _cp.get("pick_date", ""),
+
+    def _dedup_key(pick):
+        return (
+            (pick.get("player_name") or "").strip().lower(),
+            (pick.get("stat_type") or "").strip().lower(),
+            str(round(float(pick.get("prop_line") or pick.get("line") or 0), 2)),
+            (pick.get("direction") or "").strip().upper(),
+            pick.get("pick_date") or _today_str,
         )
+
+    # DB picks take priority (they have resolution status / actual_value)
+    for _cp in db_all_picks:
+        _key = _dedup_key(_cp)
         if _key not in _seen_keys:
             _seen_keys.add(_key)
             _combined_picks.append(_cp)
+    # Session picks are only added if they weren't already persisted to DB
     for _cp in session_picks:
-        _key = (
-            _cp.get("player_name", ""),
-            _cp.get("stat_type", ""),
-            str(_cp.get("prop_line") or _cp.get("line", "")),
-            _cp.get("direction", ""),
-            _cp.get("pick_date", ""),
-        )
+        _key = _dedup_key(_cp)
         if _key not in _seen_keys:
             _seen_keys.add(_key)
             _combined_picks.append(_cp)
@@ -2744,11 +2747,13 @@ with tab_achievements:
         # all_analysis_picks uses "prop_line" and "pick_date";
         # bets table uses "prop_line" and "bet_date".  Fall back to
         # alternate field names ("line", "pick_date") for compatibility.
+        # Normalize values (lowercase, rounded line, uppercase direction)
+        # to ensure consistent dedup across both tables.
         _ak = (
-            str(_ab.get("player_name", "")).lower(),
-            str(_ab.get("stat_type", "")).lower(),
-            str(_ab.get("prop_line") or _ab.get("line", "")),
-            str(_ab.get("direction", "")).upper(),
+            str(_ab.get("player_name", "")).strip().lower(),
+            str(_ab.get("stat_type", "")).strip().lower(),
+            str(round(float(_ab.get("prop_line") or _ab.get("line") or 0), 2)),
+            str(_ab.get("direction", "")).strip().upper(),
             str(_ab.get("bet_date") or _ab.get("pick_date", "")),
         )
         if _ak not in _ach_seen_keys:
