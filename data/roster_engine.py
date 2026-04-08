@@ -681,10 +681,10 @@ class RosterEngine:
                         _logger.debug("  RosterEngine._fetch_nba_api_injuries: Injury_Status table not found")
                     else:
                         _inj_rows = _db.execute(
-                            "SELECT p.full_name  AS player_name, "
+                            "SELECT COALESCE(p.full_name, p.first_name || ' ' || p.last_name) AS player_name, "
                             "       i.status, "
                             "       i.reason     AS injury, "
-                            "       t.abbreviation AS team "
+                            "       COALESCE(t.abbreviation, p.team_abbreviation) AS team "
                             "FROM Injury_Status i "
                             "JOIN Players p ON p.player_id = i.player_id "
                             "LEFT JOIN Teams t ON t.team_id = i.team_id"
@@ -737,7 +737,8 @@ class RosterEngine:
                 try:
                     for abbrev in (team_abbrevs or []):
                         rows = conn.execute(
-                            "SELECT p.full_name, tr.is_two_way "
+                            "SELECT COALESCE(p.full_name, p.first_name || ' ' || p.last_name) AS full_name, "
+                            "       tr.is_two_way "
                             "FROM Team_Roster tr "
                             "JOIN Players p ON p.player_id = tr.player_id "
                             "JOIN Teams  t ON t.team_id   = tr.team_id "

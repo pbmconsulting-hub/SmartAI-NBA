@@ -1146,7 +1146,15 @@ def fetch_todays_players_only(todays_games, progress_callback=None, precomputed_
                         team_max_gp[t_abbrev] = gp
             _logger.info(f"  Bulk stats: {len(bulk_stats)} players loaded")
         except Exception as bulk_err:
-            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Will use zero defaults for missing players.")
+            _logger.warning(f"  WARNING: Bulk stats fetch failed: {bulk_err}. Falling back to ETL database.")
+            try:
+                from data.etl_data_service import get_all_players as _db_get_all
+                db_players = _db_get_all()
+                if db_players:
+                    bulk_stats = {p["player_id"]: p for p in db_players}
+                    _logger.info(f"  DB fallback: {len(bulk_stats)} players loaded from ETL database")
+            except Exception as db_err:
+                _logger.warning(f"  DB fallback also failed: {db_err}. Will use zero defaults for missing players.")
 
         # --------------------------------------------------------
         # Step 4: Build formatted players from bulk stats.

@@ -77,37 +77,64 @@ def extract_tables_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
         "join_tolerance": 5,
     }
 
-    header: list | None = None
-    all_rows: list[list] = []
+    # Try the primary line-based extraction first, then fall back to
+    # text-based strategies for PDFs with merged header columns.
+    _settings_chain = [
+        table_settings,
+        {
+            "vertical_strategy": "text",
+            "horizontal_strategy": "text",
+            "snap_tolerance": 3,
+            "join_tolerance": 3,
+        },
+    ]
 
-    with _pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for page in pdf.pages:
-            tables = page.extract_tables(table_settings)
-            for table in (tables or []):
-                if not table:
-                    continue
-                for row in table:
-                    # Normalise cell values: None → ""
-                    cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
+    for attempt_idx, settings in enumerate(_settings_chain):
+        header: list | None = None
+        all_rows: list[list] = []
 
-                    if header is None:
-                        # First non-empty row across the whole document = header
-                        if any(cleaned):
-                            # New NBA format uses ≤2 merged columns for the report title
-                            # (e.g. "Injury Report: 04/07/26 05:00 PM") — skip to real header
-                            if len(cleaned) <= 2 and any("Injury Report" in c for c in cleaned):
-                                continue  # Skip the title row, wait for the real header
-                            header = cleaned
-                    else:
-                        # Skip repeated header rows
-                        if cleaned == header:
-                            continue
-                        # Handle column count mismatches from merged cells
-                        if len(cleaned) < len(header):
-                            cleaned += [""] * (len(header) - len(cleaned))
-                        elif len(cleaned) > len(header):
-                            cleaned = cleaned[: len(header)]
-                        all_rows.append(cleaned)
+        with _pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                # Primary: extract_tables (plural)
+                tables = page.extract_tables(settings)
+                if not tables and attempt_idx > 0:
+                    # Secondary fallback: extract_table (singular)
+                    single = page.extract_table(settings)
+                    tables = [single] if single else []
+                for table in (tables or []):
+                    if not table:
+                        continue
+                    for row in table:
+                        # Normalise cell values: None → ""
+                        cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
+
+                        if header is None:
+                            # First non-empty row across the whole document = header
+                            if any(cleaned):
+                                # New NBA format uses ≤2 merged columns for the report title
+                                # (e.g. "Injury Report: 04/07/26 05:00 PM") — skip to real header
+                                if len(cleaned) <= 2 and any("Injury Report" in c for c in cleaned):
+                                    continue  # Skip the title row, wait for the real header
+                                header = cleaned
+                        else:
+                            # Skip repeated header rows
+                            if cleaned == header:
+                                continue
+                            # Skip rows that look like the title row even after a header was set
+                            if any("Injury Report" in str(c) for c in cleaned) and len(set(cleaned) - {""}) <= 2:
+                                continue
+                            # Handle column count mismatches from merged cells
+                            if len(cleaned) < len(header):
+                                cleaned += [""] * (len(header) - len(cleaned))
+                            elif len(cleaned) > len(header):
+                                cleaned = cleaned[: len(header)]
+                            all_rows.append(cleaned)
+
+        if header is not None and all_rows:
+            df = pd.DataFrame(all_rows, columns=header)
+            if validate_columns(df):
+                return df
+            # If columns don't validate, try next strategy
 
     if header is None or not all_rows:
         raise DataValidationError(
