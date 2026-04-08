@@ -416,14 +416,14 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None,
         p_pnl = pdata["pnl"]
         # Find best and worst stat for this player
         best_stat, worst_stat = "", ""
-        best_wr, worst_wr = -1.0, 2.0
+        best_wr, worst_wr = None, None
         for st_name, st_picks in pdata["stat_picks"].items():
             st_wins = pdata["stat_wins"].get(st_name, 0)
             st_wr = st_wins / st_picks if st_picks > 0 else 0.0
-            if st_wr > best_wr:
+            if best_wr is None or st_wr > best_wr:
                 best_wr = st_wr
                 best_stat = st_name
-            if st_wr < worst_wr:
+            if worst_wr is None or st_wr < worst_wr:
                 worst_wr = st_wr
                 worst_stat = st_name
         player_win_rates[pname] = {

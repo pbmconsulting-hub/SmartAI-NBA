@@ -1065,12 +1065,19 @@ def _render_results(result, config_label=""):
                 for i in range(len(_pnl_series))
             ]
 
+            # Use spline smoothing only for smaller datasets to avoid overhead
+            _line_shape = "spline" if len(_pnl_series) <= 200 else "linear"
+            _line_smooth = 0.3 if _line_shape == "spline" else None
+            _line_kw = dict(color=_line_color, width=2.5, shape=_line_shape)
+            if _line_smooth is not None:
+                _line_kw["smoothing"] = _line_smooth
+
             fig.add_trace(go.Scatter(
                 x=list(range(1, len(_pnl_series) + 1)),
                 y=_pnl_series,
                 mode="lines",
                 name="Cumulative P&L",
-                line=dict(color=_line_color, width=2.5, shape="spline", smoothing=0.3),
+                line=_line_kw,
                 fill="tozeroy",
                 fillcolor=_fill_color,
                 hovertext=_hover,
@@ -1344,24 +1351,26 @@ if result_b:
         st.markdown(_section_header("📊", "Head-to-Head Comparison"), unsafe_allow_html=True)
         _cmp_cols = st.columns(5)
         _metrics_cmp = [
-            ("Win Rate", result["win_rate"]*100, result_b["win_rate"]*100, "%"),
-            ("ROI", result["roi"]*100, result_b["roi"]*100, "%"),
-            ("Sharpe", result.get("sharpe_ratio", 0), result_b.get("sharpe_ratio", 0), ""),
-            ("Picks", result["total_picks"], result_b["total_picks"], ""),
-            ("P&L", result["total_pnl"], result_b["total_pnl"], "u"),
+            ("Win Rate", result["win_rate"]*100, result_b["win_rate"]*100, "%", ".1f"),
+            ("ROI", result["roi"]*100, result_b["roi"]*100, "%", ".1f"),
+            ("Sharpe", result.get("sharpe_ratio", 0), result_b.get("sharpe_ratio", 0), "", ".2f"),
+            ("Picks", result["total_picks"], result_b["total_picks"], "", ".0f"),
+            ("P&L", result["total_pnl"], result_b["total_pnl"], "u", ".1f"),
         ]
-        for i, (name, val_a, val_b, unit) in enumerate(_metrics_cmp):
+        for i, (name, val_a, val_b, unit, fmt) in enumerate(_metrics_cmp):
             with _cmp_cols[i]:
                 _winner = "A" if val_a >= val_b else "B"
                 _badge_cls = "pg-winner-a" if _winner == "A" else "pg-winner-b"
                 if val_a == val_b:
                     _badge_cls = "pg-winner-tie"
                     _winner = "Tie"
+                _fa = f"{val_a:{fmt}}"
+                _fb = f"{val_b:{fmt}}"
                 st.markdown(f"""
                 <div class="pg-winner-card">
                     <div class="pg-winner-label">{_html.escape(name)}</div>
                     <div class="pg-winner-vals">
-                        A: {val_a:.1f}{_html.escape(unit)} · B: {val_b:.1f}{_html.escape(unit)}
+                        A: {_html.escape(_fa)}{_html.escape(unit)} · B: {_html.escape(_fb)}{_html.escape(unit)}
                     </div>
                     <span class="pg-winner-badge {_badge_cls}">
                         {"🏆 " if _winner != "Tie" else ""}Config {_winner}
