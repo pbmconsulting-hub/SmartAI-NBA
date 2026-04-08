@@ -2741,6 +2741,9 @@ with tab_achievements:
     _ach_seen_keys: set = set()
     _ach_all_bets: list = []
     for _ab in _ach_raw:
+        # all_analysis_picks uses "prop_line" and "pick_date";
+        # bets table uses "prop_line" and "bet_date".  Fall back to
+        # alternate field names ("line", "pick_date") for compatibility.
         _ak = (
             str(_ab.get("player_name", "")).lower(),
             str(_ab.get("stat_type", "")).lower(),
