@@ -4641,9 +4641,11 @@ def joseph_gut_call(analysis_result: dict, narrative_tags: list = None,
                 if edge < override_threshold:
                     gut_direction = trigger["direction_bias"]
                     if gut_direction == "OVER":
+                        # For OVER gut calls, upgrade weak verdicts to LEAN
                         gut_verdict = "LEAN" if original_verdict in ("FADE", "STAY_AWAY") else original_verdict
                     else:
-                        gut_verdict = "LEAN" if original_verdict in ("FADE", "STAY_AWAY") else original_verdict
+                        # For UNDER gut calls, flip direction and downgrade strong OVER verdicts
+                        gut_verdict = "FADE" if original_verdict in ("SMASH", "LEAN") else original_verdict
 
                     return {
                         "is_gut_call": True,

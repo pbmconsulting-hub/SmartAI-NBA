@@ -442,8 +442,12 @@ def render_joseph_sidebar_widget() -> None:
                 roi = record.get("roi_estimate", 0.0)
                 roi_sign = "+" if roi >= 0 else ""
                 # Brag intensity scales with ROI — connected to track record
-                brag_style = "color:#00ff9d;" if roi >= 5.0 else \
-                             "color:#eab308;" if roi >= 0 else "color:#ff4444;"
+                if roi >= 5.0:
+                    brag_style = "color:#00ff9d;"
+                elif roi >= 0:
+                    brag_style = "color:#eab308;"
+                else:
+                    brag_style = "color:#ff4444;"
                 track_html = (
                     f'<div class="joseph-track-record">'
                     f'📊 {wins}W-{losses}L '

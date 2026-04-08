@@ -246,9 +246,15 @@ def diary_update_from_track_record(track_record: dict) -> bool:
     -------
     bool — True if saved successfully.
     """
+    win_rate = track_record.get("win_rate", 0)
+    if win_rate > 0.6:
+        mood = "hot"
+    elif win_rate < 0.4:
+        mood = "cold"
+    else:
+        mood = "neutral"
     return diary_log_entry(entry={
         "wins": track_record.get("wins", 0),
         "losses": track_record.get("losses", 0),
-        "mood": "hot" if track_record.get("win_rate", 0) > 0.6 else
-                "cold" if track_record.get("win_rate", 0) < 0.4 else "neutral",
+        "mood": mood,
     })
