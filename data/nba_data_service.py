@@ -258,7 +258,18 @@ def get_todays_players(todays_games, progress_callback=None,
 
 
 def get_player_recent_form(player_id, last_n_games=10):
-    """Get a player's recent-form stats via nba_api."""
+    """Get a player's recent-form stats — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_last_n_games
+            db_rows = get_player_last_n_games(int(player_id), n=last_n_games)
+            if db_rows:
+                _logger.info("get_player_recent_form(%s): loaded %d game(s) from DB",
+                             player_id, len(db_rows))
+                return db_rows
+        except Exception as exc:
+            _logger.debug("get_player_recent_form DB path failed: %s", exc)
+
     result = _ldf_fetch_player_recent_form(player_id, last_n_games=last_n_games)
     if not result:
         _logger.debug("get_player_recent_form(%s): all sources returned no data", player_id)
@@ -314,7 +325,20 @@ def get_defensive_ratings(force=False, progress_callback=None):
 
 
 def get_player_game_log(player_id, last_n_games=20):
-    """Retrieve a player's game log via nba_api."""
+    """Retrieve a player's game log — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_game_logs as _db_get_game_logs
+            db_logs = _db_get_game_logs(int(player_id))
+            if db_logs:
+                # Honour last_n_games limit
+                result = db_logs[:last_n_games] if last_n_games else db_logs
+                _logger.info("get_player_game_log(%s): loaded %d log(s) from DB",
+                             player_id, len(result))
+                return result
+        except Exception as exc:
+            _logger.debug("get_player_game_log DB path failed: %s", exc)
+
     result = _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
     if not result:
         _logger.warning("get_player_game_log(%s): all sources returned no game log", player_id)
@@ -476,28 +500,66 @@ def _nlf_unavailable_dict(*_args, **_kwargs):
 # ── TIER 1: Critical endpoints ───────────────────────────────────────────────
 
 def get_player_game_logs_v2(player_id: int, season: str | None = None, last_n: int = 0) -> list:
-    """Return per-game stats from nba_live_fetcher (supports last_n filter)."""
+    """Return per-game stats — DB first, then nba_live_fetcher."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_game_logs as _db_get_logs
+            db_logs = _db_get_logs(int(player_id), season=season)
+            if db_logs:
+                result = db_logs[:last_n] if last_n else db_logs
+                _logger.info("get_player_game_logs_v2(%s): loaded %d log(s) from DB",
+                             player_id, len(result))
+                return result
+        except Exception as exc:
+            _logger.debug("get_player_game_logs_v2 DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_player_game_logs(player_id, season=season, last_n=last_n)
 
 
 def get_box_score_traditional(game_id: str, period: int = 0) -> dict:
-    """Return the traditional box score for a game."""
+    """Return the traditional box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_box_score_traditional_from_db
+            db_result = get_box_score_traditional_from_db(game_id)
+            if db_result:
+                _logger.info("get_box_score_traditional(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_box_score_traditional DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_box_score_traditional(game_id, period=period)
 
 
 def get_box_score_advanced(game_id: str) -> dict:
-    """Return the advanced box score for a game."""
+    """Return the advanced box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_box_score_advanced_from_db
+            db_result = get_box_score_advanced_from_db(game_id)
+            if db_result:
+                _logger.info("get_box_score_advanced(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_box_score_advanced DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_box_score_advanced(game_id)
 
 
 def get_box_score_usage(game_id: str) -> dict:
-    """Return usage statistics box score for a game (USG_PCT, touches, etc.)."""
+    """Return usage statistics box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_box_score_usage_from_db
+            db_result = get_box_score_usage_from_db(game_id)
+            if db_result:
+                _logger.info("get_box_score_usage(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_box_score_usage DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_box_score_usage(game_id)
@@ -511,7 +573,17 @@ def get_player_on_off(team_id: int, season: str | None = None) -> dict:
 
 
 def get_player_estimated_metrics(season: str | None = None) -> list:
-    """Return estimated advanced metrics for all players (pace, ortg, drtg, etc.)."""
+    """Return estimated advanced metrics — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_estimated_metrics as _db_get_est
+            db_result = _db_get_est(season=season)
+            if db_result:
+                _logger.info("get_player_estimated_metrics: loaded %d row(s) from DB",
+                             len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_player_estimated_metrics DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_player_estimated_metrics(season=season)
@@ -525,14 +597,32 @@ def get_player_fantasy_profile(player_id: int, season: str | None = None) -> dic
 
 
 def get_rotations(game_id: str) -> dict:
-    """Return in/out rotation data (exact stint times) for a game."""
+    """Return in/out rotation data — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_rotations as _db_get_rotations
+            db_result = _db_get_rotations(game_id)
+            if db_result:
+                _logger.info("get_rotations(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_rotations DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_rotations(game_id)
 
 
 def get_schedule(game_date: str | None = None) -> list:
-    """Return the game schedule for a given date (defaults to today)."""
+    """Return the game schedule — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_schedule_from_db
+            db_result = get_schedule_from_db(game_date=game_date)
+            if db_result:
+                _logger.info("get_schedule: loaded %d game(s) from DB", len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_schedule DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_schedule(game_date=game_date)
@@ -548,14 +638,32 @@ def get_todays_scoreboard() -> dict:
 # ── TIER 2: High-value endpoints ─────────────────────────────────────────────
 
 def get_box_score_matchups(game_id: str) -> dict:
-    """Return defensive matchup data for a game (who guarded whom)."""
+    """Return defensive matchup data — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_box_score_matchups_from_db
+            db_result = get_box_score_matchups_from_db(game_id)
+            if db_result:
+                _logger.info("get_box_score_matchups(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_box_score_matchups DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_box_score_matchups(game_id)
 
 
 def get_hustle_box_score(game_id: str) -> dict:
-    """Return hustle stats box score (charges, deflections, loose balls)."""
+    """Return hustle stats box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_hustle_box_score_from_db
+            db_result = get_hustle_box_score_from_db(game_id)
+            if db_result:
+                _logger.info("get_hustle_box_score(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_hustle_box_score DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_hustle_box_score(game_id)
@@ -569,21 +677,48 @@ def get_defensive_box_score(game_id: str) -> dict:
 
 
 def get_scoring_box_score(game_id: str) -> dict:
-    """Return scoring breakdown box score (FG% by zone, etc.)."""
+    """Return scoring breakdown box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_scoring_box_score_from_db
+            db_result = get_scoring_box_score_from_db(game_id)
+            if db_result:
+                _logger.info("get_scoring_box_score(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_scoring_box_score DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_scoring_box_score(game_id)
 
 
 def get_tracking_box_score(game_id: str) -> dict:
-    """Return player-tracking box score (speed, distance, touches)."""
+    """Return player-tracking box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_tracking_box_score_from_db
+            db_result = get_tracking_box_score_from_db(game_id)
+            if db_result:
+                _logger.info("get_tracking_box_score(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_tracking_box_score DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_tracking_box_score(game_id)
 
 
 def get_four_factors_box_score(game_id: str) -> dict:
-    """Return four-factors box score (eFG%, TO%, ORB%, FT rate)."""
+    """Return four-factors box score — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_box_score_four_factors_from_db
+            db_result = get_box_score_four_factors_from_db(game_id)
+            if db_result:
+                _logger.info("get_four_factors_box_score(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_four_factors_box_score DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_four_factors_box_score(game_id)
@@ -597,14 +732,34 @@ def get_player_shooting_splits(player_id: int, season: str | None = None) -> dic
 
 
 def get_shot_chart_v2(player_id: int, season: str | None = None) -> list:
-    """Return shot chart data for a player (x/y coords, made/missed, zone)."""
+    """Return shot chart data — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_shot_chart_from_db
+            db_result = get_shot_chart_from_db(int(player_id), season=season)
+            if db_result:
+                _logger.info("get_shot_chart_v2(%s): loaded %d shot(s) from DB",
+                             player_id, len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_shot_chart_v2 DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_shot_chart(player_id, season=season)
 
 
 def get_player_clutch_stats(season: str | None = None) -> list:
-    """Return clutch-time stats (last 5 min, margin ≤5) for all players."""
+    """Return clutch-time stats — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_clutch_stats_from_db
+            db_result = get_player_clutch_stats_from_db(season=season)
+            if db_result:
+                _logger.info("get_player_clutch_stats: loaded %d row(s) from DB",
+                             len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_player_clutch_stats DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_player_clutch_stats(season=season)
@@ -625,14 +780,34 @@ def get_team_dashboard(team_id: int, season: str | None = None) -> dict:
 
 
 def get_team_game_logs(team_id: int, season: str | None = None, last_n: int = 0) -> list:
-    """Return per-game stats for a team, optionally capped to last_n games."""
+    """Return per-game stats for a team — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_team_game_logs as _db_get_tlogs
+            db_result = _db_get_tlogs(int(team_id), season=season, last_n=last_n)
+            if db_result:
+                _logger.info("get_team_game_logs(%s): loaded %d game(s) from DB",
+                             team_id, len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_team_game_logs DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_team_game_logs(team_id, season=season, last_n=last_n)
 
 
 def get_player_year_over_year(player_id: int) -> list:
-    """Return year-over-year career stats for a player."""
+    """Return year-over-year career stats — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_player_career_stats_from_db
+            db_result = get_player_career_stats_from_db(int(player_id))
+            if db_result:
+                _logger.info("get_player_year_over_year(%s): loaded %d season(s) from DB",
+                             player_id, len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_player_year_over_year DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_player_year_over_year(player_id)
@@ -652,14 +827,33 @@ def get_player_vs_player(
 
 
 def get_win_probability(game_id: str) -> dict:
-    """Return real-time win probability at each point in the game."""
+    """Return win probability data — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_win_probability_from_db
+            db_result = get_win_probability_from_db(game_id)
+            if db_result:
+                _logger.info("get_win_probability(%s): loaded from DB", game_id)
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_win_probability DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return {}
     return _nlf_fetch_win_probability(game_id)
 
 
 def get_play_by_play_v2(game_id: str) -> list:
-    """Return play-by-play events for a game."""
+    """Return play-by-play events — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_play_by_play_from_db
+            db_result = get_play_by_play_from_db(game_id)
+            if db_result:
+                _logger.info("get_play_by_play_v2(%s): loaded %d event(s) from DB",
+                             game_id, len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_play_by_play_v2 DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_play_by_play(game_id)
@@ -673,14 +867,33 @@ def get_game_summary(game_id: str) -> dict:
 
 
 def get_league_leaders(stat_category: str = "PTS", season: str | None = None) -> list:
-    """Return top players for a given statistical category via nba_api."""
+    """Return top players for a given statistical category — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_league_leaders_from_db
+            db_result = get_league_leaders_from_db(stat_category=stat_category, season=season)
+            if db_result:
+                _logger.info("get_league_leaders: loaded %d row(s) from DB", len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_league_leaders DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_league_leaders(stat_category=stat_category, season=season)
 
 
 def get_team_streak_finder(team_id: int, season: str | None = None) -> list:
-    """Return full season game log for a team (for streak/form computation)."""
+    """Return full season game log for a team — DB first, then live API."""
+    if _is_db_available():
+        try:
+            from data.db_service import get_team_game_logs as _db_get_tlogs
+            db_result = _db_get_tlogs(int(team_id), season=season)
+            if db_result:
+                _logger.info("get_team_streak_finder(%s): loaded %d game(s) from DB",
+                             team_id, len(db_result))
+                return db_result
+        except Exception as exc:
+            _logger.debug("get_team_streak_finder DB path failed: %s", exc)
     if not _NLF_AVAILABLE:
         return []
     return _nlf_fetch_team_streak_finder(team_id, season=season)
@@ -809,7 +1022,18 @@ def refresh_historical_data_for_tonight(
         player_id = p.get("player_id")
         player_name = p.get("name", f"ID-{player_id}")
         try:
-            logs = _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
+            # DB-first: try local Player_Game_Logs before hitting live API
+            logs = None
+            if _is_db_available():
+                try:
+                    from data.db_service import get_player_game_logs as _db_gl
+                    db_logs = _db_gl(int(player_id))
+                    if db_logs:
+                        logs = db_logs[:last_n_games]
+                except Exception:
+                    pass
+            if not logs:
+                logs = _ldf_fetch_player_game_log(player_id, last_n_games=last_n_games)
             if logs:
                 try:
                     from data.game_log_cache import save_game_logs_to_cache as _save_cache

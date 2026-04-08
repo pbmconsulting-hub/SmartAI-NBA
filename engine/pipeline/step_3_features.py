@@ -146,6 +146,24 @@ def run(context: dict) -> dict:
     date_str = context.get("date_str", "unknown")
     feature_data = {}
 
+    # ── Load team pace/DRTG from DB for enrichment ──
+    team_lookup: dict = {}
+    try:
+        from data.etl_data_service import is_db_available, get_all_teams
+        if is_db_available():
+            teams = get_all_teams()
+            for t in (teams or []):
+                abbr = t.get("abbreviation", "")
+                if abbr:
+                    team_lookup[abbr] = {
+                        "pace": float(t.get("pace") or 0),
+                        "drtg": float(t.get("drtg") or 0),
+                    }
+            if team_lookup:
+                _logger.info("Loaded pace/drtg for %d teams from DB", len(team_lookup))
+    except Exception as exc:
+        _logger.debug("Team DB enrichment failed: %s", exc)
+
     try:
         import pandas as pd
         from utils.parquet_helpers import save_parquet
@@ -153,6 +171,23 @@ def run(context: dict) -> dict:
         player_df = clean_data.get("player_stats")
         if player_df is not None and not (hasattr(player_df, "empty") and player_df.empty):
             df = pd.DataFrame(player_df) if isinstance(player_df, list) else player_df.copy()
+
+            # ── Enrich with DB team pace/DRTG if available ──
+            if team_lookup:
+                team_col = None
+                for candidate in ("team", "team_abbreviation", "team_abbrev"):
+                    if candidate in df.columns:
+                        team_col = candidate
+                        break
+                if team_col is not None:
+                    if "team_pace" not in df.columns:
+                        df["team_pace"] = df[team_col].map(
+                            lambda a: team_lookup.get(str(a), {}).get("pace", 0)
+                        )
+                    if "team_drtg" not in df.columns:
+                        df["team_drtg"] = df[team_col].map(
+                            lambda a: team_lookup.get(str(a), {}).get("drtg", 0)
+                        )
 
             # ── Player-level metrics (TS%, usage proxy, PER) ──
             try:
