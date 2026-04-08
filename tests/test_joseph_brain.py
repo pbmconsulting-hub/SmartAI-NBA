@@ -401,13 +401,14 @@ class TestAmbientPools(unittest.TestCase):
             "page_live_sweat", "page_simulator", "page_entry_builder",
             "page_studio", "page_risk_shield", "page_data_feed",
             "page_correlation", "page_bet_tracker", "page_backtester",
+            "page_proving_grounds",
             "page_settings", "page_premium", "page_vegas_vault",
         }
         self.assertTrue(page_keys.issubset(set(self.pool.keys())))
 
     def test_total_pool_count(self):
-        """AMBIENT_POOLS should have 23 pools (6 original + 17 page)."""
-        self.assertEqual(len(self.pool), 23)
+        """AMBIENT_POOLS should have 24 pools (6 original + 18 page)."""
+        self.assertEqual(len(self.pool), 24)
 
     def test_each_context_has_15_lines(self):
         for key, lines in self.pool.items():
@@ -916,6 +917,7 @@ class TestJosephGetAmbientContextImplementation(unittest.TestCase):
             "page_live_sweat", "page_simulator", "page_entry_builder",
             "page_studio", "page_risk_shield", "page_data_feed",
             "page_correlation", "page_bet_tracker", "page_backtester",
+            "page_proving_grounds",
             "page_settings", "page_premium", "page_vegas_vault",
         ]
         for key in page_keys:
