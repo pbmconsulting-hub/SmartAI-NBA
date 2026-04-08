@@ -5800,6 +5800,22 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qcm-tier-silver   { background: rgba(192, 192, 192, 0.15); color: #C0C0C0; border: 1px solid rgba(192, 192, 192, 0.30); }
 .qcm-tier-bronze   { background: rgba(205, 127, 50, 0.15); color: #CD7F32; border: 1px solid rgba(205, 127, 50, 0.30); }
 
+/* ── Animated Tier-Glow Borders ──────────────────────────── */
+@keyframes qcm-platinum-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(200, 0, 255, 0.2); }
+    50%      { box-shadow: 0 0 18px rgba(200, 0, 255, 0.4); }
+}
+@keyframes qcm-gold-pulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.15); }
+    50%      { box-shadow: 0 0 18px rgba(255, 215, 0, 0.3); }
+}
+.qcm-card.qcm-card-platinum {
+    animation: qcm-platinum-pulse 2s ease-in-out infinite;
+}
+.qcm-card.qcm-card-gold {
+    animation: qcm-gold-pulse 2s ease-in-out infinite;
+}
+
 .qcm-stat-type {
     font-size: 0.78rem;
     color: #94A3B8;
@@ -6098,10 +6114,14 @@ QUANTUM_CARD_MATRIX_CSS = """
     border-radius: 3px;
     overflow: hidden;
 }
+@keyframes qcm-conf-bar-expand {
+    from { width: 0%; }
+}
 .qcm-conf-bar-fill {
     height: 100%;
     border-radius: 3px;
     transition: width 0.5s ease;
+    animation: qcm-conf-bar-expand 0.6s ease-out both;
 }
 
 /* ── Context Metrics Grid (Situational / Matchup / Form / Edge) ── */
@@ -6277,6 +6297,18 @@ QUANTUM_CARD_MATRIX_CSS = """
     flex: 0 0 200px;
 }
 
+/* ── Responsive Grid Breakpoints ─────────────────────────── */
+@media (min-width: 1200px) {
+    .qcm-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .qcm-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Responsive stacking — Container Queries (preferred).
    Cards adapt to their container width, not the viewport.
    This is critical when rendered inside a self-resizing iframe. */
@@ -6321,6 +6353,258 @@ QUANTUM_CARD_MATRIX_CSS = """
             flex-direction: column;
         }
     }
+    @media (min-width: 1200px) {
+        .qcm-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (max-width: 600px) {
+        .qcm-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+}
+
+/* ── QAM Helper Card Classes ─────────────────────────────── */
+.qam-dfs-edge {
+    background: linear-gradient(135deg, #0f1424, #14192b);
+    border: 1px solid rgba(0, 255, 157, 0.2);
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 6px 0;
+}
+.qam-dfs-edge-label {
+    color: #64748b;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.qam-dfs-edge-sub {
+    color: #475569;
+    font-size: 0.68rem;
+    margin-left: 8px;
+}
+.qam-dfs-edge-val {
+    font-size: 0.82rem;
+    font-weight: 800;
+    margin-left: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+.qam-tier-dist {
+    background: linear-gradient(135deg, #0f1424, #14192b);
+    border: 1px solid rgba(255, 94, 0, 0.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 8px 0 14px;
+}
+.qam-tier-dist-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #e0e7ef;
+    margin-bottom: 6px;
+}
+.qam-tier-dist-bar {
+    font-size: 0.85rem;
+}
+.qam-best-pick {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(255, 94, 0, 0.08);
+    border-radius: 6px;
+    border-left: 3px solid #ff5e00;
+}
+.qam-best-pick-label {
+    color: #ff5e00;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.qam-best-pick-detail {
+    color: #e0e7ef;
+    font-weight: 600;
+}
+.qam-best-pick-conf {
+    color: #00f0ff;
+    font-weight: 700;
+    margin-left: 10px;
+}
+.qam-news-alert {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+.qam-news-alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-news-alert-title {
+    color: #e0e7ef;
+    font-weight: 700;
+}
+.qam-news-alert-badge {
+    color: #000;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+.qam-news-alert-meta {
+    color: #8b949e;
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+.qam-news-alert-body {
+    color: #a0b4d0;
+    font-size: 0.82rem;
+    margin-top: 6px;
+}
+.qam-market-move {
+    background: #0d1117;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+}
+.qam-market-move-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-market-move-player {
+    color: #e0e7ef;
+    font-weight: 700;
+}
+.qam-market-move-signal {
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.qam-market-move-detail {
+    color: #8b949e;
+    font-size: 0.78rem;
+    margin-top: 4px;
+}
+.qam-uncertain-header {
+    background: rgba(255, 193, 7, 0.10);
+    border: 2px solid #ffc107;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 14px;
+}
+.qam-uncertain-card {
+    background: rgba(255, 193, 7, 0.06);
+    border: 1px solid rgba(255, 193, 7, 0.35);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+}
+.qam-uncertain-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.qam-uncertain-name {
+    color: #ffc107;
+    font-weight: 700;
+}
+.qam-uncertain-team-badge {
+    background: rgba(255, 193, 7, 0.15);
+    color: #ffe082;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-left: 7px;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+}
+.qam-uncertain-flag-type {
+    background: #ffc107;
+    color: #333;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-left: 8px;
+}
+.qam-uncertain-prop {
+    color: #ffe082;
+    font-size: 0.85rem;
+}
+.qam-uncertain-edge {
+    color: #ffc107;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.qam-uncertain-flags {
+    margin-top: 8px;
+}
+.qam-uncertain-flags-label {
+    color: #ffc107;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+.qam-uncertain-flags ul {
+    margin: 4px 0 0 16px;
+    padding: 0;
+}
+.qam-uncertain-flags li {
+    color: #ffe082;
+    font-size: 0.82rem;
+}
+.qam-gold-banner {
+    background: linear-gradient(135deg, #1a1200, #231800);
+    border: 2px solid #ffd700;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 4px;
+}
+.qam-section-header {
+    background: linear-gradient(135deg, #0f1a2e, #14192b);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+}
+.qam-section-header-single { border: 2px solid #00f0ff; }
+.qam-section-header-parlay { border: 2px solid #ff5e00; }
+.qam-parlay-card {
+    background: #14192b;
+    border-radius: 8px;
+    padding: 15px 18px;
+    margin-bottom: 14px;
+    border-left: 4px solid #ff5e00;
+}
+.qam-parlay-card-glow {
+    box-shadow: 0 0 14px rgba(255, 94, 0, 0.45);
+}
+.qam-parlay-pick {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.qam-parlay-pick-name {
+    color: #ff5e00;
+    font-weight: 600;
+}
+.qam-parlay-pick-detail {
+    color: #c0d0e8;
+}
+.qam-parlay-reason {
+    margin-top: 10px;
+    padding: 7px 10px;
+    background: rgba(20, 25, 43, 0.7);
+    border-radius: 4px;
+}
+.qam-parlay-reason-text {
+    color: #00c8ff;
+    font-size: 0.82rem;
+}
+.qam-parlay-stats {
+    display: flex;
+    gap: 18px;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #c0d0e8;
 }
 """
 
