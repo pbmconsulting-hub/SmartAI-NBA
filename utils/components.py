@@ -8,6 +8,7 @@
 import os
 import base64
 import logging
+import time as _time_mod
 import streamlit as st
 
 _components_logger = logging.getLogger(__name__)
@@ -282,14 +283,20 @@ def _auto_restore_page_state():
 
 
 def _auto_save_page_state():
-    """Persist critical page state to SQLite on every render.
+    """Persist critical page state to SQLite, debounced to at most once per 30 seconds.
 
-    This is lightweight (single SQLite upsert) and ensures the latest
-    data is always available for restoration after a session reset.
+    This avoids heavy SQLite writes on every single rerender while still
+    ensuring data is saved frequently enough to survive session resets.
     """
+    _SAVE_INTERVAL = 30  # seconds
+    _now = _time_mod.time()
+    _last = st.session_state.get("_page_state_last_save_ts", 0)
+    if _now - _last < _SAVE_INTERVAL:
+        return  # Skip — too soon since last save
     try:
         from tracking.database import save_page_state
         save_page_state(st.session_state)
+        st.session_state["_page_state_last_save_ts"] = _now
     except Exception as exc:
         _components_logger.debug("_auto_save_page_state failed: %s", exc)
 
