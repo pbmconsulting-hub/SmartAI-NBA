@@ -1125,8 +1125,8 @@ def auto_resolve_bet_results(date_str=None):
     resolved_count = 0
     errors_list = []
 
-    # Load all pending bets for the target date
-    all_bets = load_all_bets()
+    # Load all pending bets for the target date (include parlay legs)
+    all_bets = load_all_bets(exclude_linked=False)
     pending_bets = [
         b for b in all_bets
         if b.get("bet_date", "") == date_str and not b.get("result")
@@ -1380,7 +1380,7 @@ def resolve_todays_bets():
     summary = {"resolved": 0, "wins": 0, "losses": 0, "pushes": 0, "pending": 0, "errors": []}
 
     try:
-        all_bets = load_all_bets()
+        all_bets = load_all_bets(exclude_linked=False)
         todays_pending = [
             b for b in all_bets
             if b.get("bet_date") == today_str and not b.get("result")
@@ -1656,7 +1656,7 @@ def resolve_todays_bets():
 
     # Count remaining unresolved bets
     try:
-        remaining = load_all_bets()
+        remaining = load_all_bets(exclude_linked=False)
         summary["pending"] = sum(
             1 for b in remaining
             if b.get("bet_date") == today_str and not b.get("result")
@@ -1715,7 +1715,7 @@ def resolve_all_pending_bets():
 
     # Load all pending bets (no result set) regardless of date
     try:
-        all_bets = load_all_bets(limit=2000)
+        all_bets = load_all_bets(limit=2000, exclude_linked=False)
     except Exception as exc:
         summary["errors"].append(f"Failed to load bets: {exc}")
         return summary
@@ -2425,7 +2425,7 @@ def save_top_picks_from_analysis(analysis_results):
     # Anchor to US/Eastern — NBA game dates are defined in ET.
     today_str = _nba_today_et().isoformat()
 
-    existing_bets = load_all_bets()
+    existing_bets = load_all_bets(exclude_linked=False)
     existing_keys = set()
     for b in existing_bets:
         key = (
@@ -2537,7 +2537,7 @@ def log_props_to_tracker(props_list, direction="OVER"):
     today_str = _nba_today_et().isoformat()
 
     # Load existing bets to detect duplicates
-    existing_bets = load_all_bets(limit=2000)
+    existing_bets = load_all_bets(limit=2000, exclude_linked=False)
     existing_keys: set = set()
     for b in existing_bets:
         key = (

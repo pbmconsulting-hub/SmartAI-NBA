@@ -242,7 +242,7 @@ def _get_active_bets() -> list[dict]:
     try:
         from tracking.bet_tracker import load_all_bets
         today_str = datetime.date.today().strftime("%Y-%m-%d")
-        all_db = load_all_bets(limit=200)
+        all_db = load_all_bets(limit=200, exclude_linked=False)
         today_bets = [
             b for b in all_db
             if str(b.get("date", "")).startswith(today_str)

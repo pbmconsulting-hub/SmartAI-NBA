@@ -739,6 +739,7 @@ def search_bets_by_player(query, limit=200):
     sql = """
     SELECT * FROM bets
     WHERE LOWER(player_name) LIKE ?
+      AND entry_id IS NULL
     ORDER BY created_at DESC
     LIMIT ?
     """
@@ -767,6 +768,7 @@ def load_bets_by_date_range(start_date, end_date, limit=10000):
     sql = """
     SELECT * FROM bets
     WHERE bet_date >= ? AND bet_date <= ?
+      AND entry_id IS NULL
     ORDER BY created_at DESC
     LIMIT ?
     """
@@ -1003,18 +1005,24 @@ def delete_entry(entry_id):
     return False, f"Entry #{entry_id} not found."
 
 
-def load_all_bets(limit=10000):
+def load_all_bets(limit=10000, exclude_linked=True):
     """
     Load recent bets from the database.
 
     Args:
         limit (int): Maximum number of bets to return
+        exclude_linked (bool): If True, exclude bets linked to parlay
+            entries (entry_id IS NOT NULL) so that parlay legs are not
+            double-counted alongside their parent entry.  Pass False
+            when you need every row (e.g. bet resolution, dedup checks).
 
     Returns:
         list of dict: Bet rows as dictionaries
     """
-    select_sql = """
+    where_clause = "WHERE entry_id IS NULL" if exclude_linked else ""
+    select_sql = f"""
     SELECT * FROM bets
+    {where_clause}
     ORDER BY created_at DESC
     LIMIT ?
     """
@@ -1042,7 +1050,7 @@ def get_performance_summary():
             'total_bets', 'wins', 'losses', 'pushes',
             'win_rate', 'roi'
     """
-    # SQL aggregation query to count outcomes
+    # SQL aggregation query to count outcomes (exclude parlay legs)
     summary_sql = """
     SELECT
         COUNT(*) as total_bets,
@@ -1054,6 +1062,7 @@ def get_performance_summary():
         END) as win_rate
     FROM bets
     WHERE result IS NOT NULL AND result != ''
+      AND entry_id IS NULL
     """
 
     try:
