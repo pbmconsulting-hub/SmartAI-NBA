@@ -308,7 +308,12 @@ def get_team_stats(progress_callback=None):
 
 
 def get_defensive_ratings(force=False, progress_callback=None):
-    """Retrieve defensive ratings from the local DB only."""
+    """Retrieve defensive ratings from the local DB only.
+
+    Note: The *force* parameter is retained for backward compatibility
+    with existing callers but has no effect — data is always read from
+    the DB without any live API call.
+    """
     if _is_db_available():
         try:
             from data.etl_data_service import get_all_defense_vs_position as _db_get_dvp
