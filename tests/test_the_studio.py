@@ -1087,5 +1087,312 @@ class TestHelperFunctionsWork(unittest.TestCase):
         self.assertEqual(render_verdict_heatmap_html([{"edge": 5}]), "")
 
 
+# ── Tests for new Joseph enhancements ─────────────────────────
+
+class TestStudioNewFeatures(unittest.TestCase):
+    """Test new Studio page features: monologue, hot take, voice input."""
+
+    def setUp(self):
+        self.filepath = os.path.join(
+            os.path.dirname(__file__), "..",
+            "pages", "7_🎙️_The_Studio.py",
+        )
+        with open(self.filepath, "r") as fh:
+            self.source = fh.read()
+
+    def test_monologue_of_the_night(self):
+        """Studio should have Joseph's Monologue of the Night."""
+        self.assertIn("MONOLOGUE OF THE NIGHT", self.source)
+
+    def test_monologue_openers_defined(self):
+        self.assertIn("_MONOLOGUE_OPENERS", self.source)
+
+    def test_generate_monologue_function(self):
+        self.assertIn("_generate_monologue", self.source)
+
+    def test_hot_take_mode_toggle(self):
+        """Studio should have a Hot Take Mode toggle."""
+        self.assertIn("joseph_hot_take_mode", self.source)
+        self.assertIn("Hot Take Mode", self.source)
+
+    def test_voice_to_text_input(self):
+        """Studio should have voice-to-text input."""
+        self.assertIn("SpeechRecognition", self.source)
+        self.assertIn("Ask Joseph a question", self.source)
+
+
+class TestConditionalAvatar(unittest.TestCase):
+    """Test vibe-based avatar selection in joseph_live_desk."""
+
+    def test_get_joseph_avatar_for_vibe_importable(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_for_vibe
+        self.assertTrue(callable(get_joseph_avatar_for_vibe))
+
+    def test_get_joseph_avatar_panicking_b64_importable(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_panicking_b64
+        self.assertTrue(callable(get_joseph_avatar_panicking_b64))
+
+    def test_get_joseph_avatar_victory_b64_importable(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_victory_b64
+        self.assertTrue(callable(get_joseph_avatar_victory_b64))
+
+    def test_vibe_returns_string(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_for_vibe
+        result = get_joseph_avatar_for_vibe("Victory")
+        self.assertIsInstance(result, str)
+
+    def test_vibe_panic_returns_string(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_for_vibe
+        result = get_joseph_avatar_for_vibe("Panic")
+        self.assertIsInstance(result, str)
+
+    def test_vibe_empty_returns_string(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_for_vibe
+        result = get_joseph_avatar_for_vibe("")
+        self.assertIsInstance(result, str)
+
+
+class TestJosephCompareProps(unittest.TestCase):
+    """Test joseph_compare_props in joseph_brain."""
+
+    def setUp(self):
+        from engine.joseph_brain import joseph_compare_props
+        self.compare = joseph_compare_props
+
+    def test_importable(self):
+        self.assertTrue(callable(self.compare))
+
+    def test_empty_lines(self):
+        result = self.compare("Test Player", "points", [])
+        self.assertIn("best_platform", result)
+        self.assertEqual(result["best_platform"], "")
+
+    def test_single_line(self):
+        result = self.compare("LeBron James", "points", [
+            {"platform": "PrizePicks", "line": 24.5},
+        ])
+        self.assertEqual(result["best_platform"], "PrizePicks")
+        self.assertEqual(result["line_spread"], 0.0)
+
+    def test_multiple_lines_best_value(self):
+        result = self.compare("LeBron James", "points", [
+            {"platform": "PrizePicks", "line": 24.5},
+            {"platform": "DraftKings", "line": 25.5},
+            {"platform": "Underdog", "line": 26.0},
+        ])
+        self.assertEqual(result["best_platform"], "PrizePicks")
+        self.assertEqual(result["line_spread"], 1.5)
+        self.assertIn("all_lines", result)
+        self.assertEqual(len(result["all_lines"]), 3)
+
+    def test_same_lines_no_edge(self):
+        result = self.compare("Curry", "three_pointers", [
+            {"platform": "PrizePicks", "line": 4.5},
+            {"platform": "DraftKings", "line": 4.5},
+        ])
+        self.assertEqual(result["line_spread"], 0.0)
+
+
+class TestJosephGutCall(unittest.TestCase):
+    """Test joseph_gut_call in joseph_brain."""
+
+    def setUp(self):
+        from engine.joseph_brain import joseph_gut_call
+        self.gut_call = joseph_gut_call
+
+    def test_importable(self):
+        self.assertTrue(callable(self.gut_call))
+
+    def test_no_trigger(self):
+        result = self.gut_call({"verdict": "LEAN", "edge": 5.0}, [])
+        self.assertFalse(result["is_gut_call"])
+
+    def test_revenge_game_trigger(self):
+        result = self.gut_call(
+            {"verdict": "FADE", "edge": 1.0},
+            ["revenge_game"],
+        )
+        self.assertTrue(result["is_gut_call"])
+        self.assertEqual(result["gut_direction"], "OVER")
+        self.assertIn("revenge", result["gut_reason"].lower())
+
+    def test_high_edge_resists_gut(self):
+        result = self.gut_call(
+            {"verdict": "SMASH", "edge": 10.0},
+            ["revenge_game"],
+        )
+        self.assertFalse(result["is_gut_call"])
+
+    def test_back_to_back_under(self):
+        result = self.gut_call(
+            {"verdict": "STAY_AWAY", "edge": 1.5},
+            ["back_to_back"],
+        )
+        self.assertTrue(result["is_gut_call"])
+        self.assertEqual(result["gut_direction"], "UNDER")
+
+
+class TestPositionSpecificTake(unittest.TestCase):
+    """Test position-specific language in joseph_eval."""
+
+    def test_joseph_take_not_empty(self):
+        from engine.joseph_eval import joseph_grade_player
+        player = {
+            "name": "Test Player", "position": "PG",
+            "points_avg": 25.0, "assists_avg": 8.0, "rebounds_avg": 5.0,
+            "steals_avg": 1.5, "blocks_avg": 0.5, "turnovers_avg": 3.0,
+            "minutes_avg": 35.0, "fg3a": 6.0, "fg3_pct": 0.38,
+            "fga": 18.0, "fta": 6.0, "defensive_rebounds_avg": 4.0,
+        }
+        ctx = {
+            "opponent_team": "BOS", "opponent_def_rating": 108,
+            "narrative_tags": [], "scheme": {"primary_scheme": "switch_everything"},
+            "spread": -3.0, "total": 220, "rest_days": 2,
+        }
+        result = joseph_grade_player(player, ctx)
+        self.assertIn("joseph_take", result)
+        self.assertTrue(len(result["joseph_take"]) > 0)
+
+    def test_center_take_different(self):
+        from engine.joseph_eval import joseph_grade_player
+        player_pg = {"name": "PG", "position": "PG", "points_avg": 20.0,
+                     "assists_avg": 7.0, "rebounds_avg": 4.0, "steals_avg": 1.0,
+                     "blocks_avg": 0.2, "turnovers_avg": 3.0, "minutes_avg": 32.0,
+                     "fg3a": 5.0, "fg3_pct": 0.35, "fga": 15.0, "fta": 4.0,
+                     "defensive_rebounds_avg": 3.0}
+        player_c = {"name": "C", "position": "C", "points_avg": 20.0,
+                    "assists_avg": 3.0, "rebounds_avg": 11.0, "steals_avg": 0.5,
+                    "blocks_avg": 2.0, "turnovers_avg": 2.0, "minutes_avg": 32.0,
+                    "fg3a": 1.0, "fg3_pct": 0.30, "fga": 14.0, "fta": 5.0,
+                    "defensive_rebounds_avg": 8.0}
+        ctx = {"opponent_team": "", "opponent_def_rating": 110,
+               "narrative_tags": [], "scheme": {}, "spread": 0, "total": 0,
+               "rest_days": 2}
+        pg_result = joseph_grade_player(player_pg, ctx)
+        c_result = joseph_grade_player(player_c, ctx)
+        # Different positions should generate different takes
+        self.assertNotEqual(pg_result["joseph_take"], c_result["joseph_take"])
+
+
+class TestJosephDiary(unittest.TestCase):
+    """Test the persistent diary module."""
+
+    def test_imports(self):
+        from tracking.joseph_diary import (
+            diary_log_entry,
+            diary_get_entry,
+            diary_get_yesterday,
+            diary_get_week_summary,
+            diary_get_yesterday_reference,
+        )
+        self.assertTrue(callable(diary_log_entry))
+        self.assertTrue(callable(diary_get_entry))
+        self.assertTrue(callable(diary_get_yesterday))
+        self.assertTrue(callable(diary_get_week_summary))
+        self.assertTrue(callable(diary_get_yesterday_reference))
+
+    def test_week_summary_structure(self):
+        from tracking.joseph_diary import diary_get_week_summary
+        summary = diary_get_week_summary()
+        self.assertIn("week_wins", summary)
+        self.assertIn("week_losses", summary)
+        self.assertIn("brag_intensity", summary)
+        self.assertIn("narrative_arc", summary)
+        self.assertIsInstance(summary["brag_intensity"], float)
+
+    def test_yesterday_reference_returns_string(self):
+        from tracking.joseph_diary import diary_get_yesterday_reference
+        result = diary_get_yesterday_reference()
+        self.assertIsInstance(result, str)
+
+
+class TestLivePersonaExpansion(unittest.TestCase):
+    """Test expanded live_persona features."""
+
+    def test_record_chase_fragments(self):
+        from agent.live_persona import _RECORD_CHASE
+        self.assertGreater(len(_RECORD_CHASE), 0)
+        # Should have format placeholders
+        self.assertIn("{remaining}", _RECORD_CHASE[0])
+
+    def test_redemption_arc_fragments(self):
+        from agent.live_persona import _REDEMPTION_ARC
+        self.assertGreater(len(_REDEMPTION_ARC), 0)
+
+    def test_quarter_voice_dict(self):
+        from agent.live_persona import _QUARTER_VOICE
+        self.assertIn("Q1", _QUARTER_VOICE)
+        self.assertIn("Q4", _QUARTER_VOICE)
+        self.assertGreater(len(_QUARTER_VOICE["Q4"]), 0)
+
+    def test_reaction_with_record_chase(self):
+        from agent.live_persona import get_joseph_live_reaction
+        result = get_joseph_live_reaction({
+            "record_chase": True,
+            "record_remaining": 5,
+            "record_stat": "points",
+            "direction": "OVER",
+        })
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+
+    def test_reaction_with_redemption(self):
+        from agent.live_persona import get_joseph_live_reaction
+        result = get_joseph_live_reaction({
+            "is_redemption": True,
+            "direction": "OVER",
+        })
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+
+    def test_reaction_with_quarter(self):
+        from agent.live_persona import get_joseph_live_reaction
+        result = get_joseph_live_reaction({
+            "quarter": "Q4",
+            "direction": "OVER",
+        })
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 0)
+
+    def test_prompt_includes_record_chase(self):
+        from agent.live_persona import LIVE_JOSEPH_PROMPT
+        self.assertIn("RECORD_CHASE", LIVE_JOSEPH_PROMPT)
+
+    def test_prompt_includes_redemption(self):
+        from agent.live_persona import LIVE_JOSEPH_PROMPT
+        self.assertIn("Redemption Arc", LIVE_JOSEPH_PROMPT)
+
+
+class TestBroadcastTicker(unittest.TestCase):
+    """Test the global broadcast ticker in utils/components.py."""
+
+    def test_ticker_css_exists(self):
+        from utils.components import _TICKER_CSS
+        self.assertIn("joseph-broadcast-ticker", _TICKER_CSS)
+        self.assertIn("tickerScroll", _TICKER_CSS)
+
+    def test_render_broadcast_ticker_importable(self):
+        from utils.components import _render_broadcast_ticker
+        self.assertTrue(callable(_render_broadcast_ticker))
+
+
+class TestLiveModeCSS(unittest.TestCase):
+    """Test Live Mode CSS additions."""
+
+    def test_live_mode_avatar_css(self):
+        from styles.live_theme import get_live_mode_avatar_css
+        css = get_live_mode_avatar_css()
+        self.assertIn("joseph-avatar-live-mode", css)
+        self.assertIn("josephLivePulse", css)
+
+    def test_direction_theme_colors(self):
+        from styles.live_theme import get_live_mode_avatar_css
+        css = get_live_mode_avatar_css()
+        self.assertIn("direction-over", css)
+        self.assertIn("direction-under", css)
+        self.assertIn("#ff5e00", css)
+        self.assertIn("#00c8ff", css)
+
+
 if __name__ == "__main__":
     unittest.main()

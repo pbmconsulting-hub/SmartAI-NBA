@@ -217,6 +217,9 @@ def _render_broadcast_ticker():
         f'</div>',
         unsafe_allow_html=True,
     )
+
+
+def inject_joseph_floating():
     """Render the Joseph M. Smith floating widget in the main content area.
 
     Delegates to :func:`utils.joseph_widget.render_joseph_floating_widget`
