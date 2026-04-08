@@ -432,6 +432,7 @@ def render_joseph_sidebar_widget() -> None:
 
         # ── Track-record mini badge ───────────────────────────
         track_html = ""
+        diary_html = ""
         try:
             record = joseph_get_track_record()
             total = record.get("total", 0)
@@ -440,13 +441,39 @@ def render_joseph_sidebar_widget() -> None:
                 losses = record.get("losses", 0)
                 roi = record.get("roi_estimate", 0.0)
                 roi_sign = "+" if roi >= 0 else ""
+                # Brag intensity scales with ROI — connected to track record
+                if roi >= 5.0:
+                    brag_style = "color:#00ff9d;"
+                elif roi >= 0:
+                    brag_style = "color:#eab308;"
+                else:
+                    brag_style = "color:#ff4444;"
                 track_html = (
                     f'<div class="joseph-track-record">'
                     f'📊 {wins}W-{losses}L '
-                    f'<span style="color:#00ff9d;">{roi_sign}{roi:.1f}% ROI</span>'
+                    f'<span style="{brag_style}">{roi_sign}{roi:.1f}% ROI</span>'
                     f'</div>'
                 )
+                # Update diary with track record
+                try:
+                    from tracking.joseph_diary import diary_update_from_track_record
+                    diary_update_from_track_record(record)
+                except ImportError:
+                    pass
         except Exception:
+            pass
+
+        # ── Yesterday reference (diary integration) ───────────
+        try:
+            from tracking.joseph_diary import diary_get_yesterday_reference
+            yesterday_ref = diary_get_yesterday_reference()
+            if yesterday_ref:
+                diary_html = (
+                    f'<div style="color:#94a3b8;font-size:0.68rem;'
+                    f'font-style:italic;margin-top:4px;line-height:1.3">'
+                    f'{_html.escape(yesterday_ref)}</div>'
+                )
+        except ImportError:
             pass
 
         # ── Compose sidebar HTML ──────────────────────────────
@@ -459,6 +486,7 @@ def render_joseph_sidebar_widget() -> None:
                 f'{escaped_ambient}'
                 f'</div>'
                 f'{track_html}'
+                f'{diary_html}'
                 f'</div>',
                 unsafe_allow_html=True,
             )

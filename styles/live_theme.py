@@ -1453,3 +1453,59 @@ def get_keyboard_shortcuts_js() -> str:
     });
 })();
 </script>"""
+
+
+def get_live_mode_avatar_css() -> str:
+    """Return CSS for the 'Live Mode' animated border on Joseph's avatar.
+
+    Produces a pulsing orange glow that activates only on the Live Sweat
+    page to indicate active in-game tracking.
+    """
+    return """<style>
+/* ── Live Mode Animated Avatar Border ────────────────────── */
+/* Pulsing orange glow ring that activates during in-game tracking */
+.joseph-avatar-live-mode {
+    border-radius: 50%;
+    border: 3px solid #ff5e00;
+    box-shadow: 0 0 16px rgba(255, 94, 0, 0.6),
+                0 0 32px rgba(255, 94, 0, 0.3),
+                0 0 48px rgba(255, 94, 0, 0.15);
+    animation: josephLivePulse 1.8s ease-in-out infinite;
+}
+@keyframes josephLivePulse {
+    0%, 100% {
+        box-shadow: 0 0 16px rgba(255, 94, 0, 0.6),
+                    0 0 32px rgba(255, 94, 0, 0.3),
+                    0 0 48px rgba(255, 94, 0, 0.15);
+        border-color: #ff5e00;
+    }
+    50% {
+        box-shadow: 0 0 24px rgba(255, 94, 0, 0.8),
+                    0 0 48px rgba(255, 94, 0, 0.5),
+                    0 0 72px rgba(255, 94, 0, 0.25);
+        border-color: #ff9e00;
+    }
+}
+/* ── Direction-Based Theme Colors ────────────────────────── */
+/* Orange (#ff5e00) for OVER bets, Icy blue (#00c8ff) for UNDER bets */
+.sweat-card.direction-over {
+    --direction-color: #ff5e00;
+    --direction-glow: rgba(255, 94, 0, 0.3);
+    border-left: 3px solid #ff5e00;
+}
+.sweat-card.direction-under {
+    --direction-color: #00c8ff;
+    --direction-glow: rgba(0, 200, 255, 0.3);
+    border-left: 3px solid #00c8ff;
+}
+.sweat-card.direction-over .sweat-direction-badge {
+    background: rgba(255, 94, 0, 0.15);
+    color: #ff5e00;
+    border: 1px solid rgba(255, 94, 0, 0.3);
+}
+.sweat-card.direction-under .sweat-direction-badge {
+    background: rgba(0, 200, 255, 0.15);
+    color: #00c8ff;
+    border: 1px solid rgba(0, 200, 255, 0.3);
+}
+</style>"""

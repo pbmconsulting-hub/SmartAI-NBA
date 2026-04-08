@@ -397,7 +397,7 @@ class TestSubVibeOptions(unittest.TestCase):
 
     def test_has_four_options(self):
         from agent.live_persona import SUB_VIBE_OPTIONS
-        self.assertEqual(len(SUB_VIBE_OPTIONS), 4)
+        self.assertEqual(len(SUB_VIBE_OPTIONS), 5)
 
     def test_expected_values(self):
         from agent.live_persona import SUB_VIBE_OPTIONS
@@ -405,6 +405,7 @@ class TestSubVibeOptions(unittest.TestCase):
         self.assertIn("Conspiracy", SUB_VIBE_OPTIONS)
         self.assertIn("Delusional Hype", SUB_VIBE_OPTIONS)
         self.assertIn("Deep Depression", SUB_VIBE_OPTIONS)
+        self.assertIn("Redemption Arc", SUB_VIBE_OPTIONS)
 
 
 class TestBuildLiveJosephMessages(unittest.TestCase):

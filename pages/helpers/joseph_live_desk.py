@@ -54,13 +54,13 @@ except ImportError:
 # ═════════════════════════════════════════════════════════════
 
 @st.cache_data(show_spinner=False)
-def get_joseph_avatar_b64() -> str:
-    """Load Joseph M Smith Avatar.png and return base64-encoded string."""
+def _load_avatar_file(filename: str) -> str:
+    """Load a named avatar PNG and return base64-encoded string."""
     _this = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(_this, "..", "..", "Joseph M Smith Avatar.png"),
-        os.path.join(os.getcwd(), "Joseph M Smith Avatar.png"),
-        os.path.join(_this, "..", "..", "assets", "Joseph M Smith Avatar.png"),
+        os.path.join(_this, "..", "..", filename),
+        os.path.join(os.getcwd(), filename),
+        os.path.join(_this, "..", "..", "assets", filename),
     ]
     for path in candidates:
         norm = os.path.normpath(path)
@@ -71,8 +71,52 @@ def get_joseph_avatar_b64() -> str:
                     return base64.b64encode(fh.read()).decode("utf-8")
             except Exception:
                 _logger.warning("Failed reading avatar at %s", norm)
-    _logger.warning("Joseph M Smith Avatar.png not found in any candidate path")
+    _logger.warning("%s not found in any candidate path", filename)
     return ""
+
+
+def get_joseph_avatar_b64() -> str:
+    """Load Joseph M Smith Avatar.png and return base64-encoded string.
+
+    Falls back through Victory → default avatar filenames.
+    """
+    for name in ("Joseph M Smith Avatar Victory.png",
+                 "Joseph M Smith Avatar.png"):
+        b64 = _load_avatar_file(name)
+        if b64:
+            return b64
+    return ""
+
+
+def get_joseph_avatar_panicking_b64() -> str:
+    """Load Joseph M Smith Avatar Panicking.png and return base64."""
+    return _load_avatar_file("Joseph M Smith Avatar Panicking.png")
+
+
+def get_joseph_avatar_victory_b64() -> str:
+    """Load Joseph M Smith Avatar Victory.png and return base64."""
+    return _load_avatar_file("Joseph M Smith Avatar Victory.png")
+
+
+def get_joseph_avatar_for_vibe(vibe_status: str = "") -> str:
+    """Return the appropriate avatar base64 string based on vibe_status.
+
+    * ``"Panic"`` / ``"Disgust"`` / ``"Sweating"`` → Panicking avatar
+    * ``"Victory"`` / ``"Hype"`` → Victory avatar
+    * Anything else → default (Victory) avatar
+
+    Falls back to the default avatar if the vibe-specific one is missing.
+    """
+    vibe = str(vibe_status).strip().lower()
+    if vibe in ("panic", "disgust", "sweating"):
+        b64 = get_joseph_avatar_panicking_b64()
+        if b64:
+            return b64
+    elif vibe in ("victory", "hype"):
+        b64 = get_joseph_avatar_victory_b64()
+        if b64:
+            return b64
+    return get_joseph_avatar_b64()
 
 
 # ═════════════════════════════════════════════════════════════

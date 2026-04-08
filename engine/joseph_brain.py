@@ -4456,3 +4456,225 @@ def joseph_vault_reaction(discrepancies: list, mode: str = "joseph") -> str:
         if mode == "professor":
             return "Unable to generate analysis at this time."
         return "The Vault is loading... Joseph M. Smith will have his take SHORTLY."
+
+
+# ═══════════════════════════════════════════════════════════════
+# joseph_compare_props — Cross-platform prop comparison
+# ═══════════════════════════════════════════════════════════════
+
+def joseph_compare_props(player_name: str, stat_type: str,
+                         lines: list) -> dict:
+    """Compare prop lines across platforms for the same player+stat.
+
+    When multiple sportsbooks offer different lines for the same player
+    prop, Joseph identifies the best value and explains why.
+
+    Parameters
+    ----------
+    player_name : str
+        Player's full name.
+    stat_type : str
+        The stat category (e.g. ``"points"``, ``"assists"``).
+    lines : list[dict]
+        Each dict has keys ``platform`` (str), ``line`` (float),
+        and optionally ``direction`` (str, default ``"OVER"``).
+
+    Returns
+    -------
+    dict
+        ``best_platform``, ``best_line``, ``line_spread``, ``take``,
+        and ``all_lines`` (sorted).
+    """
+    try:
+        if not lines or not isinstance(lines, list):
+            return {
+                "best_platform": "",
+                "best_line": 0.0,
+                "line_spread": 0.0,
+                "take": "No lines available to compare.",
+                "all_lines": [],
+            }
+
+        parsed = []
+        for entry in lines:
+            if not isinstance(entry, dict):
+                continue
+            plat = str(entry.get("platform", "Unknown"))
+            ln = _safe_float(entry.get("line", 0.0))
+            direction = str(entry.get("direction", "OVER")).upper()
+            parsed.append({"platform": plat, "line": ln, "direction": direction})
+
+        if not parsed:
+            return {
+                "best_platform": "",
+                "best_line": 0.0,
+                "line_spread": 0.0,
+                "take": "Could not parse any prop lines.",
+                "all_lines": [],
+            }
+
+        parsed.sort(key=lambda x: x["line"])
+        lowest = parsed[0]
+        highest = parsed[-1]
+        spread = highest["line"] - lowest["line"]
+
+        # Best value: lowest line for OVER, highest for UNDER
+        direction = parsed[0].get("direction", "OVER")
+        if direction == "UNDER":
+            best = highest
+        else:
+            best = lowest
+
+        if spread == 0:
+            take = (
+                f"All platforms have {player_name}'s {stat_type} at {lowest['line']} — "
+                f"no line-shopping edge here. Pick the platform you trust."
+            )
+        elif spread <= 1.0:
+            take = (
+                f"LISTEN — there's a HALF-POINT to a FULL-POINT gap on "
+                f"{player_name}'s {stat_type}. {best['platform']} has the "
+                f"BEST number at {best['line']}. That's where I'm placing MY bet."
+            )
+        else:
+            take = (
+                f"🚨 BIG discrepancy on {player_name}'s {stat_type}! "
+                f"{lowest['platform']} has it at {lowest['line']} while "
+                f"{highest['platform']} has {highest['line']} — that's a "
+                f"{spread:.1f}-point spread! {best['platform']} at {best['line']} "
+                f"is the CLEAR play. This is FREE MONEY if you're shopping lines."
+            )
+
+        return {
+            "best_platform": best["platform"],
+            "best_line": best["line"],
+            "line_spread": round(spread, 1),
+            "take": take,
+            "all_lines": parsed,
+        }
+
+    except Exception as exc:
+        logger.debug("joseph_compare_props error: %s", exc)
+        return {
+            "best_platform": "",
+            "best_line": 0.0,
+            "line_spread": 0.0,
+            "take": "Joseph couldn't compare these lines right now.",
+            "all_lines": [],
+        }
+
+
+# ═══════════════════════════════════════════════════════════════
+# joseph_gut_call — "Joseph's Gut Call" Override Mode
+# ═══════════════════════════════════════════════════════════════
+
+# Gut-call triggers: conditions that make Joseph override math with instinct
+_GUT_CALL_TRIGGERS = [
+    {
+        "name": "revenge_narrative",
+        "check": lambda tags: "revenge_game" in tags,
+        "direction_bias": "OVER",
+        "reason": "Revenge games bring out the DEMON in elite players. Math says one thing — the human heart says ANOTHER.",
+    },
+    {
+        "name": "nationally_televised_star",
+        "check": lambda tags: "nationally_televised" in tags,
+        "direction_bias": "OVER",
+        "reason": "Prime-time lights, national TV, all eyes watching — STARS show up. I've seen it a THOUSAND times.",
+    },
+    {
+        "name": "contract_year_hunger",
+        "check": lambda tags: "contract_year" in tags,
+        "direction_bias": "OVER",
+        "reason": "Contract year HUNGER is the most powerful force in sports. This man is playing for his FUTURE.",
+    },
+    {
+        "name": "back_to_back_fade",
+        "check": lambda tags: "back_to_back" in tags,
+        "direction_bias": "UNDER",
+        "reason": "Back-to-backs are SILENT killers. The math won't show the dead legs, but Joseph M. Smith KNOWS.",
+    },
+    {
+        "name": "altitude_drain",
+        "check": lambda tags: "altitude" in tags,
+        "direction_bias": "UNDER",
+        "reason": "Playing at 5,280 feet in Denver DRAINS energy. The oxygen debt is REAL and the stats PROVE it.",
+    },
+]
+
+
+def joseph_gut_call(analysis_result: dict, narrative_tags: list = None,
+                    override_threshold: float = 3.0) -> dict:
+    """Joseph's Gut Call — where instinct overrides math.
+
+    When narrative triggers are present, Joseph may override the
+    mathematical verdict with his instinct-based call.
+
+    Parameters
+    ----------
+    analysis_result : dict
+        Result from ``joseph_full_analysis`` or ``joseph_analyze_pick``.
+    narrative_tags : list[str] or None
+        Narrative tags for the game situation.
+    override_threshold : float
+        Minimum edge required for math to resist a gut-call override.
+        Below this, Joseph's gut wins.
+
+    Returns
+    -------
+    dict
+        ``is_gut_call`` (bool), ``gut_direction`` (str),
+        ``gut_reason`` (str), ``original_verdict`` (str),
+        ``gut_verdict`` (str), ``confidence_boost`` (float).
+    """
+    try:
+        if narrative_tags is None:
+            narrative_tags = analysis_result.get("narrative_tags", []) or []
+
+        edge = abs(_safe_float(analysis_result.get("edge", 0.0)))
+        original_verdict = str(analysis_result.get("verdict", "STAY_AWAY"))
+
+        # Check if any gut-call trigger fires
+        for trigger in _GUT_CALL_TRIGGERS:
+            if trigger["check"](narrative_tags):
+                # Joseph's gut only overrides when the math edge is thin
+                if edge < override_threshold:
+                    gut_direction = trigger["direction_bias"]
+                    if gut_direction == "OVER":
+                        # For OVER gut calls, upgrade weak verdicts to LEAN
+                        gut_verdict = "LEAN" if original_verdict in ("FADE", "STAY_AWAY") else original_verdict
+                    else:
+                        # For UNDER gut calls, flip direction and downgrade strong OVER verdicts
+                        gut_verdict = "FADE" if original_verdict in ("SMASH", "LEAN") else original_verdict
+
+                    return {
+                        "is_gut_call": True,
+                        "gut_direction": gut_direction,
+                        "gut_reason": trigger["reason"],
+                        "original_verdict": original_verdict,
+                        "gut_verdict": gut_verdict,
+                        "trigger_name": trigger["name"],
+                        "confidence_boost": 5.0,
+                    }
+
+        return {
+            "is_gut_call": False,
+            "gut_direction": "",
+            "gut_reason": "",
+            "original_verdict": original_verdict,
+            "gut_verdict": original_verdict,
+            "trigger_name": "",
+            "confidence_boost": 0.0,
+        }
+
+    except Exception as exc:
+        logger.debug("joseph_gut_call error: %s", exc)
+        return {
+            "is_gut_call": False,
+            "gut_direction": "",
+            "gut_reason": "",
+            "original_verdict": str(analysis_result.get("verdict", "STAY_AWAY")),
+            "gut_verdict": str(analysis_result.get("verdict", "STAY_AWAY")),
+            "trigger_name": "",
+            "confidence_boost": 0.0,
+        }

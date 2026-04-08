@@ -1324,10 +1324,12 @@ if _home_one_click:
 def _load_joseph_avatar_b64() -> str:
     """Load the Joseph M Smith Avatar and return base64-encoded string."""
     _this = os.path.dirname(os.path.abspath(__file__))
-    candidates = [
-        os.path.join(_this, "Joseph M Smith Avatar.png"),
-        os.path.join(_this, "assets", "Joseph M Smith Avatar.png"),
-    ]
+    candidates = []
+    for name in ("Joseph M Smith Avatar Victory.png", "Joseph M Smith Avatar.png"):
+        candidates.extend([
+            os.path.join(_this, name),
+            os.path.join(_this, "assets", name),
+        ])
     for path in candidates:
         norm = os.path.normpath(path)
         if os.path.isfile(norm):

@@ -240,6 +240,91 @@ def _determine_scheme_fit(archetype: str, scheme: dict) -> str:
 
 
 # ------------------------------------------------------------------
+# Position-specific language — Joseph talks differently about each role
+# ------------------------------------------------------------------
+
+_POSITION_TAKES: dict = {
+    "PG": {
+        "high": "This floor general is RUNNING the show tonight — the offense flows through his hands.",
+        "mid":  "Decent orchestrator at the point, but he's not taking over any games from the perimeter.",
+        "low":  "I wouldn't trust this point guard to run a pick-up game at the YMCA right now.",
+    },
+    "SG": {
+        "high": "This shooting guard is a FLAMETHROWER tonight — every catch-and-shoot is a dagger.",
+        "mid":  "Solid two-guard, but he's more of a role player than a shot-maker in this matchup.",
+        "low":  "This two-guard is ICE COLD — I'm not touching any of his props with a ten-foot pole.",
+    },
+    "SF": {
+        "high": "This wing is a MATCHUP NIGHTMARE — versatile enough to attack from everywhere.",
+        "mid":  "Decent wing production, but he's not the kind of guy I'm building my slate around.",
+        "low":  "This small forward is getting LOCKED UP on the wing — absolutely invisible.",
+    },
+    "PF": {
+        "high": "This power forward is DOMINATING both ends — rebounding, scoring, protecting the rim.",
+        "mid":  "Solid four-man, doing his job in the paint but nothing to write home about.",
+        "low":  "This four is getting BODIED in the post — out-worked and out-muscled tonight.",
+    },
+    "C": {
+        "high": "This big man is an ABSOLUTE TOWER — controlling the paint on both ends of the floor.",
+        "mid":  "Your classic center — does the dirty work but don't expect him to take over the game.",
+        "low":  "This center is a TURNSTILE on defense and invisible on offense — hard pass.",
+    },
+    "G": {
+        "high": "This guard is ELECTRIC — creating shots for himself AND others with ease.",
+        "mid":  "Serviceable guard play, but I'm not rushing to bet on this kind of production.",
+        "low":  "This guard is a LIABILITY — can't shoot, can't create, can't defend. Next!",
+    },
+    "F": {
+        "high": "This forward is the ultimate SWISS ARMY KNIFE — versatile impact on both ends.",
+        "mid":  "Solid forward doing a bit of everything but not excelling at anything tonight.",
+        "low":  "This forward is getting EXPOSED — no impact on either end of the floor.",
+    },
+}
+
+
+def _position_specific_take(position: str, archetype: str,
+                            offense: float, defense: float,
+                            impact: float, matchup: float,
+                            scheme_fit: str) -> str:
+    """Generate a position-specific Joseph take.
+
+    Args:
+        position: Player position (e.g. ``"PG"``, ``"C"``).
+        archetype: Player archetype from classification.
+        offense: Offense grade (0-100).
+        defense: Defense grade (0-100).
+        impact: Impact grade (0-100).
+        matchup: Matchup grade (0-100).
+        scheme_fit: ``'exploitable'``, ``'problematic'``, or ``'neutral'``.
+
+    Returns:
+        A Joseph-style position-flavored take string.
+    """
+    # Normalize position to abbreviated form
+    pos = position.upper().strip()
+    pos_map = {"POINT GUARD": "PG", "SHOOTING GUARD": "SG", "SMALL FORWARD": "SF",
+               "POWER FORWARD": "PF", "CENTER": "C", "GUARD": "G", "FORWARD": "F",
+               "G-F": "G", "F-G": "F", "F-C": "F", "C-F": "C"}
+    pos = pos_map.get(pos, pos)
+
+    tier = "high" if impact >= 70 else "mid" if impact >= 45 else "low"
+    takes = _POSITION_TAKES.get(pos, _POSITION_TAKES.get("G" if "G" in pos else "F", {
+        "high": "This player is making a SERIOUS case for best in show tonight.",
+        "mid":  "Average production — nothing to write home about.",
+        "low":  "I am NOT touching this player's props tonight.",
+    }))
+    base = takes.get(tier, takes.get("mid", ""))
+
+    # Append scheme-fit flavor
+    if scheme_fit == "exploitable":
+        base += " And the opponent's scheme is PERFECT for his skillset — GREEN LIGHT."
+    elif scheme_fit == "problematic":
+        base += " The defensive scheme is a PROBLEM though — could limit his ceiling."
+
+    return base
+
+
+# ------------------------------------------------------------------
 # Core evaluation
 # ------------------------------------------------------------------
 
@@ -477,7 +562,12 @@ def joseph_grade_player(player: dict, game_context: dict) -> dict:
             "offensive_profile": offensive_profile,
             "defensive_profile": defensive_profile,
             "tonight_factors": tonight_factors,
-            "joseph_take": "",
+            "archetype": archetype,
+            "position": position,
+            "joseph_take": _position_specific_take(position, archetype,
+                                                   offense_grade, defense_grade,
+                                                   impact_grade, matchup_grade,
+                                                   scheme_fit_label),
         }
 
     except Exception:
