@@ -2443,8 +2443,11 @@ def save_page_state(session_dict):
     Uses INSERT OR REPLACE on a single-row table (state_id=1).
 
     This is designed to be called frequently (every page render) so
-    that the latest data is always available for restoration.  Writes
-    are skipped when there is nothing meaningful to save.
+    that the latest data is always available for restoration.  Empty
+    containers are skipped during save so that a page that hasn't
+    populated a key yet doesn't wipe previously saved data for that
+    key.  The function merges new non-empty values into any existing
+    saved state before writing.
 
     Args:
         session_dict (dict): Mapping of state names to values.
@@ -2460,13 +2463,19 @@ def save_page_state(session_dict):
         for k, v in session_dict.items():
             if k not in _PERSISTED_PAGE_STATE_KEYS:
                 continue
-            # Skip empty containers to avoid overwriting good data with blanks
+            # Skip empty containers so we don't overwrite previously
+            # saved non-empty values for keys that haven't been populated
+            # in the current page context.
             if isinstance(v, (list, dict)) and not v:
                 continue
             filtered[k] = v
         if not filtered:
             return True  # Nothing to save
-        _state_json = json.dumps(filtered, default=str)
+        # Merge with existing saved state so keys from other pages
+        # that aren't present in this render are preserved.
+        existing = load_page_state()
+        merged = {**existing, **filtered}
+        _state_json = json.dumps(merged, default=str)
         _execute_write(
             """INSERT OR REPLACE INTO page_state (state_id, state_json, updated_at)
                VALUES (1, ?, datetime('now'))""",

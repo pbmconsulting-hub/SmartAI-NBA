@@ -286,6 +286,9 @@ if not st.session_state.get("_page_state_restored"):
     for _key, _val in _page_state.items():
         if _key not in st.session_state:
             st.session_state[_key] = _val
+        elif isinstance(st.session_state[_key], (list, dict)) and not st.session_state[_key] and _val:
+            # Replace empty defaults with saved non-empty data
+            st.session_state[_key] = _val
 
 if "simulation_depth" not in st.session_state:
     st.session_state["simulation_depth"] = 1000

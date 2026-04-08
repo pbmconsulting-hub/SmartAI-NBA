@@ -120,25 +120,49 @@ class TestPageStatePersistence(unittest.TestCase):
         self.assertNotIn("joseph_enabled", loaded)
 
     def test_empty_containers_are_not_saved(self):
-        """Empty lists/dicts should not be persisted (avoid overwriting good data)."""
+        """Empty lists/dicts should not overwrite previously saved data.
+
+        When save_page_state is called with empty containers, those keys
+        are skipped.  The function merges new non-empty values into the
+        existing saved state, so previously saved keys are preserved.
+        """
         # First save with data
         self.db.save_page_state({
             "analysis_results": [{"player_name": "LeBron"}],
+            "selected_picks": [{"player_name": "Curry"}],
         })
-        # Save again with empty list — should not wipe the previous save
+        # Save again with empty analysis_results but non-empty picks
         self.db.save_page_state({
             "analysis_results": [],
-            "selected_picks": [],
+            "selected_picks": [{"player_name": "Updated Curry"}],
         })
         loaded = self.db.load_page_state()
-        # The original data should still be there since the second save
-        # skipped empty containers
+        # analysis_results should be preserved from the first save
+        # because the empty list was skipped during the second save
         self.assertEqual(len(loaded.get("analysis_results", [])), 1)
+        self.assertEqual(loaded["analysis_results"][0]["player_name"], "LeBron")
+        # selected_picks should be updated from the second save
+        self.assertEqual(loaded["selected_picks"][0]["player_name"], "Updated Curry")
 
     def test_empty_dict_returns_true(self):
         """Saving an empty dict should succeed (no-op)."""
         ok = self.db.save_page_state({})
         self.assertTrue(ok)
+
+    def test_merge_preserves_keys_from_other_pages(self):
+        """Saving data for one key should not wipe other previously saved keys."""
+        # Simulate page A saving analysis_results
+        self.db.save_page_state({
+            "analysis_results": [{"player_name": "Page A data"}],
+        })
+        # Simulate page B saving selected_picks only
+        self.db.save_page_state({
+            "selected_picks": [{"player_name": "Page B data"}],
+        })
+        loaded = self.db.load_page_state()
+        # Both keys should be present
+        self.assertEqual(loaded["analysis_results"][0]["player_name"], "Page A data")
+        self.assertEqual(loaded["selected_picks"][0]["player_name"], "Page B data")
 
     # ── Load when no state saved ──────────────────────────────
 

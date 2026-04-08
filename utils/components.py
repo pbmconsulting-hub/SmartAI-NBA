@@ -215,7 +215,7 @@ def _auto_restore_page_state():
         for key, value in saved.items():
             if key not in st.session_state:
                 st.session_state[key] = value
-            elif isinstance(st.session_state[key], (list, dict)) and not st.session_state[key]:
+            elif isinstance(st.session_state[key], (list, dict)) and not st.session_state[key] and value:
                 # Replace empty defaults with saved non-empty data
                 st.session_state[key] = value
     except Exception as exc:
