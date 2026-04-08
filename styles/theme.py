@@ -3125,6 +3125,7 @@ def get_game_report_html(game=None, analysis_results=None):
         reverse=True,
     )
     top_picks = results[:3]
+    all_picks = results  # render prop cards for every analysed pick
     today_str = _datetime.date.today().strftime("%B %d, %Y")
 
     # ── Game Data ─────────────────────────────────────────────
@@ -3240,7 +3241,7 @@ def get_game_report_html(game=None, analysis_results=None):
 
     # ── Prop Cards ────────────────────────────────────────────
     prop_cards = ""
-    for idx, pick in enumerate(top_picks):
+    for idx, pick in enumerate(all_picks):
         player    = pick.get("player_name", "Unknown")
         stat      = pick.get("stat_type", "points").capitalize()
         line      = pick.get("line", 0)
@@ -3410,19 +3411,43 @@ def get_game_report_html(game=None, analysis_results=None):
         )
 
     # ── Strategy Matrix ───────────────────────────────────────
+    # Use all picks (not just top 3) to build better combo recommendations.
+    _eligible = [
+        p for p in all_picks
+        if not p.get("should_avoid", False)
+        and not p.get("player_is_out", False)
+    ]
     strategy_rows = ""
-    if len(top_picks) >= 2:
+    if len(_eligible) >= 2:
+        # Pick unique players for each combo tier
+        def _unique_players(pool, n):
+            seen, out = set(), []
+            for p in pool:
+                pn = p.get("player_name", "")
+                if pn not in seen:
+                    seen.add(pn)
+                    out.append(p)
+                if len(out) == n:
+                    break
+            return out
+
         matrix = []
-        avg2 = sum(p.get("confidence_score", 75) for p in top_picks[:2]) / 2 / 10
-        matrix.append(("Pick 2", "fire", "danger",  top_picks[:2], "Power Play",  f"{avg2:.2f}"))
-        if len(top_picks) >= 3:
-            avg3 = sum(p.get("confidence_score", 75) for p in top_picks[:3]) / 3 / 10
-            matrix.append(("Pick 3", "lock",        "success", top_picks[:3], "Flex Core",   f"{avg3:.2f}"))
-            matrix.append(("Pick 5", "layer-group", "warning", top_picks[:3], "Stack Build", f"{avg3:.2f}"))
+        u2 = _unique_players(_eligible, 2)
+        if len(u2) >= 2:
+            avg2 = sum(p.get("confidence_score", 75) for p in u2) / 2 / 10
+            matrix.append(("Pick 2", "fire", "danger", u2, "Power Play", f"{avg2:.2f}"))
+        u3 = _unique_players(_eligible, 3)
+        if len(u3) >= 3:
+            avg3 = sum(p.get("confidence_score", 75) for p in u3) / 3 / 10
+            matrix.append(("Pick 3", "lock", "success", u3, "Flex Core", f"{avg3:.2f}"))
+        u5 = _unique_players(_eligible, 5)
+        if len(u5) >= 5:
+            avg5 = sum(p.get("confidence_score", 75) for p in u5) / 5 / 10
+            matrix.append(("Pick 5", "layer-group", "warning", u5, "Stack Build", f"{avg5:.2f}"))
 
         for combo, icon, color_name, picks, strategy, avg_ss in matrix:
             picks_html = ""
-            for j, p in enumerate(picks[:2]):
+            for j, p in enumerate(picks[:3]):
                 pname = _html.escape(p.get("player_name", ""))
                 pstat = p.get("stat_type", "").capitalize()
                 pline = p.get("line", 0)
@@ -3436,7 +3461,7 @@ def get_game_report_html(game=None, analysis_results=None):
                     f' {pname}</span>'
                     f'<span class="qds-strategy-prop">{pdir} {pline} {pstat}</span></div>'
                 )
-                if j == 0:
+                if j < len(picks[:3]) - 1:
                     picks_html += '<span style="color:var(--qds-text-muted);font-size:0.85rem;padding:3px 0;display:block;">+</span>'
             strategy_rows += (
                 f'<tr>'

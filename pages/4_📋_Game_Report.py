@@ -257,6 +257,7 @@ if todays_games:
 elif not todays_games and analysis_results:
     if st.button("📋 Generate Full Report for All Props", width="stretch"):
         st.session_state["game_report_show_all"] = True
+        st.rerun()
 
 elif not todays_games and not analysis_results:
     st.info(
@@ -316,8 +317,11 @@ def _is_fantasy_score_stat(stat_type: str) -> bool:
 def _build_entry_strategy(results):
     """Build entry strategy matrix entries from analysis results.
 
-    Enforces a unique-player constraint: each parlay leg must be a
-    different player.  Fantasy-score composite stat types are excluded
+    Returns two lists:
+    1. Parlay combo entries (2-leg, 3-leg, 5-leg) with unique-player constraint
+    2. Individual pick entries for every analyzed prop in the game
+
+    Fantasy-score composite stat types are excluded from parlay legs
     so legs stay comparable across sportsbooks.
     """
     top = [
@@ -382,6 +386,33 @@ def _build_entry_strategy(results):
             "strategy": "High ceiling, diversified 5-leg.",
         })
     return entries
+
+
+def _build_all_picks_table(results):
+    """Build a sorted list of all individual picks for display.
+
+    Returns list of dicts with: player_name, stat_type, direction, line,
+    confidence_score, edge_percentage, tier.
+    Includes *every* analysed prop (no edge threshold) so the user can
+    see the full picture.
+    """
+    all_picks = sorted(
+        [r for r in results if not r.get("player_is_out", False)],
+        key=lambda r: r.get("confidence_score", 0),
+        reverse=True,
+    )
+    rows = []
+    for r in all_picks:
+        rows.append({
+            "Player": r.get("player_name", "?"),
+            "Stat": r.get("stat_type", "").title(),
+            "Dir": r.get("direction", ""),
+            "Line": r.get("line", 0),
+            "SAFE": round(r.get("confidence_score", 0), 1),
+            "Edge%": round(r.get("edge_percentage", 0), 1),
+            "Tier": r.get("tier", ""),
+        })
+    return rows
 
 
 def _predict_game(home_abbrev, away_abbrev, vegas_spread=None, game_total=None):
@@ -625,6 +656,15 @@ with _tab_report:
             _away_sd = _standings_map_mc.get(away, {})
             _home_rec = f"{_home_sd.get('wins', 0)}-{_home_sd.get('losses', 0)}" if _home_sd else ""
             _away_rec = f"{_away_sd.get('wins', 0)}-{_away_sd.get('losses', 0)}" if _away_sd else ""
+
+            # Backfill game dict with standings data so downstream renderers
+            # (get_game_report_html, team stats panels) pick up records.
+            if _home_sd and not game.get("home_wins"):
+                game["home_wins"] = _home_sd.get("wins", 0)
+                game["home_losses"] = _home_sd.get("losses", 0)
+            if _away_sd and not game.get("away_wins"):
+                game["away_wins"] = _away_sd.get("wins", 0)
+                game["away_losses"] = _away_sd.get("losses", 0)
             st.markdown(
                 get_matchup_card_html(
                     away_team=away,
@@ -738,6 +778,22 @@ with _tab_report:
                 st.divider()
 
                 if game_results:
+                    # ── All Props & Picks for this game ───────────────
+                    all_picks_rows = _build_all_picks_table(game_results)
+                    if all_picks_rows:
+                        st.markdown("#### 📋 All Player Props & Picks")
+                        st.dataframe(
+                            all_picks_rows,
+                            width="stretch",
+                            hide_index=True,
+                            column_config={
+                                "Line": st.column_config.NumberColumn(format="%.1f"),
+                                "SAFE": st.column_config.NumberColumn(format="%.1f"),
+                                "Edge%": st.column_config.NumberColumn(format="%.1f"),
+                            },
+                        )
+                        st.divider()
+
                     # ── Suggested Parlays for this game ───────────────
                     game_strategy = _build_entry_strategy(game_results)
                     if game_strategy:
@@ -788,6 +844,29 @@ with _tab_report:
 
     elif analysis_results and not todays_games:
         # No games loaded — but analysis results exist from a previous session
+        # Show all-picks table above the full HTML report
+        all_picks_rows_no_game = _build_all_picks_table(report_results)
+        if all_picks_rows_no_game:
+            st.markdown("#### 📋 All Player Props & Picks")
+            st.dataframe(
+                all_picks_rows_no_game,
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "Line": st.column_config.NumberColumn(format="%.1f"),
+                    "SAFE": st.column_config.NumberColumn(format="%.1f"),
+                    "Edge%": st.column_config.NumberColumn(format="%.1f"),
+                },
+            )
+            st.divider()
+
+        # Parlay suggestions
+        all_strategy_no_game = _build_entry_strategy(report_results)
+        if all_strategy_no_game:
+            st.markdown("#### 🎯 Suggested Parlays")
+            st.markdown(get_qds_strategy_table_html(all_strategy_no_game), unsafe_allow_html=True)
+            st.divider()
+
         html_content = get_game_report_html(
             game=None,
             analysis_results=report_results,
