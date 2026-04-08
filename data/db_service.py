@@ -1036,7 +1036,12 @@ def get_play_by_play_from_db(game_id: str) -> list:
 
 
 def get_league_leaders_from_db(stat_category: str = "PTS", season: str | None = None) -> list:
-    """Read League_Leaders for a season."""
+    """Read League_Leaders for a season.
+
+    Note: The League_Leaders table is populated by ETL with the default
+    stat category (PTS).  The *stat_category* parameter is accepted for
+    API-compatibility but the table does not store multiple categories.
+    """
     conn = _get_conn()
     if conn is None:
         return []

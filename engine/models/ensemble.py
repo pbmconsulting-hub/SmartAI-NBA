@@ -11,6 +11,10 @@ from engine.models.catboost_model import CatBoostModel
 
 _logger = get_logger(__name__)
 
+# Minimum number of samples required for train/validation splitting.
+_MIN_TRAIN_SAMPLES = 5
+_MIN_VAL_SAMPLES = 2
+
 
 class ModelEnsemble(BaseModel):
     """Inverse-variance weighted blend of all available ML models."""
@@ -43,7 +47,7 @@ class ModelEnsemble(BaseModel):
                 split = int(n * 0.8)
                 # Minimum 5 training and 2 validation samples to compute
                 # meaningful RMSE for weight calibration.
-                if split < 5 or n - split < 2:
+                if split < _MIN_TRAIN_SAMPLES or n - split < _MIN_VAL_SAMPLES:
                     # Too little data to split — fall back to training eval
                     X_train, y_train = X, y
                     X_eval, y_eval = X, y

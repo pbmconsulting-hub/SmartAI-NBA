@@ -416,6 +416,9 @@ def predict_player_stat(
                         player_data[feat] = float(val)
 
         # ── Career-stat Bayesian prior for small samples ─────────────
+        # Default to 82 (full season) when games_played is missing, so we
+        # skip the small-sample career-prior path for established players
+        # whose ETL record simply omits the GP field.
         games_played = int(player_averages.get("gp", player_averages.get("games_played", 82)) or 82)
         career_prior = {}
         if games_played < 15:
