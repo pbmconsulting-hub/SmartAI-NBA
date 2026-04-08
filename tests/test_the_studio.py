@@ -10,6 +10,24 @@ from unittest.mock import MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
+def _load_studio_combined_source() -> str:
+    """Read The Studio page AND the extracted studio_theme CSS module.
+
+    CSS was extracted from inline _STUDIO_CSS into styles/studio_theme.py
+    for maintainability.  Tests that verify CSS content should search the
+    combined source.
+    """
+    base = os.path.join(os.path.dirname(__file__), "..")
+    page_path = os.path.join(base, "pages", "7_🎙️_The_Studio.py")
+    theme_path = os.path.join(base, "styles", "studio_theme.py")
+    with open(page_path, "r") as fh:
+        source = fh.read()
+    if os.path.isfile(theme_path):
+        with open(theme_path, "r") as fh:
+            source += "\n" + fh.read()
+    return source
+
+
 class TestStudioFileSyntax(unittest.TestCase):
     """Verify the Studio page file parses without syntax errors."""
 
@@ -147,15 +165,13 @@ class TestStudioFileStructure(unittest.TestCase):
 
 
 class TestStudioCSS(unittest.TestCase):
-    """Verify the Studio page contains all required CSS classes."""
+    """Verify the Studio page contains all required CSS classes.
+
+    CSS may live in the page source or in the extracted studio_theme module.
+    """
 
     def setUp(self):
-        self.filepath = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "7_🎙️_The_Studio.py",
-        )
-        with open(self.filepath, "r") as fh:
-            self.source = fh.read()
+        self.source = _load_studio_combined_source()
 
     def test_studio_hero_css(self):
         self.assertIn("studio-hero", self.source)
@@ -573,12 +589,7 @@ class TestStudioEnhancement2OnAir(unittest.TestCase):
     """Enhancement 2: Animated ON AIR indicator."""
 
     def setUp(self):
-        self.filepath = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "7_🎙️_The_Studio.py",
-        )
-        with open(self.filepath, "r") as fh:
-            self.source = fh.read()
+        self.source = _load_studio_combined_source()
 
     def test_on_air_badge_class(self):
         self.assertIn("studio-on-air", self.source)
@@ -600,12 +611,7 @@ class TestStudioEnhancement3ModeCards(unittest.TestCase):
     """Enhancement 3: Styled tab cards for mode selection."""
 
     def setUp(self):
-        self.filepath = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "7_🎙️_The_Studio.py",
-        )
-        with open(self.filepath, "r") as fh:
-            self.source = fh.read()
+        self.source = _load_studio_combined_source()
 
     def test_mode_cards_css(self):
         self.assertIn("studio-mode-cards", self.source)
@@ -632,12 +638,7 @@ class TestStudioEnhancement4GameCards(unittest.TestCase):
     """Enhancement 4 + 19: Game cards with team colors."""
 
     def setUp(self):
-        self.filepath = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "7_🎙️_The_Studio.py",
-        )
-        with open(self.filepath, "r") as fh:
-            self.source = fh.read()
+        self.source = _load_studio_combined_source()
 
     def test_game_card_class_used(self):
         """The .studio-game-card class should be used for game rendering."""
@@ -714,12 +715,7 @@ class TestStudioEnhancement8CSSVars(unittest.TestCase):
     """Enhancement 8: CSS custom properties."""
 
     def setUp(self):
-        self.filepath = os.path.join(
-            os.path.dirname(__file__), "..",
-            "pages", "7_🎙️_The_Studio.py",
-        )
-        with open(self.filepath, "r") as fh:
-            self.source = fh.read()
+        self.source = _load_studio_combined_source()
 
     def test_css_custom_properties_defined(self):
         self.assertIn("--studio-muted", self.source)

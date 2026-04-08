@@ -44,12 +44,21 @@ except ImportError:
     def get_summary_cards_html(*a, **kw):
         return ""
 
+try:
+    from styles.studio_theme import get_studio_css, get_font_preload
+except ImportError:
+    def get_studio_css():
+        return ""
+    def get_font_preload():
+        return ""
+
 st.set_page_config(
     page_title="The Studio — Joseph M. Smith",
     page_icon="🎙️",
     layout="wide",
 )
 
+st.markdown(get_font_preload(), unsafe_allow_html=True)
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
@@ -151,6 +160,7 @@ try:
         render_outcome_badge,
         render_empty_state,
         render_verdict_heatmap_html,
+        render_skeleton_cards,
     )
     _DESK_AVAILABLE = True
 except ImportError:
@@ -211,260 +221,15 @@ except ImportError:
     def render_verdict_heatmap_html(results):
         return ""
 
+    def render_skeleton_cards(count=3):
+        return ""
+
 
 # ── Inject desk CSS ──────────────────────────────────────────
 st.markdown(render_live_desk_css(), unsafe_allow_html=True)
 
-# ── Studio-specific supplemental CSS ─────────────────────────
-_STUDIO_CSS = """<style>
-/* ── CSS Custom Properties ── */
-:root{
-    --studio-muted:#94a3b8;
-    --studio-accent:#ff5e00;
-    --studio-accent-secondary:#ff9e00;
-    --studio-text:#e2e8f0;
-    --studio-bg-deep:rgba(7,10,19,0.88);
-    --studio-bg-card:rgba(15,23,42,0.75);
-    --studio-border:rgba(148,163,184,0.18);
-    --studio-green:#22c55e;
-    --studio-cyan:#00f0ff;
-    --studio-red:#ff4444;
-    --studio-yellow:#eab308;
-}
-.studio-hero{
-    background:var(--studio-bg-deep);
-    backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-    border:1px solid rgba(255,94,0,0.35);
-    border-radius:18px;padding:32px 24px;
-    text-align:center;margin-bottom:28px;
-    position:relative;overflow:hidden;
-    box-shadow:0 0 60px rgba(255,94,0,0.08),inset 0 1px 0 rgba(255,158,0,0.1);
-}
-/* Top broadcast bar */
-.studio-hero::before{
-    content:'';position:absolute;top:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
-    background-size:200% 100%;
-    animation:studioShimmer 3s linear infinite;
-}
-/* Bottom broadcast bar */
-.studio-hero::after{
-    content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
-    background-size:200% 100%;
-    animation:studioShimmer 3s linear infinite reverse;
-}
-@keyframes studioShimmer{
-    0%{background-position:-200% 0}100%{background-position:200% 0}
-}
-.studio-hero-title{
-    font-family:'Orbitron',sans-serif;font-size:1.8rem;
-    color:var(--studio-accent);font-weight:700;margin:14px 0 6px;
-    letter-spacing:1px;
-    text-shadow:0 0 20px rgba(255,94,0,0.3),0 0 40px rgba(255,94,0,0.1);
-}
-.studio-hero-subtitle{
-    color:var(--studio-muted);font-size:0.95rem;
-    font-family:'Montserrat',sans-serif;
-    letter-spacing:0.3px;
-}
-/* ── ON AIR badge ── */
-.studio-on-air{
-    display:inline-flex;align-items:center;gap:6px;
-    padding:4px 14px;border-radius:20px;
-    background:rgba(255,32,32,0.15);border:1px solid rgba(255,32,32,0.4);
-    font-family:'Orbitron',sans-serif;font-size:0.7rem;
-    font-weight:700;color:#ff2020;letter-spacing:1px;
-    margin:10px auto 4px;
-    animation:studioOnAirPulse 2s ease-in-out infinite;
-}
-.studio-on-air-dot{
-    width:8px;height:8px;border-radius:50%;background:#ff2020;
-    box-shadow:0 0 6px rgba(255,32,32,0.6);
-    animation:studioOnAirDotPulse 1.4s ease-in-out infinite;
-}
-@keyframes studioOnAirPulse{
-    0%,100%{box-shadow:0 0 8px rgba(255,32,32,0.2)}
-    50%{box-shadow:0 0 16px rgba(255,32,32,0.4)}
-}
-@keyframes studioOnAirDotPulse{
-    0%,100%{opacity:1;transform:scale(1)}
-    50%{opacity:0.4;transform:scale(0.8)}
-}
-.studio-avatar-lg{
-    width:120px;height:120px;border-radius:50%;
-    border:3px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 24px rgba(255,94,0,0.3),0 0 48px rgba(255,94,0,0.12);
-    margin:0 auto;display:block;
-    animation:studioAvatarPulse 4s ease-in-out infinite;
-}
-@keyframes studioAvatarPulse{
-    0%,100%{box-shadow:0 0 24px rgba(255,94,0,0.3),0 0 48px rgba(255,94,0,0.12)}
-    50%{box-shadow:0 0 32px rgba(255,94,0,0.5),0 0 64px rgba(255,94,0,0.2)}
-}
-/* ── Mode selector cards ── */
-.studio-mode-cards{
-    display:flex;gap:12px;margin:8px 0 20px;flex-wrap:wrap;
-    justify-content:center;
-}
-.studio-mode-card{
-    flex:1;min-width:180px;max-width:280px;
-    background:var(--studio-bg-card);
-    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-    border:2px solid var(--studio-border);
-    border-radius:14px;padding:18px 16px;text-align:center;
-    cursor:pointer;transition:all 0.25s ease;
-    position:relative;overflow:hidden;
-}
-.studio-mode-card:hover{
-    border-color:rgba(255,94,0,0.4);
-    box-shadow:0 4px 20px rgba(255,94,0,0.1);
-    transform:translateY(-2px);
-}
-.studio-mode-card.active{
-    border-color:var(--studio-accent);
-    box-shadow:0 0 24px rgba(255,94,0,0.15);
-}
-.studio-mode-card.active::after{
-    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,var(--studio-accent),transparent);
-}
-.studio-mode-icon{font-size:1.6rem;margin-bottom:6px}
-.studio-mode-title{
-    font-family:'Orbitron',sans-serif;font-size:0.82rem;
-    color:var(--studio-accent);font-weight:700;
-    letter-spacing:0.3px;margin-bottom:4px;
-}
-.studio-mode-tag{
-    color:var(--studio-muted);font-size:0.72rem;
-    font-family:'Montserrat',sans-serif;
-}
-.studio-game-card{
-    background:var(--studio-bg-card);
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    border:1px solid var(--studio-border);
-    border-left:3px solid rgba(255,94,0,0.4);
-    border-radius:12px;padding:16px 20px;
-    cursor:pointer;transition:all 0.25s ease;
-    margin-bottom:10px;
-}
-.studio-game-card:hover{
-    border-color:rgba(255,94,0,0.5);
-    box-shadow:0 4px 24px rgba(255,94,0,0.12);
-    transform:translateY(-1px);
-}
-.studio-game-card .team-badge{
-    display:inline-block;padding:2px 8px;border-radius:4px;
-    font-family:'Orbitron',sans-serif;font-size:0.72rem;
-    font-weight:700;letter-spacing:0.5px;margin-right:4px;
-}
-.studio-ticket-card{
-    background:var(--studio-bg-deep);
-    backdrop-filter:blur(12px);
-    -webkit-backdrop-filter:blur(12px);
-    border:1px solid rgba(255,94,0,0.3);
-    border-radius:14px;padding:22px 26px;
-    margin:16px 0;position:relative;overflow:hidden;
-    box-shadow:0 0 30px rgba(255,94,0,0.06);
-}
-.studio-ticket-card::before{
-    content:'';position:absolute;top:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,#ff5e00,transparent);
-    opacity:0.6;
-}
-.studio-ticket-header{
-    font-family:'Orbitron',sans-serif;
-    color:var(--studio-accent);font-size:1.15rem;
-    font-weight:700;margin-bottom:12px;
-    text-shadow:0 0 8px rgba(255,94,0,0.2);
-}
-.studio-ticket-leg{
-    padding:8px 0;border-bottom:1px solid rgba(148,163,184,0.08);
-    color:var(--studio-text);font-size:0.9rem;
-    font-family:'Montserrat',sans-serif;
-    transition:background 0.15s ease;
-}
-.studio-ticket-leg:last-child{border-bottom:none}
-.studio-ticket-leg:hover{background:rgba(255,94,0,0.03);border-radius:4px}
-.studio-section-title{
-    font-family:'Orbitron',sans-serif;
-    color:var(--studio-accent);font-size:1.2rem;font-weight:700;
-    margin:28px 0 14px;letter-spacing:0.5px;
-    text-shadow:0 0 10px rgba(255,94,0,0.15);
-    padding-left:12px;
-    border-left:3px solid #ff5e00;
-}
-.studio-metric-row{
-    display:flex;gap:14px;flex-wrap:wrap;margin:14px 0;
-}
-.studio-metric-card{
-    flex:1;min-width:140px;
-    background:var(--studio-bg-card);
-    border:1px solid rgba(255,94,0,0.2);
-    border-radius:10px;padding:14px 18px;
-    text-align:center;
-    transition:all 0.2s ease;
-    position:relative;overflow:hidden;
-}
-.studio-metric-card::before{
-    content:'';position:absolute;top:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,#ff5e00,transparent);
-    opacity:0.4;
-}
-.studio-metric-card:hover{
-    border-color:rgba(255,94,0,0.4);
-    box-shadow:0 0 16px rgba(255,94,0,0.1);
-    transform:translateY(-1px);
-}
-.studio-metric-value{
-    font-family:'JetBrains Mono',monospace;
-    font-variant-numeric:tabular-nums;
-    font-size:1.4rem;color:var(--studio-accent);font-weight:700;
-    text-shadow:0 0 8px rgba(255,94,0,0.2);
-}
-.studio-metric-label{
-    color:var(--studio-muted);font-size:0.78rem;
-    margin-top:4px;font-family:'Montserrat',sans-serif;
-    text-transform:uppercase;letter-spacing:0.5px;
-}
-/* ── Quick-nav jump buttons ── */
-.studio-quick-nav{
-    display:flex;gap:8px;flex-wrap:wrap;
-    justify-content:center;margin:14px 0 6px;
-}
-.studio-quick-nav a{
-    padding:6px 16px;border-radius:20px;font-size:0.78rem;
-    font-family:'Orbitron',sans-serif;font-weight:600;
-    color:var(--studio-accent);background:rgba(255,94,0,0.08);
-    border:1px solid rgba(255,94,0,0.25);text-decoration:none;
-    transition:all 0.2s ease;letter-spacing:0.3px;
-}
-.studio-quick-nav a:hover{
-    background:rgba(255,94,0,0.15);
-    box-shadow:0 0 12px rgba(255,94,0,0.1);
-}
-.studio-payout-table{
-    width:100%;border-collapse:separate;border-spacing:0;
-    font-family:'Montserrat',sans-serif;font-size:0.83rem;
-    margin:12px 0;
-}
-.studio-payout-table th{
-    background:rgba(255,94,0,0.1);color:var(--studio-accent);
-    padding:8px 12px;text-align:center;
-    font-family:'Orbitron',sans-serif;font-size:0.72rem;
-    letter-spacing:0.4px;
-    border-bottom:1px solid rgba(255,94,0,0.2);
-}
-.studio-payout-table td{
-    padding:6px 12px;text-align:center;color:var(--studio-text);
-    border-bottom:1px solid var(--studio-border);
-    font-family:'JetBrains Mono',monospace;
-    font-variant-numeric:tabular-nums;
-}
-.studio-payout-table td.highlight{color:var(--studio-green);font-weight:700}
-</style>"""
-st.markdown(_STUDIO_CSS, unsafe_allow_html=True)
+# ── Studio-specific supplemental CSS (extracted to styles/studio_theme.py) ──
+st.markdown(get_studio_css(), unsafe_allow_html=True)
 
 
 # ═════════════════════════════════════════════════════════════
@@ -486,6 +251,7 @@ else:
 
 st.markdown(
     f'<div class="studio-hero">'
+    f'<div class="studio-scanlines"></div>'
     f'{_hero_avatar_html}'
     f'<div class="studio-on-air">'
     f'<span class="studio-on-air-dot"></span>ON AIR</div>'
@@ -1468,6 +1234,9 @@ if not joseph_results and _BRAIN_AVAILABLE:
         _from_props = True
 
     if _gen_source:
+        # Show skeleton loader while Joseph scouts
+        _skel_placeholder = st.empty()
+        _skel_placeholder.markdown(render_skeleton_cards(3), unsafe_allow_html=True)
         with st.spinner("🎙️ Joseph is scouting the board..."):
             try:
                 _players_raw = load_players_data()
@@ -1526,6 +1295,7 @@ if not joseph_results and _BRAIN_AVAILABLE:
                 _logger.warning(
                     "Auto-generation of Joseph's picks failed: %s", _dawg_err,
                 )
+        _skel_placeholder.empty()
 
 if joseph_results:
     render_dawg_board(joseph_results)
