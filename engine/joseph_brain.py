@@ -2042,11 +2042,12 @@ def _select_fragment(pool: list, used_set: set) -> dict:
 
 def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: list,
                       mismatch: dict | None = None, comp: dict | None = None,
-                      energy: str = "medium") -> str:
-    """Build a unique 4-8 sentence Joseph rant using combinatorial fragment assembly.
+                      energy: str = "medium", db_intel: dict | None = None) -> str:
+    """Build a unique 4-10 sentence Joseph rant using combinatorial fragment assembly.
 
-    Combines opener, body template, pivot, catchphrase, and closer fragments
-    to form a multi-sentence rant personalised to the player/prop/verdict.
+    Combines opener, body template, data-driven sentences, pivot, catchphrase,
+    and closer fragments to form a multi-sentence rant personalised to the
+    player/prop/verdict with real data from the database.
 
     Parameters
     ----------
@@ -2063,7 +2064,11 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
     comp : dict or None
         Historical comp entry from JOSEPH_COMPS_DATABASE.
     energy : str
-        Energy level (``"low"``, ``"medium"``, ``"high"``).
+        Energy level (``"low"``, ``"medium"``, ``"high"``, ``"nuclear"``).
+    db_intel : dict or None
+        DB-powered intel from ``_get_player_db_intel()``.  When provided,
+        data-driven sentences referencing real game logs and splits are woven
+        into the rant.
 
     Returns
     -------
@@ -2080,7 +2085,7 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
             opener_text = opener_text.rstrip(". ") + "..."
 
         # 2. Select body sentences based on energy
-        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 3}.get(energy, 2)
+        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 4}.get(energy, 2)
         templates = BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
         stat = prop.get("stat", prop.get("stat_type", ""))
         line = prop.get("line", "")
@@ -2102,10 +2107,18 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
                 sentence = templates[idx]
             body_sentences.append(sentence)
 
+        # 2b. Data-driven sentences from DB intel (supreme upgrade)
+        data_sentences = _build_data_sentences(
+            player, prop, db_intel, energy
+        )
+        body_sentences.extend(data_sentences)
+
         # 3. Check for counter-point pivot (positive + negative tags present)
         positive_tags = {"revenge_game", "contract_year", "nationally_televised",
-                         "rivalry", "playoff_implications", "pace_up"}
-        negative_tags = {"trap_game", "back_to_back", "altitude", "blowout_risk", "pace_down"}
+                         "rivalry", "playoff_implications", "pace_up",
+                         "market_high_total"}
+        negative_tags = {"trap_game", "back_to_back", "altitude", "blowout_risk",
+                         "pace_down", "market_low_total"}
         has_positive = any(t in positive_tags for t in narrative_tags)
         has_negative = any(t in negative_tags for t in narrative_tags)
         pivot_text = ""
@@ -2160,8 +2173,124 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         return f"Joseph M. Smith likes {player}. {verdict}!"
 
 
-def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: list) -> str:
-    """Build a 1-sentence counter-argument for balance.
+def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
+                          energy: str) -> list:
+    """Build 1-3 data-driven sentences from DB intel to enrich the rant.
+
+    Selects the most impactful data points (trend, hit rate, consistency,
+    splits) and formats them into natural-language sentences.
+    """
+    if not db_intel or not db_intel.get("available"):
+        return []
+
+    sentences = []
+    stat = prop.get("stat", prop.get("stat_type", "points")).lower()
+    line = prop.get("line", 0)
+    edge = prop.get("edge", "")
+    _stat_db_key = {
+        "points": "PTS", "rebounds": "REB", "assists": "AST",
+        "steals": "STL", "blocks": "BLK", "threes": "FG3M",
+        "fg3m": "FG3M", "turnovers": "TOV",
+    }.get(stat, "PTS")
+
+    recent = db_intel.get("recent_games", [])
+    max_data_sentences = {"low": 1, "medium": 1, "high": 2, "nuclear": 3}.get(energy, 1)
+
+    if recent:
+        trend = _compute_recent_trend(recent, _stat_db_key)
+
+        # Trend sentence
+        if trend["trend"] in ("surging", "trending_up") and trend["last_3_avg"] > 0:
+            pool = DATA_BODY_TEMPLATES.get("trend_hot", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=trend["last_3_avg"], l5_avg=trend["last_5_avg"],
+                        l10_avg=trend["last_10_avg"], hit_rate=0,
+                        trend_word=trend["trend"], consistency=trend["consistency"],
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+        elif trend["trend"] in ("slumping", "trending_down") and trend["last_3_avg"] > 0:
+            pool = DATA_BODY_TEMPLATES.get("trend_cold", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=trend["last_3_avg"], l5_avg=trend["last_5_avg"],
+                        l10_avg=trend["last_10_avg"], hit_rate=0,
+                        trend_word=trend["trend"], consistency=trend["consistency"],
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+        # Hit rate sentence
+        if len(sentences) < max_data_sentences and _safe_float(line) > 0:
+            hr = _compute_hit_rate(recent, _stat_db_key, _safe_float(line))
+            if hr > 0:
+                pool = DATA_BODY_TEMPLATES.get("hit_rate", [])
+                if pool:
+                    tmpl = random.choice(pool)
+                    try:
+                        sentences.append(tmpl.format(
+                            player=player, stat=stat, line=line, edge=edge,
+                            l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=hr,
+                            trend_word="", consistency="",
+                            season_avg=0, home_away_note="",
+                        ))
+                    except (KeyError, IndexError, ValueError):
+                        pass
+
+        # Consistency sentence
+        if len(sentences) < max_data_sentences and trend["consistency"] != "unknown":
+            pool = DATA_BODY_TEMPLATES.get("consistency", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=0,
+                        trend_word="", consistency=trend["consistency"].upper(),
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+    # Home/away split sentence
+    splits = db_intel.get("splits", {})
+    if len(sentences) < max_data_sentences and splits:
+        ha = _extract_home_away_splits(splits)
+        if ha["home_ppg"] > 0 and ha["away_ppg"] > 0 and abs(ha["home_boost"]) > 5:
+            pool = DATA_BODY_TEMPLATES.get("home_away", [])
+            if pool:
+                if ha["home_boost"] > 0:
+                    note = f"He scores {ha['home_ppg']:.1f} at home versus {ha['away_ppg']:.1f} on the road"
+                else:
+                    note = f"He actually scores BETTER on the road — {ha['away_ppg']:.1f} away vs {ha['home_ppg']:.1f} at home"
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=0,
+                        trend_word="", consistency="",
+                        season_avg=0, home_away_note=note,
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+    return sentences[:max_data_sentences]
+
+
+def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: list,
+                               db_intel: dict | None = None) -> str:
+    """Build a 1-2 sentence counter-argument for balance.
+
+    Uses DB intel when available to ground the counter-argument in real data.
 
     Parameters
     ----------
@@ -2171,32 +2300,81 @@ def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: li
         Prop data with stat, line, edge, etc.
     narrative_tags : list[str]
         Active narrative tags.
+    db_intel : dict or None
+        DB-powered intel from ``_get_player_db_intel()``.
 
     Returns
     -------
     str
-        A single counter-argument sentence.
+        A counter-argument sentence grounded in data.
     """
+    player_name = player.get("name", player.get("player_name", "This player"))
+    stat = prop_data.get("stat", prop_data.get("stat_type", "points")).lower()
+    line = _safe_float(prop_data.get("line", 0))
+
+    # DB-powered counter-arguments when data is available
+    if db_intel and db_intel.get("available"):
+        recent = db_intel.get("recent_games", [])
+        _stat_db_key = {
+            "points": "PTS", "rebounds": "REB", "assists": "AST",
+            "steals": "STL", "blocks": "BLK", "threes": "FG3M",
+            "fg3m": "FG3M", "turnovers": "TOV",
+        }.get(stat, "PTS")
+
+        if recent and line > 0:
+            trend = _compute_recent_trend(recent, _stat_db_key)
+            hr = _compute_hit_rate(recent, _stat_db_key, line)
+
+            # Volatility-based counter
+            if trend["consistency"] == "volatile":
+                return (
+                    f"{player_name} has been VOLATILE with {stat} production — "
+                    f"the variance is HIGH and even good edges can miss in volatile stat lines."
+                )
+            # Low hit rate counter
+            if hr < 50 and hr > 0:
+                return (
+                    f"The hit rate on {player_name} clearing {line} {stat} is only "
+                    f"{hr}% in the last 10 games — the LINE may be set correctly."
+                )
+            # Cold streak counter
+            if trend["cold_streak"] >= 2:
+                return (
+                    f"{player_name} has been BELOW average in {stat} for "
+                    f"{trend['cold_streak']} straight games — momentum works BOTH ways."
+                )
+            # Small recent sample divergence
+            if trend["last_3_avg"] > 0 and trend["last_10_avg"] > 0:
+                if trend["last_3_avg"] < trend["last_10_avg"] * 0.9:
+                    return (
+                        f"The last 3 games show {trend['last_3_avg']} {stat} — that's "
+                        f"BELOW the 10-game average of {trend['last_10_avg']}. "
+                        f"Recent form could be a warning sign."
+                    )
+
+    # Narrative-based fallbacks
     if "back_to_back" in narrative_tags:
-        return "The fatigue factor on a back-to-back CANNOT be ignored."
+        return "The fatigue factor on a back-to-back CANNOT be ignored — legs get heavy, shots fall short."
     if "trap_game" in narrative_tags:
-        return "Motivation could be an issue in a trap game scenario."
+        return "Motivation could be an issue in a trap game scenario — stars sometimes coast."
     if "blowout_risk" in narrative_tags:
-        return "If this game gets out of hand, minutes could be CUT."
+        return "If this game gets out of hand, starters sit in the FOURTH and minutes get CUT."
     if "altitude" in narrative_tags:
-        return "Playing at altitude in Denver is a REAL factor that affects performance."
+        return "Playing at altitude in Denver is a REAL factor — fatigue hits differently at 5,280 feet."
     if "pace_down" in narrative_tags:
-        return "A slower pace environment limits OPPORTUNITIES for production."
-    return "Standard variance means even good edges lose 35-40% of the time."
+        return "A slower pace environment means FEWER possessions and fewer opportunities for production."
+    return "Standard variance means even good edges lose 35-40% of the time. Manage your bankroll accordingly."
 
 
 def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                          teams_data: dict) -> dict:
-    """THE 8-STEP REASONING LOOP. Returns complete analysis dict.
+    """THE 8-STEP SUPREME REASONING LOOP. Returns complete analysis dict.
 
-    Steps: (1) edge detection, (2) confidence scoring, (3) grading,
-    (4) narrative tagging, (5) dawg factor, (6) mismatch detection,
-    (7) historical comp, (8) rant generation.
+    Steps: (1) OBSERVE — extract QME signals, (2) FRAME — narrative tagging,
+    (3) RETRIEVE — pull DB intel + historical comps, (4) MODEL — adjustments
+    from dawg factor, mismatch, regime, trend, splits, market consensus,
+    (5) ADJUST — compute Joseph edge vs QME edge, (6) CONCLUDE — determine
+    verdict, (7) EXPLAIN — build data-driven rant, (8) TRACK — log + assemble.
 
     Parameters
     ----------
@@ -2214,15 +2392,12 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
     dict
         Complete analysis with keys: ``verdict``, ``verdict_emoji``,
         ``is_override``, ``edge``, ``confidence``, ``rant``,
-        ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``.
+        ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``,
+        ``db_trend``, ``hit_rate``, ``consistency``.
     """
     try:
         # Step 1 — OBSERVE
         qme_prob = _safe_float(analysis_result.get("probability_over", 50.0))
-        # Neural Analysis stores probability_over as 0-1 decimal (e.g. 0.63).
-        # Joseph's internal math uses 0-100 percentage scale.
-        # Use < 1.5 threshold (simulations clamp to [0.01, 0.99]; a real
-        # percentage of 1.5% would be extremely rare and still benign).
         if 0.0 < qme_prob < 1.5:
             qme_prob *= 100.0
         qme_edge = _safe_float(analysis_result.get("edge_percentage", 0.0))
@@ -2251,7 +2426,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         elif pace_delta < -2.0 and "pace_down" not in narrative_tags:
             narrative_tags.append("pace_down")
 
-        # Step 3 — RETRIEVE
+        # Step 3 — RETRIEVE (Supreme: DB Intel + Grade + Comp)
         try:
             player_grade = joseph_grade_player(player, game)
         except Exception:
@@ -2259,7 +2434,6 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                             "gravity": 50.0, "switchability": 50.0}
         archetype = player_grade.get("archetype", "Unknown")
 
-        # Find matching comp
         comp = None
         if JOSEPH_COMPS_DATABASE:
             arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
@@ -2270,6 +2444,68 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 comp = random.choice(arch_matches)
             else:
                 comp = random.choice(JOSEPH_COMPS_DATABASE)
+
+        # ── Supreme DB Knowledge Pull ─────────────────────────
+        db_intel = _get_player_db_intel(player)
+        _stat_db_key = {
+            "points": "PTS", "rebounds": "REB", "assists": "AST",
+            "steals": "STL", "blocks": "BLK", "threes": "FG3M",
+            "fg3m": "FG3M", "turnovers": "TOV",
+        }.get(stat_type.lower(), "PTS")
+
+        trend_data = {}
+        hit_rate = 0.0
+        trend_adj = 0.0
+        consistency_adj = 0.0
+        splits_adj = 0.0
+
+        if db_intel.get("available"):
+            recent = db_intel.get("recent_games", [])
+            if recent:
+                trend_data = _compute_recent_trend(recent, _stat_db_key)
+                hit_rate = _compute_hit_rate(recent, _stat_db_key, _safe_float(line))
+
+                # Trend-based adjustment: surging players get a boost, slumping a fade
+                if trend_data["trend"] == "surging":
+                    trend_adj = 2.0
+                    if "trending_up" not in narrative_tags:
+                        narrative_tags.append("trending_up")
+                elif trend_data["trend"] == "trending_up":
+                    trend_adj = 1.0
+                    if "trending_up" not in narrative_tags:
+                        narrative_tags.append("trending_up")
+                elif trend_data["trend"] == "slumping":
+                    trend_adj = -2.0
+                    if "trending_down" not in narrative_tags:
+                        narrative_tags.append("trending_down")
+                elif trend_data["trend"] == "trending_down":
+                    trend_adj = -1.0
+                    if "trending_down" not in narrative_tags:
+                        narrative_tags.append("trending_down")
+
+                # Consistency adjustment: volatile players get dampened
+                if trend_data["consistency"] == "volatile":
+                    consistency_adj = -1.0
+                elif trend_data["consistency"] == "elite":
+                    consistency_adj = 0.5
+
+            # Home/away split adjustment
+            splits = db_intel.get("splits", {})
+            if splits:
+                ha = _extract_home_away_splits(splits)
+                is_home = bool(game.get("is_home", False))
+                if ha["home_ppg"] > 0 and ha["away_ppg"] > 0:
+                    if is_home and ha["home_boost"] > 10:
+                        splits_adj = 1.0
+                    elif not is_home and ha["home_boost"] > 10:
+                        splits_adj = -1.0
+
+            # Clutch stats enrichment for narrative tags
+            clutch = db_intel.get("clutch_stats", {})
+            if clutch:
+                clutch_pts = _safe_float(clutch.get("PTS", clutch.get("pts", 0)))
+                if clutch_pts > 5 and "clutch_performer" not in narrative_tags:
+                    narrative_tags.append("clutch_performer")
 
         # Step 4 — MODEL
         _home_team = str(game.get("home_team", game.get("home", ""))).upper().strip()
@@ -2301,10 +2537,6 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             sample_dampening = -1.0 * (10 - games_played) / 10
 
         # ── Market context boost/fade from Odds API consensus ──────
-        # When The Odds API provides consensus lines from 5+ bookmakers,
-        # use the multi-book total to calibrate the game-pace assumption.
-        # High-total games (consensus > 228) get a +1.5 boost for scoring
-        # props; low-total games (consensus < 212) get -1.5.
         market_adj = 0.0
         _consensus_total = game.get("consensus_total")
         _bk_count = int(game.get("bookmaker_count", 0) or 0)
@@ -2322,14 +2554,23 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             except (TypeError, ValueError):
                 pass
 
-        joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening + market_adj
+        # Supreme probability: QME base + all adjustment layers
+        joseph_prob = (
+            qme_prob
+            + dawg_adjustment
+            + mismatch_boost
+            + regime_adj
+            + sample_dampening
+            + market_adj
+            + trend_adj
+            + consistency_adj
+            + splits_adj
+        )
         joseph_prob = max(1.0, min(99.0, joseph_prob))
 
         implied_line = _safe_float(analysis_result.get("implied_probability", 0.0))
-        # implied_probability may be stored as 0-1 decimal — convert to percentage
         if 0.0 < implied_line < 1.5:
             implied_line *= 100.0
-        # If implied_probability is missing or zero, derive from qme_prob and qme_edge
         if implied_line <= 0.0:
             if abs(qme_edge) > 0.001:
                 implied_line = qme_prob - qme_edge
@@ -2363,7 +2604,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "direction": direction,
         }
 
-        counter_argument = _generate_counter_argument(player, prop_data, narrative_tags)
+        counter_argument = _generate_counter_argument(
+            player, prop_data, narrative_tags, db_intel=db_intel
+        )
 
         risk_factors = []
         if "back_to_back" in narrative_tags:
@@ -2374,10 +2617,16 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             risk_factors.append("Blowout risk may reduce minutes")
         if games_played < 15:
             risk_factors.append(f"Small sample size ({int(games_played)} games)")
+        if trend_data.get("consistency") == "volatile":
+            risk_factors.append("Volatile stat production — high variance")
+        if trend_data.get("trend") in ("slumping", "trending_down"):
+            risk_factors.append(f"Recent form trending down ({trend_data.get('last_3_avg', 0)} last 3 avg)")
+        if trend_data.get("cold_streak", 0) >= 3:
+            risk_factors.append(f"Cold streak: {trend_data['cold_streak']} games below average")
         if not risk_factors:
             risk_factors.append("Standard variance applies")
 
-        # Step 7 — EXPLAIN
+        # Step 7 — EXPLAIN (Supreme: DB-powered rant)
         energy_level = "nuclear" if verdict == "SMASH" else "high" if verdict == "LEAN" else "medium" if verdict == "FADE" else "low"
         if is_override:
             energy_level = "nuclear"
@@ -2391,6 +2640,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             mismatch={"description": mismatch_alert} if mismatch_alert else None,
             comp=comp,
             energy=energy_level,
+            db_intel=db_intel,
         )
 
         one_liner = (
@@ -2406,21 +2656,28 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 f"Delta: {round(edge_delta, 1)}%."
             )
 
+        # Enhanced condensed summary with trend data
+        trend_tag = ""
+        if trend_data.get("trend") in ("surging", "trending_up"):
+            trend_tag = " 📈 HOT"
+        elif trend_data.get("trend") in ("slumping", "trending_down"):
+            trend_tag = " 📉 COLD"
+
         condensed_summary = (
-            f"{verdict_emoji} {verdict} \u2014 {player.get('name', 'Player')} "
+            f"{verdict_emoji} {verdict}{trend_tag} \u2014 {player.get('name', 'Player')} "
             f"{prop_data['direction']} {prop_data['line']} {prop_data['stat']} "
             f"({round(joseph_edge, 1)}% edge, {round(joseph_prob, 1)}% probability)"
         )
 
-        # Step 8 — TRACK
+        # Step 8 — TRACK (Enhanced reasoning chain)
         reasoning_chain = [
             {"step": 1, "name": "OBSERVE", "detail": f"QME: {round(qme_prob, 1)}% prob, {round(qme_edge, 1)}% edge, tier={tier}"},
             {"step": 2, "name": "FRAME", "detail": f"Tags: {narrative_tags}"},
-            {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}"},
-            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}, Market={round(market_adj, 1)}"},
+            {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}, DB Intel: {'YES' if db_intel.get('available') else 'NO'}"},
+            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}, Market={round(market_adj, 1)}, Trend={round(trend_adj, 1)}, Consistency={round(consistency_adj, 1)}, Splits={round(splits_adj, 1)}"},
             {"step": 5, "name": "ADJUST", "detail": f"Joseph edge={round(joseph_edge, 1)}%, Override={is_override}"},
             {"step": 6, "name": "CONCLUDE", "detail": f"Verdict={verdict}, Risks={risk_factors}"},
-            {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}"},
+            {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}, DB data sentences={'YES' if db_intel.get('available') else 'NO'}"},
             {"step": 8, "name": "TRACK", "detail": "Reasoning chain logged"},
         ]
 
@@ -2447,8 +2704,18 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "mismatch_boost": round(mismatch_boost, 2),
             "regime_adjustment": round(regime_adj, 2),
             "sample_dampening": round(sample_dampening, 2),
+            "market_adjustment": round(market_adj, 2),
+            "trend_adjustment": round(trend_adj, 2),
+            "consistency_adjustment": round(consistency_adj, 2),
+            "splits_adjustment": round(splits_adj, 2),
             "games_played": int(games_played),
             "implied_line": round(implied_line, 2),
+            "db_intel_available": db_intel.get("available", False),
+            "hit_rate_vs_line": hit_rate,
+            "recent_trend": trend_data.get("trend", "unknown"),
+            "last_3_avg": trend_data.get("last_3_avg", 0),
+            "last_10_avg": trend_data.get("last_10_avg", 0),
+            "consistency": trend_data.get("consistency", "unknown"),
         }
 
         return {
@@ -2475,6 +2742,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "energy_level": energy_level,
             "reasoning_chain": reasoning_chain,
             "nerd_stats": nerd_stats,
+            "db_trend": trend_data.get("trend", "unknown"),
+            "hit_rate": hit_rate,
+            "consistency": trend_data.get("consistency", "unknown"),
         }
     except Exception as exc:
         logger.warning("joseph_full_analysis failed: %s", exc)
@@ -2502,6 +2772,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "energy_level": "medium",
             "reasoning_chain": [],
             "nerd_stats": {},
+            "db_trend": "unknown",
+            "hit_rate": 0.0,
+            "consistency": "unknown",
         }
 
 
