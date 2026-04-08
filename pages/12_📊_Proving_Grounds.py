@@ -31,106 +31,466 @@ from datetime import datetime as _datetime
 # ── Proving Grounds CSS ───────────────────────────────────────
 st.markdown("""
 <style>
-.pg-glass-card {
-    background: linear-gradient(135deg, rgba(0,240,255,0.07) 0%, rgba(10,15,30,0.85) 100%);
+/* ─── Animations ─────────────────────────────────────────── */
+@keyframes pg-glow-pulse {
+    0%, 100% { box-shadow: 0 0 15px rgba(0,240,255,0.10), 0 4px 24px rgba(0,240,255,0.06); }
+    50%      { box-shadow: 0 0 30px rgba(0,240,255,0.25), 0 4px 30px rgba(0,240,255,0.12); }
+}
+@keyframes pg-fade-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pg-shimmer {
+    0%   { background-position: -300px 0; }
+    100% { background-position: 300px 0; }
+}
+@keyframes pg-border-flow {
+    0%   { border-color: rgba(0,240,255,0.20); }
+    50%  { border-color: rgba(0,240,255,0.45); }
+    100% { border-color: rgba(0,240,255,0.20); }
+}
+
+/* ─── Page Title ─────────────────────────────────────────── */
+.pg-page-title {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    font-size: 1.85rem;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #00f0ff;
+    text-shadow: 0 0 20px rgba(0,240,255,0.50), 0 0 40px rgba(0,240,255,0.20);
+    margin-bottom: 2px;
+    line-height: 1.3;
+}
+.pg-page-subtitle {
+    font-size: 0.88rem;
+    color: #8a9bb8;
+    letter-spacing: 0.3px;
+    line-height: 1.5;
+}
+.pg-title-bar {
+    background: linear-gradient(135deg, rgba(0,240,255,0.08) 0%, rgba(200,0,255,0.04) 100%);
     border: 1px solid rgba(0,240,255,0.18);
     border-radius: 14px;
-    padding: 18px 16px 14px 16px;
+    padding: 20px 28px 16px 28px;
+    margin-bottom: 20px;
+    animation: pg-fade-up 0.5s ease-out;
+}
+.pg-title-accent {
+    height: 3px;
+    width: 60px;
+    background: linear-gradient(90deg, #00f0ff, #c800ff);
+    border-radius: 2px;
+    margin-top: 10px;
+}
+
+/* ─── Glass Metric Cards ─────────────────────────────────── */
+.pg-glass-card {
+    background: linear-gradient(145deg, rgba(13,18,40,0.92) 0%, rgba(7,10,19,0.96) 100%);
+    border: 1px solid rgba(0,240,255,0.16);
+    border-radius: 14px;
+    padding: 16px 14px 14px 14px;
     text-align: center;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 4px 24px rgba(0,240,255,0.08);
-    transition: transform 0.2s, box-shadow 0.2s;
-    min-height: 110px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.40), 0 0 12px rgba(0,240,255,0.05);
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    min-height: 105px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    animation: pg-fade-up 0.4s ease-out both;
+    position: relative;
+    overflow: hidden;
+}
+.pg-glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(0,240,255,0.40), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 .pg-glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(0,240,255,0.18);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.50), 0 0 24px rgba(0,240,255,0.12);
+    border-color: rgba(0,240,255,0.35);
 }
+.pg-glass-card:hover::before { opacity: 1; }
 .pg-glass-label {
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.55);
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.48);
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin-bottom: 4px;
-    font-weight: 600;
+    letter-spacing: 1.8px;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
 }
 .pg-glass-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: #00f0ff;
-    line-height: 1.2;
-}
-.pg-glass-delta {
-    font-size: 0.72rem;
-    margin-top: 4px;
-    color: rgba(255,255,255,0.45);
-}
-.pg-glass-delta.positive { color: #00e676; }
-.pg-glass-delta.negative { color: #ff5252; }
-.pg-hero-banner {
-    background: linear-gradient(135deg, rgba(0,240,255,0.12) 0%, rgba(10,15,30,0.92) 100%);
-    border: 1px solid rgba(0,240,255,0.25);
-    border-radius: 16px;
-    padding: 24px 32px;
-    margin-bottom: 24px;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    box-shadow: 0 8px 40px rgba(0,240,255,0.10);
-}
-.pg-hero-title {
-    font-size: 1.5rem;
+    font-size: 1.55rem;
     font-weight: 800;
     color: #00f0ff;
-    margin-bottom: 6px;
-    letter-spacing: 0.5px;
+    line-height: 1.15;
+    font-family: 'JetBrains Mono', 'Inter', monospace;
+    text-shadow: 0 0 10px rgba(0,240,255,0.25);
+}
+.pg-glass-delta {
+    font-size: 0.70rem;
+    margin-top: 5px;
+    color: rgba(255,255,255,0.38);
+    font-weight: 500;
+}
+.pg-glass-delta.positive { color: #00e676; text-shadow: 0 0 6px rgba(0,230,118,0.3); }
+.pg-glass-delta.negative { color: #ff5252; text-shadow: 0 0 6px rgba(255,82,82,0.3); }
+
+/* Card value color variants */
+.pg-glass-value.green { color: #00e676; text-shadow: 0 0 10px rgba(0,230,118,0.25); }
+.pg-glass-value.red { color: #ff5252; text-shadow: 0 0 10px rgba(255,82,82,0.25); }
+.pg-glass-value.gold { color: #ffd740; text-shadow: 0 0 10px rgba(255,215,64,0.25); }
+.pg-glass-value.white { color: #e8f0ff; text-shadow: none; }
+
+/* ─── Hero Results Banner ────────────────────────────────── */
+.pg-hero-banner {
+    background: linear-gradient(135deg, rgba(13,18,40,0.95) 0%, rgba(7,10,19,0.98) 100%);
+    border: 1px solid rgba(0,240,255,0.22);
+    border-radius: 16px;
+    padding: 24px 30px;
+    margin-bottom: 22px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 0 30px rgba(0,240,255,0.08), 0 8px 32px rgba(0,0,0,0.50);
+    animation: pg-glow-pulse 4s ease-in-out infinite, pg-fade-up 0.5s ease-out;
+    position: relative;
+    overflow: hidden;
+}
+.pg-hero-banner::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent 0%, #00f0ff 30%, #c800ff 70%, transparent 100%);
+    background-size: 300px 3px;
+    animation: pg-shimmer 3s linear infinite;
+}
+.pg-hero-title {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #00f0ff;
+    text-shadow: 0 0 14px rgba(0,240,255,0.5);
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
 }
 .pg-hero-subtitle {
-    font-size: 0.92rem;
-    color: rgba(255,255,255,0.70);
-    line-height: 1.6;
+    font-size: 0.88rem;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.8;
 }
 .pg-hero-stat {
     display: inline-block;
-    margin-right: 20px;
+    margin-right: 18px;
+    margin-bottom: 4px;
     font-weight: 600;
-    color: #ffffff;
+    color: rgba(255,255,255,0.85);
+    font-size: 0.88rem;
 }
-.pg-hero-stat .hl { color: #00f0ff; }
-.pg-hero-stat .gold { color: #ffd740; }
-.pg-hero-stat .green { color: #00e676; }
-.pg-tier-elite { background: rgba(255,215,64,0.08); border-left: 3px solid #ffd740; }
-.pg-tier-strong { background: rgba(0,240,255,0.06); border-left: 3px solid #00f0ff; }
-.pg-tier-value { background: rgba(255,255,255,0.03); border-left: 3px solid rgba(255,255,255,0.3); }
-.pg-tier-lean { background: rgba(255,255,255,0.01); border-left: 3px solid rgba(255,255,255,0.12); }
+.pg-hero-stat .hl {
+    color: #00f0ff;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    text-shadow: 0 0 8px rgba(0,240,255,0.4);
+}
+.pg-hero-stat .gold {
+    color: #ffd740;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(255,215,64,0.4);
+}
+.pg-hero-stat .green {
+    color: #00e676;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(0,230,118,0.4);
+}
+.pg-hero-stat .red {
+    color: #ff5252;
+    font-weight: 800;
+    text-shadow: 0 0 8px rgba(255,82,82,0.4);
+}
+.pg-hero-divider {
+    color: rgba(0,240,255,0.25);
+    margin: 0 4px;
+    font-weight: 300;
+}
+
+/* ─── Tier Cards ─────────────────────────────────────────── */
+.pg-tier-card {
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    animation: pg-fade-up 0.35s ease-out both;
+}
+.pg-tier-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.pg-tier-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.70rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.pg-tier-meta {
+    flex: 1;
+    font-size: 0.86rem;
+    color: rgba(255,255,255,0.70);
+}
+.pg-tier-meta strong { color: #e8f0ff; }
+.pg-tier-wr {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.15rem;
+    font-weight: 800;
+    min-width: 65px;
+    text-align: right;
+    flex-shrink: 0;
+}
+.pg-tier-bar-wrap {
+    width: 100px;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.pg-tier-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease-out;
+}
+
+.pg-tier-elite {
+    background: linear-gradient(135deg, rgba(255,215,64,0.10) 0%, rgba(13,18,40,0.90) 100%);
+    border-left: 4px solid #ffd740;
+    box-shadow: 0 0 12px rgba(255,215,64,0.08);
+}
+.pg-tier-elite .pg-tier-badge {
+    background: linear-gradient(135deg, rgba(255,215,64,0.25), rgba(255,215,64,0.10));
+    color: #ffd740;
+    border: 1px solid rgba(255,215,64,0.35);
+}
+.pg-tier-strong {
+    background: linear-gradient(135deg, rgba(0,240,255,0.07) 0%, rgba(13,18,40,0.90) 100%);
+    border-left: 4px solid #00f0ff;
+    box-shadow: 0 0 12px rgba(0,240,255,0.05);
+}
+.pg-tier-strong .pg-tier-badge {
+    background: linear-gradient(135deg, rgba(0,240,255,0.20), rgba(0,240,255,0.08));
+    color: #00f0ff;
+    border: 1px solid rgba(0,240,255,0.30);
+}
+.pg-tier-value {
+    background: linear-gradient(135deg, rgba(200,200,255,0.04) 0%, rgba(13,18,40,0.90) 100%);
+    border-left: 4px solid rgba(200,200,255,0.30);
+}
+.pg-tier-value .pg-tier-badge {
+    background: rgba(200,200,255,0.08);
+    color: rgba(200,200,255,0.70);
+    border: 1px solid rgba(200,200,255,0.18);
+}
+.pg-tier-lean {
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(13,18,40,0.90) 100%);
+    border-left: 4px solid rgba(255,255,255,0.12);
+}
+.pg-tier-lean .pg-tier-badge {
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.40);
+    border: 1px solid rgba(255,255,255,0.10);
+}
+
+/* ─── Section Headers ────────────────────────────────────── */
+.pg-section-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    animation: pg-fade-up 0.4s ease-out both;
+}
+.pg-section-icon {
+    font-size: 1.3rem;
+    line-height: 1;
+}
+.pg-section-text {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #00f0ff;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(0,240,255,0.3);
+}
+.pg-section-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,240,255,0.25), transparent);
+}
+
+/* ─── Status Pills ───────────────────────────────────────── */
+.pg-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 8px 0 12px 0;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, rgba(13,18,40,0.80) 0%, rgba(7,10,19,0.90) 100%);
+    border: 1px solid rgba(0,240,255,0.10);
+    border-radius: 10px;
+    animation: pg-fade-up 0.4s ease-out both;
+}
+.pg-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+.pg-pill.ok { background: rgba(0,230,118,0.12); color: #00e676; border: 1px solid rgba(0,230,118,0.22); }
+.pg-pill.warn { background: rgba(255,94,0,0.12); color: #ff5e00; border: 1px solid rgba(255,94,0,0.22); }
+.pg-pill.info { background: rgba(0,240,255,0.10); color: #00f0ff; border: 1px solid rgba(0,240,255,0.20); }
+.pg-pill.stale { background: rgba(255,200,0,0.10); color: #ffcc00; border: 1px solid rgba(255,200,0,0.20); }
+
+/* ─── Empty State ────────────────────────────────────────── */
+.pg-empty-state {
+    text-align: center;
+    padding: 48px 32px;
+    background: linear-gradient(135deg, rgba(13,18,40,0.60) 0%, rgba(7,10,19,0.75) 100%);
+    border: 1px dashed rgba(0,240,255,0.18);
+    border-radius: 16px;
+    margin: 20px 0;
+    animation: pg-fade-up 0.5s ease-out;
+}
+.pg-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.7;
+}
+.pg-empty-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: rgba(0,240,255,0.7);
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+}
+.pg-empty-desc {
+    font-size: 0.86rem;
+    color: #8a9bb8;
+    max-width: 500px;
+    margin: 0 auto;
+    line-height: 1.6;
+}
+
+/* ─── Comparison Winner Highlight ────────────────────────── */
+.pg-winner-card {
+    background: linear-gradient(135deg, rgba(0,230,118,0.08) 0%, rgba(13,18,40,0.92) 100%);
+    border: 1px solid rgba(0,230,118,0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: center;
+    box-shadow: 0 0 16px rgba(0,230,118,0.08);
+    animation: pg-fade-up 0.4s ease-out both;
+}
+.pg-winner-label {
+    font-size: 0.68rem;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.pg-winner-vals {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.92rem;
+    color: #e8f0ff;
+    margin-bottom: 4px;
+}
+.pg-winner-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+.pg-winner-a {
+    background: rgba(0,240,255,0.15);
+    color: #00f0ff;
+    border: 1px solid rgba(0,240,255,0.30);
+}
+.pg-winner-b {
+    background: rgba(200,0,255,0.15);
+    color: #c800ff;
+    border: 1px solid rgba(200,0,255,0.30);
+}
+.pg-winner-tie {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.55);
+    border: 1px solid rgba(255,255,255,0.15);
+}
 </style>
 """, unsafe_allow_html=True)
 
 
-def _glass_card(label, value, delta="", delta_class=""):
+def _glass_card(label, value, delta="", delta_class="", value_class=""):
     """Return HTML for a glassmorphism metric card."""
     safe_label = _html.escape(str(label))
     safe_value = _html.escape(str(value))
     safe_delta = _html.escape(str(delta))
+    _vc = f" {_html.escape(value_class)}" if value_class else ""
     delta_html = (
         f'<div class="pg-glass-delta {_html.escape(delta_class)}">{safe_delta}</div>'
         if delta else ""
     )
     return f"""<div class="pg-glass-card">
         <div class="pg-glass-label">{safe_label}</div>
-        <div class="pg-glass-value">{safe_value}</div>
+        <div class="pg-glass-value{_vc}">{safe_value}</div>
         {delta_html}
     </div>"""
 
 
-st.title("📊 Proving Grounds")
-st.markdown(
-    "Validate the model against real game logs. "
-    "See win rates, ROI, and tier-by-tier performance metrics."
-)
+def _section_header(icon, text):
+    """Return HTML for a styled section header with accent line."""
+    safe_text = _html.escape(str(text))
+    return f"""<div class="pg-section-hdr">
+        <span class="pg-section-icon">{icon}</span>
+        <span class="pg-section-text">{safe_text}</span>
+        <div class="pg-section-line"></div>
+    </div>"""
+
+
+st.markdown("""
+<div class="pg-title-bar">
+    <div class="pg-page-title">📊 PROVING GROUNDS</div>
+    <div class="pg-page-subtitle">
+        Validate the model against real game logs — win rates, ROI, tier-by-tier performance, and per-player breakdowns.
+    </div>
+    <div class="pg-title-accent"></div>
+</div>
+""", unsafe_allow_html=True)
 
 with st.expander("📖 How to Use This Page", expanded=False):
     st.markdown("""
@@ -371,18 +731,28 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
 # ── Status ────────────────────────────────────────────────────
 _fresh = len(game_logs_by_player) - stale_count
 if game_logs_by_player:
-    st.info(
-        f"📁 **{len(game_logs_by_player)} player(s)** with cached game logs available "
-        f"({_fresh} fresh · {stale_count} stale). "
-        f"Use **🔄 Refresh Historical Data** in the sidebar to update all logs at once."
+    _pills = [
+        f'<span class="pg-pill ok">✅ {len(game_logs_by_player)} Players Cached</span>',
+        f'<span class="pg-pill info">📁 {_fresh} Fresh</span>',
+    ]
+    if stale_count:
+        _pills.append(f'<span class="pg-pill stale">⏳ {stale_count} Stale</span>')
+    st.markdown(
+        f'<div class="pg-status-bar">{"".join(_pills)}'
+        f'<span style="color:#8a9bb8;font-size:0.78rem;margin-left:auto;">'
+        f'Use <strong>🔄 Refresh Historical Data</strong> in the sidebar to update</span></div>',
+        unsafe_allow_html=True,
     )
 else:
-    st.warning(
-        "No game log data found. Click **🔄 Refresh Historical Data** in the sidebar "
-        "(requires tonight's games to be loaded on **📡 Live Games** first). "
-        "Or go to **🔮 Player Simulator**, search for players, "
-        "and their logs will be cached for backtesting."
-    )
+    st.markdown("""
+    <div class="pg-status-bar">
+        <span class="pg-pill warn">⚠️ No Game Logs Found</span>
+        <span style="color:#8a9bb8;font-size:0.78rem;">
+            Click <strong>🔄 Refresh Historical Data</strong> in the sidebar
+            or go to <strong>🔮 Player Simulator</strong> to cache player logs
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     if not _HIST_REFRESH_AVAILABLE:
         st.stop()
 
@@ -523,7 +893,15 @@ if run_btn:
 def _render_results(result, config_label=""):
     """Render all result sections for a single backtest result."""
     if not result:
-        st.markdown("### Configure settings and click **▶ Run Backtest** to see results.")
+        st.markdown("""
+        <div class="pg-empty-state">
+            <div class="pg-empty-icon">🎯</div>
+            <div class="pg-empty-title">READY TO TEST</div>
+            <div class="pg-empty-desc">
+                Configure settings and click <strong style="color:#00f0ff;">▶ Run Backtest</strong> to see results.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
 
     if result.get("status") == "no_data":
@@ -545,13 +923,19 @@ def _render_results(result, config_label=""):
     <div class="pg-hero-banner">
         <div class="pg-hero-title">📊 BACKTEST RESULTS</div>
         <div class="pg-hero-subtitle">
-            {_prefix}Season {_season} &nbsp;|&nbsp;
+            {_prefix}Season {_season}
+            <span class="pg-hero-divider">|</span>
             <span class="pg-hero-stat"><span class="hl">{_tp:,}</span> Picks</span>
+            <span class="pg-hero-divider">·</span>
             <span class="pg-hero-stat"><span class="hl">{_wr*100:.1f}%</span> Win Rate</span>
+            <span class="pg-hero-divider">·</span>
             <span class="pg-hero-stat">ELITE: <span class="gold">{_elite_wr*100:.0f}%</span> WR</span>
-            <span class="pg-hero-stat">ROI: <span class="green">{_roi*100:+.1f}%</span></span>
+            <span class="pg-hero-divider">·</span>
+            <span class="pg-hero-stat">ROI: <span class="{'green' if _roi >= 0 else 'red'}">{_roi*100:+.1f}%</span></span>
+            <span class="pg-hero-divider">·</span>
             <span class="pg-hero-stat">Sharpe: <span class="hl">{_sharpe:.2f}</span></span>
-            <span class="pg-hero-stat">🔥{_ws}W / ❄️{_ls}L streaks</span>
+            <span class="pg-hero-divider">·</span>
+            <span class="pg-hero-stat">🔥 {_ws}W <span style="opacity:0.4">/</span> ❄️ {_ls}L streaks</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -560,21 +944,23 @@ def _render_results(result, config_label=""):
     _dd = result.get("max_drawdown", 0.0)
     _be_delta = (_wr - 0.5238) * 100
 
+    # Cards: (label, value, delta, delta_class, value_class)
     cards = [
-        ("Total Picks", f"{_tp:,}", "", ""),
-        ("Wins ✅", str(result["wins"]), "", ""),
-        ("Losses ❌", str(result["losses"]), "", ""),
+        ("Total Picks", f"{_tp:,}", "", "", "white"),
+        ("Wins", str(result["wins"]), "", "", "green"),
+        ("Losses", str(result["losses"]), "", "", "red"),
         ("Win Rate", f"{_wr*100:.1f}%",
          f"{_be_delta:+.1f}% vs breakeven",
-         "positive" if _be_delta > 0 else "negative"),
+         "positive" if _be_delta > 0 else "negative", ""),
         ("ROI", f"{_roi*100:.2f}%",
          f"${result['total_pnl']:.2f} P&L",
-         "positive" if _roi > 0 else "negative"),
+         "positive" if _roi > 0 else "negative",
+         "green" if _roi > 0 else "red"),
         ("Sharpe Ratio", f"{_sharpe:.3f}",
-         "✅ Good" if _sharpe > 1.0 else ("⚠️ Fair" if _sharpe > 0 else "❌ Bad"), ""),
-        ("Max Drawdown", f"{_dd:.2f}u", "Peak-to-trough", ""),
-        ("Win Streak 🔥", str(_ws), "", "positive"),
-        ("Loss Streak ❄️", str(_ls), "", "negative" if _ls > 5 else ""),
+         "✅ Good" if _sharpe > 1.0 else ("⚠️ Fair" if _sharpe > 0 else "❌ Bad"), "", ""),
+        ("Max Drawdown", f"{_dd:.2f}u", "Peak-to-trough", "", "red" if _dd < -3 else ""),
+        ("Win Streak", str(_ws), "🔥 Best run", "positive", "green"),
+        ("Loss Streak", str(_ls), "❄️ Worst run", "negative" if _ls > 5 else "", "red" if _ls > 5 else ""),
     ]
 
     # Render 9 cards in rows of 5 + 4
@@ -615,20 +1001,20 @@ def _render_results(result, config_label=""):
     # ── In-Sample vs Out-of-Sample ────────────────────────────
     oos = result.get("oos_metrics", {})
     if oos and oos.get("oos_picks", 0) > 0:
-        st.subheader("🔬 In-Sample vs Out-of-Sample Validation")
-        oos_col1, oos_col2, oos_col3, oos_col4 = st.columns(4)
-        oos_col1.metric("In-Sample Picks", oos.get("is_picks", 0))
-        oos_col2.metric("In-Sample Win Rate", f"{oos.get('is_win_rate', 0)*100:.1f}%")
-        oos_col3.metric("OOS Picks", oos.get("oos_picks", 0))
+        st.markdown(_section_header("🔬", "In-Sample vs Out-of-Sample"), unsafe_allow_html=True)
         _oos_wr = oos.get("oos_win_rate", 0)
         _is_wr = oos.get("is_win_rate", 0)
         _wr_gap = (_oos_wr - _is_wr) * 100
-        oos_col4.metric(
-            "OOS Win Rate",
-            f"{_oos_wr*100:.1f}%",
-            delta=f"{_wr_gap:+.1f}% vs in-sample",
-            delta_color="normal",
-        )
+        _oos_cols = st.columns(4)
+        _oos_cols[0].markdown(_glass_card("In-Sample Picks", str(oos.get("is_picks", 0)), "", "", "white"), unsafe_allow_html=True)
+        _oos_cols[1].markdown(_glass_card("In-Sample WR", f"{_is_wr*100:.1f}%", "", "", ""), unsafe_allow_html=True)
+        _oos_cols[2].markdown(_glass_card("OOS Picks", str(oos.get("oos_picks", 0)), "", "", "white"), unsafe_allow_html=True)
+        _oos_cols[3].markdown(_glass_card(
+            "OOS Win Rate", f"{_oos_wr*100:.1f}%",
+            f"{_wr_gap:+.1f}% vs in-sample",
+            "positive" if _wr_gap >= 0 else "negative",
+            "green" if _wr_gap >= -2 else ("" if _wr_gap >= -5 else "red"),
+        ), unsafe_allow_html=True)
         if abs(_wr_gap) < 3:
             st.success("✅ Model generalizes well — OOS win rate is within 3% of in-sample rate.")
         elif _wr_gap < -5:
@@ -644,7 +1030,7 @@ def _render_results(result, config_label=""):
     # ── Cumulative P&L Chart (Plotly) ─────────────────────────
     pick_log = result.get("pick_log", [])
     if pick_log:
-        st.subheader("📈 Cumulative P&L Curve")
+        st.markdown(_section_header("📈", "Cumulative P&L Curve"), unsafe_allow_html=True)
         _PAYOUT = 0.909
         _cumulative = 0.0
         _pnl_series = []
@@ -684,7 +1070,7 @@ def _render_results(result, config_label=""):
                 y=_pnl_series,
                 mode="lines",
                 name="Cumulative P&L",
-                line=dict(color=_line_color, width=2),
+                line=dict(color=_line_color, width=2.5, shape="spline", smoothing=0.3),
                 fill="tozeroy",
                 fillcolor=_fill_color,
                 hovertext=_hover,
@@ -697,21 +1083,56 @@ def _render_results(result, config_label=""):
                 y=_peak_series,
                 mode="lines",
                 name="Peak",
-                line=dict(color="rgba(255,215,64,0.3)", width=1, dash="dot"),
+                line=dict(color="rgba(255,215,64,0.25)", width=1, dash="dot"),
                 hoverinfo="skip",
             ))
+
+            # Final P&L annotation
+            fig.add_annotation(
+                x=len(_pnl_series),
+                y=_cumulative,
+                text=f"<b>{_cumulative:+.2f}u</b>",
+                showarrow=True,
+                arrowhead=2,
+                arrowcolor="rgba(0,240,255,0.5)",
+                font=dict(color="#00f0ff", size=12, family="JetBrains Mono"),
+                bgcolor="rgba(7,10,19,0.85)",
+                bordercolor="rgba(0,240,255,0.3)",
+                borderwidth=1,
+                ax=-40,
+                ay=-25,
+            )
 
             fig.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(7,10,19,0.8)",
-                height=300,
-                margin=dict(l=40, r=20, t=30, b=40),
-                xaxis=dict(title="Pick #", gridcolor="rgba(255,255,255,0.05)"),
-                yaxis=dict(title="Units", gridcolor="rgba(255,255,255,0.05)", zeroline=True,
-                           zerolinecolor="rgba(255,255,255,0.15)"),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                font=dict(color="rgba(255,255,255,0.7)", size=11),
+                plot_bgcolor="rgba(7,10,19,0.6)",
+                height=320,
+                margin=dict(l=45, r=25, t=35, b=45),
+                xaxis=dict(
+                    title=dict(text="Pick #", font=dict(size=11, color="rgba(255,255,255,0.45)")),
+                    gridcolor="rgba(255,255,255,0.04)",
+                    tickfont=dict(size=10, color="rgba(255,255,255,0.40)"),
+                ),
+                yaxis=dict(
+                    title=dict(text="Units", font=dict(size=11, color="rgba(255,255,255,0.45)")),
+                    gridcolor="rgba(255,255,255,0.04)",
+                    zeroline=True,
+                    zerolinecolor="rgba(0,240,255,0.15)",
+                    zerolinewidth=1.5,
+                    tickfont=dict(size=10, color="rgba(255,255,255,0.40)"),
+                ),
+                legend=dict(
+                    orientation="h", yanchor="bottom", y=1.03, xanchor="right", x=1,
+                    font=dict(size=10, color="rgba(255,255,255,0.50)"),
+                    bgcolor="rgba(0,0,0,0)",
+                ),
+                font=dict(color="rgba(255,255,255,0.65)", size=11),
+                hoverlabel=dict(
+                    bgcolor="rgba(7,10,19,0.92)",
+                    bordercolor="rgba(0,240,255,0.30)",
+                    font=dict(color="#e8f0ff", size=12),
+                ),
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
@@ -733,6 +1154,7 @@ def _render_results(result, config_label=""):
             _tier_order = ["ELITE", "STRONG", "VALUE", "LEAN"]
             _tier_css = {"ELITE": "pg-tier-elite", "STRONG": "pg-tier-strong",
                          "VALUE": "pg-tier-value", "LEAN": "pg-tier-lean"}
+            _tier_icons = {"ELITE": "👑", "STRONG": "⚡", "VALUE": "📊", "LEAN": "📉"}
             for tier in _tier_order:
                 d = tier_data.get(tier)
                 if not d or d["picks"] == 0:
@@ -741,22 +1163,33 @@ def _render_results(result, config_label=""):
                 _pnl = d.get("pnl", 0.0)
                 _wr_pct = d["win_rate"] * 100
                 _css_class = _tier_css.get(tier, "")
-                # Color scale for win rate: green if > 55%, yellow if 50-55%, red if < 50%
+                _icon = _tier_icons.get(tier, "")
+                # Color scale for win rate
                 if _wr_pct >= 55:
                     _wr_color = "#00e676"
+                    _bar_color = "#00e676"
                 elif _wr_pct >= 50:
                     _wr_color = "#ffd740"
+                    _bar_color = "#ffd740"
                 else:
                     _wr_color = "#ff5252"
+                    _bar_color = "#ff5252"
+                _bar_width = min(_wr_pct, 100)
                 _safe_tier = _html.escape(tier)
                 st.markdown(f"""
-                <div class="{_html.escape(_css_class)}" style="padding:10px 16px;border-radius:8px;margin-bottom:8px;">
-                    <strong>{_safe_tier}</strong> &nbsp;·&nbsp;
-                    {d['picks']} picks &nbsp;·&nbsp;
-                    <span style="color:{_wr_color};font-weight:700;">{_wr_pct:.1f}% WR</span> &nbsp;·&nbsp;
-                    ROI: {_roi_pct:+.2f}% &nbsp;·&nbsp;
-                    P&amp;L: {_pnl:+.2f}u &nbsp;
-                    {"✅" if _roi_pct > 0 else "❌"}
+                <div class="pg-tier-card {_html.escape(_css_class)}">
+                    <span class="pg-tier-badge">{_icon} {_safe_tier}</span>
+                    <div class="pg-tier-meta">
+                        <strong>{d['picks']}</strong> picks · 
+                        <strong>{d['wins']}</strong>W / <strong>{d['picks'] - d['wins']}</strong>L ·
+                        ROI: {_roi_pct:+.2f}% ·
+                        P&amp;L: {_pnl:+.2f}u
+                        {"✅" if _roi_pct > 0 else "❌"}
+                    </div>
+                    <div class="pg-tier-bar-wrap">
+                        <div class="pg-tier-bar" style="width:{_bar_width}%;background:{_bar_color};"></div>
+                    </div>
+                    <span class="pg-tier-wr" style="color:{_wr_color};">{_wr_pct:.1f}%</span>
                 </div>
                 """, unsafe_allow_html=True)
         else:
@@ -882,12 +1315,22 @@ result = st.session_state.get("backtest_result")
 result_b = st.session_state.get("backtest_result_b")
 
 if not result and not result_b:
-    st.markdown("### Configure settings and click **▶ Run Backtest** to see results.")
+    st.markdown("""
+    <div class="pg-empty-state">
+        <div class="pg-empty-icon">🎯</div>
+        <div class="pg-empty-title">READY TO TEST</div>
+        <div class="pg-empty-desc">
+            Configure your backtest settings in the sidebar and click
+            <strong style="color:#00f0ff;">▶ Run Backtest</strong> to validate the model
+            against historical data.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
 if result_b:
     # A/B Comparison mode — show side by side
-    st.subheader("🔀 A/B Comparison Results")
+    st.markdown(_section_header("🔀", "A/B Comparison Results"), unsafe_allow_html=True)
     tab_a, tab_b = st.tabs(["⚙️ Config A", "⚙️ Config B"])
     with tab_a:
         _render_results(result, config_label="Config A")
@@ -898,7 +1341,7 @@ if result_b:
     if (result and result.get("status") == "ok" and
             result_b and result_b.get("status") == "ok"):
         st.divider()
-        st.subheader("📊 Head-to-Head Comparison")
+        st.markdown(_section_header("📊", "Head-to-Head Comparison"), unsafe_allow_html=True)
         _cmp_cols = st.columns(5)
         _metrics_cmp = [
             ("Win Rate", result["win_rate"]*100, result_b["win_rate"]*100, "%"),
@@ -910,8 +1353,20 @@ if result_b:
         for i, (name, val_a, val_b, unit) in enumerate(_metrics_cmp):
             with _cmp_cols[i]:
                 _winner = "A" if val_a >= val_b else "B"
-                st.metric(name, f"A: {val_a:.1f}{unit}", delta=f"B: {val_b:.1f}{unit}",
-                          delta_color="off")
-                st.caption(f"Winner: Config {_winner}")
+                _badge_cls = "pg-winner-a" if _winner == "A" else "pg-winner-b"
+                if val_a == val_b:
+                    _badge_cls = "pg-winner-tie"
+                    _winner = "Tie"
+                st.markdown(f"""
+                <div class="pg-winner-card">
+                    <div class="pg-winner-label">{_html.escape(name)}</div>
+                    <div class="pg-winner-vals">
+                        A: {val_a:.1f}{_html.escape(unit)} · B: {val_b:.1f}{_html.escape(unit)}
+                    </div>
+                    <span class="pg-winner-badge {_badge_cls}">
+                        {"🏆 " if _winner != "Tie" else ""}Config {_winner}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 else:
     _render_results(result)
