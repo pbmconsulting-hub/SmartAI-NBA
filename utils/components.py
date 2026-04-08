@@ -8,6 +8,7 @@
 import os
 import base64
 import logging
+import time as _time_mod
 import streamlit as st
 
 _components_logger = logging.getLogger(__name__)
@@ -287,7 +288,6 @@ def _auto_save_page_state():
     This avoids heavy SQLite writes on every single rerender while still
     ensuring data is saved frequently enough to survive session resets.
     """
-    import time as _time_mod
     _SAVE_INTERVAL = 30  # seconds
     _now = _time_mod.time()
     _last = st.session_state.get("_page_state_last_save_ts", 0)

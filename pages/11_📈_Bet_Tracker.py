@@ -18,6 +18,7 @@
 import datetime
 import json
 import logging
+import threading as _threading
 import time as _time
 import os
 
@@ -159,8 +160,6 @@ def _reload_bets():
 # Guarded by a session-state flag so this runs at most once per browser session,
 # preventing repeated blocking API calls on every Streamlit rerun.
 # Uses a background thread so the page renders immediately without blocking.
-
-import threading as _threading
 
 def _background_auto_resolve():
     """Run auto-resolve in a background thread so the page renders immediately."""
@@ -659,7 +658,8 @@ with tab_model_health:
 
         # Feature 1: Enhanced tier accuracy report
         try:
-            if _get_clv_fns() and get_tier_accuracy_report:
+            _get_clv_fns()  # trigger lazy import
+            if get_tier_accuracy_report:
                 st.subheader("📊 Model Tier Accuracy")
                 _tier_report = get_tier_accuracy_report(days=90)
                 if _tier_report.get("has_data"):
@@ -678,7 +678,8 @@ with tab_model_health:
 
         # Feature 4: Isotonic calibration curve
         try:
-            if _get_calibration_fns() and get_isotonic_calibration_curve:
+            _get_calibration_fns()  # trigger lazy import
+            if get_isotonic_calibration_curve:
                 st.subheader("📈 Isotonic Calibration Curve")
                 _iso_curve = get_isotonic_calibration_curve(days=90)
                 if _iso_curve.get("has_data"):
@@ -699,7 +700,8 @@ with tab_model_health:
 
         # CLV Summary — aggregate closing-line-value performance
         try:
-            if _get_clv_fns() and get_clv_summary:
+            _get_clv_fns()  # trigger lazy import
+            if get_clv_summary:
                 st.subheader("📈 Closing Line Value (CLV) Summary")
                 _clv_data = get_clv_summary()
                 if _clv_data and _clv_data.get("has_data"):
