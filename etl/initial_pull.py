@@ -1488,11 +1488,11 @@ def populate_player_career_stats(
 ) -> None:
     """Fetch and load career stats for active players (incremental).
 
-    On subsequent runs most players already have career data in the DB.
-    Only players that are **missing** from ``Player_Career_Stats`` or
-    that have **played a game in the last 3 days** are re-fetched.  This
-    typically reduces the fetch set from 578+ to a handful of players,
-    cutting runtime from ~10+ minutes to a few seconds.
+    Only the **current season** and the **previous season** are kept —
+    older historical rows are discarded to minimise storage and speed up
+    queries.  On subsequent runs most players already have data; only
+    those **missing** from ``Player_Career_Stats`` or who have **played
+    in the last 3 days** are re-fetched.
 
     Uses batched thread-pool processing with a dedicated rate limiter
     and progressive cooldowns to avoid NBA API throttling.  A circuit
@@ -1504,6 +1504,10 @@ def populate_player_career_stats(
         conn: Open SQLite connection.
         season: NBA season string (used to filter to current-season players).
     """
+    # Compute which two seasons to keep.  The NBA API encodes season_id as
+    # e.g. "22025" for the 2025-26 season (prefix '2' + start year).
+    _start_year = int(season.split("-")[0])
+    _keep_season_ids = {f"2{_start_year}", f"2{_start_year - 1}"}
     all_active = pd.read_sql(
         "SELECT DISTINCT player_id FROM Players WHERE is_active = 1",
         conn,
@@ -1594,7 +1598,11 @@ def populate_player_career_stats(
         if df.empty:
             return None
         available = {k: v for k, v in col_map.items() if k in df.columns}
-        return df[list(available.keys())].rename(columns=available)
+        mapped = df[list(available.keys())].rename(columns=available)
+        # Keep only current + previous season rows.
+        if "season_id" in mapped.columns:
+            mapped = mapped[mapped["season_id"].isin(_keep_season_ids)]
+        return mapped if not mapped.empty else None
 
     def _fetch_career(pid: int) -> tuple[int, pd.DataFrame | None]:
         """Rate-limited wrapper returning ``(pid, df | None)``."""
