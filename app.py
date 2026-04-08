@@ -1065,12 +1065,12 @@ for i, (_num, _label) in enumerate(_proof_data):
 # 6th dynamic card — tracked performance if data exists
 try:
     from utils.joseph_widget import joseph_get_track_record
-    _record = joseph_get_track_record()
-    if _record.get("total", 0) > 10:
+    _track_record = joseph_get_track_record()
+    if _track_record.get("total", 0) > 10:
         st.metric(
             "Tracked Win Rate",
-            f"{_record['win_rate']:.0f}%",
-            delta=f"{_record['total']} picks tracked",
+            f"{_track_record['win_rate']:.0f}%",
+            delta=f"{_track_record['total']} picks tracked",
         )
 except Exception:
     pass
@@ -1237,7 +1237,7 @@ _hiw_stages = [
      "A proprietary multi-signal composite score with built-in safeguards assigns every pick a tier: Platinum, Gold, Silver, Bronze, or Avoid."),
 ]
 
-_hiw_cols = st.columns(9)  # 5 stages + 4 arrows
+_hiw_cols = st.columns(len(_hiw_stages) * 2 - 1)  # stages + arrows between them
 for idx, (icon, title, desc) in enumerate(_hiw_stages):
     col_idx = idx * 2
     with _hiw_cols[col_idx]:
