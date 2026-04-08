@@ -308,8 +308,8 @@ def render_broadcast_segment(segment_data: dict) -> str:
 # render_dawg_board — top 10 by Dawg Factor
 # ═════════════════════════════════════════════════════════════
 
-def render_dawg_board(joseph_results: list) -> None:
-    """Render top-10 players by dawg_factor as an HTML leaderboard with bet info."""
+def _build_dawg_board_html(joseph_results: list) -> str:
+    """Build the Dawg Board HTML table. Pure function — no st calls."""
     scored = []
     for r in joseph_results:
         df = r.get("dawg_factor", 0)
@@ -319,8 +319,7 @@ def render_dawg_board(joseph_results: list) -> None:
     top10 = scored[:10]
 
     if not top10:
-        st.info("No Dawg Factor data available yet.")
-        return
+        return ""
 
     rows_html = ""
     for idx, r in enumerate(top10, 1):
@@ -386,7 +385,7 @@ def render_dawg_board(joseph_results: list) -> None:
             f'</tr>'
         )
 
-    html = (
+    return (
         '<table class="joseph-dawg-table">'
         '<thead><tr>'
         '<th>Rank</th><th>Player</th><th>Bet</th><th>Dawg Factor</th><th>Tags</th><th>Archetype</th>'
@@ -394,7 +393,15 @@ def render_dawg_board(joseph_results: list) -> None:
         f'<tbody>{rows_html}</tbody>'
         '</table>'
     )
-    st.markdown(html, unsafe_allow_html=True)
+
+
+def render_dawg_board(joseph_results: list) -> None:
+    """Render top-10 players by dawg_factor as an HTML leaderboard with bet info."""
+    html = _build_dawg_board_html(joseph_results)
+    if html:
+        st.markdown(html, unsafe_allow_html=True)
+    else:
+        st.info("No Dawg Factor data available yet.")
 
 
 # ═════════════════════════════════════════════════════════════
@@ -587,7 +594,7 @@ def render_confidence_gauge_svg(
 
     return (
         f'<div style="text-align:center">'
-        # ── Donut ──
+        # ── Donut with animated stroke fill ──
         f'<svg width="90" height="90" viewBox="0 0 90 90">'
         f'<circle cx="45" cy="45" r="{radius}" fill="none" '
         f'stroke="#1e293b" stroke-width="8"/>'
@@ -595,7 +602,9 @@ def render_confidence_gauge_svg(
         f'stroke="{color}" stroke-width="8" '
         f'stroke-dasharray="{dash:.1f} {gap:.1f}" '
         f'stroke-linecap="round" '
-        f'transform="rotate(-90 45 45)"/>'
+        f'transform="rotate(-90 45 45)" '
+        f'class="studio-gauge-ring" '
+        f'style="--gauge-dash:{dash:.1f};--gauge-gap:{gap:.1f}"/>'
         f'<text x="45" y="49" text-anchor="middle" '
         f'fill="{color}" font-size="14" font-weight="700" '
         f'font-family="Orbitron,sans-serif">{prob:.0f}%</text>'
@@ -616,6 +625,32 @@ def render_confidence_gauge_svg(
         f'border-radius:2px"></div></div></div>'
         f'</div>'
     )
+
+
+# ═════════════════════════════════════════════════════════════
+# render_skeleton_cards — shimmer placeholder cards
+# ═════════════════════════════════════════════════════════════
+
+def render_skeleton_cards(count: int = 3) -> str:
+    """Return shimmer skeleton placeholder HTML while Joseph analyses.
+
+    Parameters
+    ----------
+    count : int
+        Number of skeleton cards to render (default 3).
+    """
+    cards = ""
+    widths = ["long", "medium", "short"]
+    for i in range(count):
+        cards += (
+            f'<div class="studio-skeleton-card" '
+            f'style="animation-delay:{i * 0.15:.2f}s">'
+            f'<div class="studio-skeleton-line long"></div>'
+            f'<div class="studio-skeleton-line {widths[i % 3]}"></div>'
+            f'<div class="studio-skeleton-line medium"></div>'
+            f'</div>'
+        )
+    return cards
 
 
 # ═════════════════════════════════════════════════════════════
