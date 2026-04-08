@@ -6355,16 +6355,6 @@ QUANTUM_CARD_MATRIX_CSS = """
             flex-direction: column;
         }
     }
-    @media (min-width: 1200px) {
-        .qcm-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-    @media (max-width: 600px) {
-        .qcm-grid {
-            grid-template-columns: 1fr;
-        }
-    }
 }
 
 /* ── QAM Helper Card Classes ─────────────────────────────── */
