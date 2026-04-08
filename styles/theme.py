@@ -6720,6 +6720,162 @@ QUANTUM_CARD_MATRIX_CSS = """
                       font-variant-numeric: tabular-nums; }
 .nah-dfs-pill-be    { color: #475569; font-size: 0.58rem; }
 .nah-dfs-kelly      { color: #475569; font-size: 0.62rem; margin-top: 3px; }
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 13: Sticky Summary Dashboard
+   ═══════════════════════════════════════════════════════════ */
+.qam-sticky-summary {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: linear-gradient(180deg, #0b1120 0%, rgba(11, 17, 32, 0.97) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 8px 0 6px;
+    margin: 0 -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    border-bottom: 1px solid rgba(0, 198, 255, 0.10);
+    transition: box-shadow 0.25s ease;
+}
+.qam-sticky-summary:hover {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 14: Quick Filter Chips
+   ═══════════════════════════════════════════════════════════ */
+.qam-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0 12px;
+    align-items: center;
+}
+.qam-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(15, 20, 36, 0.7);
+    color: #94A3B8;
+    transition: all 0.2s ease;
+    user-select: none;
+    white-space: nowrap;
+}
+.qam-filter-chip:hover {
+    border-color: rgba(0, 198, 255, 0.35);
+    color: #e0e7ef;
+    background: rgba(0, 198, 255, 0.06);
+}
+.qam-filter-chip-active {
+    border-color: #00C6FF;
+    color: #00C6FF;
+    background: rgba(0, 198, 255, 0.12);
+    box-shadow: 0 0 8px rgba(0, 198, 255, 0.15);
+}
+.qam-filter-chip-platinum.qam-filter-chip-active {
+    border-color: #c800ff;
+    color: #c800ff;
+    background: rgba(200, 0, 255, 0.10);
+    box-shadow: 0 0 8px rgba(200, 0, 255, 0.2);
+}
+.qam-filter-chip-gold.qam-filter-chip-active {
+    border-color: #ffd700;
+    color: #ffd700;
+    background: rgba(255, 215, 0, 0.10);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
+}
+.qam-filter-chip-edge.qam-filter-chip-active {
+    border-color: #00ff9d;
+    color: #00ff9d;
+    background: rgba(0, 255, 157, 0.10);
+    box-shadow: 0 0 8px rgba(0, 255, 157, 0.2);
+}
+.qam-filter-chip-form.qam-filter-chip-active {
+    border-color: #ff5e00;
+    color: #ff5e00;
+    background: rgba(255, 94, 0, 0.10);
+    box-shadow: 0 0 8px rgba(255, 94, 0, 0.2);
+}
+.qam-filter-chip-avoid.qam-filter-chip-active {
+    border-color: #ff4444;
+    color: #ff4444;
+    background: rgba(255, 68, 68, 0.10);
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 15: Sort Controls
+   ═══════════════════════════════════════════════════════════ */
+.qam-sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+.qam-sort-bar-label {
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    color: #475569;
+    margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Feature 16: Collapsible Game Groups
+   ═══════════════════════════════════════════════════════════ */
+.qam-game-group {
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+    background: rgba(11, 17, 32, 0.4);
+}
+.qam-game-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, rgba(15, 20, 36, 0.9), rgba(20, 25, 43, 0.8));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+.qam-game-group-header:hover {
+    background: linear-gradient(135deg, rgba(20, 28, 50, 0.95), rgba(25, 32, 55, 0.9));
+}
+.qam-game-group-matchup {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #e0e7ef;
+}
+.qam-game-group-meta {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-left: auto;
+}
+.qam-game-group-badge {
+    font-size: 0.7rem;
+    color: #00C6FF;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(0, 198, 255, 0.08);
+    border: 1px solid rgba(0, 198, 255, 0.15);
+}
+.qam-game-group-body {
+    padding: 4px 0;
+}
 """
 
 

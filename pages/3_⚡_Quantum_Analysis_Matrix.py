@@ -647,6 +647,17 @@ with show_col:
         index=0,
     )
 
+# ── Feature 14: Quick Filter Chips ──────────────────────────────
+# Initialise session-state keys for filter chips (persist across reruns).
+for _chip_key in ("chip_platinum", "chip_gold_plus", "chip_high_edge",
+                  "chip_hot_form", "chip_show_avoids"):
+    if _chip_key not in st.session_state:
+        st.session_state[_chip_key] = False
+
+# ── Feature 15: Sort selector ───────────────────────────────────
+if "qam_sort_key" not in st.session_state:
+    st.session_state["qam_sort_key"] = "Confidence Score ↓"
+
 if run_analysis:
     _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
@@ -2109,7 +2120,68 @@ if analysis_results:
     else:
         displayed_results = analysis_results
 
-    # ── Tier Filter & Bet Classification Filter ──────────────────────────
+    # ── Feature 14: Quick Filter Chips ──────────────────────────────
+    # Render filter chips as Streamlit columns of toggle buttons.
+    _chip_col1, _chip_col2, _chip_col3, _chip_col4, _chip_col5 = st.columns(5)
+    with _chip_col1:
+        st.session_state["chip_platinum"] = st.toggle(
+            "💎 Platinum Only", value=st.session_state.get("chip_platinum", False),
+            key="_chip_platinum_toggle",
+        )
+    with _chip_col2:
+        st.session_state["chip_gold_plus"] = st.toggle(
+            "🥇 Gold+", value=st.session_state.get("chip_gold_plus", False),
+            key="_chip_gold_plus_toggle",
+        )
+    with _chip_col3:
+        st.session_state["chip_high_edge"] = st.toggle(
+            "⚡ High Edge (≥10%)", value=st.session_state.get("chip_high_edge", False),
+            key="_chip_high_edge_toggle",
+        )
+    with _chip_col4:
+        st.session_state["chip_hot_form"] = st.toggle(
+            "🔥 Hot Form", value=st.session_state.get("chip_hot_form", False),
+            key="_chip_hot_form_toggle",
+        )
+    with _chip_col5:
+        st.session_state["chip_show_avoids"] = st.toggle(
+            "❌ Show Avoids", value=st.session_state.get("chip_show_avoids", False),
+            key="_chip_show_avoids_toggle",
+        )
+
+    # Apply chip filters (chips are additive — if multiple are active
+    # the result is the union so the user can combine Platinum + High Edge).
+    _any_tier_chip = (
+        st.session_state.get("chip_platinum", False)
+        or st.session_state.get("chip_gold_plus", False)
+    )
+    if _any_tier_chip:
+        _allowed_tiers: set = set()
+        if st.session_state.get("chip_platinum"):
+            _allowed_tiers.add("Platinum")
+        if st.session_state.get("chip_gold_plus"):
+            _allowed_tiers.update({"Platinum", "Gold"})
+        displayed_results = [
+            r for r in displayed_results if r.get("tier") in _allowed_tiers
+        ]
+    if st.session_state.get("chip_high_edge"):
+        displayed_results = [
+            r for r in displayed_results
+            if abs(r.get("edge_percentage", 0)) >= 10.0
+        ]
+    if st.session_state.get("chip_hot_form"):
+        displayed_results = [
+            r for r in displayed_results
+            if (r.get("recent_form_ratio") or 0) >= 1.05
+        ]
+    if not st.session_state.get("chip_show_avoids"):
+        # Default: hide avoids. When toggled ON, show them.
+        displayed_results = [
+            r for r in displayed_results
+            if not r.get("should_avoid", False)
+        ]
+
+    # ── Legacy tier multiselect (still useful for multi-tier combos) ──
     _na_filter_col1, _na_filter_col2 = st.columns(2)
     with _na_filter_col1:
         _na_tier_filter = st.multiselect(
@@ -2120,16 +2192,37 @@ if analysis_results:
             help="Show only picks matching the selected tiers. Leave empty to show all tiers.",
         )
     with _na_filter_col2:
-        pass  # Bet Classification filter removed (tier system removed)
+        # ── Feature 15: Sort Controls ────────────────────────────────
+        _sort_options = [
+            "Confidence Score ↓",
+            "Edge % ↓",
+            "Composite Win Score ↓",
+            "Alphabetical (A→Z)",
+        ]
+        _qam_sort_key = st.selectbox(
+            "Sort by",
+            _sort_options,
+            index=_sort_options.index(
+                st.session_state.get("qam_sort_key", "Confidence Score ↓")
+            ),
+            key="_qam_sort_select",
+            help="Choose how to order the analysis results.",
+        )
+        st.session_state["qam_sort_key"] = _qam_sort_key
+
     if _na_tier_filter:
         _na_tier_names = [t.split(" ")[0] for t in _na_tier_filter]
         displayed_results = [r for r in displayed_results if r.get("tier") in _na_tier_names]
 
-    # Sort by confidence score descending
-    displayed_results.sort(
-        key=lambda r: r.get("confidence_score", 0),
-        reverse=True,
-    )
+    # ── Feature 15: Apply sort ───────────────────────────────────────
+    if _qam_sort_key == "Confidence Score ↓":
+        displayed_results.sort(key=lambda r: r.get("confidence_score", 0), reverse=True)
+    elif _qam_sort_key == "Edge % ↓":
+        displayed_results.sort(key=lambda r: abs(r.get("edge_percentage", 0)), reverse=True)
+    elif _qam_sort_key == "Composite Win Score ↓":
+        displayed_results.sort(key=lambda r: r.get("composite_win_score", 0), reverse=True)
+    elif _qam_sort_key == "Alphabetical (A→Z)":
+        displayed_results.sort(key=lambda r: r.get("player_name", "").lower())
 
     # ── Deduplicate by (player_name, stat_type, line, direction) ──
     # Prevents duplicate player cards and duplicate Streamlit element keys
@@ -2176,6 +2269,11 @@ if analysis_results:
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
 
+    # ── Feature 13: Sticky Summary Dashboard ────────────────────
+    # Wrap the DFS Edge + Tier Distribution into a sticky container
+    # so they remain visible while scrolling through results.
+    st.markdown('<div class="qam-sticky-summary">', unsafe_allow_html=True)
+
     # Phase 3: DFS Edge row (only shown when DFS metrics exist)
     if _dfs_results:
         _avg_dfs_edge = sum(
@@ -2205,6 +2303,8 @@ if analysis_results:
         ),
         unsafe_allow_html=True,
     )
+
+    st.markdown('</div>', unsafe_allow_html=True)  # close .qam-sticky-summary
 
     # ── Quick-select buttons ───────────────────────────────────
     _qb_col1, _qb_col2, _qb_col3 = st.columns([1, 1, 2])
@@ -2567,30 +2667,54 @@ if analysis_results:
         except ImportError:
             _logger.debug("joseph_brain not available for card opinions")
 
-        _unified_html = _compile_unified_matrix(_grouped, _joseph_opinions)
+        # ── Feature 16: Collapsible Game Groups ──────────────────
+        # Build team → game-matchup label mapping from todays_games.
+        _team_to_game: dict[str, str] = {}
+        for _g in (todays_games or []):
+            _ht = (_g.get("home_team") or "").upper().strip()
+            _at = (_g.get("away_team") or "").upper().strip()
+            if _ht and _at:
+                _matchup_label = f"{_at} @ {_ht}"
+                _team_to_game[_ht] = _matchup_label
+                _team_to_game[_at] = _matchup_label
 
-        # ── Item 11: Lazy-load — chunk large player sets into separate
-        # iframes so the DOM stays small.  For ≤_LAZY_CHUNK_SIZE players
-        # we render as before (single iframe).  For larger sets we split
-        # into chunks rendered in individual iframes, each inside a
-        # Streamlit expander so only the visible chunk's DOM loads.
-        _player_keys = list(_grouped.keys())
-        if len(_player_keys) <= _LAZY_CHUNK_SIZE:
-            _render_card_iframe(_unified_html, len(_grouped))
-        else:
-            for _ci in range(0, len(_player_keys), _LAZY_CHUNK_SIZE):
-                _chunk_keys = _player_keys[_ci : _ci + _LAZY_CHUNK_SIZE]
-                _chunk_data = {k: _grouped[k] for k in _chunk_keys}
-                _chunk_opinions = {k: _joseph_opinions[k] for k in _chunk_keys if k in _joseph_opinions}
-                _chunk_html = _compile_unified_matrix(_chunk_data, _chunk_opinions)
-                _chunk_num = _ci // _LAZY_CHUNK_SIZE + 1
-                _total_chunks = (len(_player_keys) + _LAZY_CHUNK_SIZE - 1) // _LAZY_CHUNK_SIZE
-                with st.expander(
-                    f"Players {_ci + 1}–{min(_ci + _LAZY_CHUNK_SIZE, len(_player_keys))} "
-                    f"(Group {_chunk_num}/{_total_chunks})",
-                    expanded=(_chunk_num == 1),
-                ):
-                    _render_card_iframe(_chunk_html, len(_chunk_data))
+        # Group players by their game matchup.
+        _game_groups: dict[str, dict[str, dict]] = {}  # matchup → {player: data}
+        _no_game = "Other"
+        for _pname, _pdata in _grouped.items():
+            # Determine team from vitals or first prop result
+            _pteam = (
+                (_pdata.get("vitals") or {}).get("team", "")
+                or (_pdata["props"][0].get("player_team", "") if _pdata.get("props") else "")
+                or (_pdata["props"][0].get("team", "") if _pdata.get("props") else "")
+            ).upper().strip()
+            _game_label = _team_to_game.get(_pteam, _no_game)
+            _game_groups.setdefault(_game_label, {})[_pname] = _pdata
+
+        # Render each game group as a collapsible Streamlit expander
+        for _game_idx, (_game_label, _game_players) in enumerate(_game_groups.items()):
+            _gp_count = len(_game_players)
+            _gp_prop_count = sum(len(d.get("props", [])) for d in _game_players.values())
+            _expander_label = (
+                f"🏀 {_game_label} — {_gp_count} player{'s' if _gp_count != 1 else ''}"
+                f", {_gp_prop_count} prop{'s' if _gp_prop_count != 1 else ''}"
+            )
+
+            with st.expander(_expander_label, expanded=(_game_idx == 0)):
+                _game_opinions = {k: _joseph_opinions[k] for k in _game_players if k in _joseph_opinions}
+                _game_html = _compile_unified_matrix(_game_players, _game_opinions)
+
+                # Apply lazy-chunk logic within each game group
+                _gp_keys = list(_game_players.keys())
+                if len(_gp_keys) <= _LAZY_CHUNK_SIZE:
+                    _render_card_iframe(_game_html, len(_game_players))
+                else:
+                    for _ci in range(0, len(_gp_keys), _LAZY_CHUNK_SIZE):
+                        _chunk_keys = _gp_keys[_ci : _ci + _LAZY_CHUNK_SIZE]
+                        _chunk_data = {k: _game_players[k] for k in _chunk_keys}
+                        _chunk_opinions = {k: _game_opinions[k] for k in _chunk_keys if k in _game_opinions}
+                        _chunk_html = _compile_unified_matrix(_chunk_data, _chunk_opinions)
+                        _render_card_iframe(_chunk_html, len(_chunk_data))
 
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
