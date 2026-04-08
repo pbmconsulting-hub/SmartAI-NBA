@@ -63,14 +63,10 @@ def render_dfs_flex_edge_html(beats_be_count: int, total_dfs: int,
     """Return the DFS FLEX EDGE inline card HTML."""
     edge_c = "#00ff9d" if avg_dfs_edge > 0 else "#ff5e00"
     return (
-        f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);'
-        f'border:1px solid rgba(0,255,157,0.2);border-radius:8px;padding:10px 16px;margin:6px 0;">'
-        f'<span style="color:#64748b;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;">'
-        f'📈 DFS FLEX EDGE</span>'
-        f'<span style="color:#475569;font-size:0.68rem;margin-left:8px;">'
-        f'{beats_be_count}/{total_dfs} legs beat breakeven</span>'
-        f'<span style="color:{edge_c};font-size:0.82rem;font-weight:800;margin-left:12px;'
-        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;\">"
+        f'<div class="qam-dfs-edge">'
+        f'<span class="qam-dfs-edge-label">📈 DFS FLEX EDGE</span>'
+        f'<span class="qam-dfs-edge-sub">{beats_be_count}/{total_dfs} legs beat breakeven</span>'
+        f'<span class="qam-dfs-edge-val" style="color:{edge_c};">'
         f'Avg Edge: {avg_dfs_edge:+.1f}%</span>'
         f'</div>'
     )
@@ -98,21 +94,19 @@ def render_tier_distribution_html(platinum_count: int, gold_count: int,
         bp_tier = best_pick.get("tier", "")
         bp_emoji = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}.get(bp_tier, "🏀")
         best_html = (
-            f'<div style="margin-top:10px;padding:10px 14px;background:rgba(255,94,0,0.08);'
-            f'border-radius:6px;border-left:3px solid #ff5e00;">'
-            f'<span style="color:#ff5e00;font-weight:700;font-size:0.85rem;">🏆 Best Pick: </span>'
-            f'<span style="color:#e0e7ef;font-weight:600;">{bp_emoji} {bp_name} — {bp_dir} {bp_line} {bp_stat}</span>'
-            f'<span style="color:#00f0ff;font-weight:700;margin-left:10px;">{bp_conf:.0f}/100</span>'
+            f'<div class="qam-best-pick">'
+            f'<span class="qam-best-pick-label">🏆 Best Pick: </span>'
+            f'<span class="qam-best-pick-detail">{bp_emoji} {bp_name} — {bp_dir} {bp_line} {bp_stat}</span>'
+            f'<span class="qam-best-pick-conf">{bp_conf:.0f}/100</span>'
             f'</div>'
         )
     return (
-        f'<div style="background:linear-gradient(135deg,#0f1424,#14192b);border:1px solid rgba(255,94,0,0.25);'
-        f'border-radius:8px;padding:14px 18px;margin:8px 0 14px;">'
-        f'<div style="font-size:0.9rem;font-weight:600;color:#e0e7ef;margin-bottom:6px;">'
+        f'<div class="qam-tier-dist">'
+        f'<div class="qam-tier-dist-header">'
         f'🗂️ Tier Distribution &nbsp;·&nbsp; '
         f'<span style="color:#00f0ff;">Avg Edge: {avg_edge:.1f}%</span>'
         f'</div>'
-        f'<div style="font-size:0.85rem;">{tier_bar}</div>'
+        f'<div class="qam-tier-dist-bar">{tier_bar}</div>'
         + best_html
         + f'</div>'
     )
@@ -133,19 +127,17 @@ def render_news_alert_html(news_item: dict) -> str:
     emoji = CATEGORY_EMOJI.get(category, "📰")
 
     return (
-        f'<div style="background:#0d1117;border-left:4px solid {color};'
-        f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        f'<span style="color:#e0e7ef;font-weight:700;">{emoji} {_html.escape(title[:80])}</span>'
-        f'<span style="background:{color};color:#000;border-radius:4px;'
-        f'padding:1px 6px;font-size:0.72rem;font-weight:700;">'
+        f'<div class="qam-news-alert" style="border-left:4px solid {color};">'
+        f'<div class="qam-news-alert-header">'
+        f'<span class="qam-news-alert-title">{emoji} {_html.escape(title[:80])}</span>'
+        f'<span class="qam-news-alert-badge" style="background:{color};">'
         f'{impact.upper() if impact else "NEWS"}</span>'
         f'</div>'
-        f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+        f'<div class="qam-news-alert-meta">'
         f'<strong style="color:#c0d0e8;">{_html.escape(player)}</strong>'
         + (f' · {_html.escape(pub)}' if pub else "")
         + f'</div>'
-        + (f'<div style="color:#a0b4d0;font-size:0.82rem;margin-top:6px;">'
+        + (f'<div class="qam-news-alert-body">'
            f'{_html.escape(body[:200])}'
            + ("…" if len(body) > 200 else "")
            + f'</div>' if body else "")
@@ -169,14 +161,13 @@ def render_market_movement_html(result: dict) -> str:
     sig_lbl = SIGNAL_LABELS.get(signal, "⚪ NEUTRAL")
 
     return (
-        f'<div style="background:#0d1117;border-left:4px solid {sig_c};'
-        f'border-radius:6px;padding:10px 14px;margin-bottom:8px;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
-        f'<span style="color:#e0e7ef;font-weight:700;">'
+        f'<div class="qam-market-move" style="border-left:4px solid {sig_c};">'
+        f'<div class="qam-market-move-header">'
+        f'<span class="qam-market-move-player">'
         f'{_html.escape(player)} — {_html.escape(stat.title())} {_html.escape(direction)}</span>'
-        f'<span style="color:{sig_c};font-weight:700;font-size:0.85rem;">{sig_lbl}</span>'
+        f'<span class="qam-market-move-signal" style="color:{sig_c};">{sig_lbl}</span>'
         f'</div>'
-        f'<div style="color:#8b949e;font-size:0.78rem;margin-top:4px;">'
+        f'<div class="qam-market-move-detail">'
         f'Line shift: <strong style="color:#c0d0e8;">{shift:+.1f}</strong>'
         + (f' · Confidence adj: <strong style="color:{sig_c};">{adj:+.1f}</strong>' if adj else '')
         + f'</div></div>'
@@ -188,8 +179,7 @@ def render_market_movement_html(result: dict) -> str:
 def render_uncertain_header_html() -> str:
     """Return the explanatory header + education box for the Uncertain Picks section."""
     header = (
-        '<div style="background:rgba(255,193,7,0.10);border:2px solid #ffc107;'
-        'border-radius:10px;padding:14px 18px;margin-bottom:14px;">'
+        '<div class="qam-uncertain-header">'
         '<strong style="color:#ffc107;font-size:1.0rem;">UNCERTAIN PICKS — Conflicting Signals</strong><br>'
         '<span style="color:#ffe082;font-size:0.85rem;">These picks have hidden structural risks: '
         'conflicting forces, high variance with low edge, fatigue combos, or hot-streak regression. '
@@ -251,39 +241,35 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
     flags = pick.get("risk_flags", pick.get("bet_type_reasons", []))
 
     team_badge = (
-        f'<span style="background:rgba(255,193,7,0.15);color:#ffe082;padding:1px 7px;'
-        f'border-radius:4px;font-size:0.78rem;font-weight:600;margin-left:7px;'
-        f'border:1px solid rgba(255,193,7,0.3);">{team}</span>'
+        f'<span class="qam-uncertain-team-badge">{team}</span>'
         if team else ""
     )
 
     flags_html = "".join(
-        f'<li style="color:#ffe082;font-size:0.82rem;">{_html.escape(str(r))}</li>'
+        f'<li>{_html.escape(str(r))}</li>'
         for r in flags
     )
 
     flag_type = _classify_flag_type(flags)
 
     return (
-        f'<div style="background:rgba(255,193,7,0.06);border:1px solid rgba(255,193,7,0.35);'
-        f'border-radius:8px;padding:12px 16px;margin-bottom:10px;">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+        f'<div class="qam-uncertain-card">'
+        f'<div class="qam-uncertain-card-header">'
         f'<div>'
-        f'<span style="color:#ffc107;font-weight:700;">⚠️ {name}</span>'
+        f'<span class="qam-uncertain-name">⚠️ {name}</span>'
         f'{team_badge}'
-        f'<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:4px;'
-        f'font-size:0.72rem;font-weight:700;margin-left:8px;">{flag_type}</span>'
+        f'<span class="qam-uncertain-flag-type">{flag_type}</span>'
         f'</div>'
         f'<div style="text-align:right;">'
-        f'<span style="color:#ffe082;font-size:0.85rem;">{direction} {line} {stat} '
+        f'<span class="qam-uncertain-prop">{direction} {line} {stat} '
         f'(Proj: {proj:.1f})</span>'
-        f'<br><span style="color:#ffc107;font-size:0.8rem;font-weight:600;">'
+        f'<br><span class="qam-uncertain-edge">'
         f'Edge: {edge:+.1f}%</span>'
         f'</div>'
         f'</div>'
-        f'<div style="margin-top:8px;">'
-        f'<span style="color:#ffc107;font-size:0.75rem;font-weight:600;">RISK FLAGS (AVOID):</span>'
-        f'<ul style="margin:4px 0 0 16px;padding:0;">{flags_html}</ul>'
+        f'<div class="qam-uncertain-flags">'
+        f'<span class="qam-uncertain-flags-label">RISK FLAGS (AVOID):</span>'
+        f'<ul>{flags_html}</ul>'
         f'</div>'
         + inline_breakdown_html
         + f'</div>'
@@ -295,8 +281,7 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
 def render_gold_tier_banner_html() -> str:
     """Return the Gold Tier picks banner HTML."""
     return (
-        '<div style="background:linear-gradient(135deg,#1a1200,#231800);'
-        'border:2px solid #ffd700;border-radius:10px;padding:14px 18px;margin-bottom:4px;">'
+        '<div class="qam-gold-banner">'
         '<h3 style="color:#ffd700;font-family:Orbitron,sans-serif;margin:0 0 4px;">🥇 Gold Tier Picks</h3>'
         '<p style="color:#ffe082;font-size:0.85rem;margin:0;">'
         'High-confidence picks with strong model projections and favorable matchups. '
@@ -311,8 +296,7 @@ def render_gold_tier_banner_html() -> str:
 def render_best_single_bets_header_html() -> str:
     """Return the Best Single Bets section header HTML."""
     return (
-        '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
-        'border:2px solid #00f0ff;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+        '<div class="qam-section-header qam-section-header-single">'
         '<h3 style="color:#00f0ff;font-family:Orbitron,sans-serif;margin:0 0 6px;">🏆 Best Single Bets</h3>'
         '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Top individual picks ranked by SAFE Score™ — Silver tier and above</p>'
         '</div>'
@@ -324,8 +308,7 @@ def render_best_single_bets_header_html() -> str:
 def render_parlays_header_html() -> str:
     """Return the Strongly Suggested Parlays section header HTML."""
     return (
-        '<div style="background:linear-gradient(135deg,#0f1a2e,#14192b);'
-        'border:2px solid #ff5e00;border-radius:10px;padding:16px 20px;margin-bottom:20px;">'
+        '<div class="qam-section-header qam-section-header-parlay">'
         '<h3 style="color:#ff5e00;font-family:Orbitron,sans-serif;margin:0 0 6px;">🎯 Strongly Suggested Parlays</h3>'
         '<p style="color:#a0b4d0;font-size:0.85rem;margin:0;">Optimized multi-leg combos ranked by combined EDGE Score™</p>'
         '</div>'
@@ -348,7 +331,7 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
     num = entry.get("num_legs", 0)
     label = PARLAY_LABELS.get(num, entry.get("combo_type", ""))
     star = PARLAY_STARS.get(num, "")
-    glow = "box-shadow:0 0 14px rgba(255,94,0,0.45);" if card_index < 2 else ""
+    glow_cls = " qam-parlay-card-glow" if card_index < 2 else ""
 
     picks_html = ""
     for pick_str in entry.get("picks", []):
@@ -356,9 +339,9 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
         pname = _html.escape(parts[0]) if parts else ""
         rest = _html.escape(parts[1]) if len(parts) > 1 else ""
         picks_html += (
-            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
-            f'<span style="color:#ff5e00;font-weight:600;">{pname}</span>'
-            f'<span style="color:#c0d0e8;">{rest}</span>'
+            f'<div class="qam-parlay-pick">'
+            f'<span class="qam-parlay-pick-name">{pname}</span>'
+            f'<span class="qam-parlay-pick-detail">{rest}</span>'
             f'</div>'
         )
 
@@ -373,8 +356,7 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
     avg_conf = entry.get("safe_avg", "—")
 
     return (
-        f'<div style="background:#14192b;border-radius:8px;padding:15px 18px;'
-        f'margin-bottom:14px;border-left:4px solid #ff5e00;{glow}">'
+        f'<div class="qam-parlay-card{glow_cls}">'
         f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
         f'<h4 style="color:#ff5e00;margin:0;font-family:Orbitron,sans-serif;">'
         f'{star} {label}</h4>'
@@ -382,10 +364,10 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
         f'font-size:0.8rem;font-weight:700;">SAFE: {avg_conf}/100</span>'
         f'</div>'
         f'{picks_html}'
-        f'<div style="margin-top:10px;padding:7px 10px;background:rgba(20,25,43,0.7);border-radius:4px;">'
-        f'<span style="color:#00c8ff;font-size:0.82rem;">💡 {reason_text}</span>'
+        f'<div class="qam-parlay-reason">'
+        f'<span class="qam-parlay-reason-text">💡 {reason_text}</span>'
         f'</div>'
-        f'<div style="display:flex;gap:18px;margin-top:8px;font-size:0.8rem;color:#c0d0e8;">'
+        f'<div class="qam-parlay-stats">'
         f'<span>Combined prob: {combined:.1f}%</span>'
         f'<span>Avg edge: {avg_edge:+.1f}%</span>'
         f'</div>'
