@@ -183,27 +183,41 @@ def _sync_sim_depth():
     st.session_state["simulation_depth"] = st.session_state.get(
         "sim_depth_widget", st.session_state.get("simulation_depth", 1000)
     )
+    _persist_settings()
 
 
 def _sync_edge_threshold():
     st.session_state["minimum_edge_threshold"] = st.session_state.get(
         "edge_threshold_widget", st.session_state.get("minimum_edge_threshold", 5.0)
     )
+    _persist_settings()
 
 
 def _sync_entry_fee():
     st.session_state["entry_fee"] = st.session_state.get(
         "entry_fee_widget", st.session_state.get("entry_fee", 10.0)
     )
+    _persist_settings()
 
 
 def _sync_total_bankroll():
     st.session_state["total_bankroll"] = st.session_state.get(
         "total_bankroll_widget", st.session_state.get("total_bankroll", 1000.0)
     )
+    _persist_settings()
 
 
 def _sync_kelly_multiplier():
     st.session_state["kelly_multiplier"] = st.session_state.get(
         "kelly_multiplier_widget", st.session_state.get("kelly_multiplier", 0.25)
     )
+    _persist_settings()
+
+
+def _persist_settings():
+    """Save the current session state settings to the database."""
+    try:
+        from tracking.database import save_user_settings
+        save_user_settings(st.session_state)
+    except Exception as exc:
+        _components_logger.debug("_persist_settings failed (non-fatal): %s", exc)
