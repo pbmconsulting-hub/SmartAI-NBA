@@ -1,4 +1,4 @@
-"""engine/models/train.py – Training script with season holdout validation."""
+"""engine/models/train.py – Training script with time-series holdout validation."""
 import os
 from utils.logger import get_logger
 
@@ -8,6 +8,12 @@ _SAVED_DIR = os.path.join(os.path.dirname(__file__), "saved")
 _ML_READY_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "ml_ready"
 )
+
+# All simple stat types the pipeline should train models for.
+_ALL_SIMPLE_STATS = [
+    "pts", "reb", "ast", "stl", "blk",
+    "tov", "fg3m", "ftm", "oreb", "plus_minus",
+]
 
 
 def _load_ml_ready_data(stat_type: str = "pts"):
@@ -60,7 +66,11 @@ def _load_ml_ready_data(stat_type: str = "pts"):
 
 
 def train_models(stat_type: str = "pts") -> dict:
-    """Train all available models with season holdout validation.
+    """Train all available models with time-series holdout validation.
+
+    Uses a time-ordered split: first 80% for training, last 20% for
+    validation.  The validation set is passed through to the ensemble
+    so that ensemble weights reflect generalisation performance.
 
     Args:
         stat_type: The target stat column to train on.
@@ -72,10 +82,11 @@ def train_models(stat_type: str = "pts") -> dict:
 
     X, y, feature_cols = _load_ml_ready_data(stat_type)
     if X is None or len(X) < 10:
-        _logger.warning("Insufficient data for training (need ≥10 samples)")
+        _logger.warning("Insufficient data for training %s (need ≥10 samples)", stat_type)
         return {}
 
-    # Season holdout: last 20% of data as validation
+    # Time-series holdout: last 20% as validation (data is assumed to be
+    # in chronological order — player_features files are date-stamped).
     split = int(len(X) * 0.8)
     X_train, X_val = X[:split], X[split:]
     y_train, y_val = y[:split], y[split:]
@@ -88,7 +99,13 @@ def train_models(stat_type: str = "pts") -> dict:
 
     for model in models_to_train:
         try:
-            model.train(X_train, y_train)
+            # Pass explicit validation set so the ensemble uses it for
+            # weight computation instead of the training set.
+            if hasattr(model, "train") and "X_val" in model.train.__code__.co_varnames:
+                model.train(X_train, y_train, X_val=X_val, y_val=y_val)
+            else:
+                model.train(X_train, y_train)
+
             metrics = model.evaluate(X_val, y_val)
             results[model.name if hasattr(model, "name") else str(model)] = metrics
 
@@ -102,14 +119,16 @@ def train_models(stat_type: str = "pts") -> dict:
             except Exception as exc:
                 _logger.debug("Performance logging failed: %s", exc)
 
-            _logger.info("Trained %s | MAE=%.3f RMSE=%.3f R²=%.3f",
-                         getattr(model, "name", "model"), metrics["mae"], metrics["rmse"], metrics["r2"])
+            _logger.info("Trained %s/%s | MAE=%.3f RMSE=%.3f R²=%.3f",
+                         getattr(model, "name", "model"), stat_type,
+                         metrics["mae"], metrics["rmse"], metrics["r2"])
         except Exception as exc:
-            _logger.error("Training failed for %s: %s", model, exc)
+            _logger.error("Training failed for %s/%s: %s", model, stat_type, exc)
 
     return results
 
 
 if __name__ == "__main__":
-    for stat in ["pts", "reb", "ast"]:
+    for stat in _ALL_SIMPLE_STATS:
+        _logger.info("=== Training models for %s ===", stat)
         train_models(stat)

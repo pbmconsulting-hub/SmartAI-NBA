@@ -672,8 +672,8 @@ def get_todays_games() -> list[dict]:
     """
     Return tonight's games from the Games table.
 
-    Falls back to nba_api.stats.endpoints.ScoreboardV2 if no games
-    are found for today's date in the DB.
+    DB-only — no live API fallback.  Data must be populated
+    by the ETL initial pull before this function is used.
     """
     today = datetime.date.today().strftime("%Y-%m-%d")
 
@@ -703,55 +703,8 @@ def get_todays_games() -> list[dict]:
     if db_games:
         return db_games
 
-    # Fallback: live nba_api call (ScoreboardV3 — replaces deprecated V2)
-    try:
-        from nba_api.stats.endpoints import scoreboardv3
-        import time
-        time.sleep(0.5)
-        sb = scoreboardv3.ScoreboardV3(game_date=today, timeout=15)
-
-        try:
-            game_header_df = sb.game_header.get_data_frame()
-        except Exception:
-            game_header_df = None
-        if game_header_df is None or game_header_df.empty:
-            return []
-
-        # Line scores have team info (teamTricode, teamCity, teamName)
-        try:
-            line_score_df = sb.line_score.get_data_frame()
-        except Exception:
-            line_score_df = None
-
-        # Build gameId → team info mapping
-        game_team_map: dict = {}
-        if line_score_df is not None and not line_score_df.empty:
-            for gid, grp in line_score_df.groupby("gameId"):
-                rows = grp.to_dict("records")
-                if len(rows) >= 2:
-                    away_row, home_row = rows[0], rows[1]
-                    game_team_map[str(gid)] = {
-                        "home_team": home_row.get("teamTricode", ""),
-                        "away_team": away_row.get("teamTricode", ""),
-                    }
-
-        games = []
-        for _, row in game_header_df.iterrows():
-            gid = str(row.get("gameId", ""))
-            tinfo = game_team_map.get(gid, {})
-            home = tinfo.get("home_team", "")
-            away = tinfo.get("away_team", "")
-            games.append({
-                "game_id":   gid,
-                "game_date": today,
-                "matchup":   f"{away} vs {home}" if away and home else "",
-                "home_team": home,
-                "away_team": away,
-            })
-        return games
-    except Exception as exc:
-        _logger.warning("get_todays_games fallback (nba_api) failed: %s", exc)
-        return []
+    _logger.warning("get_todays_games: no games in DB for %s — returning empty list", today)
+    return []
 
 
 def get_players_for_game(game_id: str) -> list[dict]:

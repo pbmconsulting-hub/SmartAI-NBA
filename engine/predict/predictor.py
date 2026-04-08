@@ -88,6 +88,10 @@ _STAT_DEFAULTS = {
     "pts+reb+ast": 24.0, "blk+stl": 1.5,
 }
 
+# Regime-detection multiplier caps
+_REGIME_BOOST_CAP = 1.12    # max upward adjustment from regime detection
+_REGIME_PENALTY_CAP = 0.88  # max downward adjustment from regime detection
+
 
 def _load_best_model(stat_type: str):
     """Load the best available saved model for a stat type.
@@ -161,6 +165,143 @@ def _lookup_player_data(player_name: str):
     return averages, team, game_logs, splits
 
 
+def _get_regime_adjustment(game_logs, stat_type):
+    """Compute a regime-detection multiplier for the prediction.
+
+    Uses CUSUM-based regime detection to detect if the player is in
+    an upward or downward regime shift, and returns an adjustment
+    multiplier accordingly.
+
+    Args:
+        game_logs: Recent game log dicts.
+        stat_type: Stat being predicted.
+
+    Returns:
+        Tuple of (multiplier, regime_info_dict).
+        multiplier is 1.0 if no regime change detected.
+    """
+    try:
+        from engine.regime_detection import detect_regime_change
+    except ImportError:
+        return 1.0, {}
+
+    col = _STAT_COL_MAP.get(stat_type)
+    if not col or not game_logs or len(game_logs) < 10:
+        return 1.0, {}
+
+    try:
+        regime = detect_regime_change(game_logs, stat_key=col, window=10)
+        if not regime.get("regime_changed"):
+            return 1.0, regime
+
+        # Scale the adjustment by regime confidence (0 to 1)
+        confidence = float(regime.get("confidence", 0))
+        direction = regime.get("direction", "stable")
+        season_avg = float(regime.get("season_avg", 1)) or 1.0
+        recent_avg = float(regime.get("recent_avg", season_avg))
+
+        # Ratio of recent performance vs season (capped to prevent extremes)
+        raw_ratio = recent_avg / season_avg if season_avg > 0 else 1.0
+        # Dampen the adjustment by confidence.  The 0.5 factor means we
+        # apply at most half of the raw regime shift — a conservative blend
+        # that avoids overcorrecting on noisy short-window signals.
+        multiplier = 1.0 + (raw_ratio - 1.0) * confidence * 0.5
+
+        # Cap the multiplier
+        multiplier = max(_REGIME_PENALTY_CAP, min(_REGIME_BOOST_CAP, multiplier))
+
+        _logger.debug(
+            "Regime adjustment for %s: direction=%s confidence=%.2f multiplier=%.3f",
+            stat_type, direction, confidence, multiplier,
+        )
+        return multiplier, regime
+    except Exception as exc:
+        _logger.debug("_get_regime_adjustment error: %s", exc)
+        return 1.0, {}
+
+
+def _get_career_prior(player_name):
+    """Fetch career stats to use as a Bayesian prior for small samples.
+
+    When a player has limited current-season data, prior-year career
+    stats are more informative than generic positional averages.
+
+    Args:
+        player_name: Player's full name.
+
+    Returns:
+        Dict of career averages (ppg, rpg, apg, etc.) or empty dict.
+    """
+    try:
+        from data.etl_data_service import get_player_by_name
+        player = get_player_by_name(player_name)
+        if not player:
+            return {}
+
+        player_id = player.get("player_id")
+        if not player_id:
+            return {}
+
+        from data.db_service import _get_conn
+        conn = _get_conn()
+        if conn is None:
+            return {}
+
+        try:
+            # Get prior season career stats (not current season)
+            rows = conn.execute(
+                """
+                SELECT gp, pts, reb, ast, stl, blk, tov, fg3m, ftm, oreb
+                FROM Player_Career_Stats
+                WHERE player_id = ?
+                ORDER BY season_id DESC
+                LIMIT 2
+                """,
+                (int(player_id),),
+            ).fetchall()
+            if not rows or len(rows) < 2:
+                return {}
+
+            # Use the second row (prior season) as the prior
+            prior = dict(rows[1])
+            gp = float(prior.get("gp", 0) or 0)
+            if gp <= 0:
+                return {}
+
+            # Player_Career_Stats stores per-game averages for standard box stats
+            return {
+                "career_ppg": float(prior.get("pts", 0) or 0),
+                "career_rpg": float(prior.get("reb", 0) or 0),
+                "career_apg": float(prior.get("ast", 0) or 0),
+                "career_spg": float(prior.get("stl", 0) or 0),
+                "career_bpg": float(prior.get("blk", 0) or 0),
+                "career_topg": float(prior.get("tov", 0) or 0),
+                "career_fg3_avg": float(prior.get("fg3m", 0) or 0),
+                "career_ftm_avg": float(prior.get("ftm", 0) or 0),
+                "career_oreb_avg": float(prior.get("oreb", 0) or 0),
+                "career_gp": gp,
+            }
+        finally:
+            conn.close()
+    except Exception as exc:
+        _logger.debug("_get_career_prior failed: %s", exc)
+        return {}
+
+
+# Mapping from stat_type to career prior key
+_CAREER_PRIOR_MAP = {
+    "pts": "career_ppg",
+    "reb": "career_rpg",
+    "ast": "career_apg",
+    "stl": "career_spg",
+    "blk": "career_bpg",
+    "tov": "career_topg",
+    "fg3m": "career_fg3_avg",
+    "ftm": "career_ftm_avg",
+    "oreb": "career_oreb_avg",
+}
+
+
 def _compute_confidence_interval(prediction, stat_type, game_logs, player_averages):
     """Derive a confidence interval from actual stat variance.
 
@@ -222,6 +363,12 @@ def predict_player_stat(
     those into ``build_feature_matrix`` so predictions are grounded in
     actual data rather than empty dicts.
 
+    Additionally:
+      - Applies CUSUM-based regime detection to adjust for structural
+        shifts in recent performance.
+      - Uses prior-season career stats as Bayesian priors when current
+        season data is limited (< 15 games).
+
     Args:
         player_name: Player's full name.
         stat_type: Stat to predict (e.g. "pts", "reb", "ast").
@@ -229,7 +376,8 @@ def predict_player_stat(
 
     Returns:
         Dict with ``player_name``, ``stat_type``, ``prediction``,
-        ``confidence_interval``, and ``source``.
+        ``confidence_interval``, ``source``, and optionally
+        ``regime_info``.
     """
     result = {
         "player_name": player_name,
@@ -246,7 +394,7 @@ def predict_player_stat(
         )
         import numpy as np
 
-        # ── Fix #1 & #6: Fetch real data from smartpicks.db ──────────
+        # ── Fetch real data from smartpicks.db ───────────────────────
         player_averages, team_data, game_logs, splits = _lookup_player_data(player_name)
 
         # Build a richer player_data dict from season averages + rolling
@@ -255,10 +403,7 @@ def predict_player_stat(
             rolling = calculate_rolling_averages(game_logs)
             player_data.update(rolling)
 
-        # ── Fix #2: Enrich with home/away split averages ─────────────
-        # Instead of just passing is_home as a binary flag, load the
-        # player's actual home vs away stat averages so the model can
-        # leverage the real location-specific performance signal.
+        # ── Enrich with home/away split averages ─────────────────────
         if splits:
             is_home = game_context.get("is_home")
             loc_key = "home" if is_home else "away"
@@ -269,6 +414,19 @@ def predict_player_stat(
                     val = loc.get(split_key)
                     if val is not None:
                         player_data[feat] = float(val)
+
+        # ── Career-stat Bayesian prior for small samples ─────────────
+        # Default to 82 (full season) when games_played is missing, so we
+        # skip the small-sample career-prior path for established players
+        # whose ETL record simply omits the GP field.
+        games_played = int(player_averages.get("gp", player_averages.get("games_played", 82)) or 82)
+        career_prior = {}
+        if games_played < 15:
+            career_prior = _get_career_prior(player_name)
+            if career_prior:
+                # Blend career prior into player_data for the feature matrix
+                for k, v in career_prior.items():
+                    player_data.setdefault(k, v)
 
         # Opponent data: use game_context overrides when provided,
         # otherwise fall through to empty (build_feature_matrix handles defaults).
@@ -282,6 +440,11 @@ def predict_player_stat(
         features = build_feature_matrix(player_data, team_data, opponent_data, game_context)
         X = np.array([list(features.values())], dtype=float)
 
+        # ── Regime detection adjustment ──────────────────────────────
+        regime_multiplier, regime_info = _get_regime_adjustment(game_logs, stat_type)
+        if regime_info:
+            result["regime_info"] = regime_info
+
         model = _load_best_model(stat_type)
         combo_avg_keys = _COMBO_STAT_AVGS.get(stat_type)
 
@@ -290,8 +453,8 @@ def predict_player_stat(
         if model is not None and combo_avg_keys is None:
             preds = model.predict(X)
             prediction = float(preds[0]) if hasattr(preds, "__len__") else float(preds)
+            prediction *= regime_multiplier
             result["prediction"] = round(prediction, 2)
-            # ── Fix #5: data-driven confidence interval ───────────────
             result["confidence_interval"] = _compute_confidence_interval(
                 prediction, stat_type, game_logs, player_averages,
             )
@@ -307,7 +470,14 @@ def predict_player_stat(
                 avg_key = _STAT_AVG_MAP.get(stat_type)
                 avg_val = float(player_averages.get(avg_key, 0) or 0) if avg_key and player_averages else 0
 
+                # If season avg is 0 but we have career prior, use it
+                if avg_val == 0 and career_prior:
+                    career_key = _CAREER_PRIOR_MAP.get(stat_type)
+                    if career_key:
+                        avg_val = float(career_prior.get(career_key, 0) or 0)
+
             if avg_val > 0:
+                avg_val *= regime_multiplier
                 result["prediction"] = round(avg_val, 2)
                 result["confidence_interval"] = _compute_confidence_interval(
                     avg_val, stat_type, game_logs, player_averages,

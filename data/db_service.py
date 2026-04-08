@@ -852,6 +852,371 @@ def get_player_stats(progress_callback=None) -> list:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+#  DB-first query functions for Tier 1/2/3 endpoints
+#  These read directly from ETL tables when data exists, avoiding live API.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def get_box_score_usage_from_db(game_id: str) -> dict:
+    """Read Box_Score_Usage for a game.  Returns {player_stats: [...]}."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Usage WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"player_stats": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_box_score_usage_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_player_clutch_stats_from_db(season: str | None = None) -> list:
+    """Read Player_Clutch_Stats for a season."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        if season is None:
+            season = _current_season()
+        rows = conn.execute(
+            "SELECT * FROM Player_Clutch_Stats WHERE season = ?",
+            (season,),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_player_clutch_stats_from_db failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_shot_chart_from_db(player_id: int, season: str | None = None) -> list:
+    """Read Shot_Chart data for a player."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        if season is None:
+            season = _current_season()
+        rows = conn.execute(
+            "SELECT * FROM Shot_Chart WHERE player_id = ? AND season = ?",
+            (int(player_id), season),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_shot_chart_from_db(%s) failed: %s", player_id, exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_schedule_from_db(game_date: str | None = None) -> list:
+    """Read Schedule table for a date."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        if game_date is None:
+            game_date = datetime.date.today().strftime("%Y-%m-%d")
+        rows = conn.execute(
+            "SELECT * FROM Schedule WHERE game_date = ?",
+            (game_date,),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_schedule_from_db(%s) failed: %s", game_date, exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_hustle_box_score_from_db(game_id: str) -> dict:
+    """Read Box_Score_Hustle for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Hustle WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"player_stats": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_hustle_box_score_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_scoring_box_score_from_db(game_id: str) -> dict:
+    """Read Box_Score_Scoring for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Scoring WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"player_stats": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_scoring_box_score_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_box_score_matchups_from_db(game_id: str) -> dict:
+    """Read Box_Score_Matchups for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Matchups WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"matchups": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_box_score_matchups_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_win_probability_from_db(game_id: str) -> dict:
+    """Read Win_Probability_PBP for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Win_Probability_PBP WHERE game_id = ? ORDER BY event_num",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"game_id": game_id, "data": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_win_probability_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_play_by_play_from_db(game_id: str) -> list:
+    """Read Play_By_Play for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Play_By_Play WHERE game_id = ? ORDER BY period, action_number",
+            (str(game_id),),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_play_by_play_from_db(%s) failed: %s", game_id, exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_league_leaders_from_db(stat_category: str = "PTS", season: str | None = None) -> list:
+    """Read League_Leaders for a season.
+
+    Note: The League_Leaders table is populated by ETL with the default
+    stat category (PTS).  The *stat_category* parameter is accepted for
+    API-compatibility but the table does not store multiple categories.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        if season is None:
+            season = _current_season()
+        rows = conn.execute(
+            "SELECT * FROM League_Leaders WHERE season = ? ORDER BY rank ASC",
+            (season,),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_league_leaders_from_db failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_player_career_stats_from_db(player_id: int) -> list:
+    """Read Player_Career_Stats (year-over-year) for a player."""
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            """
+            SELECT * FROM Player_Career_Stats
+            WHERE player_id = ?
+            ORDER BY season_id DESC
+            """,
+            (int(player_id),),
+        ).fetchall()
+        return _rows_to_dicts(rows)
+    except Exception as exc:
+        _logger.debug("get_player_career_stats_from_db(%s) failed: %s", player_id, exc)
+        return []
+    finally:
+        conn.close()
+
+
+def get_box_score_traditional_from_db(game_id: str) -> dict:
+    """Read traditional box score from Player_Game_Logs for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                l.player_id, p.first_name, p.last_name, p.team_id,
+                p.team_abbreviation, l.pts, l.reb, l.ast, l.stl, l.blk,
+                l.tov, l.min, l.fgm, l.fga, l.fg_pct, l.fg3m, l.fg3a,
+                l.fg3_pct, l.ftm, l.fta, l.ft_pct, l.oreb, l.dreb,
+                l.pf, l.plus_minus, l.wl
+            FROM Player_Game_Logs l
+            JOIN Players p ON l.player_id = p.player_id
+            WHERE l.game_id = ?
+            """,
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+
+        player_stats = []
+        for row in rows:
+            d = dict(row)
+            player_stats.append({
+                "PLAYER_ID":      d.get("player_id"),
+                "PLAYER_NAME":    f"{d.get('first_name', '')} {d.get('last_name', '')}".strip(),
+                "TEAM_ID":        d.get("team_id"),
+                "TEAM_ABBREVIATION": d.get("team_abbreviation", ""),
+                "MIN":            d.get("min", "0"),
+                "PTS":            d.get("pts", 0),
+                "REB":            d.get("reb", 0),
+                "AST":            d.get("ast", 0),
+                "STL":            d.get("stl", 0),
+                "BLK":            d.get("blk", 0),
+                "TOV":            d.get("tov", 0),
+                "FGM":            d.get("fgm", 0),
+                "FGA":            d.get("fga", 0),
+                "FG_PCT":         d.get("fg_pct", 0.0),
+                "FG3M":           d.get("fg3m", 0),
+                "FG3A":           d.get("fg3a", 0),
+                "FG3_PCT":        d.get("fg3_pct", 0.0),
+                "FTM":            d.get("ftm", 0),
+                "FTA":            d.get("fta", 0),
+                "FT_PCT":         d.get("ft_pct", 0.0),
+                "OREB":           d.get("oreb", 0),
+                "DREB":           d.get("dreb", 0),
+                "PF":             d.get("pf", 0),
+                "PLUS_MINUS":     d.get("plus_minus", 0),
+            })
+        return {"player_stats": player_stats}
+    except Exception as exc:
+        _logger.debug("get_box_score_traditional_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_tracking_box_score_from_db(game_id: str) -> dict:
+    """Read Player_Tracking_Stats for a game."""
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Player_Tracking_Stats WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if not rows:
+            return {}
+        return {"player_stats": _rows_to_dicts(rows)}
+    except Exception as exc:
+        _logger.debug("get_tracking_box_score_from_db(%s) failed: %s", game_id, exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_box_score_advanced_from_db(game_id: str) -> dict:
+    """Read Box_Score_Advanced table directly for a game.
+
+    Falls back to the computed approximation from Player_Game_Logs
+    via get_advanced_box_score() if the dedicated table is empty.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Advanced WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if rows:
+            return {"player_stats": _rows_to_dicts(rows)}
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    # Fall back to the approximation-based function
+    return get_advanced_box_score(game_id)
+
+
+def get_box_score_four_factors_from_db(game_id: str) -> dict:
+    """Read Box_Score_Four_Factors table directly for a game.
+
+    Falls back to the computed approximation via
+    get_four_factors_box_score() if the dedicated table is empty.
+    """
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT * FROM Box_Score_Four_Factors WHERE game_id = ?",
+            (str(game_id),),
+        ).fetchall()
+        if rows:
+            return {"player_stats": _rows_to_dicts(rows)}
+    except Exception:
+        pass
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    # Fall back to the computed approximation
+    return get_four_factors_box_score(game_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 #  Helpers
 # ═══════════════════════════════════════════════════════════════════════════════
 
