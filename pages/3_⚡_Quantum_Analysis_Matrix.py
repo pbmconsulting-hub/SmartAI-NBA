@@ -172,6 +172,7 @@ _MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (expand
 _HEIGHT_PER_PLAYER = 800       # px — expanded card ≈ header + prop cards (~400px each)
 _MAX_IFRAME_HEIGHT = 12000     # px — generous cap before ResizeObserver takes over
 _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
+_LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 
 # Auto-resize JavaScript injected into every card-matrix iframe.
 # Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
@@ -2563,7 +2564,29 @@ if analysis_results:
             _logger.debug("joseph_brain not available for card opinions")
 
         _unified_html = _compile_unified_matrix(_grouped, _joseph_opinions)
-        _render_card_iframe(_unified_html, len(_grouped))
+
+        # ── Item 11: Lazy-load — chunk large player sets into separate
+        # iframes so the DOM stays small.  For ≤_LAZY_CHUNK_SIZE players
+        # we render as before (single iframe).  For larger sets we split
+        # into chunks rendered in individual iframes, each inside a
+        # Streamlit expander so only the visible chunk's DOM loads.
+        _player_keys = list(_grouped.keys())
+        if len(_player_keys) <= _LAZY_CHUNK_SIZE:
+            _render_card_iframe(_unified_html, len(_grouped))
+        else:
+            for _ci in range(0, len(_player_keys), _LAZY_CHUNK_SIZE):
+                _chunk_keys = _player_keys[_ci : _ci + _LAZY_CHUNK_SIZE]
+                _chunk_data = {k: _grouped[k] for k in _chunk_keys}
+                _chunk_opinions = {k: _joseph_opinions[k] for k in _chunk_keys if k in _joseph_opinions}
+                _chunk_html = _compile_unified_matrix(_chunk_data, _chunk_opinions)
+                _chunk_num = _ci // _LAZY_CHUNK_SIZE + 1
+                _total_chunks = (len(_player_keys) + _LAZY_CHUNK_SIZE - 1) // _LAZY_CHUNK_SIZE
+                with st.expander(
+                    f"Players {_ci + 1}–{min(_ci + _LAZY_CHUNK_SIZE, len(_player_keys))} "
+                    f"(Group {_chunk_num}/{_total_chunks})",
+                    expanded=(_chunk_num == 1),
+                ):
+                    _render_card_iframe(_chunk_html, len(_chunk_data))
 
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]

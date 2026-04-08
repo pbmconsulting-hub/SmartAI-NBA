@@ -3973,9 +3973,11 @@ _QDS_NA_CSS = """
   margin-bottom:3px;display:flex;justify-content:space-between;}
 .qds-na-conf-bar-track{height:10px;background:rgba(255,255,255,0.08);
   border-radius:5px;overflow:hidden;}
+@keyframes qds-conf-bar-expand{from{width:0%}}
 .qds-na-conf-bar-fill{height:100%;border-radius:5px;
   background:linear-gradient(90deg,var(--qds-primary),var(--qds-accent));
-  transition:width 0.5s ease;}
+  transition:width 0.5s ease;
+  animation:qds-conf-bar-expand 0.6s ease-out both;}
 .qds-na-bonus-item{display:flex;align-items:flex-start;gap:8px;
   font-size:0.82rem;color:var(--qds-text-light);margin-bottom:5px;}
 .qds-na-bonus-icon{color:var(--qds-success);margin-top:2px;flex-shrink:0;}
@@ -6606,6 +6608,118 @@ QUANTUM_CARD_MATRIX_CSS = """
     font-size: 0.8rem;
     color: #c0d0e8;
 }
+
+/* ── Tier count colors ────────────────────────────────────── */
+.qam-tier-platinum { color: #c800ff; font-weight: 700; }
+.qam-tier-gold     { color: #ffd700; font-weight: 600; }
+.qam-tier-silver   { color: #b0bec5; }
+.qam-tier-bronze   { color: #b0bec5; }
+.qam-avg-edge      { color: #00f0ff; }
+.qam-news-alert-player { color: #c0d0e8; }
+.qam-detail-value  { color: #c0d0e8; }
+
+/* ── Uncertain header inner ─────────────────────────────── */
+.qam-uncertain-header-title { color: #ffc107; font-size: 1.0rem; }
+.qam-uncertain-header-desc  { color: #ffe082; font-size: 0.85rem; }
+.qam-uncertain-card-right   { text-align: right; }
+
+/* ── Banner & section header inner text ─────────────────── */
+.qam-gold-banner h3 { color: #ffd700; font-family: Orbitron, sans-serif; margin: 0 0 4px; }
+.qam-gold-banner p  { color: #ffe082; font-size: 0.85rem; margin: 0; }
+.qam-section-header-single h3 { color: #00f0ff; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
+.qam-section-header-parlay h3 { color: #ff5e00; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
+.qam-section-header p { color: #a0b4d0; font-size: 0.85rem; margin: 0; }
+
+/* ── Parlay card header row ─────────────────────────────── */
+.qam-parlay-header {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 10px;
+}
+.qam-parlay-header h4 { color: #ff5e00; margin: 0; font-family: Orbitron, sans-serif; }
+.qam-parlay-safe-badge {
+    background: #ff5e00; color: #0a0f1a; padding: 3px 10px;
+    border-radius: 4px; font-size: 0.8rem; font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NEURAL ANALYSIS HELPERS — CSS Classes (Item 2)
+   Replaces inline style= strings in neural_analysis_helpers.py
+   ═══════════════════════════════════════════════════════════ */
+
+/* Distribution row cells */
+.nah-dist-row      { display: flex; gap: 4px; margin-top: 10px; margin-bottom: 8px; }
+.nah-dist-cell     { text-align: center; padding: 5px 4px;
+                     background: rgba(15, 23, 42, 0.60); border-radius: 5px;
+                     border: 1px solid rgba(255, 255, 255, 0.04);
+                     flex: 1; min-width: 48px; }
+.nah-dist-val      { font-size: 0.82rem; font-weight: 700;
+                     font-family: 'JetBrains Mono', monospace;
+                     font-variant-numeric: tabular-nums; }
+.nah-dist-val-p10  { color: #c0d0e8; }
+.nah-dist-val-med  { color: #00f0ff; }
+.nah-dist-val-p90  { color: #c0d0e8; }
+.nah-dist-val-std  { color: #ffffff; }
+.nah-dist-val-proj { color: #ff5e00; }
+.nah-dist-label    { font-size: 0.58rem; color: #64748b;
+                     text-transform: uppercase; letter-spacing: 0.06em; margin-top: 1px; }
+
+/* Force columns */
+.nah-forces-row    { display: flex; gap: 5px; margin-bottom: 8px; }
+.nah-force-col     { flex: 1; padding: 7px 9px; border-radius: 5px;
+                     font-family: 'JetBrains Mono', monospace; min-height: 36px; }
+.nah-force-col-over  { background: rgba(0, 240, 255, 0.04); border: 1px solid rgba(0, 240, 255, 0.12); }
+.nah-force-col-under { background: rgba(255, 94, 0, 0.04); border: 1px solid rgba(255, 94, 0, 0.12); }
+.nah-force-heading { font-weight: 700; font-size: 0.65rem; text-transform: uppercase;
+                     letter-spacing: 0.06em; margin-bottom: 3px; }
+.nah-force-heading-over  { color: #00f0ff; }
+.nah-force-heading-under { color: #ff5e00; }
+.nah-force-item    { color: #c0d0e8; font-size: 0.7rem; line-height: 1.35; margin-bottom: 1px; }
+.nah-force-none    { color: #475569; font-size: 0.7rem; font-style: italic; }
+
+/* Score breakdown bars */
+.nah-breakdown     { margin-top: 2px; }
+.nah-bkd-row       { display: flex; align-items: center; gap: 5px; margin-bottom: 4px;
+                     font-family: 'JetBrains Mono', monospace; }
+.nah-bkd-label     { font-size: 0.62rem; color: #94A3B8; width: 62px; flex-shrink: 0;
+                     text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nah-bkd-score     { font-size: 0.62rem; font-weight: 600;
+                     width: 22px; flex-shrink: 0; text-align: right; }
+.nah-bkd-track     { flex: 1; height: 4px; background: rgba(26, 32, 53, 0.80);
+                     border-radius: 2px; overflow: hidden; }
+.nah-bkd-fill      { height: 4px; border-radius: 2px; }
+
+/* Kelly wager row */
+.nah-kelly-row     { display: flex; align-items: center; gap: 6px; margin-top: 8px;
+                     padding: 6px 10px;
+                     background: linear-gradient(135deg, #070A13, #0F172A);
+                     border: 1px solid rgba(0, 198, 255, 0.20); border-radius: 6px; }
+.nah-kelly-label   { color: #64748b; font-size: 0.62rem; text-transform: uppercase;
+                     letter-spacing: 0.06em; flex-shrink: 0; }
+.nah-kelly-amount  { color: #00C6FF; font-size: 0.92rem; font-weight: 800;
+                     font-family: 'JetBrains Mono', monospace;
+                     font-variant-numeric: tabular-nums; }
+.nah-kelly-pct     { color: #475569; font-size: 0.58rem; margin-left: auto; }
+
+/* DFS flex EV section */
+.nah-dfs-wrap      { background: linear-gradient(135deg, #070A13, #0F172A);
+                     border: 1px solid rgba(0, 255, 157, 0.2); border-radius: 8px;
+                     padding: 8px 12px; margin: 6px 0; }
+.nah-dfs-header    { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.nah-dfs-label     { color: #64748b; font-size: 0.7rem; text-transform: uppercase;
+                     letter-spacing: 0.08em; }
+.nah-dfs-platform  { color: #475569; font-size: 0.65rem; margin-left: 6px; }
+.nah-dfs-prob      { color: #00f0ff; font-size: 0.65rem; margin-left: auto;
+                     font-family: 'JetBrains Mono', monospace; }
+.nah-dfs-pills     { display: flex; gap: 6px; margin-top: 4px; }
+.nah-dfs-pill      { flex: 1; min-width: 68px; text-align: center; padding: 4px 6px;
+                     border-radius: 6px; }
+.nah-dfs-pill-label { font-size: 0.68rem; font-weight: 700;
+                      font-family: 'JetBrains Mono', monospace; }
+.nah-dfs-pill-edge  { font-size: 0.78rem; font-weight: 800;
+                      font-family: 'JetBrains Mono', monospace;
+                      font-variant-numeric: tabular-nums; }
+.nah-dfs-pill-be    { color: #475569; font-size: 0.58rem; }
+.nah-dfs-kelly      { color: #475569; font-size: 0.62rem; margin-top: 3px; }
 """
 
 
