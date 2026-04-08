@@ -20,12 +20,12 @@ class TestOpenerPool(unittest.TestCase):
         self.pool = OPENER_POOL
 
     def test_count(self):
-        """OPENER_POOL has exactly 15 entries."""
-        self.assertEqual(len(self.pool), 15)
+        """OPENER_POOL has exactly 25 entries."""
+        self.assertEqual(len(self.pool), 25)
 
     def test_ids_sequential(self):
-        """IDs are opener_01 through opener_15."""
-        expected = [f"opener_{i:02d}" for i in range(1, 16)]
+        """IDs are opener_01 through opener_25."""
+        expected = [f"opener_{i:02d}" for i in range(1, 26)]
         self.assertEqual([e["id"] for e in self.pool], expected)
 
     def test_all_have_text(self):
@@ -42,11 +42,11 @@ class TestPivotPool(unittest.TestCase):
         self.pool = PIVOT_POOL
 
     def test_count(self):
-        """PIVOT_POOL has exactly 10 entries."""
-        self.assertEqual(len(self.pool), 10)
+        """PIVOT_POOL has exactly 15 entries."""
+        self.assertEqual(len(self.pool), 15)
 
     def test_ids_sequential(self):
-        expected = [f"pivot_{i:02d}" for i in range(1, 11)]
+        expected = [f"pivot_{i:02d}" for i in range(1, 16)]
         self.assertEqual([e["id"] for e in self.pool], expected)
 
 
@@ -56,11 +56,11 @@ class TestCloserPool(unittest.TestCase):
         self.pool = CLOSER_POOL
 
     def test_count(self):
-        """CLOSER_POOL has exactly 10 entries."""
-        self.assertEqual(len(self.pool), 10)
+        """CLOSER_POOL has exactly 15 entries."""
+        self.assertEqual(len(self.pool), 15)
 
     def test_ids_sequential(self):
-        expected = [f"closer_{i:02d}" for i in range(1, 11)]
+        expected = [f"closer_{i:02d}" for i in range(1, 16)]
         self.assertEqual([e["id"] for e in self.pool], expected)
 
 
@@ -70,11 +70,11 @@ class TestCatchphrasePool(unittest.TestCase):
         self.pool = CATCHPHRASE_POOL
 
     def test_count(self):
-        """CATCHPHRASE_POOL has exactly 13 entries."""
-        self.assertEqual(len(self.pool), 13)
+        """CATCHPHRASE_POOL has exactly 18 entries."""
+        self.assertEqual(len(self.pool), 18)
 
     def test_ids_sequential(self):
-        expected = [f"catch_{i:02d}" for i in range(1, 14)]
+        expected = [f"catch_{i:02d}" for i in range(1, 19)]
         self.assertEqual([e["id"] for e in self.pool], expected)
 
 
