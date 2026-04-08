@@ -41,12 +41,14 @@ from engine.edge_detection import analyze_directional_forces, should_avoid_prop,
 # callable (or None) and caches the result in a module-level variable.
 
 _rotation_tracker_available = None  # sentinel; resolved on first call
+track_minutes_trend = None          # lazy-loaded
 def _get_track_minutes_trend():
-    global _rotation_tracker_available
+    global _rotation_tracker_available, track_minutes_trend
     if _rotation_tracker_available is None:
         try:
             from engine.rotation_tracker import track_minutes_trend as _fn
             _rotation_tracker_available = _fn
+            track_minutes_trend = _fn
         except ImportError:
             _rotation_tracker_available = False
     return _rotation_tracker_available if _rotation_tracker_available else None

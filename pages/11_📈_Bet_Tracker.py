@@ -162,7 +162,13 @@ def _reload_bets():
 # Uses a background thread so the page renders immediately without blocking.
 
 def _background_auto_resolve():
-    """Run auto-resolve in a background thread so the page renders immediately."""
+    """Run auto-resolve in a background thread so the page renders immediately.
+
+    Uses a simple list (``_auto_resolve_messages``) on the session state
+    to communicate results back to the main thread.  Only appends to the
+    list (atomic in CPython) to avoid race conditions with the main thread.
+    """
+    _messages = []
     try:
         _today_str = datetime.date.today().isoformat()
         _all_bets_check = load_all_bets(exclude_linked=False)
@@ -182,21 +188,17 @@ def _background_auto_resolve():
                 except Exception:
                     pass  # One date failed — continue with others
             if _total_resolved > 0:
-                st.session_state["_auto_resolve_toast"] = f"🤖 Auto-resolved {_total_resolved} past bet(s)."
-                _reload_bets()
+                _messages.append(f"🤖 Auto-resolved {_total_resolved} past bet(s).")
 
         # Silently attempt to resolve today's bets where games are Final
         try:
             from tracking.bet_tracker import resolve_todays_bets
             _today_result = resolve_todays_bets()
             if _today_result.get("resolved", 0) > 0:
-                _msg = (
+                _messages.append(
                     f"⚡ Auto-resolved {_today_result['resolved']} of today's bet(s) "
                     f"({_today_result['wins']}W / {_today_result['losses']}L)."
                 )
-                prev = st.session_state.get("_auto_resolve_toast", "")
-                st.session_state["_auto_resolve_toast"] = f"{prev}\n{_msg}".strip() if prev else _msg
-                _reload_bets()
         except Exception:
             pass  # Not available or API error — silently skip
 
@@ -205,18 +207,18 @@ def _background_auto_resolve():
             from engine.clv_tracker import auto_update_closing_lines as _auto_clv
             _clv_result = _auto_clv(days_back=1)
             if _clv_result.get("updated", 0) > 0:
-                _msg = (
+                _messages.append(
                     f"📈 CLV updated: {_clv_result['updated']} record(s) closed "
                     f"with live closing lines."
                 )
-                prev = st.session_state.get("_auto_resolve_toast", "")
-                st.session_state["_auto_resolve_toast"] = f"{prev}\n{_msg}".strip() if prev else _msg
         except Exception:
             pass  # Optional — never block page load
-
-        st.session_state["_auto_resolve_done"] = True
     except Exception:
-        st.session_state["_auto_resolve_done"] = True  # Mark done even on failure
+        pass  # Best-effort — never block page load
+
+    # Store results for the main thread to pick up on next rerender
+    st.session_state["_auto_resolve_messages"] = _messages
+    st.session_state["_auto_resolve_done"] = True
 
 if not st.session_state.get("_bet_tracker_auto_resolved", False):
     st.session_state["_bet_tracker_auto_resolved"] = True
@@ -225,11 +227,14 @@ if not st.session_state.get("_bet_tracker_auto_resolved", False):
     _resolve_thread.start()
     st.toast("🤖 Auto-resolving pending bets in the background…")
 
-# Show deferred toast messages from background thread
-if st.session_state.get("_auto_resolve_done") and st.session_state.get("_auto_resolve_toast"):
-    for _toast_line in st.session_state.pop("_auto_resolve_toast").split("\n"):
-        if _toast_line.strip():
-            st.toast(_toast_line.strip())
+# Show deferred toast messages from background thread and refresh bet cache
+if st.session_state.get("_auto_resolve_done"):
+    _msgs = st.session_state.pop("_auto_resolve_messages", [])
+    if _msgs:
+        _reload_bets()  # Refresh cache now that resolve is done (main thread)
+        for _toast_line in _msgs:
+            if _toast_line.strip():
+                st.toast(_toast_line.strip())
     st.session_state.pop("_auto_resolve_done", None)
 
 st.title("📈 Bet Tracker & Model Health")
