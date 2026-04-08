@@ -158,6 +158,35 @@ except ImportError:
     def load_teams_data():
         return []
 
+# ── Supreme DB Integration — Joseph's Knowledge Base ──────────
+# These give Joseph direct access to deep historical & analytical data
+# from the local SQLite database for supreme-level analysis.
+try:
+    from data.db_service import (
+        get_player_last_n_games as _db_last_n_games,
+        get_player_averages as _db_player_averages,
+        get_player_game_logs as _db_player_game_logs,
+        get_player_splits as _db_player_splits,
+        get_player_career_stats_from_db as _db_career_stats,
+        get_player_clutch_stats_from_db as _db_clutch_stats,
+        get_player_estimated_metrics as _db_estimated_metrics,
+        get_defense_vs_position as _db_defense_vs_position,
+        get_team_recent_stats as _db_team_recent_stats,
+        get_team_game_logs as _db_team_game_logs,
+        get_box_score_usage_from_db as _db_box_score_usage,
+        get_box_score_advanced_from_db as _db_box_score_advanced,
+        get_hustle_box_score_from_db as _db_hustle_box_score,
+        get_tracking_box_score_from_db as _db_tracking_box_score,
+        get_shot_chart_from_db as _db_shot_chart,
+        get_schedule_from_db as _db_schedule,
+        get_league_leaders_from_db as _db_league_leaders,
+        get_box_score_four_factors_from_db as _db_four_factors,
+        get_injured_players as _db_injured_players,
+    )
+    _DB_KNOWLEDGE_AVAILABLE = True
+except ImportError:
+    _DB_KNOWLEDGE_AVAILABLE = False
+
 try:
     from data.advanced_metrics import (
         enrich_player_data,
@@ -258,6 +287,203 @@ _used_fragments: dict = {}      # keyed by pool name → set of used IDs
 _used_ambient: dict = {}        # keyed by context → set of used indices
 _used_commentary: dict = {}     # keyed by context_type → set of used indices
 
+
+# ═══════════════════════════════════════════════════════════════
+# DB-POWERED KNOWLEDGE HELPERS — Joseph's Supreme Data Layer
+# ═══════════════════════════════════════════════════════════════
+
+# Stat type → DB column key mapping (single source of truth)
+_STAT_DB_KEY_MAP = {
+    "points": "PTS", "rebounds": "REB", "assists": "AST",
+    "steals": "STL", "blocks": "BLK", "threes": "FG3M",
+    "fg3m": "FG3M", "turnovers": "TOV",
+}
+
+def _get_player_db_intel(player: dict) -> dict:
+    """Pull comprehensive DB intel on a player for supreme analysis.
+
+    Returns a dict with ``recent_games``, ``splits``, ``clutch_stats``,
+    ``career_stats``, and ``estimated_metrics`` — all from the local DB.
+    Degrades gracefully if the DB module is not available or data is missing.
+    """
+    intel = {
+        "recent_games": [],
+        "splits": {},
+        "clutch_stats": {},
+        "career_stats": [],
+        "estimated_metrics": {},
+        "available": False,
+    }
+    if not _DB_KNOWLEDGE_AVAILABLE:
+        return intel
+    player_id = int(player.get("player_id", player.get("id", 0)) or 0)
+    if player_id <= 0:
+        return intel
+    try:
+        intel["recent_games"] = _db_last_n_games(player_id, 10) or []
+    except Exception:
+        pass
+    try:
+        intel["splits"] = _db_player_splits(player_id) or {}
+    except Exception:
+        pass
+    try:
+        all_clutch = _db_clutch_stats() or []
+        for c in all_clutch:
+            if int(c.get("PLAYER_ID", 0) or 0) == player_id:
+                intel["clutch_stats"] = c
+                break
+    except Exception:
+        pass
+    try:
+        intel["career_stats"] = _db_career_stats(player_id) or []
+    except Exception:
+        pass
+    try:
+        all_est = _db_estimated_metrics() or []
+        for e in all_est:
+            if int(e.get("PLAYER_ID", 0) or 0) == player_id:
+                intel["estimated_metrics"] = e
+                break
+    except Exception:
+        pass
+    intel["available"] = bool(intel["recent_games"] or intel["splits"])
+    return intel
+
+
+def _get_team_db_intel(team_id: int | str) -> dict:
+    """Pull team-level DB intel for game analysis."""
+    intel = {
+        "recent_stats": [],
+        "defense_vs_pos": {},
+        "available": False,
+    }
+    if not _DB_KNOWLEDGE_AVAILABLE:
+        return intel
+    team_id = int(team_id or 0)
+    if team_id <= 0:
+        return intel
+    try:
+        intel["recent_stats"] = _db_team_recent_stats(team_id, 10) or []
+    except Exception:
+        pass
+    intel["available"] = bool(intel["recent_stats"])
+    return intel
+
+
+def _compute_recent_trend(games: list, stat_key: str = "PTS") -> dict:
+    """Compute trend data from recent game logs.
+
+    Returns ``{'last_3_avg', 'last_5_avg', 'last_10_avg', 'trend',
+    'hit_rate_vs', 'hot_streak', 'cold_streak', 'consistency'}``.
+    """
+    if not games:
+        return {"trend": "unknown", "last_3_avg": 0.0, "last_5_avg": 0.0,
+                "last_10_avg": 0.0, "hit_rate_vs": 0.0, "hot_streak": 0,
+                "cold_streak": 0, "consistency": "unknown"}
+
+    vals = []
+    for g in games:
+        v = _safe_float(g.get(stat_key, g.get(stat_key.lower(), 0)))
+        vals.append(v)
+
+    last_3 = vals[:3] if len(vals) >= 3 else vals
+    last_5 = vals[:5] if len(vals) >= 5 else vals
+    last_10 = vals[:10]
+
+    l3 = sum(last_3) / max(1, len(last_3))
+    l5 = sum(last_5) / max(1, len(last_5))
+    l10 = sum(last_10) / max(1, len(last_10))
+
+    if l10 > 0:
+        if l3 > l10 * 1.15:
+            trend = "surging"
+        elif l3 > l10 * 1.05:
+            trend = "trending_up"
+        elif l3 < l10 * 0.85:
+            trend = "slumping"
+        elif l3 < l10 * 0.95:
+            trend = "trending_down"
+        else:
+            trend = "stable"
+    else:
+        trend = "unknown"
+
+    # Hot/cold streak detection
+    hot_streak = 0
+    cold_streak = 0
+    if l10 > 0:
+        for v in vals:
+            if v > l10 * 1.1:
+                hot_streak += 1
+            else:
+                break
+        for v in vals:
+            if v < l10 * 0.9:
+                cold_streak += 1
+            else:
+                break
+
+    # Consistency (coefficient of variation)
+    if l10 > 0 and len(vals) >= 3:
+        variance = sum((v - l10) ** 2 for v in vals) / len(vals)
+        std = variance ** 0.5
+        cv = std / l10
+        if cv < 0.15:
+            consistency = "elite"
+        elif cv < 0.25:
+            consistency = "consistent"
+        elif cv < 0.40:
+            consistency = "moderate"
+        else:
+            consistency = "volatile"
+    else:
+        consistency = "unknown"
+
+    return {
+        "last_3_avg": round(l3, 1),
+        "last_5_avg": round(l5, 1),
+        "last_10_avg": round(l10, 1),
+        "trend": trend,
+        "hit_rate_vs": 0.0,
+        "hot_streak": hot_streak,
+        "cold_streak": cold_streak,
+        "consistency": consistency,
+    }
+
+
+def _compute_hit_rate(games: list, stat_key: str, line: float) -> float:
+    """Compute how often a player clears a line in recent games (0-100%)."""
+    if not games or line <= 0:
+        return 0.0
+    hits = 0
+    for g in games:
+        v = _safe_float(g.get(stat_key, g.get(stat_key.lower(), 0)))
+        if v > line:
+            hits += 1
+    return round(hits / len(games) * 100.0, 1)
+
+
+def _extract_home_away_splits(splits: dict) -> dict:
+    """Extract home/away performance from splits dict."""
+    result = {"home_ppg": 0.0, "away_ppg": 0.0, "home_boost": 0.0}
+    if not splits:
+        return result
+    # Splits may vary in format, check for common patterns
+    location = splits.get("Location", splits.get("location", {}))
+    if isinstance(location, dict):
+        home = location.get("Home", {})
+        away = location.get("Road", location.get("Away", {}))
+        if home and away:
+            result["home_ppg"] = _safe_float(home.get("PTS", home.get("pts", 0)))
+            result["away_ppg"] = _safe_float(away.get("PTS", away.get("pts", 0)))
+            if result["away_ppg"] > 0:
+                result["home_boost"] = round(
+                    (result["home_ppg"] - result["away_ppg"]) / result["away_ppg"] * 100, 1
+                )
+    return result
+
+
 # ═══════════════════════════════════════════════════════════════
 # A) FRAGMENT POOLS — For combinatorial rant builder
 # ═══════════════════════════════════════════════════════════════
@@ -278,6 +504,16 @@ OPENER_POOL = [
     {"id": "opener_13", "text": "I've been watching this game since I was TWELVE years old..."},
     {"id": "opener_14", "text": "People keep asking me about this, so let me ADDRESS it..."},
     {"id": "opener_15", "text": "I sat down. I looked at the numbers. And I said to myself..."},
+    {"id": "opener_16", "text": "I pulled up the game logs, the shot charts, the matchup data — ALL of it..."},
+    {"id": "opener_17", "text": "You know what the FILM shows? Let me TELL you what the film shows..."},
+    {"id": "opener_18", "text": "I just finished going through EVERY game log from the last two weeks..."},
+    {"id": "opener_19", "text": "The numbers don't LIE — and I've got the RECEIPTS to prove it..."},
+    {"id": "opener_20", "text": "I stayed up LATE crunching the splits, the trends, the matchup history..."},
+    {"id": "opener_21", "text": "Let me break this down the way a REAL analyst breaks it down..."},
+    {"id": "opener_22", "text": "I looked at the last TEN games. I looked at the splits. I looked at EVERYTHING..."},
+    {"id": "opener_23", "text": "STOP scrolling and LISTEN because this analysis is backed by REAL data..."},
+    {"id": "opener_24", "text": "I don't just give you OPINIONS — I give you ANALYSIS backed by NUMBERS..."},
+    {"id": "opener_25", "text": "I've been studying the matchup data and the shot distribution ALL day..."},
 ]
 
 PIVOT_POOL = [
@@ -291,6 +527,11 @@ PIVOT_POOL = [
     {"id": "pivot_08", "text": "That being said..."},
     {"id": "pivot_09", "text": "BUT HERE'S WHAT NOBODY IS TALKING ABOUT..."},
     {"id": "pivot_10", "text": "Having said ALL of that..."},
+    {"id": "pivot_11", "text": "Now the GAME LOGS tell a different story and you NEED to hear it..."},
+    {"id": "pivot_12", "text": "But when I dig into the SPLITS — and I ALWAYS dig into the splits..."},
+    {"id": "pivot_13", "text": "The MATCHUP data paints a different picture though..."},
+    {"id": "pivot_14", "text": "But let me pull up the RECEIPTS on the other side of this argument..."},
+    {"id": "pivot_15", "text": "NOW — before you go placing that bet, consider THIS..."},
 ]
 
 CLOSER_POOL = [
@@ -304,6 +545,11 @@ CLOSER_POOL = [
     {"id": "closer_08", "text": "That's not an OPINION — that's a FACT!"},
     {"id": "closer_09", "text": "And I don't want to hear NOTHING about it!"},
     {"id": "closer_10", "text": "PERIOD. End of DISCUSSION!"},
+    {"id": "closer_11", "text": "The DATA has spoken. Joseph M. Smith has spoken. It is DONE!"},
+    {"id": "closer_12", "text": "I've shown you the numbers, I've shown you the trends — the rest is on YOU!"},
+    {"id": "closer_13", "text": "That's not a GUESS — that's an analysis backed by EVERY available data point!"},
+    {"id": "closer_14", "text": "The game logs DON'T LIE. The splits DON'T LIE. Joseph M. Smith DOESN'T LIE!"},
+    {"id": "closer_15", "text": "I've done the HOMEWORK. Now it's time to CASH the ticket!"},
 ]
 
 CATCHPHRASE_POOL = [
@@ -320,6 +566,11 @@ CATCHPHRASE_POOL = [
     {"id": "catch_11", "text": "TRAVESTY!"},
     {"id": "catch_12", "text": "With all DUE respect — and I mean that SINCERELY..."},
     {"id": "catch_13", "text": "He's a FIRST-BALLOT Hall of Famer in my book!"},
+    {"id": "catch_14", "text": "The ANALYTICS department just called — they AGREE with me!"},
+    {"id": "catch_15", "text": "I've got game logs, shot charts, AND the eye test — what do YOU have?"},
+    {"id": "catch_16", "text": "Don't bring me NARRATIVES — bring me NUMBERS!"},
+    {"id": "catch_17", "text": "I've been doing this since BEFORE analytics was COOL!"},
+    {"id": "catch_18", "text": "The FILM doesn't lie and neither does Joseph M. Smith!"},
 ]
 
 # Placeholders used in templates: {player}, {stat}, {line}, {edge}, {prob}
@@ -358,6 +609,39 @@ BODY_TEMPLATES = {
         "This is where HUMAN intelligence beats artificial intelligence. {player} at {line} {stat}? The engine is WRONG!",
         "OVERRIDE ALERT! The numbers say {edge}% but my eyes tell me DIFFERENT on {player} {stat}. Trust the EYE TEST!",
         "The computer doesn't watch the GAMES. I DO. And I'm telling you — {player} {line} {stat} needs an OVERRIDE!",
+    ],
+}
+
+# Data-driven sentence templates — populated by _build_data_sentences()
+# Placeholders: {player}, {stat}, {line}, {edge}, {prob}, {l3_avg}, {l5_avg},
+# {l10_avg}, {hit_rate}, {trend_word}, {consistency}, {season_avg}, {home_away_note}
+DATA_BODY_TEMPLATES = {
+    "trend_hot": [
+        "{player} is averaging {l3_avg} {stat} over the last 3 games — that's ABOVE the {l10_avg} ten-game average. The trend is your FRIEND!",
+        "The last THREE games? {l3_avg} {stat} per game. The last TEN? {l10_avg}. {player} is getting HOTTER and the line hasn't caught up!",
+        "{player} is SURGING — {l3_avg} {stat} in the last 3, {l5_avg} over 5. The books are slow to ADJUST and that's YOUR edge!",
+    ],
+    "trend_cold": [
+        "{player} has dipped to {l3_avg} {stat} over the last 3 — down from {l10_avg} over 10. The slump is REAL and the line hasn't moved.",
+        "CAUTION — {player} is trending DOWN. {l3_avg} {stat} lately versus {l10_avg} on the season stretch. The cold streak MATTERS.",
+        "The recent form says {l3_avg} {stat} over the last 3 games. The trend is NOT your friend on {player} right now.",
+    ],
+    "hit_rate": [
+        "{player} has cleared {line} {stat} in {hit_rate}% of the last 10 games. That's not an OPINION — that's a FACT from the game logs!",
+        "The HIT RATE on {player} over {line} {stat}? {hit_rate}% in the last 10 outings. The data speaks LOUDER than any analyst!",
+        "I pulled the RECEIPTS — {player} has gone over {line} {stat} in {hit_rate}% of recent games. The numbers don't LIE!",
+    ],
+    "consistency": [
+        "{player} has been {consistency} with {stat} production — and that MATTERS for prop betting. You want PREDICTABLE outcomes!",
+        "The consistency rating on {player} for {stat} is '{consistency}'. That tells me the FLOOR and CEILING are well-defined.",
+    ],
+    "home_away": [
+        "{player} is a DIFFERENT player on the road versus at home. {home_away_note}. Context is KING!",
+        "The home/away split on {player} is SIGNIFICANT. {home_away_note}. You HAVE to factor that in!",
+    ],
+    "season_vs_line": [
+        "{player} averages {season_avg} {stat} on the season and the line is set at {line}. That's a {edge}% edge and the math is SIMPLE!",
+        "Season average: {season_avg} {stat}. Line: {line}. The GAP between those numbers is where the MONEY lives!",
     ],
 }
 
@@ -1442,10 +1726,11 @@ _COMBO_STAT_MAP = {
 
 def joseph_generate_independent_picks(props, players_lookup, todays_games,
                                       teams_data, max_picks=20):
-    """Generate Joseph's own independent picks from raw platform props.
+    """Generate Joseph's supreme independent picks from raw platform props.
 
-    Joseph selects his top picks based on his eye-test, dawg factor,
-    and narrative analysis — separate from any user-generated analysis.
+    Joseph selects his top picks using DB-powered trend analysis, hit rates,
+    consistency metrics, and the full 8-step reasoning loop. This is his
+    highest-conviction independent analysis.
 
     Parameters
     ----------
@@ -1465,7 +1750,8 @@ def joseph_generate_independent_picks(props, players_lookup, todays_games,
     -------
     list[dict]
         List of Joseph analysis dicts with ``dawg_factor``,
-        ``narrative_tags``, ``verdict``, ``edge``, etc.
+        ``narrative_tags``, ``verdict``, ``edge``, ``db_trend``,
+        ``hit_rate``, etc.
     """
     if not props:
         return []
@@ -1514,11 +1800,32 @@ def joseph_generate_independent_picks(props, players_lookup, todays_games,
         if player_avg <= 0:
             continue
 
-        # ── basic probability & edge ─────────────────────────
-        diff_pct = (player_avg - line) / max(line, 0.1) * 100.0
-        prob_over = 50.0 + min(max(diff_pct * 2.0, -30.0), 30.0)
+        # ── DB-powered trend refinement ──────────────────────
+        _stat_db_key = _STAT_DB_KEY_MAP.get(stat_type, "PTS")
+
+        db_intel = _get_player_db_intel(p_data)
+        trend_bonus = 0.0
+        hit_rate_val = 0.0
+        recent_avg = player_avg  # Default to season avg
+
+        if db_intel.get("available"):
+            recent_games = db_intel.get("recent_games", [])
+            if recent_games:
+                trend_data = _compute_recent_trend(recent_games, _stat_db_key)
+                hit_rate_val = _compute_hit_rate(recent_games, _stat_db_key, line)
+                # Use recent 5-game average instead of season average when available
+                if trend_data.get("last_5_avg", 0) > 0:
+                    recent_avg = trend_data["last_5_avg"]
+                # Trend bonus
+                if trend_data["trend"] in ("surging", "trending_up"):
+                    trend_bonus = 3.0
+                elif trend_data["trend"] in ("slumping", "trending_down"):
+                    trend_bonus = -3.0
+
+        # ── refined probability & edge (uses recent avg when available) ──
+        diff_pct = (recent_avg - line) / max(line, 0.1) * 100.0
+        prob_over = 50.0 + min(max(diff_pct * 2.0, -30.0), 30.0) + trend_bonus
         prob_over = max(5.0, min(95.0, prob_over))
-        # Standard -110 vig breakeven: 52.38% win rate to break even
         edge = prob_over - 52.38
         direction = "OVER" if diff_pct > 0 else "UNDER"
 
@@ -1543,7 +1850,15 @@ def joseph_generate_independent_picks(props, players_lookup, todays_games,
             "direction": direction,
             "platform": platform,
         }
-        candidates.append((abs(edge), analysis_result, p_data, game_data))
+
+        # Sort score: edge + hit rate bonus + trend bonus
+        sort_score = abs(edge)
+        if hit_rate_val > 70:
+            sort_score += 2.0
+        elif hit_rate_val > 50:
+            sort_score += 1.0
+
+        candidates.append((sort_score, analysis_result, p_data, game_data))
 
     candidates.sort(key=lambda x: x[0], reverse=True)
     top_candidates = candidates[:max_picks]
@@ -1693,6 +2008,8 @@ def joseph_generate_full_slate_analysis(players, props, game_contexts,
 def joseph_commentary_for_stat(player_name, stat_type, context="neutral"):
     """Generate a short stat-specific colour commentary line.
 
+    Selects from the STAT_COMMENTARY_POOL and formats with the player name.
+
     Parameters
     ----------
     player_name : str
@@ -1707,7 +2024,26 @@ def joseph_commentary_for_stat(player_name, stat_type, context="neutral"):
     str
         A colourful one-liner about the player and stat.
     """
-    return ""
+    try:
+        stat_key = stat_type.lower().strip()
+        pool = STAT_COMMENTARY_POOL.get(stat_key, STAT_COMMENTARY_POOL.get("points", []))
+        if not pool:
+            return ""
+        used_set = _used_commentary.setdefault(f"stat_{stat_key}", set())
+        if len(used_set) > 0.6 * len(pool):
+            used_set.clear()
+        available = [i for i in range(len(pool)) if i not in used_set]
+        if not available:
+            used_set.clear()
+            available = list(range(len(pool)))
+        idx = random.choice(available)
+        used_set.add(idx)
+        try:
+            return pool[idx].format(player=player_name)
+        except (KeyError, IndexError):
+            return pool[idx]
+    except Exception:
+        return ""
 
 
 def joseph_blowout_warning(spread, game_total):
@@ -1725,7 +2061,43 @@ def joseph_blowout_warning(spread, game_total):
     str
         Warning string, or ``""`` if no blowout risk detected.
     """
-    return ""
+    try:
+        spread = _safe_float(spread)
+        game_total = _safe_float(game_total)
+
+        if abs(spread) < 8:
+            return ""
+
+        blowout_templates = [
+            (
+                f"BLOWOUT ALERT! The spread is {spread:+.1f} — that's a MASSIVE number. "
+                f"Starters could be on the bench by the FOURTH quarter. "
+                f"Player props are at RISK when garbage time kicks in."
+            ),
+            (
+                f"With a spread of {spread:+.1f}, this game has BLOWOUT written all over it. "
+                f"The game total is {game_total:.0f} but the REAL question is who's "
+                f"still playing in the fourth. BE CAREFUL with your props."
+            ),
+            (
+                f"Joseph M. Smith is WARNING you — {spread:+.1f} spread means one team "
+                f"is SIGNIFICANTLY better. Minutes could be CUT early and that KILLS "
+                f"player prop values. Proceed with CAUTION."
+            ),
+        ]
+
+        if abs(spread) >= BLOWOUT_DIFFERENTIAL_MILD:
+            # Severe blowout risk
+            return random.choice(blowout_templates)
+        elif abs(spread) >= 8:
+            return (
+                f"The spread of {spread:+.1f} suggests a lopsided game. "
+                f"Not a full blowout alert but monitor minutes CLOSELY — "
+                f"fourth-quarter rest is possible if this gets out of hand."
+            )
+        return ""
+    except Exception:
+        return ""
 
 
 def reset_fragment_state():
@@ -1782,11 +2154,12 @@ def _select_fragment(pool: list, used_set: set) -> dict:
 
 def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: list,
                       mismatch: dict | None = None, comp: dict | None = None,
-                      energy: str = "medium") -> str:
-    """Build a unique 4-8 sentence Joseph rant using combinatorial fragment assembly.
+                      energy: str = "medium", db_intel: dict | None = None) -> str:
+    """Build a unique 4-10 sentence Joseph rant using combinatorial fragment assembly.
 
-    Combines opener, body template, pivot, catchphrase, and closer fragments
-    to form a multi-sentence rant personalised to the player/prop/verdict.
+    Combines opener, body template, data-driven sentences, pivot, catchphrase,
+    and closer fragments to form a multi-sentence rant personalised to the
+    player/prop/verdict with real data from the database.
 
     Parameters
     ----------
@@ -1803,7 +2176,11 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
     comp : dict or None
         Historical comp entry from JOSEPH_COMPS_DATABASE.
     energy : str
-        Energy level (``"low"``, ``"medium"``, ``"high"``).
+        Energy level (``"low"``, ``"medium"``, ``"high"``, ``"nuclear"``).
+    db_intel : dict or None
+        DB-powered intel from ``_get_player_db_intel()``.  When provided,
+        data-driven sentences referencing real game logs and splits are woven
+        into the rant.
 
     Returns
     -------
@@ -1820,7 +2197,7 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
             opener_text = opener_text.rstrip(". ") + "..."
 
         # 2. Select body sentences based on energy
-        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 3}.get(energy, 2)
+        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 4}.get(energy, 2)
         templates = BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
         stat = prop.get("stat", prop.get("stat_type", ""))
         line = prop.get("line", "")
@@ -1842,10 +2219,18 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
                 sentence = templates[idx]
             body_sentences.append(sentence)
 
+        # 2b. Data-driven sentences from DB intel (supreme upgrade)
+        data_sentences = _build_data_sentences(
+            player, prop, db_intel, energy
+        )
+        body_sentences.extend(data_sentences)
+
         # 3. Check for counter-point pivot (positive + negative tags present)
         positive_tags = {"revenge_game", "contract_year", "nationally_televised",
-                         "rivalry", "playoff_implications", "pace_up"}
-        negative_tags = {"trap_game", "back_to_back", "altitude", "blowout_risk", "pace_down"}
+                         "rivalry", "playoff_implications", "pace_up",
+                         "market_high_total"}
+        negative_tags = {"trap_game", "back_to_back", "altitude", "blowout_risk",
+                         "pace_down", "market_low_total"}
         has_positive = any(t in positive_tags for t in narrative_tags)
         has_negative = any(t in negative_tags for t in narrative_tags)
         pivot_text = ""
@@ -1900,8 +2285,120 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         return f"Joseph M. Smith likes {player}. {verdict}!"
 
 
-def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: list) -> str:
-    """Build a 1-sentence counter-argument for balance.
+def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
+                          energy: str) -> list:
+    """Build 1-3 data-driven sentences from DB intel to enrich the rant.
+
+    Selects the most impactful data points (trend, hit rate, consistency,
+    splits) and formats them into natural-language sentences.
+    """
+    if not db_intel or not db_intel.get("available"):
+        return []
+
+    sentences = []
+    stat = str(prop.get("stat", prop.get("stat_type", "points")) or "points").lower()
+    line = prop.get("line", 0)
+    edge = prop.get("edge", "")
+    _stat_db_key = _STAT_DB_KEY_MAP.get(stat, "PTS")
+
+    recent = db_intel.get("recent_games", [])
+    max_data_sentences = {"low": 1, "medium": 1, "high": 2, "nuclear": 3}.get(energy, 1)
+
+    if recent:
+        trend = _compute_recent_trend(recent, _stat_db_key)
+
+        # Trend sentence
+        if trend["trend"] in ("surging", "trending_up") and trend["last_3_avg"] > 0:
+            pool = DATA_BODY_TEMPLATES.get("trend_hot", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=trend["last_3_avg"], l5_avg=trend["last_5_avg"],
+                        l10_avg=trend["last_10_avg"], hit_rate=0,
+                        trend_word=trend["trend"], consistency=trend["consistency"],
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+        elif trend["trend"] in ("slumping", "trending_down") and trend["last_3_avg"] > 0:
+            pool = DATA_BODY_TEMPLATES.get("trend_cold", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=trend["last_3_avg"], l5_avg=trend["last_5_avg"],
+                        l10_avg=trend["last_10_avg"], hit_rate=0,
+                        trend_word=trend["trend"], consistency=trend["consistency"],
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+        # Hit rate sentence
+        if len(sentences) < max_data_sentences and _safe_float(line) > 0:
+            hr = _compute_hit_rate(recent, _stat_db_key, _safe_float(line))
+            if hr > 0:
+                pool = DATA_BODY_TEMPLATES.get("hit_rate", [])
+                if pool:
+                    tmpl = random.choice(pool)
+                    try:
+                        sentences.append(tmpl.format(
+                            player=player, stat=stat, line=line, edge=edge,
+                            l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=hr,
+                            trend_word="", consistency="",
+                            season_avg=0, home_away_note="",
+                        ))
+                    except (KeyError, IndexError, ValueError):
+                        pass
+
+        # Consistency sentence
+        if len(sentences) < max_data_sentences and trend["consistency"] != "unknown":
+            pool = DATA_BODY_TEMPLATES.get("consistency", [])
+            if pool:
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=0,
+                        trend_word="", consistency=trend["consistency"].upper(),
+                        season_avg=0, home_away_note="",
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+    # Home/away split sentence
+    splits = db_intel.get("splits", {})
+    if len(sentences) < max_data_sentences and splits:
+        ha = _extract_home_away_splits(splits)
+        if ha["home_ppg"] > 0 and ha["away_ppg"] > 0 and abs(ha["home_boost"]) > 5:
+            pool = DATA_BODY_TEMPLATES.get("home_away", [])
+            if pool:
+                if ha["home_boost"] > 0:
+                    note = f"He averages {ha['home_ppg']:.1f} PPG at home versus {ha['away_ppg']:.1f} on the road"
+                else:
+                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} PPG away vs {ha['home_ppg']:.1f} at home"
+                tmpl = random.choice(pool)
+                try:
+                    sentences.append(tmpl.format(
+                        player=player, stat=stat, line=line, edge=edge,
+                        l3_avg=0, l5_avg=0, l10_avg=0, hit_rate=0,
+                        trend_word="", consistency="",
+                        season_avg=0, home_away_note=note,
+                    ))
+                except (KeyError, IndexError, ValueError):
+                    pass
+
+    return sentences[:max_data_sentences]
+
+
+def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: list,
+                               db_intel: dict | None = None) -> str:
+    """Build a 1-2 sentence counter-argument for balance.
+
+    Uses DB intel when available to ground the counter-argument in real data.
 
     Parameters
     ----------
@@ -1911,32 +2408,77 @@ def _generate_counter_argument(player: dict, prop_data: dict, narrative_tags: li
         Prop data with stat, line, edge, etc.
     narrative_tags : list[str]
         Active narrative tags.
+    db_intel : dict or None
+        DB-powered intel from ``_get_player_db_intel()``.
 
     Returns
     -------
     str
-        A single counter-argument sentence.
+        A counter-argument sentence grounded in data.
     """
+    player_name = player.get("name", player.get("player_name", "This player"))
+    stat = str(prop_data.get("stat", prop_data.get("stat_type", "points")) or "points").lower()
+    line = _safe_float(prop_data.get("line", 0))
+
+    # DB-powered counter-arguments when data is available
+    if db_intel and db_intel.get("available"):
+        recent = db_intel.get("recent_games", [])
+        _stat_db_key = _STAT_DB_KEY_MAP.get(stat, "PTS")
+
+        if recent and line > 0:
+            trend = _compute_recent_trend(recent, _stat_db_key)
+            hr = _compute_hit_rate(recent, _stat_db_key, line)
+
+            # Volatility-based counter
+            if trend["consistency"] == "volatile":
+                return (
+                    f"{player_name} has been VOLATILE with {stat} production — "
+                    f"the variance is HIGH and even good edges can miss in volatile stat lines."
+                )
+            # Low hit rate counter
+            if hr < 50 and hr > 0:
+                return (
+                    f"The hit rate on {player_name} clearing {line} {stat} is only "
+                    f"{hr}% in the last 10 games — the LINE may be set correctly."
+                )
+            # Cold streak counter
+            if trend["cold_streak"] >= 2:
+                return (
+                    f"{player_name} has been BELOW average in {stat} for "
+                    f"{trend['cold_streak']} straight games — momentum works BOTH ways."
+                )
+            # Small recent sample divergence
+            if trend["last_3_avg"] > 0 and trend["last_10_avg"] > 0:
+                if trend["last_3_avg"] < trend["last_10_avg"] * 0.9:
+                    return (
+                        f"The last 3 games show {trend['last_3_avg']} {stat} — that's "
+                        f"BELOW the 10-game average of {trend['last_10_avg']}. "
+                        f"Recent form could be a warning sign."
+                    )
+
+    # Narrative-based fallbacks
     if "back_to_back" in narrative_tags:
-        return "The fatigue factor on a back-to-back CANNOT be ignored."
+        return "The fatigue factor on a back-to-back CANNOT be ignored — legs get heavy, shots fall short."
     if "trap_game" in narrative_tags:
-        return "Motivation could be an issue in a trap game scenario."
+        return "Motivation could be an issue in a trap game scenario — stars sometimes coast."
     if "blowout_risk" in narrative_tags:
-        return "If this game gets out of hand, minutes could be CUT."
+        return "If this game gets out of hand, starters sit in the FOURTH and minutes get CUT."
     if "altitude" in narrative_tags:
-        return "Playing at altitude in Denver is a REAL factor that affects performance."
+        return "Playing at altitude in Denver is a REAL factor — fatigue hits differently at 5,280 feet."
     if "pace_down" in narrative_tags:
-        return "A slower pace environment limits OPPORTUNITIES for production."
-    return "Standard variance means even good edges lose 35-40% of the time."
+        return "A slower pace environment means FEWER possessions and fewer opportunities for production."
+    return "Standard variance means even good edges lose 35-40% of the time. Manage your bankroll accordingly."
 
 
 def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                          teams_data: dict) -> dict:
-    """THE 8-STEP REASONING LOOP. Returns complete analysis dict.
+    """THE 8-STEP SUPREME REASONING LOOP. Returns complete analysis dict.
 
-    Steps: (1) edge detection, (2) confidence scoring, (3) grading,
-    (4) narrative tagging, (5) dawg factor, (6) mismatch detection,
-    (7) historical comp, (8) rant generation.
+    Steps: (1) OBSERVE — extract QME signals, (2) FRAME — narrative tagging,
+    (3) RETRIEVE — pull DB intel + historical comps, (4) MODEL — adjustments
+    from dawg factor, mismatch, regime, trend, splits, market consensus,
+    (5) ADJUST — compute Joseph edge vs QME edge, (6) CONCLUDE — determine
+    verdict, (7) EXPLAIN — build data-driven rant, (8) TRACK — log + assemble.
 
     Parameters
     ----------
@@ -1954,15 +2496,12 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
     dict
         Complete analysis with keys: ``verdict``, ``verdict_emoji``,
         ``is_override``, ``edge``, ``confidence``, ``rant``,
-        ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``.
+        ``dawg_factor``, ``narrative_tags``, ``comp``, ``grade``,
+        ``db_trend``, ``hit_rate``, ``consistency``.
     """
     try:
         # Step 1 — OBSERVE
         qme_prob = _safe_float(analysis_result.get("probability_over", 50.0))
-        # Neural Analysis stores probability_over as 0-1 decimal (e.g. 0.63).
-        # Joseph's internal math uses 0-100 percentage scale.
-        # Use < 1.5 threshold (simulations clamp to [0.01, 0.99]; a real
-        # percentage of 1.5% would be extremely rare and still benign).
         if 0.0 < qme_prob < 1.5:
             qme_prob *= 100.0
         qme_edge = _safe_float(analysis_result.get("edge_percentage", 0.0))
@@ -1991,7 +2530,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
         elif pace_delta < -2.0 and "pace_down" not in narrative_tags:
             narrative_tags.append("pace_down")
 
-        # Step 3 — RETRIEVE
+        # Step 3 — RETRIEVE (Supreme: DB Intel + Grade + Comp)
         try:
             player_grade = joseph_grade_player(player, game)
         except Exception:
@@ -1999,7 +2538,6 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                             "gravity": 50.0, "switchability": 50.0}
         archetype = player_grade.get("archetype", "Unknown")
 
-        # Find matching comp
         comp = None
         if JOSEPH_COMPS_DATABASE:
             arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
@@ -2010,6 +2548,64 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 comp = random.choice(arch_matches)
             else:
                 comp = random.choice(JOSEPH_COMPS_DATABASE)
+
+        # ── Supreme DB Knowledge Pull ─────────────────────────
+        db_intel = _get_player_db_intel(player)
+        _stat_db_key = _STAT_DB_KEY_MAP.get(str(stat_type).lower(), "PTS")
+
+        trend_data = {}
+        hit_rate = 0.0
+        trend_adj = 0.0
+        consistency_adj = 0.0
+        splits_adj = 0.0
+
+        if db_intel.get("available"):
+            recent = db_intel.get("recent_games", [])
+            if recent:
+                trend_data = _compute_recent_trend(recent, _stat_db_key)
+                hit_rate = _compute_hit_rate(recent, _stat_db_key, _safe_float(line))
+
+                # Trend-based adjustment: surging players get a boost, slumping a fade
+                if trend_data["trend"] == "surging":
+                    trend_adj = 2.0
+                    if "trending_up" not in narrative_tags:
+                        narrative_tags.append("trending_up")
+                elif trend_data["trend"] == "trending_up":
+                    trend_adj = 1.0
+                    if "trending_up" not in narrative_tags:
+                        narrative_tags.append("trending_up")
+                elif trend_data["trend"] == "slumping":
+                    trend_adj = -2.0
+                    if "trending_down" not in narrative_tags:
+                        narrative_tags.append("trending_down")
+                elif trend_data["trend"] == "trending_down":
+                    trend_adj = -1.0
+                    if "trending_down" not in narrative_tags:
+                        narrative_tags.append("trending_down")
+
+                # Consistency adjustment: volatile players get dampened
+                if trend_data["consistency"] == "volatile":
+                    consistency_adj = -1.0
+                elif trend_data["consistency"] == "elite":
+                    consistency_adj = 0.5
+
+            # Home/away split adjustment
+            splits = db_intel.get("splits", {})
+            if splits:
+                ha = _extract_home_away_splits(splits)
+                is_home = bool(game.get("is_home", False))
+                if ha["home_ppg"] > 0 and ha["away_ppg"] > 0:
+                    if is_home and ha["home_boost"] > 10:
+                        splits_adj = 1.0
+                    elif not is_home and ha["home_boost"] > 10:
+                        splits_adj = -1.0
+
+            # Clutch stats enrichment for narrative tags
+            clutch = db_intel.get("clutch_stats", {})
+            if clutch:
+                clutch_pts = _safe_float(clutch.get("PTS", clutch.get("pts", 0)))
+                if clutch_pts > 5 and "clutch_performer" not in narrative_tags:
+                    narrative_tags.append("clutch_performer")
 
         # Step 4 — MODEL
         _home_team = str(game.get("home_team", game.get("home", ""))).upper().strip()
@@ -2041,10 +2637,6 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             sample_dampening = -1.0 * (10 - games_played) / 10
 
         # ── Market context boost/fade from Odds API consensus ──────
-        # When The Odds API provides consensus lines from 5+ bookmakers,
-        # use the multi-book total to calibrate the game-pace assumption.
-        # High-total games (consensus > 228) get a +1.5 boost for scoring
-        # props; low-total games (consensus < 212) get -1.5.
         market_adj = 0.0
         _consensus_total = game.get("consensus_total")
         _bk_count = int(game.get("bookmaker_count", 0) or 0)
@@ -2062,14 +2654,23 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             except (TypeError, ValueError):
                 pass
 
-        joseph_prob = qme_prob + dawg_adjustment + mismatch_boost + regime_adj + sample_dampening + market_adj
+        # Supreme probability: QME base + all adjustment layers
+        joseph_prob = (
+            qme_prob
+            + dawg_adjustment
+            + mismatch_boost
+            + regime_adj
+            + sample_dampening
+            + market_adj
+            + trend_adj
+            + consistency_adj
+            + splits_adj
+        )
         joseph_prob = max(1.0, min(99.0, joseph_prob))
 
         implied_line = _safe_float(analysis_result.get("implied_probability", 0.0))
-        # implied_probability may be stored as 0-1 decimal — convert to percentage
         if 0.0 < implied_line < 1.5:
             implied_line *= 100.0
-        # If implied_probability is missing or zero, derive from qme_prob and qme_edge
         if implied_line <= 0.0:
             if abs(qme_edge) > 0.001:
                 implied_line = qme_prob - qme_edge
@@ -2103,7 +2704,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "direction": direction,
         }
 
-        counter_argument = _generate_counter_argument(player, prop_data, narrative_tags)
+        counter_argument = _generate_counter_argument(
+            player, prop_data, narrative_tags, db_intel=db_intel
+        )
 
         risk_factors = []
         if "back_to_back" in narrative_tags:
@@ -2114,10 +2717,16 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             risk_factors.append("Blowout risk may reduce minutes")
         if games_played < 15:
             risk_factors.append(f"Small sample size ({int(games_played)} games)")
+        if trend_data.get("consistency") == "volatile":
+            risk_factors.append("Volatile stat production — high variance")
+        if trend_data.get("trend") in ("slumping", "trending_down"):
+            risk_factors.append(f"Recent form trending down ({trend_data.get('last_3_avg', 0)} last 3 avg)")
+        if trend_data.get("cold_streak", 0) >= 3:
+            risk_factors.append(f"Cold streak: {trend_data['cold_streak']} games below average")
         if not risk_factors:
             risk_factors.append("Standard variance applies")
 
-        # Step 7 — EXPLAIN
+        # Step 7 — EXPLAIN (Supreme: DB-powered rant)
         energy_level = "nuclear" if verdict == "SMASH" else "high" if verdict == "LEAN" else "medium" if verdict == "FADE" else "low"
         if is_override:
             energy_level = "nuclear"
@@ -2131,6 +2740,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             mismatch={"description": mismatch_alert} if mismatch_alert else None,
             comp=comp,
             energy=energy_level,
+            db_intel=db_intel,
         )
 
         one_liner = (
@@ -2146,21 +2756,28 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
                 f"Delta: {round(edge_delta, 1)}%."
             )
 
+        # Enhanced condensed summary with trend data
+        trend_tag = ""
+        if trend_data.get("trend") in ("surging", "trending_up"):
+            trend_tag = " 📈 HOT"
+        elif trend_data.get("trend") in ("slumping", "trending_down"):
+            trend_tag = " 📉 COLD"
+
         condensed_summary = (
-            f"{verdict_emoji} {verdict} \u2014 {player.get('name', 'Player')} "
+            f"{verdict_emoji} {verdict}{trend_tag} \u2014 {player.get('name', 'Player')} "
             f"{prop_data['direction']} {prop_data['line']} {prop_data['stat']} "
             f"({round(joseph_edge, 1)}% edge, {round(joseph_prob, 1)}% probability)"
         )
 
-        # Step 8 — TRACK
+        # Step 8 — TRACK (Enhanced reasoning chain)
         reasoning_chain = [
             {"step": 1, "name": "OBSERVE", "detail": f"QME: {round(qme_prob, 1)}% prob, {round(qme_edge, 1)}% edge, tier={tier}"},
             {"step": 2, "name": "FRAME", "detail": f"Tags: {narrative_tags}"},
-            {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}"},
-            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}, Market={round(market_adj, 1)}"},
+            {"step": 3, "name": "RETRIEVE", "detail": f"Comp: {comp['name'] if comp else 'None'}, Archetype: {archetype}, DB Intel: {'YES' if db_intel.get('available') else 'NO'}"},
+            {"step": 4, "name": "MODEL", "detail": f"Dawg={round(dawg_adjustment, 1)}, Mismatch={round(mismatch_boost, 1)}, Regime={round(regime_adj, 1)}, Sample={round(sample_dampening, 1)}, Market={round(market_adj, 1)}, Trend={round(trend_adj, 1)}, Consistency={round(consistency_adj, 1)}, Splits={round(splits_adj, 1)}"},
             {"step": 5, "name": "ADJUST", "detail": f"Joseph edge={round(joseph_edge, 1)}%, Override={is_override}"},
             {"step": 6, "name": "CONCLUDE", "detail": f"Verdict={verdict}, Risks={risk_factors}"},
-            {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}"},
+            {"step": 7, "name": "EXPLAIN", "detail": f"Rant generated, energy={energy_level}, DB data sentences={'YES' if db_intel.get('available') else 'NO'}"},
             {"step": 8, "name": "TRACK", "detail": "Reasoning chain logged"},
         ]
 
@@ -2187,8 +2804,18 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "mismatch_boost": round(mismatch_boost, 2),
             "regime_adjustment": round(regime_adj, 2),
             "sample_dampening": round(sample_dampening, 2),
+            "market_adjustment": round(market_adj, 2),
+            "trend_adjustment": round(trend_adj, 2),
+            "consistency_adjustment": round(consistency_adj, 2),
+            "splits_adjustment": round(splits_adj, 2),
             "games_played": int(games_played),
             "implied_line": round(implied_line, 2),
+            "db_intel_available": db_intel.get("available", False),
+            "hit_rate_vs_line": hit_rate,
+            "recent_trend": trend_data.get("trend", "unknown"),
+            "last_3_avg": trend_data.get("last_3_avg", 0),
+            "last_10_avg": trend_data.get("last_10_avg", 0),
+            "consistency": trend_data.get("consistency", "unknown"),
         }
 
         return {
@@ -2215,6 +2842,9 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "energy_level": energy_level,
             "reasoning_chain": reasoning_chain,
             "nerd_stats": nerd_stats,
+            "db_trend": trend_data.get("trend", "unknown"),
+            "hit_rate": hit_rate,
+            "consistency": trend_data.get("consistency", "unknown"),
         }
     except Exception as exc:
         logger.warning("joseph_full_analysis failed: %s", exc)
@@ -2242,12 +2872,18 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "energy_level": "medium",
             "reasoning_chain": [],
             "nerd_stats": {},
+            "db_trend": "unknown",
+            "hit_rate": 0.0,
+            "consistency": "unknown",
         }
 
 
 def joseph_analyze_game(game: dict, teams_data: dict,
                         analysis_results: list) -> dict:
-    """Game-level analysis for Studio Game Mode + sidebar widget.
+    """Supreme game-level analysis for Studio Game Mode + sidebar widget.
+
+    Pulls team DB intel (recent stats, defensive ratings) and uses the
+    ``joseph_blowout_warning`` function for data-driven game analysis.
 
     Parameters
     ----------
@@ -2262,7 +2898,8 @@ def joseph_analyze_game(game: dict, teams_data: dict,
     -------
     dict
         Game-level analysis with keys: ``game_narrative``, ``pace_take``,
-        ``scheme_analysis``, ``blowout_risk``, ``best_props``.
+        ``scheme_analysis``, ``blowout_risk``, ``best_props``,
+        ``home_team_form``, ``away_team_form``.
     """
     try:
         home = game.get("home_team", game.get("home", "Home"))
@@ -2282,12 +2919,32 @@ def joseph_analyze_game(game: dict, teams_data: dict,
         away_scheme = strategy.get("away_scheme", "unknown")
         if isinstance(away_scheme, dict):
             away_scheme = away_scheme.get("primary_scheme", away_scheme.get("scheme_name", "unknown"))
-        # Use strategy pace projection when game-level pace_delta isn't available
         pace_proj = _safe_float(strategy.get("pace_projection", 0.0))
         pace = _safe_float(game.get("pace_delta", 0.0))
         if pace == 0.0 and pace_proj > 0:
-            # Derive delta from league average (~100)
             pace = pace_proj - 100.0
+
+        # ── Supreme: Team DB Intel ────────────────────────────
+        home_team_id = int(game.get("home_team_id", 0) or 0)
+        away_team_id = int(game.get("away_team_id", 0) or 0)
+        home_intel = _get_team_db_intel(home_team_id) if home_team_id else {"available": False}
+        away_intel = _get_team_db_intel(away_team_id) if away_team_id else {"available": False}
+
+        # Compute team form from recent stats
+        home_form = ""
+        away_form = ""
+        if home_intel.get("available"):
+            h_stats = home_intel.get("recent_stats", [])
+            if h_stats:
+                h_wins = sum(1 for g in h_stats if str(g.get("WL", "")).upper() == "W")
+                h_ppg = sum(_safe_float(g.get("PTS", 0)) for g in h_stats) / max(1, len(h_stats))
+                home_form = f"{home} is {h_wins}-{len(h_stats)-h_wins} in their last {len(h_stats)} games, averaging {round(h_ppg, 1)} PPG."
+        if away_intel.get("available"):
+            a_stats = away_intel.get("recent_stats", [])
+            if a_stats:
+                a_wins = sum(1 for g in a_stats if str(g.get("WL", "")).upper() == "W")
+                a_ppg = sum(_safe_float(g.get("PTS", 0)) for g in a_stats) / max(1, len(a_stats))
+                away_form = f"{away} is {a_wins}-{len(a_stats)-a_wins} in their last {len(a_stats)} games, averaging {round(a_ppg, 1)} PPG."
 
         # Filter results for this game
         game_props = []
@@ -2296,11 +2953,9 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             if r_game == game_id or not game_id:
                 game_props.append(r)
 
-        # Sort by edge descending and get top 3
         sorted_props = sorted(game_props, key=lambda x: _extract_edge(x), reverse=True)
         best_props = sorted_props[:3]
 
-        # Run full analysis on top props if not already analyzed
         for i, prop in enumerate(best_props):
             if "verdict" not in prop or "rant" not in prop:
                 player_data = prop.get("player_data", prop.get("player", {}))
@@ -2310,13 +2965,25 @@ def joseph_analyze_game(game: dict, teams_data: dict,
                     logger.debug("Prop reanalysis failed for %s: %s",
                                  prop.get("player_name", "unknown"), exc)
 
-        # Generate narratives
+        # Generate narratives (enriched with team form)
         strategy_narrative = strategy.get("game_narrative", "")
-        game_narrative = strategy_narrative if strategy_narrative else (
-            f"{away} at {home} is a game I've been watching CLOSELY. "
-            f"The scheme profile says '{scheme}' and the matchups are INTRIGUING. "
-            f"I see {len(game_props)} props on the board and the edges are REAL."
-        )
+        game_narrative_parts = []
+        if strategy_narrative:
+            game_narrative_parts.append(strategy_narrative)
+        else:
+            game_narrative_parts.append(
+                f"{away} at {home} is a game I've been watching CLOSELY. "
+                f"The scheme profile says '{scheme}' and the matchups are INTRIGUING."
+            )
+        if home_form:
+            game_narrative_parts.append(home_form)
+        if away_form:
+            game_narrative_parts.append(away_form)
+        if not home_form and not away_form:
+            game_narrative_parts.append(
+                f"I see {len(game_props)} props on the board and the edges are REAL."
+            )
+        game_narrative = " ".join(game_narrative_parts)
 
         if pace > 2.0:
             pace_take = f"This game projects to be UP-TEMPO with a pace delta of +{round(pace, 1)}. That means MORE possessions and MORE opportunities for production."
@@ -2338,14 +3005,10 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             scheme_analysis += "No glaring mismatches but the matchup data tells a story."
 
         spread = _safe_float(game.get("spread", 0.0))
-        blowout_risk_text = ""
-        if abs(spread) >= BLOWOUT_DIFFERENTIAL_MILD:
-            blowout_risk_text = (
-                f"WARNING: The spread is {spread} — blowout risk is ELEVATED. "
-                f"Starters could sit in the fourth quarter. Be CAREFUL with player props."
-            )
-        elif abs(spread) >= 8:
-            blowout_risk_text = f"The spread of {spread} suggests a competitive but lopsided game. Monitor minute projections."
+        game_total = _safe_float(game.get("total", game.get("over_under", 220.0)))
+
+        # Use supreme blowout warning
+        blowout_risk_text = joseph_blowout_warning(spread, game_total)
 
         # Betting angle and game total
         strategy_angle = strategy.get("betting_angle", "")
@@ -2357,7 +3020,6 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             pname = top.get("player_name", top.get("name", "top pick"))
             betting_angle = f"My best angle for this game is {pname}. The edge profile is the STRONGEST here."
 
-        game_total = _safe_float(game.get("total", game.get("over_under", 220.0)))
         strategy_total_est = _safe_float(strategy.get("game_total_est", 0.0))
         joseph_game_total_take = f"The total is set at {game_total}. "
         if strategy_total_est > 0 and abs(strategy_total_est - game_total) > 3:
@@ -2416,6 +3078,8 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             "home": home,
             "away": away,
             "game_id": game_id,
+            "home_team_form": home_form,
+            "away_team_form": away_form,
         }
     except Exception as exc:
         logger.warning("joseph_analyze_game failed: %s", exc)
@@ -2425,12 +3089,17 @@ def joseph_analyze_game(game: dict, teams_data: dict,
             "scheme_analysis": "",
             "blowout_risk": "",
             "best_props": [],
+            "home_team_form": "",
+            "away_team_form": "",
         }
 
 
 def joseph_analyze_player(player: dict, games: list, teams_data: dict,
                           analysis_results: list) -> dict:
-    """Player-level analysis for Studio Player Mode + sidebar widget.
+    """Supreme player-level analysis for Studio Player Mode + sidebar widget.
+
+    Pulls DB intel (game logs, splits, clutch stats, career stats, estimated
+    metrics) to deliver a data-driven scouting report with real numbers.
 
     Parameters
     ----------
@@ -2447,7 +3116,8 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
     -------
     dict
         Player-level analysis with keys: ``scouting_report``, ``archetype``,
-        ``grade``, ``gravity``, ``trend``, ``narrative_tags``.
+        ``grade``, ``gravity``, ``trend``, ``narrative_tags``,
+        ``db_trend_data``, ``consistency``, ``career_context``.
     """
     try:
         player_name = player.get("name", player.get("player_name", "Player"))
@@ -2464,6 +3134,13 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         grade = grade_result.get("grade", "C")
         gravity = _safe_float(grade_result.get("gravity", 50.0))
 
+        # ── Supreme DB Knowledge Pull ─────────────────────────
+        db_intel = _get_player_db_intel(player)
+        db_recent = db_intel.get("recent_games", [])
+        pts_trend = _compute_recent_trend(db_recent, "PTS") if db_recent else {}
+        reb_trend = _compute_recent_trend(db_recent, "REB") if db_recent else {}
+        ast_trend = _compute_recent_trend(db_recent, "AST") if db_recent else {}
+
         # Filter analysis_results for this player
         player_props = []
         for r in (analysis_results or []):
@@ -2471,12 +3148,10 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             if r_name == player_name or not r_name:
                 player_props.append(r)
 
-        # Sort by edge to find best and alternatives
         sorted_props = sorted(player_props, key=lambda x: _extract_edge(x), reverse=True)
         best_prop = sorted_props[0] if sorted_props else None
         alt_props = sorted_props[1:3] if len(sorted_props) > 1 else []
 
-        # Run full analysis on best prop if needed
         best_analysis = None
         if best_prop:
             try:
@@ -2498,8 +3173,14 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
             comp = random.choice(arch_matches) if arch_matches else random.choice(JOSEPH_COMPS_DATABASE)
 
-        # Determine trend
-        if len(games) >= 3:
+        # ── Supreme Trend Detection (DB-powered) ─────────────
+        if pts_trend.get("trend", "unknown") != "unknown":
+            trend = pts_trend["trend"]
+            if trend == "surging":
+                trend = "trending_up"
+            elif trend == "slumping":
+                trend = "trending_down"
+        elif len(games) >= 3:
             recent_avg = sum(_safe_float(g.get("points", g.get("pts", 0))) for g in games[:3]) / 3
             season_avg = _safe_float(player.get("points_avg", player.get("pts_avg", recent_avg)))
             if recent_avg > season_avg * 1.1:
@@ -2511,17 +3192,75 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         else:
             trend = "neutral"
 
-        # Build scouting report
+        # ── Supreme Scouting Report (with real data) ─────────
         scouting_parts = [
             f"{player_name} is a {archetype} that I grade as a '{grade}' tonight.",
             f"His gravity score is {round(gravity, 1)} which tells you about his impact on the DEFENSE.",
         ]
+
+        # DB-powered scoring breakdown
+        if pts_trend.get("last_10_avg", 0) > 0:
+            stat_parts = [f"{pts_trend['last_10_avg']} points"]
+            if reb_trend.get("last_10_avg", 0) > 0:
+                stat_parts.append(f"{reb_trend['last_10_avg']} rebounds")
+            if ast_trend.get("last_10_avg", 0) > 0:
+                stat_parts.append(f"{ast_trend['last_10_avg']} assists")
+            scouting_parts.append(
+                f"Over the last 10 games he's averaging {', '.join(stat_parts[:-1])}"
+                + (f", and {stat_parts[-1]}." if len(stat_parts) > 1 else ".")
+            )
+            if pts_trend.get("last_3_avg", 0) > 0:
+                diff = pts_trend["last_3_avg"] - pts_trend["last_10_avg"]
+                if abs(diff) > 2:
+                    direction_word = "UP" if diff > 0 else "DOWN"
+                    scouting_parts.append(
+                        f"His last 3 games average is {pts_trend['last_3_avg']} points — "
+                        f"that's {direction_word} {abs(round(diff, 1))} from his 10-game pace."
+                    )
+
+        # Consistency insight
+        consistency = pts_trend.get("consistency", "unknown")
+        if consistency != "unknown":
+            if consistency == "elite":
+                scouting_parts.append(
+                    f"{player_name} has been REMARKABLY consistent — low variance, high floor. "
+                    f"That's GOLD for prop betting."
+                )
+            elif consistency == "volatile":
+                scouting_parts.append(
+                    f"WARNING — {player_name} has been VOLATILE lately. "
+                    f"The ceiling is high but the floor is LOW. Pick your spots CAREFULLY."
+                )
+
+        # Career context from DB
+        career = db_intel.get("career_stats", [])
+        career_context = ""
+        if career and len(career) >= 2:
+            career_context = f"{player_name} is in year {len(career)} of his career."
+
+        # Estimated metrics insight
+        est = db_intel.get("estimated_metrics", {})
+        if est:
+            e_off = _safe_float(est.get("E_OFF_RATING", 0))
+            e_def = _safe_float(est.get("E_DEF_RATING", 0))
+            if e_off > 0 and e_def > 0:
+                e_net = round(e_off - e_def, 1)
+                if e_net > 5:
+                    scouting_parts.append(
+                        f"His estimated net rating is +{e_net} — that's ELITE two-way impact."
+                    )
+                elif e_net < -5:
+                    scouting_parts.append(
+                        f"His estimated net rating is {e_net} — he's been a NET NEGATIVE on the floor."
+                    )
+
         if comp:
             try:
                 comp_text = comp["template"].format(reason=f"{player_name} has the same profile")
             except (KeyError, IndexError):
                 comp_text = f"I see similarities to {comp.get('name', 'a historical great')}."
             scouting_parts.append(comp_text)
+
         if trend == "trending_up":
             scouting_parts.append(f"{player_name} has been COOKING lately. The recent form is ELITE.")
         elif trend == "trending_down":
@@ -2540,10 +3279,23 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         tonight_matchup_take = (
             f"{player_name} faces {opponent} tonight. "
             f"As a {archetype}, the matchup profile {'FAVOURS' if gravity > 60 else 'is NEUTRAL for'} him. "
-            f"{'The narrative tags suggest extra motivation!' if any(t in ('revenge_game', 'nationally_televised', 'rivalry') for t in narrative_tags) else 'Standard game-day context applies.'}"
         )
+        if pts_trend.get("hot_streak", 0) >= 3:
+            tonight_matchup_take += (
+                f"He's on a {pts_trend['hot_streak']}-game HOT STREAK — "
+                f"momentum is REAL in this league! "
+            )
+        elif pts_trend.get("cold_streak", 0) >= 3:
+            tonight_matchup_take += (
+                f"He's been COLD for {pts_trend['cold_streak']} straight — "
+                f"regression to the MEAN could work in his favour tonight. "
+            )
+        if any(t in ("revenge_game", "nationally_televised", "rivalry") for t in narrative_tags):
+            tonight_matchup_take += "The narrative tags suggest extra motivation!"
+        else:
+            tonight_matchup_take += "Standard game-day context applies."
 
-        # Risk factors
+        # Risk factors (enhanced)
         risk_factors = []
         if "back_to_back" in narrative_tags:
             risk_factors.append("Back-to-back fatigue")
@@ -2552,7 +3304,15 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
         if "blowout_risk" in narrative_tags:
             risk_factors.append("Blowout risk — potential minutes reduction")
         if trend == "trending_down":
-            risk_factors.append("Recent form trending downward")
+            l3 = pts_trend.get("last_3_avg", 0)
+            if l3 > 0:
+                risk_factors.append(f"Recent form trending down (last 3 avg: {l3} pts)")
+            else:
+                risk_factors.append("Recent form trending downward")
+        if consistency == "volatile":
+            risk_factors.append("High variance — volatile stat production")
+        if pts_trend.get("cold_streak", 0) >= 3:
+            risk_factors.append(f"Cold streak: {pts_trend['cold_streak']} games below average")
         if not risk_factors:
             risk_factors.append("No elevated risk factors identified")
 
@@ -2561,12 +3321,25 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             fun_fact += f"think of {comp.get('name', 'a historical great')} in a similar situation."
         else:
             fun_fact += "a profile that historically performs WELL in this matchup type."
+        if career_context:
+            fun_fact += f" {career_context}"
+
+        trend_tag = ""
+        if trend == "trending_up":
+            trend_tag = " 📈"
+        elif trend == "trending_down":
+            trend_tag = " 📉"
 
         condensed_summary = (
-            f"{player_name} ({archetype}, Grade: {grade}): "
+            f"{player_name} ({archetype}, Grade: {grade}){trend_tag}: "
             f"{'TRENDING UP' if trend == 'trending_up' else 'TRENDING DOWN' if trend == 'trending_down' else 'STABLE'}. "
-            f"{'Best play: ' + best_analysis.get('one_liner', '') if best_analysis else 'No top play identified.'}"
         )
+        if pts_trend.get("last_3_avg", 0) > 0:
+            condensed_summary += f"Last 3: {pts_trend['last_3_avg']} PPG. "
+        if best_analysis:
+            condensed_summary += f"Best play: {best_analysis.get('one_liner', '')}"
+        else:
+            condensed_summary += "No top play identified."
 
         return {
             "scouting_report": scouting_report,
@@ -2582,6 +3355,9 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             "fun_fact": fun_fact,
             "comp": comp,
             "condensed_summary": condensed_summary,
+            "db_trend_data": pts_trend,
+            "consistency": consistency,
+            "career_context": career_context,
         }
     except Exception as exc:
         logger.warning("joseph_analyze_player failed: %s", exc)
@@ -2592,6 +3368,9 @@ def joseph_analyze_player(player: dict, games: list, teams_data: dict,
             "gravity": 50.0,
             "trend": "neutral",
             "narrative_tags": [],
+            "db_trend_data": {},
+            "consistency": "unknown",
+            "career_context": "",
         }
 
 
@@ -2859,7 +3638,9 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
 
 def joseph_quick_take(analysis_results: list, teams_data: dict,
                       todays_games: list) -> str:
-    """Generate a unique 3-4 sentence monologue about tonight's slate.
+    """Generate a unique 4-6 sentence supreme monologue about tonight's slate.
+
+    Uses DB data when available to ground the take in real stats and trends.
 
     Parameters
     ----------
@@ -2873,7 +3654,7 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
     Returns
     -------
     str
-        A 3-4 sentence Joseph M. Smith monologue.
+        A 4-6 sentence Joseph M. Smith monologue.
     """
     try:
         take_openers = [
@@ -2882,10 +3663,13 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
             "I've been through EVERY number tonight and I have TAKES...",
             "The board is SET and Joseph M. Smith is READY to talk...",
             "You want to know what I think about tonight? HERE IT IS...",
+            "I pulled the game logs, I crunched the splits, and I'm READY to deliver...",
+            "I've been in the LAB all day studying matchups, trends, and the DATA...",
+            "The NUMBERS have spoken and Joseph M. Smith is here to TRANSLATE...",
         ]
         used_set = _used_fragments.setdefault("quick_take", set())
         avail_openers = [i for i in range(len(take_openers)) if i not in used_set]
-        if not avail_openers or len(used_set) > 3:
+        if not avail_openers or len(used_set) > 5:
             used_set.clear()
             avail_openers = list(range(len(take_openers)))
         opener_idx = random.choice(avail_openers)
@@ -2902,21 +3686,49 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
                        if r.get("verdict") in ("FADE", "STAY_AWAY")]
         avoid_picks.sort(key=lambda x: _extract_edge(x))
 
-        # Middle sentences
+        # Count verdicts for slate summary
+        n_total = len(analysis_results or [])
+        n_smash = len(smash_picks)
+        n_lean = len([r for r in (analysis_results or []) if r.get("verdict") == "LEAN"])
+        n_games = len(todays_games or [])
+
+        # Slate summary sentence
+        slate_sentence = (
+            f"I've analyzed {n_total} props across {n_games} games tonight — "
+            f"{n_smash} SMASH plays, {n_lean} LEAN plays."
+        ) if n_total > 0 else (
+            f"We've got {n_games} games on the board tonight. Let the analysis RUN!"
+        )
+
+        # Top pick sentence with trend data
         if smash_picks:
             top = smash_picks[0]
             pname = top.get("player_name", top.get("name", "my top pick"))
             edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
-            middle1 = f"My STRONGEST play tonight is {pname} — I see a {edge}% edge and I'm going ALL IN on it!"
+            trend = top.get("db_trend", "")
+            hit_rate = top.get("hit_rate", 0)
+            trend_note = ""
+            if trend in ("surging", "trending_up"):
+                trend_note = f" He's been ON FIRE lately and the trend supports the pick!"
+            elif hit_rate > 70:
+                trend_note = f" Hit rate is {hit_rate}% in the last 10 — that's MONEY!"
+            middle1 = (
+                f"My STRONGEST play tonight is {pname} — I see a {edge}% edge and "
+                f"I'm going ALL IN on it!{trend_note}"
+            )
         else:
-            middle1 = f"I see {len(todays_games or [])} games tonight and the edges are DEVELOPING. Let the analysis run!"
+            middle1 = (
+                f"I see {n_games} games tonight and the edges are DEVELOPING. "
+                f"Let the analysis run!"
+            )
 
+        # Avoid sentence
         if avoid_picks:
             avoid = avoid_picks[0]
             aname = avoid.get("player_name", avoid.get("name", "one play"))
             middle2 = f"But STAY AWAY from {aname} — that's a TRAP and I can smell it from here!"
-        elif len(analysis_results or []) > 3:
-            lean_picks = [r for r in analysis_results if r.get("verdict") == "LEAN"]
+        elif n_total > 3:
+            lean_picks = [r for r in (analysis_results or []) if r.get("verdict") == "LEAN"]
             if lean_picks:
                 bold = lean_picks[0]
                 bname = bold.get("player_name", bold.get("name", "a sleeper"))
@@ -2930,7 +3742,7 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         closer_frag = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
         closer = closer_frag.get("text", "And I say that with GREAT conviction!")
 
-        return f"{opener} {middle1} {middle2} {closer}"
+        return f"{opener} {slate_sentence} {middle1} {middle2} {closer}"
     except Exception:
         return "Joseph M. Smith is ready for tonight's slate."
 
