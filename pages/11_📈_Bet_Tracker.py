@@ -71,18 +71,44 @@ from styles.theme import (
     get_styled_stats_table_html,
 )
 
-try:
-    from engine.clv_tracker import get_clv_summary, get_tier_accuracy_report, validate_model_edge  # F1 enhanced
-except ImportError:
-    get_clv_summary = None
-    get_tier_accuracy_report = None
-    validate_model_edge = None
+# ── Lazy-loaded optional engine modules ──────────────────────────────────────
+get_clv_summary = None
+get_tier_accuracy_report = None
+validate_model_edge = None
+def _get_clv_fns():
+    global get_clv_summary, get_tier_accuracy_report, validate_model_edge
+    if get_clv_summary is None:
+        try:
+            from engine.clv_tracker import (
+                get_clv_summary as _s,
+                get_tier_accuracy_report as _t,
+                validate_model_edge as _v,
+            )
+            get_clv_summary = _s
+            get_tier_accuracy_report = _t
+            validate_model_edge = _v
+        except ImportError:
+            get_clv_summary = False
+            get_tier_accuracy_report = False
+            validate_model_edge = False
+    return get_clv_summary if get_clv_summary else None
 
-try:
-    from engine.calibration import get_calibration_summary, get_isotonic_calibration_curve  # F4 isotonic
-except ImportError:
-    get_calibration_summary = None
-    get_isotonic_calibration_curve = None
+get_calibration_summary = None
+get_isotonic_calibration_curve = None
+def _get_calibration_fns():
+    global get_calibration_summary, get_isotonic_calibration_curve
+    if get_calibration_summary is None:
+        try:
+            from engine.calibration import (
+                get_calibration_summary as _cs,
+                get_isotonic_calibration_curve as _ic,
+            )
+            get_calibration_summary = _cs
+            get_isotonic_calibration_curve = _ic
+        except ImportError:
+            get_calibration_summary = False
+            get_isotonic_calibration_curve = False
+    return get_calibration_summary if get_calibration_summary else None
 
 # ============================================================
 # SECTION: Page Setup
@@ -132,55 +158,80 @@ def _reload_bets():
 # Auto-resolve past bets AND today's completed bets on page load (best-effort, silent).
 # Guarded by a session-state flag so this runs at most once per browser session,
 # preventing repeated blocking API calls on every Streamlit rerun.
+# Uses a background thread so the page renders immediately without blocking.
+
+import threading as _threading
+
+def _background_auto_resolve():
+    """Run auto-resolve in a background thread so the page renders immediately."""
+    try:
+        _today_str = datetime.date.today().isoformat()
+        _all_bets_check = load_all_bets(exclude_linked=False)
+
+        # Resolve past pending bets (yesterday and older)
+        _pending_old = [
+            b for b in _all_bets_check
+            if not b.get("result") and b.get("bet_date", "") < _today_str
+        ]
+        if _pending_old:
+            _dates_to_resolve = sorted({b.get("bet_date", "") for b in _pending_old if b.get("bet_date")})
+            _total_resolved = 0
+            for _d in _dates_to_resolve:
+                try:
+                    _cnt, _ = auto_resolve_bet_results(date_str=_d)
+                    _total_resolved += _cnt
+                except Exception:
+                    pass  # One date failed — continue with others
+            if _total_resolved > 0:
+                st.session_state["_auto_resolve_toast"] = f"🤖 Auto-resolved {_total_resolved} past bet(s)."
+                _reload_bets()
+
+        # Silently attempt to resolve today's bets where games are Final
+        try:
+            from tracking.bet_tracker import resolve_todays_bets
+            _today_result = resolve_todays_bets()
+            if _today_result.get("resolved", 0) > 0:
+                _msg = (
+                    f"⚡ Auto-resolved {_today_result['resolved']} of today's bet(s) "
+                    f"({_today_result['wins']}W / {_today_result['losses']}L)."
+                )
+                prev = st.session_state.get("_auto_resolve_toast", "")
+                st.session_state["_auto_resolve_toast"] = f"{prev}\n{_msg}".strip() if prev else _msg
+                _reload_bets()
+        except Exception:
+            pass  # Not available or API error — silently skip
+
+        # Auto-update CLV closing lines using Odds API prop lines
+        try:
+            from engine.clv_tracker import auto_update_closing_lines as _auto_clv
+            _clv_result = _auto_clv(days_back=1)
+            if _clv_result.get("updated", 0) > 0:
+                _msg = (
+                    f"📈 CLV updated: {_clv_result['updated']} record(s) closed "
+                    f"with live closing lines."
+                )
+                prev = st.session_state.get("_auto_resolve_toast", "")
+                st.session_state["_auto_resolve_toast"] = f"{prev}\n{_msg}".strip() if prev else _msg
+        except Exception:
+            pass  # Optional — never block page load
+
+        st.session_state["_auto_resolve_done"] = True
+    except Exception:
+        st.session_state["_auto_resolve_done"] = True  # Mark done even on failure
+
 if not st.session_state.get("_bet_tracker_auto_resolved", False):
     st.session_state["_bet_tracker_auto_resolved"] = True
-    with st.spinner("🤖 Auto-resolving pending bets..."):
-        try:
-            _today_str = datetime.date.today().isoformat()
-            _all_bets_check = load_all_bets(exclude_linked=False)
+    st.session_state["_auto_resolve_done"] = False
+    _resolve_thread = _threading.Thread(target=_background_auto_resolve, daemon=True)
+    _resolve_thread.start()
+    st.toast("🤖 Auto-resolving pending bets in the background…")
 
-            # Resolve past pending bets (yesterday and older)
-            _pending_old = [
-                b for b in _all_bets_check
-                if not b.get("result") and b.get("bet_date", "") < _today_str
-            ]
-            if _pending_old:
-                _dates_to_resolve = sorted({b.get("bet_date", "") for b in _pending_old if b.get("bet_date")})
-                _total_resolved = 0
-                for _d in _dates_to_resolve:
-                    try:
-                        _cnt, _ = auto_resolve_bet_results(date_str=_d)
-                        _total_resolved += _cnt
-                    except Exception:
-                        pass  # One date failed — continue with others
-                if _total_resolved > 0:
-                    st.toast(f"🤖 Auto-resolved {_total_resolved} past bet(s) on page load.")
-
-            # Silently attempt to resolve today's bets where games are Final
-            try:
-                from tracking.bet_tracker import resolve_todays_bets
-                _today_result = resolve_todays_bets()
-                if _today_result.get("resolved", 0) > 0:
-                    st.toast(
-                        f"⚡ Auto-resolved {_today_result['resolved']} of today's bet(s) "
-                        f"({_today_result['wins']}W / {_today_result['losses']}L)."
-                    )
-            except Exception:
-                pass  # Not available or API error — silently skip
-
-            # Auto-update CLV closing lines using Odds API prop lines
-            try:
-                from engine.clv_tracker import auto_update_closing_lines as _auto_clv
-                _clv_result = _auto_clv(days_back=1)
-                if _clv_result.get("updated", 0) > 0:
-                    st.toast(
-                        f"📈 CLV updated: {_clv_result['updated']} record(s) closed "
-                        f"with live closing lines."
-                    )
-            except Exception:
-                pass  # Optional — never block page load
-        except Exception:
-            pass  # Best-effort — never block page load
+# Show deferred toast messages from background thread
+if st.session_state.get("_auto_resolve_done") and st.session_state.get("_auto_resolve_toast"):
+    for _toast_line in st.session_state.pop("_auto_resolve_toast").split("\n"):
+        if _toast_line.strip():
+            st.toast(_toast_line.strip())
+    st.session_state.pop("_auto_resolve_done", None)
 
 st.title("📈 Bet Tracker & Model Health")
 st.markdown(
@@ -608,7 +659,7 @@ with tab_model_health:
 
         # Feature 1: Enhanced tier accuracy report
         try:
-            if get_tier_accuracy_report is not None:
+            if _get_clv_fns() and get_tier_accuracy_report:
                 st.subheader("📊 Model Tier Accuracy")
                 _tier_report = get_tier_accuracy_report(days=90)
                 if _tier_report.get("has_data"):
@@ -627,7 +678,7 @@ with tab_model_health:
 
         # Feature 4: Isotonic calibration curve
         try:
-            if get_isotonic_calibration_curve is not None:
+            if _get_calibration_fns() and get_isotonic_calibration_curve:
                 st.subheader("📈 Isotonic Calibration Curve")
                 _iso_curve = get_isotonic_calibration_curve(days=90)
                 if _iso_curve.get("has_data"):
@@ -648,7 +699,7 @@ with tab_model_health:
 
         # CLV Summary — aggregate closing-line-value performance
         try:
-            if get_clv_summary is not None:
+            if _get_clv_fns() and get_clv_summary:
                 st.subheader("📈 Closing Line Value (CLV) Summary")
                 _clv_data = get_clv_summary()
                 if _clv_data and _clv_data.get("has_data"):

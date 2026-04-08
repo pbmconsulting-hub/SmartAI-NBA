@@ -35,11 +35,21 @@ from engine import COMBO_STAT_TYPES, FANTASY_STAT_TYPES, YESNO_STAT_TYPES
 from engine.projections import build_player_projection, get_stat_standard_deviation, calculate_teammate_out_boost, POSITION_PRIORS
 from engine.edge_detection import analyze_directional_forces, should_avoid_prop, detect_correlated_props, detect_trap_line, detect_line_sharpness, classify_bet_type, calculate_composite_win_score
 
-try:
-    from engine.rotation_tracker import track_minutes_trend
-    _rotation_tracker_available = True
-except ImportError:
-    _rotation_tracker_available = False
+# ── Lazy-loaded optional engine modules ──────────────────────────────────────
+# These are imported on first use rather than at module level to reduce the
+# initial import chain when navigating to this page.  Each helper returns the
+# callable (or None) and caches the result in a module-level variable.
+
+_rotation_tracker_available = None  # sentinel; resolved on first call
+def _get_track_minutes_trend():
+    global _rotation_tracker_available
+    if _rotation_tracker_available is None:
+        try:
+            from engine.rotation_tracker import track_minutes_trend as _fn
+            _rotation_tracker_available = _fn
+        except ImportError:
+            _rotation_tracker_available = False
+    return _rotation_tracker_available if _rotation_tracker_available else None
 from engine.confidence import calculate_confidence_score, get_tier_color
 from engine.math_helpers import calculate_edge_percentage, clamp_probability
 from engine.explainer import generate_pick_explanation
@@ -47,38 +57,87 @@ from engine.odds_engine import american_odds_to_implied_probability as _odds_to_
 from engine.calibration import get_calibration_adjustment   # C10: historical calibration
 from engine.clv_tracker import store_opening_line, get_stat_type_clv_penalties  # C12: CLV + penalties
 
-try:
-    from engine.market_movement import detect_line_movement  # F9: Sharp money
-except ImportError:
-    detect_line_movement = None
+detect_line_movement = None  # lazy-loaded on first use
+def _get_detect_line_movement():
+    global detect_line_movement
+    if detect_line_movement is None:
+        try:
+            from engine.market_movement import detect_line_movement as _fn
+            detect_line_movement = _fn
+        except ImportError:
+            detect_line_movement = False
+    return detect_line_movement if detect_line_movement else None
 
-try:
-    from engine.matchup_history import calculate_matchup_adjustment, get_matchup_force_signal  # F2
-except ImportError:
-    calculate_matchup_adjustment = None
-    get_matchup_force_signal = None
+calculate_matchup_adjustment = None  # lazy-loaded
+get_matchup_force_signal = None      # lazy-loaded
+def _get_matchup_fns():
+    global calculate_matchup_adjustment, get_matchup_force_signal
+    if calculate_matchup_adjustment is None:
+        try:
+            from engine.matchup_history import (
+                calculate_matchup_adjustment as _adj,
+                get_matchup_force_signal as _sig,
+            )
+            calculate_matchup_adjustment = _adj
+            get_matchup_force_signal = _sig
+        except ImportError:
+            calculate_matchup_adjustment = False
+            get_matchup_force_signal = False
+    return (
+        calculate_matchup_adjustment if calculate_matchup_adjustment else None,
+        get_matchup_force_signal if get_matchup_force_signal else None,
+    )
 
-try:
-    from engine.ensemble import get_ensemble_projection  # Ensemble 3-model blend
-    _ensemble_available = True
-except ImportError:
-    _ensemble_available = False
-    get_ensemble_projection = None
+get_ensemble_projection = None  # lazy-loaded
+_ensemble_available = None      # sentinel; resolved on first call
+def _get_ensemble_projection():
+    global get_ensemble_projection, _ensemble_available
+    if _ensemble_available is None:
+        try:
+            from engine.ensemble import get_ensemble_projection as _fn
+            get_ensemble_projection = _fn
+            _ensemble_available = True
+        except ImportError:
+            _ensemble_available = False
+            get_ensemble_projection = False
+    return get_ensemble_projection if get_ensemble_projection else None
 
-try:
-    from engine.game_script import simulate_game_script, blend_with_flat_simulation  # Game script blend
-    _game_script_available = True
-except ImportError:
-    _game_script_available = False
-    simulate_game_script = None
-    blend_with_flat_simulation = None
+simulate_game_script = None          # lazy-loaded
+blend_with_flat_simulation = None    # lazy-loaded
+_game_script_available = None        # sentinel
+def _get_game_script_fns():
+    global simulate_game_script, blend_with_flat_simulation, _game_script_available
+    if _game_script_available is None:
+        try:
+            from engine.game_script import (
+                simulate_game_script as _sim,
+                blend_with_flat_simulation as _blend,
+            )
+            simulate_game_script = _sim
+            blend_with_flat_simulation = _blend
+            _game_script_available = True
+        except ImportError:
+            _game_script_available = False
+            simulate_game_script = False
+            blend_with_flat_simulation = False
+    return (
+        simulate_game_script if simulate_game_script else None,
+        blend_with_flat_simulation if blend_with_flat_simulation else None,
+    )
 
-try:
-    from engine.minutes_model import project_player_minutes  # Precise minutes projection
-    _minutes_model_available = True
-except ImportError:
-    _minutes_model_available = False
-    project_player_minutes = None
+project_player_minutes = None    # lazy-loaded
+_minutes_model_available = None  # sentinel
+def _get_project_player_minutes():
+    global project_player_minutes, _minutes_model_available
+    if _minutes_model_available is None:
+        try:
+            from engine.minutes_model import project_player_minutes as _fn
+            project_player_minutes = _fn
+            _minutes_model_available = True
+        except ImportError:
+            _minutes_model_available = False
+            project_player_minutes = False
+    return project_player_minutes if project_player_minutes else None
 
 # Import data loading functions
 from data.data_manager import (
@@ -1001,7 +1060,7 @@ if run_analysis:
                 # If game logs contain minutes (MIN field), detect trend vs season avg.
                 _minutes_trend = None
                 _minutes_trend_indicator = "➡️"  # default: stable
-                if _rotation_tracker_available and recent_form_games:
+                if _get_track_minutes_trend() and recent_form_games:
                     try:
                         _minutes_trend = track_minutes_trend(recent_form_games, window=5)
                         _td = _minutes_trend.get("trend_direction", "stable")
@@ -1023,7 +1082,7 @@ if run_analysis:
                 # before running the full stat projection. The minutes projection
                 # accounts for blowout spread, back-to-back, teammate injuries, and pace.
                 _precise_minutes = None
-                if _minutes_model_available and project_player_minutes is not None:
+                if _get_project_player_minutes() is not None:
                     try:
                         _teammate_status = {
                             k: v.get("status", "Active")
@@ -1101,7 +1160,7 @@ if run_analysis:
                 # This is more accurate than a single model approach.
                 _ensemble_result = None
                 _ensemble_penalty = 0.0
-                if _ensemble_available and get_ensemble_projection is not None and stat_type not in (
+                if _get_ensemble_projection() is not None and stat_type not in (
                     "double_double", "triple_double"
                 ):
                     try:
@@ -1287,7 +1346,8 @@ if run_analysis:
                     # other keys (probability_over, percentiles, etc.) from the
                     # flat simulation since blend_with_flat_simulation only
                     # provides mean/std — no probability recalculation.
-                    if _game_script_available and simulate_game_script is not None:
+                    _gs_sim, _gs_blend = _get_game_script_fns()
+                    if _gs_sim is not None:
                         try:
                             _gs_proj_dict = {
                                 "projected_stat":    projected_stat,
@@ -1683,7 +1743,7 @@ if run_analysis:
 
                 # ── Feature 9: Market movement adjustment ────────────────────
                 try:
-                    if detect_line_movement is not None:
+                    if _get_detect_line_movement() is not None:
                         _opening_snap = st.session_state.get("line_snapshots", {}).get(
                             f"{player_name}_{stat_type}", {}
                         )
