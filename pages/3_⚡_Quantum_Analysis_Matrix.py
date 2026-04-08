@@ -173,6 +173,10 @@ _HEIGHT_PER_PLAYER = 800       # px — expanded card ≈ header + prop cards (~
 _MAX_IFRAME_HEIGHT = 12000     # px — generous cap before ResizeObserver takes over
 _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
+_MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
+
+# Tier → emoji mapping used in incremental rendering feedback
+_TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
 # Auto-resize JavaScript injected into every card-matrix iframe.
 # Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
@@ -597,14 +601,14 @@ with st.expander("📖 How Neural Analysis Works — Framework Logic"):
 _seen_keys: set = set()
 _deduped_props: list = []
 for _p in current_props:
-    _dk = (
+    _dedup_key = (
         (_p.get("player_name") or "").strip().lower(),
         (_p.get("stat_type") or "").strip().lower(),
         round(float(_p.get("line", 0) or 0), 1),
         (_p.get("platform") or "").strip(),
     )
-    if _dk not in _seen_keys:
-        _seen_keys.add(_dk)
+    if _dedup_key not in _seen_keys:
+        _seen_keys.add(_dedup_key)
         _deduped_props.append(_p)
 _dedup_removed = len(current_props) - len(_deduped_props)
 final_props = _deduped_props
@@ -886,7 +890,7 @@ if run_analysis:
         if _names_to_prefetch:
             try:
                 from data.player_profile_service import get_player_bio as _get_bio
-                _max_workers = min(8, len(_names_to_prefetch))
+                _max_workers = min(_MAX_BIO_PREFETCH_WORKERS, len(_names_to_prefetch))
                 with concurrent.futures.ThreadPoolExecutor(max_workers=_max_workers) as _pool:
                     _bio_futures = {
                         _pool.submit(_get_bio, name): name
@@ -931,7 +935,7 @@ if run_analysis:
                     _ln = _cached_result.get("line", 0)
                     _conf = _cached_result.get("confidence_score", 0)
                     st.caption(
-                        f"{'💎' if _tier == 'Platinum' else '🥇' if _tier == 'Gold' else '🥈' if _tier == 'Silver' else '🥉'} "
+                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
                         f"**{_pn}** — {_dir} {_ln} — SAFE: {_conf:.0f} *(cached)*"
                     )
                 continue
@@ -1847,7 +1851,7 @@ if run_analysis:
                     _ln_s = full_result.get("line", 0)
                     _conf_s = full_result.get("confidence_score", 0)
                     st.caption(
-                        f"{'💎' if _tier == 'Platinum' else '🥇' if _tier == 'Gold' else '🥈' if _tier == 'Silver' else '🥉'} "
+                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
                         f"**{_pn}** — {_dir_s} {_ln_s} — SAFE: {_conf_s:.0f}"
                     )
             except Exception as _prop_loop_err:
