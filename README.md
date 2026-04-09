@@ -113,16 +113,16 @@ Use the `cd` command to go to the folder where you downloaded/extracted Smart Pi
 
 **Windows examples:**
 ```powershell
-cd C:\Users\YourName\Downloads\Smart Pick Pro
+cd "C:\Users\YourName\Downloads\Smart Pick Pro"
 # or
 cd "$env:USERPROFILE\Documents\Smart Pick Pro"
 ```
 
 **Mac / Linux examples:**
 ```bash
-cd ~/Downloads/Smart Pick Pro
+cd ~/Downloads/"Smart Pick Pro"
 # or
-cd ~/Documents/Smart Pick Pro
+cd ~/Documents/"Smart Pick Pro"
 ```
 
 > **💡 Tip:** You can drag the folder from File Explorer / Finder into the terminal window to paste the full path.
@@ -329,7 +329,7 @@ Every time you want to use the app:
 
 ```bash
 # 1. Open a terminal and navigate to the project folder
-cd path/to/Smart Pick Pro
+cd "path/to/Smart Pick Pro"
 
 # 2. Activate the virtual environment
 # Windows PowerShell:

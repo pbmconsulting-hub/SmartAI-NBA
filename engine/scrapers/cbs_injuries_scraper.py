@@ -9,7 +9,7 @@ _CBS_INJURY_URL = "https://www.cbssports.com/nba/injuries/"
 _DELAY = 3.0
 _MAX_RETRIES = 3
 _USER_AGENT = (
-    "Mozilla/5.0 (compatible; Smart Pick Pro/1.0; +https://github.com/pbmconsulting-hub/Smart Pick Pro)"
+    "Mozilla/5.0 (compatible; SmartPickPro/1.0; +https://github.com/pbmconsulting-hub/SmartAI-NBA)"
 )
 
 try:
