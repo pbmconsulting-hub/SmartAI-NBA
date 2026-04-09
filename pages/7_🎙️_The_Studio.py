@@ -365,7 +365,7 @@ _VERDICT_FLIP = {
     "STAY_AWAY": "SMASH",
 }
 
-_DIRECTION_FLIP = {"OVER": "UNDER", "UNDER": "OVER", "Over": "Under", "Under": "Over"}
+_DIRECTION_FLIP = {"OVER": "UNDER", "UNDER": "OVER"}
 
 _HOT_TAKE_RANT_POOL = [
     "The math says one thing, but my GUT says DIFFERENT!",
@@ -380,11 +380,14 @@ _HOT_TAKE_RANT_POOL = [
 def _apply_hot_take(result: dict) -> dict:
     """Return a shallow copy of *result* with verdict/direction flipped."""
     flipped = dict(result)
-    orig_verdict = str(flipped.get("verdict", "LEAN")).upper().replace(" ", "_")
-    flipped["original_verdict"] = orig_verdict
-    flipped["verdict"] = _VERDICT_FLIP.get(orig_verdict, orig_verdict)
+    orig_verdict = str(flipped.get("verdict", "")).upper().replace(" ", "_")
+    if orig_verdict and orig_verdict in _VERDICT_FLIP:
+        flipped["original_verdict"] = orig_verdict
+        flipped["verdict"] = _VERDICT_FLIP[orig_verdict]
+    else:
+        flipped["original_verdict"] = orig_verdict or "LEAN"
 
-    orig_dir = str(flipped.get("direction", ""))
+    orig_dir = str(flipped.get("direction", "")).upper()
     flipped["direction"] = _DIRECTION_FLIP.get(orig_dir, orig_dir)
 
     flipped["is_hot_take"] = True

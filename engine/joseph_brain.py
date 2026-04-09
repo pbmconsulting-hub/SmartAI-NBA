@@ -3695,7 +3695,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
         pname = str(r.get("player_name", r.get("name", ""))).lower()
         team = str(r.get("team", "")).lower()
         # Match on full name or any individual name part (first/last)
-        name_parts = [p for p in pname.split() if len(p) >= 3]
+        name_parts = [p for p in pname.split() if len(p) >= 2]
         name_hit = pname and (
             pname in q_lower
             or any(part in q_lower for part in name_parts)
