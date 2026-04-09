@@ -583,7 +583,7 @@ def _build_entry_strategy(results):
             teams_in = {(p.get("team") or p.get("player_team") or "").upper().strip()
                         for p in selected}
             teams_in.discard("")
-            if len(teams_in) <= 1 and teams_in:
+            if len(teams_in) == 1:
                 only_team = next(iter(teams_in))
                 # Find best unused candidate from a different team
                 used_names = {p.get("player_name", "") for p in selected}
