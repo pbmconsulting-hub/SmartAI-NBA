@@ -118,7 +118,7 @@ class TestOddsAPIHeaders(unittest.TestCase):
     def test_user_agent_identifies_app(self):
         from utils.headers import get_odds_api_headers
         h = get_odds_api_headers()
-        self.assertIn("SmartAI", h["User-Agent"])
+        self.assertIn("SmartPickPro", h["User-Agent"])
 
 
 # ============================================================
