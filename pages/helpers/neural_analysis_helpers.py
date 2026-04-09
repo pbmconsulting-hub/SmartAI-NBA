@@ -470,6 +470,38 @@ def _build_bonus_factors(result):
     return bonus[:6]  # cap at 6 items
 
 
+def _group_picks_by_game(picks):
+    """Group a list of raw pick dicts by game matchup.
+
+    Returns a dict mapping matchup labels (e.g. ``'BOS @ LAL'``) to lists
+    of pick dicts.  Falls back to the player's team if no game context
+    is available.
+    """
+    import streamlit as st
+
+    groups: dict[str, list] = {}
+    todays_games = st.session_state.get("todays_games") or []
+
+    # Build team → matchup label mapping
+    team_to_game: dict[str, str] = {}
+    for g in todays_games:
+        ht = (g.get("home_team") or "").upper().strip()
+        at = (g.get("away_team") or "").upper().strip()
+        if ht and at:
+            label = f"{at} @ {ht}"
+            team_to_game[ht] = label
+            team_to_game[at] = label
+
+    for p in picks:
+        team = (
+            p.get("team", "") or p.get("player_team", "")
+        ).upper().strip()
+        matchup = team_to_game.get(team, team or "Other")
+        groups.setdefault(matchup, []).append(p)
+
+    return groups
+
+
 def _build_entry_strategy(results):
     """Build entry strategy matrix entries from top results (2–6 legs).
 
@@ -557,6 +589,7 @@ def _build_entry_strategy(results):
             "strategy":      _LEG_STRATEGIES.get(num_legs, ""),
             "reasons":       reasons,
             "raw_picks":     picks,
+            "game_groups":   _group_picks_by_game(picks),
         })
 
     return entries

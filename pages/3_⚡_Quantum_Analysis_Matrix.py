@@ -2591,17 +2591,24 @@ if analysis_results:
     st.divider()
 
     # ── 🎯 Strongly Suggested Parlays (at TOP for maximum visibility) ─
+    # Rendered via components.html() iframe to avoid WebSocket-ClosedError
+    # that occurs when large HTML payloads are sent over the Tornado
+    # WebSocket mid-rerun.
     strategy_entries = _build_entry_strategy(displayed_results)
     if strategy_entries:
         st.markdown(
             _render_parlays_header_html(),
             unsafe_allow_html=True,
         )
-        for _i, entry in enumerate(strategy_entries):
-            st.markdown(
-                _render_parlay_card_html(entry, _i),
-                unsafe_allow_html=True,
-            )
+        _parlay_cards = "".join(
+            _render_parlay_card_html(entry, _i)
+            for _i, entry in enumerate(strategy_entries)
+        )
+        _parlay_html = (
+            f'<div class="qam-parlay-container">{_parlay_cards}</div>'
+        )
+        _parlay_css = _get_qcm_css()
+        _render_card_iframe(_parlay_css + _parlay_html, len(strategy_entries))
     else:
         st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
 

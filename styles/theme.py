@@ -6557,46 +6557,154 @@ QUANTUM_CARD_MATRIX_CSS = """
     margin-bottom: 20px;
 }
 .qam-section-header-single { border: 2px solid #00f0ff; }
-.qam-section-header-parlay { border: 2px solid #ff5e00; }
+.qam-section-header-parlay {
+    border: 1px solid rgba(0, 198, 255, 0.35);
+    background: linear-gradient(135deg, #070d1a 0%, #0f1a2e 100%);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Parlay container (wraps all parlay cards) ────────────── */
+.qam-parlay-container {
+    display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── Individual Parlay Card (glassmorphic) ────────────────── */
 .qam-parlay-card {
-    background: #14192b;
-    border-radius: 8px;
-    padding: 15px 18px;
-    margin-bottom: 14px;
-    border-left: 4px solid #ff5e00;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative; overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.qam-parlay-card::before {
+    content: ''; position: absolute; top: 0; left: 0;
+    width: 4px; height: 100%; border-radius: 12px 0 0 12px;
+    background: linear-gradient(180deg, #00C6FF 0%, #0072ff 100%);
+}
+.qam-parlay-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 24px rgba(0, 198, 255, 0.12);
+    border-color: rgba(0, 198, 255, 0.25);
 }
 .qam-parlay-card-glow {
-    box-shadow: 0 0 14px rgba(255, 94, 0, 0.45);
+    border-color: rgba(0, 198, 255, 0.3);
+    box-shadow: 0 0 20px rgba(0, 198, 255, 0.15), 0 0 40px rgba(0, 198, 255, 0.05);
 }
+.qam-parlay-card-glow::before {
+    background: linear-gradient(180deg, #00ffd5 0%, #00C6FF 100%);
+}
+
+/* ── Parlay Header Row ────────────────────────────────────── */
+.qam-parlay-header {
+    display: flex; justify-content: space-between;
+    align-items: center; margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.qam-parlay-header h4 {
+    color: #e0eeff; margin: 0;
+    font-family: Orbitron, sans-serif; font-size: 0.95rem;
+}
+.qam-parlay-safe-badge {
+    background: linear-gradient(135deg, #00C6FF, #0072ff);
+    color: #fff; padding: 4px 12px;
+    border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 8px rgba(0, 198, 255, 0.25);
+}
+
+/* ── Game Group inside Parlay ─────────────────────────────── */
+.qam-parlay-game-group {
+    margin-bottom: 10px;
+}
+.qam-parlay-game-label {
+    font-size: 0.72rem; color: #00C6FF;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.8px; margin-bottom: 6px;
+    padding: 3px 8px;
+    background: rgba(0, 198, 255, 0.08);
+    border-radius: 4px; display: inline-block;
+}
+
+/* ── Individual Pick Row ──────────────────────────────────── */
 .qam-parlay-pick {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 0; margin-left: 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
+.qam-parlay-pick:last-child { border-bottom: none; }
 .qam-parlay-pick-name {
-    color: #ff5e00;
-    font-weight: 600;
+    color: #e0eeff; font-weight: 600; font-size: 0.88rem;
+    min-width: 100px;
+}
+.qam-parlay-pick-dir {
+    font-size: 0.75rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qam-parlay-pick-dir-over {
+    background: rgba(0, 255, 157, 0.12); color: #00ff9d;
+}
+.qam-parlay-pick-dir-under {
+    background: rgba(255, 107, 107, 0.12); color: #ff6b6b;
 }
 .qam-parlay-pick-detail {
-    color: #c0d0e8;
+    color: #94A3B8; font-size: 0.84rem;
 }
+.qam-parlay-pick-edge {
+    margin-left: auto; font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; color: #00C6FF;
+}
+.qam-parlay-pick-tier {
+    font-size: 0.68rem; padding: 1px 6px;
+    border-radius: 3px; font-weight: 600;
+}
+.qam-parlay-pick-tier-platinum { background: rgba(200, 0, 255, 0.15); color: #c800ff; }
+.qam-parlay-pick-tier-gold { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
+.qam-parlay-pick-tier-silver { background: rgba(176, 190, 197, 0.15); color: #b0bec5; }
+
+/* ── Reason Tags ──────────────────────────────────────────── */
 .qam-parlay-reason {
-    margin-top: 10px;
-    padding: 7px 10px;
-    background: rgba(20, 25, 43, 0.7);
-    border-radius: 4px;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
-.qam-parlay-reason-text {
-    color: #00c8ff;
-    font-size: 0.82rem;
+.qam-parlay-reason-tag {
+    font-size: 0.72rem; padding: 3px 10px;
+    background: rgba(0, 198, 255, 0.08);
+    border: 1px solid rgba(0, 198, 255, 0.15);
+    border-radius: 20px; color: #00C6FF;
+    font-family: 'JetBrains Mono', monospace;
 }
+
+/* ── Stats Footer ─────────────────────────────────────────── */
 .qam-parlay-stats {
-    display: flex;
-    gap: 18px;
-    margin-top: 8px;
-    font-size: 0.8rem;
-    color: #c0d0e8;
+    display: flex; gap: 20px; align-items: center;
+    margin-top: 10px; padding-top: 8px;
+}
+.qam-parlay-stat-item {
+    display: flex; flex-direction: column; align-items: center;
+}
+.qam-parlay-stat-val {
+    font-size: 0.88rem; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums; color: #e0eeff;
+}
+.qam-parlay-stat-label {
+    font-size: 0.68rem; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .qam-parlay-card { padding: 14px 16px; }
+    .qam-parlay-pick { flex-wrap: wrap; gap: 4px; }
+    .qam-parlay-pick-edge { margin-left: 0; }
+    .qam-parlay-stats { flex-wrap: wrap; gap: 12px; }
 }
 
 /* ── Tier count colors ────────────────────────────────────── */
@@ -6617,19 +6725,10 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qam-gold-banner h3 { color: #ffd700; font-family: Orbitron, sans-serif; margin: 0 0 4px; }
 .qam-gold-banner p  { color: #ffe082; font-size: 0.85rem; margin: 0; }
 .qam-section-header-single h3 { color: #00f0ff; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
-.qam-section-header-parlay h3 { color: #ff5e00; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
+.qam-section-header-parlay h3 { color: #00C6FF; font-family: Orbitron, sans-serif; margin: 0 0 6px; }
 .qam-section-header p { color: #a0b4d0; font-size: 0.85rem; margin: 0; }
 
-/* ── Parlay card header row ─────────────────────────────── */
-.qam-parlay-header {
-    display: flex; justify-content: space-between;
-    align-items: center; margin-bottom: 10px;
-}
-.qam-parlay-header h4 { color: #ff5e00; margin: 0; font-family: Orbitron, sans-serif; }
-.qam-parlay-safe-badge {
-    background: #ff5e00; color: #0a0f1a; padding: 3px 10px;
-    border-radius: 4px; font-size: 0.8rem; font-weight: 700;
-}
+/* ── Parlay header h4 uses parent card styles ──────────────── */
 
 /* ═══════════════════════════════════════════════════════════
    NEURAL ANALYSIS HELPERS — CSS Classes (Item 2)
