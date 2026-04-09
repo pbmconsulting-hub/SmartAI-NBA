@@ -10,6 +10,7 @@
 # ============================================================
 
 import html as _html
+import json
 import logging
 import random
 import time as _time
@@ -121,7 +122,7 @@ NBA_FUN_FACTS = (
     "Victor Wembanyama was the #1 pick in 2023 — at 7'4\" he's one of the tallest #1 picks ever.",
     "Nikola Jokić became the first center to win MVP since Shaq in 2000 when he won it in 2021.",
     "Luka Dončić recorded a 60-point triple-double in 2022 — only the second in NBA history.",
-    "Ja Morant's explosive dunking ability earned him the nickname 'Ja Morant' — yes, his real name is just that iconic.",
+    "Ja Morant recorded the highest-scoring game by a Grizzlies player with 52 points against the Spurs in 2023.",
     "The Phoenix Suns' Kevin Durant became the youngest player ever to reach 28,000 career points.",
 
     # ── Off-court & culture ──────────────────────────────────
@@ -373,7 +374,6 @@ def render_joseph_loading_screen(
     safe_status = _html.escape(status_text)
 
     # Build JSON-safe facts list (escape for JS embedding)
-    import json
     facts_json = json.dumps(facts)
 
     # Unique ID to avoid collisions if multiple loading screens exist
