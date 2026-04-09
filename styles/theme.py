@@ -6617,16 +6617,38 @@ QUANTUM_CARD_MATRIX_CSS = """
 
 /* ── Game Group inside Parlay ─────────────────────────────── */
 .qam-parlay-game-group {
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 .qam-parlay-game-label {
-    font-size: 0.72rem; color: #00C6FF;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; margin-bottom: 8px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(20, 30, 50, 0.6));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+}
+.qam-parlay-game-team {
+    display: flex; align-items: center; gap: 6px;
+}
+.qam-parlay-team-logo {
+    width: 28px; height: 28px; object-fit: contain;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 2px;
+}
+.qam-parlay-team-abbrev {
+    font-family: Orbitron, sans-serif;
+    font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.qam-parlay-team-record {
+    font-size: 0.68rem; color: #94A3B8;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.8px; margin-bottom: 6px;
-    padding: 3px 8px;
-    background: rgba(0, 198, 255, 0.08);
-    border-radius: 4px; display: inline-block;
+    font-weight: 500;
+}
+.qam-parlay-game-vs {
+    font-size: 0.65rem; color: #475569;
+    font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; padding: 0 2px;
 }
 
 /* ── Individual Pick Row ──────────────────────────────────── */

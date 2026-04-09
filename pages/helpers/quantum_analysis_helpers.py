@@ -5,8 +5,21 @@
 #          reduce page size and improve maintainability.
 # ============================================================
 import html as _html
+import re as _re
 
-from styles.theme import get_education_box_html
+from styles.theme import get_education_box_html, get_team_colors
+
+# ESPN CDN base for team logos (same as game_report_helpers)
+_ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
+_NBA_LOGO_FALLBACK = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
+_SAFE_ABBREV_RE = _re.compile(r"^[A-Za-z0-9]+$")
+
+
+def _safe_logo_url(team_abbrev: str) -> str:
+    """Return an ESPN logo URL only if the abbreviation is safe for a URL."""
+    if _SAFE_ABBREV_RE.match(str(team_abbrev)):
+        return f"{_ESPN_NBA}/{team_abbrev.lower()}.png"
+    return _NBA_LOGO_FALLBACK
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -342,11 +355,20 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
 
     picks_html = ""
     if game_groups:
-        for matchup, legs in game_groups.items():
-            safe_matchup = _html.escape(str(matchup))
+        for matchup, group_data in game_groups.items():
+            # group_data is either a dict with "picks"/"meta" (new)
+            # or a plain list of pick dicts (legacy fallback)
+            if isinstance(group_data, dict):
+                legs = group_data.get("picks", [])
+                meta = group_data.get("meta", {})
+            else:
+                legs = group_data
+                meta = {}
+
+            game_label_html = _render_game_group_label(str(matchup), meta)
             picks_html += (
                 f'<div class="qam-parlay-game-group">'
-                f'<div class="qam-parlay-game-label">🏀 {safe_matchup}</div>'
+                f'{game_label_html}'
             )
             for leg in legs:
                 picks_html += _render_single_leg_html(leg, raw_picks)
@@ -398,6 +420,67 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
         f'<span class="qam-parlay-stat-label">Legs</span>'
         f'</div>'
         f'</div>'
+        f'</div>'
+    )
+
+
+def _render_game_group_label(matchup: str, meta: dict) -> str:
+    """Render the game group header with team logos, abbreviations, and W-L records.
+
+    Parameters
+    ----------
+    matchup : str
+        Matchup label like ``'BOS @ LAL'``.
+    meta : dict
+        Game metadata with keys: ``home_team``, ``away_team``,
+        ``home_record``, ``away_record``, ``home_conf_rank``,
+        ``away_conf_rank``.  May be empty for fallback labels.
+    """
+    away_team = meta.get("away_team", "")
+    home_team = meta.get("home_team", "")
+
+    # If we have structured meta, render the rich label with logos
+    if away_team and home_team:
+        away_color, _ = get_team_colors(away_team)
+        home_color, _ = get_team_colors(home_team)
+        away_logo = _safe_logo_url(away_team)
+        home_logo = _safe_logo_url(home_team)
+        away_rec = _html.escape(meta.get("away_record", ""))
+        home_rec = _html.escape(meta.get("home_record", ""))
+        safe_away = _html.escape(away_team)
+        safe_home = _html.escape(home_team)
+
+        away_rec_html = f' <span class="qam-parlay-team-record">({away_rec})</span>' if away_rec else ""
+        home_rec_html = f' <span class="qam-parlay-team-record">({home_rec})</span>' if home_rec else ""
+
+        return (
+            f'<div class="qam-parlay-game-label">'
+            # Away team
+            f'<div class="qam-parlay-game-team">'
+            f'<img class="qam-parlay-team-logo" '
+            f'src="{away_logo}" alt="{safe_away}" '
+            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'<span class="qam-parlay-team-abbrev" style="color:{away_color};">{safe_away}</span>'
+            f'{away_rec_html}'
+            f'</div>'
+            # VS divider
+            f'<span class="qam-parlay-game-vs">@</span>'
+            # Home team
+            f'<div class="qam-parlay-game-team">'
+            f'<img class="qam-parlay-team-logo" '
+            f'src="{home_logo}" alt="{safe_home}" '
+            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'<span class="qam-parlay-team-abbrev" style="color:{home_color};">{safe_home}</span>'
+            f'{home_rec_html}'
+            f'</div>'
+            f'</div>'
+        )
+
+    # Fallback: plain text label (no game context available)
+    safe_matchup = _html.escape(matchup)
+    return (
+        f'<div class="qam-parlay-game-label">'
+        f'<span class="qam-parlay-team-abbrev" style="color:#00C6FF;">🏀 {safe_matchup}</span>'
         f'</div>'
     )
 

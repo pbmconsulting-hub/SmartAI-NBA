@@ -473,17 +473,19 @@ def _build_bonus_factors(result):
 def _group_picks_by_game(picks):
     """Group a list of raw pick dicts by game matchup.
 
-    Returns a dict mapping matchup labels (e.g. ``'BOS @ LAL'``) to lists
-    of pick dicts.  Falls back to the player's team if no game context
-    is available.
+    Returns a dict mapping matchup labels (e.g. ``'BOS @ LAL'``) to dicts
+    with ``"picks"`` (list of pick dicts) and ``"meta"`` (game metadata
+    including team abbreviations, W-L records, and conf rank).
+    Falls back to the player's team if no game context is available.
     """
     import streamlit as st
 
-    groups: dict[str, list] = {}
+    groups: dict[str, dict] = {}
     todays_games = st.session_state.get("todays_games") or []
 
-    # Build team → matchup label mapping
+    # Build team → matchup label mapping + game metadata
     team_to_game: dict[str, str] = {}
+    game_meta: dict[str, dict] = {}  # matchup_label → metadata
     for g in todays_games:
         ht = (g.get("home_team") or "").upper().strip()
         at = (g.get("away_team") or "").upper().strip()
@@ -492,12 +494,35 @@ def _group_picks_by_game(picks):
             team_to_game[ht] = label
             team_to_game[at] = label
 
+            hw = g.get("home_wins")
+            hl = g.get("home_losses")
+            aw = g.get("away_wins")
+            al = g.get("away_losses")
+            game_meta[label] = {
+                "home_team": ht,
+                "away_team": at,
+                "home_record": (
+                    f"{hw}-{hl}"
+                    if hw is not None and hl is not None and (hw > 0 or hl > 0)
+                    else ""
+                ),
+                "away_record": (
+                    f"{aw}-{al}"
+                    if aw is not None and al is not None and (aw > 0 or al > 0)
+                    else ""
+                ),
+                "home_conf_rank": g.get("home_conf_rank", 0),
+                "away_conf_rank": g.get("away_conf_rank", 0),
+            }
+
     for p in picks:
         team = (
             p.get("team", "") or p.get("player_team", "")
         ).upper().strip()
         matchup = team_to_game.get(team, team or "Other")
-        groups.setdefault(matchup, []).append(p)
+        if matchup not in groups:
+            groups[matchup] = {"picks": [], "meta": game_meta.get(matchup, {})}
+        groups[matchup]["picks"].append(p)
 
     return groups
 
