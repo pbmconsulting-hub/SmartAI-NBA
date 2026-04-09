@@ -336,13 +336,21 @@ def _build_entry_strategy(results):
     ]
     top = sorted(top, key=lambda r: r.get("confidence_score", 0), reverse=True)
 
-    def _pick_unique_players(candidates, num_legs):
-        """Return up to num_legs picks with no repeated players."""
+    def _pick_unique_players(candidates, num_legs, exclude_players=None):
+        """Return up to num_legs picks with no repeated players.
+
+        Args:
+            candidates: Sorted list of pick dicts.
+            num_legs: Max number of picks to return.
+            exclude_players: Optional set of player names to skip so that
+                each combo tier offers genuinely different picks.
+        """
+        exclude = exclude_players or set()
         seen: set = set()
         selected = []
         for r in candidates:
             pname = r.get("player_name", "")
-            if pname and pname in seen:
+            if pname and (pname in seen or pname in exclude):
                 continue
             seen.add(pname)
             selected.append(r)
@@ -350,40 +358,58 @@ def _build_entry_strategy(results):
                 break
         return selected
 
+    def _fmt(picks):
+        return [
+            f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
+            for r in picks
+        ]
+
     entries = []
+    used_players: set = set()
+
+    # ── Power Play (2-leg): highest-confidence pair ───────────
     picks2 = _pick_unique_players(top, 2)
     if len(picks2) >= 2:
         avg2 = round(sum(r.get("confidence_score", 0) for r in picks2) / 2, 1)
         entries.append({
             "combo_type": "Power Play (2)",
-            "picks": [
-                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in picks2
-            ],
+            "picks": _fmt(picks2),
             "safe_avg": f"{avg2:.1f}",
             "strategy": "Highest-confidence 2-leg.",
         })
-    picks3 = _pick_unique_players(top, 3)
+        used_players.update(r.get("player_name", "") for r in picks2)
+
+    # ── Triple Threat (3-leg): next-best 3 picks (no overlap) ─
+    # Sort remaining by edge% for variety, fall back to confidence.
+    edge_sorted = sorted(
+        top,
+        key=lambda r: abs(r.get("edge_percentage", 0)),
+        reverse=True,
+    )
+    picks3 = _pick_unique_players(edge_sorted, 3, exclude_players=used_players)
+    if len(picks3) < 3:
+        # Not enough non-overlapping picks; allow overlap but sort by edge
+        picks3 = _pick_unique_players(edge_sorted, 3)
     if len(picks3) >= 3:
         avg3 = round(sum(r.get("confidence_score", 0) for r in picks3) / 3, 1)
         entries.append({
             "combo_type": "Triple Threat (3)",
-            "picks": [
-                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in picks3
-            ],
+            "picks": _fmt(picks3),
             "safe_avg": f"{avg3:.1f}",
-            "strategy": "Top-3 picks, balanced risk.",
+            "strategy": "Best-edge 3-leg, balanced risk.",
         })
-    picks5 = _pick_unique_players(top, 5)
+        used_players.update(r.get("player_name", "") for r in picks3)
+
+    # ── Max Parlay (5-leg): diversified across remaining pool ──
+    picks5 = _pick_unique_players(top, 5, exclude_players=used_players)
+    if len(picks5) < 5:
+        # Not enough fresh players; fill from full pool
+        picks5 = _pick_unique_players(top, 5)
     if len(picks5) >= 5:
         avg5 = round(sum(r.get("confidence_score", 0) for r in picks5) / 5, 1)
         entries.append({
             "combo_type": "Max Parlay (5)",
-            "picks": [
-                f"{r['player_name']} {r['direction']} {r['line']} {r['stat_type'].title()}"
-                for r in picks5
-            ],
+            "picks": _fmt(picks5),
             "safe_avg": f"{avg5:.1f}",
             "strategy": "High ceiling, diversified 5-leg.",
         })
@@ -913,7 +939,7 @@ with _tab_report:
                         game=game,
                         analysis_results=game_results,
                     )
-                    card_height = min(6000, 2200 + max(0, n_game_props - 1) * 800)
+                    card_height = min(12000, 2200 + max(0, n_game_props - 1) * 800)
                     components.html(html_content, height=card_height, scrolling=True)
                 else:
                     # ── Key player matchups from players.csv ────────
@@ -970,7 +996,7 @@ with _tab_report:
             game=None,
             analysis_results=report_results,
         )
-        components.html(html_content, height=6200, scrolling=True)
+        components.html(html_content, height=12000, scrolling=True)
     else:
         st.info(
             "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."
