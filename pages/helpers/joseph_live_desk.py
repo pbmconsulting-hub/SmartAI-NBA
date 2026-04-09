@@ -126,32 +126,42 @@ def get_joseph_avatar_for_vibe(vibe_status: str = "") -> str:
 def render_live_desk_css() -> str:
     """Return complete CSS string for Joseph's Live Broadcast Desk."""
     return """<style>
-/* ── Joseph Live Desk — Glassmorphic Container ─────────────── */
+/* ── Joseph Live Desk — Premium Broadcast Container ─────────── */
 .joseph-live-desk{
-    background:rgba(7,10,19,0.85);
-    backdrop-filter:blur(16px);
-    -webkit-backdrop-filter:blur(16px);
-    border:1px solid rgba(255,94,0,0.3);
-    border-radius:16px;
-    padding:24px 28px;
+    background:linear-gradient(145deg,rgba(7,10,19,0.92) 0%,rgba(15,23,42,0.88) 50%,rgba(7,10,19,0.92) 100%);
+    backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    border:1px solid rgba(255,94,0,0.25);
+    border-radius:20px;
+    padding:28px 32px 20px;
     margin:24px 0;
     position:relative;
     overflow:hidden;
-    box-shadow:0 0 40px rgba(255,94,0,0.08),inset 0 1px 0 rgba(255,158,0,0.1);
+    box-shadow:
+        0 0 50px rgba(255,94,0,0.06),
+        0 0 100px rgba(0,198,255,0.03),
+        inset 0 1px 0 rgba(255,158,0,0.12),
+        inset 0 -1px 0 rgba(0,198,255,0.05);
 }
-/* Top broadcast bar */
+/* Top broadcast bar — gradient shimmer */
 .joseph-live-desk::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,#ff5e00,#ff9e00,#ff5e00);
+    background:linear-gradient(90deg,transparent,#ff5e00,#ff9e00,#ff5e00,transparent);
     background-size:200% 100%;
-    animation:josephShimmer 3s linear infinite;
+    animation:josephShimmer 4s linear infinite;
 }
 /* Bottom broadcast bar */
 .joseph-live-desk::after{
-    content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,#ff9e00,#ff5e00,#ff9e00);
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    background:linear-gradient(90deg,transparent,#ff5e0060,#00C6FF40,#ff5e0060,transparent);
     background-size:200% 100%;
-    animation:josephShimmer 3s linear infinite reverse;
+    animation:josephShimmer 4s linear infinite reverse;
+}
+/* Subtle corner glow accents */
+.joseph-live-desk>*:first-child::before{
+    content:'';position:absolute;top:0;left:0;width:120px;height:120px;
+    background:radial-gradient(circle,rgba(255,94,0,0.06) 0%,transparent 70%);
+    pointer-events:none;z-index:0;
 }
 @keyframes josephShimmer{
     0%{background-position:-200% 0}
@@ -164,11 +174,11 @@ def render_live_desk_css() -> str:
     background:#ff2020;border-radius:50%;
     margin-right:8px;vertical-align:middle;
     animation:josephLivePulse 1.4s ease-in-out infinite;
-    box-shadow:0 0 6px rgba(255,32,32,0.6);
+    box-shadow:0 0 8px rgba(255,32,32,0.6);
 }
 @keyframes josephLivePulse{
-    0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 6px rgba(255,32,32,0.6)}
-    50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 2px rgba(255,32,32,0.3)}
+    0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 8px rgba(255,32,32,0.6)}
+    50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 3px rgba(255,32,32,0.3)}
 }
 
 /* ── Typing Indicator — 3 bouncing dots ───────────────────── */
@@ -187,116 +197,129 @@ def render_live_desk_css() -> str:
 
 /* ── Joseph Avatar Circle ─────────────────────────────────── */
 .joseph-avatar{
-    width:64px;height:64px;border-radius:50%;
-    border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15);
+    width:72px;height:72px;border-radius:50%;
+    border:3px solid #ff5e00;object-fit:cover;
+    box-shadow:
+        0 0 16px rgba(255,94,0,0.4),
+        0 0 32px rgba(255,94,0,0.15),
+        0 0 48px rgba(255,94,0,0.06);
     flex-shrink:0;
     animation:josephAvatarGlow 3s ease-in-out infinite;
 }
 @keyframes josephAvatarGlow{
-    0%,100%{box-shadow:0 0 12px rgba(255,94,0,0.35),0 0 24px rgba(255,94,0,0.15)}
-    50%{box-shadow:0 0 18px rgba(255,94,0,0.55),0 0 36px rgba(255,94,0,0.2)}
+    0%,100%{box-shadow:0 0 16px rgba(255,94,0,0.4),0 0 32px rgba(255,94,0,0.15)}
+    50%{box-shadow:0 0 24px rgba(255,94,0,0.6),0 0 48px rgba(255,94,0,0.2)}
 }
 .joseph-avatar-sm{width:48px;height:48px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 8px rgba(255,94,0,0.25);flex-shrink:0}
 
 /* ── Broadcast Header Row ─────────────────────────────────── */
-.joseph-header{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.joseph-header{
+    display:flex;align-items:center;gap:18px;
+    margin-bottom:20px;
+    padding-bottom:16px;
+    border-bottom:1px solid rgba(255,94,0,0.12);
+}
 .joseph-header-text{
-    font-family:'Orbitron',sans-serif;font-size:1.25rem;
-    color:#ff5e00;font-weight:700;letter-spacing:0.5px;
-    text-shadow:0 0 12px rgba(255,94,0,0.3);
+    font-family:'Orbitron',sans-serif;font-size:1.2rem;
+    color:#ff5e00;font-weight:700;letter-spacing:0.8px;
+    text-shadow:0 0 16px rgba(255,94,0,0.3);
+    display:flex;align-items:center;gap:8px;
 }
 .joseph-subtitle{
-    color:#94a3b8;font-size:0.85rem;margin-top:2px;
+    color:#94a3b8;font-size:0.82rem;margin-top:4px;
     font-family:'Montserrat',sans-serif;letter-spacing:0.3px;
 }
 
 /* ── Broadcast Segment Cards ──────────────────────────────── */
 .joseph-segment{
-    background:rgba(15,23,42,0.7);
+    background:linear-gradient(135deg,rgba(15,23,42,0.75) 0%,rgba(7,10,19,0.6) 100%);
     backdrop-filter:blur(8px);
     -webkit-backdrop-filter:blur(8px);
-    border:1px solid rgba(255,94,0,0.15);
+    border:1px solid rgba(255,94,0,0.12);
     border-left:3px solid rgba(255,94,0,0.5);
-    border-radius:12px;padding:18px 22px;
-    margin-bottom:14px;
+    border-radius:14px;padding:16px 20px;
+    margin-bottom:12px;
     transition:all 0.25s ease;
 }
 .joseph-segment:hover{
-    border-color:rgba(255,94,0,0.45);
+    border-color:rgba(255,94,0,0.35);
     transform:translateY(-1px);
-    box-shadow:0 4px 20px rgba(255,94,0,0.1);
+    box-shadow:0 4px 24px rgba(255,94,0,0.08);
 }
 
 .joseph-segment-title{
     font-family:'Orbitron',sans-serif;
-    color:#ff5e00;font-size:1rem;font-weight:600;
-    margin-bottom:10px;letter-spacing:0.5px;
-    text-shadow:0 0 8px rgba(255,94,0,0.15);
+    color:#ff5e00;font-size:0.92rem;font-weight:600;
+    margin-bottom:8px;letter-spacing:0.6px;
+    text-shadow:0 0 10px rgba(255,94,0,0.15);
+    display:flex;align-items:center;gap:8px;
+    flex-wrap:wrap;
 }
 .joseph-segment-body{
-    color:#e2e8f0;font-size:0.92rem;
-    line-height:1.65;font-family:'Montserrat',sans-serif;
+    color:#e2e8f0;font-size:0.9rem;
+    line-height:1.7;font-family:'Montserrat',sans-serif;
 }
 .joseph-segment-body strong{color:#ff9e00}
 
 /* ── Verdict Badges ───────────────────────────────────────── */
 .joseph-verdict{
-    display:inline-block;padding:3px 12px;border-radius:6px;
-    font-family:'Orbitron',sans-serif;font-size:0.75rem;
+    display:inline-block;padding:4px 14px;border-radius:8px;
+    font-family:'Orbitron',sans-serif;font-size:0.72rem;
     font-weight:700;letter-spacing:0.8px;margin-right:8px;
     vertical-align:middle;
-    text-shadow:0 0 6px currentColor;
+    text-shadow:0 0 8px currentColor;
     transition:transform 0.15s ease;
 }
 .joseph-verdict:hover{transform:scale(1.05)}
-.joseph-verdict-smash{background:rgba(239,68,68,0.25);color:#ff4444;border:1px solid rgba(239,68,68,0.4);box-shadow:0 0 8px rgba(239,68,68,0.15)}
-.joseph-verdict-lean{background:rgba(34,197,94,0.2);color:#22c55e;border:1px solid rgba(34,197,94,0.35);box-shadow:0 0 8px rgba(34,197,94,0.12)}
-.joseph-verdict-fade{background:rgba(234,179,8,0.2);color:#eab308;border:1px solid rgba(234,179,8,0.35);box-shadow:0 0 8px rgba(234,179,8,0.12)}
-.joseph-verdict-stay_away{background:rgba(107,114,128,0.25);color:#9ca3af;border:1px solid rgba(107,114,128,0.35)}
+.joseph-verdict-smash{background:rgba(239,68,68,0.2);color:#ff4444;border:1px solid rgba(239,68,68,0.35);box-shadow:0 0 10px rgba(239,68,68,0.15)}
+.joseph-verdict-lean{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);box-shadow:0 0 10px rgba(34,197,94,0.12)}
+.joseph-verdict-fade{background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);box-shadow:0 0 10px rgba(234,179,8,0.12)}
+.joseph-verdict-stay_away{background:rgba(107,114,128,0.2);color:#9ca3af;border:1px solid rgba(107,114,128,0.3)}
 
 /* ── Dawg Board Table ─────────────────────────────────────── */
 .joseph-dawg-table{
     width:100%;border-collapse:separate;border-spacing:0;
     font-family:'Montserrat',sans-serif;font-size:0.85rem;
+    border-radius:10px;overflow:hidden;
 }
 .joseph-dawg-table th{
-    background:rgba(255,94,0,0.12);color:#ff5e00;
+    background:rgba(255,94,0,0.10);color:#ff5e00;
     padding:10px 14px;text-align:left;
-    font-family:'Orbitron',sans-serif;font-size:0.75rem;
-    letter-spacing:0.5px;border-bottom:1px solid rgba(255,94,0,0.25);
+    font-family:'Orbitron',sans-serif;font-size:0.72rem;
+    letter-spacing:0.5px;border-bottom:1px solid rgba(255,94,0,0.2);
 }
 .joseph-dawg-table td{
     padding:8px 14px;color:#e2e8f0;
-    border-bottom:1px solid rgba(148,163,184,0.1);
+    border-bottom:1px solid rgba(148,163,184,0.08);
     transition:background 0.15s ease;
 }
-.joseph-dawg-table tr:hover td{background:rgba(255,94,0,0.06)}
+.joseph-dawg-table tr:hover td{background:rgba(255,94,0,0.05)}
 
 /* ── Override Report Table ────────────────────────────────── */
 .joseph-override-table{
     width:100%;border-collapse:separate;border-spacing:0;
     font-family:'Montserrat',sans-serif;font-size:0.85rem;
+    border-radius:10px;overflow:hidden;
 }
 .joseph-override-table th{
-    background:rgba(0,240,255,0.08);color:#00f0ff;
+    background:rgba(0,240,255,0.06);color:#00f0ff;
     padding:10px 14px;text-align:left;
-    font-family:'Orbitron',sans-serif;font-size:0.75rem;
-    letter-spacing:0.5px;border-bottom:1px solid rgba(0,240,255,0.2);
+    font-family:'Orbitron',sans-serif;font-size:0.72rem;
+    letter-spacing:0.5px;border-bottom:1px solid rgba(0,240,255,0.15);
 }
 .joseph-override-table td{
     padding:8px 14px;color:#e2e8f0;
-    border-bottom:1px solid rgba(148,163,184,0.1);
+    border-bottom:1px solid rgba(148,163,184,0.08);
     transition:background 0.15s ease;
 }
-.joseph-override-table tr:hover td{background:rgba(0,240,255,0.04)}
+.joseph-override-table tr:hover td{background:rgba(0,240,255,0.03)}
 
 /* ── Nerd Stats Toggle ────────────────────────────────────── */
 .joseph-nerd-stats{
-    background:rgba(7,10,19,0.6);border:1px solid rgba(148,163,184,0.15);
-    border-radius:8px;padding:14px 18px;margin-top:10px;
+    background:rgba(7,10,19,0.6);border:1px solid rgba(148,163,184,0.12);
+    border-radius:10px;padding:14px 18px;margin-top:10px;
     font-family:'JetBrains Mono',monospace;font-size:0.78rem;
     color:#94a3b8;line-height:1.6;
     font-variant-numeric:tabular-nums;
@@ -443,9 +466,14 @@ def render_dawg_board(joseph_results: list) -> None:
     """Render top-10 players by dawg_factor as an HTML leaderboard with bet info."""
     html = _build_dawg_board_html(joseph_results)
     if html:
+        st.markdown(
+            render_broadcast_segment({
+                "title": "🐕 THE DAWG BOARD",
+                "body": "",
+            }),
+            unsafe_allow_html=True,
+        )
         st.markdown(html, unsafe_allow_html=True)
-    else:
-        st.info("No Dawg Factor data available yet.")
 
 
 # ═════════════════════════════════════════════════════════════
@@ -456,12 +484,15 @@ def render_override_report(joseph_results: list) -> None:
     """Render override table when Joseph disagreed with the QME."""
     overrides = [r for r in joseph_results if r.get("is_override")]
     if not overrides:
-        st.markdown(
-            '<p style="color:#94a3b8;font-style:italic;">No overrides tonight — '
-            'Joseph and the Quantum Matrix Engine agree across the board.</p>',
-            unsafe_allow_html=True,
-        )
         return
+
+    st.markdown(
+        render_broadcast_segment({
+            "title": "⚡ OVERRIDE REPORT",
+            "body": "",
+        }),
+        unsafe_allow_html=True,
+    )
 
     rows_html = ""
     for r in overrides:
@@ -1051,24 +1082,12 @@ def render_joseph_live_desk(
         # SEGMENT 7 — Dawg Board
         # ─────────────────────────────────────────────────────
         if joseph_results:
-            st.markdown(
-                '<div class="joseph-segment">'
-                '<div class="joseph-segment-title">🐕 THE DAWG BOARD</div>'
-                '</div>',
-                unsafe_allow_html=True,
-            )
             render_dawg_board(joseph_results)
 
         # ─────────────────────────────────────────────────────
         # SEGMENT 8 — Override Report
         # ─────────────────────────────────────────────────────
         overrides = [r for r in joseph_results if r.get("is_override")]
-        st.markdown(
-            '<div class="joseph-segment">'
-            '<div class="joseph-segment-title">⚡ OVERRIDE REPORT</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
         render_override_report(joseph_results)
 
         # ─────────────────────────────────────────────────────
