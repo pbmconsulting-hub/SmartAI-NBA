@@ -1,1 +1,1 @@
-"""api/routes – Route modules for SmartAI-NBA API."""
+"""api/routes – Route modules for Smart Pick Pro API."""

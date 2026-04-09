@@ -1,7 +1,7 @@
 """
 scripts/setup_db.py
 ====================
-Creates (or verifies) the SQLite schema for SmartAI-NBA's ETL database.
+Creates (or verifies) the SQLite schema for Smart Pick Pro's ETL database.
 
 Database path: db/etl_data.db (relative to repo root)
 

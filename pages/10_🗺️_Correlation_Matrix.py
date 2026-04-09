@@ -1,7 +1,7 @@
 # ============================================================
 # FILE: pages/10_🗺️_Correlation_Matrix.py
 # PURPOSE: Visualize pairwise Pearson correlations between
-#          players' Monte Carlo simulation arrays.  Renders an
+#          players' Quantum Matrix simulation arrays.  Renders an
 #          interactive Plotly heatmap with the Quantum
 #          Institutional aesthetic plus parlay-impact and
 #          correlation-adjusted Kelly panels.
@@ -54,7 +54,7 @@ from engine.math_helpers import clamp_probability
 st.title("🗺️ Correlation Matrix")
 st.markdown(
     '<p style="color:#94a3b8;font-size:0.9rem;">'
-    "Pairwise Pearson correlations between players' Monte Carlo "
+    "Pairwise Pearson correlations between players' Quantum Matrix "
     "simulation distributions.  Positive correlation means their "
     "outcomes tend to move together; negative means they diverge."
     "</p>",

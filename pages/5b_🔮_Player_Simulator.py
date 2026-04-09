@@ -82,7 +82,7 @@ st.markdown(
 with st.expander("📖 How to Use the Player Simulator", expanded=False):
     st.markdown("""
 ### What This Page Does
-The Player Simulator runs the **Quantum Matrix Engine 5.6** Monte Carlo
+The Player Simulator runs the **Quantum Matrix Engine 5.6** Quantum Matrix
 simulation for any player you select, projecting their **full stat line**
 (points, rebounds, assists, steals, blocks, turnovers, and threes) for
 tonight's game.  It automatically flags **dark horse** upside picks —
@@ -99,7 +99,7 @@ the market line.
 3. **Review Context** — the simulator auto-detects the opponent, home/away
    status, game total, and spread for accurate projections.
 4. **Run Simulation** — click **Simulate** to generate thousands of
-   Monte Carlo iterations per stat category.
+   Quantum Matrix iterations per stat category.
 5. **Read Results** — each stat shows a distribution chart plus summary
    metrics (median, mean, floor, ceiling, standard deviation).
 

@@ -57,7 +57,7 @@ def get_logo_img_tag(logo_path, width=20, alt="logo"):
 # ============================================================
 
 GLOSSARY = {
-    "Monte Carlo Simulation": (
+    "Quantum Matrix Simulation": (
         "We simulate thousands of possible game outcomes using the player's historical "
         "stats, matchup data, and current conditions. The percentage you see reflects "
         "how often the player hit the target across all those simulations."
@@ -3453,7 +3453,7 @@ def get_game_report_html(game=None, analysis_results=None):
         <span class="qds-metric-score">{ss:.1f}</span>
       </div>
       <p class="qds-metric-justification">
-        Monte Carlo simulation: <strong style="color:var(--qds-primary);">{int(prob_pct)}%
+        Quantum Matrix simulation: <strong style="color:var(--qds-primary);">{int(prob_pct)}%
         hit rate</strong> across 1,000+ game scenarios.
       </p>
     </div>
@@ -3761,7 +3761,7 @@ def get_game_report_html(game=None, analysis_results=None):
         <div>
           <h3 class="qds-section-title"><i class="fas fa-chart-network"></i> KEY MATCHUP INSIGHTS</h3>
           <p class="qds-matchup-text">
-            SmartBetPro's Quantum Matrix Engine 5.6 has run 1,000+ Monte Carlo simulations for this matchup.
+            SmartBetPro's Quantum Matrix Engine 5.6 has run 1,000+ Quantum Matrix simulations for this matchup.
             The top-ranked props below reflect the strongest signal-to-noise ratio across all analysed players —
             each selected based on edge vs the posted line, recent form, and matchup-specific factors.
           </p>
@@ -3846,7 +3846,7 @@ def get_game_report_html(game=None, analysis_results=None):
           <i class="fas fa-project-diagram qds-logic-icon"></i>
           <div class="qds-logic-text">
             <strong>Causal-Driven Picks Only</strong> — No trend chasing. Every pick has layered
-            justification with clear cause-effect relationships backed by Monte Carlo simulation.
+            justification with clear cause-effect relationships backed by Quantum Matrix simulation.
           </div>
         </div>
         <div class="qds-logic-item">
@@ -3885,7 +3885,7 @@ def get_game_report_html(game=None, analysis_results=None):
         <div class="qds-final-word">
           <p class="qds-final-text">
             "These aren't locks — they're engineered plays. Built with matchup logic, stress-tested
-            through 1,000+ Monte Carlo simulations, and reinforced with real market edge.
+            through 1,000+ Quantum Matrix simulations, and reinforced with real market edge.
             The Quantum Matrix Engine 5.6 has identified {len(top_picks)} high-probability props for
             {_html.escape(matchup_label)}, each with a SAFE Score™ of {_ss(top_picks[0].get('confidence_score', 75)) if top_picks else '—'}/10 or better.
             Play disciplined, size appropriately, and trust the process."
@@ -4517,7 +4517,7 @@ def get_qds_framework_logic_html():
         str: HTML string.
     """
     items = [
-        ("🧮", "Monte Carlo Simulation",
+        ("🧮", "Quantum Matrix Simulation",
          "We run 2,000+ simulated game outcomes per player, drawing from a "
          "normal distribution centered on the adjusted projection."),
         ("📐", "Projection Engine",

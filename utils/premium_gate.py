@@ -183,7 +183,7 @@ def premium_gate(feature_name: str) -> bool:
     <li>Full Entry Builder — optimal parlay construction with EV</li>
     <li>Risk Shield — avoid bad bets before they cost you</li>
     <li>Complete Game Reports — AI-generated matchup breakdowns</li>
-    <li>Player Simulator — deep Monte Carlo stat projections</li>
+    <li>Player Simulator — deep Quantum Matrix stat projections</li>
     <li>Bet Tracker — track ROI, model health &amp; auto-resolve</li>
   </ul>
   <p class="gate-price-tag">💳 Affordable Monthly Plan</p>

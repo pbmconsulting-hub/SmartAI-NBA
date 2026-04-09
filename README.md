@@ -1,8 +1,8 @@
-# 🏀 SmartAI-NBA v7
+# 🏀 Smart Pick Pro v7
 
 **Your Personal NBA Prop Betting Analysis Engine — Built Locally, No APIs Needed**
 
-SmartAI-NBA v7 is a local web app (Streamlit) that analyzes PrizePicks, Underdog Fantasy,
+Smart Pick Pro v7 is a local web app (Streamlit) that analyzes PrizePicks, Underdog Fantasy,
 and DraftKings Pick6 props to find the highest-probability bets using Quantum Matrix Engine 5.6 simulation
 and directional force analysis. All math is built from scratch — no external libraries except Streamlit.
 
@@ -109,20 +109,20 @@ Verify: `python3.12 --version` should show `Python 3.12.x`
 
 ### Step 3: Navigate to the App Folder
 
-Use the `cd` command to go to the folder where you downloaded/extracted SmartAI-NBA.
+Use the `cd` command to go to the folder where you downloaded/extracted Smart Pick Pro.
 
 **Windows examples:**
 ```powershell
-cd C:\Users\YourName\Downloads\SmartAI-NBA
+cd C:\Users\YourName\Downloads\Smart Pick Pro
 # or
-cd "$env:USERPROFILE\Documents\SmartAI-NBA"
+cd "$env:USERPROFILE\Documents\Smart Pick Pro"
 ```
 
 **Mac / Linux examples:**
 ```bash
-cd ~/Downloads/SmartAI-NBA
+cd ~/Downloads/Smart Pick Pro
 # or
-cd ~/Documents/SmartAI-NBA
+cd ~/Documents/Smart Pick Pro
 ```
 
 > **💡 Tip:** You can drag the folder from File Explorer / Finder into the terminal window to paste the full path.
@@ -166,7 +166,7 @@ source .venv/bin/activate
 ```
 
 > **✅ How to tell it worked:** Your terminal prompt should now start with `(.venv)`.
-> Example: `(.venv) PS C:\Users\YourName\SmartAI-NBA>`
+> Example: `(.venv) PS C:\Users\YourName\Smart Pick Pro>`
 
 > **⚠️ PowerShell execution policy error?** If you see "running scripts is disabled on this system", run this first:
 > ```powershell
@@ -329,7 +329,7 @@ Every time you want to use the app:
 
 ```bash
 # 1. Open a terminal and navigate to the project folder
-cd path/to/SmartAI-NBA
+cd path/to/Smart Pick Pro
 
 # 2. Activate the virtual environment
 # Windows PowerShell:
@@ -369,7 +369,7 @@ The app will be available at **http://localhost:8501** and the API at **http://l
 ## 📁 App Structure
 
 ```
-SmartAI-NBA/
+Smart Pick Pro/
 ├── app.py                              # Main entry point — home dashboard
 ├── bootstrap.py                        # First-run ETL bootstrap
 ├── webhook_server.py                   # Stripe webhook server
@@ -613,7 +613,7 @@ Premium subscription management powered by Stripe.
 
 ## 🔴 Live NBA Data
 
-SmartAI-NBA uses **real, up-to-date NBA stats** from the **nba_api** Python package and
+Smart Pick Pro uses **real, up-to-date NBA stats** from the **nba_api** Python package and
 prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
 
 ### Setup

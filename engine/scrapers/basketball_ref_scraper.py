@@ -13,7 +13,7 @@ _BASE_URL = "https://www.basketball-reference.com"
 _DELAY = 3.0  # seconds between requests
 _MAX_RETRIES = 3
 _USER_AGENT = (
-    "Mozilla/5.0 (compatible; SmartAI-NBA/1.0; +https://github.com/pbmconsulting-hub/SmartAI-NBA)"
+    "Mozilla/5.0 (compatible; Smart Pick Pro/1.0; +https://github.com/pbmconsulting-hub/Smart Pick Pro)"
 )
 
 try:

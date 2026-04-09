@@ -385,14 +385,14 @@ def calculate_fractional_kelly(model_prob, book_odds, multiplier=0.25):
 
 def calculate_fair_odds_from_simulation(sim_array, target_line, direction="OVER"):
     """
-    Calculate fair-value American odds from a Monte Carlo simulation array.
+    Calculate fair-value American odds from a Quantum Matrix simulation array.
 
     Counts the proportion of simulated outcomes that satisfy the target
     condition and converts the resulting probability to American odds.
 
     Args:
         sim_array (list of float): Raw simulated stat values from the
-            Monte Carlo engine (typically 1,000 runs).
+            Quantum Matrix engine (typically 1,000 runs).
         target_line (float): The prop line to evaluate against.
         direction (str): ``"OVER"`` counts results > target_line;
             ``"UNDER"`` counts results <= target_line.
@@ -661,7 +661,7 @@ def calculate_dfs_parlay_ev_from_sim(
 
     Args:
         model_probability (float): Model's win probability for the
-            chosen direction (0.0–1.0), as output by the Monte Carlo
+            chosen direction (0.0–1.0), as output by the Quantum Matrix
             simulation (e.g. ``simulation_output["probability_over"]``).
         platform (str): ``"PrizePicks"``, ``"Underdog"``, or
             ``"DraftKings"``.  Default ``"PrizePicks"``.

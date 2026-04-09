@@ -1,1 +1,1 @@
-# Tests package for SmartAI-NBA engine enhancements
+# Tests package for Smart Pick Pro engine enhancements

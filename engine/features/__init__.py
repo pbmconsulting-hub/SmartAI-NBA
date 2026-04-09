@@ -1,4 +1,4 @@
-"""engine/features – Derived feature computation for SmartAI-NBA."""
+"""engine/features – Derived feature computation for Smart Pick Pro."""
 from engine.features.team_metrics import (
     calculate_possessions,
     calculate_offensive_rating,

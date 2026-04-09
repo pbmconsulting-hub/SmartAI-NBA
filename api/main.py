@@ -1,4 +1,4 @@
-"""api/main.py – FastAPI application entry point for SmartAI-NBA."""
+"""api/main.py – FastAPI application entry point for Smart Pick Pro."""
 import datetime
 from contextlib import asynccontextmanager
 from utils.logger import get_logger
@@ -18,18 +18,18 @@ if _FASTAPI_AVAILABLE:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """Warm caches on startup; release resources on shutdown."""
-        _logger.info("SmartAI-NBA API starting up — warming caches")
+        _logger.info("Smart Pick Pro API starting up — warming caches")
         try:
             from utils.cache import cache_set
             cache_set("startup_ts", datetime.datetime.utcnow().isoformat(), tier="static")
         except Exception as exc:
             _logger.debug("Cache warm failed: %s", exc)
         yield
-        _logger.info("SmartAI-NBA API shutting down")
+        _logger.info("Smart Pick Pro API shutting down")
 
     app = FastAPI(
-        title="SmartAI-NBA API",
-        description="Prediction and stats API for SmartAI-NBA",
+        title="Smart Pick Pro API",
+        description="Prediction and stats API for Smart Pick Pro",
         version="1.0.0",
         lifespan=lifespan,
     )

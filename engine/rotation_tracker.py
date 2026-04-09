@@ -1,5 +1,5 @@
 # engine/rotation_tracker.py
-# Lineup and rotation tracking for SmartAI-NBA.
+# Lineup and rotation tracking for Smart Pick Pro.
 # Detects minutes trends, role changes (starter/bench), and
 # provides a minutes trend factor for projection adjustments.
 # Standard library only — no numpy/scipy/pandas.

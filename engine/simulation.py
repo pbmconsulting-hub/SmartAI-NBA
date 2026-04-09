@@ -1951,7 +1951,7 @@ def run_sensitivity_analysis(
         projected_stat_average: Player season average for the stat.
         stat_standard_deviation: Standard deviation of stat across games.
         prop_line: The betting line (over/under threshold).
-        number_of_simulations: Number of Monte Carlo iterations per run.
+        number_of_simulations: Number of Quantum Matrix iterations per run.
         blowout_risk_factor: Base blowout risk (0–1).
         pace_adjustment_factor: Base pace multiplier.
         matchup_adjustment_factor: Base matchup multiplier.

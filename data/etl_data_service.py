@@ -2,7 +2,7 @@
 data/etl_data_service.py
 =========================
 Bridge between the ETL SQLite database (db/smartpicks.db) and
-SmartAI-NBA's data layer.
+Smart Pick Pro's data layer.
 
 All functions connect to the database read-only for queries and return
 plain Python dicts/lists.  No live API calls are made here — those happen

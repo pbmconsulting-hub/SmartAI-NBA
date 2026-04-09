@@ -1,5 +1,5 @@
 # utils/logger.py
-# Structured logging configuration for SmartAI-NBA.
+# Structured logging configuration for Smart Pick Pro.
 # Sets up a module-aware logger with console and rotating file handlers.
 
 import logging
