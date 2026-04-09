@@ -868,6 +868,128 @@ class TestJosephQuickTakeImplementation(unittest.TestCase):
         self.assertIsInstance(r2, str)
 
 
+class TestAskJosephAnswerQuestion(unittest.TestCase):
+    """Tests for the fully-built-out _joseph_answer_question via joseph_quick_take."""
+
+    _RESULTS = [
+        {"player_name": "LeBron James", "team": "LAL", "stat_type": "points",
+         "verdict": "SMASH", "joseph_edge": 8.5, "direction": "OVER",
+         "prop_line": 25.5, "rant": "King James is ON tonight!",
+         "db_trend": "surging", "hit_rate": 82},
+        {"player_name": "Steph Curry", "team": "GSW", "stat_type": "threes",
+         "verdict": "LEAN", "joseph_edge": 4.2, "direction": "OVER",
+         "prop_line": 3.5, "rant": "Splash Brother doing splash things."},
+        {"player_name": "Nikola Jokic", "team": "DEN", "stat_type": "assists",
+         "verdict": "SMASH", "joseph_edge": 7.1, "direction": "OVER",
+         "prop_line": 8.5, "rant": "The Joker runs the show!"},
+    ]
+    _GAMES = [
+        {"home_team": "LAL", "away_team": "GSW", "spread": "-3.5", "total": "224.5"},
+        {"home_team": "DEN", "away_team": "MIA", "spread": "-6", "total": "218.5"},
+    ]
+
+    def _ask(self, question):
+        from engine.joseph_brain import joseph_quick_take, reset_fragment_state
+        reset_fragment_state()
+        return joseph_quick_take(
+            self._RESULTS, {}, self._GAMES,
+            context=f"user_question: {question}",
+        )
+
+    def test_player_prop_lookup(self):
+        r = self._ask("What about LeBron?")
+        self.assertIn("LeBron", r)
+        self.assertIn("SMASH", r)
+
+    def test_player_by_last_name(self):
+        r = self._ask("Tell me about Curry")
+        self.assertIn("Curry", r)
+
+    def test_best_bets_question(self):
+        r = self._ask("What should I bet?")
+        self.assertIn("LeBron", r)
+        self.assertIn("SMASH", r)
+
+    def test_schedule_question(self):
+        r = self._ask("What games are on tonight?")
+        self.assertIn("2 games", r)
+        self.assertIn("LAL", r)
+
+    def test_game_question(self):
+        r = self._ask("How does the GSW at LAL game look?")
+        # May route to player (LAL matches LeBron's team) or game;
+        # either way it should reference LAL or GSW context.
+        self.assertTrue("LAL" in r or "GSW" in r or "LeBron" in r)
+
+    def test_game_question_alias(self):
+        r = self._ask("Tell me about the lakers game")
+        self.assertIn("LAL", r)
+
+    def test_comparison(self):
+        r = self._ask("LeBron or Jokic?")
+        self.assertIn("LeBron", r)
+        self.assertIn("Jokic", r)
+
+    def test_goat_question(self):
+        r = self._ask("Who is the GOAT?")
+        self.assertIn("Jordan", r)
+
+    def test_app_features(self):
+        r = self._ask("What can you do?")
+        self.assertIn("Neural Analysis", r)
+
+    def test_who_are_you(self):
+        r = self._ask("Who are you?")
+        self.assertIn("Joseph M. Smith", r)
+
+    def test_hello_greeting(self):
+        r = self._ask("Hello!")
+        self.assertIn("Joseph M. Smith", r)
+
+    def test_track_record_question(self):
+        r = self._ask("How are you doing?")
+        self.assertIsInstance(r, str)
+        self.assertTrue(len(r) > 30)
+
+    def test_yesterday_question(self):
+        r = self._ask("How'd you do yesterday?")
+        self.assertIsInstance(r, str)
+        self.assertTrue(len(r) > 30)
+
+    def test_mvp_question(self):
+        r = self._ask("Who should be MVP?")
+        self.assertIn("MVP", r)
+
+    def test_player_trend(self):
+        r = self._ask("How has Steph been playing?")
+        self.assertIn("Curry", r)
+
+    def test_best_team(self):
+        r = self._ask("Who is the best team?")
+        self.assertIn("DEFENSE", r)
+
+    def test_over_under(self):
+        r = self._ask("Tell me about over under")
+        self.assertIn("Over/Under", r)
+
+    def test_empty_data_fallback(self):
+        from engine.joseph_brain import joseph_quick_take, reset_fragment_state
+        reset_fragment_state()
+        r = joseph_quick_take([], {}, [], context="user_question: Random stuff")
+        self.assertIsInstance(r, str)
+        self.assertTrue(len(r) > 30)
+
+    def test_injury_question(self):
+        r = self._ask("Is LeBron hurt?")
+        self.assertIn("LeBron", r)
+
+    def test_generic_fallback_with_data(self):
+        r = self._ask("What about the weather today?")
+        # Should fall through to generic slate summary
+        self.assertIsInstance(r, str)
+        self.assertTrue(len(r) > 30)
+
+
 class TestJosephGetAmbientContextImplementation(unittest.TestCase):
     def test_idle_default(self):
         from engine.joseph_brain import joseph_get_ambient_context
