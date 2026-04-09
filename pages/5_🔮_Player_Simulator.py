@@ -964,6 +964,12 @@ if run_sim and selected_names:
         _all_sim_results = []
         _total_players = len(selected_names)
         _players_done = 0
+        # ── Joseph Loading Screen — NBA fun facts while simulation runs ──
+        try:
+            from utils.joseph_loading import joseph_loading_placeholder
+            _joseph_sim_loader = joseph_loading_placeholder("Running Player Simulation")
+        except Exception:
+            _joseph_sim_loader = None
         _progress_bar = st.progress(0, text="🏀 Initializing simulation…")
 
         for _p_idx, pname in enumerate(selected_names):
@@ -1011,12 +1017,23 @@ if run_sim and selected_names:
             )
 
         _progress_bar.empty()
+        # Dismiss the Joseph loading screen
+        if _joseph_sim_loader is not None:
+            try:
+                _joseph_sim_loader.empty()
+            except Exception:
+                pass
 
     except Exception as _sim_err:
         _sim_err_str = str(_sim_err)
         if "WebSocketClosedError" not in _sim_err_str and "StreamClosedError" not in _sim_err_str:
             st.error(f"❌ Simulation failed: {_sim_err}")
         _all_sim_results = []
+        if _joseph_sim_loader is not None:
+            try:
+                _joseph_sim_loader.empty()
+            except Exception:
+                pass
 
     # Enhancement 11: Save to session history
     if _all_sim_results:

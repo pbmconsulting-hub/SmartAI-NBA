@@ -1224,6 +1224,12 @@ with _tab_builder:
             _t0_gb = time.time()
 
             with st.status("🏗️ Running Game Builder Simulation...", expanded=True) as _gb_status:
+                # ── Joseph Loading Screen — NBA fun facts while Game Builder runs ──
+                try:
+                    from utils.joseph_loading import joseph_loading_placeholder
+                    _joseph_gb_loader = joseph_loading_placeholder("Building Game Report")
+                except Exception:
+                    _joseph_gb_loader = None
                 # Step 1: Load engine data
                 st.write("⚙️ Loading engine data...")
                 _defensive_ratings_gb = _load_def_gb()
@@ -1390,6 +1396,12 @@ with _tab_builder:
                         })
 
                 prog_gb.empty()
+                # Dismiss the Joseph loading screen
+                if _joseph_gb_loader is not None:
+                    try:
+                        _joseph_gb_loader.empty()
+                    except Exception:
+                        pass
 
                 _elapsed_gb = time.time() - _t0_gb
                 _gb_status.update(

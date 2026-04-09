@@ -240,6 +240,13 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
             pct = int((current / max(total, 1)) * 100)
             _pb.progress(pct, text=msg)
 
+        # ── Joseph Loading Screen — NBA fun facts while loading props ──
+        try:
+            from utils.joseph_loading import joseph_loading_placeholder
+            _joseph_props_loader = joseph_loading_placeholder("Loading live props from sportsbooks")
+        except Exception:
+            _joseph_props_loader = None
+
         try:
             with st.spinner("Loading live props..."):
                 _live_props = get_all_sportsbook_props(
@@ -251,6 +258,11 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
                 )
 
             _pb.progress(100, text="Done!")
+            if _joseph_props_loader is not None:
+                try:
+                    _joseph_props_loader.empty()
+                except Exception:
+                    pass
 
             if _live_props:
                 save_platform_props_to_session(_live_props, st.session_state)
@@ -284,6 +296,11 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
                 _pb.empty()
             except Exception:
                 pass
+            if _joseph_props_loader is not None:
+                try:
+                    _joseph_props_loader.empty()
+                except Exception:
+                    pass
 
     # ── Cross-Platform Comparison Table ───────────────────────────
     _platform_props = load_platform_props_from_session(st.session_state)

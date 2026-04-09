@@ -702,11 +702,22 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
     def _prog_cb(current, total, msg):
         _prog.progress(min(current / max(total, 1), 1.0), text=msg)
 
+    # ── Joseph Loading Screen — NBA fun facts while loading ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_hist_loader = joseph_loading_placeholder("Loading historical game data")
+    except Exception:
+        _joseph_hist_loader = None
     with st.spinner("Loading historical game logs from API-NBA…"):
         todays_games = st.session_state.get("todays_games", [])
         hist_result = _refresh_hist(games=todays_games, last_n_games=30, progress_callback=_prog_cb)
 
     _prog.empty()
+    if _joseph_hist_loader is not None:
+        try:
+            _joseph_hist_loader.empty()
+        except Exception:
+            pass
     refreshed  = hist_result.get("players_refreshed", 0)
     clv_closed = hist_result.get("clv_updated", 0)
     errs       = hist_result.get("errors", 0)

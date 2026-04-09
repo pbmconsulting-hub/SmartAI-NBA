@@ -722,6 +722,12 @@ if "qam_sort_key" not in st.session_state:
 
 if run_analysis:
     _analysis_start_time = time.time()
+    # ── Joseph Loading Screen — NBA fun facts while analysis runs ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_loader = joseph_loading_placeholder("Running Quantum Matrix Analysis")
+    except Exception:
+        _joseph_loader = None
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
 
@@ -2027,6 +2033,12 @@ if run_analysis:
         except Exception as _persist_err:
             pass  # Non-fatal — session state still has results
         progress_bar.empty()
+        # Dismiss the Joseph loading screen
+        if _joseph_loader is not None:
+            try:
+                _joseph_loader.empty()
+            except Exception:
+                pass
         _analysis_elapsed = time.time() - _analysis_start_time
         _cache_msg = f" ({_cache_hits} cached)" if _cache_hits > 0 else ""
         st.success(
@@ -2065,6 +2077,11 @@ if run_analysis:
             progress_bar.empty()
         except Exception:
             pass
+        if _joseph_loader is not None:
+            try:
+                _joseph_loader.empty()
+            except Exception:
+                pass
 
 # ============================================================
 # END SECTION: Analysis Runner
