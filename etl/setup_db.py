@@ -1259,6 +1259,18 @@ _INDEXES = (
     ("idx_leaders_player", "League_Leaders", "(player_id)"),
     ("idx_career_player", "Player_Career_Stats", "(player_id)"),
     ("idx_winprob_game", "Win_Probability_PBP", "(game_id)"),
+    # Composite indexes for common query patterns
+    ("idx_dvp_lookup", "Defense_Vs_Position", "(season, team_abbreviation, pos)"),
+    ("idx_roster_team_active", "Team_Roster", "(team_id, effective_end_date)"),
+    ("idx_injury_report_date", "Injury_Status", "(report_date)"),
+    ("idx_injury_player_date", "Injury_Status", "(player_id, report_date)"),
+    ("idx_schedule_season", "Schedule", "(season_year)"),
+    ("idx_bsa_game_person", "Box_Score_Advanced", "(game_id, person_id)"),
+    ("idx_bss_game_person", "Box_Score_Scoring", "(game_id, person_id)"),
+    ("idx_bsm_game_person", "Box_Score_Misc", "(game_id, person_id)"),
+    ("idx_bsh_game_person", "Box_Score_Hustle", "(game_id, person_id)"),
+    ("idx_bsff_game_person", "Box_Score_Four_Factors", "(game_id, person_id)"),
+    ("idx_bsu_game_person", "Box_Score_Usage", "(game_id, person_id)"),
 )
 
 

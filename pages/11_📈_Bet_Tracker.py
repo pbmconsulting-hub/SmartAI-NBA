@@ -784,7 +784,7 @@ with tab_ai_picks:
     with _ai_filter_col2:
         _ai_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard", "Goblin", "Normal"],
+            ["Standard", "Goblin", "Normal", "Fantasy"],
             default=[],
             key="ai_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1098,7 +1098,7 @@ with tab_all_picks:
     with _ap_filter_col2:
         _ap_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard", "Goblin", "Normal"],
+            ["Standard", "Goblin", "Normal", "Fantasy"],
             default=[],
             key="ap_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",
@@ -1746,7 +1746,7 @@ with tab_bets:
         # ── Bet Classification Filter ─────────────────────────────────
         _bets_bet_type_filter = st.multiselect(
             "Bet Classification",
-            ["Standard", "Goblin", "Normal"],
+            ["Standard", "Goblin", "Normal", "Fantasy"],
             default=[],
             key="bets_bet_type_filter",
             help="Filter by bet classification. Leave empty to show all.",

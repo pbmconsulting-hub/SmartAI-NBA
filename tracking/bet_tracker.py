@@ -30,7 +30,7 @@ from tracking.database import (
 # Import shared constants from the engine package
 # BEGINNER NOTE: We import from engine/__init__.py so there's
 # only ONE place that defines what stat types are valid.
-from engine import VALID_STAT_TYPES
+from engine import VALID_STAT_TYPES, FANTASY_STAT_TYPES
 
 
 # ============================================================
@@ -769,7 +769,7 @@ def log_new_bet(
         team (str): Player's team abbreviation
         notes (str): Optional notes about this pick
         auto_logged (int): 1 if logged automatically by the engine, 0 if manual
-        bet_type (str): 'goblin', '50_50', 'demon' (legacy), or 'normal'
+        bet_type (str): 'goblin', '50_50', 'fantasy', 'demon' (legacy), or 'normal'
         std_devs_from_line (float): How many std devs projection is from line
 
     Returns:
@@ -1063,7 +1063,10 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
         tier = res.get("tier", "Bronze")
         confidence = res.get("confidence_score", 0)
         bet_type = res.get("bet_type", "standard")
-        # Only log picks where edge is positive
+        stat_type = res.get("stat_type", "points")
+        # Auto-classify fantasy score props as "fantasy" bet type
+        if stat_type in FANTASY_STAT_TYPES:
+            bet_type = "fantasy"
         if edge <= 0:
             continue
         # Only auto-log recognised tiers
@@ -1116,7 +1119,7 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
                 )
             ),
             auto_logged=1,
-            bet_type=res.get("bet_type", "normal"),
+            bet_type=bet_type,
             std_devs_from_line=float(res.get("std_devs_from_line", 0.0)),
         )
         if ok:
