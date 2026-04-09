@@ -714,7 +714,7 @@ def get_live_sweat_css() -> str:
 /* Individual game card */
 .espn-game-card {
     flex-shrink: 0;
-    width: 240px;
+    width: 280px;
     border-right: 1px solid rgba(255,255,255,0.06);
     padding: 12px 16px 10px;
     background: transparent;
@@ -775,10 +775,12 @@ def get_live_sweat_css() -> str:
     padding: 1px 0;
 }
 .espn-leader-name {
-    max-width: 110px;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    margin-right: 8px;
 }
 .espn-leader-stat {
     font-weight: 700;

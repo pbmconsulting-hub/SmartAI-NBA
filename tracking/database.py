@@ -397,10 +397,15 @@ def initialize_database():
                 ("idx_bets_player", "bets", "(player_name)"),
                 ("idx_bets_date", "bets", "(bet_date)"),
                 ("idx_bets_created", "bets", "(created_at)"),
+                ("idx_bets_stat_type", "bets", "(stat_type)"),
+                ("idx_bets_platform", "bets", "(platform)"),
+                ("idx_bets_date_result", "bets", "(bet_date, result)"),
                 ("idx_ph_date", "prediction_history", "(prediction_date)"),
                 ("idx_ph_stat", "prediction_history", "(stat_type)"),
                 ("idx_aap_date", "all_analysis_picks", "(pick_date)"),
                 ("idx_aap_player", "all_analysis_picks", "(player_name)"),
+                ("idx_aap_stat_type", "all_analysis_picks", "(stat_type)"),
+                ("idx_aap_date_result", "all_analysis_picks", "(pick_date, result)"),
             )
             for idx_name, table, columns in _TRACKING_INDEXES:
                 cursor.execute(
@@ -1678,6 +1683,168 @@ def purge_old_snapshots(days=30):
                 conn.close()
         except Exception:
             pass
+
+
+def purge_stale_game_logs(days=30):
+    """Delete cached player game logs older than *days* days.
+
+    The ``player_game_logs`` table is a local cache that accumulates
+    indefinitely.  Pruning entries whose ``retrieved_at`` timestamp is older
+    than the cutoff keeps the database lean without losing analytical value
+    (the ETL ``Player_Game_Logs`` table retains the canonical history).
+
+    Returns:
+        int: Number of rows deleted.
+    """
+    import datetime as _dt
+
+    cutoff = (_dt.datetime.now() - _dt.timedelta(days=days)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    conn = None
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM player_game_logs WHERE retrieved_at < ?",
+            (cutoff,),
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        _logger.info("[database] purge_stale_game_logs: removed %d rows", deleted)
+        return deleted
+    except Exception as exc:
+        _logger.error("[database] purge_stale_game_logs error: %s", exc)
+        return 0
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
+
+def purge_old_sessions(days=90):
+    """Delete analysis sessions older than *days* days.
+
+    The ``analysis_sessions`` table stores full JSON blobs per run and
+    grows without bound.  Archiving old sessions recovers disk space.
+
+    Returns:
+        int: Number of rows deleted.
+    """
+    import datetime as _dt
+
+    cutoff = (_dt.datetime.now() - _dt.timedelta(days=days)).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    conn = None
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM analysis_sessions WHERE created_at < ?",
+            (cutoff,),
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        _logger.info("[database] purge_old_sessions: removed %d rows", deleted)
+        return deleted
+    except Exception as exc:
+        _logger.error("[database] purge_old_sessions error: %s", exc)
+        return 0
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
+
+def purge_old_backtest_results(keep=50):
+    """Keep only the most recent *keep* backtest result rows.
+
+    Returns:
+        int: Number of rows deleted.
+    """
+    conn = None
+    try:
+        conn = get_database_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM backtest_results WHERE backtest_id NOT IN "
+            "(SELECT backtest_id FROM backtest_results "
+            "ORDER BY created_at DESC LIMIT ?)",
+            (keep,),
+        )
+        deleted = cursor.rowcount
+        conn.commit()
+        _logger.info("[database] purge_old_backtest_results: removed %d rows", deleted)
+        return deleted
+    except Exception as exc:
+        _logger.error("[database] purge_old_backtest_results error: %s", exc)
+        return 0
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
+
+# ── Maintenance defaults ───────────────────────────────────────────────────────
+_MAINTENANCE_SNAPSHOT_DAYS = 30
+_MAINTENANCE_GAME_LOG_DAYS = 30
+_MAINTENANCE_SESSION_DAYS = 90
+_MAINTENANCE_BACKTEST_KEEP = 50
+
+
+def run_maintenance(
+    *,
+    snapshot_days=_MAINTENANCE_SNAPSHOT_DAYS,
+    game_log_days=_MAINTENANCE_GAME_LOG_DAYS,
+    session_days=_MAINTENANCE_SESSION_DAYS,
+    backtest_keep=_MAINTENANCE_BACKTEST_KEEP,
+):
+    """Run all database cleanup routines and VACUUM.
+
+    Combines snapshot, game-log, session, and backtest pruning into a
+    single convenience call, then runs VACUUM to reclaim disk space.
+
+    Args:
+        snapshot_days: Delete snapshots older than this many days.
+        game_log_days: Delete cached game logs older than this many days.
+        session_days: Delete analysis sessions older than this many days.
+        backtest_keep: Number of most-recent backtest runs to retain.
+
+    Returns:
+        dict: Summary with keys ``snapshots``, ``game_logs``, ``sessions``,
+              ``backtests`` (each the number of rows deleted) and
+              ``vacuumed`` (bool).
+    """
+    result = {
+        "snapshots": purge_old_snapshots(days=snapshot_days),
+        "game_logs": purge_stale_game_logs(days=game_log_days),
+        "sessions": purge_old_sessions(days=session_days),
+        "backtests": purge_old_backtest_results(keep=backtest_keep),
+        "vacuumed": False,
+    }
+    conn = None
+    try:
+        conn = get_database_connection()
+        conn.execute("VACUUM")
+        result["vacuumed"] = True
+        _logger.info("[database] run_maintenance: VACUUM completed")
+    except Exception as exc:
+        _logger.error("[database] run_maintenance VACUUM error: %s", exc)
+    finally:
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+    _logger.info("[database] run_maintenance complete: %s", result)
+    return result
 
 
 def get_rolling_stats(days=14):

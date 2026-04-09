@@ -280,10 +280,15 @@ class TestTrackingDBIndexes(unittest.TestCase):
             "idx_bets_player",
             "idx_bets_date",
             "idx_bets_created",
+            "idx_bets_stat_type",
+            "idx_bets_platform",
+            "idx_bets_date_result",
             "idx_ph_date",
             "idx_ph_stat",
             "idx_aap_date",
             "idx_aap_player",
+            "idx_aap_stat_type",
+            "idx_aap_date_result",
         ]
         for idx_name in expected:
             self.assertIn(idx_name, indexes, f"Missing index: {idx_name}")
