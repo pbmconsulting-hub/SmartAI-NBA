@@ -1,5 +1,5 @@
 """
-Data module for SmartAI-NBA.
+Data module for Smart Pick Pro.
 
 Provides high-level access to NBA data services, roster management,
 and player ID resolution.

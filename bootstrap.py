@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bootstrap.py – one-command setup for SmartAI-NBA.
+"""bootstrap.py – one-command setup for Smart Pick Pro.
 
 Run this script once to pull all NBA historical data and prepare the
 database for the application:
@@ -53,9 +53,9 @@ def _run_phase(label: str, func, *args, **kwargs):
 
 
 def main():
-    """Execute the full SmartAI-NBA bootstrap sequence."""
+    """Execute the full Smart Pick Pro bootstrap sequence."""
     _logger.info("=" * 60)
-    _logger.info("  SmartAI-NBA Bootstrap")
+    _logger.info("  Smart Pick Pro Bootstrap")
     _logger.info("=" * 60)
     total_start = time.perf_counter()
 

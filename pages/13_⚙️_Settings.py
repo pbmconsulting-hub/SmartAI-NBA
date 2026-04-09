@@ -46,7 +46,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - **🔥 Aggressive**: More picks, lower thresholds. For experienced bettors.
     
     **Key Settings Explained**
-    - **Simulation Depth**: How many Monte Carlo simulations to run (higher = more accurate, slower)
+    - **Simulation Depth**: How many Quantum Matrix simulations to run (higher = more accurate, slower)
     - **Minimum Edge Threshold**: Only show props where the model finds at least this much edge
     - **Sensitivity Sliders**: Fine-tune how much weight the model gives to pace, fatigue, blowout risk, etc.
     

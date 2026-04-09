@@ -1,11 +1,11 @@
 # pages/12_📊_Proving_Grounds.py
-# Historical backtesting UI for SmartAI-NBA ("Proving Grounds").
+# Historical backtesting UI for Smart Pick Pro ("Proving Grounds").
 # Runs the prediction model against historical game log data to validate accuracy.
 
 import streamlit as st
 
 st.set_page_config(
-    page_title="Proving Grounds — SmartAI-NBA",
+    page_title="Proving Grounds — Smart Pick Pro",
     page_icon="📊",
     layout="wide",
 )

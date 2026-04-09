@@ -6,7 +6,7 @@ _logger = get_logger(__name__)
 
 
 class BaseModel(abc.ABC):
-    """Abstract base class for all SmartAI-NBA prediction models."""
+    """Abstract base class for all Smart Pick Pro prediction models."""
 
     name: str = "base"
 

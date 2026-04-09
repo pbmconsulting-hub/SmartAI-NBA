@@ -1,4 +1,4 @@
-"""api/middleware.py – Custom middleware for SmartAI-NBA API."""
+"""api/middleware.py – Custom middleware for Smart Pick Pro API."""
 import time
 from utils.logger import get_logger
 

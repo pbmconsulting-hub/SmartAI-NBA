@@ -1,1 +1,1 @@
-"""engine/scrapers – Web scraping utilities for SmartAI-NBA."""
+"""engine/scrapers – Web scraping utilities for Smart Pick Pro."""

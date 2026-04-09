@@ -74,7 +74,7 @@ def render_global_settings():
             step=100,
             value=st.session_state.get("simulation_depth", 1000),
             key="sim_depth_widget",
-            help="Number of Monte Carlo simulations per prop. Higher = more accurate but slower.",
+            help="Number of Quantum Matrix simulations per prop. Higher = more accurate but slower.",
             on_change=_sync_sim_depth,
         )
 
