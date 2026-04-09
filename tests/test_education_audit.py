@@ -13,13 +13,13 @@ _BASE = os.path.join(os.path.dirname(__file__), "..")
 
 # All page files that must have education content
 _PAGE_FILES = [
-    ("app.py", "📖 How to Use"),
+    ("Smart_Picks_Pro_Home.py", "📖 How to Use"),
     ("pages/0_💦_Live_Sweat.py", "📖 How to Use"),
     ("pages/1_📡_Live_Games.py", "📖 How to Use"),
     ("pages/2_🔬_Prop_Scanner.py", "📖 How to Use"),
     ("pages/3_⚡_Quantum_Analysis_Matrix.py", "📖 How to Use"),
     ("pages/4_📋_Game_Report.py", "📖 How to Use"),
-    ("pages/5b_🔮_Player_Simulator.py", "📖 How to Use"),
+    ("pages/5_🔮_Player_Simulator.py", "📖 How to Use"),
     ("pages/6_🧬_Entry_Builder.py", "📖 How to Use"),
     ("pages/7_🎙️_The_Studio.py", "📖 How to Use"),
     ("pages/8_🛡️_Risk_Shield.py", "📖 How to Use"),

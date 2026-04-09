@@ -1,9 +1,9 @@
 # ============================================================
-# FILE: app.py
+# FILE: Smart_Picks_Pro_Home.py
 # PURPOSE: Main entry point for the SmartBetPro NBA Streamlit app.
 #          Professional dark-themed landing page that sells outcomes,
 #          guards the process, and converts first-time visitors.
-# HOW TO RUN: streamlit run app.py
+# HOW TO RUN: streamlit run Smart_Picks_Pro_Home.py
 # ============================================================
 
 import streamlit as st
@@ -1894,7 +1894,7 @@ st.markdown('<div class="nav-row-label analysis">🔬 Deep Analysis</div>', unsa
 _nav_r2 = st.columns(5)
 _nav_row2 = [
     ("📋", "Game Report", "Full game breakdowns", "pages/4_📋_Game_Report.py"),
-    ("🔮", "Player Simulator", "What-if scenarios", "pages/5b_🔮_Player_Simulator.py"),
+    ("🔮", "Player Simulator", "What-if scenarios", "pages/5_🔮_Player_Simulator.py"),
     ("🗺️", "Correlation Matrix", "Find correlated props", "pages/10_🗺️_Correlation_Matrix.py"),
     ("🛡️", "Risk Shield", "See what to avoid + why", "pages/8_🛡️_Risk_Shield.py"),
     ("🎙️", "The Studio", "Joseph's AI analysis room", "pages/7_🎙️_The_Studio.py"),

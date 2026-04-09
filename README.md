@@ -298,14 +298,14 @@ python bootstrap.py
 ### Step 7: Run the App
 
 ```bash
-streamlit run app.py
+streamlit run Smart_Picks_Pro_Home.py
 ```
 
 > **💡** If `streamlit` is not recognized, try:
 > ```bash
-> python -m streamlit run app.py
-> python3 -m streamlit run app.py
-> py -m streamlit run app.py
+> python -m streamlit run Smart_Picks_Pro_Home.py
+> python3 -m streamlit run Smart_Picks_Pro_Home.py
+> py -m streamlit run Smart_Picks_Pro_Home.py
 > ```
 
 Your browser will automatically open to **http://localhost:8501** with the app running! 🎉
@@ -340,7 +340,7 @@ cd "path/to/Smart Pick Pro"
 source .venv/bin/activate
 
 # 3. Run the app
-streamlit run app.py
+streamlit run Smart_Picks_Pro_Home.py
 ```
 
 Then in the browser:
@@ -370,7 +370,7 @@ The app will be available at **http://localhost:8501** and the API at **http://l
 
 ```
 Smart Pick Pro/
-├── app.py                              # Main entry point — home dashboard
+├── Smart_Picks_Pro_Home.py                              # Main entry point — home dashboard
 ├── bootstrap.py                        # First-run ETL bootstrap
 ├── webhook_server.py                   # Stripe webhook server
 ├── requirements.txt                    # All dependencies
@@ -382,7 +382,7 @@ Smart Pick Pro/
 │   ├── 2_🔬_Prop_Scanner.py           # Enter/upload/fetch prop lines
 │   ├── 3_⚡_Quantum_Analysis_Matrix.py # Run Neural Analysis — main engine
 │   ├── 4_📋_Game_Report.py            # AI-powered game reports (SAFE Score™)
-│   ├── 5b_🔮_Player_Simulator.py      # What-if player scenario simulator
+│   ├── 5_🔮_Player_Simulator.py       # What-if player scenario simulator
 │   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
 │   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
 │   ├── 8_🛡️_Risk_Shield.py           # Flagged picks to avoid
@@ -520,7 +520,7 @@ Smart Pick Pro/
 
 ## 📖 What Each Page Does
 
-### 🏠 Home (app.py)
+### 🏠 Home (Smart_Picks_Pro_Home.py)
 The dashboard. Shows tonight's slate, quick-start workflow guide, status
 dashboard, and links to all pages.
 
@@ -620,7 +620,7 @@ prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
 
 1. Install all dependencies (see [Quick Start](#-quick-start-complete-beginner-guide) above)
 2. Run `python bootstrap.py` to build the local database
-3. Run `streamlit run app.py`
+3. Run `streamlit run Smart_Picks_Pro_Home.py`
 4. Optionally configure API keys:
    ```bash
    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
@@ -689,7 +689,7 @@ Use whichever one shows a version between 3.11 and 3.13.
 
 **Fix B** — Use the module form:
 ```bash
-python -m streamlit run app.py
+python -m streamlit run Smart_Picks_Pro_Home.py
 ```
 
 ### "ModuleNotFoundError: No module named '...'"
@@ -705,7 +705,7 @@ python -m pip install -r requirements.txt
 
 Another Streamlit app is running. Close it, or run on a different port:
 ```bash
-streamlit run app.py --server.port 8502
+streamlit run Smart_Picks_Pro_Home.py --server.port 8502
 ```
 
 ### "running scripts is disabled on this system" (PowerShell)

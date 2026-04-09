@@ -8,7 +8,7 @@ database for the application:
 
 After the bootstrap is complete, start the Streamlit UI:
 
-    streamlit run app.py
+    streamlit run Smart_Picks_Pro_Home.py
 
 The script performs the following steps in order:
 
@@ -88,7 +88,7 @@ def main():
     total = time.perf_counter() - total_start
     _logger.info("=" * 60)
     _logger.info("  Bootstrap complete in %.1fs", total)
-    _logger.info("  Launch the app:  streamlit run app.py")
+    _logger.info("  Launch the app:  streamlit run Smart_Picks_Pro_Home.py")
     _logger.info("=" * 60)
 
 
