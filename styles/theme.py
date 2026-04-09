@@ -3524,35 +3524,57 @@ def get_game_report_html(game=None, analysis_results=None):
     ]
     strategy_rows = ""
     if len(_eligible) >= 2:
-        # Pick unique players for each combo tier
-        def _unique_players(pool, n):
+        # Pick unique players for each combo tier, excluding already-used
+        # players so each tier offers genuinely different picks.
+        def _unique_players(pool, n, exclude=None):
+            _excl = exclude or set()
             seen, out = set(), []
             for p in pool:
                 pn = p.get("player_name", "")
-                if pn not in seen:
+                if pn not in seen and pn not in _excl:
                     seen.add(pn)
                     out.append(p)
                 if len(out) == n:
                     break
             return out
 
+        # Sort by edge% for alternative ordering (variety between tiers)
+        _edge_sorted = sorted(
+            _eligible,
+            key=lambda p: abs(p.get("edge_percentage", 0)),
+            reverse=True,
+        )
+
         matrix = []
+        _used = set()
+
+        # Pick 2 — highest confidence
         u2 = _unique_players(_eligible, 2)
         if len(u2) >= 2:
             avg2 = sum(p.get("confidence_score", 75) for p in u2) / 2 / 10
             matrix.append(("Pick 2", "fire", "danger", u2, "Power Play", f"{avg2:.2f}"))
-        u3 = _unique_players(_eligible, 3)
+            _used.update(p.get("player_name", "") for p in u2)
+
+        # Pick 3 — best edge, excluding Pick 2 players for variety
+        u3 = _unique_players(_edge_sorted, 3, exclude=_used)
+        if len(u3) < 3:
+            u3 = _unique_players(_edge_sorted, 3)
         if len(u3) >= 3:
             avg3 = sum(p.get("confidence_score", 75) for p in u3) / 3 / 10
             matrix.append(("Pick 3", "lock", "success", u3, "Flex Core", f"{avg3:.2f}"))
-        u5 = _unique_players(_eligible, 5)
+            _used.update(p.get("player_name", "") for p in u3)
+
+        # Pick 5 — diversified from remaining pool
+        u5 = _unique_players(_eligible, 5, exclude=_used)
+        if len(u5) < 5:
+            u5 = _unique_players(_eligible, 5)
         if len(u5) >= 5:
             avg5 = sum(p.get("confidence_score", 75) for p in u5) / 5 / 10
             matrix.append(("Pick 5", "layer-group", "warning", u5, "Stack Build", f"{avg5:.2f}"))
 
         for combo, icon, color_name, picks, strategy, avg_ss in matrix:
             picks_html = ""
-            display_picks = picks[:3]  # Show at most 3 picks in strategy preview
+            display_picks = picks[:5]  # Show up to 5 picks in strategy preview
             for j, p in enumerate(display_picks):
                 pname = _html.escape(p.get("player_name", ""))
                 pstat = p.get("stat_type", "").capitalize()
