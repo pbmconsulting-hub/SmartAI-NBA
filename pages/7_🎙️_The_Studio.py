@@ -558,21 +558,22 @@ if mode == "🎤 ASK JOSEPH":
     # Handle voice/text question
     if _voice_question and _voice_question.strip():
         _q = _voice_question.strip()
+        _q_safe = _html.escape(_q)
         if _BRAIN_AVAILABLE:
             try:
                 _voice_answer = joseph_quick_take(
                     analysis_results,
                     teams_data,
-                    context=f"user_question: {_q}",
+                    context=f"user_question: {_q_safe}",
                 )
             except Exception:
                 _voice_answer = (
-                    f"Joseph heard your question about '{_html.escape(_q)}' "
+                    f"Joseph heard your question about '{_q_safe}' "
                     f"— give me a second to pull up the data!"
                 )
         else:
             _voice_answer = (
-                f"Joseph heard you ask about '{_html.escape(_q)}' "
+                f"Joseph heard you ask about '{_q_safe}' "
                 f"— the brain module is warming up!"
             )
         st.markdown(
