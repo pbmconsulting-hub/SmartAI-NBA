@@ -356,12 +356,18 @@ def _avatar_inline(size=48):
 
 
 # ═════════════════════════════════════════════════════════════
-# THREE INTERACTIVE MODES  (Enhancement 3: card UI, Enhancement 9: persist)
+# FOUR INTERACTIVE MODES  (Enhancement 3: card UI, Enhancement 9: persist)
 # ═════════════════════════════════════════════════════════════
 
 # Persist mode in session state (Enhancement 9)
-_MODE_OPTIONS = ["🏀 GAMES TONIGHT", "👤 SCOUT A PLAYER", "🎰 BUILD MY BETS"]
+_MODE_OPTIONS = [
+    "🎤 ASK JOSEPH",
+    "🏀 GAMES TONIGHT",
+    "👤 SCOUT A PLAYER",
+    "🎰 BUILD MY BETS",
+]
 _MODE_META = {
+    "🎤 ASK JOSEPH": ("🎤", "ASK JOSEPH", "Ask Joseph anything — voice or text"),
     "🏀 GAMES TONIGHT": ("🏀", "GAMES TONIGHT", "Full game breakdowns & takes"),
     "👤 SCOUT A PLAYER": ("👤", "SCOUT A PLAYER", "Deep dive into any player"),
     "🎰 BUILD MY BETS": ("🎰", "BUILD MY BETS", "Build optimal parlay tickets"),
@@ -421,82 +427,6 @@ if st.session_state["joseph_hot_take_mode"]:
         f'border-radius:8px;padding:10px 14px;margin-bottom:12px;'
         f'color:#ff4444;font-size:0.85rem;font-family:\'Montserrat\',sans-serif;font-weight:600">'
         f'{random.choice(_hot_take_lines)}</div>',
-        unsafe_allow_html=True,
-    )
-
-# ── Voice-to-Text Input (browser Web Speech API) ─────────────
-# Uses browser-native speech recognition so users can ask Joseph questions verbally
-st.markdown(
-    '<div style="margin:8px 0 12px 0">'
-    '<details>'
-    '<summary style="color:#ff5e00;font-family:\'Montserrat\',sans-serif;'
-    'font-size:0.85rem;cursor:pointer;font-weight:600">'
-    '🎤 Ask Joseph a question (voice or text)</summary>'
-    '</details></div>',
-    unsafe_allow_html=True,
-)
-_voice_question = st.text_input(
-    "Ask Joseph a question",
-    placeholder="Type or use the mic button below to ask Joseph anything...",
-    label_visibility="collapsed",
-    key="studio_voice_question",
-)
-# Inject browser-native Web Speech API for voice input
-st.markdown(
-    """<script>
-    (function() {
-        if (window.__josephVoiceInit) return;
-        window.__josephVoiceInit = true;
-        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return;
-        var inputs = window.parent.document.querySelectorAll('input[aria-label="Ask Joseph a question"]');
-        if (!inputs.length) return;
-        var input = inputs[inputs.length - 1];
-        var btn = document.createElement('button');
-        btn.textContent = '🎤 Speak';
-        btn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);'
-            + 'background:#ff5e00;color:#fff;border:none;border-radius:6px;padding:4px 10px;'
-            + 'font-size:0.75rem;cursor:pointer;font-family:Montserrat,sans-serif;z-index:10';
-        btn.onclick = function(e) {
-            e.preventDefault();
-            var rec = new SpeechRecognition();
-            rec.lang = 'en-US';
-            rec.onresult = function(ev) {
-                var txt = ev.results[0][0].transcript;
-                var nativeSet = Object.getOwnPropertyDescriptor(
-                    window.HTMLInputElement.prototype, 'value').set;
-                nativeSet.call(input, txt);
-                input.dispatchEvent(new Event('input', {bubbles: true}));
-            };
-            rec.start();
-            btn.textContent = '🔴 Listening...';
-            rec.onend = function() { btn.textContent = '🎤 Speak'; };
-        };
-        if (input.parentElement) {
-            input.parentElement.style.position = 'relative';
-            input.parentElement.appendChild(btn);
-        }
-    })();
-    </script>""",
-    unsafe_allow_html=True,
-)
-
-# Handle voice/text question
-if _voice_question and _voice_question.strip():
-    _q = _voice_question.strip()
-    if _BRAIN_AVAILABLE:
-        try:
-            _voice_answer = joseph_quick_take(
-                analysis_results,
-                teams_data,
-                context=f"user_question: {_q}",
-            )
-        except Exception:
-            _voice_answer = f"Joseph heard your question about '{_q}' — give me a second to pull up the data!"
-    else:
-        _voice_answer = f"Joseph heard you ask about '{_q}' — the brain module is warming up!"
-    st.markdown(
-        render_avatar_commentary(_voice_answer),
         unsafe_allow_html=True,
     )
 
@@ -563,6 +493,92 @@ elif isinstance(teams_data_list, dict):
 else:
     teams_data = {}
 
+
+# ─────────────────────────────────────────────────────────────
+# MODE 0: ASK JOSEPH (voice or text)
+# ─────────────────────────────────────────────────────────────
+if mode == "🎤 ASK JOSEPH":
+    st.markdown(
+        '<div class="studio-section-title">Ask Joseph a Question</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        render_avatar_commentary(
+            "What's on your mind? Type your question below — or hit the mic "
+            "button and just TALK to me. I'll give you the real answer, no fluff."
+        ),
+        unsafe_allow_html=True,
+    )
+    _voice_question = st.text_input(
+        "Ask Joseph a question",
+        placeholder="Type or use the mic button below to ask Joseph anything...",
+        label_visibility="collapsed",
+        key="studio_voice_question",
+    )
+    # Inject browser-native Web Speech API for voice input
+    st.markdown(
+        """<script>
+        (function() {
+            if (window.__josephVoiceInit) return;
+            window.__josephVoiceInit = true;
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) return;
+            var inputs = window.parent.document.querySelectorAll('input[aria-label="Ask Joseph a question"]');
+            if (!inputs.length) return;
+            var input = inputs[inputs.length - 1];
+            var btn = document.createElement('button');
+            btn.textContent = '🎤 Speak';
+            btn.style.cssText = 'position:absolute;right:8px;top:50%;transform:translateY(-50%);'
+                + 'background:#ff5e00;color:#fff;border:none;border-radius:6px;padding:4px 10px;'
+                + 'font-size:0.75rem;cursor:pointer;font-family:Montserrat,sans-serif;z-index:10';
+            btn.onclick = function(e) {
+                e.preventDefault();
+                var rec = new SpeechRecognition();
+                rec.lang = 'en-US';
+                rec.onresult = function(ev) {
+                    var txt = ev.results[0][0].transcript;
+                    var nativeSet = Object.getOwnPropertyDescriptor(
+                        window.HTMLInputElement.prototype, 'value').set;
+                    nativeSet.call(input, txt);
+                    input.dispatchEvent(new Event('input', {bubbles: true}));
+                };
+                rec.start();
+                btn.textContent = '🔴 Listening...';
+                rec.onend = function() { btn.textContent = '🎤 Speak'; };
+            };
+            if (input.parentElement) {
+                input.parentElement.style.position = 'relative';
+                input.parentElement.appendChild(btn);
+            }
+        })();
+        </script>""",
+        unsafe_allow_html=True,
+    )
+
+    # Handle voice/text question
+    if _voice_question and _voice_question.strip():
+        _q = _voice_question.strip()
+        if _BRAIN_AVAILABLE:
+            try:
+                _voice_answer = joseph_quick_take(
+                    analysis_results,
+                    teams_data,
+                    context=f"user_question: {_q}",
+                )
+            except Exception:
+                _voice_answer = (
+                    f"Joseph heard your question about '{_html.escape(_q)}' "
+                    f"— give me a second to pull up the data!"
+                )
+        else:
+            _voice_answer = (
+                f"Joseph heard you ask about '{_html.escape(_q)}' "
+                f"— the brain module is warming up!"
+            )
+        st.markdown(
+            render_avatar_commentary(_voice_answer),
+            unsafe_allow_html=True,
+        )
 
 # ─────────────────────────────────────────────────────────────
 # MODE 1: GAMES TONIGHT
