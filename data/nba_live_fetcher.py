@@ -631,7 +631,7 @@ def fetch_schedule(game_date: str | None = None) -> list[dict]:
     """
     Return the game schedule for a given date.
 
-    Endpoint: nba_api.stats.endpoints.scoreboardv2.ScoreboardV2
+    Endpoint: nba_api.stats.endpoints.scoreboardv3.ScoreboardV3
 
     Parameters
     ----------
@@ -658,10 +658,10 @@ def fetch_schedule(game_date: str | None = None) -> list[dict]:
         return []
 
     try:
-        from nba_api.stats.endpoints import scoreboardv2
+        from nba_api.stats.endpoints import scoreboardv3
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
-        endpoint = scoreboardv2.ScoreboardV2(
+        endpoint = scoreboardv3.ScoreboardV3(
             game_date=game_date,
             league_id="00",
         )
@@ -670,7 +670,41 @@ def fetch_schedule(game_date: str | None = None) -> list[dict]:
             _logger.warning("fetch_schedule: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
-        games = norm.get("GameHeader", [])
+        # V3 GameHeader uses camelCase keys; build V2-compatible dicts so
+        # downstream callers that expect GAME_ID / GAME_STATUS_TEXT etc.
+        # continue to work unchanged.
+        raw_headers = norm.get("GameHeader", [])
+        raw_lines = norm.get("LineScore", [])
+
+        # Build gameId → team info mapping from LineScore rows.
+        # Each game has two LineScore rows (away first, home second).
+        _ls_map: dict[str, dict] = {}
+        for ls in raw_lines:
+            gid = str(ls.get("gameId", ""))
+            if gid not in _ls_map:
+                _ls_map[gid] = {"away": ls}
+            else:
+                _ls_map[gid]["home"] = ls
+
+        games: list[dict] = []
+        for gh in raw_headers:
+            gid = str(gh.get("gameId", ""))
+            team_info = _ls_map.get(gid, {})
+            home = team_info.get("home", {})
+            away = team_info.get("away", {})
+            games.append({
+                "GAME_ID": gid,
+                "GAME_STATUS_TEXT": gh.get("gameStatusText", ""),
+                "HOME_TEAM_ID": home.get("teamId"),
+                "VISITOR_TEAM_ID": away.get("teamId"),
+                "HOME_TEAM_ABBREVIATION": home.get("teamTricode", ""),
+                "VISITOR_TEAM_ABBREVIATION": away.get("teamTricode", ""),
+                "GAMECODE": gh.get("gameCode", ""),
+                # Preserve original V3 keys as well for callers that use them
+                "gameId": gid,
+                "gameStatusText": gh.get("gameStatusText", ""),
+            })
+
         _cache_set(cache_key, games)
         _logger.info(
             "fetch_schedule(%s): %d games in %.1f ms", game_date, len(games), elapsed
@@ -685,7 +719,7 @@ def fetch_todays_scoreboard() -> dict:
     """
     Return today's full scoreboard including game headers, line scores, etc.
 
-    Endpoint: nba_api.stats.endpoints.scoreboardv2.ScoreboardV2
+    Endpoint: nba_api.stats.endpoints.scoreboardv3.ScoreboardV3
 
     Returns
     -------
@@ -707,10 +741,10 @@ def fetch_todays_scoreboard() -> dict:
         return {}
 
     try:
-        from nba_api.stats.endpoints import scoreboardv2
+        from nba_api.stats.endpoints import scoreboardv3
         time.sleep(_NBA_API_CALL_DELAY)
         t0 = time.monotonic()
-        endpoint = scoreboardv2.ScoreboardV2(
+        endpoint = scoreboardv3.ScoreboardV3(
             game_date=today,
             league_id="00",
         )
@@ -719,13 +753,65 @@ def fetch_todays_scoreboard() -> dict:
             _logger.warning("fetch_todays_scoreboard: get_normalized_dict() returned None/empty")
         elapsed = round((time.monotonic() - t0) * 1000, 1)
 
+        # Translate V3 camelCase keys to V2-compatible UPPERCASE keys so
+        # downstream callers (Live Sweat, advanced_fetcher, etc.) that
+        # reference GAME_ID / TEAM_ABBREVIATION / PTS keep working.
+        raw_headers = norm.get("GameHeader", [])
+        raw_lines = norm.get("LineScore", [])
+
+        # Build gameId → team info from LineScore
+        _ls_map: dict[str, dict] = {}
+        for ls in raw_lines:
+            gid = str(ls.get("gameId", ""))
+            if gid not in _ls_map:
+                _ls_map[gid] = {"away": ls}
+            else:
+                _ls_map[gid]["home"] = ls
+
+        compat_headers: list[dict] = []
+        for gh in raw_headers:
+            gid = str(gh.get("gameId", ""))
+            team_info = _ls_map.get(gid, {})
+            home = team_info.get("home", {})
+            away = team_info.get("away", {})
+            compat_headers.append({
+                "GAME_ID": gid,
+                "GAME_STATUS_TEXT": gh.get("gameStatusText", ""),
+                "HOME_TEAM_ID": home.get("teamId"),
+                "VISITOR_TEAM_ID": away.get("teamId"),
+                "HOME_TEAM_ABBREVIATION": home.get("teamTricode", ""),
+                "VISITOR_TEAM_ABBREVIATION": away.get("teamTricode", ""),
+                "GAMECODE": gh.get("gameCode", ""),
+                # Preserve V3 keys
+                "gameId": gid,
+                "gameStatusText": gh.get("gameStatusText", ""),
+            })
+
+        compat_lines: list[dict] = []
+        for ls in raw_lines:
+            compat_lines.append({
+                "GAME_ID": str(ls.get("gameId", "")),
+                "TEAM_ID": ls.get("teamId"),
+                "TEAM_CITY_NAME": ls.get("teamCity", ""),
+                "TEAM_NAME": ls.get("teamName", ""),
+                "TEAM_ABBREVIATION": ls.get("teamTricode", ""),
+                "PTS": ls.get("score"),
+                # Preserve V3 keys
+                "gameId": str(ls.get("gameId", "")),
+                "teamId": ls.get("teamId"),
+                "teamTricode": ls.get("teamTricode", ""),
+                "score": ls.get("score"),
+            })
+
         result = {
-            "game_header": norm.get("GameHeader", []),
-            "line_score": norm.get("LineScore", []),
-            "series_standings": norm.get("SeriesStandings", []),
-            "last_meeting": norm.get("LastMeeting", []),
-            "east_conf_standings": norm.get("EastConfStandingsByDay", []),
-            "west_conf_standings": norm.get("WestConfStandingsByDay", []),
+            "game_header": compat_headers,
+            "line_score": compat_lines,
+            # V3 does not provide these data sets; return empty lists
+            # for backward compatibility with callers that check these keys.
+            "series_standings": [],
+            "last_meeting": [],
+            "east_conf_standings": [],
+            "west_conf_standings": [],
         }
         _cache_set(cache_key, result)
         _logger.info("fetch_todays_scoreboard: ok in %.1f ms", elapsed)

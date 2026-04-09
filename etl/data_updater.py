@@ -24,7 +24,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 import pandas as pd
-from nba_api.stats.endpoints import LeagueGameLog, ScoreboardV2
+from nba_api.stats.endpoints import LeagueGameLog, ScoreboardV3
 
 from . import initial_pull
 from . import setup_db
@@ -252,7 +252,7 @@ def _upsert_team_game_stats(
 
 
 def sync_todays_games(conn: sqlite3.Connection) -> int:
-    """Fetch today's scheduled games via ``ScoreboardV2`` and insert them.
+    """Fetch today's scheduled games via ``ScoreboardV3`` and insert them.
 
     Only games whose ``game_id`` is not already in the ``Games`` table are
     inserted.  This ensures that ``GET /api/games/today`` can be answered
@@ -265,11 +265,11 @@ def sync_todays_games(conn: sqlite3.Connection) -> int:
         Number of new game rows inserted into the ``Games`` table.
     """
     today_str = date.today().isoformat()
-    logger.info("Syncing today's schedule (%s) via ScoreboardV2 …", today_str)
+    logger.info("Syncing today's schedule (%s) via ScoreboardV3 …", today_str)
 
     try:
         def _fetch_scoreboard():
-            sb = ScoreboardV2(
+            sb = ScoreboardV3(
                 game_date=today_str,
                 timeout=initial_pull._SEASON_DASHBOARD_TIMEOUT,
             )
@@ -278,26 +278,27 @@ def sync_todays_games(conn: sqlite3.Connection) -> int:
         initial_pull._rate_limited_sleep()
         game_header, line_score = initial_pull._call_with_retries(
             _fetch_scoreboard,
-            description=f"ScoreboardV2({today_str})",
+            description=f"ScoreboardV3({today_str})",
         )
     except Exception:  # Broad: _call_with_retries re-raises whatever the NBA API raises.
         logger.exception(
-            "Failed to fetch ScoreboardV2 for %s after %d attempts.",
+            "Failed to fetch ScoreboardV3 for %s after %d attempts.",
             today_str, initial_pull._MAX_RETRIES,
         )
         return 0
 
     if game_header.empty:
-        logger.info("ScoreboardV2 returned no games for %s.", today_str)
+        logger.info("ScoreboardV3 returned no games for %s.", today_str)
         return 0
 
-    # Pre-convert GAME_ID column to string once to avoid repeated conversions.
-    line_score_game_ids = line_score["GAME_ID"].astype(str)
+    # V3 uses camelCase columns: gameId, teamId, teamTricode, gameCode, etc.
+    # Pre-convert gameId column to string once to avoid repeated conversions.
+    line_score_game_ids = line_score["gameId"].astype(str)
 
     inserted = 0
     cursor = conn.cursor()
     for _, game_row in game_header.iterrows():
-        game_id = str(game_row.get("GAME_ID", ""))
+        game_id = str(game_row.get("gameId", ""))
         if not game_id:
             continue
 
@@ -308,28 +309,25 @@ def sync_todays_games(conn: sqlite3.Connection) -> int:
         if existing:
             continue
 
-        # Use GameHeader's HOME_TEAM_ID / VISITOR_TEAM_ID for reliable IDs.
-        raw_home = game_row.get("HOME_TEAM_ID")
-        raw_away = game_row.get("VISITOR_TEAM_ID")
-        home_team_id = int(raw_home) if raw_home is not None else None
-        away_team_id = int(raw_away) if raw_away is not None else None
-
-        # Look up team abbreviations from LineScore.
+        # V3 GameHeader does not contain team IDs directly; derive from
+        # LineScore where each game has two rows (away first, home second).
         teams = line_score[line_score_game_ids == game_id]
+        home_team_id = None
+        away_team_id = None
         home_tri = ""
         away_tri = ""
-        if not teams.empty and home_team_id is not None:
-            home_rows = teams[teams["TEAM_ID"] == home_team_id]
-            away_rows = teams[teams["TEAM_ID"] != home_team_id]
-            if not home_rows.empty:
-                home_tri = home_rows.iloc[0].get("TEAM_ABBREVIATION", "")
-            if not away_rows.empty:
-                away_tri = away_rows.iloc[0].get("TEAM_ABBREVIATION", "")
+        if len(teams) >= 2:
+            away_row = teams.iloc[0]
+            home_row = teams.iloc[1]
+            home_team_id = int(home_row.get("teamId")) if home_row.get("teamId") is not None else None
+            away_team_id = int(away_row.get("teamId")) if away_row.get("teamId") is not None else None
+            home_tri = str(home_row.get("teamTricode", ""))
+            away_tri = str(away_row.get("teamTricode", ""))
 
         if home_tri and away_tri:
             matchup = f"{home_tri} vs. {away_tri}"
         else:
-            matchup = game_row.get("GAMECODE", "TBD")
+            matchup = game_row.get("gameCode", "TBD")
 
         cursor.execute(
             "INSERT INTO Games (game_id, game_date, season, home_team_id, "

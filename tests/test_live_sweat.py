@@ -847,8 +847,8 @@ class TestLiveSweatPageFile(unittest.TestCase):
     def test_get_all_todays_games_function(self):
         self.assertIn("def _get_all_todays_games", self.source)
 
-    def test_scoreboard_uses_scoreboard_v2(self):
-        """Scoreboard should fall back to ScoreboardV2 for complete game list."""
+    def test_scoreboard_uses_scoreboard_v3(self):
+        """Scoreboard should fall back to ScoreboardV3 for complete game list."""
         self.assertIn("get_todays_scoreboard", self.source)
 
     def test_source_tag_in_bets(self):

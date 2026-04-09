@@ -332,7 +332,7 @@ def _get_all_todays_games() -> list[dict]:
     """Return all of today's games (live + scheduled + final).
 
     Uses the live box-scores already fetched and supplements with the
-    ScoreboardV2 endpoint so that pre-tipoff and final games also
+    ScoreboardV3 endpoint so that pre-tipoff and final games also
     appear.  Includes per-game leaders when box-score data is available.
     """
     seen_ids: set[str] = set()
@@ -355,7 +355,7 @@ def _get_all_todays_games() -> list[dict]:
             "away_players": g.get("away_players", []),
         })
 
-    # Supplement with ScoreboardV2 for pre-tipoff / final games
+    # Supplement with ScoreboardV3 for pre-tipoff / final games
     try:
         from data.nba_data_service import get_todays_scoreboard
         sb = get_todays_scoreboard()
