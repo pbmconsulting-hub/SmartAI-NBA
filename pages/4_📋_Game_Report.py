@@ -414,7 +414,7 @@ def _build_all_picks_table(results):
             "Stat":   r.get("stat_type", "").title(),
             "Dir":    r.get("direction", ""),
             "Line":   r.get("line", 0),
-            "Proj":   round(r.get("projected_value", r.get("projection", 0)), 1),
+            "Proj":   round(r.get("adjusted_projection", r.get("projected_value", r.get("projection", 0))) or 0, 1),
             "SAFE":   round(r.get("confidence_score", 0), 1),
             "Edge%":  round(r.get("edge_percentage", 0), 1),
             "Tier":   r.get("tier", ""),
