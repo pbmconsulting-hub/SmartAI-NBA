@@ -470,6 +470,62 @@ def _build_bonus_factors(result):
     return bonus[:6]  # cap at 6 items
 
 
+def _format_record(wins, losses):
+    """Return a ``'W-L'`` string or ``''`` when data is missing/zero."""
+    if wins is not None and losses is not None and (wins > 0 or losses > 0):
+        return f"{wins}-{losses}"
+    return ""
+
+
+def _group_picks_by_game(picks):
+    """Group a list of raw pick dicts by game matchup.
+
+    Returns a dict mapping matchup labels (e.g. ``'BOS @ LAL'``) to dicts
+    with ``"picks"`` (list of pick dicts) and ``"meta"`` (game metadata
+    including team abbreviations, W-L records, and conf rank).
+    Falls back to the player's team if no game context is available.
+    """
+    import streamlit as st
+
+    groups: dict[str, dict] = {}
+    todays_games = st.session_state.get("todays_games") or []
+
+    # Build team → matchup label mapping + game metadata
+    team_to_game: dict[str, str] = {}
+    game_meta: dict[str, dict] = {}  # matchup_label → metadata
+    for g in todays_games:
+        ht = (g.get("home_team") or "").upper().strip()
+        at = (g.get("away_team") or "").upper().strip()
+        if ht and at:
+            label = f"{at} @ {ht}"
+            team_to_game[ht] = label
+            team_to_game[at] = label
+
+            hw = g.get("home_wins")
+            hl = g.get("home_losses")
+            aw = g.get("away_wins")
+            al = g.get("away_losses")
+            game_meta[label] = {
+                "home_team": ht,
+                "away_team": at,
+                "home_record": _format_record(hw, hl),
+                "away_record": _format_record(aw, al),
+                "home_conf_rank": g.get("home_conf_rank", 0),
+                "away_conf_rank": g.get("away_conf_rank", 0),
+            }
+
+    for p in picks:
+        team = (
+            p.get("team", "") or p.get("player_team", "")
+        ).upper().strip()
+        matchup = team_to_game.get(team, team or "Other")
+        if matchup not in groups:
+            groups[matchup] = {"picks": [], "meta": game_meta.get(matchup, {})}
+        groups[matchup]["picks"].append(p)
+
+    return groups
+
+
 def _build_entry_strategy(results):
     """Build entry strategy matrix entries from top results (2–6 legs).
 
@@ -557,6 +613,7 @@ def _build_entry_strategy(results):
             "strategy":      _LEG_STRATEGIES.get(num_legs, ""),
             "reasons":       reasons,
             "raw_picks":     picks,
+            "game_groups":   _group_picks_by_game(picks),
         })
 
     return entries

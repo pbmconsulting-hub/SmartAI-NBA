@@ -5,8 +5,21 @@
 #          reduce page size and improve maintainability.
 # ============================================================
 import html as _html
+import re as _re
 
-from styles.theme import get_education_box_html
+from styles.theme import get_education_box_html, get_team_colors
+
+# ESPN CDN base for team logos (same as game_report_helpers)
+_ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
+_NBA_LOGO_FALLBACK = "https://cdn.nba.com/logos/leagues/logo-nba.svg"
+_SAFE_ABBREV_RE = _re.compile(r"^[A-Za-z0-9]+$")
+
+
+def _safe_logo_url(team_abbrev: str) -> str:
+    """Return an ESPN logo URL only if the abbreviation is safe for a URL."""
+    if _SAFE_ABBREV_RE.match(str(team_abbrev)):
+        return f"{_ESPN_NBA}/{team_abbrev.lower()}.png"
+    return _NBA_LOGO_FALLBACK
 
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -38,6 +51,10 @@ CATEGORY_EMOJI = {
 }
 
 SIGNAL_COLORS = {"sharp_buy": "#00ff9d", "sharp_fade": "#ff6b6b", "neutral": "#8b949e"}
+
+# Shared positive/negative accent colors used for edge and direction styling
+_POSITIVE_COLOR = "#00ff9d"
+_NEGATIVE_COLOR = "#ff6b6b"
 
 SIGNAL_LABELS = {
     "sharp_buy": "🟢 SHARP BUY",
@@ -310,7 +327,8 @@ def render_parlays_header_html() -> str:
     return (
         '<div class="qam-section-header qam-section-header-parlay">'
         '<h3>🎯 Strongly Suggested Parlays</h3>'
-        '<p>Optimized multi-leg combos ranked by combined EDGE Score™</p>'
+        '<p>Optimized multi-leg combos ranked by combined EDGE Score™ — '
+        'grouped by game for easy entry</p>'
         '</div>'
     )
 
@@ -325,6 +343,8 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
     entry : dict
         Parlay entry with keys: num_legs, combo_type, picks, reasons,
         strategy, combined_prob, avg_edge, safe_avg.
+        Optionally ``raw_picks`` with full result dicts and ``game_groups``
+        mapping ``matchup_label → [pick_strings]``.
     card_index : int
         Zero-based index; top-2 entries get a glow border.
     """
@@ -333,41 +353,228 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
     star = PARLAY_STARS.get(num, "")
     glow_cls = " qam-parlay-card-glow" if card_index < 2 else ""
 
-    picks_html = ""
-    for pick_str in entry.get("picks", []):
-        parts = pick_str.split(" ", 1)
-        pname = _html.escape(parts[0]) if parts else ""
-        rest = _html.escape(parts[1]) if len(parts) > 1 else ""
-        picks_html += (
-            f'<div class="qam-parlay-pick">'
-            f'<span class="qam-parlay-pick-name">{pname}</span>'
-            f'<span class="qam-parlay-pick-detail">{rest}</span>'
-            f'</div>'
-        )
+    # ── Build picks, grouped by game when available ──────────
+    game_groups = entry.get("game_groups", {})
+    raw_picks = entry.get("raw_picks", [])
 
+    picks_html = ""
+    if game_groups:
+        for matchup, group_data in game_groups.items():
+            # group_data is either a dict with "picks"/"meta" (new)
+            # or a plain list of pick dicts (legacy fallback)
+            if isinstance(group_data, dict):
+                legs = group_data.get("picks", [])
+                meta = group_data.get("meta", {})
+            else:
+                legs = group_data
+                meta = {}
+
+            game_label_html = _render_game_group_label(str(matchup), meta)
+            picks_html += (
+                f'<div class="qam-parlay-game-group">'
+                f'{game_label_html}'
+            )
+            for leg in legs:
+                picks_html += _render_single_leg_html(leg, raw_picks)
+            picks_html += '</div>'
+    else:
+        # Fallback: flat pick list (legacy format)
+        for pick_str in entry.get("picks", []):
+            picks_html += _render_leg_from_string(pick_str, raw_picks)
+
+    # ── Reason tags ──────────────────────────────────────────
     reasons = entry.get("reasons", [])
-    reason_text = (
-        _html.escape(" | ".join(reasons))
-        if reasons
-        else _html.escape(entry.get("strategy", ""))
-    )
+    reason_html = ""
+    if reasons:
+        tags = "".join(
+            f'<span class="qam-parlay-reason-tag">{_html.escape(r)}</span>'
+            for r in reasons
+        )
+        reason_html = f'<div class="qam-parlay-reason">{tags}</div>'
+    elif entry.get("strategy"):
+        tag = f'<span class="qam-parlay-reason-tag">{_html.escape(entry["strategy"])}</span>'
+        reason_html = f'<div class="qam-parlay-reason">{tag}</div>'
+
+    # ── Stats footer ─────────────────────────────────────────
     combined = entry.get("combined_prob", 0)
     avg_edge = entry.get("avg_edge", 0)
     avg_conf = entry.get("safe_avg", "—")
+
+    edge_color = _POSITIVE_COLOR if avg_edge > 0 else _NEGATIVE_COLOR
 
     return (
         f'<div class="qam-parlay-card{glow_cls}">'
         f'<div class="qam-parlay-header">'
         f'<h4>{star} {label}</h4>'
-        f'<span class="qam-parlay-safe-badge">SAFE: {avg_conf}/100</span>'
+        f'<span class="qam-parlay-safe-badge">SAFE {avg_conf}/100</span>'
         f'</div>'
         f'{picks_html}'
-        f'<div class="qam-parlay-reason">'
-        f'<span class="qam-parlay-reason-text">💡 {reason_text}</span>'
-        f'</div>'
+        f'{reason_html}'
         f'<div class="qam-parlay-stats">'
-        f'<span>Combined prob: {combined:.1f}%</span>'
-        f'<span>Avg edge: {avg_edge:+.1f}%</span>'
+        f'<div class="qam-parlay-stat-item">'
+        f'<span class="qam-parlay-stat-val">{combined:.1f}%</span>'
+        f'<span class="qam-parlay-stat-label">Combined Prob</span>'
         f'</div>'
+        f'<div class="qam-parlay-stat-item">'
+        f'<span class="qam-parlay-stat-val" style="color:{edge_color};">{avg_edge:+.1f}%</span>'
+        f'<span class="qam-parlay-stat-label">Avg Edge</span>'
+        f'</div>'
+        f'<div class="qam-parlay-stat-item">'
+        f'<span class="qam-parlay-stat-val">{num}</span>'
+        f'<span class="qam-parlay-stat-label">Legs</span>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def _render_game_group_label(matchup: str, meta: dict) -> str:
+    """Render the game group header with team logos, abbreviations, and W-L records.
+
+    Parameters
+    ----------
+    matchup : str
+        Matchup label like ``'BOS @ LAL'``.
+    meta : dict
+        Game metadata with keys: ``home_team``, ``away_team``,
+        ``home_record``, ``away_record``, ``home_conf_rank``,
+        ``away_conf_rank``.  May be empty for fallback labels.
+    """
+    away_team = meta.get("away_team", "")
+    home_team = meta.get("home_team", "")
+
+    # If we have structured meta, render the rich label with logos
+    if away_team and home_team:
+        away_color, _ = get_team_colors(away_team)
+        home_color, _ = get_team_colors(home_team)
+        away_logo = _safe_logo_url(away_team)
+        home_logo = _safe_logo_url(home_team)
+        away_rec = _html.escape(meta.get("away_record", ""))
+        home_rec = _html.escape(meta.get("home_record", ""))
+        safe_away = _html.escape(away_team)
+        safe_home = _html.escape(home_team)
+
+        away_rec_html = f' <span class="qam-parlay-team-record">({away_rec})</span>' if away_rec else ""
+        home_rec_html = f' <span class="qam-parlay-team-record">({home_rec})</span>' if home_rec else ""
+
+        return (
+            f'<div class="qam-parlay-game-label">'
+            # Away team
+            f'<div class="qam-parlay-game-team">'
+            f'<img class="qam-parlay-team-logo" '
+            f'src="{away_logo}" alt="{safe_away}" '
+            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'<span class="qam-parlay-team-abbrev" style="color:{away_color};">{safe_away}</span>'
+            f'{away_rec_html}'
+            f'</div>'
+            # VS divider
+            f'<span class="qam-parlay-game-vs">@</span>'
+            # Home team
+            f'<div class="qam-parlay-game-team">'
+            f'<img class="qam-parlay-team-logo" '
+            f'src="{home_logo}" alt="{safe_home}" '
+            f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+            f'<span class="qam-parlay-team-abbrev" style="color:{home_color};">{safe_home}</span>'
+            f'{home_rec_html}'
+            f'</div>'
+            f'</div>'
+        )
+
+    # Fallback: plain text label (no game context available)
+    safe_matchup = _html.escape(matchup)
+    return (
+        f'<div class="qam-parlay-game-label">'
+        f'<span class="qam-parlay-team-abbrev" style="color:#00C6FF;">🏀 {safe_matchup}</span>'
+        f'</div>'
+    )
+
+
+def _render_single_leg_html(leg_info: dict, raw_picks: list) -> str:
+    """Render one pick leg with direction badge and edge info.
+
+    Parameters
+    ----------
+    leg_info : dict
+        Must have ``player_name``, ``direction``, ``line``, ``stat_type``.
+        May also have ``edge_percentage`` and ``tier``.
+    raw_picks : list
+        Full raw pick dicts (used as fallback for edge/tier lookup).
+    """
+    pname = _html.escape(str(leg_info.get("player_name", "")))
+    direction = (leg_info.get("direction", "") or "").upper()
+    line = leg_info.get("line", "")
+    stat = _html.escape(str(leg_info.get("stat_type", "")).replace("_", " ").title())
+    edge = leg_info.get("edge_percentage", 0) or 0
+    tier = (leg_info.get("tier", "") or "").lower()
+
+    dir_cls = "qam-parlay-pick-dir-over" if direction == "OVER" else "qam-parlay-pick-dir-under"
+    dir_label = _html.escape(direction) if direction else ""
+
+    tier_html = ""
+    if tier in ("platinum", "gold", "silver"):
+        tier_html = f'<span class="qam-parlay-pick-tier qam-parlay-pick-tier-{tier}">{tier.title()}</span>'
+
+    edge_color = _POSITIVE_COLOR if edge > 0 else _NEGATIVE_COLOR
+
+    return (
+        f'<div class="qam-parlay-pick">'
+        f'<span class="qam-parlay-pick-name">{pname}</span>'
+        f'<span class="qam-parlay-pick-dir {dir_cls}">{dir_label}</span>'
+        f'<span class="qam-parlay-pick-detail">{line} {stat}</span>'
+        f'{tier_html}'
+        f'<span class="qam-parlay-pick-edge" style="color:{edge_color};">{edge:+.1f}%</span>'
+        f'</div>'
+    )
+
+
+def _render_leg_from_string(pick_str: str, raw_picks: list) -> str:
+    """Render a legacy pick string as a styled leg row.
+
+    Falls back to matching the player name against raw_picks for edge/tier.
+    """
+    parts = pick_str.split(" ", 1)
+    pname = _html.escape(parts[0]) if parts else ""
+    rest = parts[1] if len(parts) > 1 else ""
+
+    # Try to find matching raw pick for edge/tier
+    edge = 0.0
+    tier = ""
+    direction = ""
+    for rp in raw_picks:
+        if rp.get("player_name", "") == (parts[0] if parts else ""):
+            edge = rp.get("edge_percentage", 0) or 0
+            tier = (rp.get("tier", "") or "").lower()
+            direction = (rp.get("direction", "") or "").upper()
+            break
+
+    # Parse direction from rest string if not found
+    if not direction:
+        rest_upper = rest.upper()
+        if rest_upper.startswith("OVER"):
+            direction = "OVER"
+        elif rest_upper.startswith("UNDER"):
+            direction = "UNDER"
+
+    dir_cls = "qam-parlay-pick-dir-over" if direction == "OVER" else "qam-parlay-pick-dir-under"
+    dir_label = _html.escape(direction)
+
+    # Remove direction from rest to avoid duplication
+    rest_cleaned = rest
+    if direction and rest.upper().startswith(direction):
+        rest_cleaned = rest[len(direction):].strip()
+
+    tier_html = ""
+    if tier in ("platinum", "gold", "silver"):
+        tier_html = f'<span class="qam-parlay-pick-tier qam-parlay-pick-tier-{tier}">{tier.title()}</span>'
+
+    edge_color = _POSITIVE_COLOR if edge > 0 else _NEGATIVE_COLOR
+
+    return (
+        f'<div class="qam-parlay-pick">'
+        f'<span class="qam-parlay-pick-name">{pname}</span>'
+        f'<span class="qam-parlay-pick-dir {dir_cls}">{dir_label}</span>'
+        f'<span class="qam-parlay-pick-detail">{_html.escape(rest_cleaned)}</span>'
+        f'{tier_html}'
+        f'<span class="qam-parlay-pick-edge" style="color:{edge_color};">{edge:+.1f}%</span>'
         f'</div>'
     )
