@@ -339,6 +339,9 @@ def _build_entry_strategy(results):
     def _pick_unique_players(candidates, num_legs, exclude_players=None):
         """Return up to num_legs picks with no repeated players.
 
+        Enforces team diversity: swaps the weakest pick for the best
+        pick from a different team when all selections are same-team.
+
         Args:
             candidates: Sorted list of pick dicts.
             num_legs: Max number of picks to return.
@@ -356,6 +359,23 @@ def _build_entry_strategy(results):
             selected.append(r)
             if len(selected) == num_legs:
                 break
+
+        # Team diversity: replace weakest pick if all from same team
+        if len(selected) >= 2:
+            teams_in = {(p.get("team") or p.get("player_team") or "").upper().strip()
+                        for p in selected}
+            teams_in.discard("")
+            if len(teams_in) == 1:
+                only_team = next(iter(teams_in))
+                used_names = {p.get("player_name", "") for p in selected}
+                used_names.update(exclude)
+                for alt in candidates:
+                    alt_team = (alt.get("team") or alt.get("player_team") or "").upper().strip()
+                    alt_name = alt.get("player_name", "")
+                    if alt_team and alt_team != only_team and alt_name not in used_names:
+                        selected[-1] = alt
+                        break
+
         return selected
 
     def _fmt(picks):
@@ -939,7 +959,7 @@ with _tab_report:
                         game=game,
                         analysis_results=game_results,
                     )
-                    card_height = min(12000, 2200 + max(0, n_game_props - 1) * 800)
+                    card_height = min(30000, 2500 + max(0, n_game_props - 1) * 1000)
                     components.html(html_content, height=card_height, scrolling=True)
                 else:
                     # ── Key player matchups from players.csv ────────
@@ -996,7 +1016,9 @@ with _tab_report:
             game=None,
             analysis_results=report_results,
         )
-        components.html(html_content, height=12000, scrolling=True)
+        _n_all_props = len(report_results)
+        _all_height = min(30000, 2500 + max(0, _n_all_props - 1) * 1000)
+        components.html(html_content, height=_all_height, scrolling=True)
     else:
         st.info(
             "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."

@@ -4563,20 +4563,48 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         used_set.add(opener_idx)
         opener = take_openers[opener_idx]
 
-        # Find best SMASH pick
+        # Find best SMASH pick — fall back to high-confidence/high-edge
+        # picks when verdicts haven't been assigned yet (pre-joseph_full_analysis).
         smash_picks = [r for r in (analysis_results or [])
                        if r.get("verdict") == "SMASH"]
+        if not smash_picks:
+            # Approximate: Platinum/Gold tier with high edge → "SMASH"
+            smash_picks = [
+                r for r in (analysis_results or [])
+                if r.get("tier") in ("Platinum", "Gold")
+                and abs(_extract_edge(r)) >= 8.0
+            ]
         smash_picks.sort(key=lambda x: _extract_edge(x), reverse=True)
 
-        # Find best fade/stay_away
+        # Find best fade/stay_away — fall back to should_avoid
         avoid_picks = [r for r in (analysis_results or [])
                        if r.get("verdict") in ("FADE", "STAY_AWAY")]
+        if not avoid_picks:
+            avoid_picks = [r for r in (analysis_results or [])
+                          if r.get("should_avoid", False)]
         avoid_picks.sort(key=lambda x: _extract_edge(x))
 
-        # Count verdicts for slate summary
+        # Count verdicts for slate summary — use verdict when available,
+        # otherwise approximate from tier and edge data so the monologue
+        # numbers match the picks the user actually sees.
         n_total = len(analysis_results or [])
-        n_smash = len(smash_picks)
+        n_smash = len([r for r in (analysis_results or []) if r.get("verdict") == "SMASH"])
         n_lean = len([r for r in (analysis_results or []) if r.get("verdict") == "LEAN"])
+        if n_smash == 0 and n_lean == 0 and n_total > 0:
+            # Pre-verdict fallback: count by tier + edge thresholds
+            n_smash = len([
+                r for r in (analysis_results or [])
+                if r.get("tier") in ("Platinum", "Gold")
+                and abs(_extract_edge(r)) >= 8.0
+                and not r.get("should_avoid", False)
+            ])
+            n_lean = len([
+                r for r in (analysis_results or [])
+                if r.get("tier") in ("Platinum", "Gold", "Silver")
+                and abs(_extract_edge(r)) >= 3.0
+                and not r.get("should_avoid", False)
+            ]) - n_smash  # Don't double-count smash picks
+            n_lean = max(0, n_lean)
         n_games = len(todays_games or [])
 
         # Slate summary sentence

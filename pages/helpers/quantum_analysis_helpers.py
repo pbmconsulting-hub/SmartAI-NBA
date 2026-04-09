@@ -578,3 +578,59 @@ def _render_leg_from_string(pick_str: str, raw_picks: list) -> str:
         f'<span class="qam-parlay-pick-edge" style="color:{edge_color};">{edge:+.1f}%</span>'
         f'</div>'
     )
+
+
+# ── Game Matchup Card (replaces plain expander labels) ───────────────────────
+
+def render_game_matchup_card_html(
+    away_team: str,
+    home_team: str,
+    away_record: str = "",
+    home_record: str = "",
+    n_players: int = 0,
+    n_props: int = 0,
+) -> str:
+    """Return an HTML matchup card with team logos, colors, records,
+    and prop/player counts for the QAM game group headers.
+    """
+    away_color, _ = get_team_colors(away_team)
+    home_color, _ = get_team_colors(home_team)
+    away_logo = _safe_logo_url(away_team)
+    home_logo = _safe_logo_url(home_team)
+    safe_away = _html.escape(str(away_team))
+    safe_home = _html.escape(str(home_team))
+    safe_away_rec = _html.escape(str(away_record)) if away_record else ""
+    safe_home_rec = _html.escape(str(home_record)) if home_record else ""
+
+    props_badge = (
+        f'<div class="qam-matchup-badges">'
+        f'<span class="qam-matchup-badge qam-matchup-badge-players">'
+        f'{n_players} player{"s" if n_players != 1 else ""}</span>'
+        f'<span class="qam-matchup-badge qam-matchup-badge-props">'
+        f'{n_props} prop{"s" if n_props != 1 else ""}</span>'
+        f'</div>'
+    )
+
+    return (
+        f'<div class="qam-matchup-card">'
+        f'<div class="qam-matchup-teams">'
+        # Away team
+        f'<div class="qam-matchup-team">'
+        f'<img class="qam-matchup-logo" src="{away_logo}" alt="{safe_away}" '
+        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+        f'<span class="qam-matchup-abbrev" style="color:{away_color};">{safe_away}</span>'
+        + (f'<span class="qam-matchup-record">{safe_away_rec}</span>' if safe_away_rec else "")
+        + f'</div>'
+        # VS divider
+        f'<div class="qam-matchup-vs">@</div>'
+        # Home team
+        f'<div class="qam-matchup-team">'
+        f'<img class="qam-matchup-logo" src="{home_logo}" alt="{safe_home}" '
+        f'onerror="this.onerror=null;this.src=\'{_NBA_LOGO_FALLBACK}\'">'
+        f'<span class="qam-matchup-abbrev" style="color:{home_color};">{safe_home}</span>'
+        + (f'<span class="qam-matchup-record">{safe_home_rec}</span>' if safe_home_rec else "")
+        + f'</div>'
+        f'</div>'
+        + props_badge
+        + f'</div>'
+    )

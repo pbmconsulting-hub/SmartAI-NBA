@@ -558,7 +558,12 @@ def _build_entry_strategy(results):
     }
 
     def _pick_unique_players(candidates, num_legs):
-        """Return up to num_legs picks with no repeated players."""
+        """Return up to num_legs picks with no repeated players.
+
+        Enforces team diversity: picks from at least two different
+        teams when the candidate pool spans multiple teams, so parlays
+        include bets from both sides of a matchup.
+        """
         seen_players: set = set()
         selected = []
         for r in candidates:
@@ -569,6 +574,27 @@ def _build_entry_strategy(results):
             selected.append(r)
             if len(selected) == num_legs:
                 break
+
+        # ── Team diversity check ────────────────────────────────
+        # If all selected picks are from one team but the candidate
+        # pool contains players from other teams, swap the weakest
+        # pick for the best pick from a different team.
+        if len(selected) >= 2:
+            teams_in = {(p.get("team") or p.get("player_team") or "").upper().strip()
+                        for p in selected}
+            teams_in.discard("")
+            if len(teams_in) == 1:
+                only_team = next(iter(teams_in))
+                # Find best unused candidate from a different team
+                used_names = {p.get("player_name", "") for p in selected}
+                for alt in candidates:
+                    alt_team = (alt.get("team") or alt.get("player_team") or "").upper().strip()
+                    alt_name = alt.get("player_name", "")
+                    if alt_team and alt_team != only_team and alt_name not in used_names:
+                        # Replace the last (weakest) pick with this one
+                        selected[-1] = alt
+                        break
+
         return selected
 
     entries = []

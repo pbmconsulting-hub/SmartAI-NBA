@@ -438,6 +438,7 @@ from pages.helpers.quantum_analysis_helpers import (
     render_best_single_bets_header_html as _render_best_single_bets_header_html,
     render_parlays_header_html as _render_parlays_header_html,
     render_parlay_card_html as _render_parlay_card_html,
+    render_game_matchup_card_html as _render_game_matchup_card_html,
     IMPACT_COLORS as _IMP_COLORS,
     CATEGORY_EMOJI as _CAT_EMOJI,
 )
@@ -724,10 +725,6 @@ if run_analysis:
     progress_bar         = st.progress(0, text="Starting analysis...")
     analysis_results_list = []
 
-    # ── Change 8: Incremental rendering placeholder ──────────────
-    # Render each card as it completes instead of waiting for all to finish.
-    _incremental_container = st.container()
-
     # Clear stale Joseph results so fresh ones are generated after this run.
     st.session_state.pop("joseph_results", None)
     st.session_state["joseph_bets_logged"] = False
@@ -999,17 +996,6 @@ if run_analysis:
             if _cached_result is not None:
                 analysis_results_list.append(_cached_result)
                 _cache_hits += 1
-                # ── Change 8: Stream cached result immediately ────────
-                with _incremental_container:
-                    _tier = _cached_result.get("tier", "Bronze")
-                    _pn = _cached_result.get("player_name", "")
-                    _dir = _cached_result.get("direction", "OVER")
-                    _ln = _cached_result.get("line", 0)
-                    _conf = _cached_result.get("confidence_score", 0)
-                    st.caption(
-                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
-                        f"**{_pn}** — {_dir} {_ln} — SAFE: {_conf:.0f} *(cached)*"
-                    )
                 continue
 
             try:
@@ -1916,17 +1902,6 @@ if run_analysis:
                 # ── Change 10: Store in simulation cache ──────────────
                 _sim_cache[_cache_k] = full_result
 
-                # ── Change 8: Stream result immediately ───────────────
-                with _incremental_container:
-                    _tier = full_result.get("tier", "Bronze")
-                    _pn = full_result.get("player_name", "")
-                    _dir_s = full_result.get("direction", "OVER")
-                    _ln_s = full_result.get("line", 0)
-                    _conf_s = full_result.get("confidence_score", 0)
-                    st.caption(
-                        f"{_TIER_EMOJI.get(_tier, '🥉')} "
-                        f"**{_pn}** — {_dir_s} {_ln_s} — SAFE: {_conf_s:.0f}"
-                    )
             except Exception as _prop_loop_err:
                 _logger.warning(
                     "Prop #%d (%s/%s) analysis failed — skipped: %s",
@@ -2739,6 +2714,7 @@ if analysis_results:
         # ── Feature 16: Collapsible Game Groups ──────────────────
         # Build team → game-matchup label mapping from todays_games.
         _team_to_game: dict[str, str] = {}
+        _game_meta_map: dict[str, dict] = {}  # matchup_label → game dict
         for _g in (todays_games or []):
             _ht = (_g.get("home_team") or "").upper().strip()
             _at = (_g.get("away_team") or "").upper().strip()
@@ -2746,6 +2722,7 @@ if analysis_results:
                 _matchup_label = f"{_at} @ {_ht}"
                 _team_to_game[_ht] = _matchup_label
                 _team_to_game[_at] = _matchup_label
+                _game_meta_map[_matchup_label] = _g
 
         # Group players by their game matchup.
         _game_groups: dict[str, dict[str, dict]] = {}  # matchup → {player: data}
@@ -2764,7 +2741,32 @@ if analysis_results:
         for _game_idx, (_game_label, _game_players) in enumerate(_game_groups.items()):
             _gp_count = len(_game_players)
             _gp_prop_count = sum(len(d.get("props", [])) for d in _game_players.values())
+
+            # Render matchup card with team logos above the expander
+            _gm = _game_meta_map.get(_game_label)
+            if _gm and _game_label != _no_game:
+                _mc_ht = (_gm.get("home_team") or "").upper().strip()
+                _mc_at = (_gm.get("away_team") or "").upper().strip()
+                _hw = _gm.get("home_wins"); _hl = _gm.get("home_losses")
+                _aw = _gm.get("away_wins"); _al = _gm.get("away_losses")
+                _mc_h_rec = f"{_hw}-{_hl}" if _hw is not None and _hl is not None and (_hw > 0 or _hl > 0) else ""
+                _mc_a_rec = f"{_aw}-{_al}" if _aw is not None and _al is not None and (_aw > 0 or _al > 0) else ""
+                st.markdown(
+                    _render_game_matchup_card_html(
+                        away_team=_mc_at,
+                        home_team=_mc_ht,
+                        away_record=_mc_a_rec,
+                        home_record=_mc_h_rec,
+                        n_players=_gp_count,
+                        n_props=_gp_prop_count,
+                    ),
+                    unsafe_allow_html=True,
+                )
+
             _expander_label = (
+                f"📊 View {_gp_count} player{'s' if _gp_count != 1 else ''}"
+                f", {_gp_prop_count} prop{'s' if _gp_prop_count != 1 else ''}"
+            ) if _gm and _game_label != _no_game else (
                 f"🏀 {_game_label} — {_gp_count} player{'s' if _gp_count != 1 else ''}"
                 f", {_gp_prop_count} prop{'s' if _gp_prop_count != 1 else ''}"
             )

@@ -7009,6 +7009,84 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qam-game-group-body {
     padding: 4px 0;
 }
+
+/* ── QAM Matchup Card ─────────────────────────────────────── */
+.qam-matchup-card {
+    background: linear-gradient(135deg, rgba(0,198,255,0.06) 0%, rgba(255,94,0,0.04) 100%);
+    border: 1px solid rgba(0,198,255,0.18);
+    border-radius: 14px;
+    padding: 14px 20px 10px;
+    margin-bottom: 8px;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.qam-matchup-card:hover {
+    border-color: rgba(0,198,255,0.35);
+    box-shadow: 0 0 18px rgba(0,198,255,0.08);
+}
+.qam-matchup-teams {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+.qam-matchup-team {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 80px;
+}
+.qam-matchup-logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(0,198,255,0.35));
+    transition: transform 0.2s ease;
+}
+.qam-matchup-card:hover .qam-matchup-logo {
+    transform: scale(1.08);
+}
+.qam-matchup-abbrev {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+.qam-matchup-record {
+    font-size: 0.72rem;
+    color: #8a9bb8;
+    font-weight: 500;
+}
+.qam-matchup-vs {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    color: #64748b;
+    padding: 4px 14px;
+    background: rgba(0,198,255,0.08);
+    border-radius: 20px;
+    font-weight: 600;
+}
+.qam-matchup-badges {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 8px;
+}
+.qam-matchup-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+.qam-matchup-badge-players {
+    background: rgba(0,255,157,0.10);
+    color: #00ff9d;
+}
+.qam-matchup-badge-props {
+    background: rgba(0,198,255,0.10);
+    color: #00C6FF;
+}
 """
 
 
