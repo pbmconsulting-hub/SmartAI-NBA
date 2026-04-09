@@ -604,14 +604,14 @@ if mode == "🎤 ASK JOSEPH":
     if _voice_question and _voice_question.strip():
         _q = _voice_question.strip()
         _q_safe = _html.escape(_q)
-        _todays = st.session_state.get("todays_games", [])
+        _todays_games = st.session_state.get("todays_games", [])
         _is_hot_take = st.session_state.get("joseph_hot_take_mode", False)
         if _BRAIN_AVAILABLE:
             try:
                 _voice_answer = joseph_quick_take(
                     analysis_results,
                     teams_data,
-                    _todays,
+                    _todays_games,
                     context=f"user_question: {_q_safe}",
                 )
                 # When Hot Take Mode is on, prepend a contrarian spin

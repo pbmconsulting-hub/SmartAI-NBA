@@ -319,6 +319,138 @@ _STAT_DB_KEY_MAP = {
     "fg3m": "FG3M", "turnovers": "TOV",
 }
 
+# ── Ask-Joseph question-answering constants ──────────────────
+# Moved to module-level to avoid recreation on every call.
+
+_ASK_STAT_KEYWORDS = {
+    "points": "points", "pts": "points", "scoring": "points",
+    "rebounds": "rebounds", "boards": "rebounds", "reb": "rebounds",
+    "assists": "assists", "dimes": "assists", "ast": "assists",
+    "threes": "three_pointers_made", "3s": "three_pointers_made",
+    "steals": "steals", "blocks": "blocks",
+    "turnovers": "turnovers", "fantasy": "fantasy",
+    "pra": "pts_reb_ast", "combos": "pts_reb_ast",
+    "double": "double_double",
+}
+
+_ASK_TEAM_ALIASES = {
+    "lakers": "lal", "celtics": "bos", "warriors": "gsw",
+    "nuggets": "den", "bucks": "mil", "sixers": "phi",
+    "76ers": "phi", "heat": "mia", "suns": "phx",
+    "knicks": "nyk", "nets": "bkn", "bulls": "chi",
+    "cavs": "cle", "cavaliers": "cle", "hawks": "atl",
+    "raptors": "tor", "mavericks": "dal", "mavs": "dal",
+    "rockets": "hou", "timberwolves": "min", "wolves": "min",
+    "thunder": "okc", "pelicans": "nop", "pels": "nop",
+    "spurs": "sas", "jazz": "uta", "blazers": "por",
+    "trail blazers": "por", "pacers": "ind", "kings": "sac",
+    "magic": "orl", "pistons": "det", "hornets": "cha",
+    "grizzlies": "mem", "clippers": "lac", "wizards": "was",
+}
+
+_ASK_PERSONALITY_MAP = {
+    "goat": (
+        "The GOAT? Let me tell you something — it's Michael Jeffrey Jordan. "
+        "Six rings. Six Finals MVPs. ZERO Game 7s in the Finals. "
+        "You can talk about LeBron's longevity, Kobe's mentality, "
+        "Kareem's sky hook — but MJ is the STANDARD. "
+        "And I, Joseph M. Smith, will FIGHT anyone who disagrees!"
+    ),
+    "best player": (
+        "Right NOW? It's a two-man race between Nikola Jokic and "
+        "Luka Doncic. Jokic does things with the basketball that "
+        "shouldn't be POSSIBLE for a man his size. Luka is a "
+        "generational TALENT. But don't sleep on Shai Gilgeous-Alexander — "
+        "that man is ascending to SUPERSTARDOM!"
+    ),
+    "best team": (
+        "The BEST team? That changes game to game — but I'll tell you this: "
+        "the team with the best DEFENSE will win in the playoffs. "
+        "Every. Single. Time. Offense gets you regular season wins. "
+        "DEFENSE gets you RINGS!"
+    ),
+    "mvp": (
+        "MVP is about NARRATIVE as much as performance. "
+        "You need the stats, the wins, AND the story. "
+        "That's why I analyze the DATA and not just the highlights. "
+        "Check the Neural Analysis and I'll show you who the REAL MVP-caliber players are tonight!"
+    ),
+    "favorite team": (
+        "Joseph M. Smith doesn't have FAVORITES — I have ANALYSIS. "
+        "I go where the DATA takes me. Tonight, my favorite team is "
+        "whoever has the most SMASH plays on the board. "
+        "Run the analysis and I'll TELL you who that is!"
+    ),
+    "favorite player": (
+        "I don't play FAVORITES with players — I play favorites with NUMBERS. "
+        "My favorite player tonight is whoever has the best edge in the analysis. "
+        "That's the beauty of being data-driven — NO BIAS, just FACTS!"
+    ),
+    "hello": (
+        "What's up! Joseph M. Smith here, LIVE from The Studio! "
+        "I've got game logs, shot charts, matchup data, and a FIRE personality. "
+        "Ask me anything — I'm ready to WORK!"
+    ),
+    "who are you": (
+        "I'm Joseph M. Smith — the SUPREME NBA analyst. "
+        "I combine machine-learning models with my INSTINCT to deliver "
+        "the best picks in the game. I've got data, I've got personality, "
+        "and I've got RECEIPTS. Ask me about any player, any game, "
+        "or my track record and I'll DELIVER!"
+    ),
+    "thank": (
+        "You're WELCOME! That's what Joseph M. Smith is here for — "
+        "to give you the REAL analysis that nobody else will. "
+        "Keep asking questions and I'll keep delivering the GOODS!"
+    ),
+    "love you": (
+        "I appreciate the love! But you know what REALLY shows love? "
+        "Following my SMASH plays and cashing tickets! "
+        "Let's make MONEY together!"
+    ),
+    "you suck": (
+        "EXCUSE ME?! Joseph M. Smith has been doing this since BEFORE "
+        "analytics was cool! My track record SPEAKS for itself. "
+        "The game logs don't lie. The splits don't lie. "
+        "And Joseph M. Smith DOESN'T lie! Check the receipts!"
+    ),
+    "funny": (
+        "I'm not here to be FUNNY — I'm here to be RIGHT! "
+        "But if making you money HAPPENS to make you laugh, "
+        "then consider me a COMEDIAN and an ANALYST!"
+    ),
+    "playoff": (
+        "PLAYOFF basketball is a DIFFERENT sport. The stars play 40+ minutes, "
+        "the defenses TIGHTEN, and only the REAL ones show up. "
+        "That's why my analysis factors in clutch stats, "
+        "minutes adjustments, and playoff history!"
+    ),
+    "trade": (
+        "Trades change EVERYTHING. New team, new role, new matchups. "
+        "When a trade happens, I recalculate from SCRATCH. "
+        "You can't just plug old numbers into a new situation — "
+        "that's AMATEUR hour. Joseph M. Smith adjusts for CONTEXT!"
+    ),
+    "draft": (
+        "The draft is where FUTURES are made. I look at college translations, "
+        "physical profiles, and historical comps. "
+        "But tonight we're focused on the CURRENT slate. "
+        "Ask me about any player on tonight's games!"
+    ),
+    "over under": (
+        "Over/Under is where the MONEY is! I analyze usage rates, pace, "
+        "defensive matchups, and recent trends to find the props that are "
+        "MISPRICED. My Neural Analysis crunches ALL of that for you. "
+        "Run it and I'll show you where the value is!"
+    ),
+    "spread": (
+        "Spreads are about matchups, pace, and home-court advantage. "
+        "I factor in defensive ratings, offensive efficiency, and "
+        "recent form to give you the REAL number. "
+        "Ask me about a specific game and I'll break it down!"
+    ),
+}
+
 def _get_player_db_intel(player: dict) -> dict:
     """Pull comprehensive DB intel on a player for supreme analysis.
 
@@ -3751,33 +3883,8 @@ def _joseph_answer_question(question: str, analysis_results: list,
                 game_matched.append(g)
         return game_matched
 
-    # ── Stat-type keyword mapping ─────────────────────────────
-    _STAT_KEYWORDS = {
-        "points": "points", "pts": "points", "scoring": "points",
-        "rebounds": "rebounds", "boards": "rebounds", "reb": "rebounds",
-        "assists": "assists", "dimes": "assists", "ast": "assists",
-        "threes": "three_pointers_made", "3s": "three_pointers_made",
-        "steals": "steals", "blocks": "blocks",
-        "turnovers": "turnovers", "fantasy": "fantasy",
-        "pra": "pts_reb_ast", "combos": "pts_reb_ast",
-        "double": "double_double",
-    }
-
-    # ── Team name alias map (common abbreviations) ────────────
-    _TEAM_ALIASES = {
-        "lakers": "lal", "celtics": "bos", "warriors": "gsw",
-        "nuggets": "den", "bucks": "mil", "sixers": "phi",
-        "76ers": "phi", "heat": "mia", "suns": "phx",
-        "knicks": "nyk", "nets": "bkn", "bulls": "chi",
-        "cavs": "cle", "cavaliers": "cle", "hawks": "atl",
-        "raptors": "tor", "mavericks": "dal", "mavs": "dal",
-        "rockets": "hou", "timberwolves": "min", "wolves": "min",
-        "thunder": "okc", "pelicans": "nop", "pels": "nop",
-        "spurs": "sas", "jazz": "uta", "blazers": "por",
-        "trail blazers": "por", "pacers": "ind", "kings": "sac",
-        "magic": "orl", "pistons": "det", "hornets": "cha",
-        "grizzlies": "mem", "clippers": "lac", "wizards": "was",
-    }
+    # ── Stat-type and team alias maps are at module level ──────
+    # _ASK_STAT_KEYWORDS, _ASK_TEAM_ALIASES, _ASK_PERSONALITY_MAP
 
     # ──────────────────────────────────────────────────────────
     # TOPIC 1: TRACK RECORD / "How are you doing?"
@@ -4187,7 +4294,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
 
     # Filter by stat type if mentioned
     stat_filter = None
-    for kw, stat_key in _STAT_KEYWORDS.items():
+    for kw, stat_key in _ASK_STAT_KEYWORDS.items():
         if kw in q_lower:
             stat_filter = stat_key
             break
@@ -4243,7 +4350,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
     # Also check team aliases
     game_matched = _match_games(q_lower)
     if not game_matched:
-        for alias, abbrev in _TEAM_ALIASES.items():
+        for alias, abbrev in _ASK_TEAM_ALIASES.items():
             if alias in q_lower:
                 for g in (todays_games or []):
                     home = str(
@@ -4348,109 +4455,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
     # ──────────────────────────────────────────────────────────
     # TOPIC 11: GENERAL BASKETBALL / GOAT DEBATE / PERSONALITY
     # ──────────────────────────────────────────────────────────
-    _PERSONALITY_MAP = {
-        "goat": (
-            "The GOAT? Let me tell you something — it's Michael Jeffrey Jordan. "
-            "Six rings. Six Finals MVPs. ZERO Game 7s in the Finals. "
-            "You can talk about LeBron's longevity, Kobe's mentality, "
-            "Kareem's sky hook — but MJ is the STANDARD. "
-            "And I, Joseph M. Smith, will FIGHT anyone who disagrees!"
-        ),
-        "best player": (
-            "Right NOW? It's a two-man race between Nikola Jokic and "
-            "Luka Doncic. Jokic does things with the basketball that "
-            "shouldn't be POSSIBLE for a man his size. Luka is a "
-            "generational TALENT. But don't sleep on Shai Gilgeous-Alexander — "
-            "that man is ascending to SUPERSTARDOM!"
-        ),
-        "best team": (
-            "The BEST team? That changes game to game — but I'll tell you this: "
-            "the team with the best DEFENSE will win in the playoffs. "
-            "Every. Single. Time. Offense gets you regular season wins. "
-            "DEFENSE gets you RINGS!"
-        ),
-        "mvp": (
-            "MVP is about NARRATIVE as much as performance. "
-            "You need the stats, the wins, AND the story. "
-            "That's why I analyze the DATA and not just the highlights. "
-            "Check the Neural Analysis and I'll show you who the REAL MVP-caliber players are tonight!"
-        ),
-        "favorite team": (
-            "Joseph M. Smith doesn't have FAVORITES — I have ANALYSIS. "
-            "I go where the DATA takes me. Tonight, my favorite team is "
-            "whoever has the most SMASH plays on the board. "
-            "Run the analysis and I'll TELL you who that is!"
-        ),
-        "favorite player": (
-            "I don't play FAVORITES with players — I play favorites with NUMBERS. "
-            "My favorite player tonight is whoever has the best edge in the analysis. "
-            "That's the beauty of being data-driven — NO BIAS, just FACTS!"
-        ),
-        "hello": (
-            "What's up! Joseph M. Smith here, LIVE from The Studio! "
-            "I've got game logs, shot charts, matchup data, and a FIRE personality. "
-            "Ask me anything — I'm ready to WORK!"
-        ),
-        "who are you": (
-            "I'm Joseph M. Smith — the SUPREME NBA analyst. "
-            "I combine machine-learning models with my INSTINCT to deliver "
-            "the best picks in the game. I've got data, I've got personality, "
-            "and I've got RECEIPTS. Ask me about any player, any game, "
-            "or my track record and I'll DELIVER!"
-        ),
-        "thank": (
-            "You're WELCOME! That's what Joseph M. Smith is here for — "
-            "to give you the REAL analysis that nobody else will. "
-            "Keep asking questions and I'll keep delivering the GOODS!"
-        ),
-        "love you": (
-            "I appreciate the love! But you know what REALLY shows love? "
-            "Following my SMASH plays and cashing tickets! "
-            "Let's make MONEY together!"
-        ),
-        "you suck": (
-            "EXCUSE ME?! Joseph M. Smith has been doing this since BEFORE "
-            "analytics was cool! My track record SPEAKS for itself. "
-            "The game logs don't lie. The splits don't lie. "
-            "And Joseph M. Smith DOESN'T lie! Check the receipts!"
-        ),
-        "funny": (
-            "I'm not here to be FUNNY — I'm here to be RIGHT! "
-            "But if making you money HAPPENS to make you laugh, "
-            "then consider me a COMEDIAN and an ANALYST!"
-        ),
-        "playoff": (
-            "PLAYOFF basketball is a DIFFERENT sport. The stars play 40+ minutes, "
-            "the defenses TIGHTEN, and only the REAL ones show up. "
-            "That's why my analysis factors in clutch stats, "
-            "minutes adjustments, and playoff history!"
-        ),
-        "trade": (
-            "Trades change EVERYTHING. New team, new role, new matchups. "
-            "When a trade happens, I recalculate from SCRATCH. "
-            "You can't just plug old numbers into a new situation — "
-            "that's AMATEUR hour. Joseph M. Smith adjusts for CONTEXT!"
-        ),
-        "draft": (
-            "The draft is where FUTURES are made. I look at college translations, "
-            "physical profiles, and historical comps. "
-            "But tonight we're focused on the CURRENT slate. "
-            "Ask me about any player on tonight's games!"
-        ),
-        "over under": (
-            "Over/Under is where the MONEY is! I analyze usage rates, pace, "
-            "defensive matchups, and recent trends to find the props that are "
-            "MISPRICED. My Neural Analysis crunches ALL of that for you. "
-            "Run it and I'll show you where the value is!"
-        ),
-        "spread": (
-            "Spreads are about matchups, pace, and home-court advantage. "
-            "I factor in defensive ratings, offensive efficiency, and "
-            "recent form to give you the REAL number. "
-            "Ask me about a specific game and I'll break it down!"
-        ),
-    }
-    for trigger, response in _PERSONALITY_MAP.items():
+    for trigger, response in _ASK_PERSONALITY_MAP.items():
         if trigger in q_lower:
             return f"{_opener()} {response} {_closer()}"
 
