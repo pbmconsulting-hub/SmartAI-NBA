@@ -376,7 +376,7 @@ if sub_status["is_premium"]:
         ("🧬", "Entry Builder",     "pages/6_🧬_Entry_Builder.py"),
         ("🛡️", "Risk Shield",        "pages/8_🛡️_Risk_Shield.py"),
         ("📋", "Game Report",        "pages/4_📋_Game_Report.py"),
-        ("🔮", "Player Simulator",  "pages/5b_🔮_Player_Simulator.py"),
+        ("🔮", "Player Simulator",  "pages/5_🔮_Player_Simulator.py"),
         ("📈", "Bet Tracker",        "pages/11_📈_Bet_Tracker.py"),
         ("🔬", "Full Prop Scanner",  "pages/2_🔬_Prop_Scanner.py"),
     ]
