@@ -1,5 +1,5 @@
 # engine/backtester.py
-# Historical backtesting engine for the SmartAI-NBA prediction model.
+# Historical backtesting engine for the Smart Pick Pro prediction model.
 # Runs the simulation/projection/edge pipeline against historical game log data.
 # Standard library only — no numpy/scipy/pandas.
 
@@ -143,7 +143,7 @@ def run_backtest(season, stat_types, min_edge=0.05, tier_filter=None,
             If None, returns an empty result (no data available).
         progress_callback (callable or None): Called with (current_idx, total, message)
             to report simulation progress to the UI.
-        number_of_simulations (int): Number of Monte Carlo simulations per prop.
+        number_of_simulations (int): Number of Quantum Matrix simulations per prop.
             Defaults to 500. Wire to Settings page "Simulation Depth" for user control.
         start_date (str or None): ISO date string (e.g. "2024-10-22"). Only include
             game logs on or after this date.

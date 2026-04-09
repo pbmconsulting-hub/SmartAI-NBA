@@ -828,7 +828,7 @@ def correlation_adjusted_kelly(picks, bankroll, correlation_matrix):
 
 def pearson_sim_correlation(array_a, array_b):
     """
-    Pearson correlation between two Monte Carlo simulation arrays.
+    Pearson correlation between two Quantum Matrix simulation arrays.
 
     Thin wrapper around :func:`calculate_pearson_correlation` that
     rounds the result to four decimal places — matching the precision

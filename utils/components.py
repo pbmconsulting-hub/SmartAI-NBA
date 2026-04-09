@@ -96,7 +96,7 @@ def render_global_settings():
             step=100,
             value=st.session_state.get("simulation_depth", 1000),
             key="sim_depth_widget",
-            help="Number of Monte Carlo simulations per prop. Higher = more accurate but slower.",
+            help="Number of Quantum Matrix simulations per prop. Higher = more accurate but slower.",
             on_change=_sync_sim_depth,
         )
 
@@ -199,13 +199,9 @@ _TICKER_CSS = """<style>
 def _render_broadcast_ticker():
     """Render Joseph's global broadcast ticker at the top of the page.
 
-    Shows a scrolling marquee with ambient Joseph lines — only once
-    per session to avoid duplicate injection on re-runs.
+    Shows a scrolling marquee with ambient Joseph lines on every page.
+    The ticker re-renders on each page navigation so it appears site-wide.
     """
-    if st.session_state.get("_ticker_injected"):
-        return
-    st.session_state["_ticker_injected"] = True
-
     # Build ticker items from analysis results or defaults
     ticker_items = []
     analysis = st.session_state.get("analysis_results", [])

@@ -1,4 +1,4 @@
-"""engine/models – ML model layer for SmartAI-NBA (separate from engine/ensemble.py)."""
+"""engine/models – ML model layer for Smart Pick Pro (separate from engine/ensemble.py)."""
 from engine.models.base_model import BaseModel
 from engine.models.ridge_model import RidgeModel
 from engine.models.xgboost_model import XGBoostModel

@@ -10,7 +10,7 @@ _ESPN_TRANSACTIONS_URL = "https://www.espn.com/nba/transactions"
 _DELAY = 3.0
 _MAX_RETRIES = 3
 _USER_AGENT = (
-    "Mozilla/5.0 (compatible; SmartAI-NBA/1.0; +https://github.com/pbmconsulting-hub/SmartAI-NBA)"
+    "Mozilla/5.0 (compatible; SmartPickPro/1.0; +https://github.com/pbmconsulting-hub/SmartAI-NBA)"
 )
 
 try:

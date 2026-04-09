@@ -76,6 +76,6 @@ def get_underdog_headers() -> Dict[str, str]:
 def get_odds_api_headers() -> Dict[str, str]:
     """Headers for The Odds API."""
     return {
-        "User-Agent": "SmartAI-NBA/1.0",
+        "User-Agent": "SmartPickPro/1.0",
         "Accept": "application/json",
     }

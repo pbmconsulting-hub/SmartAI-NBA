@@ -2,7 +2,7 @@
 
 ## Current Setup: SQLite
 
-SmartAI-NBA uses SQLite (`db/smartai_nba.db`) by default. This works great for:
+Smart Pick Pro uses SQLite (`db/smartai_nba.db`) by default. This works great for:
 - Local development
 - Single-user deployments
 - Quick prototyping

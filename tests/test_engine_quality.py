@@ -1,6 +1,6 @@
 # ============================================================
 # FILE: tests/test_engine_quality.py
-# PURPOSE: Quality tests for SmartAI-NBA core engine modules.
+# PURPOSE: Quality tests for Smart Pick Pro core engine modules.
 #          Covers simulation, confidence, edge detection,
 #          sensitivity analysis, and magic number constants.
 # ============================================================

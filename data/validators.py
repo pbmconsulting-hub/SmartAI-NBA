@@ -1,5 +1,5 @@
 # data/validators.py
-# Data validation layer for SmartAI-NBA.
+# Data validation layer for Smart Pick Pro.
 # Validates CSV data structure, freshness, and cross-file integrity.
 # Standard library only — no numpy/scipy/pandas.
 

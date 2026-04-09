@@ -1,1 +1,1 @@
-"""api – FastAPI application package for SmartAI-NBA."""
+"""api – FastAPI application package for Smart Pick Pro."""

@@ -22,7 +22,7 @@ from styles.theme import get_global_css
 # ============================================================
 
 st.set_page_config(
-    page_title="Smart Pick Pro — NBA Edition",
+    page_title="Smart Pick Pro Home",
     page_icon="🏀",
     layout="wide",
     initial_sidebar_state="auto",
@@ -1256,55 +1256,125 @@ _home_one_click = st.button(
     help="Loads tonight's games, rosters, injuries, and live props from all platforms in one click.",
 )
 if _home_one_click:
-    progress = st.progress(0, "Loading tonight's games...")
+    import time as _hoc_time
+    st.subheader("⚡ One-Click Setup")
+    st.markdown("Running **Auto-Load** + **Get Live Props** in one step…")
+    _hoc_bar = st.progress(0)
+    _hoc_status = st.empty()
+
     try:
-        from data.nba_data_service import get_todays_games as _hoc_fg, get_todays_players as _hoc_fp
+        # ── Phase 0: ETL Update for fresh local DB stats ──────────────
+        try:
+            from data.nba_data_service import refresh_from_etl as _hoc_refresh_etl
+            _hoc_etl_available = True
+        except ImportError:
+            _hoc_etl_available = False
+
+        if _hoc_etl_available:
+            _hoc_status.text("⏳ Phase 0/4 — Running Smart ETL Update for fresh stats…")
+            _hoc_bar.progress(2)
+            try:
+                _hoc_etl_result = _hoc_refresh_etl()
+            except Exception:
+                pass
+
+        # ── Phase 1: Auto-Load Tonight's Games ────────────────────────
+        _hoc_status.text("⏳ Phase 1/4 — Auto-loading tonight's games, rosters & stats…")
+        _hoc_bar.progress(5)
+        from data.nba_data_service import (
+            get_todays_games as _hoc_fg,
+            get_todays_players as _hoc_fp,
+            get_team_stats as _hoc_ft,
+            get_standings as _hoc_fs,
+        )
         from data.data_manager import (
             clear_all_caches as _hoc_cc,
             load_injury_status as _hoc_li,
+            save_props_to_session as _hoc_sp,
         )
-        progress.progress(25, "Fetching rosters & injuries...")
+
         _hoc_games = _hoc_fg()
         if _hoc_games:
             st.session_state["todays_games"] = _hoc_games
         else:
             _hoc_games = st.session_state.get("todays_games", [])
-        _hoc_fp(_hoc_games)
+
+        _hoc_bar.progress(25)
+        _hoc_status.text(f"⏳ Phase 1/4 — {len(_hoc_games)} game(s) loaded. Loading player data…")
+
+        _hoc_players_ok = _hoc_fp(_hoc_games) if _hoc_games else False
+        _hoc_bar.progress(40)
+
+        # Clear caches so freshly-written players.csv is read
         _hoc_cc()
+
         try:
             st.session_state["injury_status_map"] = _hoc_li()
         except Exception:
             pass
-        progress.progress(50, "Pulling live props from all platforms...")
+
+        # ── Phase 2: Load team stats & standings ─────────────────────
+        _hoc_status.text("⏳ Phase 2/4 — Loading team stats & standings…")
+        _hoc_bar.progress(50)
+
+        try:
+            _hoc_ft()
+        except Exception:
+            pass
+
+        try:
+            _hoc_standings = _hoc_fs()
+            if _hoc_standings:
+                st.session_state["league_standings"] = _hoc_standings
+        except Exception:
+            pass
+
+        _hoc_bar.progress(60)
+
+        # ── Phase 3: Get Live Platform Props ────────────────────────
+        _hoc_status.text("⏳ Phase 3/4 — Retrieving live prop lines from all platforms…")
+
         try:
             from data.sportsbook_service import get_all_sportsbook_props as _hoc_fap
             from data.data_manager import (
                 save_platform_props_to_session as _hoc_sps,
-                save_props_to_session as _hoc_sp,
+                save_platform_props_to_csv as _hoc_csv,
             )
-            _hoc_live = _hoc_fap(
-                include_prizepicks=True,
-                include_underdog=True,
-                include_draftkings=True,
-            )
-            progress.progress(75, "Enriching player data...")
+            _hoc_odds_key = st.session_state.get("odds_api_key") or ""
+            _hoc_live = _hoc_fap(odds_api_key=_hoc_odds_key or None)
+            _hoc_bar.progress(85)
             if _hoc_live:
-                _hoc_sps(_hoc_live, st.session_state)
                 _hoc_sp(_hoc_live, st.session_state)
-                _hoc_total = len(st.session_state.get("current_props", []))
-                progress.progress(100, "✅ Ready! Head to ⚡ Quantum Analysis")
-                st.success(f"✅ Setup complete! {len(_hoc_games)} games · {_hoc_total} props loaded. Go to ⚡ Quantum Analysis.")
+                _hoc_sps(_hoc_live, st.session_state)
+                try:
+                    _hoc_csv(_hoc_live)
+                except Exception:
+                    pass
+                _hoc_platform_msg = f"✅ {len(_hoc_live)} live props retrieved"
             else:
-                progress.progress(100, "✅ Ready! Head to ⚡ Quantum Analysis")
-                st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Quantum Analysis.")
+                _hoc_platform_msg = "⚠️ No live platform props returned (data may be unavailable)"
         except Exception as _hoc_plat_err:
-            _hoc_err_str = str(_hoc_plat_err)
-            if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
-                pass
-            else:
-                progress.progress(100, "✅ Games loaded!")
-                st.success(f"✅ Setup complete! {len(_hoc_games)} games loaded. Go to ⚡ Quantum Analysis.")
+            _hoc_platform_msg = f"⚠️ Platform retrieval failed: {_hoc_plat_err}"
+
+        _hoc_bar.progress(100)
+        _hoc_status.empty()
+        _hoc_bar.empty()
+
+        _hoc_total = len(st.session_state.get("current_props", []))
+        st.success(
+            f"✅ **One-Click Setup complete!** "
+            f"Games: {'✅ ' + str(len(_hoc_games)) if _hoc_games else '⚠️ none'} | "
+            f"Players: {'✅' if _hoc_players_ok else '⚠️ check data'} | "
+            f"Props: {_hoc_platform_msg} | "
+            f"Total props loaded: **{_hoc_total}**\n\n"
+            "👉 Go to **⚡ Neural Analysis** and click **Run Analysis** to analyze all loaded props."
+        )
+        _hoc_time.sleep(1)
+        st.rerun()
+
     except Exception as _hoc_err:
+        _hoc_bar.empty()
+        _hoc_status.empty()
         _hoc_err_str = str(_hoc_err)
         if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
             pass
