@@ -1792,11 +1792,30 @@ def purge_old_backtest_results(keep=50):
             pass
 
 
-def run_maintenance():
+# ── Maintenance defaults ───────────────────────────────────────────────────────
+_MAINTENANCE_SNAPSHOT_DAYS = 30
+_MAINTENANCE_GAME_LOG_DAYS = 30
+_MAINTENANCE_SESSION_DAYS = 90
+_MAINTENANCE_BACKTEST_KEEP = 50
+
+
+def run_maintenance(
+    *,
+    snapshot_days=_MAINTENANCE_SNAPSHOT_DAYS,
+    game_log_days=_MAINTENANCE_GAME_LOG_DAYS,
+    session_days=_MAINTENANCE_SESSION_DAYS,
+    backtest_keep=_MAINTENANCE_BACKTEST_KEEP,
+):
     """Run all database cleanup routines and VACUUM.
 
     Combines snapshot, game-log, session, and backtest pruning into a
     single convenience call, then runs VACUUM to reclaim disk space.
+
+    Args:
+        snapshot_days: Delete snapshots older than this many days.
+        game_log_days: Delete cached game logs older than this many days.
+        session_days: Delete analysis sessions older than this many days.
+        backtest_keep: Number of most-recent backtest runs to retain.
 
     Returns:
         dict: Summary with keys ``snapshots``, ``game_logs``, ``sessions``,
@@ -1804,10 +1823,10 @@ def run_maintenance():
               ``vacuumed`` (bool).
     """
     result = {
-        "snapshots": purge_old_snapshots(days=30),
-        "game_logs": purge_stale_game_logs(days=30),
-        "sessions": purge_old_sessions(days=90),
-        "backtests": purge_old_backtest_results(keep=50),
+        "snapshots": purge_old_snapshots(days=snapshot_days),
+        "game_logs": purge_stale_game_logs(days=game_log_days),
+        "sessions": purge_old_sessions(days=session_days),
+        "backtests": purge_old_backtest_results(keep=backtest_keep),
         "vacuumed": False,
     }
     conn = None
