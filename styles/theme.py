@@ -3526,7 +3526,7 @@ def get_game_report_html(game=None, analysis_results=None):
     if len(_eligible) >= 2:
         # Pick unique players for each combo tier, excluding already-used
         # players so each tier offers genuinely different picks.
-        def _unique_players(pool, n, exclude=None):
+        def _unique_players(pool, num_picks, exclude=None):
             _excl = exclude or set()
             seen, out = set(), []
             for p in pool:
@@ -3534,7 +3534,7 @@ def get_game_report_html(game=None, analysis_results=None):
                 if pn not in seen and pn not in _excl:
                     seen.add(pn)
                     out.append(p)
-                if len(out) == n:
+                if len(out) == num_picks:
                     break
             return out
 
