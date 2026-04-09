@@ -308,6 +308,20 @@ def detect_narrative_tags(player: dict, game: dict, teams: dict) -> list:
         list: A list of string tags (e.g. ``["revenge_game", "rivalry"]``).
     """
     tags: list = []
+
+    # Normalise *teams*: callers may pass a list of team dicts instead of a
+    # dict keyed by abbreviation.  Convert once so downstream .get() works.
+    if isinstance(teams, list):
+        _teams: dict = {}
+        for _t in teams:
+            if isinstance(_t, dict):
+                key = _t.get("abbreviation") or _t.get("team") or ""
+                if key:
+                    _teams[key] = _t
+        teams = _teams
+    if not isinstance(teams, dict):
+        teams = {}
+
     player_name = player.get("name", "")
     player_team = player.get("team", "")
     home_team = game.get("home_team", "")
