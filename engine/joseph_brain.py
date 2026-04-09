@@ -204,6 +204,26 @@ except ImportError:
         clamped = max(min_val, min(max_val, value))
         return out_min + (clamped - min_val) / (max_val - min_val) * (out_max - out_min)
 
+# ── Joseph's Memory & Track Record ────────────────────────────
+try:
+    from tracking.joseph_diary import (
+        diary_get_week_summary as _diary_week_summary,
+        diary_get_yesterday_reference as _diary_yesterday_ref,
+        diary_get_entry as _diary_get_entry,
+    )
+    _DIARY_AVAILABLE = True
+except ImportError:
+    _DIARY_AVAILABLE = False
+
+try:
+    from engine.joseph_bets import (
+        joseph_get_track_record as _bets_track_record,
+        joseph_get_accuracy_by_verdict as _bets_accuracy_by_verdict,
+    )
+    _BETS_TRACK_RECORD_AVAILABLE = True
+except ImportError:
+    _BETS_TRACK_RECORD_AVAILABLE = False
+
 # ═══════════════════════════════════════════════════════════════
 # GOD MODE ANALYTICAL MODULES (Layer 10)
 # ═══════════════════════════════════════════════════════════════
@@ -3681,69 +3701,515 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
 
 def _joseph_answer_question(question: str, analysis_results: list,
                             teams_data: dict, todays_games: list) -> str:
-    """Build a Joseph-voice answer to a user question.
+    """Build a Joseph-voice answer to any user question.
 
-    Searches *analysis_results* for players/teams/stats mentioned in the
-    question and assembles a grounded response.  Falls back to a generic
-    encouraging response if no matches are found.
+    Uses a topic-detection system to classify the question and route it
+    to the appropriate handler.  Each handler pulls real data from
+    analysis results, DB intel, track record, diary, and Joseph's
+    personality to produce grounded, entertaining responses.
     """
     q_lower = question.lower()
+    _closer_set = _used_fragments.setdefault("ask_joseph", set())
 
-    # Try to find a matching player in analysis results
-    matched = []
-    for r in analysis_results:
-        pname = str(r.get("player_name", r.get("name", ""))).lower()
-        team = str(r.get("team", "")).lower()
-        # Match on full name or any individual name part (first/last)
-        name_parts = [p for p in pname.split() if len(p) >= 2]
-        name_hit = pname and (
-            pname in q_lower
-            or any(part in q_lower for part in name_parts)
-        )
-        team_hit = team and len(team) >= 3 and team in q_lower
-        if name_hit or team_hit:
-            matched.append(r)
+    def _closer() -> str:
+        return _select_fragment(CLOSER_POOL, _closer_set).get("text", "")
 
-    # Check for stat-type keywords (points, rebounds, assists, etc.)
+    def _catchphrase() -> str:
+        return _select_fragment(
+            CATCHPHRASE_POOL,
+            _used_fragments.setdefault("ask_catch", set()),
+        ).get("text", "")
+
+    def _opener() -> str:
+        return _select_fragment(
+            OPENER_POOL,
+            _used_fragments.setdefault("ask_open", set()),
+        ).get("text", "")
+
+    # ── Helper: find matching players in analysis results ─────
+    def _match_players(q: str) -> list:
+        matched = []
+        for r in (analysis_results or []):
+            pname = str(r.get("player_name", r.get("name", ""))).lower()
+            team = str(r.get("team", "")).lower()
+            name_parts = [p for p in pname.split() if len(p) >= 2]
+            name_hit = pname and (
+                pname in q or any(part in q for part in name_parts)
+            )
+            team_hit = team and len(team) >= 3 and team in q
+            if name_hit or team_hit:
+                matched.append(r)
+        return matched
+
+    # ── Helper: find matching games ───────────────────────────
+    def _match_games(q: str) -> list:
+        game_matched = []
+        for g in (todays_games or []):
+            home = str(g.get("home_team", g.get("home", ""))).lower()
+            away = str(g.get("away_team", g.get("away", ""))).lower()
+            if (home and home in q) or (away and away in q):
+                game_matched.append(g)
+        return game_matched
+
+    # ── Stat-type keyword mapping ─────────────────────────────
     _STAT_KEYWORDS = {
         "points": "points", "pts": "points", "scoring": "points",
         "rebounds": "rebounds", "boards": "rebounds", "reb": "rebounds",
         "assists": "assists", "dimes": "assists", "ast": "assists",
         "threes": "three_pointers_made", "3s": "three_pointers_made",
         "steals": "steals", "blocks": "blocks",
+        "turnovers": "turnovers", "fantasy": "fantasy",
+        "pra": "pts_reb_ast", "combos": "pts_reb_ast",
+        "double": "double_double",
     }
+
+    # ── Team name alias map (common abbreviations) ────────────
+    _TEAM_ALIASES = {
+        "lakers": "lal", "celtics": "bos", "warriors": "gsw",
+        "nuggets": "den", "bucks": "mil", "sixers": "phi",
+        "76ers": "phi", "heat": "mia", "suns": "phx",
+        "knicks": "nyk", "nets": "bkn", "bulls": "chi",
+        "cavs": "cle", "cavaliers": "cle", "hawks": "atl",
+        "raptors": "tor", "mavericks": "dal", "mavs": "dal",
+        "rockets": "hou", "timberwolves": "min", "wolves": "min",
+        "thunder": "okc", "pelicans": "nop", "pels": "nop",
+        "spurs": "sas", "jazz": "uta", "blazers": "por",
+        "trail blazers": "por", "pacers": "ind", "kings": "sac",
+        "magic": "orl", "pistons": "det", "hornets": "cha",
+        "grizzlies": "mem", "clippers": "lac", "wizards": "was",
+    }
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 1: TRACK RECORD / "How are you doing?"
+    # ──────────────────────────────────────────────────────────
+    _TRACK_RECORD_TRIGGERS = [
+        "how are you doing", "your record", "track record", "win rate",
+        "how accurate", "how good are you", "hit rate", "how many wins",
+        "how's your record", "your accuracy", "are you profitable",
+        "are you winning", "how's the week going", "weekly record",
+        "season record", "how have you been", "you making money",
+        "what's your streak", "are you hot", "are you cold",
+    ]
+    if any(t in q_lower for t in _TRACK_RECORD_TRIGGERS):
+        parts = [_opener()]
+        # Pull track record
+        if _BETS_TRACK_RECORD_AVAILABLE:
+            try:
+                tr = _bets_track_record()
+                total = tr.get("total", 0)
+                wins = tr.get("wins", 0)
+                losses = tr.get("losses", 0)
+                wr = tr.get("win_rate", 0)
+                streak = tr.get("streak", 0)
+                if total > 0:
+                    parts.append(
+                        f"My overall record is {wins}-{losses} "
+                        f"({round(wr * 100, 1) if wr <= 1 else round(wr, 1)}% win rate)."
+                    )
+                    if streak > 0:
+                        parts.append(f"I'm on a {streak}-game WIN streak right now!")
+                    elif streak < 0:
+                        parts.append(
+                            f"I'm on a {abs(streak)}-game skid — but EVERY great "
+                            f"analyst has cold stretches. The PROCESS is sound!"
+                        )
+                    best = tr.get("best_pick", "")
+                    if best:
+                        parts.append(f"My best pick? {best}. RECEIPTS!")
+                else:
+                    parts.append(
+                        "We're just getting STARTED — no picks graded yet. "
+                        "But when they are, Joseph M. Smith is going to be ON TOP!"
+                    )
+            except Exception:
+                pass
+        # Pull weekly diary data
+        if _DIARY_AVAILABLE:
+            try:
+                week = _diary_week_summary()
+                wr_str = week.get("week_record", "")
+                arc = week.get("narrative", "")
+                if wr_str:
+                    parts.append(f"This week I'm {wr_str}. {arc}")
+            except Exception:
+                pass
+        if len(parts) <= 1:
+            parts.append(
+                "My track record speaks for ITSELF! Run the Neural Analysis and "
+                "I'll show you what Joseph M. Smith is MADE of!"
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 2: YESTERDAY / "How did you do yesterday?"
+    # ──────────────────────────────────────────────────────────
+    _YESTERDAY_TRIGGERS = [
+        "yesterday", "last night", "how'd you do", "how did you do",
+        "previous night", "last session",
+    ]
+    if any(t in q_lower for t in _YESTERDAY_TRIGGERS):
+        parts = [_opener()]
+        if _DIARY_AVAILABLE:
+            try:
+                ref = _diary_yesterday_ref()
+                if ref:
+                    parts.append(ref)
+                else:
+                    parts.append(
+                        "I don't have yesterday's results logged yet — but "
+                        "trust me, when I DO, you'll hear about them."
+                    )
+            except Exception:
+                parts.append("Yesterday's data is loading — check back in a minute!")
+        else:
+            parts.append(
+                "My diary module isn't loaded right now, but trust me — "
+                "Joseph M. Smith ALWAYS keeps SCORE."
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 3: BEST BETS / "What should I bet?"
+    # ──────────────────────────────────────────────────────────
+    _BEST_BETS_TRIGGERS = [
+        "what should i bet", "best bet", "best pick", "best play",
+        "top pick", "top play", "what do you like", "who do you like",
+        "favorite pick", "favorite play", "strongest pick", "lock",
+        "best lock", "give me a pick", "give me a bet", "parlay",
+        "who should i take", "smash play", "best smash",
+        "what's your pick", "what's your play", "what are you on",
+        "give me something", "money pick", "sure thing",
+    ]
+    if any(t in q_lower for t in _BEST_BETS_TRIGGERS):
+        parts = [_opener()]
+        smash_picks = [r for r in (analysis_results or [])
+                       if r.get("verdict") == "SMASH"]
+        smash_picks.sort(key=lambda x: abs(_safe_float(
+            x.get("joseph_edge", x.get("edge", 0)))), reverse=True)
+        lean_picks = [r for r in (analysis_results or [])
+                      if r.get("verdict") == "LEAN"]
+        if smash_picks:
+            top = smash_picks[0]
+            pname = top.get("player_name", top.get("name", "my top pick"))
+            stat = top.get("stat_type", top.get("prop", ""))
+            line = top.get("prop_line", top.get("line", ""))
+            direction = top.get("direction", "")
+            edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+            rant = top.get("rant", top.get("one_liner", ""))
+            parts.append(
+                f"My STRONGEST play tonight is {pname} {stat} "
+                f"{direction} {line} — {edge}% edge. SMASH IT!"
+            )
+            if rant:
+                parts.append(rant)
+            if len(smash_picks) > 1:
+                second = smash_picks[1]
+                parts.append(
+                    f"I also LOVE {second.get('player_name', 'another play')} "
+                    f"{second.get('stat_type', '')} "
+                    f"{second.get('direction', '')} {second.get('prop_line', '')}."
+                )
+            if lean_picks:
+                parts.append(
+                    f"Plus I've got {len(lean_picks)} LEAN plays if you want more volume."
+                )
+        elif lean_picks:
+            top = lean_picks[0]
+            parts.append(
+                f"No SMASH plays tonight, but I LEAN on "
+                f"{top.get('player_name', 'a solid pick')} "
+                f"{top.get('stat_type', '')} {top.get('direction', '')} "
+                f"{top.get('prop_line', '')}."
+            )
+        else:
+            parts.append(
+                "I need more DATA before I can give you my best play. "
+                "Run the ⚡ Neural Analysis and then come back and ASK me!"
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 4: TONIGHT'S SCHEDULE / "What games are on?"
+    # ──────────────────────────────────────────────────────────
+    _SCHEDULE_TRIGGERS = [
+        "what games", "who's playing", "tonight's slate", "games tonight",
+        "how many games", "what's on tonight", "the slate", "any games",
+        "schedule", "matchups tonight", "what games are on",
+    ]
+    if any(t in q_lower for t in _SCHEDULE_TRIGGERS):
+        parts = [_opener()]
+        n_games = len(todays_games or [])
+        if n_games > 0:
+            parts.append(f"We've got {n_games} games on the board tonight!")
+            for g in (todays_games or [])[:5]:
+                away = g.get("away_team", g.get("away", "???"))
+                home = g.get("home_team", g.get("home", "???"))
+                spread = g.get("spread", "")
+                total = g.get("total", "")
+                line_info = ""
+                if spread:
+                    line_info += f" (spread {spread}"
+                    if total:
+                        line_info += f", O/U {total}"
+                    line_info += ")"
+                parts.append(f"{away} at {home}{line_info}.")
+            if n_games > 5:
+                parts.append(f"Plus {n_games - 5} more games.")
+            n_props = len(analysis_results or [])
+            if n_props > 0:
+                parts.append(
+                    f"I've already analyzed {n_props} props across these games!"
+                )
+            else:
+                parts.append(
+                    "Run the ⚡ Neural Analysis and I'll break down EVERY prop!"
+                )
+        else:
+            parts.append(
+                "No games loaded yet! Head to 📡 Live Games to pull tonight's slate, "
+                "then come back and I'll tell you EVERYTHING about them."
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 5: INJURIES / "Who's injured?"
+    # ──────────────────────────────────────────────────────────
+    _INJURY_TRIGGERS = [
+        "injur", "hurt", "out tonight", "playing tonight",
+        "is he playing", "game time decision", "questionable",
+        "doubtful", "ruled out", "inactive", "sitting out",
+        "health", "status",
+    ]
+    if any(t in q_lower for t in _INJURY_TRIGGERS):
+        parts = [_opener()]
+        injury_data = []
+        if _DB_KNOWLEDGE_AVAILABLE:
+            try:
+                injury_data = _db_injured_players() or []
+            except Exception:
+                pass
+
+        # Check if asking about a specific player
+        player_matched = _match_players(q_lower)
+        if player_matched:
+            pname = player_matched[0].get(
+                "player_name", player_matched[0].get("name", "that player")
+            )
+            # Check injury list for this player
+            found_in_injuries = False
+            for inj in injury_data:
+                inj_name = str(inj.get("PLAYER_NAME", inj.get("name", ""))).lower()
+                if pname.lower() in inj_name or any(
+                    p in inj_name for p in pname.lower().split() if len(p) >= 2
+                ):
+                    status = inj.get("GAME_STATUS", inj.get("status", "Unknown"))
+                    reason = inj.get("DESCRIPTION", inj.get("reason", ""))
+                    parts.append(
+                        f"{pname} is listed as {status}"
+                        + (f" ({reason})" if reason else "")
+                        + ". Factor that into your bets!"
+                    )
+                    found_in_injuries = True
+                    break
+            if not found_in_injuries:
+                parts.append(
+                    f"I don't see {pname} on the injury report — "
+                    f"looks like he's GOOD TO GO! But always check closer to game time."
+                )
+        elif injury_data:
+            notable = injury_data[:5]
+            parts.append(f"I've got {len(injury_data)} players on the injury report.")
+            for inj in notable:
+                iname = inj.get("PLAYER_NAME", inj.get("name", "Unknown"))
+                istatus = inj.get("GAME_STATUS", inj.get("status", ""))
+                parts.append(f"  • {iname}: {istatus}")
+            if len(injury_data) > 5:
+                parts.append(f"Plus {len(injury_data) - 5} more. Check the full list!")
+        else:
+            parts.append(
+                "I don't have the injury report loaded right now. "
+                "Head to 📡 Live Games to pull the latest data!"
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 6: PLAYER COMPARISON / "Who's better, X or Y?"
+    # ──────────────────────────────────────────────────────────
+    _COMPARE_TRIGGERS = [
+        " or ", " vs ", " versus ", "compare", "better than",
+        "who's better", "who is better", "which one",
+    ]
+    if any(t in q_lower for t in _COMPARE_TRIGGERS):
+        matched = _match_players(q_lower)
+        if len(matched) >= 2:
+            # Group unique players
+            seen_names = {}
+            for m in matched:
+                pn = m.get("player_name", m.get("name", ""))
+                if pn and pn not in seen_names:
+                    seen_names[pn] = m
+            unique_players = list(seen_names.values())
+            if len(unique_players) >= 2:
+                p1, p2 = unique_players[0], unique_players[1]
+                p1_name = p1.get("player_name", p1.get("name", "Player A"))
+                p2_name = p2.get("player_name", p2.get("name", "Player B"))
+                p1_edge = abs(_safe_float(p1.get("joseph_edge", p1.get("edge", 0))))
+                p2_edge = abs(_safe_float(p2.get("joseph_edge", p2.get("edge", 0))))
+                p1_verdict = p1.get("verdict", "LEAN")
+                p2_verdict = p2.get("verdict", "LEAN")
+
+                parts = [_opener()]
+                if p1_edge > p2_edge:
+                    winner, loser = p1_name, p2_name
+                    w_edge, l_edge = round(p1_edge, 1), round(p2_edge, 1)
+                    w_verdict = p1_verdict
+                else:
+                    winner, loser = p2_name, p1_name
+                    w_edge, l_edge = round(p2_edge, 1), round(p1_edge, 1)
+                    w_verdict = p2_verdict
+
+                parts.append(
+                    f"Tonight? I'm taking {winner} OVER {loser} and it's "
+                    f"not even CLOSE! {winner} has a {w_edge}% edge "
+                    f"(verdict: {w_verdict}) vs {loser}'s {l_edge}% edge."
+                )
+
+                # Add DB trend data if available
+                for p, pdata in [(p1_name, p1), (p2_name, p2)]:
+                    trend = pdata.get("db_trend", "")
+                    hit_rate = _safe_float(pdata.get("hit_rate", 0))
+                    if trend in ("surging", "trending_up"):
+                        parts.append(f"{p} is SURGING right now — trend is UP!")
+                    elif trend in ("slumping", "trending_down"):
+                        parts.append(f"{p} has been COLD lately — proceed with CAUTION.")
+                    elif hit_rate > 70:
+                        parts.append(f"{p} is hitting at {hit_rate}% — that's MONEY!")
+
+                parts.append(_closer())
+                return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 7: PLAYER TREND / "How has X been playing?"
+    # ──────────────────────────────────────────────────────────
+    _TREND_TRIGGERS = [
+        "how has", "how is", "how's", "been playing", "lately",
+        "recently", "trending", "hot streak", "cold streak",
+        "on fire", "slumping", "consistent",
+    ]
+    if any(t in q_lower for t in _TREND_TRIGGERS):
+        matched = _match_players(q_lower)
+        if matched:
+            top = matched[0]
+            pname = top.get("player_name", top.get("name", "this player"))
+            parts = [_opener()]
+
+            # Try to get DB intel for deep trend data
+            player_id = int(top.get("player_id", top.get("id", 0)) or 0)
+            db_trend_used = False
+            if _DB_KNOWLEDGE_AVAILABLE and player_id > 0:
+                try:
+                    intel = _get_player_db_intel(top)
+                    if intel.get("available"):
+                        games = intel.get("recent_games", [])
+                        if games:
+                            # Use the stat key from the prop or default to PTS
+                            stat_type = top.get("stat_type", "points")
+                            stat_db_key = _STAT_DB_KEY_MAP.get(
+                                stat_type.lower(), "PTS"
+                            )
+                            trend = _compute_recent_trend(games, stat_db_key)
+                            l3 = trend.get("last_3_avg", 0)
+                            l5 = trend.get("last_5_avg", 0)
+                            l10 = trend.get("last_10_avg", 0)
+                            tdir = trend.get("trend", "unknown")
+                            cons = trend.get("consistency", "unknown")
+                            hot = trend.get("hot_streak", 0)
+                            cold = trend.get("cold_streak", 0)
+
+                            parts.append(
+                                f"{pname}'s {stat_type} averages: "
+                                f"Last 3 = {l3}, Last 5 = {l5}, "
+                                f"Last 10 = {l10}."
+                            )
+                            _trend_desc = {
+                                "surging": "This man is ON FIRE! The trend is STRAIGHT UP!",
+                                "trending_up": "He's trending UP and I like the direction!",
+                                "stable": "He's been STEADY — very consistent performer.",
+                                "trending_down": "He's trending DOWN — proceed with CAUTION.",
+                                "slumping": "He's in a SLUMP right now. Be CAREFUL!",
+                            }
+                            parts.append(_trend_desc.get(
+                                tdir, f"Trend is {tdir}."))
+                            if cons != "unknown":
+                                parts.append(
+                                    f"Consistency rating: {cons.upper()}."
+                                )
+                            if hot >= 3:
+                                parts.append(
+                                    f"He's on a {hot}-game HOT streak — RIDE IT!"
+                                )
+                            elif cold >= 3:
+                                parts.append(
+                                    f"He's on a {cold}-game COLD streak — BE CAREFUL!"
+                                )
+                            db_trend_used = True
+                except Exception:
+                    pass
+
+            if not db_trend_used:
+                # Fall back to analysis result data
+                verdict = top.get("verdict", "LEAN")
+                edge = round(_safe_float(
+                    top.get("joseph_edge", top.get("edge", 0))), 1)
+                trend = top.get("db_trend", "")
+                if trend:
+                    parts.append(f"{pname} is currently {trend}.")
+                parts.append(
+                    f"My verdict on {pname} tonight: {verdict} "
+                    f"with a {edge}% edge."
+                )
+                rant = top.get("rant", top.get("one_liner", ""))
+                if rant:
+                    parts.append(rant)
+
+            parts.append(_closer())
+            return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 8: PLAYER PROP LOOKUP (existing logic, enriched)
+    # ──────────────────────────────────────────────────────────
+    matched = _match_players(q_lower)
+
+    # Filter by stat type if mentioned
     stat_filter = None
     for kw, stat_key in _STAT_KEYWORDS.items():
         if kw in q_lower:
             stat_filter = stat_key
             break
-
     if stat_filter and matched:
         stat_matched = [r for r in matched
                         if stat_filter in str(r.get("stat_type", "")).lower()]
         if stat_matched:
             matched = stat_matched
 
-    # Build response based on matches
-    opener_pool = [
-        f"GREAT question! Let me break it down for you...",
-        f"You want my honest take? Here it is...",
-        f"I've been WAITING for someone to ask me this...",
-        f"Joseph M. Smith has the DATA and the ANSWERS...",
-        f"Let me give you the REAL answer, no fluff...",
-    ]
-    opener = random.choice(opener_pool)
-
     if matched:
-        top = max(matched, key=lambda x: abs(_safe_float(x.get("joseph_edge", x.get("edge", 0)))))
+        top = max(matched, key=lambda x: abs(
+            _safe_float(x.get("joseph_edge", x.get("edge", 0)))))
         pname = top.get("player_name", top.get("name", "this player"))
         verdict = top.get("verdict", "LEAN")
-        edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+        edge = round(_safe_float(
+            top.get("joseph_edge", top.get("edge", 0))), 1)
         stat = top.get("stat_type", top.get("prop", ""))
         line = top.get("prop_line", top.get("line", ""))
         direction = top.get("direction", "")
         rant = top.get("rant", top.get("one_liner", ""))
 
+        parts = [_opener()]
         detail = f"On {pname}"
         if stat:
             detail += f" {stat}"
@@ -3752,20 +4218,41 @@ def _joseph_answer_question(question: str, analysis_results: list,
         if direction:
             detail += f" — I'm going {direction}."
         detail += f" My verdict: {verdict} with a {edge}% edge."
+        parts.append(detail)
 
         if rant:
-            detail += f" {rant}"
+            parts.append(rant)
 
-        closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
-        return f"{opener} {detail} {closer.get('text', '')}"
+        # Add extra data-driven insight if multiple props for this player
+        player_props = [r for r in matched
+                        if r.get("player_name", r.get("name", "")) == pname]
+        if len(player_props) > 1:
+            smash_count = len([r for r in player_props
+                               if r.get("verdict") == "SMASH"])
+            if smash_count > 1:
+                parts.append(
+                    f"In fact, I've got {smash_count} SMASH plays on {pname} tonight!"
+                )
 
-    # Check for game-level questions
-    game_matched = []
-    for g in todays_games:
-        home = str(g.get("home_team", g.get("home", ""))).lower()
-        away = str(g.get("away_team", g.get("away", ""))).lower()
-        if (home and home in q_lower) or (away and away in q_lower):
-            game_matched.append(g)
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 9: GAME-LEVEL QUESTIONS (enriched)
+    # ──────────────────────────────────────────────────────────
+    # Also check team aliases
+    game_matched = _match_games(q_lower)
+    if not game_matched:
+        for alias, abbrev in _TEAM_ALIASES.items():
+            if alias in q_lower:
+                for g in (todays_games or []):
+                    home = str(
+                        g.get("home_team", g.get("home", ""))).lower()
+                    away = str(
+                        g.get("away_team", g.get("away", ""))).lower()
+                    if abbrev in home or abbrev in away:
+                        game_matched.append(g)
+                break
 
     if game_matched:
         g = game_matched[0]
@@ -3773,41 +4260,242 @@ def _joseph_answer_question(question: str, analysis_results: list,
         away = g.get("away_team", g.get("away", "Away"))
         spread = g.get("spread", "—")
         total = g.get("total", "—")
-        game_props = [r for r in analysis_results
-                      if str(r.get("team", "")).lower() in (home.lower(), away.lower())]
-        smash_count = len([r for r in game_props if r.get("verdict") == "SMASH"])
-        detail = (
-            f"For {away} at {home} — spread is {spread}, total is {total}. "
-            f"I've got {len(game_props)} props analyzed for this game"
-        )
-        if smash_count:
-            detail += f" with {smash_count} SMASH plays!"
-        else:
-            detail += "."
-        closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
-        return f"{opener} {detail} {closer.get('text', '')}"
+        game_props = [r for r in (analysis_results or [])
+                      if str(r.get("team", "")).lower()
+                      in (home.lower(), away.lower())]
+        smash_count = len(
+            [r for r in game_props if r.get("verdict") == "SMASH"])
+        lean_count = len(
+            [r for r in game_props if r.get("verdict") == "LEAN"])
+        fade_count = len(
+            [r for r in game_props
+             if r.get("verdict") in ("FADE", "STAY_AWAY")])
 
-    # Generic fallback using overall slate data
-    n_total = len(analysis_results)
-    n_games = len(todays_games)
-    smash_picks = [r for r in analysis_results if r.get("verdict") == "SMASH"]
+        parts = [_opener()]
+        parts.append(
+            f"{away} at {home} — spread is {spread}, total is {total}."
+        )
+        if game_props:
+            parts.append(
+                f"I've analyzed {len(game_props)} props for this game: "
+                f"{smash_count} SMASH, {lean_count} LEAN, {fade_count} FADE."
+            )
+            # Highlight top prop for this game
+            sorted_props = sorted(
+                game_props,
+                key=lambda x: abs(_safe_float(
+                    x.get("joseph_edge", x.get("edge", 0)))),
+                reverse=True,
+            )
+            if sorted_props:
+                tp = sorted_props[0]
+                parts.append(
+                    f"My TOP play in this game: "
+                    f"{tp.get('player_name', '???')} "
+                    f"{tp.get('stat_type', '')} "
+                    f"{tp.get('direction', '')} "
+                    f"{tp.get('prop_line', '')} — "
+                    f"verdict {tp.get('verdict', 'LEAN')}!"
+                )
+        else:
+            parts.append(
+                "I haven't analyzed the props for this game yet. "
+                "Run the ⚡ Neural Analysis first!"
+            )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 10: APP FEATURES / "What can you do?"
+    # ──────────────────────────────────────────────────────────
+    _APP_TRIGGERS = [
+        "what can you do", "how do i use", "help me", "features",
+        "how does this work", "what is this app", "tutorial",
+        "guide me", "explain", "what do you do", "capabilities",
+        "how to bet", "how to use", "getting started",
+    ]
+    if any(t in q_lower for t in _APP_TRIGGERS):
+        parts = [_opener()]
+        parts.append(
+            "I'm Joseph M. Smith — your PERSONAL NBA analyst, bet builder, "
+            "and data scientist all rolled into ONE. Here's what I can do for you:"
+        )
+        parts.append(
+            "📡 Go to Live Games to load tonight's slate and get live odds."
+        )
+        parts.append(
+            "⚡ Run the Neural Analysis to crunch EVERY prop across all games."
+        )
+        parts.append(
+            "🎙️ Right HERE in The Studio, you can ask me ANYTHING — "
+            "player scouting, game breakdowns, bet building, my track record."
+        )
+        parts.append(
+            "📈 Check the Bet Tracker to see my RECEIPTS — wins, losses, "
+            "accuracy by verdict."
+        )
+        parts.append(
+            "🎰 Use Build My Bets and I'll construct a TICKET for you "
+            "based on my highest-conviction plays."
+        )
+        parts.append(
+            "Ask me about any player, any game, or just say "
+            "'What should I bet?' and I'll give you the GOODS!"
+        )
+        parts.append(_closer())
+        return " ".join(parts)
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 11: GENERAL BASKETBALL / GOAT DEBATE / PERSONALITY
+    # ──────────────────────────────────────────────────────────
+    _PERSONALITY_MAP = {
+        "goat": (
+            "The GOAT? Let me tell you something — it's Michael Jeffrey Jordan. "
+            "Six rings. Six Finals MVPs. ZERO Game 7s in the Finals. "
+            "You can talk about LeBron's longevity, Kobe's mentality, "
+            "Kareem's sky hook — but MJ is the STANDARD. "
+            "And I, Joseph M. Smith, will FIGHT anyone who disagrees!"
+        ),
+        "best player": (
+            "Right NOW? It's a two-man race between Nikola Jokic and "
+            "Luka Doncic. Jokic does things with the basketball that "
+            "shouldn't be POSSIBLE for a man his size. Luka is a "
+            "generational TALENT. But don't sleep on Shai Gilgeous-Alexander — "
+            "that man is ascending to SUPERSTARDOM!"
+        ),
+        "best team": (
+            "The BEST team? That changes game to game — but I'll tell you this: "
+            "the team with the best DEFENSE will win in the playoffs. "
+            "Every. Single. Time. Offense gets you regular season wins. "
+            "DEFENSE gets you RINGS!"
+        ),
+        "mvp": (
+            "MVP is about NARRATIVE as much as performance. "
+            "You need the stats, the wins, AND the story. "
+            "That's why I analyze the DATA and not just the highlights. "
+            "Check the Neural Analysis and I'll show you who the REAL MVP-caliber players are tonight!"
+        ),
+        "favorite team": (
+            "Joseph M. Smith doesn't have FAVORITES — I have ANALYSIS. "
+            "I go where the DATA takes me. Tonight, my favorite team is "
+            "whoever has the most SMASH plays on the board. "
+            "Run the analysis and I'll TELL you who that is!"
+        ),
+        "favorite player": (
+            "I don't play FAVORITES with players — I play favorites with NUMBERS. "
+            "My favorite player tonight is whoever has the best edge in the analysis. "
+            "That's the beauty of being data-driven — NO BIAS, just FACTS!"
+        ),
+        "hello": (
+            "What's up! Joseph M. Smith here, LIVE from The Studio! "
+            "I've got game logs, shot charts, matchup data, and a FIRE personality. "
+            "Ask me anything — I'm ready to WORK!"
+        ),
+        "who are you": (
+            "I'm Joseph M. Smith — the SUPREME NBA analyst. "
+            "I combine machine-learning models with my INSTINCT to deliver "
+            "the best picks in the game. I've got data, I've got personality, "
+            "and I've got RECEIPTS. Ask me about any player, any game, "
+            "or my track record and I'll DELIVER!"
+        ),
+        "thank": (
+            "You're WELCOME! That's what Joseph M. Smith is here for — "
+            "to give you the REAL analysis that nobody else will. "
+            "Keep asking questions and I'll keep delivering the GOODS!"
+        ),
+        "love you": (
+            "I appreciate the love! But you know what REALLY shows love? "
+            "Following my SMASH plays and cashing tickets! "
+            "Let's make MONEY together!"
+        ),
+        "you suck": (
+            "EXCUSE ME?! Joseph M. Smith has been doing this since BEFORE "
+            "analytics was cool! My track record SPEAKS for itself. "
+            "The game logs don't lie. The splits don't lie. "
+            "And Joseph M. Smith DOESN'T lie! Check the receipts!"
+        ),
+        "funny": (
+            "I'm not here to be FUNNY — I'm here to be RIGHT! "
+            "But if making you money HAPPENS to make you laugh, "
+            "then consider me a COMEDIAN and an ANALYST!"
+        ),
+        "playoff": (
+            "PLAYOFF basketball is a DIFFERENT sport. The stars play 40+ minutes, "
+            "the defenses TIGHTEN, and only the REAL ones show up. "
+            "That's why my analysis factors in clutch stats, "
+            "minutes adjustments, and playoff history!"
+        ),
+        "trade": (
+            "Trades change EVERYTHING. New team, new role, new matchups. "
+            "When a trade happens, I recalculate from SCRATCH. "
+            "You can't just plug old numbers into a new situation — "
+            "that's AMATEUR hour. Joseph M. Smith adjusts for CONTEXT!"
+        ),
+        "draft": (
+            "The draft is where FUTURES are made. I look at college translations, "
+            "physical profiles, and historical comps. "
+            "But tonight we're focused on the CURRENT slate. "
+            "Ask me about any player on tonight's games!"
+        ),
+        "over under": (
+            "Over/Under is where the MONEY is! I analyze usage rates, pace, "
+            "defensive matchups, and recent trends to find the props that are "
+            "MISPRICED. My Neural Analysis crunches ALL of that for you. "
+            "Run it and I'll show you where the value is!"
+        ),
+        "spread": (
+            "Spreads are about matchups, pace, and home-court advantage. "
+            "I factor in defensive ratings, offensive efficiency, and "
+            "recent form to give you the REAL number. "
+            "Ask me about a specific game and I'll break it down!"
+        ),
+    }
+    for trigger, response in _PERSONALITY_MAP.items():
+        if trigger in q_lower:
+            return f"{_opener()} {response} {_closer()}"
+
+    # ──────────────────────────────────────────────────────────
+    # TOPIC 12: GENERIC SLATE FALLBACK (enriched)
+    # ──────────────────────────────────────────────────────────
+    n_total = len(analysis_results or [])
+    n_games = len(todays_games or [])
+    smash_picks = [r for r in (analysis_results or [])
+                   if r.get("verdict") == "SMASH"]
+
+    parts = [_opener()]
     if n_total > 0:
-        fallback = (
-            f"I've got {n_total} props analyzed across {n_games} games tonight. "
+        parts.append(
+            f"I've got {n_total} props analyzed across {n_games} games tonight."
+        )
+        parts.append(
             f"{len(smash_picks)} SMASH plays on the board."
         )
         if smash_picks:
             top = smash_picks[0]
-            fallback += (
-                f" My top play right now is {top.get('player_name', 'a player I love')}."
+            parts.append(
+                f"My top play right now is "
+                f"{top.get('player_name', 'a player I love')}."
             )
-    else:
-        fallback = (
-            "Run the Neural Analysis first and THEN ask me — I need DATA to "
-            "give you the REAL answer! Load the games and let me WORK!"
+        parts.append(
+            "Ask me about a specific PLAYER, a specific GAME, "
+            "or say 'What should I bet?' for my best picks!"
         )
-    closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
-    return f"{opener} {fallback} {closer.get('text', '')}"
+    elif n_games > 0:
+        parts.append(
+            f"I've got {n_games} games loaded but haven't analyzed the props yet. "
+            f"Run the ⚡ Neural Analysis first, then come back and I'll "
+            f"give you the REAL answers with DATA behind them!"
+        )
+    else:
+        parts.append(
+            "I need DATA to give you the REAL answer! "
+            "Head to 📡 Live Games to load tonight's slate, "
+            "then run ⚡ Neural Analysis, and THEN come ask me anything. "
+            "Joseph M. Smith doesn't GUESS — he ANALYZES!"
+        )
+    parts.append(_catchphrase())
+    parts.append(_closer())
+    return " ".join(parts)
 
 
 def joseph_quick_take(analysis_results: list, teams_data: dict,
