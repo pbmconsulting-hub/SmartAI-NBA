@@ -3679,11 +3679,145 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
         }
 
 
+def _joseph_answer_question(question: str, analysis_results: list,
+                            teams_data: dict, todays_games: list) -> str:
+    """Build a Joseph-voice answer to a user question.
+
+    Searches *analysis_results* for players/teams/stats mentioned in the
+    question and assembles a grounded response.  Falls back to a generic
+    encouraging response if no matches are found.
+    """
+    q_lower = question.lower()
+
+    # Try to find a matching player in analysis results
+    matched = []
+    for r in analysis_results:
+        pname = str(r.get("player_name", r.get("name", ""))).lower()
+        team = str(r.get("team", "")).lower()
+        # Match on full name or any individual name part (first/last)
+        name_parts = [p for p in pname.split() if len(p) >= 3]
+        name_hit = pname and (
+            pname in q_lower
+            or any(part in q_lower for part in name_parts)
+        )
+        team_hit = team and len(team) >= 3 and team in q_lower
+        if name_hit or team_hit:
+            matched.append(r)
+
+    # Check for stat-type keywords (points, rebounds, assists, etc.)
+    _STAT_KEYWORDS = {
+        "points": "points", "pts": "points", "scoring": "points",
+        "rebounds": "rebounds", "boards": "rebounds", "reb": "rebounds",
+        "assists": "assists", "dimes": "assists", "ast": "assists",
+        "threes": "three_pointers_made", "3s": "three_pointers_made",
+        "steals": "steals", "blocks": "blocks",
+    }
+    stat_filter = None
+    for kw, stat_key in _STAT_KEYWORDS.items():
+        if kw in q_lower:
+            stat_filter = stat_key
+            break
+
+    if stat_filter and matched:
+        stat_matched = [r for r in matched
+                        if stat_filter in str(r.get("stat_type", "")).lower()]
+        if stat_matched:
+            matched = stat_matched
+
+    # Build response based on matches
+    opener_pool = [
+        f"GREAT question! Let me break it down for you...",
+        f"You want my honest take? Here it is...",
+        f"I've been WAITING for someone to ask me this...",
+        f"Joseph M. Smith has the DATA and the ANSWERS...",
+        f"Let me give you the REAL answer, no fluff...",
+    ]
+    opener = random.choice(opener_pool)
+
+    if matched:
+        top = max(matched, key=lambda x: abs(_safe_float(x.get("joseph_edge", x.get("edge", 0)))))
+        pname = top.get("player_name", top.get("name", "this player"))
+        verdict = top.get("verdict", "LEAN")
+        edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+        stat = top.get("stat_type", top.get("prop", ""))
+        line = top.get("prop_line", top.get("line", ""))
+        direction = top.get("direction", "")
+        rant = top.get("rant", top.get("one_liner", ""))
+
+        detail = f"On {pname}"
+        if stat:
+            detail += f" {stat}"
+        if line:
+            detail += f" {line}"
+        if direction:
+            detail += f" — I'm going {direction}."
+        detail += f" My verdict: {verdict} with a {edge}% edge."
+
+        if rant:
+            detail += f" {rant}"
+
+        closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+        return f"{opener} {detail} {closer.get('text', '')}"
+
+    # Check for game-level questions
+    game_matched = []
+    for g in todays_games:
+        home = str(g.get("home_team", g.get("home", ""))).lower()
+        away = str(g.get("away_team", g.get("away", ""))).lower()
+        if (home and home in q_lower) or (away and away in q_lower):
+            game_matched.append(g)
+
+    if game_matched:
+        g = game_matched[0]
+        home = g.get("home_team", g.get("home", "Home"))
+        away = g.get("away_team", g.get("away", "Away"))
+        spread = g.get("spread", "—")
+        total = g.get("total", "—")
+        game_props = [r for r in analysis_results
+                      if str(r.get("team", "")).lower() in (home.lower(), away.lower())]
+        smash_count = len([r for r in game_props if r.get("verdict") == "SMASH"])
+        detail = (
+            f"For {away} at {home} — spread is {spread}, total is {total}. "
+            f"I've got {len(game_props)} props analyzed for this game"
+        )
+        if smash_count:
+            detail += f" with {smash_count} SMASH plays!"
+        else:
+            detail += "."
+        closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+        return f"{opener} {detail} {closer.get('text', '')}"
+
+    # Generic fallback using overall slate data
+    n_total = len(analysis_results)
+    n_games = len(todays_games)
+    smash_picks = [r for r in analysis_results if r.get("verdict") == "SMASH"]
+    if n_total > 0:
+        fallback = (
+            f"I've got {n_total} props analyzed across {n_games} games tonight. "
+            f"{len(smash_picks)} SMASH plays on the board."
+        )
+        if smash_picks:
+            top = smash_picks[0]
+            fallback += (
+                f" My top play right now is {top.get('player_name', 'a player I love')}."
+            )
+    else:
+        fallback = (
+            "Run the Neural Analysis first and THEN ask me — I need DATA to "
+            "give you the REAL answer! Load the games and let me WORK!"
+        )
+    closer = _select_fragment(CLOSER_POOL, _used_fragments.setdefault("rant", set()))
+    return f"{opener} {fallback} {closer.get('text', '')}"
+
+
 def joseph_quick_take(analysis_results: list, teams_data: dict,
-                      todays_games: list) -> str:
+                      todays_games: list = None, *,
+                      context: str = "") -> str:
     """Generate a unique 4-6 sentence supreme monologue about tonight's slate.
 
     Uses DB data when available to ground the take in real stats and trends.
+    When *context* contains a ``user_question:`` prefix the response is
+    tailored to the user's question using available analysis data.
 
     Parameters
     ----------
@@ -3691,8 +3825,12 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         All prop analysis results.
     teams_data : dict
         All teams data.
-    todays_games : list[dict]
+    todays_games : list[dict] or None
         Tonight's games.
+    context : str
+        Optional context string.  When it starts with ``user_question:``
+        the remainder is treated as a question from the user and the
+        monologue is built around that question.
 
     Returns
     -------
@@ -3700,6 +3838,19 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         A 4-6 sentence Joseph M. Smith monologue.
     """
     try:
+        if todays_games is None:
+            todays_games = []
+
+        # ── User-question path ──────────────────────────────────
+        if context.startswith("user_question:"):
+            return _joseph_answer_question(
+                context[len("user_question:"):].strip(),
+                analysis_results or [],
+                teams_data or {},
+                todays_games,
+            )
+
+        # ── Default slate-monologue path ────────────────────────
         take_openers = [
             "Joseph M. Smith has STUDIED tonight's slate and here's what I see...",
             "Tonight's games? Let me BREAK it down for you...",

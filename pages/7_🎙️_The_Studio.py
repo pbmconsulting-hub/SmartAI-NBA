@@ -98,6 +98,7 @@ try:
         joseph_generate_independent_picks,
         joseph_quick_take,
         joseph_commentary,
+        joseph_gut_call,
         _extract_edge,
         _select_fragment,
         CLOSER_POOL,
@@ -355,6 +356,47 @@ def _avatar_inline(size=48):
     return f'<span style="font-size:{size // 2}px">🎙️</span>'
 
 
+# ── Hot Take helpers ─────────────────────────────────────────
+# Verdict inversion map used by Hot Take Mode to produce contrarian output.
+_VERDICT_FLIP = {
+    "SMASH": "FADE",
+    "LEAN": "STAY_AWAY",
+    "FADE": "LEAN",
+    "STAY_AWAY": "SMASH",
+}
+
+_DIRECTION_FLIP = {"OVER": "UNDER", "UNDER": "OVER", "Over": "Under", "Under": "Over"}
+
+_HOT_TAKE_RANT_POOL = [
+    "The math says one thing, but my GUT says DIFFERENT!",
+    "Everyone is going the OTHER way — but Joseph sees what they DON'T!",
+    "This is a CONTRARIAN play and I'm ALL IN on my instinct!",
+    "Forget the spreadsheet — this is a FEELING and I TRUST it!",
+    "The public is WRONG on this one. Trust the man, not the machine!",
+    "Joseph M. Smith goes AGAINST the grain and that's where the MONEY is!",
+]
+
+
+def _apply_hot_take(result: dict) -> dict:
+    """Return a shallow copy of *result* with verdict/direction flipped."""
+    flipped = dict(result)
+    orig_verdict = str(flipped.get("verdict", "LEAN")).upper().replace(" ", "_")
+    flipped["original_verdict"] = orig_verdict
+    flipped["verdict"] = _VERDICT_FLIP.get(orig_verdict, orig_verdict)
+
+    orig_dir = str(flipped.get("direction", ""))
+    flipped["direction"] = _DIRECTION_FLIP.get(orig_dir, orig_dir)
+
+    flipped["is_hot_take"] = True
+    flipped["rant"] = random.choice(_HOT_TAKE_RANT_POOL)
+    return flipped
+
+
+def _apply_hot_take_to_list(results: list) -> list:
+    """Apply hot-take inversion to every result dict in *results*."""
+    return [_apply_hot_take(r) for r in results]
+
+
 # ═════════════════════════════════════════════════════════════
 # FOUR INTERACTIVE MODES  (Enhancement 3: card UI, Enhancement 9: persist)
 # ═════════════════════════════════════════════════════════════
@@ -559,13 +601,24 @@ if mode == "🎤 ASK JOSEPH":
     if _voice_question and _voice_question.strip():
         _q = _voice_question.strip()
         _q_safe = _html.escape(_q)
+        _todays = st.session_state.get("todays_games", [])
+        _is_hot_take = st.session_state.get("joseph_hot_take_mode", False)
         if _BRAIN_AVAILABLE:
             try:
                 _voice_answer = joseph_quick_take(
                     analysis_results,
                     teams_data,
+                    _todays,
                     context=f"user_question: {_q_safe}",
                 )
+                # When Hot Take Mode is on, prepend a contrarian spin
+                if _is_hot_take:
+                    _hot_take_prefix = random.choice([
+                        "🔥 HOT TAKE — the math says one thing but Joseph says DIFFERENT! ",
+                        "🔥 CONTRARIAN ALERT — I'm going AGAINST the consensus here! ",
+                        "🔥 HOT TAKE MODE — everybody else is WRONG and here's WHY! ",
+                    ])
+                    _voice_answer = _hot_take_prefix + _voice_answer
             except Exception:
                 _voice_answer = (
                     f"Joseph heard your question about '{_q_safe}' "
@@ -651,6 +704,19 @@ if mode == "🏀 GAMES TONIGHT":
                             result = {}
 
                     if result:
+                        # Hot Take Mode: flip verdicts on best_props
+                        if st.session_state.get("joseph_hot_take_mode", False):
+                            _raw_props = result.get("best_props", [])
+                            result["best_props"] = _apply_hot_take_to_list(_raw_props)
+                            st.markdown(
+                                '<div style="background:rgba(255,68,68,0.08);'
+                                'border:1px solid rgba(255,68,68,0.3);border-radius:8px;'
+                                'padding:8px 14px;margin-bottom:10px;color:#ff4444;'
+                                'font-size:0.82rem;font-weight:600">'
+                                '🔥 HOT TAKE — Joseph is going AGAINST the model on these picks!</div>',
+                                unsafe_allow_html=True,
+                            )
+
                         # Avatar + commentary (Enhancement 18: use helper)
                         try:
                             commentary = joseph_commentary(
@@ -860,6 +926,26 @@ elif mode == "👤 SCOUT A PLAYER":
                         result = {}
 
                 if result:
+                    # Hot Take Mode: flip best_prop and alt verdicts
+                    if st.session_state.get("joseph_hot_take_mode", False):
+                        bp = result.get("best_prop")
+                        if isinstance(bp, dict) and bp:
+                            result["best_prop"] = _apply_hot_take(bp)
+                        _alts = result.get("alternative_props", result.get("alt_props", []))
+                        if _alts:
+                            key = "alternative_props" if "alternative_props" in result else "alt_props"
+                            result[key] = _apply_hot_take_to_list(
+                                [a for a in _alts if isinstance(a, dict)]
+                            )
+                        st.markdown(
+                            '<div style="background:rgba(255,68,68,0.08);'
+                            'border:1px solid rgba(255,68,68,0.3);border-radius:8px;'
+                            'padding:8px 14px;margin-bottom:10px;color:#ff4444;'
+                            'font-size:0.82rem;font-weight:600">'
+                            '🔥 HOT TAKE — Joseph is going AGAINST the model on this scouting report!</div>',
+                            unsafe_allow_html=True,
+                        )
+
                     # Avatar + scouting report (Enhancement 18: use helper)
                     report = result.get("scouting_report", "")
                     if report:
@@ -1119,6 +1205,24 @@ elif mode == "🎰 BUILD MY BETS":
                         ticket_result = {}
 
                 if ticket_result and ticket_result.get("legs"):
+                    # Hot Take Mode: flip verdicts on ticket legs
+                    if st.session_state.get("joseph_hot_take_mode", False):
+                        ticket_result["legs"] = _apply_hot_take_to_list(
+                            ticket_result.get("legs", [])
+                        )
+                        ticket_result["rant"] = (
+                            "🔥 HOT TAKE TICKET — Joseph is going AGAINST "
+                            "the model on EVERY leg! Pure instinct, no math!"
+                        )
+                        st.markdown(
+                            '<div style="background:rgba(255,68,68,0.08);'
+                            'border:1px solid rgba(255,68,68,0.3);border-radius:8px;'
+                            'padding:8px 14px;margin-bottom:10px;color:#ff4444;'
+                            'font-size:0.82rem;font-weight:600">'
+                            '🔥 HOT TAKE TICKET — All legs are CONTRARIAN picks!</div>',
+                            unsafe_allow_html=True,
+                        )
+
                     # Store ticket in session state for comparison (Enhancement 11)
                     if "studio_tickets" not in st.session_state:
                         st.session_state["studio_tickets"] = {}
