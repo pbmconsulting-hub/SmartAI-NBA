@@ -239,5 +239,121 @@ class TestFetchResolveGameLogSourceCheck(unittest.TestCase):
                 self.assertEqual(logs[0]["ftm"], 5.0)
 
 
+class TestNewStatMappings(unittest.TestCase):
+    """Verify new stat type mappings resolve correctly."""
+
+    def test_three_pt_attempted_in_stat_col(self):
+        from tracking.bet_tracker import _STAT_COL
+        self.assertEqual(_STAT_COL["3-pt attempted"], "fg3a")
+        self.assertEqual(_STAT_COL["3pt attempted"], "fg3a")
+        self.assertEqual(_STAT_COL["fg3a"], "fg3a")
+        self.assertEqual(_STAT_COL["three pointers attempted"], "fg3a")
+
+    def test_computed_stats_exist(self):
+        from tracking.bet_tracker import _COMPUTED_STATS
+        self.assertIn("two pointers made", _COMPUTED_STATS)
+        self.assertIn("two pointers attempted", _COMPUTED_STATS)
+
+    def test_computed_two_pointers_made(self):
+        from tracking.bet_tracker import _compute_actual_value_from_row, _COMPUTED_STATS
+        row = {"fgm": 10.0, "fg3m": 3.0, "fga": 20.0, "fg3a": 7.0}
+        val = _compute_actual_value_from_row(
+            row, "two pointers made", None, False, False, {}, {}, is_computed=True,
+        )
+        self.assertAlmostEqual(val, 7.0)  # 10 - 3
+
+    def test_computed_two_pointers_attempted(self):
+        from tracking.bet_tracker import _compute_actual_value_from_row, _COMPUTED_STATS
+        row = {"fgm": 10.0, "fg3m": 3.0, "fga": 20.0, "fg3a": 7.0}
+        val = _compute_actual_value_from_row(
+            row, "two pointers attempted", None, False, False, {}, {}, is_computed=True,
+        )
+        self.assertAlmostEqual(val, 13.0)  # 20 - 7
+
+    def test_dunks_is_unresolvable(self):
+        from tracking.bet_tracker import _UNRESOLVABLE_STATS
+        self.assertIn("dunks", _UNRESOLVABLE_STATS)
+
+    def test_three_pt_attempted_resolves(self):
+        """3-pt attempted bet should resolve via fg3a column."""
+        import tracking.bet_tracker as bt
+
+        fake_bet = {
+            "bet_id": 10,
+            "bet_date": "2026-03-05",
+            "player_name": "TestPlayer",
+            "stat_type": "3-pt attempted",
+            "prop_line": 5.5,
+            "direction": "OVER",
+            "result": None,
+        }
+        fake_log = [{
+            "game_date": "MAR 05, 2026",
+            "pts": 20.0, "reb": 5.0, "ast": 3.0, "stl": 1.0, "blk": 0.0,
+            "tov": 2.0, "fg3m": 3.0, "fg3a": 8.0, "minutes": 32.0,
+            "ftm": 4.0, "fta": 5.0, "fgm": 9.0, "fga": 17.0,
+            "oreb": 1.0, "dreb": 4.0, "pf": 2.0,
+        }]
+        with patch.object(bt, "_fetch_bulk_boxscores", return_value={}):
+            with patch("tracking.bet_tracker.record_bet_result", return_value=(True, "ok")) as mock_record:
+                with patch("data.player_profile_service.get_player_id", return_value=12345):
+                    with patch("tracking.bet_tracker._fetch_resolve_game_log", return_value=fake_log):
+                        with patch("tracking.bet_tracker.load_all_bets", return_value=[fake_bet]):
+                            result = bt.resolve_all_pending_bets()
+                            self.assertEqual(result["resolved"], 1)
+                            mock_record.assert_called_once_with(10, "WIN", 8.0)
+
+    def test_two_pointers_made_resolves(self):
+        """two pointers made bet should resolve via fgm - fg3m."""
+        import tracking.bet_tracker as bt
+
+        fake_bet = {
+            "bet_id": 20,
+            "bet_date": "2026-03-05",
+            "player_name": "TestPlayer",
+            "stat_type": "two pointers made",
+            "prop_line": 5.5,
+            "direction": "OVER",
+            "result": None,
+        }
+        fake_log = [{
+            "game_date": "MAR 05, 2026",
+            "pts": 20.0, "reb": 5.0, "ast": 3.0, "stl": 1.0, "blk": 0.0,
+            "tov": 2.0, "fg3m": 3.0, "fg3a": 8.0, "minutes": 32.0,
+            "ftm": 4.0, "fta": 5.0, "fgm": 9.0, "fga": 17.0,
+            "oreb": 1.0, "dreb": 4.0, "pf": 2.0,
+        }]
+        with patch.object(bt, "_fetch_bulk_boxscores", return_value={}):
+            with patch("tracking.bet_tracker.record_bet_result", return_value=(True, "ok")) as mock_record:
+                with patch("data.player_profile_service.get_player_id", return_value=12345):
+                    with patch("tracking.bet_tracker._fetch_resolve_game_log", return_value=fake_log):
+                        with patch("tracking.bet_tracker.load_all_bets", return_value=[fake_bet]):
+                            result = bt.resolve_all_pending_bets()
+                            self.assertEqual(result["resolved"], 1)
+                            # fgm(9) - fg3m(3) = 6.0, > 5.5 → WIN
+                            mock_record.assert_called_once_with(20, "WIN", 6.0)
+
+    def test_dunks_gives_graceful_error(self):
+        """dunks stat should produce a graceful unresolvable error, not 'unknown stat'."""
+        import tracking.bet_tracker as bt
+
+        fake_bet = {
+            "bet_id": 17,
+            "bet_date": "2026-03-05",
+            "player_name": "TestPlayer",
+            "stat_type": "dunks",
+            "prop_line": 1.5,
+            "direction": "OVER",
+            "result": None,
+        }
+        with patch.object(bt, "_fetch_bulk_boxscores", return_value={}):
+            with patch("tracking.bet_tracker.load_all_bets", return_value=[fake_bet]):
+                result = bt.resolve_all_pending_bets()
+                self.assertEqual(result["resolved"], 0)
+                self.assertTrue(len(result["errors"]) >= 1)
+                self.assertIn("not available in standard box scores", result["errors"][0])
+                self.assertNotIn("unknown stat", result["errors"][0])
+
+
 if __name__ == "__main__":
     unittest.main()

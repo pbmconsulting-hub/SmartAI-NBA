@@ -158,6 +158,7 @@ _STAT_COL = {
     "fta":              "fta",
     "fga":              "fga",
     "fgm":              "fgm",
+    "fg3a":             "fg3a",
     "personal_fouls":   "pf",
     "offensive_rebounds": "oreb",
     "defensive_rebounds": "dreb",
@@ -172,7 +173,31 @@ _STAT_COL = {
     "reb":              "reb",
     "ast":              "ast",
     "min":              "minutes",
+    # ── 3-pt attempted aliases ─────────────────────────
+    "3-pt attempted":           "fg3a",
+    "3pt attempted":            "fg3a",
+    "three pointers attempted": "fg3a",
+    "three_pointers_attempted": "fg3a",
+    "3-pointers attempted":     "fg3a",
 }
+
+# ── Computed stats: derived from multiple box-score columns ──
+# Each entry maps a stat name to a tuple of (add_cols, subtract_cols)
+# so that actual_value = sum(add_cols) - sum(subtract_cols).
+_COMPUTED_STATS = {
+    "two pointers made":      (("fgm",), ("fg3m",)),
+    "two pointers attempted": (("fga",), ("fg3a",)),
+    "2pm":                    (("fgm",), ("fg3m",)),
+    "2pa":                    (("fga",), ("fg3a",)),
+    "two_pointers_made":      (("fgm",), ("fg3m",)),
+    "two_pointers_attempted": (("fga",), ("fg3a",)),
+}
+
+# Stats that exist on some platforms but CANNOT be resolved from a
+# standard NBA box score (full-game totals).  Flagged gracefully.
+_UNRESOLVABLE_STATS = frozenset({
+    "dunks",
+})
 
 # Game-segment prop patterns that CANNOT be resolved from PlayerGameLog
 # (which only has full-game totals). These are flagged gracefully instead
@@ -635,6 +660,7 @@ def _compute_actual_value_from_row(
     is_fantasy: bool,
     combo_stats: dict,
     fantasy_scoring: dict,
+    is_computed: bool = False,
 ) -> float:
     """
     Compute the actual stat value for a bet from a box-score row dict.
@@ -650,6 +676,7 @@ def _compute_actual_value_from_row(
         is_fantasy: True if stat_type is a fantasy scoring stat
         combo_stats: COMBO_STATS mapping from data.platform_mappings
         fantasy_scoring: FANTASY_SCORING mapping from data.platform_mappings
+        is_computed: True if stat_type is in _COMPUTED_STATS (derived value)
 
     Returns:
         float: computed actual stat value
@@ -669,6 +696,11 @@ def _compute_actual_value_from_row(
             ),
             2,
         )
+    if is_computed:
+        add_cols, sub_cols = _COMPUTED_STATS[stat_type]
+        total = sum(float(row.get(c, 0) or 0) for c in add_cols)
+        total -= sum(float(row.get(c, 0) or 0) for c in sub_cols)
+        return total
     return float(row.get(stat_col, 0) or 0)
 
 def _lookup_bulk_row(bulk_lookup: dict, player_name: str, normalize_fn=None) -> dict | None:
@@ -1158,7 +1190,7 @@ def auto_resolve_bet_results(date_str=None):
     target_date = _dt.datetime.strptime(date_str, "%Y-%m-%d").date()
 
     # ── Pre-validate bets and collect unique player names ─────
-    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line)
     _names_to_load: set = set()
 
     for bet in pending_bets:
@@ -1171,27 +1203,37 @@ def auto_resolve_bet_results(date_str=None):
         # Determine how to compute actual_value for this stat_type
         is_combo   = stat_type in COMBO_STATS
         is_fantasy = stat_type in FANTASY_SCORING
+        is_computed = stat_type in _COMPUTED_STATS
         stat_col   = _STAT_COL.get(stat_type)
 
         # Fallback: try normalizing the platform-native name to an internal key
-        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+        if not stat_col and not is_combo and not is_fantasy and not is_computed and _norm_stat_type is not None:
             normalized = _norm_stat_type(stat_type)
             stat_col = _STAT_COL.get(normalized)
             if stat_col:
                 stat_type = normalized
+            elif normalized in _COMPUTED_STATS:
+                is_computed = True
+                stat_type = normalized
 
-        if not stat_col and not is_combo and not is_fantasy:
+        if not stat_col and not is_combo and not is_fantasy and not is_computed:
             if _is_segment_prop(stat_type):
                 errors_list.append(
                     f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
                     f"cannot resolve from full-game box score"
                 )
                 continue
+            if stat_type in _UNRESOLVABLE_STATS:
+                errors_list.append(
+                    f"#{bet_id} {player_name}: '{stat_type}' is not available in "
+                    f"standard box scores — cannot auto-resolve"
+                )
+                continue
             errors_list.append(f"#{bet_id} {player_name}: unknown stat type '{stat_type}'")
             continue
 
         _names_to_load.add(player_name)
-        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line))
 
     if not _bet_prep:
         return resolved_count, errors_list
@@ -1249,7 +1291,7 @@ def auto_resolve_bet_results(date_str=None):
     _tier12_resolved = 0
 
     # ── Resolve bets from cached game logs ────────────────────
-    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line) in _bet_prep:
         bet_id = bet.get("bet_id")
 
         try:
@@ -1259,7 +1301,7 @@ def auto_resolve_bet_results(date_str=None):
             if bulk_row is not None:
                 actual_value = _compute_actual_value_from_row(
                     bulk_row, stat_type, stat_col, is_combo, is_fantasy,
-                    COMBO_STATS, FANTASY_SCORING,
+                    COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
                 )
                 if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                     result = "PUSH"
@@ -1318,6 +1360,10 @@ def auto_resolve_bet_results(date_str=None):
                     if comp in _STAT_COL
                 )
                 actual_value = round(actual_value, 2)
+            elif is_computed:
+                add_cols, sub_cols = _COMPUTED_STATS[stat_type]
+                actual_value = sum(float(matching_log.get(c, 0) or 0) for c in add_cols)
+                actual_value -= sum(float(matching_log.get(c, 0) or 0) for c in sub_cols)
             else:
                 actual_value = float(matching_log.get(stat_col, 0) or 0)
 
@@ -1452,7 +1498,7 @@ def resolve_todays_bets():
     target_date = _dt.datetime.strptime(today_str, "%Y-%m-%d").date()
 
     # ── Pre-validate bets and collect unique player names ─────
-    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line)
+    _bet_prep = []  # (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line)
     _names_to_load: set = set()
 
     for bet in todays_pending:
@@ -1464,20 +1510,29 @@ def resolve_todays_bets():
 
         is_combo   = stat_type in COMBO_STATS
         is_fantasy = stat_type in FANTASY_SCORING
+        is_computed = stat_type in _COMPUTED_STATS
         stat_col   = _STAT_COL.get(stat_type)
 
         # Fallback: try normalizing the platform-native name to an internal key
-        if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+        if not stat_col and not is_combo and not is_fantasy and not is_computed and _norm_stat_type is not None:
             normalized = _norm_stat_type(stat_type)
             stat_col = _STAT_COL.get(normalized)
             if stat_col:
                 stat_type = normalized
+            elif normalized in _COMPUTED_STATS:
+                is_computed = True
+                stat_type = normalized
 
-        if not stat_col and not is_combo and not is_fantasy:
+        if not stat_col and not is_combo and not is_fantasy and not is_computed:
             if _is_segment_prop(stat_type):
                 summary["errors"].append(
                     f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
                     f"cannot resolve from full-game box score"
+                )
+            elif stat_type in _UNRESOLVABLE_STATS:
+                summary["errors"].append(
+                    f"#{bet_id} {player_name}: '{stat_type}' is not available in "
+                    f"standard box scores — cannot auto-resolve"
                 )
             else:
                 summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
@@ -1485,7 +1540,7 @@ def resolve_todays_bets():
             continue
 
         _names_to_load.add(player_name)
-        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line))
+        _bet_prep.append((bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line))
 
     if not _bet_prep:
         return summary
@@ -1541,7 +1596,7 @@ def resolve_todays_bets():
     _tier12_resolved = 0
 
     # ── Resolve bets from cached game logs ────────────────────
-    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, direction, prop_line) in _bet_prep:
+    for (bet, player_name, stat_type, stat_col, is_combo, is_fantasy, is_computed, direction, prop_line) in _bet_prep:
         bet_id = bet.get("id") or bet.get("bet_id")
 
         try:
@@ -1551,7 +1606,7 @@ def resolve_todays_bets():
             if bulk_row is not None:
                 actual_value = _compute_actual_value_from_row(
                     bulk_row, stat_type, stat_col, is_combo, is_fantasy,
-                    COMBO_STATS, FANTASY_SCORING,
+                    COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
                 )
                 if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                     result = "PUSH"
@@ -1613,6 +1668,10 @@ def resolve_todays_bets():
                     for col, mult in scoring_weights.items()
                     if _STAT_COL.get(col)
                 )
+            elif is_computed:
+                add_cols, sub_cols = _COMPUTED_STATS[stat_type]
+                actual_value = sum(float(latest.get(c, 0) or 0) for c in add_cols)
+                actual_value -= sum(float(latest.get(c, 0) or 0) for c in sub_cols)
             else:
                 actual_value = float(latest.get(stat_col, 0) or 0)
 
@@ -1759,20 +1818,29 @@ def resolve_all_pending_bets():
 
             is_combo   = stat_type in COMBO_STATS
             is_fantasy = stat_type in FANTASY_SCORING
+            is_computed = stat_type in _COMPUTED_STATS
             stat_col   = _STAT_COL.get(stat_type)
 
             # Fallback: try normalizing the platform-native name to an internal key
-            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            if not stat_col and not is_combo and not is_fantasy and not is_computed and _norm_stat_type is not None:
                 normalized = _norm_stat_type(stat_type)
                 stat_col = _STAT_COL.get(normalized)
                 if stat_col:
                     stat_type = normalized
+                elif normalized in _COMPUTED_STATS:
+                    is_computed = True
+                    stat_type = normalized
 
-            if not stat_col and not is_combo and not is_fantasy:
+            if not stat_col and not is_combo and not is_fantasy and not is_computed:
                 if _is_segment_prop(stat_type):
                     summary["errors"].append(
                         f"#{bet_id} {player_name}: '{stat_type}' is a game-segment prop — "
                         f"cannot resolve from full-game box score"
+                    )
+                elif stat_type in _UNRESOLVABLE_STATS:
+                    summary["errors"].append(
+                        f"#{bet_id} {player_name}: '{stat_type}' is not available in "
+                        f"standard box scores — cannot auto-resolve"
                     )
                 else:
                     summary["errors"].append(f"#{bet_id} {player_name}: unknown stat '{stat_type}'")
@@ -1786,7 +1854,7 @@ def resolve_all_pending_bets():
                 try:
                     actual_value = _compute_actual_value_from_row(
                         bulk_row, stat_type, stat_col, is_combo, is_fantasy,
-                        COMBO_STATS, FANTASY_SCORING,
+                        COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
                     )
                     if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                         result = "PUSH"
@@ -1874,6 +1942,10 @@ def resolve_all_pending_bets():
                         for c, w in FANTASY_SCORING[stat_type].items()
                         if _STAT_COL.get(c)
                     ), 2)
+                elif is_computed:
+                    add_cols, sub_cols = _COMPUTED_STATS[stat_type]
+                    actual_value = sum(float(matching_log.get(c, 0) or 0) for c in add_cols)
+                    actual_value -= sum(float(matching_log.get(c, 0) or 0) for c in sub_cols)
                 else:
                     actual_value = float(matching_log.get(stat_col, 0) or 0)
 
@@ -2046,20 +2118,29 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
             is_combo   = stat_type in COMBO_STATS
             is_fantasy = stat_type in FANTASY_SCORING
+            is_computed = stat_type in _COMPUTED_STATS
             stat_col   = _STAT_COL.get(stat_type)
 
             # Fallback: try normalizing the platform-native name to an internal key
-            if not stat_col and not is_combo and not is_fantasy and _norm_stat_type is not None:
+            if not stat_col and not is_combo and not is_fantasy and not is_computed and _norm_stat_type is not None:
                 normalized = _norm_stat_type(stat_type)
                 stat_col = _STAT_COL.get(normalized)
                 if stat_col:
                     stat_type = normalized
+                elif normalized in _COMPUTED_STATS:
+                    is_computed = True
+                    stat_type = normalized
 
-            if not stat_col and not is_combo and not is_fantasy:
+            if not stat_col and not is_combo and not is_fantasy and not is_computed:
                 if _is_segment_prop(stat_type):
                     summary["errors"].append(
                         f"#{pick_id} {player_name}: '{stat_type}' is a game-segment prop — "
                         f"cannot resolve from full-game box score"
+                    )
+                elif stat_type in _UNRESOLVABLE_STATS:
+                    summary["errors"].append(
+                        f"#{pick_id} {player_name}: '{stat_type}' is not available in "
+                        f"standard box scores — cannot auto-resolve"
                     )
                 else:
                     summary["errors"].append(
@@ -2075,7 +2156,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 try:
                     actual_value = _compute_actual_value_from_row(
                         bulk_row, stat_type, stat_col, is_combo, is_fantasy,
-                        COMBO_STATS, FANTASY_SCORING,
+                        COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
                     )
                     if abs(actual_value - prop_line) < PUSH_THRESHOLD_EPSILON:
                         result = "PUSH"
@@ -2173,6 +2254,10 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                         for c, w in FANTASY_SCORING[stat_type].items()
                         if _STAT_COL.get(c)
                     ), 2)
+                elif is_computed:
+                    add_cols, sub_cols = _COMPUTED_STATS[stat_type]
+                    actual_value = sum(float(matching_log.get(c, 0) or 0) for c in add_cols)
+                    actual_value -= sum(float(matching_log.get(c, 0) or 0) for c in sub_cols)
                 else:
                     actual_value = float(matching_log.get(stat_col, 0) or 0)
 
@@ -2351,6 +2436,28 @@ def get_live_bet_status(bets_list):
         "turnovers": "tov",
         "threes": "fg3m",
         "three_pointers": "fg3m",
+        "3-pt made": "fg3m",
+        "3pm": "fg3m",
+        "three pointers": "fg3m",
+        "3-pointers": "fg3m",
+        "3-pt attempted": "fg3a",
+        "fg3a": "fg3a",
+        "free throws made": "ftm",
+        "ftm": "ftm",
+        "fta": "fta",
+        "fga": "fga",
+        "fgm": "fgm",
+        "blocked shots": "blk",
+        "personal_fouls": "pf",
+        "offensive_rebounds": "oreb",
+        "defensive_rebounds": "dreb",
+        "minutes": "minutes",
+    }
+
+    # Computed stats for live tracking (derived from multiple box cols)
+    _LIVE_COMPUTED = {
+        "two pointers made":      lambda b: b.get("fgm", 0.0) - b.get("fg3m", 0.0),
+        "two pointers attempted": lambda b: b.get("fga", 0.0) - b.get("fg3a", 0.0),
     }
 
     for bet in bets_list:
@@ -2370,6 +2477,8 @@ def get_live_bet_status(bets_list):
             box_key = STAT_TO_BOX.get(stat_type)
             if box_key:
                 current_value = box_entry.get(box_key, 0.0)
+            elif stat_type in _LIVE_COMPUTED:
+                current_value = _LIVE_COMPUTED[stat_type](box_entry)
             elif stat_type == "points_rebounds":
                 current_value = box_entry.get("pts", 0.0) + box_entry.get("reb", 0.0)
             elif stat_type == "points_assists":
