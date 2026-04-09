@@ -1637,11 +1637,9 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         narrative_tags = []
         try:
             narrative_tags = detect_narrative_tags(player_data, game_context,
-                                                  game_context.get("teams_data", []))
+                                                  game_context.get("teams_data", [])) or []
         except Exception:
-            narrative_tags = []
-        if not narrative_tags:
-            narrative_tags = []
+            pass
         if game_context.get("is_back_to_back"):
             if "back_to_back" not in narrative_tags:
                 narrative_tags.append("back_to_back")

@@ -246,31 +246,34 @@ def _render_spp_nav_logo():
     logo_b64 = _get_spp_logo_b64()
     if not logo_b64:
         return
+    _NAV_LOGO_CSS = """
+    <style>
+    .spp-nav-logo-bar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        padding: 8px 0 4px 0;
+        margin-bottom: 4px;
+    }
+    .spp-nav-logo {
+        height: 54px;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 2px 8px rgba(0, 255, 213, 0.25));
+        transition: transform 0.3s ease;
+    }
+    .spp-nav-logo:hover {
+        transform: scale(1.05);
+    }
+    </style>
+    """
     st.markdown(
         f'<div class="spp-nav-logo-bar">'
         f'<img src="data:image/png;base64,{logo_b64}" '
         f'class="spp-nav-logo" alt="Smart Pick Pro" />'
         f'</div>'
-        f'<style>'
-        f'.spp-nav-logo-bar {{'
-        f'  display: flex;'
-        f'  justify-content: center;'
-        f'  align-items: center;'
-        f'  width: 100%;'
-        f'  padding: 8px 0 4px 0;'
-        f'  margin-bottom: 4px;'
-        f'}}'
-        f'.spp-nav-logo {{'
-        f'  height: 54px;'
-        f'  width: auto;'
-        f'  object-fit: contain;'
-        f'  filter: drop-shadow(0 2px 8px rgba(0, 255, 213, 0.25));'
-        f'  transition: transform 0.3s ease;'
-        f'}}'
-        f'.spp-nav-logo:hover {{'
-        f'  transform: scale(1.05);'
-        f'}}'
-        f'</style>',
+        f'{_NAV_LOGO_CSS}',
         unsafe_allow_html=True,
     )
 
