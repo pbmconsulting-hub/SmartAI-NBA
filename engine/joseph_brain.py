@@ -1633,6 +1633,50 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
         else:
             verdict = "STAY_AWAY"
 
+        # --- Narrative tags ---
+        narrative_tags = []
+        try:
+            narrative_tags = detect_narrative_tags(player_data, game_context,
+                                                  game_context.get("teams_data", []))
+        except Exception:
+            narrative_tags = []
+        if not narrative_tags:
+            narrative_tags = []
+        if game_context.get("is_back_to_back"):
+            if "back_to_back" not in narrative_tags:
+                narrative_tags.append("back_to_back")
+        pace_delta = _safe_float(game_context.get("pace_delta", 0.0))
+        if pace_delta > 2.0 and "pace_up" not in narrative_tags:
+            narrative_tags.append("pace_up")
+        elif pace_delta < -2.0 and "pace_down" not in narrative_tags:
+            narrative_tags.append("pace_down")
+
+        # --- DB intel for data-driven rant sentences ---
+        db_intel = None
+        try:
+            db_intel = _get_player_db_intel(player_data)
+        except Exception:
+            pass
+
+        # --- Mismatch info from grading ---
+        mismatch_info = None
+        mismatch_grade = grade_result.get("mismatch_grade", "C")
+        if mismatch_grade in ("A+", "A"):
+            mismatch_info = {"description": f"{player_name} has a SIGNIFICANT mismatch advantage"}
+
+        # --- Comp selection ---
+        comp = None
+        if JOSEPH_COMPS_DATABASE:
+            try:
+                arch_matches = [c for c in JOSEPH_COMPS_DATABASE if c.get("archetype") == archetype]
+                stat_matches = [c for c in arch_matches if c.get("stat_context") == stat_type]
+                if stat_matches:
+                    comp = random.choice(stat_matches)
+                elif arch_matches:
+                    comp = random.choice(arch_matches)
+            except Exception:
+                pass
+
         # --- Rant ---
         energy = "nuclear" if verdict == "SMASH" else "high" if verdict == "LEAN" else "medium"
         rant = build_joseph_rant(
@@ -1640,8 +1684,9 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             prop={"stat": stat_type, "line": str(prop_line),
                   "edge": str(round(edge, 1)), "prob": str(round(prob_over * 100.0 if prob_over <= 1 else prob_over, 1))},
             verdict=verdict,
-            narrative_tags=[],
-            mismatch=None, comp=None, energy=energy,
+            narrative_tags=narrative_tags,
+            mismatch=mismatch_info, comp=comp, energy=energy,
+            db_intel=db_intel,
         )
 
         # --- Explanation ---

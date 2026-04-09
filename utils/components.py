@@ -7,11 +7,33 @@
 
 import os
 import base64
+import functools
 import logging
 import time as _time_mod
 import streamlit as st
 
 _components_logger = logging.getLogger(__name__)
+
+
+# ── Cached Smart Pick Pro Logo Loader ──────────────────────────────────────
+@functools.lru_cache(maxsize=1)
+def _get_spp_logo_b64() -> str:
+    """Load the Smart Pick Pro logo and return base64-encoded string (cached)."""
+    _this = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_this, "..", "assets", "Smart_Pick_Pro_Logo.png"),
+        os.path.join(os.getcwd(), "assets", "Smart_Pick_Pro_Logo.png"),
+        os.path.join(os.getcwd(), "Smart_Pick_Pro_Logo.png"),
+    ]
+    for path in candidates:
+        norm = os.path.normpath(path)
+        if os.path.isfile(norm):
+            try:
+                with open(norm, "rb") as fh:
+                    return base64.b64encode(fh.read()).decode("utf-8")
+            except Exception:
+                pass
+    return ""
 
 
 # ── Cached Hero Banner Loader ─────────────────────────────────────────────
@@ -219,6 +241,40 @@ def _render_broadcast_ticker():
     )
 
 
+def _render_spp_nav_logo():
+    """Render the Smart Pick Pro logo centered at the top of every page."""
+    logo_b64 = _get_spp_logo_b64()
+    if not logo_b64:
+        return
+    st.markdown(
+        f'<div class="spp-nav-logo-bar">'
+        f'<img src="data:image/png;base64,{logo_b64}" '
+        f'class="spp-nav-logo" alt="Smart Pick Pro" />'
+        f'</div>'
+        f'<style>'
+        f'.spp-nav-logo-bar {{'
+        f'  display: flex;'
+        f'  justify-content: center;'
+        f'  align-items: center;'
+        f'  width: 100%;'
+        f'  padding: 8px 0 4px 0;'
+        f'  margin-bottom: 4px;'
+        f'}}'
+        f'.spp-nav-logo {{'
+        f'  height: 54px;'
+        f'  width: auto;'
+        f'  object-fit: contain;'
+        f'  filter: drop-shadow(0 2px 8px rgba(0, 255, 213, 0.25));'
+        f'  transition: transform 0.3s ease;'
+        f'}}'
+        f'.spp-nav-logo:hover {{'
+        f'  transform: scale(1.05);'
+        f'}}'
+        f'</style>',
+        unsafe_allow_html=True,
+    )
+
+
 def inject_joseph_floating():
     """Render the Joseph M. Smith floating widget in the main content area.
 
@@ -232,6 +288,9 @@ def inject_joseph_floating():
     _inject_session_keepalive()
     _auto_restore_page_state()
     _auto_save_page_state()
+
+    # ── Site-wide Smart Pick Pro Logo ─────────────────────────
+    _render_spp_nav_logo()
 
     # ── Global Broadcast Ticker ───────────────────────────────
     try:

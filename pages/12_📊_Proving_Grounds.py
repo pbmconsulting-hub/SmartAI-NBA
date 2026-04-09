@@ -765,8 +765,8 @@ if _CLV_AVAILABLE:
             f"🎯 CLV Model Validation — {clv_records_count} records (last 90 days)",
             expanded=False,
         ):
-            avg_clv = clv_summary.get("avg_clv", 0.0)
-            pos_rate = clv_summary.get("positive_clv_rate", 0.0)
+            avg_clv = clv_summary.get("avg_clv") or 0.0
+            pos_rate = clv_summary.get("positive_clv_rate") or 0.0
             clv_c1, clv_c2, clv_c3 = st.columns(3)
             clv_c1.metric(
                 "Avg CLV",
@@ -796,12 +796,14 @@ if _CLV_AVAILABLE:
                 for stat, info in sorted(clv_by_stat.items()):
                     cnt = info.get("count", 0)
                     if cnt >= 3:
+                        _info_avg_clv = info.get('avg_clv') or 0
+                        _info_pos_rate = info.get('positive_clv_rate') or 0
                         _clv_rows.append({
                             "Stat": stat.capitalize(),
                             "Picks": cnt,
-                            "Avg CLV": f"{info.get('avg_clv', 0):+.2f}",
-                            "Positive Rate": f"{info.get('positive_clv_rate', 0)*100:.1f}%",
-                            "Signal": "✅ Edge" if info.get("avg_clv", 0) > 0 else "❌ No Edge",
+                            "Avg CLV": f"{_info_avg_clv:+.2f}",
+                            "Positive Rate": f"{_info_pos_rate*100:.1f}%",
+                            "Signal": "✅ Edge" if _info_avg_clv > 0 else "❌ No Edge",
                         })
                 if _clv_rows:
                     st.dataframe(_clv_rows, hide_index=True, use_container_width=True)
@@ -819,10 +821,10 @@ if _DB_AVAILABLE:
                     "Date": str(r.get("run_timestamp", r.get("created_at", "")))[:19],
                     "Season": r.get("season", ""),
                     "Picks": r.get("total_picks", 0),
-                    "Win Rate": f"{r.get('win_rate', 0)*100:.1f}%",
-                    "ROI": f"{r.get('roi', 0)*100:.2f}%",
-                    "P&L": f"{r.get('total_pnl', 0):+.2f}",
-                    "Min Edge": f"{r.get('min_edge', 0)*100:.0f}%",
+                    "Win Rate": f"{(r.get('win_rate') or 0)*100:.1f}%",
+                    "ROI": f"{(r.get('roi') or 0)*100:.2f}%",
+                    "P&L": f"{(r.get('total_pnl') or 0):+.2f}",
+                    "Min Edge": f"{(r.get('min_edge') or 0)*100:.0f}%",
                 })
             st.dataframe(_run_rows, hide_index=True, use_container_width=True)
 
