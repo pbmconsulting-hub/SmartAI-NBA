@@ -337,7 +337,7 @@ def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
     """
     TIER 1: Fetch all player box scores for a date via nba_api BoxScore endpoints.
 
-    Uses ScoreboardV2 to find game IDs, then BoxScoreTraditionalV2 per game.
+    Uses ScoreboardV3 to find game IDs, then BoxScoreTraditionalV3 per game.
     This replaces N per-player calls with ~G game-level calls (~5-8 per night).
 
     Returns:
@@ -346,55 +346,60 @@ def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
     """
     try:
         import time as _time
-        from nba_api.stats.endpoints import scoreboardv2, boxscoretraditionalv2
+        from nba_api.stats.endpoints import scoreboardv3, boxscoretraditionalv3
 
-        sb = scoreboardv2.ScoreboardV2(
+        sb = scoreboardv3.ScoreboardV3(
             game_date=date_str, league_id="00", timeout=NBA_API_TIMEOUT
         )
         game_header = sb.game_header.get_data_frame()
         if game_header.empty:
             return {}
 
-        game_ids = game_header["GAME_ID"].tolist()
+        game_ids = game_header["gameId"].tolist()
         lookup: dict = {}
 
         for game_id in game_ids:
             try:
                 _time.sleep(0.6)  # gentle rate limiting between game calls
-                bx = boxscoretraditionalv2.BoxScoreTraditionalV2(
+                bx = boxscoretraditionalv3.BoxScoreTraditionalV3(
                     game_id=game_id, timeout=NBA_API_TIMEOUT
                 )
                 player_stats = bx.player_stats.get_data_frame()
                 for _, row in player_stats.iterrows():
-                    pname = str(row.get("PLAYER_NAME", "") or "").lower().strip()
+                    # V3 uses firstName + familyName instead of PLAYER_NAME
+                    first = str(row.get("firstName") or "").strip()
+                    last = str(row.get("familyName") or "").strip()
+                    pname = f"{first} {last}".lower().strip()
                     if not pname:
                         continue
-                    # Parse MIN field which may be "MM:SS" or a float
-                    min_raw = str(row.get("MIN") or "0")
+                    # Parse minutes field (V3 uses "minutes" in "PT00M00.00S" or "MM:SS" format)
+                    min_raw = str(row.get("minutes") or "0")
                     try:
-                        mins = (
-                            float(min_raw.split(":")[0])
-                            if ":" in min_raw
-                            else float(min_raw)
-                        )
+                        if min_raw.startswith("PT") and "M" in min_raw:
+                            # ISO 8601 duration format: "PT36M12.00S"
+                            mins = float(min_raw[2:].split("M")[0])
+                        elif ":" in min_raw:
+                            mins = float(min_raw.split(":")[0])
+                        else:
+                            mins = float(min_raw)
                     except (ValueError, TypeError):
                         mins = 0.0
                     lookup[pname] = {
-                        "pts":     float(row.get("PTS") or 0),
-                        "reb":     float(row.get("REB") or 0),
-                        "ast":     float(row.get("AST") or 0),
-                        "stl":     float(row.get("STL") or 0),
-                        "blk":     float(row.get("BLK") or 0),
-                        "tov":     float(row.get("TO") or 0),
-                        "fg3m":    float(row.get("FG3M") or 0),
-                        "fg3a":    float(row.get("FG3A") or 0),
-                        "fgm":     float(row.get("FGM") or 0),
-                        "fga":     float(row.get("FGA") or 0),
-                        "ftm":     float(row.get("FTM") or 0),
-                        "fta":     float(row.get("FTA") or 0),
-                        "oreb":    float(row.get("OREB") or 0),
-                        "dreb":    float(row.get("DREB") or 0),
-                        "pf":      float(row.get("PF") or 0),
+                        "pts":     float(row.get("points") or 0),
+                        "reb":     float(row.get("reboundsTotal") or 0),
+                        "ast":     float(row.get("assists") or 0),
+                        "stl":     float(row.get("steals") or 0),
+                        "blk":     float(row.get("blocks") or 0),
+                        "tov":     float(row.get("turnovers") or 0),
+                        "fg3m":    float(row.get("threePointersMade") or 0),
+                        "fg3a":    float(row.get("threePointersAttempted") or 0),
+                        "fgm":     float(row.get("fieldGoalsMade") or 0),
+                        "fga":     float(row.get("fieldGoalsAttempted") or 0),
+                        "ftm":     float(row.get("freeThrowsMade") or 0),
+                        "fta":     float(row.get("freeThrowsAttempted") or 0),
+                        "oreb":    float(row.get("reboundsOffensive") or 0),
+                        "dreb":    float(row.get("reboundsDefensive") or 0),
+                        "pf":      float(row.get("foulsPersonal") or 0),
                         "minutes": mins,
                     }
             except Exception as _game_exc:

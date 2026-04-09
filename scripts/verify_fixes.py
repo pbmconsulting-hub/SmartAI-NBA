@@ -28,8 +28,8 @@ def verify_nba_api_version():
     print(f"✓ nba_api version: {ver}")
 
     # Test endpoints actually used by the codebase
-    from nba_api.stats.endpoints import ScoreboardV2, LeagueStandingsV3
-    print("✓ ScoreboardV2 import successful")
+    from nba_api.stats.endpoints import ScoreboardV3, LeagueStandingsV3
+    print("✓ ScoreboardV3 import successful")
     print("✓ LeagueStandingsV3 import successful")
     return True
 
