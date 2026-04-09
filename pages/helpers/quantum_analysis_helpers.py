@@ -52,6 +52,10 @@ CATEGORY_EMOJI = {
 
 SIGNAL_COLORS = {"sharp_buy": "#00ff9d", "sharp_fade": "#ff6b6b", "neutral": "#8b949e"}
 
+# Shared positive/negative accent colors used for edge and direction styling
+_POSITIVE_COLOR = "#00ff9d"
+_NEGATIVE_COLOR = "#ff6b6b"
+
 SIGNAL_LABELS = {
     "sharp_buy": "🟢 SHARP BUY",
     "sharp_fade": "🔴 SHARP FADE",
@@ -396,7 +400,7 @@ def render_parlay_card_html(entry: dict, card_index: int) -> str:
     avg_edge = entry.get("avg_edge", 0)
     avg_conf = entry.get("safe_avg", "—")
 
-    edge_color = "#00ff9d" if avg_edge > 0 else "#ff6b6b"
+    edge_color = _POSITIVE_COLOR if avg_edge > 0 else _NEGATIVE_COLOR
 
     return (
         f'<div class="qam-parlay-card{glow_cls}">'
@@ -510,7 +514,7 @@ def _render_single_leg_html(leg_info: dict, raw_picks: list) -> str:
     if tier in ("platinum", "gold", "silver"):
         tier_html = f'<span class="qam-parlay-pick-tier qam-parlay-pick-tier-{tier}">{tier.title()}</span>'
 
-    edge_color = "#00ff9d" if edge > 0 else "#ff6b6b"
+    edge_color = _POSITIVE_COLOR if edge > 0 else _NEGATIVE_COLOR
 
     return (
         f'<div class="qam-parlay-pick">'
@@ -563,7 +567,7 @@ def _render_leg_from_string(pick_str: str, raw_picks: list) -> str:
     if tier in ("platinum", "gold", "silver"):
         tier_html = f'<span class="qam-parlay-pick-tier qam-parlay-pick-tier-{tier}">{tier.title()}</span>'
 
-    edge_color = "#00ff9d" if edge > 0 else "#ff6b6b"
+    edge_color = _POSITIVE_COLOR if edge > 0 else _NEGATIVE_COLOR
 
     return (
         f'<div class="qam-parlay-pick">'

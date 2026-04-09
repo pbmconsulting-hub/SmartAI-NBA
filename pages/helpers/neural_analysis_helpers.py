@@ -470,6 +470,13 @@ def _build_bonus_factors(result):
     return bonus[:6]  # cap at 6 items
 
 
+def _format_record(wins, losses):
+    """Return a ``'W-L'`` string or ``''`` when data is missing/zero."""
+    if wins is not None and losses is not None and (wins > 0 or losses > 0):
+        return f"{wins}-{losses}"
+    return ""
+
+
 def _group_picks_by_game(picks):
     """Group a list of raw pick dicts by game matchup.
 
@@ -501,16 +508,8 @@ def _group_picks_by_game(picks):
             game_meta[label] = {
                 "home_team": ht,
                 "away_team": at,
-                "home_record": (
-                    f"{hw}-{hl}"
-                    if hw is not None and hl is not None and (hw > 0 or hl > 0)
-                    else ""
-                ),
-                "away_record": (
-                    f"{aw}-{al}"
-                    if aw is not None and al is not None and (aw > 0 or al > 0)
-                    else ""
-                ),
+                "home_record": _format_record(hw, hl),
+                "away_record": _format_record(aw, al),
                 "home_conf_rank": g.get("home_conf_rank", 0),
                 "away_conf_rank": g.get("away_conf_rank", 0),
             }
