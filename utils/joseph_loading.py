@@ -708,8 +708,8 @@ NBA_FUN_FACTS = (
     "Michael Jordan won the 1988 Slam Dunk Contest with his iconic free-throw line dunk, beating Dominique Wilkins.",
     "The 2020 Slam Dunk Contest saw Aaron Gordon and Derrick Jones Jr. trade perfect 50s in one of the most controversial finishes ever.",
     "Nate Robinson is the only player in NBA history to win the Slam Dunk Contest three times.",
-    "The Three-Point Contest record is held by Craig Hodges, who won three consecutive contests from 1990 to 1992.",
-    "Magic Johnson won the first-ever NBA All-Star Game MVP in the same year it was played in his hometown of Inglewood in 1984.",
+    "Craig Hodges won three consecutive Three-Point Contests from 1990 to 1992 — the longest winning streak in the event's history.",
+    "Magic Johnson scored 22 points in the 1992 All-Star Game despite having retired months earlier, winning his second All-Star MVP.",
     "Kobe Bryant scored 28 points in the 2001 All-Star Game and had some of the most memorable moments in All-Star history.",
 
     # ── Franchise origins & oddities ─────────────────────────
