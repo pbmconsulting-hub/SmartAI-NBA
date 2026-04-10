@@ -340,6 +340,12 @@ def calculate_median(numbers_list):
 # meaningful edge percentages and labels.
 # ============================================================
 
+# Maximum realistic edge percentage for NBA props.  20% edge corresponds to
+# ~72% true win probability on a -110 line, which is near-certainty territory.
+# Anything above is almost always model noise.  Used by calculate_edge_percentage()
+# and referenced by _CWS_MAX_EDGE_PCT / _MAX_REALISTIC_EDGE_PCT in the engine.
+MAX_REALISTIC_EDGE_PCT = 20.0
+
 def calculate_edge_percentage(probability_over, implied_probability=None):
     """
     Convert a probability (0-1) into an "edge" value showing
@@ -378,13 +384,6 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
     # is near-certain model overconfidence.
     edge = max(-MAX_REALISTIC_EDGE_PCT, min(MAX_REALISTIC_EDGE_PCT, edge))
     return edge
-
-
-# Maximum realistic edge percentage for NBA props.  20% edge corresponds to
-# ~72% true win probability on a -110 line, which is near-certainty territory.
-# Anything above is almost always model noise.  Used by calculate_edge_percentage()
-# and referenced by _CWS_MAX_EDGE_PCT / _MAX_REALISTIC_EDGE_PCT in the engine.
-MAX_REALISTIC_EDGE_PCT = 20.0
 
 
 # Platform-specific implied probability baselines.
