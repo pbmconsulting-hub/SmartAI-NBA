@@ -61,10 +61,10 @@ class TestModuleImports(unittest.TestCase):
 class TestNBAFunFacts(unittest.TestCase):
     """Verify the NBA fun facts pool has enough variety and quality."""
 
-    def test_minimum_80_facts(self):
-        """Pool should have at least 80 unique facts."""
+    def test_minimum_180_facts(self):
+        """Pool should have at least 180 unique facts."""
         from utils.joseph_loading import NBA_FUN_FACTS
-        self.assertGreaterEqual(len(NBA_FUN_FACTS), 80)
+        self.assertGreaterEqual(len(NBA_FUN_FACTS), 180)
 
     def test_all_facts_are_strings(self):
         from utils.joseph_loading import NBA_FUN_FACTS
@@ -162,6 +162,34 @@ class TestLoadingCSS(unittest.TestCase):
         from utils.joseph_loading import JOSEPH_LOADING_CSS
         self.assertIn("courtLineGlow", JOSEPH_LOADING_CSS)
 
+    def test_particle_drift_animation(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("particleDrift", JOSEPH_LOADING_CSS)
+
+    def test_shimmer_slide_animation(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("shimmerSlide", JOSEPH_LOADING_CSS)
+
+    def test_progress_pulse_animation(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("progressPulse", JOSEPH_LOADING_CSS)
+
+    def test_avatar_ring_animation(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("avatarRingRotate", JOSEPH_LOADING_CSS)
+
+    def test_glassmorphic_backdrop_blur(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("backdrop-filter", JOSEPH_LOADING_CSS)
+
+    def test_responsive_media_query(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("@media", JOSEPH_LOADING_CSS)
+
+    def test_glow_breath_animation(self):
+        from utils.joseph_loading import JOSEPH_LOADING_CSS
+        self.assertIn("glowBreath", JOSEPH_LOADING_CSS)
+
 
 # ============================================================
 # SECTION 5: render_joseph_loading_screen
@@ -233,6 +261,51 @@ class TestRenderJosephLoadingScreen(unittest.TestCase):
         render_joseph_loading_screen()
         html = _mock_st.markdown.call_args[0][0]
         self.assertIn("joseph-loading-ball", html)
+
+    def test_html_has_avatar_ring(self):
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.markdown.reset_mock()
+        render_joseph_loading_screen()
+        html = _mock_st.markdown.call_args[0][0]
+        self.assertIn("joseph-loading-avatar-ring", html)
+
+    def test_html_has_particles(self):
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.markdown.reset_mock()
+        render_joseph_loading_screen()
+        html = _mock_st.markdown.call_args[0][0]
+        self.assertIn("joseph-loading-particles", html)
+
+    def test_html_has_progress_bar(self):
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.markdown.reset_mock()
+        render_joseph_loading_screen()
+        html = _mock_st.markdown.call_args[0][0]
+        self.assertIn("joseph-loading-progress-bar", html)
+
+    def test_html_has_ambient_glow(self):
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.markdown.reset_mock()
+        render_joseph_loading_screen()
+        html = _mock_st.markdown.call_args[0][0]
+        self.assertIn("joseph-loading-ambient-glow", html)
+
+    def test_html_has_subtitle(self):
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.markdown.reset_mock()
+        render_joseph_loading_screen()
+        html = _mock_st.markdown.call_args[0][0]
+        self.assertIn("Your NBA Analytics Expert", html)
 
     def test_html_has_js_rotation_script(self):
         from utils.joseph_loading import render_joseph_loading_screen

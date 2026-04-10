@@ -38,7 +38,7 @@ except ImportError:
 
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 80+ facts about NBA history, players,
+# NBA Fun Facts Pool — 180+ facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
@@ -148,27 +148,210 @@ NBA_FUN_FACTS = (
     "The NBA's G League was originally called the D-League (Development League) before Gatorade sponsored it.",
     "Klay Thompson once scored 37 points in a single quarter against the Sacramento Kings in 2015.",
     "Before the shot clock, the lowest-scoring NBA game was 19-18 (Fort Wayne Pistons vs. Minneapolis Lakers in 1950).",
+
+    # ── Rivalries & iconic matchups ──────────────────────────
+    "The Lakers-Celtics rivalry is the most storied in NBA history — they've met 12 times in the Finals.",
+    "The 1990s Bulls-Knicks rivalry was so intense that their playoff games averaged under 90 points per team.",
+    "Bird and Magic's rivalry began in the 1979 NCAA championship game and carried into the NBA for a decade.",
+    "The Pistons' 'Bad Boys' era featured the 'Jordan Rules' — a set of physical defensive strategies designed to stop Michael Jordan.",
+    "The 2002 Western Conference Finals between the Kings and Lakers is considered one of the most controversial series ever.",
+    "The Knicks and Heat rivalry in the 1990s was so physical that it led to multiple rule changes about hand-checking.",
+    "The Celtics-76ers rivalry dates back to the 1960s when Bill Russell and Wilt Chamberlain battled for Eastern supremacy.",
+    "Tim Duncan's block on Shaq's dunk attempt in the 2003 playoffs is one of the greatest defensive plays in NBA history.",
+    "The 'Malice at the Palace' brawl in 2004 between Pistons and Pacers led to the NBA's strictest-ever suspensions.",
+    "LeBron James and Stephen Curry met in four consecutive NBA Finals from 2015 to 2018.",
+
+    # ── International basketball & global impact ─────────────
+    "Yao Ming was the #1 overall pick in 2002 and helped grow the NBA's popularity in China to over 300 million viewers.",
+    "Dirk Nowitzki was the first European-born player to win NBA Finals MVP in 2011.",
+    "The 1992 'Dream Team' featuring Jordan, Bird, and Magic is considered the greatest sports team ever assembled.",
+    "Manu Ginóbili is the only player to have won an Olympic gold medal, a EuroLeague title, and an NBA championship.",
+    "Luka Dončić won the EuroLeague MVP at age 19 before being drafted 3rd overall by the Dallas Mavericks.",
+    "Giannis Antetokounmpo moved from Nigeria to Greece as a child and didn't start playing basketball until age 12.",
+    "Tony Parker, born in Belgium and raised in France, won four NBA championships and a Finals MVP with the Spurs.",
+    "Pau Gasol won two NBA championships with the Lakers and is Spain's all-time leading scorer in international play.",
+    "Hakeem Olajuwon, born in Nigeria, learned basketball playing soccer — his footwork in the post was legendary.",
+    "The NBA has featured players from over 40 different countries since 2000.",
+
+    # ── Iconic individual moments ────────────────────────────
+    "Michael Jordan's 'Last Shot' in the 1998 Finals — a pull-up jumper over Bryon Russell — clinched his sixth title.",
+    "Kawhi Leonard's buzzer-beater against the 76ers in 2019 bounced four times on the rim before going in.",
+    "Ray Allen's corner three-pointer in Game 6 of the 2013 Finals saved the Heat's season and is known as 'The Shot.'",
+    "Derek Fisher hit a game-winning shot with 0.4 seconds left against the Spurs in the 2004 Western Conference Semis.",
+    "Dame Lillard waved goodbye to the Thunder after hitting a 37-foot series-clinching three in the 2019 playoffs.",
+    "Vince Carter's dunk over 7'2\" Frédéric Weis at the 2000 Olympics is called 'Le Dunk de la Mort' — the Dunk of Death.",
+    "Julius Erving's baseline reverse layup in the 1980 Finals is one of the most replayed highlights in NBA history.",
+    "Devin Booker scored 70 points against the Celtics in 2017, becoming the youngest player to reach that mark.",
+    "Steph Curry hit 402 three-pointers in a single season in 2015-16, shattering his own record of 286.",
+    "Willis Reed limped onto the court for Game 7 of the 1970 Finals despite a torn thigh muscle, inspiring the Knicks to a championship.",
+
+    # ── Arenas, courts & venues ──────────────────────────────
+    "Madison Square Garden in New York City is known as 'The Mecca of Basketball' and has been open since 1968.",
+    "The Staples Center (now Crypto.com Arena) hosted both the Lakers and Clippers under the same roof for over 20 years.",
+    "Oracle Arena in Oakland was nicknamed 'Roaracle' because Warriors fans were considered the loudest in the NBA.",
+    "The Chicago Bulls play at the United Center, which features a bronze statue of Michael Jordan out front.",
+    "The Boston Celtics' TD Garden hangs 17 championship banners from the rafters — more than any other NBA arena.",
+    "The San Antonio Spurs' arena once had a resident bat colony that occasionally flew onto the court during games.",
+    "Every NBA court is made of hard maple wood, specifically sugar maple from forests in the northern United States.",
+    "The Milwaukee Bucks' Fiserv Forum was designed with the largest outdoor public plaza of any NBA arena.",
+    "The Phoenix Suns' arena has a retractable roof section that can let in natural sunlight during daytime events.",
+    "The NBA mandates specific court dimensions, but teams can customize the paint, logo, and sideline designs.",
+
+    # ── Jerseys, shoes & style ───────────────────────────────
+    "Michael Jordan's Air Jordan sneakers were originally banned by the NBA for violating uniform rules. Nike paid the fines.",
+    "The NBA introduced the 'City Edition' jersey concept in 2017, allowing teams to create unique alternate designs each year.",
+    "Allen Iverson's cultural impact extended beyond basketball — his cornrows and baggy clothes led to the NBA's dress code in 2005.",
+    "LeBron James signed a lifetime deal with Nike worth over $1 billion — the largest athlete endorsement in history.",
+    "Wilt Chamberlain wore #13 throughout his career, a number most players avoided due to superstition.",
+    "The original NBA jerseys were made of wool, which made players incredibly hot during games.",
+    "Chuck Taylor All-Stars were the most popular basketball shoe for decades before modern signature sneakers took over.",
+    "The NBA switched from short shorts to baggy ones in the 1990s largely due to Michael Jordan's preference for longer shorts.",
+    "Kobe Bryant wore #8 for his first 10 seasons, then switched to #24 — both numbers are retired by the Lakers.",
+    "The NBA has no rule against the number 69. However, Dennis Rodman requested it and was denied by the league.",
+
+    # ── Analytics & strategy evolution ────────────────────────
+    "The Houston Rockets' 'Moreyball' era popularized the strategy of shooting only threes and layups, minimizing mid-range shots.",
+    "In the 2022-23 season, NBA teams averaged 34.2 three-point attempts per game, up from 18.0 in the 2004-05 season.",
+    "The 'Hack-a-Shaq' strategy led to rule changes limiting intentional fouling away from the ball in the final two minutes.",
+    "PER (Player Efficiency Rating) was created by John Hollinger and became one of the first widely-used advanced stats.",
+    "The Golden State Warriors' 'Death Lineup' small-ball unit changed NBA strategy by proving a team could win without a true center.",
+    "True Shooting Percentage accounts for free throws and three-pointers, giving a more accurate picture than regular FG%.",
+    "The concept of 'pace and space' — spreading the floor with shooters — has become the dominant offensive philosophy in modern NBA.",
+    "Win Shares, developed by basketball statistician Dean Oliver, attempts to distribute credit for team wins among individual players.",
+    "The corner three-pointer is the most efficient shot in basketball — it's the shortest three-point distance at 22 feet.",
+    "Box Plus/Minus (BPM) estimates a player's contribution per 100 possessions relative to an average player.",
+
+    # ── Records that may never be broken ─────────────────────
+    "Wilt Chamberlain had 55 rebounds in a single game in 1960 — a record that seems virtually unbreakable.",
+    "Scott Skiles dished out 30 assists in a single game in 1990 — nobody has come within 6 assists of that record since.",
+    "The 1995-96 Bulls went 72-10, a record that stood for 20 years until the Warriors' 73-9 in 2015-16.",
+    "John Stockton's 15,806 career assists are nearly 4,000 ahead of Jason Kidd in second place.",
+    "Wilt Chamberlain averaged 48.5 minutes per game in the 1961-62 season — NBA games are only 48 minutes long.",
+    "Bill Russell grabbed 51 rebounds in a single game in 1960 — modern big men rarely get 20 in a game.",
+    "The Celtics' 8 consecutive championships from 1959-1966 is a record that no team will likely ever approach.",
+    "Elgin Baylor scored 61 points in an NBA Finals game in 1962 — a Finals record that stood for over 30 years.",
+    "AC Green played 1,192 consecutive games — the NBA's all-time 'Iron Man' streak spanning 16 seasons.",
+    "Bob Cousy dished 28 assists in a game in 1959 — a record that stood for 31 years until Scott Skiles broke it.",
+
+    # ── Basketball science & physicality ─────────────────────
+    "The average NBA player can jump roughly 28 inches vertically; elite leapers like Zach LaVine exceed 46 inches.",
+    "An NBA regulation basketball has a circumference of 29.5 inches and is inflated to between 7.5 and 8.5 PSI.",
+    "Studies show NBA players make about 4,000 decisions per game involving passing, shooting, or movement.",
+    "The fastest recorded sprint speed by an NBA player during a game is approximately 20.5 mph.",
+    "NBA players experience forces of up to 7 times their body weight when landing from a dunk.",
+    "The average NBA game features over 200 possessions combined between both teams.",
+    "A perfectly shot basketball enters the hoop at an angle of roughly 45 degrees for the highest probability of going in.",
+    "Professional basketball players typically have a wingspan-to-height ratio above 1.06 — longer arms than average.",
+    "Studies have found that NBA players' reaction times average about 200 milliseconds — 30% faster than the general population.",
+    "The 'hot hand' phenomenon in basketball was debated for decades until 2018 research confirmed it exists statistically.",
+
+    # ── Front office, trades & business ──────────────────────
+    "The NBA generates over $10 billion in annual revenue, with each franchise valued at over $2 billion on average.",
+    "The most lopsided trade in NBA history is often cited as the 1996 deal that sent Kobe Bryant to the Lakers for Vlade Divac.",
+    "The NBA's luxury tax system penalizes teams that exceed the salary cap, with repeat offenders paying quadruple the overage.",
+    "The Boston Celtics fleeced the Brooklyn Nets in a 2013 trade that netted picks which became Jayson Tatum and Jaylen Brown.",
+    "The Harden-for-everyone trade from OKC to Houston in 2012 is considered one of the worst trades for the Thunder.",
+    "NBA teams spend millions on sports science departments including sleep specialists, nutritionists, and biomechanics experts.",
+    "The NBA's two-way contract was introduced in 2017, allowing teams to shuttle players between the NBA and G League.",
+    "The Cleveland Cavaliers won the #1 draft pick four times in a 14-year span (2003, 2011, 2013, 2014).",
+    "The Golden State Warriors' value increased from $450 million in 2012 to over $7 billion by 2024.",
+    "Pat Riley's 'Big Three' concept in Miami — assembling LeBron, Wade, and Bosh — changed how NBA superstars form teams.",
+
+    # ── All-Star Game & celebrations ─────────────────────────
+    "The NBA All-Star Game was first played in 1951 in Boston, with the East beating the West 111-94.",
+    "The 2003 All-Star Game in Atlanta featured Michael Jordan's last All-Star appearance — he scored 20 points.",
+    "The Slam Dunk Contest debuted in 1984 and was won by Larry Nance Sr. — but it became iconic when Jordan entered in 1987.",
+    "Vince Carter's 2000 Slam Dunk Contest performance is widely considered the greatest dunk contest of all time.",
+    "Kobe Bryant and Tim Duncan were co-MVPs of the 2001 All-Star Game — the last time the award was shared.",
+    "The NBA Three-Point Contest has been won by Larry Bird, Craig Hodges, and Steph Curry — each winning it multiple times.",
+    "The All-Star Weekend's Skills Challenge tests big men against guards in dribbling, passing, and shooting drills.",
+    "The Rising Stars Challenge showcases the best rookies and sophomores — LeBron dominated it in both his appearances.",
+    "Anthony Davis scored 52 points in the 2017 All-Star Game, breaking Wilt Chamberlain's All-Star scoring record of 42.",
+    "In 2020, the NBA renamed the All-Star MVP award to the Kobe Bryant MVP Award after Kobe's tragic passing.",
+
+    # ── Underdogs & sleeper stories ──────────────────────────
+    "The 2011 Mavericks were the biggest underdog to win the title in modern NBA history, upsetting the LeBron-Wade-Bosh Heat.",
+    "Jimmy Butler went undrafted out of high school, was homeless as a teen, and became a six-time All-Star.",
+    "The 2004 Pistons had no player average over 17 points per game but won the championship through elite team defense.",
+    "Isaiah Thomas (5'9\") averaged 28.9 PPG for the Celtics in 2016-17 despite being one of the shortest players in the league.",
+    "Ben Wallace went undrafted in 1996 and became a four-time Defensive Player of the Year and NBA champion.",
+    "The 1994 and 1995 Rockets won back-to-back titles — the only championships won without a top-2 seed in the West.",
+    "Udonis Haslem went undrafted, played for a league in France, and came back to win three NBA championships with the Heat.",
+    "The 2007 Warriors pulled off a historic first-round upset of the top-seeded Dallas Mavericks as the 8th seed.",
+    "Fred VanVleet went undrafted in 2016 and became a key starter on the 2019 champion Toronto Raptors.",
+    "The 1999 Knicks became the first 8th seed to reach the NBA Finals, led by Patrick Ewing's injured replacement, Allan Houston.",
+
+    # ── Forgotten legends & hidden gems ──────────────────────
+    "Pete Maravich averaged 44.2 PPG in college without a three-point line and a shot clock — still the NCAA record.",
+    "George Mikan was so dominant in the 1940s-50s that the NBA widened the lane from 6 feet to 12 feet because of him.",
+    "Nate Archibald is the only player in NBA history to lead the league in both scoring and assists in the same season.",
+    "Bob Pettit was the first NBA player to score 20,000 career points and the first to win the All-Star Game MVP.",
+    "Elvin Hayes scored 39 points against Lew Alcindor (Kareem) in the 1968 'Game of the Century' watched by 52,000 fans.",
+    "Walt Frazier's Game 7 performance in the 1970 Finals — 36 points, 19 assists — is one of the greatest Finals games ever.",
+    "Dave Cowens, at just 6'9\", won MVP in 1973 as one of the shortest centers to ever dominate the league.",
+    "Moses Malone's famous '4-4-4' prediction for the 1983 playoffs almost came true — the Sixers went 12-1.",
+    "Earl Monroe was nicknamed 'Black Jesus' for his mesmerizing playground-style moves that revolutionized guard play.",
+    "Rick Barry shot free throws underhanded ('granny style') and holds one of the highest career free throw percentages ever.",
+
+    # ── Coaching strategy & philosophy ────────────────────────
+    "Phil Jackson used Zen Buddhism and Native American spirituality to motivate players — earning him the nickname 'Zen Master.'",
+    "The 'Triangle Offense' used by Phil Jackson was actually created by assistant coach Tex Winter.",
+    "Don Nelson pioneered 'Nellie Ball' — a fast-paced, three-point-heavy style that was decades ahead of its time.",
+    "The Detroit Pistons' 'Bad Boys' defense under Chuck Daly was so physical it led to changes in how referees called fouls.",
+    "Rick Carlisle is known for making more in-game adjustments than almost any other coach in NBA history.",
+    "Doc Rivers earned his nickname from his grandmother and Julius Erving — it has nothing to do with his coaching style.",
+    "Mike D'Antoni's 'Seven Seconds or Less' offense with the Suns in the mid-2000s was the precursor to today's pace-and-space NBA.",
+    "Red Holzman's coaching philosophy was simple: 'See the ball, hit the open man' — it won two championships for the Knicks.",
+    "Larry Brown is the only coach to win both an NCAA championship and an NBA championship.",
+    "Tyronn Lue was the first rookie head coach to win an NBA title since Pat Riley in 1982.",
+
+    # ── Wild stats & oddities ────────────────────────────────
+    "In 1983, the Denver Nuggets and Detroit Pistons combined for 370 points in a triple-overtime game — the highest-scoring NBA game ever.",
+    "The NBA once had a rule where the team that was behind could choose which basket to shoot at to start the 4th quarter.",
+    "Rasheed Wallace holds the record for most technical fouls in a single season with 41 in 2000-01.",
+    "Ron Artest (Metta World Peace) legally changed his name and thanked his psychiatrist in his championship acceptance speech.",
+    "The NBA's shortest-ever game delay was caused by a bat flying around the court in San Antonio.",
+    "Draymond Green is the only player in NBA history to record a triple-double without scoring in double figures.",
+    "In 1998, the Vancouver Grizzlies and Toronto Raptors played an NBA game in Tokyo, Japan.",
+    "Karl Malone and John Stockton played together for 18 seasons — the longest-tenured duo in NBA history.",
+    "James Harden once recorded a 60-point triple-double, joining Wilt Chamberlain as the only players to do so at the time.",
+    "The NBA once considered adding a 4-point line at 30 feet but ultimately rejected the idea.",
 )
 
 # Number of facts to embed in each loading screen (cycled via JS)
-_FACTS_PER_SCREEN = 12
+_FACTS_PER_SCREEN = 15
 
 
 # ═════════════════════════════════════════════════════════════
-# CSS — loading screen styles
+# CSS — loading screen styles (glassmorphic dark theme)
 # ═════════════════════════════════════════════════════════════
 
 JOSEPH_LOADING_CSS = """<style>
 /* ── Joseph Loading Screen ────────────────────────────────── */
 @keyframes josephBounceIn {
     0%   { opacity:0; transform:scale(0.3) translateY(40px); }
-    50%  { opacity:1; transform:scale(1.08) translateY(-8px); }
-    70%  { transform:scale(0.95) translateY(2px); }
+    40%  { opacity:1; transform:scale(1.12) translateY(-12px); }
+    65%  { transform:scale(0.95) translateY(4px); }
+    85%  { transform:scale(1.03) translateY(-2px); }
     100% { opacity:1; transform:scale(1) translateY(0); }
 }
 @keyframes josephPulseGlow {
-    0%, 100% { box-shadow:0 0 20px rgba(255,94,0,0.4), 0 0 60px rgba(255,94,0,0.1); }
-    50%      { box-shadow:0 0 30px rgba(255,94,0,0.6), 0 0 80px rgba(255,94,0,0.2); }
+    0%, 100% { box-shadow:0 0 20px rgba(255,94,0,0.35),
+                          0 0 60px rgba(255,94,0,0.08),
+                          inset 0 0 15px rgba(255,94,0,0.05); }
+    50%      { box-shadow:0 0 35px rgba(255,94,0,0.55),
+                          0 0 90px rgba(255,94,0,0.15),
+                          inset 0 0 20px rgba(255,94,0,0.10); }
+}
+@keyframes avatarRingRotate {
+    0%   { transform:translate(-50%,-50%) rotate(0deg); }
+    100% { transform:translate(-50%,-50%) rotate(360deg); }
+}
+@keyframes basketballBounce {
+    0%, 100% { transform:translateY(0) rotate(0deg); }
+    25%      { transform:translateY(-14px) rotate(90deg); }
+    50%      { transform:translateY(0) rotate(180deg); }
+    75%      { transform:translateY(-8px) rotate(270deg); }
 }
 @keyframes basketballSpin {
     0%   { transform:rotate(0deg); }
@@ -188,27 +371,65 @@ JOSEPH_LOADING_CSS = """<style>
     66%  { content:'...'; }
 }
 @keyframes courtLineGlow {
-    0%, 100% { opacity:0.15; }
-    50%      { opacity:0.30; }
+    0%, 100% { opacity:0.12; }
+    50%      { opacity:0.28; }
+}
+@keyframes particleDrift {
+    0%   { transform:translateY(0) translateX(0) scale(1); opacity:0; }
+    15%  { opacity:0.6; }
+    85%  { opacity:0.3; }
+    100% { transform:translateY(-200px) translateX(40px) scale(0.3); opacity:0; }
+}
+@keyframes shimmerSlide {
+    0%   { background-position:-200% center; }
+    100% { background-position:200% center; }
+}
+@keyframes progressPulse {
+    0%, 100% { opacity:0.7; width:20%; }
+    50%      { opacity:1; width:60%; }
+}
+@keyframes glowBreath {
+    0%, 100% { filter:blur(30px) brightness(0.8); }
+    50%      { filter:blur(45px) brightness(1.2); }
 }
 
+/* ── Outer wrapper ───────────────────────────────────────── */
 .joseph-loading-overlay {
     position:relative;
     width:100%;
-    min-height:340px;
+    min-height:400px;
     background:
-        radial-gradient(circle at 50% 120%, rgba(255,94,0,0.08) 0%, transparent 60%),
-        radial-gradient(circle at 20% 20%, rgba(0,240,255,0.04) 0%, transparent 40%),
-        linear-gradient(180deg, #0a0f1a 0%, #0d1425 50%, #111b2e 100%);
-    border:1px solid rgba(255,94,0,0.25);
-    border-radius:16px;
+        radial-gradient(ellipse at 50% 0%, rgba(255,94,0,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(0,240,255,0.04) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 90%, rgba(200,0,255,0.03) 0%, transparent 40%),
+        linear-gradient(180deg, #080c18 0%, #0a1020 40%, #0d1428 70%, #101830 100%);
+    border:1px solid rgba(255,94,0,0.20);
+    border-radius:20px;
     overflow:hidden;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    padding:32px 24px;
+    padding:36px 28px 32px;
     margin:16px 0;
+    backdrop-filter:blur(2px);
+    -webkit-backdrop-filter:blur(2px);
+}
+
+/* ── Ambient glow behind avatar ──────────────────────────── */
+.joseph-loading-ambient-glow {
+    position:absolute;
+    top:35%; left:50%;
+    width:220px; height:220px;
+    border-radius:50%;
+    background:radial-gradient(circle,
+        rgba(255,94,0,0.18) 0%,
+        rgba(255,94,0,0.06) 40%,
+        transparent 70%);
+    transform:translate(-50%,-50%);
+    animation:glowBreath 4s ease-in-out infinite;
+    pointer-events:none;
+    z-index:0;
 }
 
 /* ── Basketball court lines (decorative background) ──────── */
@@ -216,109 +437,252 @@ JOSEPH_LOADING_CSS = """<style>
     content:'';
     position:absolute;
     top:50%; left:50%;
-    width:180px; height:180px;
-    border:2px solid rgba(255,94,0,0.12);
+    width:200px; height:200px;
+    border:2px solid rgba(255,94,0,0.08);
     border-radius:50%;
     transform:translate(-50%,-50%);
-    animation:courtLineGlow 3s ease-in-out infinite;
+    animation:courtLineGlow 3.5s ease-in-out infinite;
     pointer-events:none;
 }
 .joseph-loading-overlay::after {
     content:'';
     position:absolute;
     top:0; left:50%;
-    width:2px; height:100%;
+    width:1px; height:100%;
     background:linear-gradient(180deg,
         transparent 0%,
-        rgba(255,94,0,0.10) 30%,
-        rgba(255,94,0,0.10) 70%,
+        rgba(255,94,0,0.07) 25%,
+        rgba(255,94,0,0.07) 75%,
         transparent 100%);
-    animation:courtLineGlow 3s ease-in-out infinite 1.5s;
+    animation:courtLineGlow 3.5s ease-in-out infinite 1.5s;
     pointer-events:none;
 }
 
-/* ── Basketball emoji spinner ────────────────────────────── */
+/* ── Free-throw semi-circle ──────────────────────────────── */
+.joseph-loading-court-ft {
+    position:absolute;
+    top:50%; left:50%;
+    width:120px; height:60px;
+    border:1.5px solid rgba(255,94,0,0.06);
+    border-bottom:none;
+    border-radius:120px 120px 0 0;
+    transform:translate(-50%,-70%);
+    animation:courtLineGlow 3.5s ease-in-out infinite 0.8s;
+    pointer-events:none;
+}
+
+/* ── Three-point arc ─────────────────────────────────────── */
+.joseph-loading-court-arc {
+    position:absolute;
+    top:50%; left:50%;
+    width:280px; height:140px;
+    border:1.5px solid rgba(255,94,0,0.04);
+    border-bottom:none;
+    border-radius:280px 280px 0 0;
+    transform:translate(-50%,-55%);
+    animation:courtLineGlow 3.5s ease-in-out infinite 2s;
+    pointer-events:none;
+}
+
+/* ── Floating particles ──────────────────────────────────── */
+.joseph-loading-particles {
+    position:absolute; inset:0;
+    overflow:hidden; pointer-events:none; z-index:0;
+}
+.joseph-loading-particle {
+    position:absolute;
+    width:3px; height:3px;
+    border-radius:50%;
+    background:rgba(255,94,0,0.35);
+    animation:particleDrift 6s ease-in-out infinite;
+}
+.joseph-loading-particle:nth-child(2) {
+    left:20%; bottom:10%; animation-delay:1s; animation-duration:7s;
+    background:rgba(0,240,255,0.25); width:2px; height:2px;
+}
+.joseph-loading-particle:nth-child(3) {
+    left:70%; bottom:20%; animation-delay:2.5s; animation-duration:8s;
+    background:rgba(255,94,0,0.25);
+}
+.joseph-loading-particle:nth-child(4) {
+    left:85%; bottom:5%; animation-delay:0.5s; animation-duration:5.5s;
+    background:rgba(0,240,255,0.20); width:2px; height:2px;
+}
+.joseph-loading-particle:nth-child(5) {
+    left:35%; bottom:15%; animation-delay:3.5s; animation-duration:9s;
+    background:rgba(200,0,255,0.15);
+}
+.joseph-loading-particle:nth-child(6) {
+    left:55%; bottom:8%; animation-delay:4s; animation-duration:6.5s;
+    background:rgba(255,94,0,0.20); width:2px; height:2px;
+}
+
+/* ── Basketball emoji ────────────────────────────────────── */
 .joseph-loading-ball {
-    font-size:2rem;
-    animation:basketballSpin 2s linear infinite;
-    margin-bottom:8px;
-    filter:drop-shadow(0 0 8px rgba(255,140,0,0.4));
+    font-size:1.8rem;
+    animation:basketballBounce 2s ease-in-out infinite;
+    margin-bottom:6px;
+    filter:drop-shadow(0 0 10px rgba(255,140,0,0.5));
+    z-index:1;
 }
 
 /* ── Avatar container ────────────────────────────────────── */
 .joseph-loading-avatar-wrap {
     position:relative;
-    animation:josephBounceIn 0.8s cubic-bezier(0.34,1.56,0.64,1) both;
-    margin-bottom:16px;
+    animation:josephBounceIn 0.9s cubic-bezier(0.34,1.56,0.64,1) both;
+    margin-bottom:14px;
+    z-index:1;
+}
+/* Animated ring around avatar */
+.joseph-loading-avatar-ring {
+    position:absolute;
+    top:50%; left:50%;
+    width:140px; height:140px;
+    border-radius:50%;
+    border:2px solid transparent;
+    border-top:2px solid rgba(255,94,0,0.6);
+    border-right:2px solid rgba(0,240,255,0.4);
+    border-bottom:2px solid rgba(255,94,0,0.3);
+    border-left:2px solid rgba(0,240,255,0.2);
+    animation:avatarRingRotate 4s linear infinite;
+    pointer-events:none;
 }
 .joseph-loading-avatar {
     width:120px; height:120px;
     border-radius:50%;
     object-fit:cover;
-    border:3px solid rgba(255,94,0,0.6);
-    animation:josephPulseGlow 2.5s ease-in-out infinite;
+    border:3px solid rgba(255,94,0,0.5);
+    animation:josephPulseGlow 3s ease-in-out infinite;
     background:#0d1425;
 }
 
 /* ── Name badge ──────────────────────────────────────────── */
 .joseph-loading-name {
     font-family:'Orbitron','Montserrat',sans-serif;
-    font-size:0.85rem;
+    font-size:0.9rem;
     font-weight:700;
     color:#ff5e00;
-    letter-spacing:1.5px;
+    letter-spacing:2px;
     text-transform:uppercase;
-    margin-bottom:4px;
-    text-shadow:0 0 12px rgba(255,94,0,0.3);
+    margin-bottom:2px;
+    text-shadow:0 0 16px rgba(255,94,0,0.35);
+    z-index:1;
+}
+.joseph-loading-subtitle {
+    font-family:'Montserrat',sans-serif;
+    font-size:0.65rem;
+    font-weight:500;
+    color:rgba(0,240,255,0.55);
+    letter-spacing:3px;
+    text-transform:uppercase;
+    margin-bottom:12px;
+    z-index:1;
 }
 
 /* ── "Did you know?" label ───────────────────────────────── */
 .joseph-loading-label {
     font-family:'Montserrat',sans-serif;
-    font-size:0.72rem;
-    font-weight:600;
+    font-size:0.7rem;
+    font-weight:700;
     color:#00f0ff;
-    letter-spacing:2px;
+    letter-spacing:2.5px;
     text-transform:uppercase;
     margin-bottom:10px;
-    opacity:0.85;
+    opacity:0.9;
+    z-index:1;
+    text-shadow:0 0 10px rgba(0,240,255,0.2);
 }
 
-/* ── Fun fact text ───────────────────────────────────────── */
+/* ── Fun fact card (glassmorphic) ────────────────────────── */
 .joseph-loading-fact-container {
     position:relative;
-    min-height:72px;
-    max-width:560px;
+    min-height:80px;
+    max-width:580px;
     width:100%;
     display:flex;
     align-items:center;
     justify-content:center;
     text-align:center;
+    z-index:1;
 }
 .joseph-loading-fact {
     font-family:'Montserrat',sans-serif;
     font-size:0.92rem;
-    line-height:1.55;
-    color:#e2e8f0;
-    padding:14px 20px;
-    background:rgba(255,94,0,0.06);
-    border:1px solid rgba(255,94,0,0.15);
-    border-radius:12px;
+    line-height:1.6;
+    color:#e8edf5;
+    padding:16px 24px;
+    background:rgba(255,255,255,0.03);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(255,94,0,0.12);
+    border-radius:14px;
     transition:opacity 0.5s ease, transform 0.5s ease;
     width:100%;
+    box-shadow:0 4px 24px rgba(0,0,0,0.25),
+               inset 0 1px 0 rgba(255,255,255,0.04);
+    position:relative;
+    overflow:hidden;
+}
+/* Holographic shimmer overlay on fact card */
+.joseph-loading-fact::before {
+    content:'';
+    position:absolute; inset:0;
+    background:linear-gradient(110deg,
+        transparent 20%,
+        rgba(255,94,0,0.04) 40%,
+        rgba(0,240,255,0.03) 60%,
+        transparent 80%);
+    background-size:200% 100%;
+    animation:shimmerSlide 6s linear infinite;
+    pointer-events:none;
+    border-radius:14px;
+}
+
+/* ── Animated progress bar ───────────────────────────────── */
+.joseph-loading-progress-wrap {
+    width:100%;
+    max-width:320px;
+    height:3px;
+    background:rgba(255,255,255,0.05);
+    border-radius:3px;
+    margin-top:18px;
+    overflow:hidden;
+    z-index:1;
+}
+.joseph-loading-progress-bar {
+    height:100%;
+    border-radius:3px;
+    background:linear-gradient(90deg,
+        rgba(255,94,0,0.7),
+        rgba(0,240,255,0.6),
+        rgba(255,94,0,0.7));
+    background-size:200% 100%;
+    animation:progressPulse 3s ease-in-out infinite,
+             shimmerSlide 2s linear infinite;
 }
 
 /* ── Status text below fact ──────────────────────────────── */
 .joseph-loading-status {
     font-family:'Montserrat',sans-serif;
-    font-size:0.75rem;
-    color:rgba(226,232,240,0.5);
-    margin-top:14px;
+    font-size:0.73rem;
+    color:rgba(226,232,240,0.45);
+    margin-top:10px;
     letter-spacing:0.5px;
+    z-index:1;
 }
 .joseph-loading-status::after {
     content:'...';
     animation:dotsAnimation 1.5s steps(3,end) infinite;
+}
+
+/* ── Responsive adjustments ──────────────────────────────── */
+@media (max-width: 600px) {
+    .joseph-loading-overlay { min-height:340px; padding:24px 16px 22px; }
+    .joseph-loading-avatar { width:100px; height:100px; }
+    .joseph-loading-avatar-ring { width:120px; height:120px; }
+    .joseph-loading-fact { font-size:0.84rem; padding:12px 16px; }
+    .joseph-loading-name { font-size:0.78rem; }
+    .joseph-loading-fact-container { max-width:95%; }
 }
 </style>"""
 
@@ -381,16 +745,34 @@ def render_joseph_loading_screen(
 
     html_block = f"""{JOSEPH_LOADING_CSS}
 <div class="joseph-loading-overlay" id="{uid}_overlay">
+    <!-- Decorative court elements -->
+    <div class="joseph-loading-court-ft"></div>
+    <div class="joseph-loading-court-arc"></div>
+    <div class="joseph-loading-ambient-glow"></div>
+    <!-- Floating particles -->
+    <div class="joseph-loading-particles">
+        <div class="joseph-loading-particle" style="left:10%;bottom:5%"></div>
+        <div class="joseph-loading-particle"></div>
+        <div class="joseph-loading-particle"></div>
+        <div class="joseph-loading-particle"></div>
+        <div class="joseph-loading-particle"></div>
+        <div class="joseph-loading-particle"></div>
+    </div>
     <div class="joseph-loading-ball">🏀</div>
     <div class="joseph-loading-avatar-wrap">
+        <div class="joseph-loading-avatar-ring"></div>
         {avatar_html}
     </div>
     <div class="joseph-loading-name">Joseph M. Smith</div>
+    <div class="joseph-loading-subtitle">Your NBA Analytics Expert</div>
     <div class="joseph-loading-label">🏀 Did You Know? 🏀</div>
     <div class="joseph-loading-fact-container">
         <div class="joseph-loading-fact" id="{uid}_fact">
             {_html.escape(facts[0])}
         </div>
+    </div>
+    <div class="joseph-loading-progress-wrap">
+        <div class="joseph-loading-progress-bar"></div>
     </div>
     <div class="joseph-loading-status">{safe_status}</div>
 </div>
