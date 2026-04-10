@@ -721,7 +721,7 @@ def _render_sim_card(sim_result: dict):
     )
 
     headshot_url = (
-        f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+        f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
         if player_id else ""
     )
     # Enhancement 1: Team logo URL

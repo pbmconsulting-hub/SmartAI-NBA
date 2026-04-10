@@ -65,9 +65,10 @@ def render_joseph_hero_banner() -> None:
     if not b64:
         return
     st.markdown(
-        f'<div style="width:100%;margin-bottom:12px;">'
+        f'<div style="width:100%;max-width:900px;margin:0 auto 12px;">'
         f'<img src="data:image/png;base64,{b64}" '
-        f'style="width:100%;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);" '
+        f'style="width:100%;max-height:280px;object-fit:cover;'
+        f'border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.4);" '
         f'alt="Joseph M Smith Hero Banner" />'
         f'</div>',
         unsafe_allow_html=True,

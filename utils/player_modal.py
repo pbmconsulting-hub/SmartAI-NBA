@@ -63,7 +63,7 @@ def show_player_spotlight(player_name: str, grouped_entry: dict) -> None:
     st.markdown(
         f'<div class="gm-modal-vitals">'
         f'<img class="gm-modal-headshot" src="{headshot}" alt="{safe_name}" '
-        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png\'">'
+        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png\'">'
         f'<div class="gm-modal-info">'
         f'<h2>{safe_name}</h2>'
         f'<p>{position} · {team} vs {opponent}</p>'

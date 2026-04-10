@@ -57,7 +57,7 @@ def get_player_headshot_url(player_name: str) -> str:
     """Return the NBA CDN headshot URL for a player, or empty string."""
     pid = _PLAYER_ID_MAP.get(str(player_name).lower().strip())
     if pid:
-        return f"https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png"
+        return f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
     return ""
 
 
