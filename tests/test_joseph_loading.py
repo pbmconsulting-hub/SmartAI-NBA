@@ -61,10 +61,10 @@ class TestModuleImports(unittest.TestCase):
 class TestNBAFunFacts(unittest.TestCase):
     """Verify the NBA fun facts pool has enough variety and quality."""
 
-    def test_minimum_420_facts(self):
-        """Pool should have at least 420 unique facts (currently 424)."""
+    def test_minimum_520_facts(self):
+        """Pool should have at least 520 unique facts (currently 524)."""
         from utils.joseph_loading import NBA_FUN_FACTS
-        self.assertGreaterEqual(len(NBA_FUN_FACTS), 420)
+        self.assertGreaterEqual(len(NBA_FUN_FACTS), 520)
 
     def test_all_facts_are_strings(self):
         from utils.joseph_loading import NBA_FUN_FACTS

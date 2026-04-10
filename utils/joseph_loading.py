@@ -44,7 +44,7 @@ except ImportError:
 
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 424 facts about NBA history, players,
+# NBA Fun Facts Pool — 524 facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
@@ -562,6 +562,126 @@ NBA_FUN_FACTS = (
     "Many NBA players take up surfing, golf, or wine-making during the off-season to decompress from the grind.",
     "The Rico Hines runs in LA have become the most famous off-season pickup games, attracting dozens of NBA players.",
     "NBA teams host 'minicamp' sessions in September before training camp, though player attendance is technically voluntary.",
+
+    # ── Underdogs & Cinderella runs ──────────────────────────
+    "The 1994-95 Houston Rockets are the only team in NBA history to win a championship as a 6th seed.",
+    "The 2006-07 Golden State Warriors shocked the #1 seed Dallas Mavericks in the first round — the 'We Believe' Warriors.",
+    "The 2010-11 Dallas Mavericks swept the defending champion Lakers and then beat the Miami Heat superteam for the title.",
+    "The 1999 New York Knicks became the first (and only) 8th seed to reach the NBA Finals.",
+    "Jimmy Butler's 2022-23 playoff run with the Heat as an 8-seed nearly toppled the Nuggets dynasty before it started.",
+    "The 2003-04 Detroit Pistons won the title with no All-Stars on the roster — the ultimate team-first championship.",
+    "The 1977 Portland Trail Blazers came back from 0-2 against the 76ers to win their only championship with Bill Walton.",
+    "The 2019 Toronto Raptors became the first team outside the U.S. to win an NBA championship.",
+    "The 2014 San Antonio Spurs dismantled the Heat with the most beautiful team basketball ever played in the Finals.",
+    "Hakeem Olajuwon led the Rockets to back-to-back titles in 1994 and 1995 while Michael Jordan was playing baseball.",
+
+    # ── Technology & innovation ───────────────────────────────
+    "The NBA was the first major sports league to offer a virtual reality viewing experience, launching NextVR in 2016.",
+    "NBA courts are now equipped with 'smart floors' that can detect player positioning and impact force in real time.",
+    "The NBA's partnership with Microsoft Surface tablets on sidelines began in 2014, replacing traditional clipboard play diagrams.",
+    "Second Spectrum's optical tracking cameras capture 25 frames per second, generating over 1 million data points per game.",
+    "NBA 2K is the best-selling basketball video game franchise of all time, with over 120 million copies sold worldwide.",
+    "The NBA introduced LED-lit basketball courts in 2018 for special events, allowing the court design to change dynamically.",
+    "Wearable tech like Whoop bands and Catapult vests are now standard equipment during NBA practices for load monitoring.",
+    "The NBA's official app supports augmented reality features that let fans virtually place trophies and players in their living rooms.",
+    "Player-tracking data has shown that NBA players collectively run over 250,000 miles per season — roughly 10 trips around Earth.",
+    "The NBA experimented with in-game betting integration during the 2023 In-Season Tournament broadcasts.",
+
+    # ── Legendary duos & trios ───────────────────────────────
+    "Magic Johnson and Kareem Abdul-Jabbar won five championships together — the most successful duo in Lakers history.",
+    "Michael Jordan and Scottie Pippen combined for six championships and are considered the greatest duo in NBA history.",
+    "Tim Duncan, Tony Parker, and Manu Ginóbili won four titles together — the winningest trio in modern NBA history.",
+    "LeBron James and Dwyane Wade led the Miami Heat to four consecutive Finals appearances from 2011 to 2014.",
+    "Steph Curry and Klay Thompson, the 'Splash Brothers,' combined for 484 three-pointers in the 2015-16 season.",
+    "Shaquille O'Neal and Kobe Bryant won three consecutive championships from 2000 to 2002 despite constant internal conflict.",
+    "Kevin Durant and Russell Westbrook led OKC to the 2012 Finals as a young duo before their partnership dissolved.",
+    "Isiah Thomas and Joe Dumars anchored the 'Bad Boy' Pistons to back-to-back championships in 1989 and 1990.",
+    "Chris Paul and Blake Griffin turned the Clippers from NBA laughingstock to 'Lob City' — one of the most entertaining teams ever.",
+    "Stockton-to-Malone became synonymous with the pick-and-roll — they ran it to perfection over 18 seasons together.",
+
+    # ── Court dimensions & equipment ─────────────────────────
+    "An NBA court is exactly 94 feet long and 50 feet wide — dimensions that haven't changed since 1961.",
+    "The three-point line is 23 feet 9 inches from the basket at the arc, and 22 feet at the corners.",
+    "NBA basketballs are inflated to between 7.5 and 8.5 pounds per square inch and weigh about 22 ounces.",
+    "The basketball hoop stands exactly 10 feet high — the same height James Naismith used when he invented the game in 1891.",
+    "NBA backboards are made of tempered glass, measuring 6 feet wide and 3.5 feet tall, and can withstand tremendous force.",
+    "The free-throw line is exactly 15 feet from the backboard — a distance that has remained constant since the game's invention.",
+    "NBA courts use hard maple wood from forests in Michigan and Wisconsin — each court requires about 200 individual boards.",
+    "The 'restricted area' arc beneath the basket has a radius of 4 feet and prevents charges from being drawn too close to the hoop.",
+    "Each NBA team has 14 regulation basketballs available for each game, selected from a pool of 72 balls per team per season.",
+    "The shot clock resets to 14 seconds after an offensive rebound — a rule change introduced in 2018-19 to speed up play.",
+
+    # ── Game-day rituals & superstitions ──────────────────────
+    "Michael Jordan wore his University of North Carolina shorts under his Bulls uniform for every single NBA game.",
+    "LeBron James performs his signature chalk toss at center court before every home game — a ritual since his Cleveland days.",
+    "Jason Kidd used to blow a kiss to the basket before every free throw attempt throughout his 19-year career.",
+    "Karl Malone would talk to the basketball before shooting free throws, earning curious looks from opponents.",
+    "Rajon Rondo would watch film of every opponent for at least 2 hours before each game — even regular-season matchups.",
+    "Gilbert Arenas insisted on eating a full meal of pancakes exactly 4 hours before every game for his entire career.",
+    "Kevin Garnett would headbutt the stanchion before every game — a pre-game ritual that left dents in arena equipment.",
+    "Many NBA players refuse to shave during playoff runs — the 'playoff beard' tradition originated in hockey but spread to basketball.",
+    "Steve Nash would wet his hands and run them through his hair before every free throw — a quirky ritual fans loved.",
+    "Caron Butler used to chew on straws during games until the NBA banned them from the bench in 2010.",
+
+    # ── Business & franchise values ──────────────────────────
+    "The New York Knicks are the most valuable NBA franchise, worth approximately $7.5 billion as of 2024.",
+    "The Golden State Warriors' value skyrocketed from $450 million in 2010 to over $7 billion by 2024.",
+    "NBA total revenue exceeded $13 billion for the 2023-24 season — more than triple what it was a decade earlier.",
+    "The average NBA team is now worth over $4 billion — up from $1.1 billion just ten years ago.",
+    "Joe Lacob purchased the Warriors for $450 million in 2010 — it's now considered the best sports investment in modern history.",
+    "The NBA's salary cap has grown from $3.6 million in 1984 to over $140 million — a nearly 40x increase.",
+    "Michael Jordan bought the Charlotte Bobcats for $275 million in 2010 and sold the Hornets for $3 billion in 2023.",
+    "NBA players collectively earn about $4.5 billion in salary annually — roughly 50% of basketball-related income.",
+    "The NBA generates over $1.5 billion per year in merchandise sales, with LeBron James consistently the top jersey seller.",
+    "Courtside seats at Madison Square Garden can cost over $10,000 per game — the most expensive in the NBA.",
+
+    # ── Legendary performances ────────────────────────────────
+    "LeBron James scored 25 straight points for the Cavaliers in the 4th quarter of Game 5 of the 2007 Eastern Conference Finals.",
+    "Allen Iverson scored 48 points and crossed over Tyronn Lue in Game 1 of the 2001 Finals — the Sixers' lone victory.",
+    "Isiah Thomas scored 25 third-quarter points on a severely sprained ankle in Game 6 of the 1988 Finals — one of the gutsiest performances ever.",
+    "Tracy McGrady scored 13 points in 35 seconds against the Spurs in 2004 — the most improbable comeback by a single player.",
+    "Damian Lillard's 37-foot buzzer-beater to eliminate the Thunder in the 2019 playoffs became an instant classic.",
+    "Dirk Nowitzki averaged 26 PPG in the 2011 Finals while playing through a torn tendon in his left hand.",
+    "Kevin Garnett's 32-point, 21-rebound Game 3 in the 2008 Finals cemented the Celtics' dominance over the Lakers.",
+    "Hakeem Olajuwon's 'Dream Shake' destroyed David Robinson in the 1995 Western Conference Finals — the most dominant post moves ever.",
+    "Stephen Curry scored 17 points in overtime against the Thunder in 2016 — capped by a 37-foot buzzer-beating three.",
+    "Jaylen Brown's 40-point Game 3 in the 2024 Finals helped the Celtics sweep the Mavericks for their 18th championship.",
+
+    # ── Trades that changed history ──────────────────────────
+    "The Celtics trading for Kevin Garnett and Ray Allen in 2007 created the modern NBA 'Big Three' superteam model.",
+    "The Pau Gasol trade from Memphis to the Lakers in 2008 gave Kobe Bryant the co-star he needed for two more titles.",
+    "The James Harden trade from OKC to Houston in 2012 sent a future MVP for Kevin Martin and draft picks — considered one of the worst trades ever.",
+    "The Chris Paul trade veto by David Stern in 2011 (as NBA-owned Hornets' decision-maker) was the most controversial non-trade in NBA history.",
+    "The Kawhi Leonard trade from San Antonio to Toronto in 2018 resulted in a championship — and then Leonard left for the Clippers.",
+    "The Wilt Chamberlain trade to the Lakers in 1968 united him with Jerry West and created one of the first superteams.",
+    "The Charles Barkley trade to Phoenix in 1992 immediately made the Suns a title contender and Barkley an MVP.",
+    "The Kevin Durant sign-and-trade to the Warriors in 2016 created the most stacked roster in modern NBA history.",
+    "The Carmelo Anthony trade from Denver to New York in 2011 gutted the Knicks' roster for a star who never won a playoff series there.",
+    "The Luka Dončić draft-night trade — Dallas sent the #5 pick (Trae Young) to Atlanta for the #3 pick — reshuffled two franchises' futures.",
+
+    # ── Jerseys & uniforms ───────────────────────────────────
+    "The Miami Heat's 'Vice' City Edition jerseys became the best-selling alternate uniform in NBA history when launched in 2018.",
+    "Michael Jordan's #23 Bulls jersey is the best-selling NBA jersey of all time across all eras.",
+    "The NBA's 'City Edition' uniform program, introduced in 2017, lets teams create unique jerseys inspired by their home city's culture.",
+    "The Toronto Raptors' purple dinosaur jersey from the 1990s is now one of the most sought-after retro jerseys in the NBA.",
+    "Nike took over as the NBA's official uniform supplier in 2017, replacing Adidas after an 11-year partnership.",
+    "The 1972 Portland Trail Blazers' pinstripe uniform is considered one of the worst jersey designs in NBA history.",
+    "LeBron James' #6 jersey became the NBA's top seller within weeks of his move to that number with the Lakers in 2021.",
+    "The Golden State Warriors' 'The Town' jersey paying homage to Oakland sold out within hours of its release.",
+    "NBA jerseys now feature a 2.5-inch sponsor patch on the chest — a practice that began in the 2017-18 season.",
+    "The Charlotte Hornets' original teal-and-purple color scheme was one of the most popular in 1990s sports culture.",
+
+    # ── Comebacks & collapses ────────────────────────────────
+    "The Clippers blew a 3-1 series lead to the Rockets in the 2015 Western Conference Semifinals — part of their 'cursed' history.",
+    "The Warriors blew a 3-1 lead in the 2016 Finals — the only team in NBA Finals history to lose after leading 3-1.",
+    "The Celtics came back from 0-3 to force a Game 7 against the 76ers in the 1968 Eastern Division Finals — the ultimate comeback.",
+    "The Rockets came back from 20 points down in the second half to beat the Clippers in Game 6 of the 2015 playoffs.",
+    "The Trail Blazers blew a 15-point fourth-quarter lead against the Lakers in Game 7 of the 2000 Western Conference Finals.",
+    "The Nuggets came back from 3-1 down against the Clippers in the 2020 bubble playoffs — then did it again against the Jazz.",
+    "The Cavaliers' historic 3-1 Finals comeback in 2016 is considered the greatest championship run in NBA history.",
+    "The Pacers blew an 8-point lead with 19 seconds left against the Knicks in Game 1 of the 1995 Eastern Conference Semifinals.",
+    "The Spurs' epic collapse in Game 6 of the 2013 Finals — blowing a 5-point lead with 28 seconds left — still haunts San Antonio.",
+    "The Celtics trailed the Warriors 2-1 in the 2022 Finals but couldn't close, losing the last three games by a combined 44 points.",
 )
 
 # Number of facts to embed in each loading screen (cycled via JS)
@@ -646,35 +766,38 @@ JOSEPH_LOADING_CSS = """<style>
 .joseph-loading-overlay {
     position:relative;
     width:100%;
-    min-height:400px;
+    min-height:460px;
     background:
-        radial-gradient(ellipse at 50% 0%, rgba(255,94,0,0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 80%, rgba(0,240,255,0.04) 0%, transparent 40%),
-        radial-gradient(ellipse at 20% 90%, rgba(200,0,255,0.03) 0%, transparent 40%),
-        linear-gradient(180deg, #080c18 0%, #0a1020 40%, #0d1428 70%, #101830 100%);
-    border:1px solid rgba(255,94,0,0.20);
-    border-radius:20px;
+        radial-gradient(ellipse at 50% 0%, rgba(255,94,0,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(0,240,255,0.05) 0%, transparent 40%),
+        radial-gradient(ellipse at 20% 90%, rgba(200,0,255,0.04) 0%, transparent 40%),
+        linear-gradient(180deg, #060a14 0%, #0a1020 35%, #0d1428 65%, #101830 100%);
+    border:1px solid rgba(255,94,0,0.22);
+    border-radius:24px;
     overflow:hidden;
     display:flex;
     flex-direction:column;
     align-items:center;
     justify-content:center;
-    padding:36px 28px 32px;
+    padding:40px 32px 36px;
     margin:16px 0;
     backdrop-filter:blur(2px);
     -webkit-backdrop-filter:blur(2px);
+    box-shadow:0 8px 40px rgba(0,0,0,0.45),
+               0 0 80px rgba(255,94,0,0.04),
+               inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 /* ── Ambient glow behind avatar ──────────────────────────── */
 .joseph-loading-ambient-glow {
     position:absolute;
-    top:32%; left:50%;
-    width:260px; height:260px;
+    top:30%; left:50%;
+    width:300px; height:300px;
     border-radius:50%;
     background:radial-gradient(circle,
-        rgba(255,94,0,0.22) 0%,
-        rgba(255,94,0,0.08) 35%,
-        rgba(0,240,255,0.04) 55%,
+        rgba(255,94,0,0.25) 0%,
+        rgba(255,94,0,0.10) 30%,
+        rgba(0,240,255,0.05) 50%,
         transparent 70%);
     transform:translate(-50%,-50%);
     animation:glowBreath 4s ease-in-out infinite;
@@ -780,15 +903,15 @@ JOSEPH_LOADING_CSS = """<style>
 .joseph-loading-avatar-wrap {
     position:relative;
     animation:josephBounceIn 0.9s cubic-bezier(0.34,1.56,0.64,1) both;
-    margin-bottom:14px;
+    margin-bottom:16px;
     z-index:1;
 }
 /* Animated ring around avatar */
 .joseph-loading-avatar-ring {
     position:absolute;
     top:50%; left:50%;
-    width:170px; height:200px;
-    border-radius:28px;
+    width:204px; height:244px;
+    border-radius:30px;
     border:2px solid transparent;
     border-top:2px solid rgba(255,94,0,0.6);
     border-right:2px solid rgba(0,240,255,0.4);
@@ -798,8 +921,8 @@ JOSEPH_LOADING_CSS = """<style>
     pointer-events:none;
 }
 .joseph-loading-avatar {
-    width:150px; height:180px;
-    border-radius:22px;
+    width:184px; height:220px;
+    border-radius:24px;
     object-fit:cover;
     object-position:center 10%;
     border:3px solid rgba(255,94,0,0.5);
@@ -810,24 +933,26 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Name badge ──────────────────────────────────────────── */
 .joseph-loading-name {
     font-family:'Orbitron','Montserrat',sans-serif;
-    font-size:0.9rem;
+    font-size:1.0rem;
     font-weight:700;
     color:#ff5e00;
-    letter-spacing:2px;
+    letter-spacing:2.5px;
     text-transform:uppercase;
-    margin-bottom:2px;
-    text-shadow:0 0 16px rgba(255,94,0,0.35);
+    margin-bottom:3px;
+    text-shadow:0 0 20px rgba(255,94,0,0.40),
+                0 0 40px rgba(255,94,0,0.15);
     z-index:1;
 }
 .joseph-loading-subtitle {
     font-family:'Montserrat',sans-serif;
-    font-size:0.65rem;
+    font-size:0.68rem;
     font-weight:500;
-    color:rgba(0,240,255,0.55);
-    letter-spacing:3px;
+    color:rgba(0,240,255,0.60);
+    letter-spacing:3.5px;
     text-transform:uppercase;
-    margin-bottom:12px;
+    margin-bottom:14px;
     z-index:1;
+    text-shadow:0 0 12px rgba(0,240,255,0.15);
 }
 
 /* ── "Did you know?" label ───────────────────────────────── */
@@ -847,8 +972,8 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Fun fact card (glassmorphic) ────────────────────────── */
 .joseph-loading-fact-container {
     position:relative;
-    min-height:80px;
-    max-width:580px;
+    min-height:88px;
+    max-width:620px;
     width:100%;
     display:flex;
     align-items:center;
@@ -858,19 +983,20 @@ JOSEPH_LOADING_CSS = """<style>
 }
 .joseph-loading-fact {
     font-family:'Montserrat',sans-serif;
-    font-size:0.92rem;
-    line-height:1.6;
+    font-size:0.95rem;
+    line-height:1.65;
     color:#e8edf5;
-    padding:16px 24px;
-    background:rgba(255,255,255,0.03);
-    backdrop-filter:blur(12px);
-    -webkit-backdrop-filter:blur(12px);
-    border:1px solid rgba(255,94,0,0.12);
-    border-radius:14px;
+    padding:18px 28px;
+    background:rgba(255,255,255,0.035);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,94,0,0.14);
+    border-radius:16px;
     transition:opacity 0.5s ease, transform 0.5s ease;
     width:100%;
-    box-shadow:0 4px 24px rgba(0,0,0,0.25),
-               inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow:0 6px 32px rgba(0,0,0,0.30),
+               0 0 24px rgba(255,94,0,0.03),
+               inset 0 1px 0 rgba(255,255,255,0.05);
     position:relative;
     overflow:hidden;
 }
@@ -892,21 +1018,21 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Animated progress bar ───────────────────────────────── */
 .joseph-loading-progress-wrap {
     width:100%;
-    max-width:320px;
-    height:3px;
-    background:rgba(255,255,255,0.05);
-    border-radius:3px;
-    margin-top:18px;
+    max-width:380px;
+    height:4px;
+    background:rgba(255,255,255,0.06);
+    border-radius:4px;
+    margin-top:20px;
     overflow:hidden;
     z-index:1;
 }
 .joseph-loading-progress-bar {
     height:100%;
-    border-radius:3px;
+    border-radius:4px;
     background:linear-gradient(90deg,
-        rgba(255,94,0,0.7),
-        rgba(0,240,255,0.6),
-        rgba(255,94,0,0.7));
+        rgba(255,94,0,0.8),
+        rgba(0,240,255,0.7),
+        rgba(255,94,0,0.8));
     background-size:200% 100%;
     animation:progressPulse 3s ease-in-out infinite,
              shimmerSlide 2s linear infinite;
@@ -928,11 +1054,11 @@ JOSEPH_LOADING_CSS = """<style>
 
 /* ── Responsive adjustments ──────────────────────────────── */
 @media (max-width: 600px) {
-    .joseph-loading-overlay { min-height:340px; padding:24px 16px 22px; }
-    .joseph-loading-avatar { width:120px; height:144px; border-radius:18px; }
-    .joseph-loading-avatar-ring { width:140px; height:164px; border-radius:22px; }
-    .joseph-loading-fact { font-size:0.84rem; padding:12px 16px; }
-    .joseph-loading-name { font-size:0.78rem; }
+    .joseph-loading-overlay { min-height:380px; padding:28px 16px 24px; }
+    .joseph-loading-avatar { width:140px; height:168px; border-radius:20px; }
+    .joseph-loading-avatar-ring { width:160px; height:188px; border-radius:24px; }
+    .joseph-loading-fact { font-size:0.86rem; padding:14px 18px; }
+    .joseph-loading-name { font-size:0.85rem; }
     .joseph-loading-fact-container { max-width:95%; }
 }
 </style>"""
@@ -952,7 +1078,7 @@ def get_random_facts(count: int = _FACTS_PER_SCREEN) -> list:
 def render_joseph_loading_screen(
     status_text: str = "Crunching the numbers",
     fact_count: int = _FACTS_PER_SCREEN,
-    rotation_seconds: int = 6,
+    rotation_seconds: int = 5,
 ) -> None:
     """Render Joseph's animated loading screen with rotating NBA fun facts.
 
@@ -963,7 +1089,7 @@ def render_joseph_loading_screen(
     fact_count : int
         Number of fun facts to embed (cycled via JavaScript).
     rotation_seconds : int
-        Seconds between fact rotations.
+        Seconds between fact rotations (default 5).
     """
     if st is None:
         return  # pragma: no cover
@@ -1057,7 +1183,7 @@ def render_joseph_loading_screen(
 def joseph_loading_placeholder(
     status_text: str = "Crunching the numbers",
     fact_count: int = _FACTS_PER_SCREEN,
-    rotation_seconds: int = 6,
+    rotation_seconds: int = 5,
 ):
     """Create a Streamlit placeholder with Joseph's loading screen.
 
