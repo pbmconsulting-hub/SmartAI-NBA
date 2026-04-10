@@ -35,7 +35,7 @@ try:
     from data.player_profile_service import get_headshot_url as _get_headshot_url
 except ImportError:  # pragma: no cover
     def _get_headshot_url(name):  # type: ignore[misc]
-        return "https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png"
+        return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
 
 
 # ── Joseph M Smith avatar (cached base64) ────────────────────
@@ -265,7 +265,7 @@ def _build_single_card_html(result, index=0):
     # ── Player headshot ──────────────────────────────────────────
     player_id = result.get("player_id", "") or ""
     if player_id:
-        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
     else:
         # Fallback: resolve headshot from player name via profile service
         _raw_name = result.get("player_name", "")
@@ -273,7 +273,6 @@ def _build_single_card_html(result, index=0):
     if headshot_url:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
-            f'width="72" height="72" '
             f'src="{headshot_url}" '
             f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
             f'alt="{player_name}">'
@@ -281,7 +280,6 @@ def _build_single_card_html(result, index=0):
     else:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
-            f'width="72" height="72" '
             f'src="{_FALLBACK_SVG}" alt="{player_name}">'
         )
 
@@ -658,14 +656,13 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     # Headshot
     player_id = result.get("player_id", "") or ""
     if player_id:
-        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
     else:
         _raw_name = result.get("player_name", "")
         headshot_url = _get_headshot_url(_raw_name) if _raw_name else ""
     if headshot_url:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
-            f'width="72" height="72" '
             f'src="{headshot_url}" '
             f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
             f'alt="{player_name}">'
@@ -673,7 +670,6 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
     else:
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
-            f'width="72" height="72" '
             f'src="{_FALLBACK_SVG}" alt="{player_name}">'
         )
 
@@ -923,7 +919,7 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
 # =====================================================================
 
 _FALLBACK_HEADSHOT = (
-    "https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png"
+    "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
 )
 
 
@@ -957,7 +953,7 @@ def _build_unified_player_header(player_name, vitals):
     ) if team and team != "N/A" else ""
 
     return (
-        f'<img class="upc-headshot" width="80" height="80" src="{headshot}" alt="{safe_name}" '
+        f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}" '
         f'onerror="this.onerror=null;this.src=\'{_FALLBACK_HEADSHOT}\'">'
         f'<div class="upc-identity">'
         f'<div class="upc-player-name">{safe_name}{team_badge}</div>'

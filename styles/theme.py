@@ -2147,7 +2147,7 @@ def get_player_card_html(result):
     Build the complete styled analysis card HTML for one prop result.
 
     The card header now includes a player headshot loaded from the NBA CDN
-    (``https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png``).
+    (``https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png``).
     An ``onerror`` handler falls back to a generic silhouette when the image
     is unavailable (e.g. sample / unknown player IDs).
 
@@ -2206,20 +2206,20 @@ def get_player_card_html(result):
     position_tag = f'<span class="position-tag">{position}</span>' if position else ""
 
     # Player headshot from NBA CDN with fallback silhouette
-    NBA_CDN_BASE = "https://cdn.nba.com/headshots/nba/latest/260x190"
+    NBA_CDN_BASE = "https://cdn.nba.com/headshots/nba/latest/1040x760"
     FALLBACK_HEADSHOT = f"{NBA_CDN_BASE}/fallback.png"
     if player_id:
         headshot_url = f"{NBA_CDN_BASE}/{player_id}.png"
         headshot_html = (
             f'<img src="{headshot_url}" '
             f'onerror="this.onerror=null;this.src=\'{FALLBACK_HEADSHOT}\';" '
-            f'style="width:60px;height:44px;border-radius:8px;object-fit:cover;'
+            f'style="width:60px;height:60px;border-radius:50%;object-fit:cover;'
             f'margin-right:12px;flex-shrink:0;background:#1a2035;" '
             f'alt="{player}">'
         )
     else:
         headshot_html = (
-            f'<div style="width:60px;height:44px;border-radius:8px;'
+            f'<div style="width:60px;height:60px;border-radius:50%;'
             f'background:#1a2035;margin-right:12px;flex-shrink:0;'
             f'display:flex;align-items:center;justify-content:center;'
             f'font-size:1.6rem;">🏀</div>'
@@ -3215,7 +3215,7 @@ def get_game_report_html(game=None, analysis_results=None):
     Returns:
         str: Complete self-contained HTML document with embedded CSS and JS
     """
-    NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
+    NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/1040x760"
     ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
 
     # Confidence thresholds for color-coded bar fills
@@ -4180,7 +4180,7 @@ def get_qds_prop_card_html(
 
     # ── Player headshot ───────────────────────────────────────────
     if player_id:
-        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
     else:
         headshot_url = ""
 
@@ -5273,7 +5273,7 @@ def get_bet_card_html(bet, show_live_status=False):
     if player_id:
         headshot_html = (
             f'<img class="bet-card-headshot" '
-            f'src="https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png" '
+            f'src="https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png" '
             f'alt="" onerror="this.style.display=\'none\'" loading="lazy"/>'
         )
 
@@ -7671,7 +7671,7 @@ def get_player_trading_card_html(
     return (
         f'<div class="gm-player-card">'
         f'<img class="gm-card-headshot" src="{safe_url}" alt="{safe_name}" '
-        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png\'">'
+        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png\'">'
         f'<div class="gm-card-name">{safe_name}</div>'
         f'<div class="gm-card-sub">{safe_pos} · {safe_team} vs {safe_opp}</div>'
         f'<div class="gm-card-stats">'
