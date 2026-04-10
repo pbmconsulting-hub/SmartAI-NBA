@@ -43,7 +43,7 @@ except ImportError:
 
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 524 facts about NBA history, players,
+# NBA Fun Facts Pool — 582 facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
@@ -681,6 +681,80 @@ NBA_FUN_FACTS = (
     "The Pacers blew an 8-point lead with 19 seconds left against the Knicks in Game 1 of the 1995 Eastern Conference Semifinals.",
     "The Spurs' epic collapse in Game 6 of the 2013 Finals — blowing a 5-point lead with 28 seconds left — still haunts San Antonio.",
     "The Celtics trailed the Warriors 2-1 in the 2022 Finals but couldn't close, losing the last three games by a combined 44 points.",
+
+    # ── Rookie sensations ───────────────────────────────────
+    "Wilt Chamberlain averaged 37.6 points and 27.0 rebounds per game in his rookie season — both still rookie records.",
+    "LeBron James won Rookie of the Year in 2004, averaging 20.9 points, 5.5 rebounds, and 5.9 assists per game.",
+    "Blake Griffin's poster dunk over Timofey Mozgov in 2011 became the defining image of his Rookie of the Year campaign.",
+    "Luka Dončić won Rookie of the Year unanimously in 2019, the first European player to do so.",
+    "David Robinson averaged 24.3 points per game as a rookie in 1990, earning him Rookie of the Year honors.",
+    "Patrick Ewing was the first overall pick in 1985 and won Rookie of the Year, averaging 20.0 points per game.",
+    "Ben Simmons won Rookie of the Year in 2018, despite being drafted in 2016 — he missed his first season entirely with a foot injury.",
+    "Pau Gasol became the first non-American to win NBA Rookie of the Year in 2002.",
+
+    # ── Legendary clutch moments ─────────────────────────────
+    "Ray Allen's corner three-pointer in Game 6 of the 2013 Finals saved the Heat's season and is considered the greatest shot in Finals history.",
+    "Kyrie Irving's three-pointer over Stephen Curry with 53 seconds left sealed the Cavaliers' 2016 championship.",
+    "Robert Horry earned the nickname 'Big Shot Rob' for hitting seven game-winning shots in the playoffs across three different teams.",
+    "Reggie Miller scored 8 points in 8.9 seconds against the Knicks in the 1995 Eastern Conference Semifinals.",
+    "Derek Fisher hit a buzzer-beating shot with 0.4 seconds left against the Spurs in Game 5 of the 2004 Western Conference Semifinals.",
+    "Damian Lillard's series-ending three-pointer over Paul George from 37 feet in 2019 sent the Thunder home and became an iconic moment.",
+    "John Havlicek's steal at the end of the 1965 Eastern Conference Finals prompted the famous call: 'Havlicek stole the ball!'",
+    "Michael Jordan's last shot as a Bull — the 1998 Finals Game 6 winner over Bryon Russell — is simply known as 'The Last Shot.'",
+
+    # ── All-Star weekend lore ────────────────────────────────
+    "The NBA Slam Dunk Contest began in 1984 and was won by Larry Nance in its inaugural year.",
+    "Vince Carter's 2000 Slam Dunk Contest performance — featuring an elbow-in-the-rim dunk — is widely regarded as the greatest ever.",
+    "Michael Jordan won the 1988 Slam Dunk Contest with his iconic free-throw line dunk, beating Dominique Wilkins.",
+    "The 2020 Slam Dunk Contest saw Aaron Gordon and Derrick Jones Jr. trade perfect 50s in one of the most controversial finishes ever.",
+    "Nate Robinson is the only player in NBA history to win the Slam Dunk Contest three times.",
+    "The Three-Point Contest record is held by Craig Hodges, who won three consecutive contests from 1990 to 1992.",
+    "Magic Johnson won the first-ever NBA All-Star Game MVP in the same year it was played in his hometown of Inglewood in 1984.",
+    "Kobe Bryant scored 28 points in the 2001 All-Star Game and had some of the most memorable moments in All-Star history.",
+
+    # ── Franchise origins & oddities ─────────────────────────
+    "The Toronto Raptors got their name from a nationwide 'Name Game' contest inspired by the popularity of Jurassic Park in 1994.",
+    "The Sacramento Kings are the oldest franchise in the NBA, founded as the Rochester Royals in 1923.",
+    "The Jazz got their name while located in New Orleans — the name stuck even after the team moved to Utah in 1979.",
+    "The Lakers were named for Minnesota's famous lakes — the name stayed when they relocated to Los Angeles in 1960.",
+    "The Memphis Grizzlies were originally the Vancouver Grizzlies, Canada's first NBA expansion team in 1995.",
+    "The Oklahoma City Thunder were previously the Seattle SuperSonics — one of the most controversial relocations in NBA history.",
+    "The Pelicans replaced the Hornets name in New Orleans in 2013 when Charlotte reclaimed its original Hornets identity.",
+    "The Brooklyn Nets moved from New Jersey in 2012, playing their first season at Barclays Center.",
+
+    # ── Defensive dominance ──────────────────────────────────
+    "Ben Wallace won the Defensive Player of the Year award four times in five seasons (2002-2006) despite being undrafted.",
+    "Dikembe Mutombo's finger wag after blocking a shot became one of the NBA's most iconic celebrations.",
+    "The 2004 Detroit Pistons held opponents to under 84 points per game in the playoffs en route to their championship.",
+    "Bill Russell won five MVP awards largely because of his defensive prowess and shot-blocking, despite blocks not being officially tracked.",
+    "Gary Payton is the only point guard ever to win the NBA Defensive Player of the Year award, earning it in 1996.",
+    "Kawhi Leonard won back-to-back Defensive Player of the Year awards in 2015 and 2016, the first perimeter player to do so since Sidney Moncrief.",
+    "Marcus Camby led the NBA in blocks per game three times and averaged 3.3 blocks per game in the 2006-07 season.",
+    "The 1996 Chicago Bulls allowed just 92.9 points per game while winning 72 games — an elite defensive squad.",
+
+    # ── Milestone moments ────────────────────────────────────
+    "LeBron James became the youngest player in NBA history to reach 30,000 career points, doing so at age 33.",
+    "Karl Malone finished his career with 36,928 points — second all-time until LeBron passed him in 2023.",
+    "John Stockton holds the all-time assists record with 15,806 — nearly 4,000 more than second-place Jason Kidd.",
+    "Robert Parish played in 1,611 NBA games — the most in league history — across 21 seasons.",
+    "Wilt Chamberlain grabbed 55 rebounds in a single game against the Boston Celtics in 1960 — the all-time single-game record.",
+    "Kareem Abdul-Jabbar played 20 NBA seasons and appeared in the All-Star Game 19 times.",
+
+    # ── Playoff drama & upsets ──────────────────────────────
+    "The 2007 Golden State Warriors, as an 8-seed, upset the top-seeded Dallas Mavericks — the first 8-over-1 upset since 1999.",
+    "The 2011 Dallas Mavericks, led by Dirk Nowitzki, defeated the Miami Heat's 'Big Three' to win the championship as underdogs.",
+    "The 1994 Houston Rockets are the only 6-seed to ever win the NBA Championship, sweeping Shaq's Orlando Magic in the Finals.",
+    "The New York Knicks, as an 8-seed in 1999, reached the NBA Finals — the lowest seed ever to make it that far.",
+    "The 2004 Detroit Pistons upset the heavily favored Los Angeles Lakers in five games — one of the biggest Finals upsets ever.",
+    "The 1969 Boston Celtics, as a 4-seed in the East, defeated the Lakers to win the championship in Bill Russell's final season.",
+
+    # ── Longevity & endurance ────────────────────────────────
+    "Kareem Abdul-Jabbar scored 24,000 of his career points using his signature skyhook — the most unstoppable move in NBA history.",
+    "Kevin Garnett played 21 seasons in the NBA and was named to 15 All-Star teams, the most by any power forward.",
+    "A.C. Green played in 1,192 consecutive NBA games — the longest ironman streak in league history.",
+    "LeBron James has played in more career playoff minutes than any player in NBA history, surpassing 12,000 minutes.",
+    "Udonis Haslem played 20 seasons — all with the Miami Heat — the longest single-team tenure by an undrafted player.",
+    "Jason Terry played 19 NBA seasons, appearing in 1,410 games and winning a championship with the Mavericks in 2011.",
 )
 
 # Number of facts to embed in each loading screen (cycled via JS)
