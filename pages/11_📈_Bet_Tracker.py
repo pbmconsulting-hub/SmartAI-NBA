@@ -72,6 +72,13 @@ from styles.theme import (
     get_styled_stats_table_html,
 )
 
+# ── Joseph loading screen (shown during resolve operations) ──
+try:
+    from utils.joseph_loading import joseph_loading_placeholder
+    _JOSEPH_LOADING_AVAILABLE = True
+except ImportError:
+    _JOSEPH_LOADING_AVAILABLE = False
+
 # ── Lazy-loaded optional engine modules ──────────────────────────────────────
 get_clv_summary = None
 get_tier_accuracy_report = None
@@ -285,29 +292,35 @@ with _check_info_col:
     )
 
 if _check_now_btn:
-    with st.spinner("Checking live NBA games and resolving today's bets…"):
-        try:
-            from tracking.bet_tracker import resolve_todays_bets as _rtr_top
-            _top_result = _rtr_top()
-            if _top_result.get("resolved", 0) > 0:
-                st.success(
-                    f"✅ Resolved **{_top_result['resolved']}** bet(s): "
-                    f"**{_top_result['wins']}** WIN · **{_top_result['losses']}** LOSS · **{_top_result['pushes']}** PUSH"
-                )
-                st.rerun()
-            else:
-                st.info(
-                    f"ℹ️ No bets resolved. Games may still be in progress or not started. "
-                    f"Pending: {_top_result.get('pending', 0)}"
-                )
-            if _top_result.get("errors"):
-                st.warning("⚠️ " + " | ".join(_top_result["errors"][:3]))
-                if len(_top_result["errors"]) > 3:
-                    with st.expander(f"See all {len(_top_result['errors'])} detail(s)"):
-                        for _e in _top_result["errors"]:
-                            st.markdown(f"- {_e}")
-        except Exception as _top_err:
-            st.error(f"❌ Could not check results: {_top_err}")
+    _jl_loader_top = None
+    if _JOSEPH_LOADING_AVAILABLE:
+        _jl_loader_top = joseph_loading_placeholder("Checking live NBA games and resolving today's bets")
+    try:
+        from tracking.bet_tracker import resolve_todays_bets as _rtr_top
+        _top_result = _rtr_top()
+        if _jl_loader_top is not None:
+            _jl_loader_top.empty()
+        if _top_result.get("resolved", 0) > 0:
+            st.success(
+                f"✅ Resolved **{_top_result['resolved']}** bet(s): "
+                f"**{_top_result['wins']}** WIN · **{_top_result['losses']}** LOSS · **{_top_result['pushes']}** PUSH"
+            )
+            st.rerun()
+        else:
+            st.info(
+                f"ℹ️ No bets resolved. Games may still be in progress or not started. "
+                f"Pending: {_top_result.get('pending', 0)}"
+            )
+        if _top_result.get("errors"):
+            st.warning("⚠️ " + " | ".join(_top_result["errors"][:3]))
+            if len(_top_result["errors"]) > 3:
+                with st.expander(f"See all {len(_top_result['errors'])} detail(s)"):
+                    for _e in _top_result["errors"]:
+                        st.markdown(f"- {_e}")
+    except Exception as _top_err:
+        if _jl_loader_top is not None:
+            _jl_loader_top.empty()
+        st.error(f"❌ Could not check results: {_top_err}")
 
 # ============================================================
 # SECTION: Top-Level Platform Selector
@@ -882,51 +895,58 @@ with tab_all_picks:
         st.caption("Auto-resolves every pending pick using live NBA stats — includes both manual and AI-logged picks.")
 
     if _resolve_all_picks_btn:
-        with st.spinner("🔄 Resolving all pending picks across all dates…"):
-            try:
-                # ── Step 1: Resolve all_analysis_picks table (what this tab displays) ──
-                _picks_result  = resolve_all_analysis_picks(include_today=True)
-                # ── Step 2: Also resolve the bets table (manual + AI bets) ──────────
-                _bets_result   = resolve_all_pending_bets()
+        _jl_loader_rap = None
+        if _JOSEPH_LOADING_AVAILABLE:
+            _jl_loader_rap = joseph_loading_placeholder("Resolving all pending picks across all dates")
+        try:
+            # ── Step 1: Resolve all_analysis_picks table (what this tab displays) ──
+            _picks_result  = resolve_all_analysis_picks(include_today=True)
+            # ── Step 2: Also resolve the bets table (manual + AI bets) ──────────
+            _bets_result   = resolve_all_pending_bets()
 
-                # Combine both results for reporting
-                _rap_resolved  = _picks_result.get("resolved", 0) + _bets_result.get("resolved", 0)
-                _rap_wins      = _picks_result.get("wins", 0)    + _bets_result.get("wins", 0)
-                _rap_losses    = _picks_result.get("losses", 0)  + _bets_result.get("losses", 0)
-                _rap_pushes    = _picks_result.get("pushes", 0)  + _bets_result.get("pushes", 0)
-                _rap_pending   = _picks_result.get("pending", 0) + _bets_result.get("pending", 0)
-                _rap_errors    = _picks_result.get("errors", []) + _bets_result.get("errors", [])
+            if _jl_loader_rap is not None:
+                _jl_loader_rap.empty()
 
-                # Deduplicate errors (same player may appear in both tables)
-                _rap_errors = list(dict.fromkeys(_rap_errors))
+            # Combine both results for reporting
+            _rap_resolved  = _picks_result.get("resolved", 0) + _bets_result.get("resolved", 0)
+            _rap_wins      = _picks_result.get("wins", 0)    + _bets_result.get("wins", 0)
+            _rap_losses    = _picks_result.get("losses", 0)  + _bets_result.get("losses", 0)
+            _rap_pushes    = _picks_result.get("pushes", 0)  + _bets_result.get("pushes", 0)
+            _rap_pending   = _picks_result.get("pending", 0) + _bets_result.get("pending", 0)
+            _rap_errors    = _picks_result.get("errors", []) + _bets_result.get("errors", [])
 
-                if _rap_resolved > 0:
-                    st.success(
-                        f"✅ Resolved **{_rap_resolved}** pick(s): "
-                        f"✅ {_rap_wins} WIN · ❌ {_rap_losses} LOSS · 🔄 {_rap_pushes} PUSH"
-                        + (f" | ⏳ {_rap_pending} still pending (game may not be final)" if _rap_pending > 0 else "")
-                    )
-                    # Show per-date breakdown
-                    _combined_by_date = {}
-                    for _d, _n in {**_picks_result.get("by_date", {}), **_bets_result.get("by_date", {})}.items():
-                        _combined_by_date[_d] = _combined_by_date.get(_d, 0) + _n
-                    if _combined_by_date:
-                        for _d in sorted(_combined_by_date):
-                            st.caption(f"  📅 {_d}: {_combined_by_date[_d]} resolved")
-                elif _rap_errors and not _rap_pending:
-                    st.info("ℹ️ No picks were resolved. See errors below.")
-                else:
-                    st.info(
-                        "ℹ️ No pending picks found to resolve. "
-                        "Either all picks are already resolved, today's games aren't final yet, "
-                        "or no picks have been logged."
-                    )
-                if _rap_errors:
-                    with st.expander(f"⚠️ {len(_rap_errors)} resolution error(s) (click to expand)"):
-                        for _e in _rap_errors:
-                            st.caption(_e)
-            except Exception as _rap_exc:
-                st.error(f"❌ Resolution failed: {_rap_exc}")
+            # Deduplicate errors (same player may appear in both tables)
+            _rap_errors = list(dict.fromkeys(_rap_errors))
+
+            if _rap_resolved > 0:
+                st.success(
+                    f"✅ Resolved **{_rap_resolved}** pick(s): "
+                    f"✅ {_rap_wins} WIN · ❌ {_rap_losses} LOSS · 🔄 {_rap_pushes} PUSH"
+                    + (f" | ⏳ {_rap_pending} still pending (game may not be final)" if _rap_pending > 0 else "")
+                )
+                # Show per-date breakdown
+                _combined_by_date = {}
+                for _d, _n in {**_picks_result.get("by_date", {}), **_bets_result.get("by_date", {})}.items():
+                    _combined_by_date[_d] = _combined_by_date.get(_d, 0) + _n
+                if _combined_by_date:
+                    for _d in sorted(_combined_by_date):
+                        st.caption(f"  📅 {_d}: {_combined_by_date[_d]} resolved")
+            elif _rap_errors and not _rap_pending:
+                st.info("ℹ️ No picks were resolved. See errors below.")
+            else:
+                st.info(
+                    "ℹ️ No pending picks found to resolve. "
+                    "Either all picks are already resolved, today's games aren't final yet, "
+                    "or no picks have been logged."
+                )
+            if _rap_errors:
+                with st.expander(f"⚠️ {len(_rap_errors)} resolution error(s) (click to expand)"):
+                    for _e in _rap_errors:
+                        st.caption(_e)
+        except Exception as _rap_exc:
+            if _jl_loader_rap is not None:
+                _jl_loader_rap.empty()
+            st.error(f"❌ Resolution failed: {_rap_exc}")
 
     st.divider()
 
@@ -1009,37 +1029,44 @@ with tab_all_picks:
             )
 
             if _rbd_resolve_btn:
-                with st.spinner(f"Retrieving NBA stats and resolving picks for {_rbd_selected}…"):
-                    try:
-                        # Resolve all_analysis_picks for this date (re-checks even resolved rows)
-                        _rbd_picks_res  = resolve_all_analysis_picks(date_str=_rbd_selected)
-                        # Also resolve the bets table for this date
-                        _rbd_bets_cnt, _rbd_bets_errs = auto_resolve_bet_results(date_str=_rbd_selected)
+                _jl_loader_rbd = None
+                if _JOSEPH_LOADING_AVAILABLE:
+                    _jl_loader_rbd = joseph_loading_placeholder(f"Resolving picks for {_rbd_selected}")
+                try:
+                    # Resolve all_analysis_picks for this date (re-checks even resolved rows)
+                    _rbd_picks_res  = resolve_all_analysis_picks(date_str=_rbd_selected)
+                    # Also resolve the bets table for this date
+                    _rbd_bets_cnt, _rbd_bets_errs = auto_resolve_bet_results(date_str=_rbd_selected)
 
-                        _rbd_total = _rbd_picks_res.get("resolved", 0) + _rbd_bets_cnt
-                        _rbd_wins  = _rbd_picks_res.get("wins", 0)
-                        _rbd_loss  = _rbd_picks_res.get("losses", 0)
-                        _rbd_psh   = _rbd_picks_res.get("pushes", 0)
-                        _rbd_errs  = _rbd_picks_res.get("errors", []) + _rbd_bets_errs
-                        _rbd_errs  = list(dict.fromkeys(_rbd_errs))
+                    if _jl_loader_rbd is not None:
+                        _jl_loader_rbd.empty()
 
-                        if _rbd_total > 0:
-                            st.success(
-                                f"✅ Resolved **{_rbd_total}** pick(s) for {_rbd_selected}: "
-                                f"✅ {_rbd_wins} WIN · ❌ {_rbd_loss} LOSS · 🔄 {_rbd_psh} PUSH"
-                            )
-                            st.rerun()
-                        else:
-                            st.warning(
-                                f"⚠️ No picks were resolved for {_rbd_selected}. "
-                                "The game log may not yet be available, or no matching players were found."
-                            )
-                        if _rbd_errs:
-                            with st.expander(f"⚠️ {len(_rbd_errs)} error(s)"):
-                                for _e in _rbd_errs:
-                                    st.caption(_e)
-                    except Exception as _rbd_exc:
-                        st.error(f"❌ Resolution failed: {_rbd_exc}")
+                    _rbd_total = _rbd_picks_res.get("resolved", 0) + _rbd_bets_cnt
+                    _rbd_wins  = _rbd_picks_res.get("wins", 0)
+                    _rbd_loss  = _rbd_picks_res.get("losses", 0)
+                    _rbd_psh   = _rbd_picks_res.get("pushes", 0)
+                    _rbd_errs  = _rbd_picks_res.get("errors", []) + _rbd_bets_errs
+                    _rbd_errs  = list(dict.fromkeys(_rbd_errs))
+
+                    if _rbd_total > 0:
+                        st.success(
+                            f"✅ Resolved **{_rbd_total}** pick(s) for {_rbd_selected}: "
+                            f"✅ {_rbd_wins} WIN · ❌ {_rbd_loss} LOSS · 🔄 {_rbd_psh} PUSH"
+                        )
+                        st.rerun()
+                    else:
+                        st.warning(
+                            f"⚠️ No picks were resolved for {_rbd_selected}. "
+                            "The game log may not yet be available, or no matching players were found."
+                        )
+                    if _rbd_errs:
+                        with st.expander(f"⚠️ {len(_rbd_errs)} error(s)"):
+                            for _e in _rbd_errs:
+                                st.caption(_e)
+                except Exception as _rbd_exc:
+                    if _jl_loader_rbd is not None:
+                        _jl_loader_rbd.empty()
+                    st.error(f"❌ Resolution failed: {_rbd_exc}")
 
     st.divider()
 
@@ -1512,30 +1539,36 @@ with tab_auto_resolve:
     )
 
     if resolve_today_btn:
-        with st.spinner("Checking today's games and resolving completed bets…"):
-            try:
-                from tracking.bet_tracker import resolve_todays_bets
-                _result = resolve_todays_bets()
-                if _result["resolved"] > 0:
-                    st.success(
-                        f"✅ Resolved **{_result['resolved']}** bet(s) today: "
-                        f"**{_result['wins']}** WIN · **{_result['losses']}** LOSS · **{_result['pushes']}** PUSH"
-                    )
-                    st.rerun()
-                else:
-                    st.info(
-                        f"ℹ️ No bets resolved. "
-                        f"Games may still be in progress or not started. "
-                        f"Still pending: {_result.get('pending', 0)}"
-                    )
-                if _result.get("errors"):
-                    st.warning("⚠️ " + " | ".join(_result["errors"][:3]))
-                    if len(_result["errors"]) > 3:
-                        with st.expander(f"See all {len(_result['errors'])} issue(s)"):
-                            for err in _result["errors"]:
-                                st.markdown(f"- {err}")
-            except Exception as _err:
-                st.error(f"❌ Resolve failed: {_err}")
+        _jl_loader_today = None
+        if _JOSEPH_LOADING_AVAILABLE:
+            _jl_loader_today = joseph_loading_placeholder("Checking today's games and resolving completed bets")
+        try:
+            from tracking.bet_tracker import resolve_todays_bets
+            _result = resolve_todays_bets()
+            if _jl_loader_today is not None:
+                _jl_loader_today.empty()
+            if _result["resolved"] > 0:
+                st.success(
+                    f"✅ Resolved **{_result['resolved']}** bet(s) today: "
+                    f"**{_result['wins']}** WIN · **{_result['losses']}** LOSS · **{_result['pushes']}** PUSH"
+                )
+                st.rerun()
+            else:
+                st.info(
+                    f"ℹ️ No bets resolved. "
+                    f"Games may still be in progress or not started. "
+                    f"Still pending: {_result.get('pending', 0)}"
+                )
+            if _result.get("errors"):
+                st.warning("⚠️ " + " | ".join(_result["errors"][:3]))
+                if len(_result["errors"]) > 3:
+                    with st.expander(f"See all {len(_result['errors'])} issue(s)"):
+                        for err in _result["errors"]:
+                            st.markdown(f"- {err}")
+        except Exception as _err:
+            if _jl_loader_today is not None:
+                _jl_loader_today.empty()
+            st.error(f"❌ Resolve failed: {_err}")
 
     st.divider()
 
@@ -1685,9 +1718,14 @@ with tab_auto_resolve:
     )
 
     if resolve_all_btn:
+        _jl_loader_all = None
+        if _JOSEPH_LOADING_AVAILABLE:
+            _jl_loader_all = joseph_loading_placeholder("Resolving all pending bets — this may take a moment")
         try:
-            with st.spinner("Resolving all pending bets — this may take a moment…"):
-                _all_result = resolve_all_pending_bets()
+            _all_result = resolve_all_pending_bets()
+
+            if _jl_loader_all is not None:
+                _jl_loader_all.empty()
 
             _all_resolved = _all_result.get("resolved", 0)
             _all_errors   = _all_result.get("errors", [])
@@ -1713,6 +1751,8 @@ with tab_auto_resolve:
                         for err in _all_errors:
                             st.markdown(f"- {err}")
         except Exception as _resolve_all_err:
+            if _jl_loader_all is not None:
+                _jl_loader_all.empty()
             _resolve_err_str = str(_resolve_all_err)
             if "WebSocketClosedError" not in _resolve_err_str and "StreamClosedError" not in _resolve_err_str:
                 st.error(f"❌ Resolve all failed: {_resolve_all_err}")

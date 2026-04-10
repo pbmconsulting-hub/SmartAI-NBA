@@ -28,7 +28,10 @@ except ImportError:
 
 # ── Avatar loader (safe import) ──────────────────────────────
 try:
-    from pages.helpers.joseph_live_desk import get_joseph_avatar_b64
+    from pages.helpers.joseph_live_desk import (
+        get_joseph_avatar_b64,
+        get_joseph_avatar_spinning_b64,
+    )
     _AVATAR_AVAILABLE = True
 except ImportError:
     _AVATAR_AVAILABLE = False
@@ -36,9 +39,12 @@ except ImportError:
     def get_joseph_avatar_b64() -> str:
         return ""
 
+    def get_joseph_avatar_spinning_b64() -> str:
+        return ""
+
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 220+ facts about NBA history, players,
+# NBA Fun Facts Pool — 320+ facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
@@ -316,6 +322,126 @@ NBA_FUN_FACTS = (
     "Karl Malone and John Stockton played together for 18 seasons — the longest-tenured duo in NBA history.",
     "James Harden once recorded a 60-point triple-double, joining Wilt Chamberlain as the only players to do so at the time.",
     "The NBA once considered adding a 4-point line at 30 feet but ultimately rejected the idea.",
+
+    # ── Expansion era & relocations ──────────────────────────
+    "The Charlotte Hornets moved to New Orleans in 2002, and Charlotte got a new team (the Bobcats) in 2004 before reclaiming the Hornets name in 2014.",
+    "The Seattle SuperSonics relocated to Oklahoma City in 2008 and became the Thunder — one of the most controversial moves in NBA history.",
+    "The NBA expanded to Canada in 1995 with the Toronto Raptors and Vancouver Grizzlies. Only Toronto survived.",
+    "The Sacramento Kings nearly moved to Seattle, Anaheim, and Virginia Beach before their new arena deal kept them in Sacramento.",
+    "The Brooklyn Nets were originally the New Jersey Americans in the ABA before becoming the Nets and eventually moving to Brooklyn in 2012.",
+    "The Memphis Grizzlies started as the Vancouver Grizzlies in 1995 and relocated to Memphis in 2001.",
+    "The original Charlotte Hornets were one of the most popular expansion teams ever, selling out 364 consecutive games.",
+    "The Oklahoma City Thunder made the playoffs in their third season after relocating — one of the fastest turnarounds for a relocated franchise.",
+    "The New Orleans Pelicans were formerly the Hornets, who were formerly the Charlotte Hornets — one of the most confusing franchise name histories.",
+    "The ABA-NBA merger in 1976 brought four teams into the NBA: the Nets, Pacers, Nuggets, and Spurs.",
+
+    # ── Salary cap & contracts ───────────────────────────────
+    "The first NBA salary cap was set at $3.6 million in 1984-85. By 2024-25 it had grown to approximately $141 million.",
+    "Kevin Garnett's 6-year, $126 million extension in 1997 was so large it led directly to the 1998-99 NBA lockout.",
+    "The 'supermax' contract extension, introduced in 2017, allows teams to offer their own players up to 35% of the salary cap.",
+    "LeBron James's lifetime Nike deal, reportedly worth over $1 billion, dwarfs any NBA contract ever signed.",
+    "The 'mid-level exception' allows teams over the salary cap to sign a free agent for a set amount — a key tool for contenders.",
+    "The NBA's luxury tax was introduced in the 1999 CBA to penalize big-spending teams and promote competitive balance.",
+    "Steph Curry signed a 4-year, $215 million extension in 2021 — the largest contract in NBA history at the time.",
+    "The 'Bird Rights' rule, named after Larry Bird, allows teams to exceed the salary cap to re-sign their own players.",
+    "Patrick Ewing's $33.5 million contract in 1996 was considered astronomical — today that's barely above the average NBA salary.",
+    "The NBA's 'stretch provision' allows teams to waive a player and spread the dead money over twice the remaining years plus one.",
+
+    # ── Mascots & entertainment ──────────────────────────────
+    "The Chicago Bulls' mascot Benny the Bull is considered the best mascot in the NBA and has been performing since 1969.",
+    "The Phoenix Suns' Gorilla became one of the first NBA mascots to go viral, famous for trampoline dunks during timeouts.",
+    "The Toronto Raptors' mascot is called 'The Raptor' and once fell off his in-arena ATV during a performance.",
+    "The San Antonio Spurs' Coyote once tried to distract opposing free throw shooters by eating a burrito on the baseline.",
+    "Benny the Bull was inducted into the Mascot Hall of Fame in 2005 — the first NBA mascot to receive the honor.",
+    "The Utah Jazz Bear has been suspended multiple times for overly aggressive antics with opposing fans and players.",
+    "The Cleveland Cavaliers' mascot Moondog once lowered from the rafters on a wire to half-court — a signature entrance.",
+    "The Brooklyn Nets are one of the few NBA teams that don't have an official mascot.",
+    "The Phillie Phanatic inspired many NBA mascots — teams realized a great mascot could become a revenue-generating brand.",
+    "The Miami Heat's Burnie has performed at every Heat home game since 1988 and is one of the longest-serving NBA mascots.",
+
+    # ── Draft busts & what-ifs ───────────────────────────────
+    "Sam Bowie was drafted #2 overall in 1984 — one pick ahead of Michael Jordan — and is often called the biggest draft bust in NBA history.",
+    "Greg Oden, the #1 pick in 2007 over Kevin Durant, played only 105 NBA games due to chronic knee injuries.",
+    "Len Bias, drafted #2 overall by the Celtics in 1986, tragically died of a cocaine overdose just two days after the draft.",
+    "Darko Milicic was picked #2 in the legendary 2003 draft — ahead of Carmelo Anthony, Chris Bosh, and Dwyane Wade.",
+    "Anthony Bennett became the first #1 overall pick to be waived by the team that drafted him (Cleveland, 2013).",
+    "Kwame Brown, the #1 pick in 2001, was only 18 and became one of the most criticized top picks in NBA history.",
+    "The Portland Trail Blazers passed on Michael Jordan AND Kevin Durant (#1 picks Sam Bowie in 1984 and Greg Oden in 2007).",
+    "Hasheem Thabeet was drafted #2 in 2009 over James Harden and Steph Curry — he averaged just 2.2 PPG in his career.",
+    "Michael Olowokandi, the #1 pick in 1998, averaged only 8.3 points per game over his nine-year career.",
+    "LaRue Martin, the #1 pick in 1972, averaged just 5.3 PPG and is considered one of the worst top picks ever.",
+
+    # ── Streaks & durability ─────────────────────────────────
+    "The 1971-72 Lakers won 33 consecutive games — a record that stood for over 50 years.",
+    "The 2015-16 Warriors started 24-0, the best start in NBA history.",
+    "LeBron James played in 1,163 consecutive regular-season games without missing one between 2005 and 2012.",
+    "The 2010-11 Cleveland Cavaliers lost 26 consecutive games — the longest losing streak in NBA history at the time.",
+    "The Philadelphia 76ers went 9-73 in 1972-73, the worst record in NBA history until the 2015-16 76ers' tank job.",
+    "The 2023-24 Detroit Pistons lost 28 consecutive games, breaking the all-time NBA losing streak record.",
+    "Karl Malone played 18 seasons without missing more than one game in a single season until his final year.",
+    "Robert Parish played until age 43, appearing in 1,611 regular-season games — the most in NBA history at the time.",
+    "Kareem Abdul-Jabbar played 20 NBA seasons, the longest career for a #1 overall pick at the time.",
+    "John Havlicek played all 16 of his NBA seasons with the Boston Celtics and never missed the playoffs.",
+
+    # ── Halftime & off-court entertainment ────────────────────
+    "The NBA All-Star Saturday Night features the Slam Dunk Contest, Three-Point Contest, and Skills Challenge.",
+    "Red Panda, the famous halftime acrobat who balances bowls on her head while unicycling, has performed at over 1,500 NBA games.",
+    "The Jabbawockeez dance crew has been the official halftime entertainment partner for multiple NBA teams.",
+    "NBA arenas use 'decibel meters' during games — the loudest recorded crowd noise in an NBA arena exceeded 126 decibels.",
+    "The T-shirt cannon was popularized in NBA arenas in the 1990s and is now a staple of every home game experience.",
+    "Some NBA teams have had live animal mascots — the Bucks once had a real deer at their arena.",
+    "The 'Kiss Cam' was first used in NBA arenas in the 1980s and has produced some of the most viral sports moments.",
+    "NBA teams collectively spend over $50 million per year on in-arena entertainment and game-night production.",
+    "The Golden State Warriors' 'Strength in Numbers' fan campaign became one of the most recognizable slogans in sports.",
+    "The Philadelphia 76ers' 'Trust the Process' became a cultural phenomenon that transcended basketball.",
+
+    # ── Training & preparation ───────────────────────────────
+    "NBA teams now employ full-time sleep scientists to optimize player rest schedules during the grueling 82-game season.",
+    "Kobe Bryant was famous for his '4 AM workouts' — arriving at the gym before dawn for extra practice sessions.",
+    "LeBron James reportedly spends over $1.5 million per year on his body, including cryotherapy, hyperbaric chambers, and personal chefs.",
+    "Stephen Curry's pregame shooting routine has become a viral spectacle, with fans arriving early to watch his tunnel shots.",
+    "NBA teams use player-tracking cameras (Second Spectrum) that record every movement at 25 frames per second.",
+    "The average NBA player consumes roughly 3,500-4,500 calories per day during the season to maintain peak performance.",
+    "Many NBA players use float tanks (sensory deprivation tanks) for recovery and mental clarity between games.",
+    "Tim Grover, Michael Jordan's personal trainer, also trained Kobe Bryant and Dwyane Wade.",
+    "The NBA's 'load management' strategy — resting healthy stars — became controversial when Kawhi Leonard sat out games in 2019.",
+    "Modern NBA shooters use video analysis tools that break down their shot mechanics frame by frame to identify micro-adjustments.",
+
+    # ── Broadcasting & media ─────────────────────────────────
+    "Marv Albert's 'Yes!' call is one of the most iconic catchphrases in NBA broadcasting history.",
+    "The NBA signed an 11-year, $76 billion media deal in 2024 with Disney, NBC, and Amazon — the largest in sports history.",
+    "Inside the NBA on TNT, featuring Charles Barkley, Shaquille O'Neal, Kenny Smith, and Ernie Johnson, is considered the best studio show in sports.",
+    "The NBA was the first major U.S. sports league to embrace social media, launching official accounts on Twitter and Instagram early on.",
+    "Mike Breen's 'BANG!' call during big three-pointers has become synonymous with clutch NBA moments.",
+    "The NBA League Pass streaming service launched in 2003, making the NBA an early adopter of direct-to-consumer sports streaming.",
+    "Ahmad Rashad's sideline interviews in the 1990s set the standard for in-game player access in NBA broadcasting.",
+    "TNT's 'Players Only' broadcast experiment in 2018-19, using only former players as commentators, received mixed reviews.",
+    "The NBA's official YouTube channel has over 20 million subscribers, making it one of the most-followed sports channels globally.",
+    "Doris Burke became the first woman to serve as a full-time NBA game analyst for ESPN in 2020.",
+
+    # ── Unusual rules & rare plays ───────────────────────────
+    "A player can technically score 0 points but still record a triple-double with assists, rebounds, and steals or blocks.",
+    "The 'Elam Ending' — removing the game clock and playing to a target score — was tested in the 2020 NBA All-Star Game.",
+    "A 'natural shooting motion' foul has been debated for years — the NBA cracked down on non-basketball moves in 2021-22.",
+    "The NBA's 'clear path' foul rule awards two free throws plus possession to the fouled team on fast-break fouls.",
+    "An 'alley-oop' was originally considered showboating and was actually illegal in some early basketball rule sets.",
+    "The NBA experimented with a 'no-charge zone' semicircle under the basket starting in the 1997-98 season.",
+    "A 'flagrant 2' foul results in automatic ejection — the player is removed from the game and can be fined or suspended.",
+    "The NBA's 'take foul' rule, introduced in 2022-23, awards one free throw plus possession on transition fouls.",
+    "A 'double dribble' is one of the most basic violations but has been controversially missed in high-stakes playoff games.",
+    "The NBA allows coaches to 'challenge' one call per game using instant replay — a rule introduced in the 2019-20 season.",
+
+    # ── Fashion & pregame tunnels ─────────────────────────────
+    "The NBA pregame tunnel walk became a fashion runway in the 2010s, with players wearing designer outfits documented by photographers.",
+    "Russell Westbrook is widely considered the NBA's most fashion-forward player, often wearing avant-garde outfits to games.",
+    "The NBA relaxed its strict dress code in 2023, allowing players to wear more casual attire during non-game appearances.",
+    "Kyle Kuzma's giant pink sweater at a 2022 game went viral and became one of the most talked-about NBA fashion moments.",
+    "LeBron James arrived at a 2018 playoff game wearing a custom Thom Browne suit valued at over $30,000.",
+    "Jordan Brand generates over $5 billion in annual revenue — more than some NBA teams are worth.",
+    "The 'players' tunnel' camera setup was pioneered by NBA photographer Andrew Bernstein in the early 2010s.",
+    "Dwyane Wade is now a fashion mogul post-retirement, co-owning a clothing brand and attending Paris Fashion Week.",
+    "P.J. Tucker is known as the NBA's 'Sneaker King,' owning over 5,000 pairs of rare sneakers.",
+    "The NBA's Christmas Day games always feature special edition uniforms designed uniquely for the holiday matchups.",
 )
 
 # Number of facts to embed in each loading screen (cycled via JS)
@@ -537,7 +663,7 @@ JOSEPH_LOADING_CSS = """<style>
 .joseph-loading-avatar-ring {
     position:absolute;
     top:50%; left:50%;
-    width:140px; height:140px;
+    width:150px; height:150px;
     border-radius:50%;
     border:2px solid transparent;
     border-top:2px solid rgba(255,94,0,0.6);
@@ -548,9 +674,10 @@ JOSEPH_LOADING_CSS = """<style>
     pointer-events:none;
 }
 .joseph-loading-avatar {
-    width:120px; height:120px;
+    width:130px; height:130px;
     border-radius:50%;
     object-fit:cover;
+    object-position:center 15%;
     border:3px solid rgba(255,94,0,0.5);
     animation:josephPulseGlow 3s ease-in-out infinite;
     background:#0d1425;
@@ -678,8 +805,8 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Responsive adjustments ──────────────────────────────── */
 @media (max-width: 600px) {
     .joseph-loading-overlay { min-height:340px; padding:24px 16px 22px; }
-    .joseph-loading-avatar { width:100px; height:100px; }
-    .joseph-loading-avatar-ring { width:120px; height:120px; }
+    .joseph-loading-avatar { width:110px; height:110px; }
+    .joseph-loading-avatar-ring { width:130px; height:130px; }
     .joseph-loading-fact { font-size:0.84rem; padding:12px 16px; }
     .joseph-loading-name { font-size:0.78rem; }
     .joseph-loading-fact-container { max-width:95%; }
@@ -717,8 +844,10 @@ def render_joseph_loading_screen(
     if st is None:
         return  # pragma: no cover
 
-    # ── Load avatar ──────────────────────────────────────────
-    avatar_b64 = get_joseph_avatar_b64() if _AVATAR_AVAILABLE else ""
+    # ── Load avatar (prefer Spinning Basketball variant) ────────
+    avatar_b64 = ""
+    if _AVATAR_AVAILABLE:
+        avatar_b64 = get_joseph_avatar_spinning_b64() or get_joseph_avatar_b64()
     if avatar_b64:
         avatar_html = (
             f'<img class="joseph-loading-avatar" '
