@@ -165,7 +165,6 @@ from styles.theme import (
     get_roster_health_html,
     get_best_bets_section_html,
     get_qds_css,
-    get_qds_confidence_bar_html,
     get_qds_metrics_grid_html,
     get_qds_prop_card_html,
     get_qds_matchup_header_html,
@@ -229,9 +228,9 @@ def _get_sim_cache() -> dict:
 #      height or scroll-bar is needed.
 # ---------------------------------------------------------------------------
 
-_MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (expanded)
-_HEIGHT_PER_PLAYER = 800       # px — expanded card ≈ header + prop cards (~400px each)
-_MAX_IFRAME_HEIGHT = 12000     # px — generous cap before ResizeObserver takes over
+_MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player (expanded)
+_HEIGHT_PER_PLAYER = 450       # px — expanded card ≈ header + prop cards (~350px each)
+_MAX_IFRAME_HEIGHT = 6000      # px — cap before ResizeObserver takes over
 _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
@@ -294,6 +293,13 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
+
+# ── Reduce excessive bottom padding / blank space ─────────────
+st.markdown(
+    '<style>.main .block-container{padding-bottom:1rem !important}'
+    ' iframe{max-height:fit-content}</style>',
+    unsafe_allow_html=True,
+)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
 from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
@@ -723,6 +729,14 @@ if "qam_sort_key" not in st.session_state:
 if run_analysis:
     _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
+
+    # ── Show Joseph's animated loading screen with NBA fun facts ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_loading = joseph_loading_placeholder("🔬 Analyzing props — hang tight…")
+    except Exception:
+        _joseph_loading = None
+
     analysis_results_list = []
 
     # Clear stale Joseph results so fresh ones are generated after this run.
@@ -2065,6 +2079,11 @@ if run_analysis:
             progress_bar.empty()
         except Exception:
             pass
+        try:
+            if _joseph_loading is not None:
+                _joseph_loading.empty()
+        except Exception:
+            pass
 
 # ============================================================
 # END SECTION: Analysis Runner
@@ -2474,7 +2493,6 @@ if analysis_results:
                     _render_news_alert_html(_na),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ============================================================
     # SECTION: Market Movement Alerts (Odds API line snapshots)
@@ -2494,7 +2512,6 @@ if analysis_results:
                     _render_market_movement_html(_mm_r),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ============================================================
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
@@ -2521,7 +2538,6 @@ if analysis_results:
                     ),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
     _single_bet_pool = [
@@ -2586,36 +2602,6 @@ if analysis_results:
         _render_card_iframe(_parlay_css + _parlay_html, len(strategy_entries))
     else:
         st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
-
-    st.divider()
-
-    # ── Confidence Bars: sorted ranking ─────────────────────────
-    non_out_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-    if non_out_results:
-        with st.expander("📈 Confidence Rankings (all picks)", expanded=True):
-            _tier_icon_map = {
-                "Platinum": "💎", "Gold": "🔒", "Silver": "✓", "Bronze": "⭐"
-            }
-            _STAT_EMOJI = {
-                "points": "🏀", "rebounds": "📊", "assists": "🎯",
-                "threes": "🎯", "steals": "⚡", "blocks": "🛡️", "turnovers": "❌",
-            }
-            for r in non_out_results:
-                _stat     = r.get("stat_type", "")
-                _emoji    = _STAT_EMOJI.get(_stat, "🏀")
-                _dir      = "More" if r.get("direction") == "OVER" else "Less"
-                _label    = (
-                    f"{r.get('player_name', '')} — "
-                    f"{_emoji} {_dir} {r.get('line', '')} {_stat.title()}"
-                )
-                st.markdown(
-                    get_qds_confidence_bar_html(
-                        label=_label,
-                        percentage=r.get("confidence_score", 50),
-                        tier_icon=_tier_icon_map.get(r.get("tier", "Bronze"), "⭐"),
-                    ),
-                    unsafe_allow_html=True,
-                )
 
     # ── Team Breakdown (when single game) ────────────────────────
     if len(todays_games) == 1:
