@@ -90,7 +90,8 @@ def _make_test_db() -> tuple[str, sqlite3.Connection]:
     Returns:
         (db_path, conn) — caller is responsible for closing conn.
     """
-    tmp = tempfile.mktemp(suffix=".db")
+    fd, tmp = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
     conn = sqlite3.connect(tmp)
     conn.executescript(
         """
