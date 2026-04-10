@@ -757,8 +757,9 @@ NBA_FUN_FACTS = (
     "Jason Terry played 19 NBA seasons, appearing in 1,410 games and winning a championship with the Mavericks in 2011.",
 )
 
-# Number of facts to embed in each loading screen (cycled via JS)
-_FACTS_PER_SCREEN = 15
+# Number of facts to embed in each loading screen.
+# Set to the full pool size so facts never repeat within a session.
+_FACTS_PER_SCREEN = len(NBA_FUN_FACTS)
 
 
 # ═════════════════════════════════════════════════════════════
@@ -1151,7 +1152,7 @@ def get_random_facts(count: int = _FACTS_PER_SCREEN) -> list:
 def render_joseph_loading_screen(
     status_text: str = "Crunching the numbers",
     fact_count: int = _FACTS_PER_SCREEN,
-    rotation_seconds: int = 5,
+    rotation_seconds: int = 10,
 ) -> None:
     """Render Joseph's animated loading screen with rotating NBA fun facts.
 
@@ -1162,7 +1163,7 @@ def render_joseph_loading_screen(
     fact_count : int
         Number of fun facts to embed (cycled via JavaScript).
     rotation_seconds : int
-        Seconds between fact rotations (default 5).
+        Seconds between fact rotations (default 10).
     """
     if st is None:
         return  # pragma: no cover
@@ -1237,11 +1238,12 @@ def render_joseph_loading_screen(
     if (!el || facts.length < 2) return;
     var tid = setInterval(function() {{
         if (!document.contains(el)) {{ clearInterval(tid); return; }}
+        if (idx + 1 >= facts.length) {{ clearInterval(tid); return; }}
         el.style.opacity = "0";
         el.style.transform = "translateY(-12px)";
         setTimeout(function() {{
             if (!document.contains(el)) {{ clearInterval(tid); return; }}
-            idx = (idx + 1) % facts.length;
+            idx = idx + 1;
             el.textContent = facts[idx];
             el.style.transform = "translateY(12px)";
             /* Force reflow before animating in */
@@ -1259,7 +1261,7 @@ def render_joseph_loading_screen(
 def joseph_loading_placeholder(
     status_text: str = "Crunching the numbers",
     fact_count: int = _FACTS_PER_SCREEN,
-    rotation_seconds: int = 5,
+    rotation_seconds: int = 10,
 ):
     """Create a Streamlit placeholder with Joseph's loading screen.
 
