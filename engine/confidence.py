@@ -103,6 +103,23 @@ COMBO_STAT_TYPES = {
     "double_double", "triple_double",
 }
 
+# Binary / near-binary stat confidence penalty multiplier.
+# Stats like dunks and blocked shots are effectively 0-or-1 outcomes per game.
+# Their high intrinsic variance means projections are much less reliable than
+# for continuous stats (points, rebounds, assists).  Applying a 0.75x penalty
+# ensures these volatile props don't achieve Gold/Platinum tiers unless the
+# underlying signals are extremely strong.
+BINARY_STAT_CONFIDENCE_MULTIPLIER = 0.75
+
+# Stats treated as binary/near-binary for confidence penalty purposes.
+# These are 0-or-1-per-game stats or derived stats with doubled variance.
+BINARY_STAT_TYPES = {
+    "dunks",
+    "blocked_shots", "blocked shots",
+    "two_pointers_made", "two_pointers_attempted",
+    "two pointers made", "two pointers attempted",
+    "2pm", "2pa",
+}
 # Synergy bonus: multiplicative interaction between edge + consistency + probability.
 # When all three strong signals align, a bonus is added to confidence score.
 SYNERGY_EDGE_THRESHOLD        = 8.0   # Edge % required for synergy bonus
@@ -469,6 +486,13 @@ def calculate_confidence_score(
     _stat_type_lower = str(stat_type).lower() if stat_type else ""
     if _stat_type_lower in COMBO_STAT_TYPES:
         combined_score *= COMBO_STAT_CONFIDENCE_MULTIPLIER
+
+    # Apply binary-stat confidence penalty — dunks, blocked shots, two-pointers
+    # are essentially 0-or-1 outcomes with very high inherent variance.  The
+    # model's projection for these stats is much less reliable than for
+    # continuous stats like points, so we penalize the confidence score.
+    if _stat_type_lower in BINARY_STAT_TYPES:
+        combined_score *= BINARY_STAT_CONFIDENCE_MULTIPLIER
 
     # W2: Recency Regression-to-Mean Correction
     # Extreme recent performance (hot or cold streaks) tends to revert to the season

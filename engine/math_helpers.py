@@ -349,6 +349,11 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
     edge = (probability - implied_probability) * 100.
     When not provided, defaults to 0.5238 (the -110 breakeven standard).
 
+    The raw edge is clamped to ±MAX_REALISTIC_EDGE_PCT (20%).  A 20% edge
+    already implies ~72% true probability on a standard -110 line — anything
+    above that is almost certainly model noise or data artefact, not a real
+    edge.  This cap is consistent with _CWS_MAX_EDGE_PCT in edge_detection.py.
+
     BEGINNER NOTE: At -110 odds (standard American bet), you need to win
     52.38% of the time just to break even. So the real edge is your
     probability minus 52.38%, not minus 50%.
@@ -359,16 +364,27 @@ def calculate_edge_percentage(probability_over, implied_probability=None):
             If None, defaults to 0.5238 (breakeven for -110 odds).
 
     Returns:
-        float: Edge in percentage points
+        float: Edge in percentage points (clamped to ±20%)
 
     Examples:
         calculate_edge_percentage(0.63)          → +10.62% (vs -110 breakeven)
         calculate_edge_percentage(0.63, 0.5238)  → +10.62% (explicit -110 baseline)
         calculate_edge_percentage(0.63, 0.50)    → +13.0%  (vs 50/50 baseline)
+        calculate_edge_percentage(0.99)          → +20.0%  (capped — was 46.6%)
     """
     baseline = implied_probability if implied_probability is not None else 0.5238
     edge = (probability_over - baseline) * 100.0
+    # Clamp to realistic NBA prop range — 20% edge is exceptional; above that
+    # is near-certain model overconfidence.
+    edge = max(-MAX_REALISTIC_EDGE_PCT, min(MAX_REALISTIC_EDGE_PCT, edge))
     return edge
+
+
+# Maximum realistic edge percentage for NBA props.  20% edge corresponds to
+# ~72% true win probability on a -110 line, which is near-certainty territory.
+# Anything above is almost always model noise.  Used by calculate_edge_percentage()
+# and referenced by _CWS_MAX_EDGE_PCT / _MAX_REALISTIC_EDGE_PCT in the engine.
+MAX_REALISTIC_EDGE_PCT = 20.0
 
 
 # Platform-specific implied probability baselines.
