@@ -10,10 +10,18 @@ import datetime
 import pandas as pd
 
 from data.nba_injury_pdf._cleaner import clean_injury_report
-from data.nba_injury_pdf._constants import EXPECTED_COLUMNS
+from data.nba_injury_pdf._constants import EXPECTED_COLUMNS, REQUEST_HEADERS
 from data.nba_injury_pdf._exceptions import DataValidationError, URLRetrievalError
 from data.nba_injury_pdf._parser import extract_tables_from_pdf, fetch_pdf_bytes, validate_columns
 from data.nba_injury_pdf._url import generate_report_url
+
+# curl_cffi provides TLS browser-impersonation used to bypass Akamai 403 blocks.
+try:
+    from curl_cffi import requests as _curl_requests
+    _CURL_CFFI_AVAILABLE = True
+except ImportError:
+    _curl_requests = None  # type: ignore[assignment]
+    _CURL_CFFI_AVAILABLE = False
 
 try:
     from utils.logger import get_logger
@@ -114,7 +122,13 @@ def get_report(
 def check_report_available(timestamp: datetime.datetime) -> bool:
     """Check whether an injury report PDF exists for the given datetime.
 
-    Performs an HTTP HEAD request against the NBA CDN URL.
+    Performs an HTTP HEAD request against the NBA CDN URL.  Uses
+    ``curl_cffi`` with Chrome browser impersonation when available to
+    avoid Akamai 403 blocks; falls back to plain ``requests`` otherwise.
+
+    Note: ``REQUEST_HEADERS`` are only used on the plain-``requests`` path.
+    When ``curl_cffi`` impersonates Chrome it automatically synthesises
+    the appropriate TLS fingerprint and HTTP headers end-to-end.
 
     Args:
         timestamp: The datetime whose report URL should be checked.
@@ -122,12 +136,14 @@ def check_report_available(timestamp: datetime.datetime) -> bool:
     Returns:
         ``True`` if the server responds with HTTP 200, ``False`` otherwise.
     """
-    import requests as _requests
-    from data.nba_injury_pdf._constants import REQUEST_HEADERS
-
     url = generate_report_url(timestamp)
     try:
-        resp = _requests.head(url, headers=REQUEST_HEADERS, timeout=10)
+        if _CURL_CFFI_AVAILABLE:
+            # curl_cffi impersonates Chrome's TLS fingerprint end-to-end.
+            resp = _curl_requests.head(url, impersonate="chrome", timeout=10)
+        else:
+            import requests as _requests
+            resp = _requests.head(url, headers=REQUEST_HEADERS, timeout=10)
         return resp.status_code == 200
     except Exception:
         return False

@@ -350,7 +350,8 @@ class TestCheckReportAvailable(unittest.TestCase):
         """HTTP 200 response must return True."""
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        with patch("requests.head", return_value=mock_resp):
+        with patch("data.nba_injury_pdf.report._CURL_CFFI_AVAILABLE", False), \
+             patch("requests.head", return_value=mock_resp):
             result = self.check(datetime.datetime(2026, 3, 25, 17, 0))
         self.assertTrue(result)
 
@@ -359,9 +360,54 @@ class TestCheckReportAvailable(unittest.TestCase):
         """HTTP 404 response must return False."""
         mock_resp = MagicMock()
         mock_resp.status_code = 404
-        with patch("requests.head", return_value=mock_resp):
+        with patch("data.nba_injury_pdf.report._CURL_CFFI_AVAILABLE", False), \
+             patch("requests.head", return_value=mock_resp):
             result = self.check(datetime.datetime(2026, 3, 25, 17, 0))
         self.assertFalse(result)
+
+    # ── Test 16: curl_cffi path HEAD 200 → True ───────────────────────────────
+    def test_curl_cffi_head_200_returns_true(self):
+        """curl_cffi HEAD 200 response must return True."""
+        mock_curl = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_curl.head.return_value = mock_resp
+        with patch("data.nba_injury_pdf.report._CURL_CFFI_AVAILABLE", True), \
+             patch("data.nba_injury_pdf.report._curl_requests", mock_curl):
+            result = self.check(datetime.datetime(2026, 3, 25, 17, 0))
+        self.assertTrue(result)
+        mock_curl.head.assert_called_once()
+        _, kwargs = mock_curl.head.call_args
+        self.assertEqual(kwargs.get("impersonate"), "chrome")
+
+    # ── Test 17: curl_cffi fetch_pdf_bytes uses impersonate=chrome ────────────
+    def test_curl_cffi_fetch_pdf_bytes(self):
+        """fetch_pdf_bytes must use curl_cffi with impersonate='chrome' when available."""
+        from data.nba_injury_pdf._parser import fetch_pdf_bytes
+        mock_curl = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"%PDF-1.4 fake"
+        mock_curl.get.return_value = mock_resp
+        with patch("data.nba_injury_pdf._parser._CURL_CFFI_AVAILABLE", True), \
+             patch("data.nba_injury_pdf._parser._curl_requests", mock_curl):
+            result = fetch_pdf_bytes("https://example.com/test.pdf")
+        self.assertEqual(result, b"%PDF-1.4 fake")
+        mock_curl.get.assert_called_once()
+        _, kwargs = mock_curl.get.call_args
+        self.assertEqual(kwargs.get("impersonate"), "chrome")
+
+    # ── Test 18: fetch_pdf_bytes falls back to requests when curl_cffi absent ─
+    def test_requests_fallback_fetch_pdf_bytes(self):
+        """fetch_pdf_bytes must use plain requests when curl_cffi is unavailable."""
+        from data.nba_injury_pdf._parser import fetch_pdf_bytes
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"%PDF-1.4 fake"
+        with patch("data.nba_injury_pdf._parser._CURL_CFFI_AVAILABLE", False), \
+             patch("requests.get", return_value=mock_resp):
+            result = fetch_pdf_bytes("https://example.com/test.pdf")
+        self.assertEqual(result, b"%PDF-1.4 fake")
 
 
 if __name__ == "__main__":
