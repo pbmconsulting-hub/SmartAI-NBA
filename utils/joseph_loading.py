@@ -38,7 +38,7 @@ except ImportError:
 
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 180+ facts about NBA history, players,
+# NBA Fun Facts Pool — 220+ facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
