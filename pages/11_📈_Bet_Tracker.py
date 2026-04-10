@@ -1687,8 +1687,14 @@ with tab_auto_resolve:
         )
 
     if resolve_btn:
-        with st.spinner("Retrieving actual stats…"):
+        _jl_loader_date = None
+        if _JOSEPH_LOADING_AVAILABLE:
+            _jl_loader_date = joseph_loading_placeholder(f"Retrieving actual stats for {resolve_date.isoformat()}")
+        try:
             resolved, errors = auto_resolve_bet_results(date_str=resolve_date.isoformat())
+        finally:
+            if _jl_loader_date is not None:
+                _jl_loader_date.empty()
 
         if resolved > 0:
             try:

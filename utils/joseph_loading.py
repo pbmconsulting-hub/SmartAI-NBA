@@ -44,7 +44,7 @@ except ImportError:
 
 
 # ═════════════════════════════════════════════════════════════
-# NBA Fun Facts Pool — 324 facts about NBA history, players,
+# NBA Fun Facts Pool — 424 facts about NBA history, players,
 # coaches, records, and basketball culture
 # ═════════════════════════════════════════════════════════════
 
@@ -442,6 +442,126 @@ NBA_FUN_FACTS = (
     "Dwyane Wade is now a fashion mogul post-retirement, co-owning a clothing brand and attending Paris Fashion Week.",
     "P.J. Tucker is known as the NBA's 'Sneaker King,' owning over 5,000 pairs of rare sneakers.",
     "The NBA's Christmas Day games always feature special edition uniforms designed uniquely for the holiday matchups.",
+
+    # ── International impact ──────────────────────────────────
+    "Dirk Nowitzki became the first European-born player to win NBA MVP in 2007 and Finals MVP in 2011.",
+    "Yao Ming's arrival in Houston in 2002 transformed the NBA into a global brand, especially across Asia.",
+    "Giannis Antetokounmpo grew up in Athens, Greece, selling goods on the street before becoming a two-time NBA MVP.",
+    "Luka Dončić won the EuroLeague MVP at age 19 before being drafted by the Dallas Mavericks in 2018.",
+    "Hakeem Olajuwon, born in Lagos, Nigeria, didn't start playing basketball until age 15 and became an all-time great.",
+    "Manu Ginóbili is widely considered the greatest international player in NBA history after a Hall of Fame career with the Spurs.",
+    "Tony Parker, born in Belgium and raised in France, became the youngest Finals MVP at 25 in 2007.",
+    "The NBA has had players from over 40 different countries play in the league.",
+    "Nikola Jokić, from Sombor, Serbia, became the first player from the Balkans to win NBA MVP.",
+    "Rui Hachimura became the first Japanese-born player drafted in the first round when Washington selected him in 2019.",
+
+    # ── Iconic arenas & courts ────────────────────────────────
+    "Madison Square Garden in New York City is known as 'The Mecca of Basketball' and has hosted NBA games since 1968.",
+    "The Boston Celtics' parquet floor at the old Boston Garden had dead spots that only the home team knew about.",
+    "Crypto.com Arena (formerly Staples Center) in LA hosted both the Lakers and Clippers until the Clippers moved to the Intuit Dome in 2024.",
+    "The Toronto Raptors play at Scotiabank Arena — the only NBA arena located outside the United States.",
+    "The Chicago Bulls' United Center is nicknamed 'The Madhouse on Madison' for its raucous home crowd atmosphere.",
+    "The Phoenix Suns' Footprint Center was the site of one of the loudest playoff crowds ever recorded in 2021.",
+    "The Milwaukee Bucks' Fiserv Forum opened in 2018 and helped keep the franchise from relocating to Las Vegas or Seattle.",
+    "The Golden State Warriors moved from Oakland's Oracle Arena to the Chase Center in San Francisco in 2019.",
+    "The Utah Jazz's Delta Center (now renamed) was known for having one of the most hostile atmospheres in the NBA.",
+    "The Indiana Pacers' Gainbridge Fieldhouse was the first NBA arena to be named after a financial tech company.",
+
+    # ── Playoff & Finals legends ──────────────────────────────
+    "Michael Jordan's 'Flu Game' in the 1997 Finals — 38 points while visibly ill — is one of the most iconic performances in NBA history.",
+    "LeBron James's chase-down block on Andre Iguodala in Game 7 of the 2016 Finals is considered the greatest block ever.",
+    "Ray Allen's corner three-pointer in Game 6 of the 2013 Finals saved the Miami Heat from elimination and is the most clutch shot in Finals history.",
+    "Tim Duncan's bank shot against the Suns in the 2008 playoffs was famously called 'The greatest bank shot ever' by commentators.",
+    "Kawhi Leonard's buzzer-beater that bounced four times on the rim in Game 7 against the 76ers in 2019 is unforgettable.",
+    "Willis Reed's inspirational walk onto the court in Game 7 of the 1970 Finals while injured rallied the Knicks to a championship.",
+    "Robert Horry earned the nickname 'Big Shot Rob' for hitting clutch three-pointers in multiple NBA Finals for three different teams.",
+    "Derek Fisher's 0.4-second shot against the Spurs in the 2004 playoffs remains one of the most improbable game-winners ever.",
+    "Reggie Miller scored 8 points in 8.9 seconds against the Knicks in the 1995 playoffs — one of the greatest comebacks in postseason history.",
+    "The 2016 Cavaliers became the first team in NBA history to overcome a 3-1 deficit in the Finals.",
+
+    # ── Coaching legends ──────────────────────────────────────
+    "Gregg Popovich has won 5 NBA championships with the Spurs and holds the record for most career wins by a head coach.",
+    "Pat Riley coined the term 'three-peat' and trademarked it — he collects royalties whenever the phrase is used commercially.",
+    "Red Auerbach celebrated victories by lighting a cigar on the bench — a tradition that became synonymous with Celtics dominance.",
+    "Steve Kerr went from being a player with 5 championship rings to a coach with 4 more, totaling 9 rings.",
+    "Erik Spoelstra is one of only a few coaches to have never played in the NBA and still win multiple championships.",
+    "Lenny Wilkens is the only person in NBA history to be inducted into the Hall of Fame as both a player and a coach.",
+    "Jack Ramsay coached the Portland Trail Blazers to their only championship in 1977 with the iconic Bill Walton-led team.",
+    "Chuck Daly, coach of the 'Bad Boy' Pistons, was also the head coach of the original 1992 Olympic Dream Team.",
+    "Rudy Tomjanovich's famous quote 'Don't ever underestimate the heart of a champion' came after the Rockets' 1995 title.",
+    "Mike Budenholzer won Coach of the Year in 2015 and 2019, then led the Bucks to a championship in 2021.",
+
+    # ── Draft night drama ─────────────────────────────────────
+    "The 1996 NBA Draft produced Kobe Bryant, Allen Iverson, Steve Nash, and Ray Allen — arguably the greatest draft class ever.",
+    "The 2003 Draft featured LeBron James, Carmelo Anthony, Chris Bosh, and Dwyane Wade — four future Hall of Famers.",
+    "Kobe Bryant was drafted 13th overall by the Charlotte Hornets and immediately traded to the Lakers for Vlade Divac.",
+    "The NBA Draft Lottery was introduced in 1985 after the league wanted to prevent teams from deliberately tanking.",
+    "The 1984 Draft produced Hakeem Olajuwon, Michael Jordan, Charles Barkley, and John Stockton — four of the top 50 players ever.",
+    "Stephen Curry was drafted 7th overall in 2009 — six teams passed on the greatest shooter in basketball history.",
+    "Giannis Antetokounmpo was drafted 15th overall in 2013, with many teams underestimating his raw potential.",
+    "The New York Knicks won the first-ever NBA Draft Lottery in 1985, selecting Patrick Ewing — sparking conspiracy theories that persist today.",
+    "Tim Duncan was the consensus #1 pick in 1997 and is considered the safest draft pick in NBA history — delivering exactly as promised.",
+    "Kevin Garnett was the first player drafted directly from high school in the modern era (1995), paving the way for Kobe, LeBron, and others.",
+
+    # ── Rivalries & feuds ─────────────────────────────────────
+    "The Lakers-Celtics rivalry is the most storied in NBA history — they've met in the Finals 12 times.",
+    "The Michael Jordan vs. Isiah Thomas rivalry was so intense that Jordan reportedly kept Thomas off the 1992 Dream Team.",
+    "Shaq and Kobe's feud nearly destroyed the Lakers dynasty — despite winning three championships together, they couldn't coexist.",
+    "The 'Malice at the Palace' brawl between the Pacers and Pistons in 2004 led to the longest suspensions in NBA history.",
+    "Larry Bird and Magic Johnson's rivalry, which began in the 1979 NCAA championship game, saved the NBA from declining ratings.",
+    "The Knicks-Heat rivalry of the 1990s featured physical, hard-nosed basketball that defined an era of playoff intensity.",
+    "Wilt Chamberlain and Bill Russell faced each other 142 times — Russell won 85 of those matchups.",
+    "The Warriors-Cavaliers met in four consecutive NBA Finals (2015-2018) — the most by the same two teams in a row.",
+    "Reggie Miller's trash-talking feud with Spike Lee during Knicks-Pacers games became one of the NBA's most entertaining subplots.",
+    "Tim Duncan and Kevin Garnett had a quiet but fierce rivalry — two power forwards who defined the early 2000s in different ways.",
+
+    # ── Analytics & modern strategy ───────────────────────────
+    "The Houston Rockets under Daryl Morey pioneered the 'Moreyball' approach — emphasizing three-pointers and layups while avoiding mid-range shots.",
+    "In 2023-24, NBA teams attempted an average of 35 three-pointers per game — up from just 18 per game a decade earlier.",
+    "The 'pace and space' era transformed NBA offenses, with nearly every team now employing a five-out shooting lineup.",
+    "Player Efficiency Rating (PER) was invented by John Hollinger and became one of the first widely used advanced stats.",
+    "The concept of 'true shooting percentage' accounts for free throws and three-pointers, giving a more accurate picture of shooting efficiency.",
+    "The NBA introduced the 'Hustle Stats' category in 2016 to track deflections, loose balls recovered, and charges drawn.",
+    "Win Shares, a metric that estimates the number of wins a player contributes, was popularized by Basketball-Reference.",
+    "The term 'floor spacing' became a coaching buzzword as the three-point revolution made it essential for every player to shoot.",
+    "Box Plus/Minus (BPM) estimates a player's contribution per 100 possessions relative to league average.",
+    "The 'hot hand' debate — whether shooters get streaky — has been studied for decades with no definitive conclusion.",
+
+    # ── Nicknames & culture ───────────────────────────────────
+    "Earvin Johnson got his 'Magic' nickname from a sportswriter after a 36-point, 16-rebound, 16-assist performance in high school.",
+    "Karl Malone was nicknamed 'The Mailman' because he always delivered — except, critics note, in the biggest moments.",
+    "Allen Iverson's 'The Answer' nickname reflected his ability to respond to every challenge thrown at him on the court.",
+    "Julius Erving's 'Dr. J' nickname originated in his teenage years, reportedly given to him by a high school friend.",
+    "Shaquille O'Neal had more nicknames than any NBA player — Shaq, Diesel, The Big Aristotle, Superman, and The Big Cactus, among others.",
+    "Dwyane Wade was called 'Flash' early in his career for his lightning-quick drives to the basket.",
+    "Tim Duncan was nicknamed 'The Big Fundamental' for his mastery of basic basketball skills — boring but devastatingly effective.",
+    "Charles Barkley's 'Round Mound of Rebound' nickname highlighted his undersized frame and dominant rebounding.",
+    "Kevin Durant earned 'Slim Reaper' and 'Easy Money Sniper' — two of the most admired nicknames in modern NBA history.",
+    "Vince Carter's 'Vinsanity' nickname captured the electric, high-flying style that made him one of the most exciting dunkers ever.",
+
+    # ── Record-breaking moments ───────────────────────────────
+    "Klay Thompson scored 37 points in a single quarter against the Sacramento Kings in 2015 — an NBA record.",
+    "Devin Booker scored 70 points against the Boston Celtics in 2017, becoming the youngest player to score 70 in a game.",
+    "Scott Skiles recorded 30 assists in a single game in 1990 — a record that has stood for over 30 years.",
+    "Wilt Chamberlain grabbed 55 rebounds in a single game in 1960 — a record that will almost certainly never be broken.",
+    "Russell Westbrook broke Oscar Robertson's single-season triple-double record with 42 in the 2016-17 season.",
+    "The 1995-96 Chicago Bulls went 72-10, a record that stood until the Warriors broke it with 73-9 in 2015-16.",
+    "Stephen Curry made 402 three-pointers in the 2015-16 season — the first player to ever hit 300, let alone 400.",
+    "LeBron James passed Kareem Abdul-Jabbar to become the NBA's all-time leading scorer on February 7, 2023.",
+    "John Stockton's career assist record of 15,806 is considered one of the most unbreakable records in all of sports.",
+    "Wilt Chamberlain once played an entire 48-minute game without committing a single foul — in an era of physical play.",
+
+    # ── Off-season & summer league ────────────────────────────
+    "The NBA Summer League in Las Vegas has become a major scouting event, attracting over 500 NBA executives and scouts annually.",
+    "Many NBA stars spend their off-seasons training in exotic locations — Chris Paul famously runs camps in the U.S. Virgin Islands.",
+    "The Drew League in Los Angeles is a legendary pro-am where NBA stars play pickup games during the off-season.",
+    "NBA free agency typically begins on June 30th at 6 PM ET, and the first hours are a frenzy of signings and trades.",
+    "The Jamal Crawford Pro-Am in Seattle has featured stars like LeBron James and Kevin Durant playing in a community gym.",
+    "NBA players who are traded mid-season must physically relocate within 48 hours, often leaving everything behind.",
+    "The concept of 'tampering' — teams contacting players before free agency — has led to multiple fines and investigations.",
+    "Many NBA players take up surfing, golf, or wine-making during the off-season to decompress from the grind.",
+    "The Rico Hines runs in LA have become the most famous off-season pickup games, attracting dozens of NBA players.",
+    "NBA teams host 'minicamp' sessions in September before training camp, though player attendance is technically voluntary.",
 )
 
 # Number of facts to embed in each loading screen (cycled via JS)
@@ -470,8 +590,11 @@ JOSEPH_LOADING_CSS = """<style>
                           inset 0 0 20px rgba(255,94,0,0.10); }
 }
 @keyframes avatarRingRotate {
-    0%   { transform:translate(-50%,-50%) rotate(0deg); }
-    100% { transform:translate(-50%,-50%) rotate(360deg); }
+    0%   { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.6) rgba(0,240,255,0.4) rgba(255,94,0,0.3) rgba(0,240,255,0.2); }
+    25%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(0,240,255,0.4) rgba(255,94,0,0.6) rgba(0,240,255,0.2) rgba(255,94,0,0.3); }
+    50%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.3) rgba(0,240,255,0.2) rgba(255,94,0,0.6) rgba(0,240,255,0.4); }
+    75%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(0,240,255,0.2) rgba(255,94,0,0.3) rgba(0,240,255,0.4) rgba(255,94,0,0.6); }
+    100% { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.6) rgba(0,240,255,0.4) rgba(255,94,0,0.3) rgba(0,240,255,0.2); }
 }
 @keyframes basketballBounce {
     0%, 100% { transform:translateY(0) rotate(0deg); }
@@ -545,12 +668,13 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Ambient glow behind avatar ──────────────────────────── */
 .joseph-loading-ambient-glow {
     position:absolute;
-    top:35%; left:50%;
-    width:220px; height:220px;
+    top:32%; left:50%;
+    width:260px; height:260px;
     border-radius:50%;
     background:radial-gradient(circle,
-        rgba(255,94,0,0.18) 0%,
-        rgba(255,94,0,0.06) 40%,
+        rgba(255,94,0,0.22) 0%,
+        rgba(255,94,0,0.08) 35%,
+        rgba(0,240,255,0.04) 55%,
         transparent 70%);
     transform:translate(-50%,-50%);
     animation:glowBreath 4s ease-in-out infinite;
@@ -663,8 +787,8 @@ JOSEPH_LOADING_CSS = """<style>
 .joseph-loading-avatar-ring {
     position:absolute;
     top:50%; left:50%;
-    width:150px; height:150px;
-    border-radius:50%;
+    width:170px; height:200px;
+    border-radius:28px;
     border:2px solid transparent;
     border-top:2px solid rgba(255,94,0,0.6);
     border-right:2px solid rgba(0,240,255,0.4);
@@ -674,13 +798,13 @@ JOSEPH_LOADING_CSS = """<style>
     pointer-events:none;
 }
 .joseph-loading-avatar {
-    width:130px; height:130px;
-    border-radius:50%;
+    width:150px; height:180px;
+    border-radius:22px;
     object-fit:cover;
-    object-position:center 15%;
+    object-position:center 10%;
     border:3px solid rgba(255,94,0,0.5);
     animation:josephPulseGlow 3s ease-in-out infinite;
-    background:#0d1425;
+    background:linear-gradient(180deg, #141c30 0%, #0d1425 100%);
 }
 
 /* ── Name badge ──────────────────────────────────────────── */
@@ -805,8 +929,8 @@ JOSEPH_LOADING_CSS = """<style>
 /* ── Responsive adjustments ──────────────────────────────── */
 @media (max-width: 600px) {
     .joseph-loading-overlay { min-height:340px; padding:24px 16px 22px; }
-    .joseph-loading-avatar { width:110px; height:110px; }
-    .joseph-loading-avatar-ring { width:130px; height:130px; }
+    .joseph-loading-avatar { width:120px; height:144px; border-radius:18px; }
+    .joseph-loading-avatar-ring { width:140px; height:164px; border-radius:22px; }
     .joseph-loading-fact { font-size:0.84rem; padding:12px 16px; }
     .joseph-loading-name { font-size:0.78rem; }
     .joseph-loading-fact-container { max-width:95%; }
