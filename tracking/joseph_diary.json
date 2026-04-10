@@ -1,15 +1,5 @@
 {
   "entries": {
-    "2026-04-09": {
-      "date": "2026-04-09",
-      "wins": 7,
-      "losses": 3,
-      "picks": [],
-      "hot_takes": [],
-      "mood": "cold",
-      "narrative": "",
-      "timestamp": "2026-04-09T23:20:33.491012"
-    },
     "2026-04-10": {
       "date": "2026-04-10",
       "wins": 7,
@@ -18,8 +8,7 @@
       "hot_takes": [],
       "mood": "cold",
       "narrative": "",
-      "timestamp": "2026-04-10T06:33:30.544744"
-      "timestamp": "2026-04-10T04:21:53.350170"
+      "timestamp": "2026-04-10T16:35:39.297625"
     }
   }
 }

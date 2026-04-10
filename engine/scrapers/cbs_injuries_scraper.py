@@ -20,9 +20,21 @@ except ImportError:
     _DEPS_AVAILABLE = False
     _logger.debug("requests/beautifulsoup4 not installed; cbs_injuries_scraper unavailable")
 
+# curl_cffi provides TLS browser-impersonation to bypass Cloudflare/Akamai 403 blocks.
+try:
+    from curl_cffi import requests as _curl_requests
+    _CURL_CFFI_AVAILABLE = True
+except ImportError:
+    _curl_requests = None  # type: ignore[assignment]
+    _CURL_CFFI_AVAILABLE = False
+
 
 def _fetch(url: str) -> str:
     """Fetch a URL with rate limiting and retry logic.
+
+    Uses ``curl_cffi`` with Chrome browser impersonation when available
+    to bypass TLS fingerprinting blocks; falls back to plain ``requests``
+    otherwise.
 
     Args:
         url: Target URL.
@@ -30,13 +42,16 @@ def _fetch(url: str) -> str:
     Returns:
         HTML text or empty string.
     """
-    if not _DEPS_AVAILABLE:
+    if not _DEPS_AVAILABLE and not _CURL_CFFI_AVAILABLE:
         return ""
 
     time.sleep(_DELAY)
     for attempt in range(_MAX_RETRIES):
         try:
-            resp = requests.get(url, headers={"User-Agent": _USER_AGENT}, timeout=15)
+            if _CURL_CFFI_AVAILABLE:
+                resp = _curl_requests.get(url, impersonate="chrome", timeout=15)
+            else:
+                resp = requests.get(url, headers={"User-Agent": _USER_AGENT}, timeout=15)
             resp.raise_for_status()
             return resp.text
         except Exception as exc:
