@@ -12,6 +12,15 @@ import requests
 from data.nba_injury_pdf._constants import EXPECTED_COLUMNS, REQUEST_HEADERS
 from data.nba_injury_pdf._exceptions import DataValidationError, URLRetrievalError
 
+# curl_cffi provides TLS browser-impersonation, bypassing Akamai 403 blocks.
+# Fall back to plain requests when curl_cffi is not installed.
+try:
+    from curl_cffi import requests as _curl_requests
+    _CURL_CFFI_AVAILABLE = True
+except ImportError:
+    _curl_requests = None  # type: ignore[assignment]
+    _CURL_CFFI_AVAILABLE = False
+
 # Wrap pdfplumber import so the app degrades gracefully if the package is absent.
 try:
     import pdfplumber as _pdfplumber
@@ -24,6 +33,16 @@ except ImportError:
 def fetch_pdf_bytes(url: str, timeout: int = 15) -> bytes:
     """Download the PDF from the NBA CDN.
 
+    Uses ``curl_cffi`` with Chrome browser impersonation when available to
+    bypass Akamai TLS fingerprinting (which blocks plain ``requests`` calls
+    with HTTP 403).  Falls back to plain ``requests`` if ``curl_cffi`` is
+    not installed.
+
+    Note: ``REQUEST_HEADERS`` (custom User-Agent etc.) are only passed on
+    the plain-``requests`` path.  When ``curl_cffi`` impersonates Chrome it
+    synthesises the full TLS handshake and HTTP headers automatically;
+    injecting custom headers on top would break the impersonation.
+
     Args:
         url:     Full URL to the injury report PDF.
         timeout: Request timeout in seconds.
@@ -35,7 +54,11 @@ def fetch_pdf_bytes(url: str, timeout: int = 15) -> bytes:
         URLRetrievalError: If the request fails (non-200 status or network error).
     """
     try:
-        resp = requests.get(url, headers=REQUEST_HEADERS, timeout=timeout)
+        if _CURL_CFFI_AVAILABLE:
+            # curl_cffi impersonates Chrome's TLS fingerprint end-to-end.
+            resp = _curl_requests.get(url, impersonate="chrome", timeout=timeout)
+        else:
+            resp = requests.get(url, headers=REQUEST_HEADERS, timeout=timeout)
         if resp.status_code != 200:
             raise URLRetrievalError(url, f"HTTP {resp.status_code}")
         return resp.content

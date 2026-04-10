@@ -58,6 +58,14 @@ try:
 except ImportError:
     _HAS_FILE_CACHE = False
 
+# curl_cffi provides TLS browser-impersonation to bypass Akamai/Cloudflare 403 blocks.
+try:
+    from curl_cffi import requests as _curl_requests
+    _CURL_CFFI_AVAILABLE = True
+except ImportError:
+    _curl_requests = None  # type: ignore[assignment]
+    _CURL_CFFI_AVAILABLE = False
+
 # ============================================================
 # SECTION: Module-level constants
 # ============================================================
@@ -498,15 +506,19 @@ class RosterEngine:
 
         # ── Source 1: NBA CDN (with circuit breaker) ──────────
         def _cdn_fetch():
-            resp = _requests.get(
-                "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
-                headers={
-                    **_CDN_HEADERS,
-                    "Origin": "https://www.nba.com",
-                    "Referer": "https://www.nba.com/",
-                },
-                timeout=10,
-            )
+            _cdn_url = "https://cdn.nba.com/static/json/liveData/injuries/injuries.json"
+            if _CURL_CFFI_AVAILABLE:
+                resp = _curl_requests.get(_cdn_url, impersonate="chrome", timeout=10)
+            else:
+                resp = _requests.get(
+                    _cdn_url,
+                    headers={
+                        **_CDN_HEADERS,
+                        "Origin": "https://www.nba.com",
+                        "Referer": "https://www.nba.com/",
+                    },
+                    timeout=10,
+                )
             resp.raise_for_status()
             data = resp.json()
             injured_list = (
@@ -540,7 +552,10 @@ class RosterEngine:
             last_exc = None
             for _url in urls:
                 try:
-                    resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
+                    if _CURL_CFFI_AVAILABLE:
+                        resp2 = _curl_requests.get(_url, impersonate="chrome", timeout=12)
+                    else:
+                        resp2 = _requests.get(_url, headers=_NBA_HEADERS, timeout=12)
                     resp2.raise_for_status()
                     data2 = resp2.json()
                     injured_list2 = (
@@ -604,14 +619,17 @@ class RosterEngine:
         # ── Source 4: ESPN public injury API ──────────────────────
         try:
             _espn_url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/injuries"
-            resp4 = _requests.get(
-                _espn_url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    "Accept": "application/json",
-                },
-                timeout=10,
-            )
+            if _CURL_CFFI_AVAILABLE:
+                resp4 = _curl_requests.get(_espn_url, impersonate="chrome", timeout=10)
+            else:
+                resp4 = _requests.get(
+                    _espn_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "application/json",
+                    },
+                    timeout=10,
+                )
             resp4.raise_for_status()
             espn_data = resp4.json()
             result4: dict = {}
