@@ -210,9 +210,9 @@ def get_headshot_url(player_name: str) -> str:
     pid = get_player_id(player_name)
     if pid:
         return (
-            f"https://cdn.nba.com/headshots/nba/latest/1040x760/{pid}.png"
+            f"https://cdn.nba.com/headshots/nba/latest/260x190/{pid}.png"
         )
-    return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
+    return "https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png"
 
 
 # ── Team logo CDN ───────────────────────────────────────────
