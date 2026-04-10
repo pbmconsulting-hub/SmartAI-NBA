@@ -54,7 +54,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
     def test_glassmorphic_container(self):
         self.assertIn("joseph-live-desk", self.css)
         self.assertIn("backdrop-filter", self.css)
-        self.assertIn("rgba(7,10,19,0.92)", self.css)
+        self.assertIn("rgba(7,10,19,0.96)", self.css)
 
     def test_live_pulse_animation(self):
         self.assertIn("josephLivePulse", self.css)
@@ -121,7 +121,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
 
     def test_verdict_text_shadow(self):
         """Verdict badges should have a text glow."""
-        self.assertIn("text-shadow:0 0 8px currentColor", self.css)
+        self.assertIn("text-shadow:0 0 10px currentColor", self.css)
 
     def test_verdict_hover_scale(self):
         """Verdict badges should scale on hover."""
@@ -137,7 +137,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
 
     def test_live_dot_box_shadow(self):
         """LIVE dot should have a red glow shadow."""
-        self.assertIn("box-shadow:0 0 8px rgba(255,32,32,0.6)", self.css)
+        self.assertIn("box-shadow:0 0 12px rgba(255,32,32,0.7)", self.css)
 
     def test_subtitle_montserrat(self):
         """Subtitle should use Montserrat font."""

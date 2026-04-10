@@ -53,6 +53,13 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 
+# ── Reduce excessive bottom padding / blank space ─────────────
+st.markdown(
+    '<style>.main .block-container{padding-bottom:1rem !important}'
+    ' iframe{max-height:fit-content}</style>',
+    unsafe_allow_html=True,
+)
+
 # ── Joseph M. Smith Hero Banner & Floating Widget ─────────────
 from utils.components import render_joseph_hero_banner, inject_joseph_floating
 st.session_state["joseph_page_context"] = "page_game_report"
@@ -959,7 +966,7 @@ with _tab_report:
                         game=game,
                         analysis_results=game_results,
                     )
-                    card_height = min(30000, 2500 + max(0, n_game_props - 1) * 1000)
+                    card_height = min(8000, 800 + max(0, n_game_props) * 400)
                     components.html(html_content, height=card_height, scrolling=True)
                 else:
                     # ── Key player matchups from players.csv ────────
@@ -1017,7 +1024,7 @@ with _tab_report:
             analysis_results=report_results,
         )
         _n_all_props = len(report_results)
-        _all_height = min(30000, 2500 + max(0, _n_all_props - 1) * 1000)
+        _all_height = min(8000, 800 + max(0, _n_all_props) * 400)
         components.html(html_content, height=_all_height, scrolling=True)
     else:
         st.info(
