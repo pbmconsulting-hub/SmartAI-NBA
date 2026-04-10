@@ -647,8 +647,7 @@ def calculate_confidence_score(
     # confidence engine's own red flags (high CV, low edge, do-not-bet score)
     # were cosmetic only.  Now we respect them: any genuine avoid reason sets
     # the flag.  Downstream code merges this with should_avoid_prop() results.
-    if avoid_reasons:
-        should_avoid = True
+    should_avoid = bool(avoid_reasons)
 
     return {
         "confidence_score": _safe_float(final_score, 0.0),

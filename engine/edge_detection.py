@@ -701,7 +701,7 @@ def should_avoid_prop(
     # respect the reasons: if any genuine avoid reason was detected, the
     # prop is flagged.  Downstream code can still choose to display the
     # prop with warnings rather than hiding it entirely.
-    should_avoid = len(avoid_reasons) > 0
+    should_avoid = bool(avoid_reasons)
 
     return should_avoid, avoid_reasons
 
