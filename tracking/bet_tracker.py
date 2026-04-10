@@ -791,6 +791,23 @@ def _lookup_bulk_row(bulk_lookup: dict, player_name: str, normalize_fn=None) -> 
         row = bulk_lookup.get(normalize_fn(player_name))
     return row
 
+
+def _is_dnp(row: dict) -> bool:
+    """Return True if the box-score row indicates the player did not play.
+
+    A player is considered DNP when the ``minutes`` key is present in the
+    row and its value converts to 0.0.  If the key is absent (e.g. older
+    data or mock fixtures that omit minutes), we conservatively assume the
+    player *did* play and allow resolution to proceed.
+    """
+    if "minutes" not in row and "min" not in row:
+        return False  # key missing — cannot determine DNP; assume played
+    _raw = row.get("minutes", row.get("min", 0))
+    try:
+        return float(_raw or 0) == 0.0
+    except (ValueError, TypeError):
+        return False
+
 # ============================================================
 # END SECTION: 3-Tier Bulk Box Score Helpers
 # ============================================================
@@ -1374,8 +1391,7 @@ def auto_resolve_bet_results(date_str=None):
                 # shows all zeroes.  Resolving these as actual_value=0.0 would
                 # incorrectly mark UNDER bets as wins and OVER bets as losses.
                 # Leave the bet unresolved so it can be voided or re-evaluated.
-                _player_minutes = float(bulk_row.get("minutes", 0) or 0)
-                if _player_minutes == 0.0 and stat_type != "minutes":
+                if _is_dnp(bulk_row) and stat_type != "minutes":
                     errors_list.append(
                         f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
                     )
@@ -1427,8 +1443,7 @@ def auto_resolve_bet_results(date_str=None):
                 continue
 
             # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
-            _t3_minutes = float(matching_log.get("minutes", matching_log.get("min", 0)) or 0)
-            if _t3_minutes == 0.0 and stat_type != "minutes":
+            if _is_dnp(matching_log) and stat_type != "minutes":
                 errors_list.append(
                     f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
                 )
@@ -1695,8 +1710,7 @@ def resolve_todays_bets():
 
             if bulk_row is not None:
                 # ── DNP guard: skip if player logged 0 minutes ──
-                _player_minutes = float(bulk_row.get("minutes", 0) or 0)
-                if _player_minutes == 0.0 and stat_type != "minutes":
+                if _is_dnp(bulk_row) and stat_type != "minutes":
                     summary["errors"].append(
                         f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
                     )
@@ -1753,8 +1767,7 @@ def resolve_todays_bets():
                 continue
 
             # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
-            _t3_minutes = float(latest.get("minutes", latest.get("min", 0)) or 0)
-            if _t3_minutes == 0.0 and stat_type != "minutes":
+            if _is_dnp(latest) and stat_type != "minutes":
                 summary["errors"].append(
                     f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
                 )
@@ -1961,8 +1974,7 @@ def resolve_all_pending_bets():
             if bulk_row is not None:
                 try:
                     # ── DNP guard: skip if player logged 0 minutes ──
-                    _player_minutes = float(bulk_row.get("minutes", 0) or 0)
-                    if _player_minutes == 0.0 and stat_type != "minutes":
+                    if _is_dnp(bulk_row) and stat_type != "minutes":
                         summary["errors"].append(
                             f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
                         )
@@ -2047,8 +2059,7 @@ def resolve_all_pending_bets():
                 continue
 
             # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
-            _t3_minutes = float(matching_log.get("minutes", matching_log.get("min", 0)) or 0)
-            if _t3_minutes == 0.0 and stat_type != "minutes":
+            if _is_dnp(matching_log) and stat_type != "minutes":
                 summary["errors"].append(
                     f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
                 )
@@ -2281,8 +2292,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
             if bulk_row is not None:
                 try:
                     # ── DNP guard: skip if player logged 0 minutes ──
-                    _player_minutes = float(bulk_row.get("minutes", 0) or 0)
-                    if _player_minutes == 0.0 and stat_type != "minutes":
+                    if _is_dnp(bulk_row) and stat_type != "minutes":
                         summary["errors"].append(
                             f"#{pick_id} {player_name}: DNP (0 minutes played) — skipping resolution"
                         )
@@ -2376,8 +2386,7 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                 continue
 
             # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
-            _t3_minutes = float(matching_log.get("minutes", matching_log.get("min", 0)) or 0)
-            if _t3_minutes == 0.0 and stat_type != "minutes":
+            if _is_dnp(matching_log) and stat_type != "minutes":
                 summary["errors"].append(
                     f"#{pick_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
                 )
