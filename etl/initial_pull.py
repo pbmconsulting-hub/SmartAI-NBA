@@ -51,6 +51,7 @@ from nba_api.stats.endpoints import (
 from nba_api.stats.static import teams as static_teams
 
 from . import setup_db
+from .rotowire_injuries import sync_rotowire_injuries
 from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
 logging.basicConfig(
@@ -2190,6 +2191,17 @@ def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> dict:
         populate_league_leaders(conn, season)
         conn.commit()
         populate_standings(conn, season)
+        conn.commit()
+
+        # --- RotoWire injury data ---
+        logger.info("--- Syncing RotoWire injury report ---")
+        try:
+            injury_count = sync_rotowire_injuries(db_path)
+            logger.info("RotoWire injury sync: %d rows upserted.", injury_count)
+        except Exception:
+            logger.exception(
+                "RotoWire injury sync failed — continuing without injury data."
+            )
         conn.commit()
 
         # --- Per-player data (rate-limited: 1 req / player) ---
