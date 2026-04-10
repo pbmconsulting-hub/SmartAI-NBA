@@ -143,6 +143,7 @@ _STAT_COL = {
     "turnovers":        "tov",
     "three_pointers":   "fg3m",
     "minutes":          "minutes",
+    "dunks":            "dunks",
     # ── Platform name aliases ─────────────────────────────────────
     "pts":              "pts",
     "rebs":             "reb",
@@ -195,9 +196,8 @@ _COMPUTED_STATS = {
 
 # Stats that exist on some platforms but CANNOT be resolved from a
 # standard NBA box score (full-game totals).  Flagged gracefully.
-_UNRESOLVABLE_STATS = frozenset({
-    "dunks",
-})
+# NOTE: "dunks" was removed — we now resolve it via play-by-play data.
+_UNRESOLVABLE_STATS = frozenset()
 
 # Game-segment prop patterns that CANNOT be resolved from PlayerGameLog
 # (which only has full-game totals). These are flagged gracefully instead
@@ -333,6 +333,55 @@ def _fetch_resolve_game_log(player_id, last_n: int = 10) -> list[dict]:
 # Tier 3: Legacy per-player PlayerGameLog (kept for compatibility)
 # ============================================================
 
+
+def _count_dunks_from_pbp(game_ids: list[str]) -> dict:
+    """Count made dunks per player from play-by-play data.
+
+    Fetches PlayByPlayV3 for each *game_id* and counts actions whose
+    ``subType`` contains "dunk" and ``shotResult`` is "Made".
+
+    Args:
+        game_ids: list of NBA game ID strings.
+
+    Returns:
+        dict: ``{player_name_lower: int}`` — dunk counts keyed by lowercase
+              player name.  Players with zero dunks are omitted.
+    """
+    dunk_counts: dict[str, int] = {}
+    try:
+        import time as _time
+        from nba_api.stats.endpoints import playbyplayv3
+    except ImportError:
+        return dunk_counts
+
+    for game_id in game_ids:
+        try:
+            _time.sleep(0.6)
+            pbp = playbyplayv3.PlayByPlayV3(
+                game_id=game_id, timeout=NBA_API_TIMEOUT,
+            )
+            norm = pbp.get_normalized_dict() or {}
+            plays = norm.get("PlayByPlay", [])
+            for play in plays:
+                sub_type = str(play.get("subType", "") or "").lower()
+                shot_result = str(play.get("shotResult", "") or "").lower()
+                if "dunk" in sub_type and shot_result == "made":
+                    # Build lowercase name from play data
+                    first = str(play.get("playerName", "") or "").strip()
+                    name_i = str(play.get("playerNameI", "") or "").strip()
+                    pname = first.lower() if first else name_i.lower()
+                    if pname:
+                        dunk_counts[pname] = dunk_counts.get(pname, 0) + 1
+        except Exception as _exc:
+            _logger.debug(
+                "[BetTracker] PBP dunk count failed for game %s: %s",
+                game_id, _exc,
+            )
+            continue
+
+    return dunk_counts
+
+
 def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
     """
     TIER 1: Fetch all player box scores for a date via nba_api BoxScore endpoints.
@@ -407,6 +456,19 @@ def _fetch_all_boxscores_nba_api(date_str: str) -> dict:
                     f"[BetTracker] Tier 1: box score fetch failed for game {game_id}: {_game_exc}"
                 )
                 continue
+
+        # ── Enrich with dunk counts from play-by-play data ──────
+        try:
+            dunk_counts = _count_dunks_from_pbp(game_ids)
+            for pname, stats in lookup.items():
+                stats["dunks"] = float(dunk_counts.get(pname, 0))
+        except Exception as _dunk_exc:
+            _logger.debug(
+                "[BetTracker] PBP dunk enrichment failed: %s", _dunk_exc,
+            )
+            # Ensure every player row has a "dunks" key (0) even on failure
+            for stats in lookup.values():
+                stats.setdefault("dunks", 0.0)
 
         return lookup
 
