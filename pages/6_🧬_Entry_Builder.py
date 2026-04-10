@@ -1231,8 +1231,19 @@ if _generate_clicked:
     _locked_names = st.session_state.get("locked_legs", set())
     _locked_picks_for_slip = [p for p in qualifying_picks if p.get("player_name", "") in _locked_names] if _locked_names else []
 
+    # ── Joseph Loading Screen — NBA fun facts while optimizer runs ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_opt_loader = joseph_loading_placeholder("Optimizing Entry Combinations")
+    except Exception:
+        _joseph_opt_loader = None
     with st.spinner("🔬 Running combinatorial optimizer..."):
         _slips = generate_optimal_slip(qualifying_picks, platform=_opt_platform)
+    if _joseph_opt_loader is not None:
+        try:
+            _joseph_opt_loader.empty()
+        except Exception:
+            pass
 
     # If locked legs exist, force them into every slip
     if _locked_picks_for_slip and _slips:

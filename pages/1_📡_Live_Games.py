@@ -501,6 +501,12 @@ st.markdown("---")
 if auto_load_clicked:
     progress_bar = st.progress(0)
     status_text = st.empty()
+    # ── Joseph Loading Screen — NBA fun facts while loading games ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_games_loader = joseph_loading_placeholder("Loading tonight's NBA games")
+    except Exception:
+        _joseph_games_loader = None
 
     try:
         # ── ETL Step: Refresh local DB before loading games ──────────
@@ -581,6 +587,12 @@ if auto_load_clicked:
             time.sleep(1)
             status_text.empty()
             progress_bar.empty()
+            # Dismiss the Joseph loading screen
+            if _joseph_games_loader is not None:
+                try:
+                    _joseph_games_loader.empty()
+                except Exception:
+                    pass
 
             st.success(
                 f"✅ Loaded **{len(games)} game(s)** for tonight! "
@@ -593,6 +605,11 @@ if auto_load_clicked:
     except Exception as _exc:
         progress_bar.empty()
         status_text.empty()
+        if _joseph_games_loader is not None:
+            try:
+                _joseph_games_loader.empty()
+            except Exception:
+                pass
         _exc_str = str(_exc)
         if "WebSocketClosedError" in _exc_str or "StreamClosedError" in _exc_str:
             pass  # Connection closed — user navigated away

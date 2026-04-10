@@ -699,12 +699,23 @@ if mode == "🏀 GAMES TONIGHT":
                 if not _BRAIN_AVAILABLE:
                     st.warning("Joseph's brain module is not available.")
                 else:
+                    # ── Joseph Loading Screen — NBA fun facts ──
+                    try:
+                        from utils.joseph_loading import joseph_loading_placeholder
+                        _joseph_studio_loader = joseph_loading_placeholder("Joseph is breaking down the game")
+                    except Exception:
+                        _joseph_studio_loader = None
                     with st.spinner("Joseph is analyzing this game..."):
                         try:
                             result = joseph_analyze_game(game, teams_data, analysis_results)
                         except Exception as exc:
                             _logger.warning("joseph_analyze_game failed: %s", exc)
                             result = {}
+                    if _joseph_studio_loader is not None:
+                        try:
+                            _joseph_studio_loader.empty()
+                        except Exception:
+                            pass
 
                     if result:
                         # Hot Take Mode: flip verdicts on best_props
@@ -919,6 +930,12 @@ elif mode == "👤 SCOUT A PLAYER":
                 st.warning("Joseph's brain module is not available.")
             else:
                 todays_games = st.session_state.get("todays_games", [])
+                # ── Joseph Loading Screen — NBA fun facts ──
+                try:
+                    from utils.joseph_loading import joseph_loading_placeholder
+                    _joseph_scout_loader = joseph_loading_placeholder("Joseph is scouting the player")
+                except Exception:
+                    _joseph_scout_loader = None
                 with st.spinner("Joseph is scouting this player..."):
                     try:
                         result = joseph_analyze_player(
@@ -927,6 +944,11 @@ elif mode == "👤 SCOUT A PLAYER":
                     except Exception as exc:
                         _logger.warning("joseph_analyze_player failed: %s", exc)
                         result = {}
+                if _joseph_scout_loader is not None:
+                    try:
+                        _joseph_scout_loader.empty()
+                    except Exception:
+                        pass
 
                 if result:
                     # Hot Take Mode: flip best_prop and alt verdicts
@@ -1519,6 +1541,12 @@ if not joseph_results and _BRAIN_AVAILABLE:
         # Show skeleton loader while Joseph scouts
         _skel_placeholder = st.empty()
         _skel_placeholder.markdown(render_skeleton_cards(3), unsafe_allow_html=True)
+        # ── Joseph Loading Screen — NBA fun facts ──
+        try:
+            from utils.joseph_loading import joseph_loading_placeholder
+            _joseph_board_loader = joseph_loading_placeholder("Joseph is scouting the board")
+        except Exception:
+            _joseph_board_loader = None
         with st.spinner("🎙️ Joseph is scouting the board..."):
             try:
                 _players_raw = load_players_data()
@@ -1578,6 +1606,11 @@ if not joseph_results and _BRAIN_AVAILABLE:
                     "Auto-generation of Joseph's picks failed: %s", _dawg_err,
                 )
         _skel_placeholder.empty()
+        if _joseph_board_loader is not None:
+            try:
+                _joseph_board_loader.empty()
+            except Exception:
+                pass
 
 if joseph_results:
     render_dawg_board(joseph_results)

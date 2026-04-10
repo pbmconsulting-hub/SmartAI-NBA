@@ -98,6 +98,11 @@ def get_joseph_avatar_victory_b64() -> str:
     return _load_avatar_file("Joseph M Smith Avatar Victory.png")
 
 
+def get_joseph_avatar_spinning_b64() -> str:
+    """Load Joseph M Smith Avatar Spinning Basketball.png and return base64."""
+    return _load_avatar_file("Joseph M Smith Avatar Spinning Basketball.png")
+
+
 def get_joseph_avatar_for_vibe(vibe_status: str = "") -> str:
     """Return the appropriate avatar base64 string based on vibe_status.
 
