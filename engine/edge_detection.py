@@ -63,11 +63,38 @@ STAT_EDGE_THRESHOLDS = {
     "fantasy_score_pp": 2.0,
     "fantasy_score_dk": 2.0,
     "fantasy_score_ud": 2.0,
+    # Binary / near-binary stats — these are essentially 0-or-1 outcomes
+    # and need much larger edges to overcome inherent volatility.
+    "dunks": 8.0,
+    "blocked_shots": 6.0,
+    "blocked shots": 6.0,
+    # Derived stats — doubly volatile (sum/diff of two independent columns)
+    "two_pointers_made": 5.0,
+    "two_pointers_attempted": 5.0,
+    "two pointers made": 5.0,
+    "two pointers attempted": 5.0,
+    "2pm": 5.0,
+    "2pa": 5.0,
+    # Shooting stats with moderate variance
+    "fga": 3.5,
+    "fgm": 3.5,
+    "fta": 4.0,
+    "fg3a": 4.0,
+    "personal_fouls": 5.0,
 }
 
 # Low-volume stat types with inherently higher variance.
 # These require a larger raw edge to overcome uncertainty.
-LOW_VOLUME_STATS = {"steals", "blocks", "turnovers", "threes", "ftm"}
+# Includes binary/near-binary stats (dunks, blocked shots) and derived stats
+# (two pointers made/attempted) that are doubly volatile.
+LOW_VOLUME_STATS = {
+    "steals", "blocks", "turnovers", "threes", "ftm",
+    "dunks", "blocked_shots", "blocked shots",
+    "two_pointers_made", "two_pointers_attempted",
+    "two pointers made", "two pointers attempted",
+    "2pm", "2pa",
+    "personal_fouls", "fta",
+}
 
 # Uncertainty multiplier applied to low-volume stats' edge calculations.
 # 1.3x means a steal prop needs effectively 1.3x more edge to qualify.
@@ -668,10 +695,13 @@ def should_avoid_prop(
             )
             break
 
-    # Zero-Filter Recovery: never flag a prop as "should_avoid".
-    # Reasons are retained as informational metadata but do NOT block
-    # the prop from rendering on the analysis page.
-    should_avoid = False
+    # Determine should_avoid based on whether any avoid reasons were found.
+    # Previously this was hardcoded to False ("Zero-Filter Recovery"), which
+    # meant no prop was ever filtered regardless of red flags.  Now we
+    # respect the reasons: if any genuine avoid reason was detected, the
+    # prop is flagged.  Downstream code can still choose to display the
+    # prop with warnings rather than hiding it entirely.
+    should_avoid = bool(avoid_reasons)
 
     return should_avoid, avoid_reasons
 

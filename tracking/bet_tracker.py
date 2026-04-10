@@ -791,6 +791,23 @@ def _lookup_bulk_row(bulk_lookup: dict, player_name: str, normalize_fn=None) -> 
         row = bulk_lookup.get(normalize_fn(player_name))
     return row
 
+
+def _is_dnp(row: dict) -> bool:
+    """Return True if the box-score row indicates the player did not play.
+
+    A player is considered DNP when the ``minutes`` key is present in the
+    row and its value converts to 0.0.  If the key is absent (e.g. older
+    data or mock fixtures that omit minutes), we conservatively assume the
+    player *did* play and allow resolution to proceed.
+    """
+    if "minutes" not in row and "min" not in row:
+        return False  # key missing — cannot determine DNP; assume played
+    _raw = row.get("minutes", row.get("min", 0))
+    try:
+        return float(_raw or 0) == 0.0
+    except (ValueError, TypeError):
+        return False
+
 # ============================================================
 # END SECTION: 3-Tier Bulk Box Score Helpers
 # ============================================================
@@ -1153,6 +1170,13 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
             continue
         if res.get("player_is_out", False):
             continue
+        # Skip props flagged as should_avoid by the confidence engine or
+        # edge_detection's should_avoid_prop().  These include high-CV binary
+        # stats (dunks, blocks), conflicting directional forces, insufficient
+        # edge after vig, etc.  Logging them would pollute the tracker with
+        # picks that are known coin-flips.
+        if res.get("should_avoid", False):
+            continue
 
         dedup_key = (
             res.get("player_name", "").lower(),
@@ -1369,6 +1393,17 @@ def auto_resolve_bet_results(date_str=None):
             bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
 
             if bulk_row is not None:
+                # ── DNP guard: skip resolution if player logged 0 minutes ──
+                # When a player doesn't play (DNP/rest/injury), the box score
+                # shows all zeroes.  Resolving these as actual_value=0.0 would
+                # incorrectly mark UNDER bets as wins and OVER bets as losses.
+                # Leave the bet unresolved so it can be voided or re-evaluated.
+                if _is_dnp(bulk_row) and stat_type != "minutes":
+                    errors_list.append(
+                        f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
+                    )
+                    continue
+
                 actual_value = _compute_actual_value_from_row(
                     bulk_row, stat_type, stat_col, is_combo, is_fantasy,
                     COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
@@ -1411,6 +1446,13 @@ def auto_resolve_bet_results(date_str=None):
                 errors_list.append(
                     f"#{bet_id} {player_name}: no game found on {date_str} "
                     f"(last game: {last_date})"
+                )
+                continue
+
+            # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
+            if _is_dnp(matching_log) and stat_type != "minutes":
+                errors_list.append(
+                    f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
                 )
                 continue
 
@@ -1674,6 +1716,14 @@ def resolve_todays_bets():
             bulk_row = _lookup_bulk_row(_bulk_lookup, player_name, _normalize_name)
 
             if bulk_row is not None:
+                # ── DNP guard: skip if player logged 0 minutes ──
+                if _is_dnp(bulk_row) and stat_type != "minutes":
+                    summary["errors"].append(
+                        f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
+                    )
+                    summary["pending"] += 1
+                    continue
+
                 actual_value = _compute_actual_value_from_row(
                     bulk_row, stat_type, stat_col, is_combo, is_fantasy,
                     COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
@@ -1720,6 +1770,14 @@ def resolve_todays_bets():
                     break
 
             if latest is None:
+                summary["pending"] += 1
+                continue
+
+            # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
+            if _is_dnp(latest) and stat_type != "minutes":
+                summary["errors"].append(
+                    f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
+                )
                 summary["pending"] += 1
                 continue
 
@@ -1922,6 +1980,14 @@ def resolve_all_pending_bets():
 
             if bulk_row is not None:
                 try:
+                    # ── DNP guard: skip if player logged 0 minutes ──
+                    if _is_dnp(bulk_row) and stat_type != "minutes":
+                        summary["errors"].append(
+                            f"#{bet_id} {player_name}: DNP (0 minutes played) — skipping resolution"
+                        )
+                        summary["pending"] += 1
+                        continue
+
                     actual_value = _compute_actual_value_from_row(
                         bulk_row, stat_type, stat_col, is_combo, is_fantasy,
                         COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
@@ -1996,6 +2062,14 @@ def resolve_all_pending_bets():
                     break
 
             if matching_log is None:
+                summary["pending"] += 1
+                continue
+
+            # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
+            if _is_dnp(matching_log) and stat_type != "minutes":
+                summary["errors"].append(
+                    f"#{bet_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
+                )
                 summary["pending"] += 1
                 continue
 
@@ -2224,6 +2298,14 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
 
             if bulk_row is not None:
                 try:
+                    # ── DNP guard: skip if player logged 0 minutes ──
+                    if _is_dnp(bulk_row) and stat_type != "minutes":
+                        summary["errors"].append(
+                            f"#{pick_id} {player_name}: DNP (0 minutes played) — skipping resolution"
+                        )
+                        summary["pending"] += 1
+                        continue
+
                     actual_value = _compute_actual_value_from_row(
                         bulk_row, stat_type, stat_col, is_combo, is_fantasy,
                         COMBO_STATS, FANTASY_SCORING, is_computed=is_computed,
@@ -2307,6 +2389,14 @@ def resolve_all_analysis_picks(date_str=None, include_today=False):
                     break
 
             if matching_log is None:
+                summary["pending"] += 1
+                continue
+
+            # ── DNP guard (Tier 3): skip if player logged 0 minutes ──
+            if _is_dnp(matching_log) and stat_type != "minutes":
+                summary["errors"].append(
+                    f"#{pick_id} {player_name}: DNP (0 minutes in game log) — skipping resolution"
+                )
                 summary["pending"] += 1
                 continue
 
