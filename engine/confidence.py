@@ -288,8 +288,13 @@ def calculate_confidence_score(
     probability_score = min(100.0, probability_distance_from_50 * 200.0)
 
     # --- Factor 2: Edge Magnitude (0-100) ---
-    # Larger edge = higher score. Cap at 25% edge = 100 score
-    edge_score = min(100.0, abs(edge_percentage) * 4.0)
+    # Larger edge = higher score.  Cap at 20% edge = 100 score.
+    # 20% is the realistic ceiling for NBA props (matching _CWS_MAX_EDGE_PCT).
+    # Previous 25% cap (4.0x multiplier) allowed impossibly-high edges to
+    # inflate Gold-tier scores.  Using 5.0x now: 20% → 100, 10% → 50.
+    _MAX_REALISTIC_EDGE_PCT = 20.0
+    capped_edge = min(abs(edge_percentage), _MAX_REALISTIC_EDGE_PCT)
+    edge_score = min(100.0, capped_edge * 5.0)
 
     # --- Factor 3: Directional Agreement (0-100) ---
     # How many forces agree on the direction vs disagree?
