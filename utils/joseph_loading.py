@@ -13,7 +13,6 @@ import html as _html
 import json
 import logging
 import random
-import time as _time
 
 try:
     import streamlit as st
@@ -711,10 +710,10 @@ JOSEPH_LOADING_CSS = """<style>
 }
 @keyframes avatarRingRotate {
     0%   { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.6) rgba(0,240,255,0.4) rgba(255,94,0,0.3) rgba(0,240,255,0.2); }
-    25%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(0,240,255,0.4) rgba(255,94,0,0.6) rgba(0,240,255,0.2) rgba(255,94,0,0.3); }
-    50%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.3) rgba(0,240,255,0.2) rgba(255,94,0,0.6) rgba(0,240,255,0.4); }
-    75%  { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(0,240,255,0.2) rgba(255,94,0,0.3) rgba(0,240,255,0.4) rgba(255,94,0,0.6); }
-    100% { transform:translate(-50%,-50%) rotate(0deg); border-color:rgba(255,94,0,0.6) rgba(0,240,255,0.4) rgba(255,94,0,0.3) rgba(0,240,255,0.2); }
+    25%  { transform:translate(-50%,-50%) rotate(90deg); border-color:rgba(0,240,255,0.4) rgba(255,94,0,0.6) rgba(0,240,255,0.2) rgba(255,94,0,0.3); }
+    50%  { transform:translate(-50%,-50%) rotate(180deg); border-color:rgba(255,94,0,0.3) rgba(0,240,255,0.2) rgba(255,94,0,0.6) rgba(0,240,255,0.4); }
+    75%  { transform:translate(-50%,-50%) rotate(270deg); border-color:rgba(0,240,255,0.2) rgba(255,94,0,0.3) rgba(0,240,255,0.4) rgba(255,94,0,0.6); }
+    100% { transform:translate(-50%,-50%) rotate(360deg); border-color:rgba(255,94,0,0.6) rgba(0,240,255,0.4) rgba(255,94,0,0.3) rgba(0,240,255,0.2); }
 }
 @keyframes basketballBounce {
     0%, 100% { transform:translateY(0) rotate(0deg); }
@@ -1113,7 +1112,8 @@ def render_joseph_loading_screen(
         )
 
     # ── Pick random facts ────────────────────────────────────
-    facts = get_random_facts(fact_count)
+    clamped = max(1, min(fact_count, len(NBA_FUN_FACTS)))
+    facts = get_random_facts(clamped)
     safe_status = _html.escape(status_text)
 
     # Build JSON-safe facts list (escape for JS embedding)
@@ -1161,10 +1161,12 @@ def render_joseph_loading_screen(
     var idx = 0;
     var el = document.getElementById("{uid}_fact");
     if (!el || facts.length < 2) return;
-    setInterval(function() {{
+    var tid = setInterval(function() {{
+        if (!document.contains(el)) {{ clearInterval(tid); return; }}
         el.style.opacity = "0";
         el.style.transform = "translateY(-12px)";
         setTimeout(function() {{
+            if (!document.contains(el)) {{ clearInterval(tid); return; }}
             idx = (idx + 1) % facts.length;
             el.textContent = facts[idx];
             el.style.transform = "translateY(12px)";

@@ -116,11 +116,18 @@ class TestGetRandomFacts(unittest.TestCase):
         self.assertIsInstance(facts, list)
 
     def test_randomness(self):
-        """Two calls should produce different orderings (probabilistically)."""
-        from utils.joseph_loading import get_random_facts
-        results = [tuple(get_random_facts(20)) for _ in range(5)]
-        # At least 2 of 5 runs should differ (virtually guaranteed)
-        self.assertGreater(len(set(results)), 1)
+        """get_random_facts returns a permutation of the source pool."""
+        import random as _rng
+        from utils.joseph_loading import get_random_facts, NBA_FUN_FACTS
+        _rng.seed(42)
+        a = tuple(get_random_facts(20))
+        _rng.seed(99)
+        b = tuple(get_random_facts(20))
+        # Different seeds ⇒ different orderings
+        self.assertNotEqual(a, b)
+        # Every returned fact comes from the pool
+        for fact in a + b:
+            self.assertIn(fact, NBA_FUN_FACTS)
 
 
 # ============================================================
