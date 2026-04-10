@@ -268,8 +268,19 @@ def _resolve_current_stat(player_stats: dict, stat_type: str) -> float | None:
     try:
         from data.platform_mappings import normalize_stat_type as _norm
         normalized = _norm(st_lower)
-        if normalized != st_lower:
-            return _resolve_current_stat(player_stats, normalized)
+        if normalized and normalized != st_lower:
+            # Non-recursive: look up directly in our maps to avoid cycles
+            if normalized in _COMBO_STATS:
+                return sum(player_stats.get(k, 0) for k in _COMBO_STATS[normalized])
+            if normalized in _FANTASY_SCORING:
+                formula = _FANTASY_SCORING[normalized]
+                return round(
+                    sum(float(player_stats.get(k, 0)) * w for k, w in formula.items()),
+                    2,
+                )
+            box_key = _STAT_MAP.get(normalized)
+            if box_key:
+                return float(player_stats.get(box_key, 0))
     except ImportError:
         pass
     return None
