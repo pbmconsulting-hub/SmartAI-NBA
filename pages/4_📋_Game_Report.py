@@ -11,7 +11,7 @@
 # ============================================================
 
 import streamlit as st
-# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
+# st.html(unsafe_allow_javascript=True) is required so DOMPurify preserves <style> tags
 import datetime
 import html
 import time
@@ -965,7 +965,7 @@ with _tab_report:
                         game=game,
                         analysis_results=game_results,
                     )
-                    st.html(html_content)
+                    st.html(html_content, unsafe_allow_javascript=True)
                 else:
                     # ── Key player matchups from players.csv ────────
                     kp_col1, kp_col2 = st.columns(2)
@@ -1021,7 +1021,7 @@ with _tab_report:
             game=None,
             analysis_results=report_results,
         )
-        st.html(html_content)
+        st.html(html_content, unsafe_allow_javascript=True)
     else:
         st.info(
             "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."

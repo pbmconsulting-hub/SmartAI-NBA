@@ -7,7 +7,10 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
-# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
+# st.html() is used for HTML rendering with embedded CSS and JavaScript.
+# In Streamlit ≥1.55, st.html() sanitises via DOMPurify; passing
+# unsafe_allow_javascript=True is required so <style> and <script> tags
+# are preserved (they are in the ADD_TAGS allowlist only in that mode).
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
@@ -215,16 +218,16 @@ def _get_sim_cache() -> dict:
 
 
 # ── HTML card renderer ────────────────────────────────────────────────────────
-# Renders the unified card matrix via st.html() which auto-sizes the iframe
-# to fit the content — eliminating both blank space and content cutoff.
+# Renders the unified card matrix via st.html() which injects the HTML
+# directly into the page DOM (not iframed in Streamlit ≥1.55).
+# unsafe_allow_javascript=True is required so that DOMPurify preserves
+# <style> and <script> tags — without it, the HTML profile strips them.
 #
 # Why this is more resilient than inline st.markdown:
-#   1. Atomic delivery — the iframe either loads fully or not at all; a
+#   1. Atomic delivery — the element either loads fully or not at all; a
 #      mid-render WebSocket closure does not crash the page.
-#   2. CSS isolation — card styles cannot leak into (or be affected by) the
-#      main Streamlit page.
-#   3. Auto-sizing — st.html() automatically adjusts the iframe height to
-#      match the content, so no fixed height estimation or scroll-bars needed.
+#   2. CSS isolation — card styles are scoped inside the DOMPurify-cleaned
+#      fragment, reducing leakage into the main Streamlit page.
 # ---------------------------------------------------------------------------
 
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
@@ -235,7 +238,12 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 
 
 def _render_card_iframe(card_html, player_count):
-    """Render *card_html* via st.html() which auto-sizes to fit content.
+    """Render *card_html* via ``st.html(unsafe_allow_javascript=True)``.
+
+    ``unsafe_allow_javascript`` is required so that DOMPurify preserves
+    the embedded ``<style>`` and ``<script>`` tags.  Without it,
+    Streamlit ≥1.55 sanitises with ``{USE_PROFILES:{html:true}}`` which
+    strips ``<style>`` — causing all card CSS to disappear.
 
     Parameters
     ----------
@@ -243,8 +251,7 @@ def _render_card_iframe(card_html, player_count):
         Complete HTML (including ``<style>`` blocks) returned by
         :func:`utils.renderers.compile_unified_card_matrix`.
     player_count : int
-        Number of player groups (kept for API compatibility, not used for
-        height estimation since st.html auto-sizes).
+        Number of player groups (kept for API compatibility).
     """
     _doc = (
         "<!DOCTYPE html><html><head>"
@@ -256,7 +263,7 @@ def _render_card_iframe(card_html, player_count):
         f"{card_html}"
         "</body></html>"
     )
-    st.html(_doc)
+    st.html(_doc, unsafe_allow_javascript=True)
 
 
 st.set_page_config(

@@ -54,7 +54,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
     def test_glassmorphic_container(self):
         self.assertIn("joseph-live-desk", self.css)
         self.assertIn("backdrop-filter", self.css)
-        self.assertIn("rgba(7,10,19,0.96)", self.css)
+        self.assertIn("rgba(7,10,19,0.97)", self.css)
 
     def test_live_pulse_animation(self):
         self.assertIn("josephLivePulse", self.css)
@@ -66,7 +66,7 @@ class TestRenderLiveDeskCss(unittest.TestCase):
 
     def test_avatar_circle(self):
         self.assertIn("joseph-avatar", self.css)
-        self.assertIn("72px", self.css)
+        self.assertIn("88px", self.css)
         self.assertIn("#ff5e00", self.css)
 
     def test_segment_cards(self):

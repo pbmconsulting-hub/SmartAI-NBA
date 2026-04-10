@@ -1179,7 +1179,7 @@ def render_joseph_loading_screen(
 }})();
 </script>"""
 
-    st.markdown(html_block, unsafe_allow_html=True)
+    st.html(html_block, unsafe_allow_javascript=True)
 
 
 def joseph_loading_placeholder(

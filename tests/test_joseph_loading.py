@@ -206,131 +206,148 @@ class TestRenderJosephLoadingScreen(unittest.TestCase):
     """Verify render_joseph_loading_screen generates correct HTML."""
 
     def setUp(self):
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
 
-    def test_calls_st_markdown(self):
+    def test_calls_st_html(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
         render_joseph_loading_screen()
-        _mock_st.markdown.assert_called_once()
+        _mock_st.html.assert_called_once()
 
     def test_html_has_avatar_section(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-avatar", html)
 
     def test_html_has_fact_section(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-fact", html)
 
     def test_html_has_name(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("Joseph M. Smith", html)
 
     def test_html_has_did_you_know(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("Did You Know?", html)
 
     def test_custom_status_text(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen(status_text="Testing analysis")
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("Testing analysis", html)
 
     def test_html_has_basketball_spinner(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-ball", html)
 
     def test_html_has_avatar_ring(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-avatar-ring", html)
 
     def test_html_has_particles(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-particles", html)
 
     def test_html_has_progress_bar(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-progress-bar", html)
 
     def test_html_has_ambient_glow(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("joseph-loading-ambient-glow", html)
 
     def test_html_has_subtitle(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("Your NBA Analytics Expert", html)
 
     def test_html_has_js_rotation_script(self):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertIn("setInterval", html)
 
-    def test_unsafe_allow_html_enabled(self):
+    def test_uses_st_html_for_script_execution(self):
+        """st.html() is used instead of st.markdown() so <script> tags execute."""
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
+        _mock_st.html.reset_mock()
         _mock_st.markdown.reset_mock()
         render_joseph_loading_screen()
-        kwargs = _mock_st.markdown.call_args[1]
-        self.assertTrue(kwargs.get("unsafe_allow_html", False))
+        _mock_st.html.assert_called_once()
+        _mock_st.markdown.assert_not_called()
+
+    def test_st_html_passes_unsafe_allow_javascript(self):
+        """unsafe_allow_javascript=True is required so DOMPurify preserves <style>/<script>."""
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.html.reset_mock()
+        render_joseph_loading_screen()
+        _mock_st.html.assert_called_once()
+        _, kwargs = _mock_st.html.call_args
+        self.assertTrue(
+            kwargs.get("unsafe_allow_javascript", False),
+            "st.html must be called with unsafe_allow_javascript=True "
+            "so that DOMPurify preserves <style> and <script> tags",
+        )
 
 
 # ============================================================
@@ -370,7 +387,7 @@ class TestAvatarFallback(unittest.TestCase):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
 
         # Force avatar to be unavailable
         original_fn = jl.get_joseph_avatar_b64
@@ -378,7 +395,7 @@ class TestAvatarFallback(unittest.TestCase):
         jl._AVATAR_AVAILABLE = True
 
         render_joseph_loading_screen()
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         # Should still have the avatar class (with basketball fallback)
         self.assertIn("joseph-loading-avatar", html)
 
@@ -397,9 +414,9 @@ class TestStatusTextEscaping(unittest.TestCase):
         from utils.joseph_loading import render_joseph_loading_screen
         import utils.joseph_loading as jl
         jl.st = _mock_st
-        _mock_st.markdown.reset_mock()
+        _mock_st.html.reset_mock()
         render_joseph_loading_screen(status_text="<script>alert('xss')</script>")
-        html = _mock_st.markdown.call_args[0][0]
+        html = _mock_st.html.call_args[0][0]
         self.assertNotIn("<script>alert", html)
         self.assertIn("&lt;script&gt;", html)
 

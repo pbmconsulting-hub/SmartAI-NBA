@@ -3638,7 +3638,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
                             )
                             pick_result["game_id"] = r.get("game_id", r.get("game", ""))
                             pick_result["prop_line"] = _ln
-                            pick_result["joseph_edge"] = pick_result.get("edge", 0.0)
+                            pick_result["joseph_edge"] = _extract_edge(pick_result)
                             pick_result["joseph_probability"] = pick_result.get("probability_over", 50.0)
                             analyzed.append(pick_result)
                         else:
@@ -3694,7 +3694,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
 
         for combo in itertools.combinations(range(len(candidates)), min(leg_count, len(candidates))):
             legs = [candidates[i] for i in combo]
-            edge_sum = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in legs)
+            edge_sum = sum(_extract_edge(l) for l in legs)
 
             # Game concentration penalty: max 2 per game
             game_counts = {}
@@ -3736,7 +3736,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             total_ev = round(payout_mult * entry_fee * combined_prob - entry_fee, 2)
 
         # Synergy score
-        total_edge = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in best_combo)
+        total_edge = sum(_extract_edge(l) for l in best_combo)
         avg_edge = total_edge / max(1, len(best_combo))
         synergy_score = min(100.0, avg_edge * 10)
 
@@ -3783,7 +3783,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
                 "prop_line": l.get("prop_line", l.get("line", 0)),
                 "direction": l.get("direction", "OVER"),
                 "verdict": l.get("verdict", "LEAN"),
-                "joseph_edge": round(_safe_float(l.get("joseph_edge", l.get("edge", 0))), 1),
+                "joseph_edge": round(_extract_edge(l), 1),
                 "one_liner": l.get("rant", l.get("one_liner", "")),
             })
 
@@ -3794,7 +3794,7 @@ def joseph_generate_best_bets(leg_count: int, analysis_results: list,
             for alt_start in range(0, min(3, len(alt_candidates) - leg_count + 1)):
                 alt_legs = alt_candidates[alt_start:alt_start + leg_count]
                 if len(alt_legs) == leg_count:
-                    alt_edge = sum(_safe_float(l.get("joseph_edge", l.get("edge", 0))) for l in alt_legs)
+                    alt_edge = sum(_extract_edge(l) for l in alt_legs)
                     alternative_tickets.append({
                         "legs": [l.get("player_name", "") for l in alt_legs],
                         "total_edge": round(alt_edge, 1),
@@ -3993,8 +3993,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
         parts = [_opener()]
         smash_picks = [r for r in (analysis_results or [])
                        if r.get("verdict") == "SMASH"]
-        smash_picks.sort(key=lambda x: abs(_safe_float(
-            x.get("joseph_edge", x.get("edge", 0)))), reverse=True)
+        smash_picks.sort(key=lambda x: abs(_extract_edge(x)), reverse=True)
         lean_picks = [r for r in (analysis_results or [])
                       if r.get("verdict") == "LEAN"]
         if smash_picks:
@@ -4003,7 +4002,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
             stat = top.get("stat_type", top.get("prop", ""))
             line = top.get("prop_line", top.get("line", ""))
             direction = top.get("direction", "")
-            edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+            edge = round(_extract_edge(top), 1)
             rant = top.get("rant", top.get("one_liner", ""))
             parts.append(
                 f"My STRONGEST play tonight is {pname} {stat} "
@@ -4165,8 +4164,8 @@ def _joseph_answer_question(question: str, analysis_results: list,
                 p1, p2 = unique_players[0], unique_players[1]
                 p1_name = p1.get("player_name", p1.get("name", "Player A"))
                 p2_name = p2.get("player_name", p2.get("name", "Player B"))
-                p1_edge = abs(_safe_float(p1.get("joseph_edge", p1.get("edge", 0))))
-                p2_edge = abs(_safe_float(p2.get("joseph_edge", p2.get("edge", 0))))
+                p1_edge = abs(_extract_edge(p1))
+                p2_edge = abs(_extract_edge(p2))
                 p1_verdict = p1.get("verdict", "LEAN")
                 p2_verdict = p2.get("verdict", "LEAN")
 
@@ -4271,8 +4270,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
             if not db_trend_used:
                 # Fall back to analysis result data
                 verdict = top.get("verdict", "LEAN")
-                edge = round(_safe_float(
-                    top.get("joseph_edge", top.get("edge", 0))), 1)
+                edge = round(_extract_edge(top), 1)
                 trend = top.get("db_trend", "")
                 if trend:
                     parts.append(f"{pname} is currently {trend}.")
@@ -4305,12 +4303,10 @@ def _joseph_answer_question(question: str, analysis_results: list,
             matched = stat_matched
 
     if matched:
-        top = max(matched, key=lambda x: abs(
-            _safe_float(x.get("joseph_edge", x.get("edge", 0)))))
+        top = max(matched, key=lambda x: abs(_extract_edge(x)))
         pname = top.get("player_name", top.get("name", "this player"))
         verdict = top.get("verdict", "LEAN")
-        edge = round(_safe_float(
-            top.get("joseph_edge", top.get("edge", 0))), 1)
+        edge = round(_extract_edge(top), 1)
         stat = top.get("stat_type", top.get("prop", ""))
         line = top.get("prop_line", top.get("line", ""))
         direction = top.get("direction", "")
@@ -4390,8 +4386,7 @@ def _joseph_answer_question(question: str, analysis_results: list,
             # Highlight top prop for this game
             sorted_props = sorted(
                 game_props,
-                key=lambda x: abs(_safe_float(
-                    x.get("joseph_edge", x.get("edge", 0)))),
+                key=lambda x: abs(_extract_edge(x)),
                 reverse=True,
             )
             if sorted_props:
@@ -4619,7 +4614,7 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         if smash_picks:
             top = smash_picks[0]
             pname = top.get("player_name", top.get("name", "my top pick"))
-            edge = round(_safe_float(top.get("joseph_edge", top.get("edge", 0))), 1)
+            edge = round(_extract_edge(top), 1)
             trend = top.get("db_trend", "")
             hit_rate = top.get("hit_rate", 0)
             trend_note = ""
@@ -4817,7 +4812,7 @@ def joseph_commentary(results: list, context_type: str) -> str:
             sorted_results = sorted(results, key=lambda x: _extract_edge(x), reverse=True)
             top = sorted_results[0]
             pname = top.get("player_name", top.get("name", "someone"))
-            edge = round(_safe_float(top.get("joseph_edge", top.get("edge_percentage", top.get("edge", 0)))), 1)
+            edge = round(_extract_edge(top), 1)
             body1 = f"I'm looking at {pname} and the edge is {edge}%. "
             if len(sorted_results) > 1:
                 second = sorted_results[1]
