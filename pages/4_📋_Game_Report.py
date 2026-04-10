@@ -11,7 +11,7 @@
 # ============================================================
 
 import streamlit as st
-import streamlit.components.v1 as components
+# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
 import datetime
 import html
 import time
@@ -55,8 +55,7 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 
 # ── Reduce excessive bottom padding / blank space ─────────────
 st.markdown(
-    '<style>.main .block-container{padding-bottom:1rem !important}'
-    ' iframe{max-height:fit-content}</style>',
+    '<style>.main .block-container{padding-bottom:1rem !important}</style>',
     unsafe_allow_html=True,
 )
 
@@ -966,8 +965,7 @@ with _tab_report:
                         game=game,
                         analysis_results=game_results,
                     )
-                    card_height = min(8000, 800 + max(0, n_game_props) * 400)
-                    components.html(html_content, height=card_height, scrolling=True)
+                    st.html(html_content)
                 else:
                     # ── Key player matchups from players.csv ────────
                     kp_col1, kp_col2 = st.columns(2)
@@ -1023,9 +1021,7 @@ with _tab_report:
             game=None,
             analysis_results=report_results,
         )
-        _n_all_props = len(report_results)
-        _all_height = min(8000, 800 + max(0, _n_all_props) * 400)
-        components.html(html_content, height=_all_height, scrolling=True)
+        st.html(html_content)
     else:
         st.info(
             "💡 Load tonight's games on the **📡 Live Games** page to see a full report for every matchup."
