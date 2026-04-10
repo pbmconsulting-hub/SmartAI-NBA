@@ -553,8 +553,10 @@ def calculate_confidence_score(
     should_avoid = False
     avoid_reasons = []
 
-    # Kill switch 1: coefficient of variation > threshold → informational flag only.
-    # Zero-Filter Recovery: never set should_avoid=True; keep reason as metadata.
+    # Kill switch 1: coefficient of variation > threshold → flag as should_avoid.
+    # High CV means the stat is extremely unpredictable (e.g. dunks, blocks).
+    # Previously this was "informational only" (Zero-Filter Recovery), but that
+    # allowed binary-stat props with CV > 0.45 to reach Gold tier and get tracked.
     if stat_average > 0:
         cv = stat_standard_deviation / stat_average
         if cv > AUTO_AVOID_CV_THRESHOLD:
@@ -639,6 +641,14 @@ def calculate_confidence_score(
     # ============================================================
     # END SECTION: Assign Tier and Direction
     # ============================================================
+
+    # Determine should_avoid from accumulated kill-switch reasons.
+    # Previously hardcoded to False ("Zero-Filter Recovery"), which meant the
+    # confidence engine's own red flags (high CV, low edge, do-not-bet score)
+    # were cosmetic only.  Now we respect them: any genuine avoid reason sets
+    # the flag.  Downstream code merges this with should_avoid_prop() results.
+    if avoid_reasons:
+        should_avoid = True
 
     return {
         "confidence_score": _safe_float(final_score, 0.0),
