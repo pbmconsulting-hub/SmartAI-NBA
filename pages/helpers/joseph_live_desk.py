@@ -133,12 +133,12 @@ def render_live_desk_css() -> str:
     return """<style>
 /* ── Joseph Live Desk — Premium QDS Broadcast Container ─────── */
 .joseph-live-desk{
-    background:linear-gradient(145deg,rgba(7,10,19,0.96) 0%,rgba(15,23,42,0.92) 40%,rgba(7,10,19,0.96) 100%);
+    background:linear-gradient(145deg,rgba(7,10,19,0.97) 0%,rgba(15,23,42,0.93) 40%,rgba(7,10,19,0.97) 100%);
     backdrop-filter:blur(24px);
     -webkit-backdrop-filter:blur(24px);
     border:1px solid rgba(255,94,0,0.30);
     border-radius:20px;
-    padding:28px 32px 20px;
+    padding:0;
     margin:24px 0;
     position:relative;
     overflow:hidden;
@@ -154,6 +154,7 @@ def render_live_desk_css() -> str:
     background:linear-gradient(90deg,transparent,#ff5e00,#00C6FF,#ff9e00,#ff5e00,transparent);
     background-size:300% 100%;
     animation:josephShimmer 4s linear infinite;
+    z-index:2;
 }
 /* Bottom broadcast bar — cyan accent */
 .joseph-live-desk::after{
@@ -167,8 +168,16 @@ def render_live_desk_css() -> str:
     100%{background-position:200% 0}
 }
 
-/* ── Ambient scan-line effect ─────────────────────────────── */
-.joseph-live-desk .joseph-header::after{
+/* ── Hero Banner — ESPN-style broadcast header ────────────── */
+.joseph-hero{
+    display:flex;align-items:center;gap:20px;
+    padding:28px 32px 22px;
+    background:linear-gradient(135deg,rgba(15,20,35,0.95) 0%,rgba(25,15,8,0.4) 60%,rgba(15,20,35,0.95) 100%);
+    border-bottom:1px solid rgba(255,94,0,0.18);
+    position:relative;
+}
+/* Ambient scan-line overlay on hero */
+.joseph-hero::after{
     content:'';position:absolute;top:0;left:0;right:0;bottom:0;
     background:repeating-linear-gradient(
         0deg,transparent,transparent 2px,rgba(0,198,255,0.015) 2px,rgba(0,198,255,0.015) 4px
@@ -180,13 +189,23 @@ def render_live_desk_css() -> str:
 .joseph-live-dot{
     display:inline-block;width:10px;height:10px;
     background:#ff2020;border-radius:50%;
-    margin-right:8px;vertical-align:middle;
+    margin-right:6px;vertical-align:middle;
     animation:josephLivePulse 1.4s ease-in-out infinite;
     box-shadow:0 0 12px rgba(255,32,32,0.7);
 }
 @keyframes josephLivePulse{
     0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 12px rgba(255,32,32,0.7)}
     50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 4px rgba(255,32,32,0.3)}
+}
+
+/* ── LIVE Badge Pill ──────────────────────────────────────── */
+.joseph-live-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 14px 4px 10px;border-radius:20px;
+    background:rgba(255,32,32,0.15);border:1px solid rgba(255,32,32,0.4);
+    font-family:'Orbitron',sans-serif;font-size:0.72rem;
+    font-weight:700;color:#ff4444;letter-spacing:1px;
+    text-transform:uppercase;
 }
 
 /* ── Typing Indicator — 3 bouncing dots ───────────────────── */
@@ -205,7 +224,7 @@ def render_live_desk_css() -> str:
 
 /* ── Joseph Avatar Circle — enhanced glow ring ────────────── */
 .joseph-avatar{
-    width:72px;height:72px;border-radius:50%;
+    width:88px;height:88px;border-radius:50%;
     border:3px solid #ff5e00;object-fit:cover;
     box-shadow:
         0 0 20px rgba(255,94,0,0.5),
@@ -213,6 +232,7 @@ def render_live_desk_css() -> str:
         0 0 60px rgba(255,94,0,0.08);
     flex-shrink:0;
     animation:josephAvatarGlow 3s ease-in-out infinite;
+    position:relative;z-index:1;
 }
 @keyframes josephAvatarGlow{
     0%,100%{box-shadow:0 0 20px rgba(255,94,0,0.5),0 0 40px rgba(255,94,0,0.18)}
@@ -222,24 +242,77 @@ def render_live_desk_css() -> str:
     border:2px solid #ff5e00;object-fit:cover;
     box-shadow:0 0 10px rgba(255,94,0,0.3);flex-shrink:0}
 
-/* ── Broadcast Header Row ─────────────────────────────────── */
+/* ── Broadcast Header Text ────────────────────────────────── */
 .joseph-header{
-    display:flex;align-items:center;gap:18px;
-    margin-bottom:20px;
-    padding-bottom:16px;
-    border-bottom:1px solid rgba(255,94,0,0.15);
-    position:relative;
+    display:flex;flex-direction:column;gap:6px;
+    position:relative;z-index:1;
 }
 .joseph-header-text{
-    font-family:'Orbitron',sans-serif;font-size:1.2rem;
-    color:#ff5e00;font-weight:700;letter-spacing:0.8px;
+    font-family:'Orbitron',sans-serif;font-size:1.35rem;
+    color:#ffffff;font-weight:700;letter-spacing:0.5px;
     text-shadow:0 0 20px rgba(255,94,0,0.35);
-    display:flex;align-items:center;gap:8px;
+    display:flex;align-items:center;gap:10px;
+    flex-wrap:wrap;
+    line-height:1.3;
+}
+.joseph-header-text .joseph-name-accent{
+    color:#ff5e00;
 }
 .joseph-subtitle{
-    color:#94a3b8;font-size:0.82rem;margin-top:4px;
+    color:#94a3b8;font-size:0.82rem;margin-top:2px;
     font-family:'Montserrat',sans-serif;letter-spacing:0.3px;
+    display:flex;align-items:center;gap:8px;
 }
+
+/* ── Desk Content Body ────────────────────────────────────── */
+.joseph-desk-body{
+    padding:20px 28px 24px;
+}
+
+/* ── Section Divider ──────────────────────────────────────── */
+.joseph-divider{
+    height:1px;margin:20px 0;
+    background:linear-gradient(90deg,transparent,rgba(255,94,0,0.25),rgba(0,198,255,0.15),transparent);
+}
+
+/* ── Stat Summary KPI Bar ─────────────────────────────────── */
+.joseph-kpi-bar{
+    display:flex;gap:10px;flex-wrap:wrap;
+    margin-bottom:18px;
+}
+.joseph-kpi{
+    display:flex;align-items:center;gap:6px;
+    padding:6px 14px;border-radius:10px;
+    background:rgba(15,23,42,0.7);
+    border:1px solid rgba(148,163,184,0.12);
+    font-family:'Montserrat',sans-serif;font-size:0.82rem;
+    color:#cbd5e1;
+}
+.joseph-kpi-value{
+    font-family:'Orbitron',sans-serif;font-weight:700;
+    font-size:0.9rem;font-variant-numeric:tabular-nums;
+}
+
+/* ── Opening Monologue — speech bubble style ──────────────── */
+.joseph-monologue{
+    background:linear-gradient(135deg,rgba(20,26,44,0.85) 0%,rgba(12,16,30,0.7) 100%);
+    border:1px solid rgba(255,94,0,0.12);
+    border-radius:16px;padding:20px 24px;
+    margin-bottom:8px;
+    position:relative;
+}
+.joseph-monologue-label{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:'Orbitron',sans-serif;font-size:0.78rem;
+    font-weight:600;color:#ff5e00;letter-spacing:0.6px;
+    margin-bottom:12px;
+    text-shadow:0 0 12px rgba(255,94,0,0.18);
+}
+.joseph-monologue-text{
+    color:#e2e8f0;font-size:0.92rem;
+    line-height:1.75;font-family:'Montserrat',sans-serif;
+}
+.joseph-monologue-text strong{color:#ff9e00}
 
 /* ── Broadcast Segment Cards — QDS glassmorphism ──────────── */
 .joseph-segment{
@@ -283,6 +356,68 @@ def render_live_desk_css() -> str:
 }
 .joseph-segment-body strong{color:#ff9e00}
 
+/* ── Pick Card — premium numbered cards ───────────────────── */
+.joseph-pick-card{
+    display:flex;gap:16px;align-items:stretch;
+    background:linear-gradient(135deg,rgba(15,23,42,0.80) 0%,rgba(7,10,19,0.65) 100%);
+    border:1px solid rgba(255,94,0,0.15);
+    border-radius:14px;padding:0;
+    margin-bottom:12px;overflow:hidden;
+    transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.joseph-pick-card:hover{
+    border-color:rgba(255,94,0,0.40);
+    transform:translateY(-2px);
+    box-shadow:0 6px 32px rgba(255,94,0,0.10),0 0 16px rgba(0,198,255,0.04);
+}
+.joseph-pick-rank{
+    display:flex;align-items:center;justify-content:center;
+    min-width:52px;
+    font-family:'Orbitron',sans-serif;font-size:1.3rem;font-weight:800;
+    color:rgba(255,255,255,0.9);
+    background:linear-gradient(180deg,rgba(255,94,0,0.25) 0%,rgba(255,94,0,0.08) 100%);
+    border-right:1px solid rgba(255,94,0,0.2);
+    flex-shrink:0;
+}
+.joseph-pick-content{
+    flex:1;padding:16px 18px 14px 0;
+    display:flex;flex-direction:column;gap:6px;
+}
+.joseph-pick-player{
+    font-family:'Montserrat',sans-serif;font-size:1.05rem;
+    font-weight:700;color:#ffffff;
+}
+.joseph-pick-prop{
+    font-family:'Montserrat',sans-serif;font-size:0.88rem;
+    color:#94a3b8;display:flex;align-items:center;gap:8px;
+    flex-wrap:wrap;
+}
+.joseph-pick-edge{
+    display:inline-flex;align-items:center;gap:4px;
+    padding:3px 10px;border-radius:6px;
+    background:rgba(255,94,0,0.12);border:1px solid rgba(255,94,0,0.3);
+    font-family:'JetBrains Mono',monospace;font-size:0.82rem;
+    font-weight:700;color:#ff5e00;
+    font-variant-numeric:tabular-nums;
+}
+.joseph-pick-rant{
+    color:#cbd5e1;font-size:0.88rem;line-height:1.6;
+    font-family:'Montserrat',sans-serif;margin-top:4px;
+}
+
+/* ── Section Header ───────────────────────────────────────── */
+.joseph-section-header{
+    display:flex;align-items:center;gap:10px;
+    font-family:'Orbitron',sans-serif;font-size:0.95rem;
+    font-weight:700;color:#ff5e00;letter-spacing:0.6px;
+    margin-bottom:14px;
+    text-shadow:0 0 12px rgba(255,94,0,0.18);
+}
+.joseph-section-header::after{
+    content:'';flex:1;height:1px;
+    background:linear-gradient(90deg,rgba(255,94,0,0.3),transparent);
+}
+
 /* ── Verdict Badges — enhanced glow ──────────────────────── */
 .joseph-verdict{
     display:inline-block;padding:4px 14px;border-radius:8px;
@@ -297,6 +432,36 @@ def render_live_desk_css() -> str:
 .joseph-verdict-lean{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.35);box-shadow:0 0 14px rgba(34,197,94,0.15)}
 .joseph-verdict-fade{background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.35);box-shadow:0 0 14px rgba(234,179,8,0.15)}
 .joseph-verdict-stay_away{background:rgba(107,114,128,0.2);color:#9ca3af;border:1px solid rgba(107,114,128,0.3)}
+
+/* ── Ticket Card ──────────────────────────────────────────── */
+.joseph-ticket{
+    display:flex;align-items:stretch;
+    background:rgba(15,23,42,0.6);
+    border:1px solid rgba(255,94,0,0.15);border-radius:12px;
+    margin-bottom:10px;overflow:hidden;
+}
+.joseph-ticket-icon{
+    display:flex;align-items:center;justify-content:center;
+    min-width:44px;font-size:1.2rem;
+    background:rgba(255,94,0,0.08);
+    border-right:1px solid rgba(255,94,0,0.15);
+}
+.joseph-ticket-body{
+    flex:1;padding:12px 16px;
+}
+.joseph-ticket-name{
+    font-family:'Orbitron',sans-serif;font-size:0.82rem;
+    font-weight:700;color:#ff5e00;letter-spacing:0.5px;
+    margin-bottom:4px;
+}
+.joseph-ticket-legs{
+    font-family:'Montserrat',sans-serif;font-size:0.85rem;
+    color:#e2e8f0;line-height:1.5;
+}
+.joseph-ticket-pitch{
+    font-family:'Montserrat',sans-serif;font-size:0.82rem;
+    color:#94a3b8;margin-top:6px;font-style:italic;
+}
 
 /* ── Dawg Board Table ─────────────────────────────────────── */
 .joseph-dawg-table{
@@ -352,6 +517,19 @@ def render_live_desk_css() -> str:
     font-variant-numeric:tabular-nums;
     font-weight:700;color:#ff5e00;
 }
+
+/* ── Sign-off Footer ──────────────────────────────────────── */
+.joseph-signoff{
+    text-align:center;padding:20px 28px;
+    border-top:1px solid rgba(255,94,0,0.12);
+    background:linear-gradient(180deg,transparent,rgba(255,94,0,0.03));
+}
+.joseph-signoff-text{
+    color:#cbd5e1;font-size:0.92rem;line-height:1.6;
+    font-family:'Montserrat',sans-serif;
+}
+.joseph-signoff-text em{color:#ff9e00}
+.joseph-signoff-icon{font-size:1.3rem;margin-bottom:6px}
 </style>"""
 
 
@@ -918,6 +1096,25 @@ def render_joseph_live_desk(
         st.markdown('<div class="joseph-live-desk">', unsafe_allow_html=True)
 
         # ─────────────────────────────────────────────────────
+        # HERO HEADER — ESPN broadcast banner
+        # ─────────────────────────────────────────────────────
+        st.markdown(
+            f'<div class="joseph-hero">'
+            f'{avatar_img}'
+            f'<div class="joseph-header">'
+            f'<div class="joseph-header-text">'
+            f'<span class="joseph-name-accent">Joseph M. Smith\'s</span> Broadcast Desk'
+            f'</div>'
+            f'<div class="joseph-subtitle">'
+            f'<span class="joseph-live-badge">'
+            f'<span class="joseph-live-dot"></span>LIVE</span>'
+            f'God-Mode Analyst &bull; Live Commentary'
+            f'</div>'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+
+        # ─────────────────────────────────────────────────────
         # SEGMENT 0 — Opening Monologue
         # ─────────────────────────────────────────────────────
         opening_text = ""
@@ -928,22 +1125,15 @@ def render_joseph_live_desk(
             opening_text = "Good evening, everybody. The board is loaded tonight and I've got some STRONG takes for you."
 
         st.markdown(
-            f'<div class="joseph-header">'
-            f'{avatar_img}'
-            f'<div>'
-            f'<div class="joseph-header-text">'
-            f'<span class="joseph-live-dot"></span>'
-            f'🔴 LIVE — Joseph M. Smith\'s Broadcast Desk'
-            f'</div>'
-            f'<div class="joseph-subtitle">God-Mode Analyst • Live Commentary</div>'
-            f'</div></div>',
+            '<div class="joseph-desk-body">',
             unsafe_allow_html=True,
         )
+
         st.markdown(
-            render_broadcast_segment({
-                "title": "📢 OPENING MONOLOGUE",
-                "body": _html.escape(opening_text),
-            }),
+            f'<div class="joseph-monologue">'
+            f'<div class="joseph-monologue-label">📢 OPENING MONOLOGUE</div>'
+            f'<div class="joseph-monologue-text">{_html.escape(opening_text)}</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
@@ -993,6 +1183,30 @@ def render_joseph_live_desk(
             progress_placeholder.empty()
 
         # ─────────────────────────────────────────────────────
+        # KPI Summary Bar
+        # ─────────────────────────────────────────────────────
+        n_smash = len([r for r in joseph_results if r.get("verdict", "").upper() == "SMASH"])
+        n_lean = len([r for r in joseph_results if r.get("verdict", "").upper() == "LEAN"])
+        n_fade = len([r for r in joseph_results if r.get("verdict", "").upper() in ("FADE", "STAY_AWAY")])
+        n_total = len(joseph_results)
+
+        if n_total > 0:
+            st.markdown(
+                '<div class="joseph-divider"></div>'
+                '<div class="joseph-kpi-bar">'
+                f'<div class="joseph-kpi">📊 Analyzed '
+                f'<span class="joseph-kpi-value" style="color:#00f0ff">{n_total}</span></div>'
+                f'<div class="joseph-kpi">🔥 SMASH '
+                f'<span class="joseph-kpi-value" style="color:#ff4444">{n_smash}</span></div>'
+                f'<div class="joseph-kpi">✅ LEAN '
+                f'<span class="joseph-kpi-value" style="color:#22c55e">{n_lean}</span></div>'
+                f'<div class="joseph-kpi">⚠️ FADE '
+                f'<span class="joseph-kpi-value" style="color:#eab308">{n_fade}</span></div>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ─────────────────────────────────────────────────────
         # SEGMENTS 1-5 — Top 5 Picks
         # ─────────────────────────────────────────────────────
         top5 = sorted(
@@ -1003,10 +1217,7 @@ def render_joseph_live_desk(
 
         if top5:
             st.markdown(
-                render_broadcast_segment({
-                    "title": "🏆 JOSEPH'S TOP 5 PICKS TONIGHT",
-                    "body": "",
-                }),
+                '<div class="joseph-section-header">🏆 JOSEPH\'S TOP 5 PICKS TONIGHT</div>',
                 unsafe_allow_html=True,
             )
 
@@ -1019,6 +1230,13 @@ def render_joseph_live_desk(
             direction = _html.escape(str(pick.get("direction", "")))
             rant = pick.get("rant", "")
             edge = pick.get("edge", 0)
+
+            # Verdict badge
+            v_lower = verdict.lower().replace(" ", "_")
+            verdict_badge = (
+                f'<span class="joseph-verdict joseph-verdict-{_html.escape(v_lower)}">'
+                f'{_html.escape(emoji)} {_html.escape(verdict)}</span>'
+            )
 
             # Mismatch alert
             mismatch_html = ""
@@ -1040,22 +1258,32 @@ def render_joseph_live_desk(
                     f'</div>'
                 )
 
-            body = (
-                f'<strong style="font-size:1.05rem">{player}</strong> — '
-                f'{prop} {direction} {_html.escape(str(line))} '
-                f'<span style="color:#ff5e00;font-weight:600">(Edge: {edge:+.1f}%)</span>'
-                f'<div style="margin-top:8px">{_html.escape(rant)}</div>'
-                f'{mismatch_html}{comp_html}'
+            # Medal emoji for rank
+            medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(idx, f"#{idx}")
+
+            rant_html = (
+                f'<div class="joseph-pick-rant">{_html.escape(rant)}</div>'
+                if rant else ""
             )
 
-            st.markdown(
-                render_broadcast_segment({
-                    "title": f"#{idx} PICK",
-                    "body": body,
-                    "verdict": verdict,
-                }),
-                unsafe_allow_html=True,
+            body = (
+                f'<div class="joseph-pick-card">'
+                f'<div class="joseph-pick-rank">{medal}</div>'
+                f'<div class="joseph-pick-content">'
+                f'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+                f'<span class="joseph-pick-player">{player}</span>'
+                f'{verdict_badge}'
+                f'</div>'
+                f'<div class="joseph-pick-prop">'
+                f'{prop} {direction} {_html.escape(str(line))} '
+                f'<span class="joseph-pick-edge">{edge:+.1f}% edge</span>'
+                f'</div>'
+                f'{rant_html}'
+                f'{mismatch_html}{comp_html}'
+                f'</div></div>'
             )
+
+            st.markdown(body, unsafe_allow_html=True)
 
             # Nerd Stats expander
             nerd_html = _build_nerd_stats_html(pick)
@@ -1079,22 +1307,29 @@ def render_joseph_live_desk(
                         ls = _html.escape(str(leg.get("stat_type", leg.get("prop", ""))))
                         ld = _html.escape(str(leg.get("direction", "")))
                         leg_lines.append(f"{lp} {ls} {ld}")
-                    legs_str = " | ".join(leg_lines)
+                    legs_str = " &bull; ".join(leg_lines)
+                    ticket_icon = "⚡" if legs == 2 else "🎯"
+                    pitch_html = (
+                        f'<div class="joseph-ticket-pitch">{pitch}</div>'
+                        if pitch else ""
+                    )
                     ticket_html_parts.append(
-                        f'<div style="margin-bottom:8px">'
-                        f'<strong style="color:#ff5e00">{tname}:</strong> {legs_str}'
-                        f'<div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">{pitch}</div>'
-                        f'</div>'
+                        f'<div class="joseph-ticket">'
+                        f'<div class="joseph-ticket-icon">{ticket_icon}</div>'
+                        f'<div class="joseph-ticket-body">'
+                        f'<div class="joseph-ticket-name">{tname}</div>'
+                        f'<div class="joseph-ticket-legs">{legs_str}</div>'
+                        f'{pitch_html}'
+                        f'</div></div>'
                     )
             except Exception as exc:
                 _logger.warning("joseph_generate_best_bets(%d) failed: %s", legs, exc)
 
         if ticket_html_parts:
             st.markdown(
-                render_broadcast_segment({
-                    "title": "🎰 QUICK PICKS — Best Tickets",
-                    "body": "".join(ticket_html_parts),
-                }),
+                '<div class="joseph-divider"></div>'
+                '<div class="joseph-section-header">🎰 QUICK PICKS — Best Tickets</div>'
+                + "".join(ticket_html_parts),
                 unsafe_allow_html=True,
             )
 
@@ -1102,13 +1337,53 @@ def render_joseph_live_desk(
         # SEGMENT 7 — Dawg Board
         # ─────────────────────────────────────────────────────
         if joseph_results:
-            render_dawg_board(joseph_results)
+            dawg_html = _build_dawg_board_html(joseph_results)
+            if dawg_html:
+                st.markdown(
+                    '<div class="joseph-divider"></div>'
+                    '<div class="joseph-section-header">🐕 THE DAWG BOARD</div>'
+                    + dawg_html,
+                    unsafe_allow_html=True,
+                )
 
         # ─────────────────────────────────────────────────────
         # SEGMENT 8 — Override Report
         # ─────────────────────────────────────────────────────
         overrides = [r for r in joseph_results if r.get("is_override")]
-        render_override_report(joseph_results)
+        if overrides:
+            rows_html = ""
+            for r in overrides:
+                name = _html.escape(str(r.get("player", r.get("name", "Unknown"))))
+                prop = _html.escape(str(r.get("prop", r.get("stat_type", "—"))))
+                qme_edge = r.get("qme_edge", r.get("original_edge", 0))
+                j_edge = r.get("edge", 0)
+                direction = _html.escape(str(r.get("direction", r.get("verdict", "—"))))
+                reasoning = _html.escape(str(r.get("override_reason", r.get("rant", "")[:120])))
+                rows_html += (
+                    f'<tr>'
+                    f'<td><strong>{name}</strong></td>'
+                    f'<td>{prop}</td>'
+                    f'<td style="color:#00f0ff">{qme_edge:+.1f}%</td>'
+                    f'<td style="color:#ff5e00;font-weight:700">{j_edge:+.1f}%</td>'
+                    f'<td>{direction}</td>'
+                    f'<td style="font-size:0.8rem;max-width:300px">{reasoning}</td>'
+                    f'</tr>'
+                )
+            override_table = (
+                '<table class="joseph-override-table">'
+                '<thead><tr>'
+                '<th>Player</th><th>Prop</th><th>QME Edge</th><th>Joseph Edge</th>'
+                '<th>Direction</th><th>Reasoning</th>'
+                '</tr></thead>'
+                f'<tbody>{rows_html}</tbody>'
+                '</table>'
+            )
+            st.markdown(
+                '<div class="joseph-divider"></div>'
+                '<div class="joseph-section-header">⚡ OVERRIDE REPORT</div>'
+                + override_table,
+                unsafe_allow_html=True,
+            )
 
         # ─────────────────────────────────────────────────────
         # SEGMENT 9 — Bet Log
@@ -1116,7 +1391,8 @@ def render_joseph_live_desk(
         n_bets = len([r for r in joseph_results
                       if r.get("verdict", "").upper() in ("SMASH", "LEAN")])
         st.markdown(
-            render_broadcast_segment({
+            '<div class="joseph-divider"></div>'
+            + render_broadcast_segment({
                 "title": "📝 BET LOG",
                 "body": (
                     f"I've logged <strong>{n_bets}</strong> bets tonight. "
@@ -1126,8 +1402,11 @@ def render_joseph_live_desk(
             unsafe_allow_html=True,
         )
 
+        # Close desk body
+        st.markdown('</div>', unsafe_allow_html=True)
+
         # ─────────────────────────────────────────────────────
-        # SEGMENT 10 — Sign-Off
+        # SEGMENT 10 — Sign-Off (in its own footer)
         # ─────────────────────────────────────────────────────
         closer = ""
         catchphrase = ""
@@ -1143,13 +1422,13 @@ def render_joseph_live_desk(
 
         signoff = f"{_html.escape(closer)}"
         if catchphrase:
-            signoff += f' <em style="color:#ff9e00">{_html.escape(catchphrase)}</em>'
+            signoff += f' <em>{_html.escape(catchphrase)}</em>'
 
         st.markdown(
-            render_broadcast_segment({
-                "title": "🎙️ SIGN-OFF",
-                "body": signoff,
-            }),
+            f'<div class="joseph-signoff">'
+            f'<div class="joseph-signoff-icon">🎙️</div>'
+            f'<div class="joseph-signoff-text">{signoff}</div>'
+            f'</div>',
             unsafe_allow_html=True,
         )
 
