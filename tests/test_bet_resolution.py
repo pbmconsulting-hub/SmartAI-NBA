@@ -270,9 +270,13 @@ class TestNewStatMappings(unittest.TestCase):
         )
         self.assertAlmostEqual(val, 13.0)  # 20 - 7
 
-    def test_dunks_is_unresolvable(self):
+    def test_dunks_is_resolvable(self):
+        from tracking.bet_tracker import _STAT_COL
+        self.assertIn("dunks", _STAT_COL)
+
+    def test_unresolvable_stats_empty(self):
         from tracking.bet_tracker import _UNRESOLVABLE_STATS
-        self.assertIn("dunks", _UNRESOLVABLE_STATS)
+        self.assertNotIn("dunks", _UNRESOLVABLE_STATS)
 
     def test_three_pt_attempted_resolves(self):
         """3-pt attempted bet should resolve via fg3a column."""
@@ -333,8 +337,8 @@ class TestNewStatMappings(unittest.TestCase):
                             # fgm(9) - fg3m(3) = 6.0, > 5.5 → WIN
                             mock_record.assert_called_once_with(20, "WIN", 6.0)
 
-    def test_dunks_gives_graceful_error(self):
-        """dunks stat should produce a graceful unresolvable error, not 'unknown stat'."""
+    def test_dunks_resolves_via_pbp(self):
+        """dunks stat should resolve via play-by-play dunk counting."""
         import tracking.bet_tracker as bt
 
         fake_bet = {
@@ -346,13 +350,15 @@ class TestNewStatMappings(unittest.TestCase):
             "direction": "OVER",
             "result": None,
         }
-        with patch.object(bt, "_fetch_bulk_boxscores", return_value={}):
-            with patch("tracking.bet_tracker.load_all_bets", return_value=[fake_bet]):
-                result = bt.resolve_all_pending_bets()
-                self.assertEqual(result["resolved"], 0)
-                self.assertTrue(len(result["errors"]) >= 1)
-                self.assertIn("not available in standard box scores", result["errors"][0])
-                self.assertNotIn("unknown stat", result["errors"][0])
+        # Tier 1/2 bulk lookup provides dunks=3 for the player
+        fake_bulk = {"testplayer": {"pts": 20.0, "reb": 5.0, "dunks": 3.0}}
+        with patch.object(bt, "_fetch_bulk_boxscores", return_value=fake_bulk):
+            with patch("tracking.bet_tracker.record_bet_result", return_value=(True, "ok")) as mock_record:
+                with patch("tracking.bet_tracker.load_all_bets", return_value=[fake_bet]):
+                    result = bt.resolve_all_pending_bets()
+                    self.assertEqual(result["resolved"], 1)
+                    # dunks=3.0 > 1.5 → WIN
+                    mock_record.assert_called_once_with(17, "WIN", 3.0)
 
 
 if __name__ == "__main__":

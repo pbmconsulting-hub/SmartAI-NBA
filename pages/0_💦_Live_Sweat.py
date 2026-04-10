@@ -159,6 +159,7 @@ st.divider()
 # ============================================================
 
 _STAT_MAP = {
+    # ── Internal canonical keys ────────────────────────────────
     "points":               "pts",
     "rebounds":             "reb",
     "assists":              "ast",
@@ -167,6 +168,8 @@ _STAT_MAP = {
     "turnovers":            "tov",
     "threes":               "fg3m",
     "three_pointers":       "fg3m",
+    "minutes":              "minutes",
+    # ── Direct box-score keys ─────────────────────────────────
     "pts":                  "pts",
     "reb":                  "reb",
     "ast":                  "ast",
@@ -174,6 +177,49 @@ _STAT_MAP = {
     "blk":                  "blk",
     "tov":                  "tov",
     "fg3m":                 "fg3m",
+    "fg3a":                 "fg3a",
+    "fgm":                  "fgm",
+    "fga":                  "fga",
+    "ftm":                  "ftm",
+    "fta":                  "fta",
+    "oreb":                 "oreb",
+    "dreb":                 "dreb",
+    "pf":                   "pf",
+    "min":                  "minutes",
+    # ── Platform name aliases ─────────────────────────────────
+    "three pointers":       "fg3m",
+    "3-pointers":           "fg3m",
+    "3-point made":         "fg3m",
+    "3-pointers made":      "fg3m",
+    "three pointers made":  "fg3m",
+    "3pm":                  "fg3m",
+    "three_point":          "fg3m",
+    "3-pt made":            "fg3m",
+    "3-pt attempted":       "fg3a",
+    "3pt attempted":        "fg3a",
+    "three pointers attempted": "fg3a",
+    "three_pointers_attempted": "fg3a",
+    "3-pointers attempted": "fg3a",
+    "free throws made":     "ftm",
+    "fg attempted":         "fga",
+    "field goals attempted": "fga",
+    "fg made":              "fgm",
+    "field goals made":     "fgm",
+    "ft attempted":         "fta",
+    "free throws attempted": "fta",
+    "personal_fouls":       "pf",
+    "personal fouls":       "pf",
+    "offensive_rebounds":   "oreb",
+    "offensive rebounds":   "oreb",
+    "defensive_rebounds":   "dreb",
+    "defensive rebounds":   "dreb",
+    "blocked shots":        "blk",
+    # ── Shorthand aliases ─────────────────────────────────────
+    "rebs":                 "reb",
+    "asts":                 "ast",
+    "blks":                 "blk",
+    "stls":                 "stl",
+    "tovs":                 "tov",
 }
 
 _COMBO_STATS = {
@@ -184,15 +230,59 @@ _COMBO_STATS = {
     "blocks_steals":            ("blk", "stl"),
 }
 
+# Fantasy scoring formulas (mirroring data/platform_mappings.py)
+_FANTASY_SCORING = {
+    "fantasy_score_pp": {
+        "pts": 1.0, "reb": 1.2, "ast": 1.5,
+        "stl": 3.0, "blk": 3.0, "tov": -1.0,
+    },
+    "fantasy_score_dk": {
+        "pts": 1.0, "reb": 1.25, "ast": 1.5,
+        "stl": 2.0, "blk": 2.0, "tov": -0.5, "fg3m": 0.5,
+    },
+    "fantasy_score_ud": {
+        "pts": 1.0, "reb": 1.2, "ast": 1.5,
+        "stl": 3.0, "blk": 3.0, "tov": -1.0,
+    },
+}
+
 
 def _resolve_current_stat(player_stats: dict, stat_type: str) -> float | None:
     """Extract the correct stat value from a player's live stats dict."""
     st_lower = str(stat_type).lower().strip()
+    # Combo stats (PRA, P+R, etc.)
     if st_lower in _COMBO_STATS:
         return sum(player_stats.get(k, 0) for k in _COMBO_STATS[st_lower])
+    # Fantasy score stats
+    if st_lower in _FANTASY_SCORING:
+        formula = _FANTASY_SCORING[st_lower]
+        return round(
+            sum(float(player_stats.get(k, 0)) * w for k, w in formula.items()),
+            2,
+        )
+    # Simple stat lookup
     box_key = _STAT_MAP.get(st_lower)
     if box_key:
         return float(player_stats.get(box_key, 0))
+    # Fallback: try normalize_stat_type from platform_mappings
+    try:
+        from data.platform_mappings import normalize_stat_type as _norm
+        normalized = _norm(st_lower)
+        if normalized and normalized != st_lower:
+            # Non-recursive: look up directly in our maps to avoid cycles
+            if normalized in _COMBO_STATS:
+                return sum(player_stats.get(k, 0) for k in _COMBO_STATS[normalized])
+            if normalized in _FANTASY_SCORING:
+                formula = _FANTASY_SCORING[normalized]
+                return round(
+                    sum(float(player_stats.get(k, 0)) * w for k, w in formula.items()),
+                    2,
+                )
+            box_key = _STAT_MAP.get(normalized)
+            if box_key:
+                return float(player_stats.get(box_key, 0))
+    except ImportError:
+        pass
     return None
 
 
