@@ -78,10 +78,10 @@ def _load_avatar_file(filename: str) -> str:
 def get_joseph_avatar_b64() -> str:
     """Load Joseph M Smith Avatar.png and return base64-encoded string.
 
-    Falls back through Victory → default avatar filenames.
+    Uses the main avatar as default; falls back to Victory if missing.
     """
-    for name in ("Joseph M Smith Avatar Victory.png",
-                 "Joseph M Smith Avatar.png"):
+    for name in ("Joseph M Smith Avatar.png",
+                 "Joseph M Smith Avatar Victory.png"):
         b64 = _load_avatar_file(name)
         if b64:
             return b64
@@ -131,46 +131,49 @@ def get_joseph_avatar_for_vibe(vibe_status: str = "") -> str:
 def render_live_desk_css() -> str:
     """Return complete CSS string for Joseph's Live Broadcast Desk."""
     return """<style>
-/* ── Joseph Live Desk — Premium Broadcast Container ─────────── */
+/* ── Joseph Live Desk — Premium QDS Broadcast Container ─────── */
 .joseph-live-desk{
-    background:linear-gradient(145deg,rgba(7,10,19,0.92) 0%,rgba(15,23,42,0.88) 50%,rgba(7,10,19,0.92) 100%);
-    backdrop-filter:blur(20px);
-    -webkit-backdrop-filter:blur(20px);
-    border:1px solid rgba(255,94,0,0.25);
+    background:linear-gradient(145deg,rgba(7,10,19,0.96) 0%,rgba(15,23,42,0.92) 40%,rgba(7,10,19,0.96) 100%);
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+    border:1px solid rgba(255,94,0,0.30);
     border-radius:20px;
     padding:28px 32px 20px;
     margin:24px 0;
     position:relative;
     overflow:hidden;
     box-shadow:
-        0 0 50px rgba(255,94,0,0.06),
-        0 0 100px rgba(0,198,255,0.03),
-        inset 0 1px 0 rgba(255,158,0,0.12),
-        inset 0 -1px 0 rgba(0,198,255,0.05);
+        0 0 60px rgba(255,94,0,0.08),
+        0 0 120px rgba(0,198,255,0.04),
+        inset 0 1px 0 rgba(255,158,0,0.15),
+        inset 0 -1px 0 rgba(0,198,255,0.06);
 }
-/* Top broadcast bar — gradient shimmer */
+/* Top broadcast bar — enhanced gradient shimmer */
 .joseph-live-desk::before{
     content:'';position:absolute;top:0;left:0;right:0;height:3px;
-    background:linear-gradient(90deg,transparent,#ff5e00,#ff9e00,#ff5e00,transparent);
-    background-size:200% 100%;
+    background:linear-gradient(90deg,transparent,#ff5e00,#00C6FF,#ff9e00,#ff5e00,transparent);
+    background-size:300% 100%;
     animation:josephShimmer 4s linear infinite;
 }
-/* Bottom broadcast bar */
+/* Bottom broadcast bar — cyan accent */
 .joseph-live-desk::after{
     content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,#ff5e0060,#00C6FF40,#ff5e0060,transparent);
-    background-size:200% 100%;
+    background:linear-gradient(90deg,transparent,#00C6FF40,#ff5e0060,#00C6FF40,transparent);
+    background-size:300% 100%;
     animation:josephShimmer 4s linear infinite reverse;
-}
-/* Subtle corner glow accents */
-.joseph-live-desk>*:first-child::before{
-    content:'';position:absolute;top:0;left:0;width:120px;height:120px;
-    background:radial-gradient(circle,rgba(255,94,0,0.06) 0%,transparent 70%);
-    pointer-events:none;z-index:0;
 }
 @keyframes josephShimmer{
     0%{background-position:-200% 0}
     100%{background-position:200% 0}
+}
+
+/* ── Ambient scan-line effect ─────────────────────────────── */
+.joseph-live-desk .joseph-header::after{
+    content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+    background:repeating-linear-gradient(
+        0deg,transparent,transparent 2px,rgba(0,198,255,0.015) 2px,rgba(0,198,255,0.015) 4px
+    );
+    pointer-events:none;z-index:0;
 }
 
 /* ── LIVE Pulsing Dot ─────────────────────────────────────── */
@@ -179,11 +182,11 @@ def render_live_desk_css() -> str:
     background:#ff2020;border-radius:50%;
     margin-right:8px;vertical-align:middle;
     animation:josephLivePulse 1.4s ease-in-out infinite;
-    box-shadow:0 0 8px rgba(255,32,32,0.6);
+    box-shadow:0 0 12px rgba(255,32,32,0.7);
 }
 @keyframes josephLivePulse{
-    0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 8px rgba(255,32,32,0.6)}
-    50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 3px rgba(255,32,32,0.3)}
+    0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 12px rgba(255,32,32,0.7)}
+    50%{opacity:0.4;transform:scale(0.85);box-shadow:0 0 4px rgba(255,32,32,0.3)}
 }
 
 /* ── Typing Indicator — 3 bouncing dots ───────────────────── */
@@ -200,36 +203,37 @@ def render_live_desk_css() -> str:
     40%{transform:translateY(-8px)}
 }
 
-/* ── Joseph Avatar Circle ─────────────────────────────────── */
+/* ── Joseph Avatar Circle — enhanced glow ring ────────────── */
 .joseph-avatar{
     width:72px;height:72px;border-radius:50%;
     border:3px solid #ff5e00;object-fit:cover;
     box-shadow:
-        0 0 16px rgba(255,94,0,0.4),
-        0 0 32px rgba(255,94,0,0.15),
-        0 0 48px rgba(255,94,0,0.06);
+        0 0 20px rgba(255,94,0,0.5),
+        0 0 40px rgba(255,94,0,0.18),
+        0 0 60px rgba(255,94,0,0.08);
     flex-shrink:0;
     animation:josephAvatarGlow 3s ease-in-out infinite;
 }
 @keyframes josephAvatarGlow{
-    0%,100%{box-shadow:0 0 16px rgba(255,94,0,0.4),0 0 32px rgba(255,94,0,0.15)}
-    50%{box-shadow:0 0 24px rgba(255,94,0,0.6),0 0 48px rgba(255,94,0,0.2)}
+    0%,100%{box-shadow:0 0 20px rgba(255,94,0,0.5),0 0 40px rgba(255,94,0,0.18)}
+    50%{box-shadow:0 0 28px rgba(255,94,0,0.7),0 0 56px rgba(255,94,0,0.25)}
 }
 .joseph-avatar-sm{width:48px;height:48px;border-radius:50%;
     border:2px solid #ff5e00;object-fit:cover;
-    box-shadow:0 0 8px rgba(255,94,0,0.25);flex-shrink:0}
+    box-shadow:0 0 10px rgba(255,94,0,0.3);flex-shrink:0}
 
 /* ── Broadcast Header Row ─────────────────────────────────── */
 .joseph-header{
     display:flex;align-items:center;gap:18px;
     margin-bottom:20px;
     padding-bottom:16px;
-    border-bottom:1px solid rgba(255,94,0,0.12);
+    border-bottom:1px solid rgba(255,94,0,0.15);
+    position:relative;
 }
 .joseph-header-text{
     font-family:'Orbitron',sans-serif;font-size:1.2rem;
     color:#ff5e00;font-weight:700;letter-spacing:0.8px;
-    text-shadow:0 0 16px rgba(255,94,0,0.3);
+    text-shadow:0 0 20px rgba(255,94,0,0.35);
     display:flex;align-items:center;gap:8px;
 }
 .joseph-subtitle{
@@ -237,28 +241,39 @@ def render_live_desk_css() -> str:
     font-family:'Montserrat',sans-serif;letter-spacing:0.3px;
 }
 
-/* ── Broadcast Segment Cards ──────────────────────────────── */
+/* ── Broadcast Segment Cards — QDS glassmorphism ──────────── */
 .joseph-segment{
-    background:linear-gradient(135deg,rgba(15,23,42,0.75) 0%,rgba(7,10,19,0.6) 100%);
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    border:1px solid rgba(255,94,0,0.12);
-    border-left:3px solid rgba(255,94,0,0.5);
+    background:linear-gradient(135deg,rgba(15,23,42,0.80) 0%,rgba(7,10,19,0.65) 100%);
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+    border:1px solid rgba(255,94,0,0.15);
+    border-left:3px solid rgba(255,94,0,0.55);
     border-radius:14px;padding:16px 20px;
     margin-bottom:12px;
-    transition:all 0.25s ease;
+    transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+    position:relative;
+    overflow:hidden;
 }
+/* Subtle inner shimmer on hover */
+.joseph-segment::before{
+    content:'';position:absolute;top:0;left:-100%;
+    width:100%;height:100%;
+    background:linear-gradient(90deg,transparent,rgba(255,94,0,0.04),transparent);
+    transition:left 0.5s ease;
+    pointer-events:none;
+}
+.joseph-segment:hover::before{left:100%}
 .joseph-segment:hover{
-    border-color:rgba(255,94,0,0.35);
-    transform:translateY(-1px);
-    box-shadow:0 4px 24px rgba(255,94,0,0.08);
+    border-color:rgba(255,94,0,0.40);
+    transform:translateY(-2px);
+    box-shadow:0 6px 32px rgba(255,94,0,0.10),0 0 16px rgba(0,198,255,0.04);
 }
 
 .joseph-segment-title{
     font-family:'Orbitron',sans-serif;
     color:#ff5e00;font-size:0.92rem;font-weight:600;
     margin-bottom:8px;letter-spacing:0.6px;
-    text-shadow:0 0 10px rgba(255,94,0,0.15);
+    text-shadow:0 0 12px rgba(255,94,0,0.18);
     display:flex;align-items:center;gap:8px;
     flex-wrap:wrap;
 }
@@ -268,19 +283,19 @@ def render_live_desk_css() -> str:
 }
 .joseph-segment-body strong{color:#ff9e00}
 
-/* ── Verdict Badges ───────────────────────────────────────── */
+/* ── Verdict Badges — enhanced glow ──────────────────────── */
 .joseph-verdict{
     display:inline-block;padding:4px 14px;border-radius:8px;
     font-family:'Orbitron',sans-serif;font-size:0.72rem;
     font-weight:700;letter-spacing:0.8px;margin-right:8px;
     vertical-align:middle;
-    text-shadow:0 0 8px currentColor;
-    transition:transform 0.15s ease;
+    text-shadow:0 0 10px currentColor;
+    transition:transform 0.15s ease,box-shadow 0.15s ease;
 }
-.joseph-verdict:hover{transform:scale(1.05)}
-.joseph-verdict-smash{background:rgba(239,68,68,0.2);color:#ff4444;border:1px solid rgba(239,68,68,0.35);box-shadow:0 0 10px rgba(239,68,68,0.15)}
-.joseph-verdict-lean{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);box-shadow:0 0 10px rgba(34,197,94,0.12)}
-.joseph-verdict-fade{background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3);box-shadow:0 0 10px rgba(234,179,8,0.12)}
+.joseph-verdict:hover{transform:scale(1.08)}
+.joseph-verdict-smash{background:rgba(239,68,68,0.2);color:#ff4444;border:1px solid rgba(239,68,68,0.40);box-shadow:0 0 14px rgba(239,68,68,0.18)}
+.joseph-verdict-lean{background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.35);box-shadow:0 0 14px rgba(34,197,94,0.15)}
+.joseph-verdict-fade{background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.35);box-shadow:0 0 14px rgba(234,179,8,0.15)}
 .joseph-verdict-stay_away{background:rgba(107,114,128,0.2);color:#9ca3af;border:1px solid rgba(107,114,128,0.3)}
 
 /* ── Dawg Board Table ─────────────────────────────────────── */
@@ -290,7 +305,7 @@ def render_live_desk_css() -> str:
     border-radius:10px;overflow:hidden;
 }
 .joseph-dawg-table th{
-    background:rgba(255,94,0,0.10);color:#ff5e00;
+    background:rgba(255,94,0,0.12);color:#ff5e00;
     padding:10px 14px;text-align:left;
     font-family:'Orbitron',sans-serif;font-size:0.72rem;
     letter-spacing:0.5px;border-bottom:1px solid rgba(255,94,0,0.2);
@@ -300,7 +315,7 @@ def render_live_desk_css() -> str:
     border-bottom:1px solid rgba(148,163,184,0.08);
     transition:background 0.15s ease;
 }
-.joseph-dawg-table tr:hover td{background:rgba(255,94,0,0.05)}
+.joseph-dawg-table tr:hover td{background:rgba(255,94,0,0.06)}
 
 /* ── Override Report Table ────────────────────────────────── */
 .joseph-override-table{
@@ -309,17 +324,17 @@ def render_live_desk_css() -> str:
     border-radius:10px;overflow:hidden;
 }
 .joseph-override-table th{
-    background:rgba(0,240,255,0.06);color:#00f0ff;
+    background:rgba(0,240,255,0.08);color:#00f0ff;
     padding:10px 14px;text-align:left;
     font-family:'Orbitron',sans-serif;font-size:0.72rem;
-    letter-spacing:0.5px;border-bottom:1px solid rgba(0,240,255,0.15);
+    letter-spacing:0.5px;border-bottom:1px solid rgba(0,240,255,0.18);
 }
 .joseph-override-table td{
     padding:8px 14px;color:#e2e8f0;
     border-bottom:1px solid rgba(148,163,184,0.08);
     transition:background 0.15s ease;
 }
-.joseph-override-table tr:hover td{background:rgba(0,240,255,0.03)}
+.joseph-override-table tr:hover td{background:rgba(0,240,255,0.04)}
 
 /* ── Nerd Stats Toggle ────────────────────────────────────── */
 .joseph-nerd-stats{

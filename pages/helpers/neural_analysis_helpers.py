@@ -4,7 +4,7 @@
 #          Extracted from pages/3_⚡_Quantum_Analysis_Matrix.py to reduce page size.
 # ============================================================
 import streamlit as st
-import streamlit.components.v1 as _components
+# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
 import math
 import html as _html
 
@@ -654,14 +654,14 @@ def _render_qds_full_breakdown_html(result):
     inside the existing dark-card visual context without a plain Streamlit
     expander frame breaking the design.
 
-    Rendered via streamlit.components.v1.html() to avoid st.markdown
-    stripping complex inline styles or mis-rendering grid/flex containers.
+    Rendered via st.html() which auto-sizes the iframe to fit the content,
+    avoiding both blank space and content cutoff.
 
     Args:
         result (dict): Full analysis result from the simulation loop.
 
     Returns:
-        str: Full standalone HTML document ready for components.html().
+        str: Full standalone HTML document ready for st.html().
     """
     player = _html.escape(str(result.get("player_name", "Unknown")))
     stat   = _html.escape(str(result.get("stat_type", "points")).title())
@@ -825,7 +825,7 @@ def _render_qds_full_breakdown_html(result):
         '</details>'
     )
 
-    # Wrap in a full standalone HTML document so components.html() renders it correctly.
+    # Wrap in a full standalone HTML document so st.html() renders it correctly.
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
         '<style>'
@@ -1451,22 +1451,8 @@ def display_prop_analysis_card_qds(result):
                     unsafe_allow_html=True,
                 )
 
-    # ── Full Breakdown (QDS-styled HTML rendered via iframe to avoid st.markdown stripping) ─
+    # ── Full Breakdown (QDS-styled HTML rendered via st.html for auto-sizing) ─
     breakdown_html = _render_qds_full_breakdown_html(result)
-    # Dynamic height: base + per-section additions so content is never cut off
-    _over_forces  = len(result.get("forces", {}).get("over_forces",  []) or [])
-    _under_forces = len(result.get("forces", {}).get("under_forces", []) or [])
-    _breakdown_n  = len(result.get("score_breakdown", {}) or {})
-    _explain_n    = len([v for v in (result.get("explanation") or {}).values() if v])
-    _est_height = (
-        60                              # summary bar / <details> toggle
-        + 130                           # distribution grid
-        + max(_over_forces, _under_forces, 1) * 55 + 80  # forces grid
-        + _breakdown_n * 28 + (40 if _breakdown_n else 0)
-        + _explain_n   * 60 + (20 if _explain_n   else 0)
-        + (50 if result.get("should_avoid") else 0)
-    )
-    _est_height = max(200, min(900, _est_height))
-    _components.html(breakdown_html, height=_est_height, scrolling=True)
+    st.html(breakdown_html)
 
 

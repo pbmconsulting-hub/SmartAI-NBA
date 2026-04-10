@@ -103,6 +103,23 @@ COMBO_STAT_TYPES = {
     "double_double", "triple_double",
 }
 
+# Binary / near-binary stat confidence penalty multiplier.
+# Stats like dunks and blocked shots are effectively 0-or-1 outcomes per game.
+# Their high intrinsic variance means projections are much less reliable than
+# for continuous stats (points, rebounds, assists).  Applying a 0.75x penalty
+# ensures these volatile props don't achieve Gold/Platinum tiers unless the
+# underlying signals are extremely strong.
+BINARY_STAT_CONFIDENCE_MULTIPLIER = 0.75
+
+# Stats treated as binary/near-binary for confidence penalty purposes.
+# These are 0-or-1-per-game stats or derived stats with doubled variance.
+BINARY_STAT_TYPES = {
+    "dunks",
+    "blocked_shots", "blocked shots",
+    "two_pointers_made", "two_pointers_attempted",
+    "two pointers made", "two pointers attempted",
+    "2pm", "2pa",
+}
 # Synergy bonus: multiplicative interaction between edge + consistency + probability.
 # When all three strong signals align, a bonus is added to confidence score.
 SYNERGY_EDGE_THRESHOLD        = 8.0   # Edge % required for synergy bonus
@@ -288,8 +305,13 @@ def calculate_confidence_score(
     probability_score = min(100.0, probability_distance_from_50 * 200.0)
 
     # --- Factor 2: Edge Magnitude (0-100) ---
-    # Larger edge = higher score. Cap at 25% edge = 100 score
-    edge_score = min(100.0, abs(edge_percentage) * 4.0)
+    # Larger edge = higher score.  Cap at 20% edge = 100 score.
+    # 20% is the realistic ceiling for NBA props (matching _CWS_MAX_EDGE_PCT).
+    # Previous 25% cap (4.0x multiplier) allowed impossibly-high edges to
+    # inflate Gold-tier scores.  Using 5.0x now: 20% → 100, 10% → 50.
+    _MAX_REALISTIC_EDGE_PCT = 20.0
+    capped_edge = min(abs(edge_percentage), _MAX_REALISTIC_EDGE_PCT)
+    edge_score = min(100.0, capped_edge * 5.0)
 
     # --- Factor 3: Directional Agreement (0-100) ---
     # How many forces agree on the direction vs disagree?
@@ -465,6 +487,13 @@ def calculate_confidence_score(
     if _stat_type_lower in COMBO_STAT_TYPES:
         combined_score *= COMBO_STAT_CONFIDENCE_MULTIPLIER
 
+    # Apply binary-stat confidence penalty — dunks, blocked shots, two-pointers
+    # are essentially 0-or-1 outcomes with very high inherent variance.  The
+    # model's projection for these stats is much less reliable than for
+    # continuous stats like points, so we penalize the confidence score.
+    if _stat_type_lower in BINARY_STAT_TYPES:
+        combined_score *= BINARY_STAT_CONFIDENCE_MULTIPLIER
+
     # W2: Recency Regression-to-Mean Correction
     # Extreme recent performance (hot or cold streaks) tends to revert to the season
     # average. If the last 5 games show >25% deviation from the season average,
@@ -524,8 +553,10 @@ def calculate_confidence_score(
     should_avoid = False
     avoid_reasons = []
 
-    # Kill switch 1: coefficient of variation > threshold → informational flag only.
-    # Zero-Filter Recovery: never set should_avoid=True; keep reason as metadata.
+    # Kill switch 1: coefficient of variation > threshold → flag as should_avoid.
+    # High CV means the stat is extremely unpredictable (e.g. dunks, blocks).
+    # Previously this was "informational only" (Zero-Filter Recovery), but that
+    # allowed binary-stat props with CV > 0.45 to reach Gold tier and get tracked.
     if stat_average > 0:
         cv = stat_standard_deviation / stat_average
         if cv > AUTO_AVOID_CV_THRESHOLD:
@@ -610,6 +641,13 @@ def calculate_confidence_score(
     # ============================================================
     # END SECTION: Assign Tier and Direction
     # ============================================================
+
+    # Determine should_avoid from accumulated kill-switch reasons.
+    # Previously hardcoded to False ("Zero-Filter Recovery"), which meant the
+    # confidence engine's own red flags (high CV, low edge, do-not-bet score)
+    # were cosmetic only.  Now we respect them: any genuine avoid reason sets
+    # the flag.  Downstream code merges this with should_avoid_prop() results.
+    should_avoid = bool(avoid_reasons)
 
     return {
         "confidence_score": _safe_float(final_score, 0.0),

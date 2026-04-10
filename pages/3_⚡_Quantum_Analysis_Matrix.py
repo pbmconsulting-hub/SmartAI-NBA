@@ -7,7 +7,7 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
-import streamlit.components.v1 as _components  # For Full Breakdown iframe rendering
+# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
@@ -165,7 +165,6 @@ from styles.theme import (
     get_roster_health_html,
     get_best_bets_section_html,
     get_qds_css,
-    get_qds_confidence_bar_html,
     get_qds_metrics_grid_html,
     get_qds_prop_card_html,
     get_qds_matchup_header_html,
@@ -215,50 +214,28 @@ def _get_sim_cache() -> dict:
     return st.session_state["_sim_result_cache"]
 
 
-# ── Iframe card renderer ─────────────────────────────────────────────────────
-# Renders the unified card matrix inside a self-resizing <iframe> via
-# streamlit.components.v1.html() instead of st.markdown(unsafe_allow_html=True).
+# ── HTML card renderer ────────────────────────────────────────────────────────
+# Renders the unified card matrix via st.html() which auto-sizes the iframe
+# to fit the content — eliminating both blank space and content cutoff.
 #
 # Why this is more resilient than inline st.markdown:
 #   1. Atomic delivery — the iframe either loads fully or not at all; a
 #      mid-render WebSocket closure does not crash the page.
 #   2. CSS isolation — card styles cannot leak into (or be affected by) the
 #      main Streamlit page.
-#   3. Self-resizing — a ResizeObserver + toggle listener adjusts the iframe
-#      height when <details> cards are expanded / collapsed, so no fixed
-#      height or scroll-bar is needed.
+#   3. Auto-sizing — st.html() automatically adjusts the iframe height to
+#      match the content, so no fixed height estimation or scroll-bars needed.
 # ---------------------------------------------------------------------------
 
-_MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (expanded)
-_HEIGHT_PER_PLAYER = 800       # px — expanded card ≈ header + prop cards (~400px each)
-_MAX_IFRAME_HEIGHT = 12000     # px — generous cap before ResizeObserver takes over
-_RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
-# Auto-resize JavaScript injected into every card-matrix iframe.
-# Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
-# the iframe height whenever the content changes (e.g. <details> toggle).
-_IFRAME_RESIZE_JS = (
-    "<script>"
-    "(function(){"
-    "var timer;"
-    "function sendHeight(){clearTimeout(timer);timer=setTimeout(function(){"
-    "window.parent.postMessage({type:'streamlit:setFrameHeight',"
-    f"height:document.body.scrollHeight}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
-    "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
-    "document.addEventListener('toggle',sendHeight,true);"
-    "window.addEventListener('load',sendHeight)"
-    "})()"
-    "</script>"
-)
-
 
 def _render_card_iframe(card_html, player_count):
-    """Render *card_html* inside a self-resizing iframe.
+    """Render *card_html* via st.html() which auto-sizes to fit content.
 
     Parameters
     ----------
@@ -266,10 +243,9 @@ def _render_card_iframe(card_html, player_count):
         Complete HTML (including ``<style>`` blocks) returned by
         :func:`utils.renderers.compile_unified_card_matrix`.
     player_count : int
-        Number of player groups — used to estimate the initial iframe
-        height before the ``ResizeObserver`` adjusts it.
+        Number of player groups (kept for API compatibility, not used for
+        height estimation since st.html auto-sizes).
     """
-    _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
     _doc = (
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
@@ -278,10 +254,9 @@ def _render_card_iframe(card_html, player_count):
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
         "</head><body>"
         f"{card_html}"
-        f"{_IFRAME_RESIZE_JS}"
         "</body></html>"
     )
-    _components.html(_doc, height=_est_h, scrolling=True)
+    st.html(_doc)
 
 
 st.set_page_config(
@@ -294,6 +269,12 @@ st.set_page_config(
 st.markdown(get_global_css(), unsafe_allow_html=True)
 st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
+
+# ── Reduce excessive bottom padding / blank space ─────────────
+st.markdown(
+    '<style>.main .block-container{padding-bottom:1rem !important}</style>',
+    unsafe_allow_html=True,
+)
 
 # ── Global Settings Popover (accessible from sidebar) ─────────
 from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
@@ -729,6 +710,14 @@ if run_analysis:
     except Exception:
         _joseph_loader = None
     progress_bar         = st.progress(0, text="Starting analysis...")
+
+    # ── Show Joseph's animated loading screen with NBA fun facts ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_loading = joseph_loading_placeholder("🔬 Analyzing props — hang tight…")
+    except Exception:
+        _joseph_loading = None
+
     analysis_results_list = []
 
     # Clear stale Joseph results so fresh ones are generated after this run.
@@ -2491,7 +2480,6 @@ if analysis_results:
                     _render_news_alert_html(_na),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ============================================================
     # SECTION: Market Movement Alerts (Odds API line snapshots)
@@ -2511,7 +2499,6 @@ if analysis_results:
                     _render_market_movement_html(_mm_r),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ============================================================
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
@@ -2538,7 +2525,6 @@ if analysis_results:
                     ),
                     unsafe_allow_html=True,
                 )
-        st.divider()
 
     # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
     _single_bet_pool = [
@@ -2603,36 +2589,6 @@ if analysis_results:
         _render_card_iframe(_parlay_css + _parlay_html, len(strategy_entries))
     else:
         st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
-
-    st.divider()
-
-    # ── Confidence Bars: sorted ranking ─────────────────────────
-    non_out_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-    if non_out_results:
-        with st.expander("📈 Confidence Rankings (all picks)", expanded=True):
-            _tier_icon_map = {
-                "Platinum": "💎", "Gold": "🔒", "Silver": "✓", "Bronze": "⭐"
-            }
-            _STAT_EMOJI = {
-                "points": "🏀", "rebounds": "📊", "assists": "🎯",
-                "threes": "🎯", "steals": "⚡", "blocks": "🛡️", "turnovers": "❌",
-            }
-            for r in non_out_results:
-                _stat     = r.get("stat_type", "")
-                _emoji    = _STAT_EMOJI.get(_stat, "🏀")
-                _dir      = "More" if r.get("direction") == "OVER" else "Less"
-                _label    = (
-                    f"{r.get('player_name', '')} — "
-                    f"{_emoji} {_dir} {r.get('line', '')} {_stat.title()}"
-                )
-                st.markdown(
-                    get_qds_confidence_bar_html(
-                        label=_label,
-                        percentage=r.get("confidence_score", 50),
-                        tier_icon=_tier_icon_map.get(r.get("tier", "Bronze"), "⭐"),
-                    ),
-                    unsafe_allow_html=True,
-                )
 
     # ── Team Breakdown (when single game) ────────────────────────
     if len(todays_games) == 1:
