@@ -4,7 +4,7 @@
 #          Extracted from pages/3_⚡_Quantum_Analysis_Matrix.py to reduce page size.
 # ============================================================
 import streamlit as st
-# st.html() is used for auto-sizing HTML rendering (no fixed heights / blank space)
+# st.html(unsafe_allow_javascript=True) is required so DOMPurify preserves <style> tags
 import math
 import html as _html
 
@@ -1453,6 +1453,6 @@ def display_prop_analysis_card_qds(result):
 
     # ── Full Breakdown (QDS-styled HTML rendered via st.html for auto-sizing) ─
     breakdown_html = _render_qds_full_breakdown_html(result)
-    st.html(breakdown_html)
+    st.html(breakdown_html, unsafe_allow_javascript=True)
 
 

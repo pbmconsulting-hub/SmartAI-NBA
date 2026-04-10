@@ -334,6 +334,21 @@ class TestRenderJosephLoadingScreen(unittest.TestCase):
         _mock_st.html.assert_called_once()
         _mock_st.markdown.assert_not_called()
 
+    def test_st_html_passes_unsafe_allow_javascript(self):
+        """unsafe_allow_javascript=True is required so DOMPurify preserves <style>/<script>."""
+        from utils.joseph_loading import render_joseph_loading_screen
+        import utils.joseph_loading as jl
+        jl.st = _mock_st
+        _mock_st.html.reset_mock()
+        render_joseph_loading_screen()
+        _mock_st.html.assert_called_once()
+        _, kwargs = _mock_st.html.call_args
+        self.assertTrue(
+            kwargs.get("unsafe_allow_javascript", False),
+            "st.html must be called with unsafe_allow_javascript=True "
+            "so that DOMPurify preserves <style> and <script> tags",
+        )
+
 
 # ============================================================
 # SECTION 6: joseph_loading_placeholder
