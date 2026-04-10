@@ -2147,7 +2147,7 @@ def get_player_card_html(result):
     Build the complete styled analysis card HTML for one prop result.
 
     The card header now includes a player headshot loaded from the NBA CDN
-    (``https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png``).
+    (``https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png``).
     An ``onerror`` handler falls back to a generic silhouette when the image
     is unavailable (e.g. sample / unknown player IDs).
 
@@ -2206,7 +2206,7 @@ def get_player_card_html(result):
     position_tag = f'<span class="position-tag">{position}</span>' if position else ""
 
     # Player headshot from NBA CDN with fallback silhouette
-    NBA_CDN_BASE = "https://cdn.nba.com/headshots/nba/latest/1040x760"
+    NBA_CDN_BASE = "https://cdn.nba.com/headshots/nba/latest/260x190"
     FALLBACK_HEADSHOT = f"{NBA_CDN_BASE}/fallback.png"
     if player_id:
         headshot_url = f"{NBA_CDN_BASE}/{player_id}.png"
@@ -3215,7 +3215,7 @@ def get_game_report_html(game=None, analysis_results=None):
     Returns:
         str: Complete self-contained HTML document with embedded CSS and JS
     """
-    NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/1040x760"
+    NBA_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
     ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
 
     # Confidence thresholds for color-coded bar fills
@@ -4180,7 +4180,7 @@ def get_qds_prop_card_html(
 
     # ── Player headshot ───────────────────────────────────────────
     if player_id:
-        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/1040x760/{player_id}.png"
+        headshot_url = f"https://cdn.nba.com/headshots/nba/latest/260x190/{player_id}.png"
     else:
         headshot_url = ""
 
@@ -7242,15 +7242,9 @@ UNIFIED_PLAYER_CARD_CSS = """
 }
 
 /* ── Expanded body ──────────────────────────────────────── */
-/* Lazy-load: content-visibility:auto lets the browser skip
-   layout/paint for collapsed card bodies until the user opens
-   them.  contain-intrinsic-size gives a size hint so the
-   scrollbar doesn't jump. */
 .upc-body {
     padding: 0 20px 18px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
-    content-visibility: auto;
-    contain-intrinsic-size: auto 400px;
 }
 .upc-body .qcm-grid {
     padding-top: 14px;
@@ -7677,7 +7671,7 @@ def get_player_trading_card_html(
     return (
         f'<div class="gm-player-card">'
         f'<img class="gm-card-headshot" src="{safe_url}" alt="{safe_name}" '
-        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png\'">'
+        f'onerror="this.src=\'https://cdn.nba.com/headshots/nba/latest/260x190/fallback.png\'">'
         f'<div class="gm-card-name">{safe_name}</div>'
         f'<div class="gm-card-sub">{safe_pos} · {safe_team} vs {safe_opp}</div>'
         f'<div class="gm-card-stats">'
