@@ -723,6 +723,14 @@ if "qam_sort_key" not in st.session_state:
 if run_analysis:
     _analysis_start_time = time.time()
     progress_bar         = st.progress(0, text="Starting analysis...")
+
+    # ── Show Joseph's animated loading screen with NBA fun facts ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _joseph_loading = joseph_loading_placeholder("🔬 Analyzing props — hang tight…")
+    except Exception:
+        _joseph_loading = None
+
     analysis_results_list = []
 
     # Clear stale Joseph results so fresh ones are generated after this run.
@@ -2063,6 +2071,11 @@ if run_analysis:
     finally:
         try:
             progress_bar.empty()
+        except Exception:
+            pass
+        try:
+            if _joseph_loading is not None:
+                _joseph_loading.empty()
         except Exception:
             pass
 

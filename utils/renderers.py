@@ -48,7 +48,7 @@ def _get_joseph_avatar_b64() -> str:
     if _JOSEPH_AVATAR_B64 is not None:
         return _JOSEPH_AVATAR_B64
     _candidates = []
-    for name in ("Joseph M Smith Avatar Victory.png", "Joseph M Smith Avatar.png"):
+    for name in ("Joseph M Smith Avatar.png", "Joseph M Smith Avatar Victory.png"):
         _candidates.extend([
             _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", name),
             _os.path.join(_os.getcwd(), name),

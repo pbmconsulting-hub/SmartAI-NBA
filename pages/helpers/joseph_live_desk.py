@@ -78,10 +78,10 @@ def _load_avatar_file(filename: str) -> str:
 def get_joseph_avatar_b64() -> str:
     """Load Joseph M Smith Avatar.png and return base64-encoded string.
 
-    Falls back through Victory → default avatar filenames.
+    Uses the main avatar as default; falls back to Victory if missing.
     """
-    for name in ("Joseph M Smith Avatar Victory.png",
-                 "Joseph M Smith Avatar.png"):
+    for name in ("Joseph M Smith Avatar.png",
+                 "Joseph M Smith Avatar Victory.png"):
         b64 = _load_avatar_file(name)
         if b64:
             return b64
