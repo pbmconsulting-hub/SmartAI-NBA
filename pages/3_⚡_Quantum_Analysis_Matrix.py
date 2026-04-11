@@ -252,6 +252,11 @@ def _render_card_iframe(card_html, player_count):
     structural tags and emit global ``html``/``body`` CSS rules that
     leaked into the parent page.
 
+    A small ``<script>`` block is appended to handle ``data-fallback``
+    attributes on ``<img>`` tags.  DOMPurify strips inline ``onerror``
+    event handlers, so the fallback is applied via ``addEventListener``
+    instead.
+
     Parameters
     ----------
     card_html : str
@@ -260,6 +265,22 @@ def _render_card_iframe(card_html, player_count):
     player_count : int
         Number of player groups (kept for API compatibility).
     """
+    # Generic data-fallback handler for images whose onerror was stripped
+    # by DOMPurify.  Only emitted when the card_html does NOT already
+    # contain its own <script> block (e.g. parlay cards).
+    if "<script>" not in card_html:
+        _fb_script = (
+            "<script>"
+            "(function(){"
+            "document.querySelectorAll('img[data-fallback]').forEach(function(img){"
+            "var fb=img.getAttribute('data-fallback');"
+            "img.addEventListener('error',function(){this.src=fb;});"
+            "if(img.complete&&!img.naturalWidth){img.src=fb;}"
+            "});"
+            "})();"
+            "</script>"
+        )
+        card_html = card_html + _fb_script
     st.html(card_html, unsafe_allow_javascript=True)
 
 
