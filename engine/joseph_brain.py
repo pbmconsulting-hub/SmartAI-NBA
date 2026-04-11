@@ -139,6 +139,12 @@ except ImportError:
         return None
 
 try:
+    from data.platform_mappings import display_stat_name as _display_stat_name
+except ImportError:
+    def _display_stat_name(key: str) -> str:  # type: ignore[misc]
+        return key.replace("_", " ").title() if key else ""
+
+try:
     from engine.math_helpers import _safe_float
 except ImportError:
     def _safe_float(value, fallback=0.0):
@@ -2394,7 +2400,7 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         # 2. Select body sentences based on energy
         body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 4}.get(energy, 2)
         templates = BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
-        stat = prop.get("stat", prop.get("stat_type", ""))
+        stat = _display_stat_name(prop.get("stat", prop.get("stat_type", "")))
         line = prop.get("line", "")
         edge = prop.get("edge", prop.get("edge_percentage", ""))
         prob = prop.get("prob", prop.get("probability_over", ""))
@@ -2491,10 +2497,11 @@ def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
         return []
 
     sentences = []
-    stat = str(prop.get("stat", prop.get("stat_type", "points")) or "points").lower()
+    _raw_stat = str(prop.get("stat", prop.get("stat_type", "points")) or "points").lower()
+    stat = _display_stat_name(_raw_stat)
     line = prop.get("line", 0)
     edge = prop.get("edge", "")
-    _stat_db_key = _STAT_DB_KEY_MAP.get(stat, "PTS")
+    _stat_db_key = _STAT_DB_KEY_MAP.get(_raw_stat, "PTS")
 
     recent = db_intel.get("recent_games", [])
     max_data_sentences = {"low": 1, "medium": 1, "high": 2, "nuclear": 3}.get(energy, 1)
@@ -2940,7 +2947,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
 
         one_liner = (
             f"{player.get('name', 'Player')} {prop_data['direction']} {prop_data['line']} "
-            f"{prop_data['stat']}: {verdict_emoji} {verdict} ({round(joseph_edge, 1)}% edge)"
+            f"{_display_stat_name(prop_data['stat'])}: {verdict_emoji} {verdict} ({round(joseph_edge, 1)}% edge)"
         )
 
         override_explanation = None
