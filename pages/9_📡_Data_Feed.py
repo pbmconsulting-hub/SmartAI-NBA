@@ -1255,7 +1255,9 @@ if current_action:
         after = _after_counts.get(key, 0)
         if after != before:
             diff = after - before
-            diffs.append(f"{'+'if diff>0 else ''}{diff} {label} ({'now ' + str(after) if after else ''})")
+            sign = "+" if diff > 0 else ""
+            count_info = f"now {after}" if after else ""
+            diffs.append(f"{sign}{diff} {label} ({count_info})")
     if diffs:
         st.info("📝 **What changed:** " + " · ".join(diffs))
 

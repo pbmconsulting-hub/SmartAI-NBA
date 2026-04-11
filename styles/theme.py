@@ -7961,7 +7961,8 @@ def get_action_card_html(title: str, description: str, gradient: str = "",
     _safe_desc = str(description)
     _gradient_css = f"background:{gradient};" if gradient else ""
     _border_css = f"border-color:{border_color};" if border_color else ""
-    _top_bar_css = f"background:{border_color};" if border_color else f"background:{icon_color};"
+    _top_bar_color = border_color or icon_color
+    _top_bar_css = f"background:{_top_bar_color};"
     return (
         f'<div class="df-action-card" style="{_gradient_css}{_border_css}">'
         f'<div style="position:absolute;top:0;left:0;right:0;height:2px;{_top_bar_css}'
