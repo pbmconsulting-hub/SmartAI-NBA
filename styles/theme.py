@@ -7687,3 +7687,405 @@ def get_player_trading_card_html(
 # ============================================================
 # END SECTION: Glassmorphic Dark Theme
 # ============================================================
+
+
+# ============================================================
+# SECTION: Data Feed — Premium Glassmorphic Card / Widget Helpers
+# Used by pages/9_📡_Data_Feed.py.  Matches the app-wide
+# "AI Neural Network Lab" dark theme with glassmorphism,
+# animated glows, and Orbitron / JetBrains Mono typography.
+# ============================================================
+
+
+def get_data_feed_css() -> str:
+    """Return page-specific CSS for the Data Feed page."""
+    return """<style>
+/* ── Data Feed page animations ───────────────────────────── */
+@keyframes df-pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(0,240,255,0.15), 0 4px 20px rgba(0,0,0,0.3); }
+    50%      { box-shadow: 0 0 20px rgba(0,240,255,0.30), 0 4px 28px rgba(0,0,0,0.4); }
+}
+@keyframes df-shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+@keyframes df-bar-fill {
+    from { width: 0%; }
+}
+@keyframes df-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes df-status-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+/* ── Action card ─────────────────────────────────────────── */
+.df-action-card {
+    background: linear-gradient(135deg, #0a0f1a 0%, #0d1a2e 50%, #0a1428 100%);
+    border: 1px solid rgba(0,240,255,0.18);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: df-fade-in 0.4s ease-out;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.df-action-card:hover {
+    border-color: rgba(0,240,255,0.35);
+    box-shadow: 0 0 16px rgba(0,240,255,0.15), 0 4px 24px rgba(0,0,0,0.4);
+}
+.df-action-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+}
+.df-action-card .df-card-title {
+    font-family: 'Orbitron', 'Inter', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+}
+.df-action-card .df-card-desc {
+    color: rgba(192,208,232,0.75);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+/* ── Readiness gauge ─────────────────────────────────────── */
+.df-readiness-wrap {
+    background: linear-gradient(135deg, #070A13 0%, #0d1a2e 50%, #070A13 100%);
+    border: 1px solid rgba(0,240,255,0.20);
+    border-radius: 16px;
+    padding: 24px 28px 20px;
+    position: relative;
+    overflow: hidden;
+    animation: df-pulse-glow 4s ease-in-out infinite;
+}
+.df-readiness-wrap::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #00f0ff, #00ff9d, #ff5e00, #c800ff, #00f0ff);
+    background-size: 200% 100%;
+    animation: df-shimmer 3s linear infinite;
+}
+.df-readiness-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.df-readiness-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+.df-readiness-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+    color: rgba(192,208,232,0.70);
+}
+.df-readiness-track {
+    height: 12px;
+    background: rgba(13,18,32,0.80);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(0,240,255,0.08);
+}
+.df-readiness-fill {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #ff4444, #ff5e00, #ffcc00, #00ff9d, #00f0ff);
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: df-bar-fill 1.2s ease-out;
+    position: relative;
+}
+.df-readiness-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0; bottom: 0; width: 40px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25));
+    border-radius: 0 6px 6px 0;
+}
+/* ── Freshness timeline ──────────────────────────────────── */
+.df-timeline {
+    background: linear-gradient(135deg, #0a0f1a 0%, #10182e 100%);
+    border: 1px solid rgba(0,240,255,0.12);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-top: 12px;
+}
+.df-timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+}
+.df-timeline-label {
+    min-width: 140px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #c0d0e8;
+}
+.df-timeline-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(13,18,32,0.80);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(0,240,255,0.05);
+}
+.df-timeline-fill {
+    height: 8px;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+    animation: df-bar-fill 0.8s ease-out;
+}
+.df-timeline-status {
+    min-width: 100px;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+/* ── Preflight checklist ─────────────────────────────────── */
+.df-preflight {
+    background: linear-gradient(135deg, #0a0f1a 0%, #0d182a 100%);
+    border: 1px solid rgba(0,240,255,0.10);
+    border-radius: 10px;
+    padding: 14px 18px;
+}
+.df-check-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(0,240,255,0.04);
+}
+.df-check-row:last-child { border-bottom: none; }
+.df-check-icon { font-size: 1.1rem; }
+.df-check-label {
+    font-weight: 700;
+    font-size: 0.88rem;
+}
+.df-check-detail {
+    color: rgba(192,208,232,0.55);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.76rem;
+}
+/* ── Status dot (pulsing) ────────────────────────────────── */
+.df-dot-live {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #00ff9d;
+    animation: df-status-pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(0,255,157,0.7);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.df-dot-warn {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #ffcc00;
+    animation: df-status-pulse 1.2s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(255,204,0,0.7);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.df-dot-stale {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #ff4444;
+    animation: df-status-pulse 0.8s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(255,68,68,0.7);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+/* ── Section header (replicates neural-header-subtitle style) */
+.df-section-head {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    background: linear-gradient(135deg, #00f0ff, #00ff9d);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 0 8px rgba(0,240,255,0.4));
+    margin-bottom: 4px;
+}
+.df-section-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: rgba(192,208,232,0.55);
+    letter-spacing: 0.05em;
+}
+/* ── Platform badge pills ────────────────────────────────── */
+.df-platform-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-right: 6px;
+    margin-bottom: 4px;
+}
+.df-badge-pp { background: rgba(0,255,157,0.12); color: #00ff9d; border-color: rgba(0,255,157,0.25); }
+.df-badge-ud { background: rgba(255,204,0,0.12); color: #ffcc00; border-color: rgba(255,204,0,0.25); }
+.df-badge-dk { background: rgba(0,160,255,0.12); color: #00a0ff; border-color: rgba(0,160,255,0.25); }
+.df-badge-off { background: rgba(100,100,120,0.12); color: #6e7681; border-color: rgba(100,100,120,0.15); }
+</style>"""
+
+
+def get_action_card_html(title: str, description: str, gradient: str = "",
+                         border_color: str = "", icon_color: str = "#00f0ff") -> str:
+    """Return a premium glassmorphic action card for Data Feed buttons."""
+    _safe_title = _html.escape(str(title))
+    _safe_desc = str(description)
+    _gradient_css = f"background:{gradient};" if gradient else ""
+    _border_css = f"border-color:{border_color};" if border_color else ""
+    _top_bar_color = border_color or icon_color
+    _top_bar_css = f"background:{_top_bar_color};"
+    return (
+        f'<div class="df-action-card" style="{_gradient_css}{_border_css}">'
+        f'<div style="position:absolute;top:0;left:0;right:0;height:2px;{_top_bar_css}'
+        f'opacity:0.6;border-radius:14px 14px 0 0;"></div>'
+        f'<div class="df-card-title" style="color:{icon_color};">{_safe_title}</div>'
+        f'<div class="df-card-desc">{_safe_desc}</div>'
+        f'</div>'
+    )
+
+
+def get_health_card_html(label: str, badge_html: str, health_html: str, description: str) -> str:
+    """Return a single data-health card for the status dashboard."""
+    _safe_label = _html.escape(str(label))
+    _safe_desc = _html.escape(str(description))
+    return (
+        f'<div class="df-action-card" style="padding:16px 18px;">'
+        f'<div style="font-size:0.92rem;font-weight:700;color:#c0d0e8;'
+        f'font-family:\'Orbitron\',sans-serif;letter-spacing:0.03em;margin-bottom:8px;">{_safe_label}</div>'
+        f'{badge_html}'
+        f'{health_html}'
+        f'<div style="color:rgba(192,208,232,0.50);font-size:0.73rem;margin-top:6px;'
+        f'font-family:\'JetBrains Mono\',monospace;">{_safe_desc}</div>'
+        f'</div>'
+    )
+
+
+def get_readiness_bar_html(score: int) -> str:
+    """Return a premium animated readiness gauge (0-100)."""
+    score = max(0, min(100, int(score)))
+    if score >= 80:
+        score_color = "#00ff9d"
+        status_text = "SYSTEMS NOMINAL ✅"
+    elif score >= 50:
+        score_color = "#ffcc00"
+        status_text = "UPDATE RECOMMENDED ⚠️"
+    else:
+        score_color = "#ff4444"
+        status_text = "DATA REFRESH NEEDED ❌"
+    return (
+        f'<div class="df-readiness-wrap">'
+        f'<div class="df-readiness-header">'
+        f'<div>'
+        f'<div style="font-size:0.72rem;color:rgba(192,208,232,0.45);font-family:\'JetBrains Mono\',monospace;'
+        f'letter-spacing:0.1em;margin-bottom:2px;">SESSION READINESS</div>'
+        f'<div class="df-readiness-score" style="color:{score_color};">{score}%</div>'
+        f'</div>'
+        f'<div class="df-readiness-label">{status_text}</div>'
+        f'</div>'
+        f'<div class="df-readiness-track">'
+        f'<div class="df-readiness-fill" style="width:{score}%;"></div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def get_freshness_timeline_html(sources: list[tuple[str, str, float | None]]) -> str:
+    """
+    Premium visual freshness timeline with animated bars.
+
+    *sources*: list of (label, emoji, age_hours_or_None).
+    """
+    rows_html = []
+    for label, emoji, age_h in sources:
+        if age_h is None:
+            pct = 0
+            status = "NEVER"
+            bar_color = "#553c9a"
+            text_color = "#b794f4"
+            dot_class = "df-dot-stale"
+        else:
+            freshness = max(0.0, 1.0 - age_h / 24.0)
+            pct = round(freshness * 100)
+            if pct > 70:
+                bar_color = "#00ff9d"
+                text_color = "#00ff9d"
+                status = f"{age_h:.0f}h ago"
+                dot_class = "df-dot-live"
+            elif pct > 30:
+                bar_color = "#ffcc00"
+                text_color = "#ffcc00"
+                status = f"{age_h:.0f}h ago"
+                dot_class = "df-dot-warn"
+            else:
+                bar_color = "#ff4444"
+                text_color = "#ff4444"
+                status = f"{age_h:.1f}h ago"
+                dot_class = "df-dot-stale"
+        rows_html.append(
+            f'<div class="df-timeline-row">'
+            f'<div class="df-timeline-label"><span class="{dot_class}"></span>{emoji} {_html.escape(str(label))}</div>'
+            f'<div class="df-timeline-track">'
+            f'<div class="df-timeline-fill" style="width:{pct}%;background:{bar_color};'
+            f'box-shadow:0 0 6px {bar_color};"></div></div>'
+            f'<div class="df-timeline-status" style="color:{text_color};">{status}</div>'
+            f'</div>'
+        )
+    return (
+        '<div class="df-timeline">'
+        + "\n".join(rows_html)
+        + '</div>'
+    )
+
+
+def get_preflight_checklist_html(checks: list[tuple[str, bool, str]]) -> str:
+    """
+    Premium pre-flight checklist with pulsing status indicators.
+
+    *checks*: list of (label, is_ok, detail_text).
+    """
+    items = []
+    for label, ok, detail in checks:
+        icon_class = "df-dot-live" if ok else "df-dot-stale"
+        color = "#00ff9d" if ok else "#ff4444"
+        items.append(
+            f'<div class="df-check-row">'
+            f'<span class="df-check-icon"><span class="{icon_class}"></span></span>'
+            f'<span class="df-check-label" style="color:{color};">{_html.escape(str(label))}</span>'
+            f'<span class="df-check-detail">{_html.escape(str(detail))}</span>'
+            f'</div>'
+        )
+    return '<div class="df-preflight">' + "\n".join(items) + '</div>'
+
+
+# ============================================================
+# END SECTION: Data Feed — Premium Glassmorphic Card / Widget Helpers
+# ============================================================
