@@ -1101,7 +1101,6 @@ else:
             st.caption(f"Showing {len(_filtered_rows)} of {len(_qa_rows)} props")
 
             # ── Quick Analysis rows ────────────────────────────────────
-            import html as _html_mod
             for _qrow in _filtered_rows:
                 _qp = _qrow.get("player_name", "")
                 _qs = _qrow.get("stat_type", "")
@@ -1113,61 +1112,65 @@ else:
                 _qfl = _qrow.get("form_label", "No Data")
                 _qform = _qrow.get("form_results", [])
                 _qavail = _qrow.get("availability_badge", "🟢 Active")
-                _qavail_cls = _qrow.get("availability_class", "avail-active")
                 _qinj = _qrow.get("injury_note", "")
                 _qstreak = _qrow.get("streak_label", "")
                 _qplat = _qrow.get("platform", "")
                 _qteam = _qrow.get("team", _qrow.get("player_team", ""))
 
-                # Edge colour
-                _edge_css = "qa-edge-pos" if _qedge >= 4 else "qa-edge-neg" if _qedge <= -4 else "qa-edge-neu"
-                _edge_sign = "+" if _qedge >= 0 else ""
-
-                # Form label colour
-                _flbl_css = "form-label-hot" if "Hot" in _qfl else "form-label-cold" if "Cold" in _qfl else "form-label-neutral"
-
-                # Dots HTML
-                _dots_html = get_form_dots_html(_qform, window=5, prop_line=float(_ql or 0))
-
-                # Availability badge HTML
-                _avail_html = (
-                    f'<span class="avail-badge {_qavail_cls}"'
-                    + (f' title="{_html_mod.escape(_qinj)}"' if _qinj else "")
-                    + f">{_qavail}</span>"
-                )
-
-                # Platform badge
-                _plat_lower = _qplat.lower() if _qplat else "default"
-                _plat_html = f'<span class="plat-{_plat_lower}">{_qplat}</span>' if _qplat else ""
-
-                # Streak badge
-                _streak_html = ""
-                if _qstreak:
-                    _sbanner = "streak-banner-hot" if "Over" in _qstreak else "streak-banner-cold"
-                    _streak_html = (
-                        f'<span class="{_sbanner}" style="padding:1px 8px;border-radius:4px;">'
-                        f'{_html_mod.escape(_qstreak)}</span>'
+                with st.container(border=True):
+                    _c_player, _c_stat, _c_edge, _c_form, _c_status = st.columns(
+                        [3, 2, 2, 2, 2]
                     )
 
-                # Row HTML
-                _avg_html = (
-                    f'<span style="color:#8a9bb8;font-size:0.75rem;"> (avg {_qavg:.1f})</span>'
-                    if _qavg > 0 else ""
-                )
-                _row_html = (
-                    f'<div class="qa-row">'
-                    f'<div><span class="qa-player">{_html_mod.escape(_qp)}</span>'
-                    f' <span class="qa-stat">{_html_mod.escape(_qteam)}</span> {_plat_html}</div>'
-                    f'<div><span class="qa-stat">{_html_mod.escape(_qs.replace("_"," ").title())}</span>'
-                    f' <span class="qa-line">{_ql}</span>{_avg_html}</div>'
-                    f'<div><span class="qa-edge {_edge_css}">{_edge_sign}{_qedge:.1f}% {_qdir}</span></div>'
-                    f'<div style="display:flex;align-items:center;gap:6px;">'
-                    f'{_dots_html}<span class="{_flbl_css}">{int(_qhr*100)}% over</span></div>'
-                    f'<div>{_avail_html}</div>'
-                    + (f'<div>{_streak_html}</div>' if _streak_html else "")
-                    + f'</div>'
-                )
-                st.markdown(_row_html, unsafe_allow_html=True)
+                    # Player + team + platform
+                    with _c_player:
+                        _plat_str = f" · {_qplat}" if _qplat else ""
+                        st.markdown(f"**{_qp}** · {_qteam}{_plat_str}")
+
+                    # Stat type + line + average
+                    with _c_stat:
+                        _stat_disp = _qs.replace("_", " ").title()
+                        _avg_str = f" (avg {_qavg:.1f})" if _qavg > 0 else ""
+                        st.markdown(f"{_stat_disp} **{_ql}**{_avg_str}")
+
+                    # Edge %
+                    with _c_edge:
+                        _edge_sign = "+" if _qedge >= 0 else ""
+                        _edge_val = f"{_edge_sign}{_qedge:.1f}%"
+                        if _qedge >= 4:
+                            st.markdown(f":green[**{_edge_val}**] {_qdir}")
+                        elif _qedge <= -4:
+                            st.markdown(f":red[**{_edge_val}**] {_qdir}")
+                        else:
+                            st.markdown(f":gray[**{_edge_val}**] {_qdir}")
+
+                    # Form dots + hit rate
+                    with _c_form:
+                        _dots_html = get_form_dots_html(
+                            _qform, window=5, prop_line=float(_ql or 0)
+                        )
+                        _hr_pct = int(_qhr * 100)
+                        if "Hot" in _qfl:
+                            _hr_md = f":orange[**{_hr_pct}% over**]"
+                        elif "Cold" in _qfl:
+                            _hr_md = f":blue[**{_hr_pct}% over**]"
+                        else:
+                            _hr_md = f":gray[{_hr_pct}% over]"
+                        st.markdown(
+                            f"{_dots_html} {_hr_md}",
+                            unsafe_allow_html=True,
+                        )
+
+                    # Availability + streak
+                    with _c_status:
+                        st.markdown(_qavail)
+                        if _qinj:
+                            st.caption(_qinj)
+                        if _qstreak:
+                            if "Over" in _qstreak:
+                                st.markdown(f"🔥 :orange[{_qstreak}]")
+                            else:
+                                st.markdown(f"🧊 :blue[{_qstreak}]")
 
             # ── Hot/Cold summary footer ────────────────────────────────
             if _streak_summary["hot_players"]:
