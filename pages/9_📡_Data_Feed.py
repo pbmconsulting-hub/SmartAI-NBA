@@ -975,15 +975,14 @@ if current_action:
         st.subheader("🏥 Refreshing Injury Report…")
 
         st.info(
-            "Loading real-time injury data "
-            "with NBA CDN feed as fallback. "
+            "Loading real-time injury data from RotoWire. "
             "This typically takes 5–15 seconds."
         )
 
         # Clear the action flag immediately so a page reload doesn't re-run it
         st.session_state["update_action"] = None
 
-        with st.spinner("Loading injury data from API-NBA…"):
+        with st.spinner("Loading injury data from RotoWire…"):
             try:
                 from data.roster_engine import RosterEngine as _RE
                 _re = _RE()
@@ -1020,9 +1019,9 @@ if current_action:
                 )
 
             # Show a summary table
-            st.markdown("### 📋 Injury Data (API-NBA + NBA CDN)")
+            st.markdown("### 📋 Injury Data (RotoWire)")
             st.caption(
-                "Showing players with a non-Active designation from API-NBA / NBA CDN. "
+                "Showing players with a non-Active designation from RotoWire. "
                 "Run a Smart Update or Full Setup to apply these to the "
                 "full injury_status.json."
             )
