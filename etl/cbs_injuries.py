@@ -1,20 +1,24 @@
 """
-rotowire_injuries.py
---------------------
-ETL module for scraping the RotoWire NBA Injury Report.
+cbs_injuries.py
+---------------
+ETL module for scraping the CBS Sports NBA Injury Report.
 
-Extracts injury data from https://www.rotowire.com/basketball/injury-report.php,
-transforms it by fuzzy-matching player names to player IDs and mapping team
-abbreviations to team IDs, and loads the result into the ``Injury_Status``
-table using ``upsert_dataframe()``.
+Extracts injury data from the CBS Sports injury page, transforms it by
+fuzzy-matching player names to player IDs and mapping full team names to
+team IDs, and loads the result into the ``Injury_Status`` table using
+``upsert_dataframe()``.
 
-Exposes a single public function, :func:`sync_rotowire_injuries`, which can be
+Mirrors the structure of :mod:`etl.rotowire_injuries` so both sources
+coexist under the ``(player_id, report_date, source)`` composite primary
+key.
+
+Exposes a single public function, :func:`sync_cbs_injuries`, which can be
 called from ``data_updater.run_update()`` or run standalone.
 
 Usage::
 
-    from etl.rotowire_injuries import sync_rotowire_injuries
-    rows_upserted = sync_rotowire_injuries()
+    from etl.cbs_injuries import sync_cbs_injuries
+    rows_upserted = sync_cbs_injuries()
 """
 
 import logging
@@ -43,20 +47,20 @@ DB_PATH = setup_db.DB_PATH
 # Constants
 # ---------------------------------------------------------------------------
 
-ROTOWIRE_INJURY_URL = "https://www.rotowire.com/basketball/injury-report.php"
+_CBS_INJURY_URL = "https://www.cbssports.com/nba/injuries/"
 
 # Minimum fuzzy-match score (0–100) to accept a player name match.
 _FUZZY_MATCH_THRESHOLD = 85
 
 # Seconds to wait before each HTTP request (rate-limit).
-_REQUEST_DELAY = 1.0
+_REQUEST_DELAY = 3.0
 
 # Retry settings for HTTP requests.
 _MAX_RETRIES = 3
 _MAX_BACKOFF_DELAY = 30
 
 # Source tag stored in the Injury_Status table.
-_SOURCE = "rotowire"
+_SOURCE = "cbssports"
 
 # HTTP headers that mimic a browser to avoid being blocked.
 _HEADERS = {
@@ -69,21 +73,57 @@ _HEADERS = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-# RotoWire uses non-standard abbreviations for some teams; map them to the
-# canonical three-letter codes used in the Players / Teams tables.
-_ROTOWIRE_ABBREV_MAP: dict[str, str] = {
-    "GS":  "GSW",
-    "NO":  "NOP",
-    "NY":  "NYK",
-    "SA":  "SAS",
-    "OKC": "OKC",
-    "PHX": "PHX",
-    "WSH": "WAS",
+# curl_cffi provides TLS browser-impersonation to bypass Cloudflare/Akamai.
+try:
+    from curl_cffi import requests as _curl_requests
+
+    _CURL_CFFI_AVAILABLE = True
+except ImportError:
+    _curl_requests = None  # type: ignore[assignment]
+    _CURL_CFFI_AVAILABLE = False
+
+# ---------------------------------------------------------------------------
+# CBS full team name → canonical 3-letter abbreviation mapping
+# ---------------------------------------------------------------------------
+
+_CBS_TEAM_NAME_MAP: dict[str, str] = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BKN",
+    "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "LA Clippers": "LAC",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "LA Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHX",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Washington Wizards": "WAS",
 }
 
 
 # ---------------------------------------------------------------------------
-# HTTP helpers (mirror the pattern in initial_pull.py)
+# HTTP helpers
 # ---------------------------------------------------------------------------
 
 
@@ -92,15 +132,15 @@ def _rate_limited_sleep() -> None:
     time.sleep(_REQUEST_DELAY)
 
 
-def _call_with_retries(callable_, description: str = "HTTP request") -> requests.Response:
+def _call_with_retries(callable_, description: str = "HTTP request"):
     """Call *callable_* up to :data:`_MAX_RETRIES` times with exponential backoff.
 
     Args:
-        callable_: Zero-argument callable that returns a :class:`requests.Response`.
+        callable_: Zero-argument callable that returns a response.
         description: Human-readable label used in log messages.
 
     Returns:
-        The :class:`requests.Response` returned by *callable_* on success.
+        The response returned by *callable_* on success.
 
     Raises:
         Exception: The last exception raised after all retries are exhausted.
@@ -127,13 +167,14 @@ def _call_with_retries(callable_, description: str = "HTTP request") -> requests
 # ---------------------------------------------------------------------------
 
 
-def fetch_injury_page(url: str = ROTOWIRE_INJURY_URL) -> str:
-    """Fetch the RotoWire injury report page HTML.
+def fetch_injury_page(url: str = _CBS_INJURY_URL) -> str:
+    """Fetch the CBS Sports injury report page HTML.
 
-    Uses a browser-like ``User-Agent`` header and retries on failure.
+    Uses ``curl_cffi`` with Chrome impersonation as primary (CBS has
+    Cloudflare protection), falling back to plain ``requests``.
 
     Args:
-        url: URL of the RotoWire injury report page.
+        url: URL of the CBS Sports injury report page.
 
     Returns:
         Raw HTML string of the page.
@@ -142,11 +183,14 @@ def fetch_injury_page(url: str = ROTOWIRE_INJURY_URL) -> str:
         requests.HTTPError: If the HTTP response indicates an error.
         Exception: After :data:`_MAX_RETRIES` failed attempts.
     """
-    logger.info("Fetching RotoWire injury report from %s …", url)
+    logger.info("Fetching CBS Sports injury report from %s …", url)
     _rate_limited_sleep()
 
     def _fetch():
-        resp = requests.get(url, headers=_HEADERS, timeout=30)
+        if _CURL_CFFI_AVAILABLE:
+            resp = _curl_requests.get(url, impersonate="chrome", timeout=30)
+        else:
+            resp = requests.get(url, headers=_HEADERS, timeout=30)
         resp.raise_for_status()
         return resp
 
@@ -161,73 +205,75 @@ def fetch_injury_page(url: str = ROTOWIRE_INJURY_URL) -> str:
 
 
 def parse_injury_table(html: str) -> list[dict]:
-    """Parse the RotoWire injury report HTML into a list of row dicts.
+    """Parse the CBS Sports injury report HTML into a list of row dicts.
 
-    The page contains an HTML table whose rows have columns:
-    Player, Team, Position, Injury, Status, Est. Return.
+    CBS uses ``div.TeamCard`` sections with the team name in an ``<a>`` tag
+    and player rows in ``<tr>``/``<td>`` within each section.  Columns are:
+    player, status, injury, date.
 
     Args:
-        html: Raw HTML string of the RotoWire injury report page.
+        html: Raw HTML string of the CBS Sports injury report page.
 
     Returns:
-        A list of dicts, one per player row, with keys:
-        ``player_name``, ``team_abbrev``, ``position``, ``reason``,
-        ``status``, ``est_return``.  Returns an empty list if the table
-        cannot be found or is empty.
+        A list of dicts with keys: ``player_name``, ``team_name``,
+        ``status``, ``reason``, ``date``.  Returns an empty list if
+        the page cannot be parsed.
     """
     soup = BeautifulSoup(html, "lxml")
-
-    # RotoWire renders the injury table with class "rt-table" or similar;
-    # we locate the first <table> on the page that contains injury rows.
-    table = soup.find("table")
-    if table is None:
-        logger.warning("No <table> found on the RotoWire injury report page.")
-        return []
-
     rows: list[dict] = []
-    tbody = table.find("tbody")
-    tr_elements = tbody.find_all("tr") if tbody else table.find_all("tr")[1:]
 
-    for tr in tr_elements:
-        cells = tr.find_all("td")
-        if len(cells) < 5:
-            continue
+    for team_section in soup.find_all(
+        "div", class_=lambda c: c and "TeamCard" in c
+    ):
+        team_tag = team_section.find("a")
+        team_name = team_tag.get_text(strip=True) if team_tag else "Unknown"
 
-        player_name = cells[0].get_text(strip=True)
-        team_abbrev = cells[1].get_text(strip=True)
-        position = cells[2].get_text(strip=True)
-        reason = cells[3].get_text(strip=True)
-        status = cells[4].get_text(strip=True)
-        est_return = cells[5].get_text(strip=True) if len(cells) > 5 else ""
+        for tr in team_section.find_all("tr"):
+            cells = tr.find_all("td")
+            if len(cells) < 3:
+                continue
 
-        if not player_name or not status:
-            continue
+            player_name = cells[0].get_text(strip=True)
+            status = cells[1].get_text(strip=True)
+            injury = cells[2].get_text(strip=True)
+            injury_date = cells[3].get_text(strip=True) if len(cells) > 3 else ""
 
-        rows.append(
-            {
-                "player_name": player_name,
-                "team_abbrev": team_abbrev,
-                "position": position,
-                "reason": reason,
-                "status": status,
-                "est_return": est_return,
-            }
-        )
+            if not player_name or not status:
+                continue
 
-    logger.info("Parsed %d injury rows from the HTML table.", len(rows))
+            rows.append(
+                {
+                    "player_name": player_name,
+                    "team_name": team_name,
+                    "status": status,
+                    "reason": injury,
+                    "date": injury_date,
+                }
+            )
+
+    logger.info("Parsed %d injury rows from CBS Sports HTML.", len(rows))
     return rows
 
 
-def _normalise_team_abbrev(raw: str) -> str:
-    """Translate a RotoWire team abbreviation to the canonical three-letter code.
+def _normalise_team_name(raw: str) -> str:
+    """Map a full CBS team name to the canonical three-letter abbreviation.
 
     Args:
-        raw: Raw team abbreviation as scraped from RotoWire.
+        raw: Full team name as scraped from CBS (e.g. ``'Golden State Warriors'``).
 
     Returns:
-        Canonical abbreviation (e.g. ``'GS'`` → ``'GSW'``).
+        Canonical abbreviation (e.g. ``'GSW'``), or the raw string upper-cased
+        if no mapping is found.
     """
-    return _ROTOWIRE_ABBREV_MAP.get(raw.upper(), raw.upper())
+    stripped = raw.strip()
+    if stripped in _CBS_TEAM_NAME_MAP:
+        return _CBS_TEAM_NAME_MAP[stripped]
+    # Try case-insensitive lookup
+    for full_name, abbrev in _CBS_TEAM_NAME_MAP.items():
+        if full_name.lower() == stripped.lower():
+            return abbrev
+    logger.warning("CBS team name '%s' not found in mapping; returning as-is.", raw)
+    return stripped.upper()
 
 
 def _build_player_lookup(conn: sqlite3.Connection) -> dict[str, int]:
@@ -263,12 +309,8 @@ def _match_player(
 ) -> Optional[int]:
     """Resolve *name* to a player_id using exact then fuzzy matching.
 
-    1. Tries a case-insensitive exact match against all keys in *lookup*.
-    2. If not found, uses ``thefuzz.process.extractOne`` for fuzzy matching.
-    3. Returns ``None`` and logs a warning if no match exceeds *threshold*.
-
     Args:
-        name: Player name as scraped from RotoWire.
+        name: Player name as scraped from CBS.
         lookup: Mapping of ``full_name.lower()`` to ``player_id``.
         threshold: Minimum fuzzy-match score to accept (0–100).
 
@@ -294,7 +336,7 @@ def _match_player(
         return lookup[matched_name]
 
     logger.warning(
-        "Could not match player '%s' to any Players record (best score=%s). Skipping.",
+        "Could not match CBS player '%s' to any Players record (best score=%s). Skipping.",
         name,
         match[1] if match else "N/A",
     )
@@ -305,9 +347,9 @@ def transform_injuries(
     raw_rows: list[dict],
     conn: sqlite3.Connection,
 ) -> pd.DataFrame:
-    """Transform scraped injury rows into a DataFrame ready for ``Injury_Status``.
+    """Transform scraped CBS injury rows into a DataFrame for ``Injury_Status``.
 
-    Maps player names to ``player_id`` (fuzzy) and team abbreviations to
+    Maps player names to ``player_id`` (fuzzy) and full team names to
     ``team_id`` from the database.  Rows whose player cannot be matched are
     dropped with a warning.
 
@@ -321,7 +363,7 @@ def transform_injuries(
         ``source``, ``last_updated_ts``.
     """
     if not raw_rows:
-        logger.info("No raw injury rows to transform.")
+        logger.info("No raw CBS injury rows to transform.")
         return pd.DataFrame(
             columns=[
                 "player_id", "team_id", "report_date", "status",
@@ -341,12 +383,12 @@ def transform_injuries(
         if player_id is None:
             continue
 
-        canonical_abbrev = _normalise_team_abbrev(row["team_abbrev"])
+        canonical_abbrev = _normalise_team_name(row["team_name"])
         team_id: Optional[int] = team_lookup.get(canonical_abbrev)
         if team_id is None:
             logger.debug(
-                "Team abbreviation '%s' not found in Teams table; storing NULL.",
-                canonical_abbrev,
+                "CBS team '%s' (→ '%s') not found in Teams table; storing NULL.",
+                row["team_name"], canonical_abbrev,
             )
 
         records.append(
@@ -365,7 +407,7 @@ def transform_injuries(
     if not df.empty:
         # Deduplicate: keep last occurrence per (player_id, report_date, source).
         df = df.drop_duplicates(subset=["player_id", "report_date", "source"], keep="last")
-    logger.info("Transformed %d injury records (from %d raw rows).", len(df), len(raw_rows))
+    logger.info("Transformed %d CBS injury records (from %d raw rows).", len(df), len(raw_rows))
     return df
 
 
@@ -385,7 +427,7 @@ def load_injuries(df: pd.DataFrame, conn: sqlite3.Connection) -> int:
         Number of rows upserted.
     """
     if df.empty:
-        logger.info("Injury_Status: no rows to upsert.")
+        logger.info("Injury_Status (CBS): no rows to upsert.")
         return 0
     upsert_dataframe(df, "Injury_Status", conn)
     return len(df)
@@ -396,14 +438,14 @@ def load_injuries(df: pd.DataFrame, conn: sqlite3.Connection) -> int:
 # ---------------------------------------------------------------------------
 
 
-def sync_rotowire_injuries(db_path: str = DB_PATH) -> int:
-    """Scrape RotoWire and upsert today's injury data into ``Injury_Status``.
+def sync_cbs_injuries(db_path: str = DB_PATH) -> int:
+    """Scrape CBS Sports and upsert today's injury data into ``Injury_Status``.
 
     Full ETL cycle:
 
-    1. Fetches the RotoWire NBA injury report page.
-    2. Parses the HTML table into structured rows.
-    3. Fuzzy-matches player names and maps team abbreviations.
+    1. Fetches the CBS Sports NBA injury report page.
+    2. Parses the HTML into structured rows.
+    3. Fuzzy-matches player names and maps team names.
     4. Upserts the result into ``Injury_Status`` via ``upsert_dataframe()``.
 
     Args:
@@ -412,17 +454,17 @@ def sync_rotowire_injuries(db_path: str = DB_PATH) -> int:
     Returns:
         Number of rows upserted into ``Injury_Status``.
     """
-    logger.info("=== RotoWire Injury Sync ===")
+    logger.info("=== CBS Sports Injury Sync ===")
 
     try:
         html = fetch_injury_page()
     except Exception:
-        logger.exception("Failed to fetch RotoWire injury report page. Aborting sync.")
+        logger.exception("Failed to fetch CBS Sports injury report page. Aborting sync.")
         return 0
 
     raw_rows = parse_injury_table(html)
     if not raw_rows:
-        logger.info("No injury rows found on the page. Nothing to load.")
+        logger.info("No CBS injury rows found on the page. Nothing to load.")
         return 0
 
     conn = sqlite3.connect(db_path)
@@ -430,10 +472,10 @@ def sync_rotowire_injuries(db_path: str = DB_PATH) -> int:
         df = transform_injuries(raw_rows, conn)
         count = load_injuries(df, conn)
         conn.commit()
-        logger.info("=== RotoWire Injury Sync complete. %d rows upserted. ===", count)
+        logger.info("=== CBS Sports Injury Sync complete. %d rows upserted. ===", count)
         return count
     except Exception:
-        logger.exception("Error during RotoWire injury sync.")
+        logger.exception("Error during CBS Sports injury sync.")
         conn.rollback()
         return 0
     finally:
@@ -441,4 +483,4 @@ def sync_rotowire_injuries(db_path: str = DB_PATH) -> int:
 
 
 if __name__ == "__main__":
-    sync_rotowire_injuries()
+    sync_cbs_injuries()

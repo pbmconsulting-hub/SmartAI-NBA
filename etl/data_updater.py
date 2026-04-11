@@ -28,6 +28,7 @@ from nba_api.stats.endpoints import LeagueGameLog, ScoreboardV3
 
 from . import initial_pull
 from . import setup_db
+from .cbs_injuries import sync_cbs_injuries
 from .rotowire_injuries import sync_rotowire_injuries
 from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
@@ -465,6 +466,13 @@ def run_update(db_path: str = DB_PATH) -> int:
                 logger.exception(
                     "RotoWire injury sync failed — continuing without injury data."
                 )
+            try:
+                cbs_count = sync_cbs_injuries(db_path)
+                logger.info("CBS injury sync: %d rows upserted.", cbs_count)
+            except Exception:
+                logger.exception(
+                    "CBS injury sync failed — continuing without CBS injury data."
+                )
             return 0
 
         logger.info(
@@ -486,6 +494,13 @@ def run_update(db_path: str = DB_PATH) -> int:
             except Exception:
                 logger.exception(
                     "RotoWire injury sync failed — continuing without injury data."
+                )
+            try:
+                cbs_count = sync_cbs_injuries(db_path)
+                logger.info("CBS injury sync: %d rows upserted.", cbs_count)
+            except Exception:
+                logger.exception(
+                    "CBS injury sync failed — continuing without CBS injury data."
                 )
             return 0
 
@@ -534,6 +549,15 @@ def run_update(db_path: str = DB_PATH) -> int:
         except Exception:
             logger.exception(
                 "RotoWire injury sync failed — continuing without injury data."
+            )
+
+        # --- Sync CBS Sports injury report ---
+        try:
+            cbs_count = sync_cbs_injuries(db_path)
+            logger.info("CBS injury sync: %d rows upserted.", cbs_count)
+        except Exception:
+            logger.exception(
+                "CBS injury sync failed — continuing without CBS injury data."
             )
 
         return new_log_count

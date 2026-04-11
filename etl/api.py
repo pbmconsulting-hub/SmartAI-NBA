@@ -24,10 +24,10 @@ import logging
 import sqlite3
 from contextlib import contextmanager
 from datetime import date
-from typing import Generator
+from typing import Generator, Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import data_updater
@@ -1005,12 +1005,16 @@ def get_schedule() -> dict:
 
 
 @app.get("/api/injuries")
-def get_injuries() -> dict:
+def get_injuries(source: Optional[str] = Query(default=None, description="Filter by injury source (e.g. 'rotowire')")) -> dict:
     """Return all current injury reports for the latest report date.
 
     Joins with the ``Players`` and ``Teams`` tables to include player and team
     names alongside the raw status fields.  Only rows for the most recent
     ``report_date`` stored in ``Injury_Status`` are returned.
+
+    Args:
+        source: Optional source filter (e.g. ``rotowire``, ``cbssports``).
+                When omitted all sources for the latest date are returned.
 
     Returns:
         JSON with a ``report_date`` and an ``injuries`` list::
@@ -1037,7 +1041,7 @@ def get_injuries() -> dict:
     Raises:
         HTTPException 500: On unexpected database errors.
     """
-    logger.info("GET /api/injuries")
+    logger.info("GET /api/injuries source=%s", source)
 
     latest = _query_one(
         "SELECT MAX(report_date) AS latest FROM Injury_Status",
@@ -1048,8 +1052,15 @@ def get_injuries() -> dict:
     if not report_date:
         return {"report_date": None, "injuries": []}
 
+    if source:
+        source_clause = "AND i.source = ?"
+        params: tuple = (report_date, source)
+    else:
+        source_clause = ""
+        params = (report_date,)
+
     rows = _query_rows(
-        """
+        f"""
         SELECT
             i.player_id,
             p.full_name,
@@ -1064,28 +1075,52 @@ def get_injuries() -> dict:
         FROM Injury_Status i
         LEFT JOIN Players p ON i.player_id = p.player_id
         LEFT JOIN Teams   t ON i.team_id   = t.team_id
-        WHERE i.report_date = ?
+        WHERE i.report_date = ? {source_clause}
         ORDER BY t.abbreviation, p.full_name
         """,
-        (report_date,),
+        params,
         label="get_injuries",
     )
     logger.info("Found %d injury rows for %s.", len(rows), report_date)
     return {"report_date": report_date, "injuries": rows}
 
 
+@app.get("/api/injuries/sources")
+def get_injury_sources() -> dict:
+    """Return the distinct injury data sources currently in the database.
+
+    Returns:
+        JSON with a ``sources`` list::
+
+            {"sources": ["rotowire", "cbssports"]}
+
+    Raises:
+        HTTPException 500: On unexpected database errors.
+    """
+    logger.info("GET /api/injuries/sources")
+    rows = _query_rows(
+        "SELECT DISTINCT source FROM Injury_Status ORDER BY source",
+        label="get_injury_sources",
+    )
+    return {"sources": [r["source"] for r in rows if r.get("source")]}
+
+
 @app.get("/api/players/{player_id}/injury")
 def get_player_injury(player_id: int) -> dict:
     """Return the most recent injury status for a specific player.
 
-    Joins with the ``Teams`` table for team name and abbreviation.
+    Joins with the ``Teams`` table for team name and abbreviation.  When
+    multiple sources have reported on the same player the most recently
+    updated record is returned as the primary ``injury`` value, and all
+    source records for the latest date are included in ``all_sources``.
 
     Args:
         player_id: The NBA player ID.
 
     Returns:
         JSON with an ``injury`` key containing the latest injury record (or
-        ``{}`` if the player has no injury record)::
+        ``{}`` if the player has no injury record) and an ``all_sources`` list
+        with all source records for the most recent date::
 
             {
               "player_id": 2544,
@@ -1099,7 +1134,8 @@ def get_player_injury(player_id: int) -> dict:
                 "reason": "ankle",
                 "source": "rotowire",
                 "last_updated_ts": "2026-04-10T21:00:00Z"
-              }
+              },
+              "all_sources": [...]
             }
 
     Raises:
@@ -1131,13 +1167,38 @@ def get_player_injury(player_id: int) -> dict:
         FROM Injury_Status i
         LEFT JOIN Teams t ON i.team_id = t.team_id
         WHERE i.player_id = ?
-        ORDER BY i.report_date DESC
+        ORDER BY i.report_date DESC, i.last_updated_ts DESC
         LIMIT 1
         """,
         (player_id,),
         label="get_player_injury",
     )
-    return {"player_id": player_id, "injury": row or {}}
+
+    if not row:
+        return {"player_id": player_id, "injury": {}, "all_sources": []}
+
+    # Fetch all source records for the latest report_date.
+    all_sources = _query_rows(
+        """
+        SELECT
+            i.player_id,
+            i.team_id,
+            t.team_name,
+            t.abbreviation,
+            i.report_date,
+            i.status,
+            i.reason,
+            i.source,
+            i.last_updated_ts
+        FROM Injury_Status i
+        LEFT JOIN Teams t ON i.team_id = t.team_id
+        WHERE i.player_id = ? AND i.report_date = ?
+        ORDER BY i.source
+        """,
+        (player_id, row["report_date"]),
+        label="get_player_injury/all_sources",
+    )
+    return {"player_id": player_id, "injury": row, "all_sources": all_sources}
 
 
 # ---------------------------------------------------------------------------
