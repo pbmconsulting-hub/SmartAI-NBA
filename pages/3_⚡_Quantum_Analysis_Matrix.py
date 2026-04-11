@@ -235,6 +235,10 @@ _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
+# Injury status confidence penalties (points deducted from SAFE Score)
+_DOUBTFUL_INJURY_PENALTY = 8.0      # Doubtful: ~75% chance of sitting
+_QUESTIONABLE_INJURY_PENALTY = 4.0  # Questionable/GTD: uncertain availability
+
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
@@ -1617,9 +1621,9 @@ if run_analysis:
                 # ── Compute injury status penalty for Doubtful/Questionable ─
                 _injury_penalty = 0.0
                 if player_status == "Doubtful":
-                    _injury_penalty = 8.0   # heavy penalty — 75% chance of sitting
+                    _injury_penalty = _DOUBTFUL_INJURY_PENALTY
                 elif player_status in ("Questionable", "GTD"):
-                    _injury_penalty = 4.0   # moderate penalty — uncertain availability
+                    _injury_penalty = _QUESTIONABLE_INJURY_PENALTY
 
                 confidence_output = calculate_confidence_score(
                     probability_over=probability_over,

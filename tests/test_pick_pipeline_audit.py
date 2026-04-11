@@ -182,24 +182,31 @@ class TestInjuryStatusPenalty(unittest.TestCase):
         self.assertIn("injury_status_penalty=_injury_penalty", source,
                       "calculate_confidence_score should receive injury_status_penalty")
 
-    def test_doubtful_penalty_is_8(self):
+    def test_doubtful_penalty_value(self):
         """Doubtful players should receive an 8-point penalty."""
         page_path = "pages/3_⚡_Quantum_Analysis_Matrix.py"
         with open(page_path, "r") as f:
             source = f.read()
 
-        self.assertIn('"Doubtful"', source)
-        self.assertIn("_injury_penalty = 8.0", source,
-                      "Doubtful should get 8-point injury penalty")
+        self.assertIn("_DOUBTFUL_INJURY_PENALTY", source,
+                      "Should have a named constant for Doubtful injury penalty")
+        self.assertIn("_DOUBTFUL_INJURY_PENALTY = 8.0", source,
+                      "Doubtful injury penalty constant should be 8.0")
+        self.assertIn("_injury_penalty = _DOUBTFUL_INJURY_PENALTY", source,
+                      "Doubtful case should use the named constant")
 
-    def test_questionable_penalty_is_4(self):
+    def test_questionable_penalty_value(self):
         """Questionable/GTD players should receive a 4-point penalty."""
         page_path = "pages/3_⚡_Quantum_Analysis_Matrix.py"
         with open(page_path, "r") as f:
             source = f.read()
 
-        self.assertIn("_injury_penalty = 4.0", source,
-                      "Questionable/GTD should get 4-point injury penalty")
+        self.assertIn("_QUESTIONABLE_INJURY_PENALTY", source,
+                      "Should have a named constant for Questionable injury penalty")
+        self.assertIn("_QUESTIONABLE_INJURY_PENALTY = 4.0", source,
+                      "Questionable injury penalty constant should be 4.0")
+        self.assertIn("_injury_penalty = _QUESTIONABLE_INJURY_PENALTY", source,
+                      "Questionable case should use the named constant")
 
     def test_confidence_engine_accepts_injury_penalty(self):
         """The confidence engine should accept injury_status_penalty parameter."""
