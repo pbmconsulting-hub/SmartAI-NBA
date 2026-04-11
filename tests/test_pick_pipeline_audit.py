@@ -230,8 +230,8 @@ class TestShouldAvoidTransparency(unittest.TestCase):
                       "Should count avoid picks before filtering them")
         self.assertIn("pick(s) hidden", source,
                       "Should show a message about hidden picks")
-        self.assertIn("Show Avoids", source,
-                      "Should reference the Show Avoids toggle")
+        self.assertIn("Hide Avoids", source,
+                      "Should reference the Hide Avoids toggle")
 
 
 if __name__ == "__main__":

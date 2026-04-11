@@ -1170,13 +1170,11 @@ def auto_log_analysis_bets(analysis_results, minimum_edge=5.0, max_bets=15):
             continue
         if res.get("player_is_out", False):
             continue
-        # Skip props flagged as should_avoid by the confidence engine or
-        # edge_detection's should_avoid_prop().  These include high-CV binary
-        # stats (dunks, blocks), conflicting directional forces, insufficient
-        # edge after vig, etc.  Logging them would pollute the tracker with
-        # picks that are known coin-flips.
-        if res.get("should_avoid", False):
-            continue
+        # NOTE: should_avoid picks are NOT skipped — they are already gated
+        # by tier-specific edge thresholds and the tier allowlist above.
+        # Hiding them from the tracker was overly aggressive and caused the
+        # QAM to undercount logged bets.  The avoid metadata is preserved in
+        # the notes field for transparency.
 
         dedup_key = (
             res.get("player_name", "").lower(),
