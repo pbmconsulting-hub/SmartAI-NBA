@@ -66,7 +66,7 @@ STAT_EDGE_THRESHOLDS = {
     # Binary / near-binary stats — these are essentially 0-or-1 outcomes
     # and need larger edges to overcome inherent volatility.
     # Lowered from 8.0/6.0: the BINARY_STAT_CONFIDENCE_MULTIPLIER (0.75x)
-    # already penalises confidence scores, so the edge threshold doesn't
+    # already penalizes confidence scores, so the edge threshold doesn't
     # need to be as extreme.  Previous values effectively required 12-13%
     # raw edge when combined with LOW_VOLUME_UNCERTAINTY_MULTIPLIER.
     "dunks": 5.0,
