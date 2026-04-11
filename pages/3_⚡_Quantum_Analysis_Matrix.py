@@ -7,10 +7,7 @@
 # ============================================================
 
 import streamlit as st  # Main UI framework
-# st.html() is used for HTML rendering with embedded CSS and JavaScript.
-# In Streamlit ≥1.55, st.html() sanitises via DOMPurify; passing
-# unsafe_allow_javascript=True is required so <style> and <script> tags
-# are preserved (they are in the ADD_TAGS allowlist only in that mode).
+import streamlit.components.v1 as _components  # For iframe-based card rendering
 import math             # For rounding in display
 import html as _html   # For safe HTML escaping in inline cards
 import datetime         # For analysis result freshness timestamps
@@ -217,33 +214,55 @@ def _get_sim_cache() -> dict:
     return st.session_state["_sim_result_cache"]
 
 
-# ── HTML card renderer ────────────────────────────────────────────────────────
-# Renders the unified card matrix via st.html() which injects the HTML
-# directly into the page DOM (not iframed in Streamlit ≥1.55).
-# unsafe_allow_javascript=True is required so that DOMPurify preserves
-# <style> and <script> tags — without it, the HTML profile strips them.
+# ── Iframe card renderer ─────────────────────────────────────────────────────
+# Renders the unified card matrix inside a self-resizing <iframe> via
+# streamlit.components.v1.html() instead of st.html().
 #
-# Why this is more resilient than inline st.markdown:
-#   1. Atomic delivery — the element either loads fully or not at all; a
+# Why iframe rendering is preferred:
+#   1. Atomic delivery — the iframe either loads fully or not at all; a
 #      mid-render WebSocket closure does not crash the page.
-#   2. CSS isolation — card styles are scoped inside the DOMPurify-cleaned
-#      fragment, reducing leakage into the main Streamlit page.
+#   2. CSS isolation — card styles cannot leak into (or be affected by) the
+#      main Streamlit page.
+#   3. Self-resizing — a ResizeObserver + toggle listener adjusts the iframe
+#      height when <details> cards are expanded / collapsed, so no fixed
+#      height or scroll-bar is needed.
 # ---------------------------------------------------------------------------
 
+_MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
+_HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
+_MAX_IFRAME_HEIGHT = 3000      # px — cap before ResizeObserver takes over
+_RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
+# Auto-resize JavaScript injected into every card-matrix iframe.
+# Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
+# the iframe height whenever the content changes (e.g. <details> toggle).
+_IFRAME_RESIZE_JS = (
+    "<script>"
+    "(function(){"
+    "var timer;"
+    "function sendHeight(){clearTimeout(timer);timer=setTimeout(function(){"
+    "window.parent.postMessage({type:'streamlit:setFrameHeight',"
+    f"height:document.body.scrollHeight}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
+    "document.addEventListener('toggle',sendHeight,true);"
+    "window.addEventListener('load',sendHeight)"
+    "})()"
+    "</script>"
+)
+
 
 def _render_card_iframe(card_html, player_count):
-    """Render *card_html* via ``st.html(unsafe_allow_javascript=True)``.
+    """Render *card_html* inside a self-resizing iframe.
 
-    ``unsafe_allow_javascript`` is required so that DOMPurify preserves
-    the embedded ``<style>`` and ``<script>`` tags.  Without it,
-    Streamlit ≥1.55 sanitises with ``{USE_PROFILES:{html:true}}`` which
-    strips ``<style>`` — causing all card CSS to disappear.
+    Uses ``streamlit.components.v1.html()`` which creates a real ``<iframe>``
+    with full CSS isolation.  A ``ResizeObserver`` inside the iframe posts
+    ``streamlit:setFrameHeight`` messages so the iframe auto-grows when
+    ``<details>`` cards are expanded.
 
     Parameters
     ----------
@@ -251,19 +270,22 @@ def _render_card_iframe(card_html, player_count):
         Complete HTML (including ``<style>`` blocks) returned by
         :func:`utils.renderers.compile_unified_card_matrix`.
     player_count : int
-        Number of player groups (kept for API compatibility).
+        Number of player groups — used to estimate the initial iframe
+        height before the ``ResizeObserver`` adjusts it.
     """
+    _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
     _doc = (
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>html{overflow:visible}"
+        "<style>html{overflow:hidden}"
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
         "</head><body>"
         f"{card_html}"
+        f"{_IFRAME_RESIZE_JS}"
         "</body></html>"
     )
-    st.html(_doc, unsafe_allow_javascript=True)
+    _components.html(_doc, height=_est_h, scrolling=False)
 
 
 st.set_page_config(
