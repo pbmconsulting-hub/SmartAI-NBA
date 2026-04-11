@@ -34,7 +34,7 @@ def _safe_float(value, fallback=0.0):
 # Coefficient of variation (std / mean) above which a stat is
 # considered "too unpredictable" to bet reliably.
 # CV of 0.45 means the std is 45% of the average — very noisy.
-HIGH_VARIANCE_CV_THRESHOLD = 0.45  # loosened from 0.40 so secondary stats (steals, blocks, threes) aren't auto-avoided
+HIGH_VARIANCE_CV_THRESHOLD = 0.50  # loosened from 0.45 (was 0.40) so secondary stats (steals, blocks, threes) aren't auto-avoided
 
 # Sportsbook vig/juice is typically ~4.5%. We subtract 2.0% from raw edge
 # to account for this before declaring a qualifying edge.
@@ -64,10 +64,14 @@ STAT_EDGE_THRESHOLDS = {
     "fantasy_score_dk": 2.0,
     "fantasy_score_ud": 2.0,
     # Binary / near-binary stats — these are essentially 0-or-1 outcomes
-    # and need much larger edges to overcome inherent volatility.
-    "dunks": 8.0,
-    "blocked_shots": 6.0,
-    "blocked shots": 6.0,
+    # and need larger edges to overcome inherent volatility.
+    # Lowered from 8.0/6.0: the BINARY_STAT_CONFIDENCE_MULTIPLIER (0.75x)
+    # already penalises confidence scores, so the edge threshold doesn't
+    # need to be as extreme.  Previous values effectively required 12-13%
+    # raw edge when combined with LOW_VOLUME_UNCERTAINTY_MULTIPLIER.
+    "dunks": 5.0,
+    "blocked_shots": 4.5,
+    "blocked shots": 4.5,
     # Derived stats — doubly volatile (sum/diff of two independent columns)
     "two_pointers_made": 5.0,
     "two_pointers_attempted": 5.0,
@@ -652,7 +656,13 @@ def should_avoid_prop(
     stat_type_lower = str(stat_type).lower() if stat_type else ""
     vig_adjusted_edge = abs(edge_percentage) - effective_vig
     # Low-volume stats require a larger effective edge due to higher variance.
-    if stat_type_lower in LOW_VOLUME_STATS:
+    # BUT: only apply the uncertainty multiplier when the stat does NOT already
+    # have an elevated per-stat threshold in STAT_EDGE_THRESHOLDS.  The custom
+    # thresholds already account for higher volatility; stacking the 1.3×
+    # divisor on top created impossibly high requirements (e.g. dunks needed
+    # 12%+ raw edge).
+    _has_custom_threshold = stat_type_lower in STAT_EDGE_THRESHOLDS
+    if stat_type_lower in LOW_VOLUME_STATS and not _has_custom_threshold:
         effective_edge = vig_adjusted_edge / LOW_VOLUME_UNCERTAINTY_MULTIPLIER
     else:
         effective_edge = vig_adjusted_edge

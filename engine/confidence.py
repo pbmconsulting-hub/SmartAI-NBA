@@ -73,8 +73,8 @@ SILVER_TIER_MINIMUM_SCORE = 57    # Solid evidence above average (raised from 50
 # Anything below 57 = Bronze (lower confidence)
 
 # Minimum edge gate (W2): picks below these thresholds get auto-demoted
-PLATINUM_MIN_EDGE_PCT = 10.0   # Platinum requires ≥10% edge (lowered from 12%)
-GOLD_MIN_EDGE_PCT = 7.0        # Gold requires ≥7% edge (lowered from 10%)
+PLATINUM_MIN_EDGE_PCT = 8.0    # Platinum requires ≥8% edge (lowered from 10%; 12% originally)
+GOLD_MIN_EDGE_PCT = 5.0        # Gold requires ≥5% edge (lowered from 7%; 10% originally)
 SILVER_MIN_EDGE_PCT = 3.0      # Silver requires ≥3% edge (lowered from 5%)
 LOW_EDGE_THRESHOLD = 3.0       # Below 3% → add "Low edge" to avoid reasons (lowered from 5%)
 
@@ -83,7 +83,7 @@ PLATINUM_MIN_PROBABILITY = 0.62   # No Platinum below 62% win probability (was 0
 GOLD_MIN_PROBABILITY = 0.57       # No Gold below 57% win probability (was 0.55)
 
 # Auto-AVOID: coefficient of variation above this → automatically avoid
-AUTO_AVOID_CV_THRESHOLD = 0.45    # CV > 0.45 → auto-AVOID (loosened from 0.40 to reduce over-filtering)
+AUTO_AVOID_CV_THRESHOLD = 0.50    # CV > 0.50 → auto-AVOID (loosened from 0.45; was 0.40 originally)
 
 # Score below this threshold → "Do Not Bet" / Avoid tier.
 # 35/100 corresponds roughly to a coin-flip bet with marginal edge that is unlikely
@@ -553,14 +553,14 @@ def calculate_confidence_score(
     should_avoid = False
     avoid_reasons = []
 
-    # Kill switch 1: coefficient of variation > threshold → flag as should_avoid.
-    # High CV means the stat is extremely unpredictable (e.g. dunks, blocks).
-    # Previously this was "informational only" (Zero-Filter Recovery), but that
-    # allowed binary-stat props with CV > 0.45 to reach Gold tier and get tracked.
-    if stat_average > 0:
-        cv = stat_standard_deviation / stat_average
-        if cv > AUTO_AVOID_CV_THRESHOLD:
-            avoid_reasons.append(f"High variance (CV={cv:.2f} > {AUTO_AVOID_CV_THRESHOLD})")
+    # NOTE: CV-based auto-avoid was previously checked here as well, but
+    # this duplicated the same check in edge_detection.should_avoid_prop().
+    # When the QAM page merged both sources (OR'ing the flags), a prop with
+    # high CV was double-counted — flagged by BOTH engines — making it
+    # impossible to unflag.  The CV check now lives exclusively in
+    # should_avoid_prop() which is the canonical source for avoid logic.
+    # confidence.py still uses CV for SCORING (the cv_penalty on
+    # combined_score) but no longer sets should_avoid based on CV alone.
 
     # Kill switch 2: edge < SILVER_MIN_EDGE_PCT → auto-Bronze
     # (Force the score down to Bronze range if edge is too small to warrant higher tier)
