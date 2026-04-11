@@ -230,7 +230,7 @@ def _get_sim_cache() -> dict:
 
 _MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
 _HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
-_MAX_IFRAME_HEIGHT = 3000      # px — cap before ResizeObserver takes over
+_MAX_IFRAME_HEIGHT = 8000      # px — cap before ResizeObserver takes over
 _RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
@@ -282,14 +282,14 @@ def _render_card_iframe(card_html, player_count):
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>html{overflow:hidden}"
+        "<style>html{overflow-y:auto}"
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
         "</head><body>"
         f"{card_html}"
         f"{_IFRAME_RESIZE_JS}"
         "</body></html>"
     )
-    _components.html(_doc, height=_est_h, scrolling=False)
+    _components.html(_doc, height=_est_h, scrolling=True)
 
 
 st.set_page_config(

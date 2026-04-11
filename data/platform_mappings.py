@@ -122,6 +122,15 @@ for _map in (PRIZEPICKS_STAT_MAP, DRAFTKINGS_STAT_MAP, UNDERDOG_STAT_MAP):
     for _k, _v in _map.items():
         ALL_PLATFORM_STAT_NAMES[_k.lower()] = _v
 
+# Reverse lookup: internal stat key → human-readable display name.
+# Built from PrizePicks map (preferred display names) with fallbacks
+# from DraftKings for any keys not already present.
+_INTERNAL_TO_DISPLAY: dict[str, str] = {}
+for _map in (PRIZEPICKS_STAT_MAP, DRAFTKINGS_STAT_MAP, UNDERDOG_STAT_MAP):
+    for _display, _internal in _map.items():
+        if _internal not in _INTERNAL_TO_DISPLAY:
+            _INTERNAL_TO_DISPLAY[_internal] = _display
+
 # ============================================================
 # END SECTION: Platform Stat Name Mappings
 # ============================================================
@@ -241,6 +250,32 @@ def normalize_stat_type(raw_stat_name, platform=None):
 
     # Return lowercased name as fallback (may already be internal key)
     return lower_name
+
+
+def display_stat_name(internal_key: str) -> str:
+    """Convert an internal stat key to a human-readable display name.
+
+    Args:
+        internal_key: Internal stat key (e.g., ``"personal_fouls"``,
+            ``"points_rebounds_assists"``).
+
+    Returns:
+        Human-readable name (e.g., ``"Personal Fouls"``,
+        ``"Pts+Rebs+Asts"``).  Falls back to title-casing with
+        underscores replaced by spaces if no mapping exists.
+
+    Example:
+        display_stat_name("personal_fouls")  → "Personal Fouls"
+        display_stat_name("threes")          → "3-Point Made"
+        display_stat_name("points")          → "Points"
+    """
+    if not internal_key:
+        return ""
+    hit = _INTERNAL_TO_DISPLAY.get(internal_key)
+    if hit:
+        return hit
+    # Fallback: title-case with underscores → spaces
+    return internal_key.replace("_", " ").title()
 
 
 def detect_platform_from_stat_names(stat_names):

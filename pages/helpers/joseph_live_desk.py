@@ -48,6 +48,12 @@ try:
 except ImportError:
     _TICKETS_AVAILABLE = False
 
+try:
+    from data.platform_mappings import display_stat_name as _display_stat_name
+except ImportError:
+    def _display_stat_name(key: str) -> str:  # type: ignore[misc]
+        return key.replace("_", " ").title() if key else ""
+
 
 # ═════════════════════════════════════════════════════════════
 # get_joseph_avatar_b64 — cached base64 loader for avatar
@@ -1170,7 +1176,7 @@ def render_joseph_live_desk(
                 try:
                     result = joseph_full_analysis(ar, player_data, game_data, teams_data)
                     result["player"] = player_name
-                    result["prop"] = ar.get("stat_type", ar.get("prop", ""))
+                    result["prop"] = _display_stat_name(ar.get("stat_type", ar.get("prop", "")))
                     result["line"] = ar.get("line", ar.get("prop_line", ""))
                     result["direction"] = ar.get("direction", "")
                     result["team"] = player_team
@@ -1304,7 +1310,7 @@ def render_joseph_live_desk(
                     leg_lines = []
                     for leg in ticket.get("legs", []):
                         lp = _html.escape(str(leg.get("player", "")))
-                        ls = _html.escape(str(leg.get("stat_type", leg.get("prop", ""))))
+                        ls = _html.escape(_display_stat_name(str(leg.get("stat_type", leg.get("prop", "")))))
                         ld = _html.escape(str(leg.get("direction", "")))
                         leg_lines.append(f"{lp} {ls} {ld}")
                     legs_str = " &bull; ".join(leg_lines)
