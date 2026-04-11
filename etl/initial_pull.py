@@ -51,6 +51,7 @@ from nba_api.stats.endpoints import (
 from nba_api.stats.static import teams as static_teams
 
 from . import setup_db
+from .cbs_injuries import sync_cbs_injuries
 from .rotowire_injuries import sync_rotowire_injuries
 from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
@@ -2201,6 +2202,17 @@ def run_initial_pull(db_path: str = DB_PATH, season: str = SEASON) -> dict:
         except Exception:
             logger.exception(
                 "RotoWire injury sync failed — continuing without injury data."
+            )
+        conn.commit()
+
+        # --- CBS Sports injury data ---
+        logger.info("--- Syncing CBS Sports injury report ---")
+        try:
+            cbs_count = sync_cbs_injuries(db_path)
+            logger.info("CBS injury sync: %d rows upserted.", cbs_count)
+        except Exception:
+            logger.exception(
+                "CBS injury sync failed — continuing without CBS injury data."
             )
         conn.commit()
 
