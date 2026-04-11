@@ -2273,7 +2273,7 @@ if analysis_results:
             st.caption(
                 f"ℹ️ {_avoid_count} pick(s) hidden (flagged as avoid due to "
                 "low edge, high variance, or conflicting signals). "
-                "Toggle **❌ Hide Avoids** off to reveal them."
+                "Disable **❌ Hide Avoids** to reveal them."
             )
 
     # ── Legacy tier multiselect (still useful for multi-tier combos) ──
