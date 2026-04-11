@@ -151,9 +151,9 @@ CREATE TABLE IF NOT EXISTS Injury_Status (
     report_date     TEXT    NOT NULL,
     status          TEXT    NOT NULL,
     reason          TEXT,
-    source          TEXT,
+    source          TEXT    NOT NULL DEFAULT 'unknown',
     last_updated_ts TEXT,
-    PRIMARY KEY (player_id, report_date)
+    PRIMARY KEY (player_id, report_date, source)
 );
 """
 
@@ -1264,6 +1264,7 @@ _INDEXES = (
     ("idx_roster_team_active", "Team_Roster", "(team_id, effective_end_date)"),
     ("idx_injury_report_date", "Injury_Status", "(report_date)"),
     ("idx_injury_player_date", "Injury_Status", "(player_id, report_date)"),
+    ("idx_injury_source", "Injury_Status", "(source)"),
     ("idx_schedule_season", "Schedule", "(season_year)"),
     ("idx_bsa_game_person", "Box_Score_Advanced", "(game_id, person_id)"),
     ("idx_bss_game_person", "Box_Score_Scoring", "(game_id, person_id)"),
@@ -1302,7 +1303,41 @@ def create_tables(db_path: str = DB_PATH) -> None:
         cursor.execute(CREATE_TEAM_ROSTER)
         cursor.execute(CREATE_INJURY_STATUS)
 
-        # ---- API data tables (added in previous iteration) ----
+        # ------------------------------------------------------------------
+        # Migration: upgrade Injury_Status from 2-column PK to 3-column PK
+        # ------------------------------------------------------------------
+        # Detect the old schema by inspecting the table's SQL definition.
+        # If it contains "PRIMARY KEY (player_id, report_date)" (without
+        # source) we rename the table, recreate with the new PK, copy data
+        # over (defaulting source to 'unknown' where NULL), then drop old.
+        _old_pk_sig = "primary key (player_id, report_date)"
+        _inj_row = cursor.execute(
+            "SELECT sql FROM sqlite_master "
+            "WHERE type='table' AND name='Injury_Status'"
+        ).fetchone()
+        if _inj_row and _old_pk_sig in (_inj_row[0] or "").lower():
+            logger.info(
+                "Migrating Injury_Status: upgrading PK from "
+                "(player_id, report_date) → (player_id, report_date, source)"
+            )
+            cursor.execute(
+                "ALTER TABLE Injury_Status RENAME TO Injury_Status_old"
+            )
+            cursor.execute(CREATE_INJURY_STATUS)
+            cursor.execute(
+                """
+                INSERT INTO Injury_Status
+                    (player_id, team_id, report_date, status, reason,
+                     source, last_updated_ts)
+                SELECT player_id, team_id, report_date, status, reason,
+                       COALESCE(source, 'unknown'), last_updated_ts
+                FROM Injury_Status_old
+                """
+            )
+            cursor.execute("DROP TABLE Injury_Status_old")
+            logger.info("Injury_Status migration complete.")
+
+
         logger.info("Creating API data tables …")
         cursor.execute(CREATE_STANDINGS)
         cursor.execute(CREATE_SCHEDULE)

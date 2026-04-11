@@ -363,8 +363,8 @@ def transform_injuries(
 
     df = pd.DataFrame(records)
     if not df.empty:
-        # Deduplicate: keep last occurrence per (player_id, report_date).
-        df = df.drop_duplicates(subset=["player_id", "report_date"], keep="last")
+        # Deduplicate: keep last occurrence per (player_id, report_date, source).
+        df = df.drop_duplicates(subset=["player_id", "report_date", "source"], keep="last")
     logger.info("Transformed %d injury records (from %d raw rows).", len(df), len(raw_rows))
     return df
 

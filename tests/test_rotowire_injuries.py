@@ -121,9 +121,9 @@ def _make_test_db() -> tuple[str, sqlite3.Connection]:
             report_date     TEXT    NOT NULL,
             status          TEXT    NOT NULL,
             reason          TEXT,
-            source          TEXT,
+            source          TEXT    NOT NULL DEFAULT 'unknown',
             last_updated_ts TEXT,
-            PRIMARY KEY (player_id, report_date)
+            PRIMARY KEY (player_id, report_date, source)
         );
         """
     )
@@ -700,3 +700,131 @@ class TestPlayerInjuryEndpoint:
         finally:
             api_mod.DB_PATH = orig_db
             setup_mod.DB_PATH = orig_setup
+
+
+# ===========================================================================
+# Tests: multi-source coexistence (new 3-column PK)
+# ===========================================================================
+
+
+class TestMultiSourceCoexistence:
+    """Verify that two rows with the same (player_id, report_date) but
+    different source values can coexist in the Injury_Status table after the
+    PK migration to (player_id, report_date, source)."""
+
+    def setup_method(self):
+        self.db_path, self.conn = _make_test_db()
+
+    def teardown_method(self):
+        self.conn.close()
+        try:
+            os.unlink(self.db_path)
+        except OSError:
+            pass
+
+    def _insert(self, player_id, report_date, source, status="Questionable"):
+        self.conn.execute(
+            "INSERT OR REPLACE INTO Injury_Status "
+            "(player_id, team_id, report_date, status, reason, source, last_updated_ts) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (player_id, 1610612747, report_date, status, "ankle", source,
+             "2026-04-10T21:00:00Z"),
+        )
+        self.conn.commit()
+
+    def test_two_sources_same_player_date_coexist(self):
+        """RotoWire + CBS rows for same player/date should both persist."""
+        self._insert(2544, "2026-04-10", "rotowire")
+        self._insert(2544, "2026-04-10", "cbssports")
+        count = self.conn.execute(
+            "SELECT COUNT(*) FROM Injury_Status "
+            "WHERE player_id=2544 AND report_date='2026-04-10'"
+        ).fetchone()[0]
+        assert count == 2
+
+    def test_upsert_same_pk_is_idempotent(self):
+        """Inserting same (player_id, report_date, source) twice replaces, not appends."""
+        self._insert(2544, "2026-04-10", "rotowire", status="Questionable")
+        self._insert(2544, "2026-04-10", "rotowire", status="Out")
+        count = self.conn.execute(
+            "SELECT COUNT(*) FROM Injury_Status "
+            "WHERE player_id=2544 AND report_date='2026-04-10' AND source='rotowire'"
+        ).fetchone()[0]
+        assert count == 1
+        status = self.conn.execute(
+            "SELECT status FROM Injury_Status "
+            "WHERE player_id=2544 AND report_date='2026-04-10' AND source='rotowire'"
+        ).fetchone()[0]
+        assert status == "Out"
+
+    def test_source_filter_api(self):
+        """GET /api/injuries?source=rotowire returns only rotowire rows."""
+        self._insert(2544, "2026-04-10", "rotowire", status="Questionable")
+        self._insert(201939, "2026-04-10", "cbssports", status="Out")
+        self.conn.close()
+        client, api_mod, orig_db, setup_mod, orig_setup = _make_api_client(self.db_path)
+        try:
+            resp = client.get("/api/injuries?source=rotowire")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert all(r["source"] == "rotowire" for r in data["injuries"])
+            assert len(data["injuries"]) == 1
+            assert data["injuries"][0]["player_id"] == 2544
+        finally:
+            api_mod.DB_PATH = orig_db
+            setup_mod.DB_PATH = orig_setup
+            self.conn = sqlite3.connect(self.db_path)
+
+    def test_no_source_filter_returns_all_sources(self):
+        """GET /api/injuries (no filter) returns rows from all sources."""
+        self._insert(2544, "2026-04-10", "rotowire")
+        self._insert(201939, "2026-04-10", "cbssports")
+        self.conn.close()
+        client, api_mod, orig_db, setup_mod, orig_setup = _make_api_client(self.db_path)
+        try:
+            resp = client.get("/api/injuries")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data["injuries"]) == 2
+            sources = {r["source"] for r in data["injuries"]}
+            assert sources == {"rotowire", "cbssports"}
+        finally:
+            api_mod.DB_PATH = orig_db
+            setup_mod.DB_PATH = orig_setup
+            self.conn = sqlite3.connect(self.db_path)
+
+    def test_injuries_sources_endpoint(self):
+        """GET /api/injuries/sources returns distinct sources."""
+        self._insert(2544, "2026-04-10", "rotowire")
+        self._insert(201939, "2026-04-10", "cbssports")
+        self.conn.close()
+        client, api_mod, orig_db, setup_mod, orig_setup = _make_api_client(self.db_path)
+        try:
+            resp = client.get("/api/injuries/sources")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "sources" in data
+            assert set(data["sources"]) == {"rotowire", "cbssports"}
+        finally:
+            api_mod.DB_PATH = orig_db
+            setup_mod.DB_PATH = orig_setup
+            self.conn = sqlite3.connect(self.db_path)
+
+    def test_player_injury_all_sources_field(self):
+        """GET /api/players/{id}/injury includes all_sources for the latest date."""
+        self._insert(2544, "2026-04-10", "rotowire", status="Questionable")
+        self._insert(2544, "2026-04-10", "cbssports", status="Out")
+        self.conn.close()
+        client, api_mod, orig_db, setup_mod, orig_setup = _make_api_client(self.db_path)
+        try:
+            resp = client.get("/api/players/2544/injury")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "all_sources" in data
+            assert len(data["all_sources"]) == 2
+            source_names = {r["source"] for r in data["all_sources"]}
+            assert source_names == {"rotowire", "cbssports"}
+        finally:
+            api_mod.DB_PATH = orig_db
+            setup_mod.DB_PATH = orig_setup
+            self.conn = sqlite3.connect(self.db_path)
