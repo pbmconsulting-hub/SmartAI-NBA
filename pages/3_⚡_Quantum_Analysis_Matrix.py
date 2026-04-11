@@ -245,6 +245,13 @@ def _render_card_iframe(card_html, player_count):
     Streamlit ≥1.55 sanitises with ``{USE_PROFILES:{html:true}}`` which
     strips ``<style>`` — causing all card CSS to disappear.
 
+    The card HTML is passed directly — no ``<!DOCTYPE>`` / ``<html>``
+    wrapper is needed because ``st.html()`` injects content into the
+    existing page DOM (Streamlit ≥1.55 does NOT iframe it).  A full
+    document wrapper caused DOMPurify to strip ``<head>``/``<body>``
+    structural tags and emit global ``html``/``body`` CSS rules that
+    leaked into the parent page.
+
     Parameters
     ----------
     card_html : str
@@ -253,17 +260,7 @@ def _render_card_iframe(card_html, player_count):
     player_count : int
         Number of player groups (kept for API compatibility).
     """
-    _doc = (
-        "<!DOCTYPE html><html><head>"
-        '<meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>html{overflow:visible}"
-        "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
-        "</head><body>"
-        f"{card_html}"
-        "</body></html>"
-    )
-    st.html(_doc, unsafe_allow_javascript=True)
+    st.html(card_html, unsafe_allow_javascript=True)
 
 
 st.set_page_config(

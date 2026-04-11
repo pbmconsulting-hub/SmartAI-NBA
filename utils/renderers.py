@@ -274,7 +274,6 @@ def _build_single_card_html(result, index=0):
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
             f'src="{headshot_url}" '
-            f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
             f'alt="{player_name}">'
         )
     else:
@@ -664,7 +663,6 @@ def build_horizontal_card_html(result, accent_color="#00f0ff"):
         img_html = (
             f'<img class="qcm-headshot qcm-headshot-{tier_lower}" '
             f'src="{headshot_url}" '
-            f'onerror="this.onerror=null;this.src=\'{_FALLBACK_SVG}\'" '
             f'alt="{player_name}">'
         )
     else:
@@ -953,8 +951,7 @@ def _build_unified_player_header(player_name, vitals):
     ) if team and team != "N/A" else ""
 
     return (
-        f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}" '
-        f'onerror="this.onerror=null;this.src=\'{_FALLBACK_HEADSHOT}\'">'
+        f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}">'
         f'<div class="upc-identity">'
         f'<div class="upc-player-name">{safe_name}{team_badge}</div>'
         f'<div class="upc-subtitle">{position} · {team} vs {opponent}</div>'
@@ -1001,15 +998,13 @@ def build_unified_player_card_html(player_name, vitals, props,
         lock_stat = _html.escape(str(joseph_opinion.get("platinum_lock_stat", "N/A")))
         rant_text = _html.escape(str(joseph_opinion.get("rant", "")))
         joseph_html = (
-            f'<div class="upc-joseph-row" onclick="toggleJoseph(\'{_safe_id}\')">'
-            f'<img class="upc-joseph-avatar" '
-            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            f'<div class="upc-joseph-row" data-joseph-id="{_safe_id}">'
+            f'<img class="upc-joseph-avatar" alt="Joseph M Smith">'
             f'<span class="upc-joseph-label">🎙️ Ask Joseph M Smith</span>'
             f'</div>'
             f'<div id="joseph-resp-{_safe_id}" class="upc-joseph-response" style="display:none;">'
             f'<div class="upc-joseph-resp-header">'
-            f'<img class="upc-joseph-resp-avatar" '
-            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            f'<img class="upc-joseph-resp-avatar" alt="Joseph M Smith">'
             f'<div class="upc-joseph-resp-title">'
             f'<span class="upc-joseph-resp-name">Joseph M. Smith</span>'
             f'<span class="upc-joseph-resp-role">🟢 LIVE — NBA Analyst</span>'
@@ -1022,8 +1017,7 @@ def build_unified_player_card_html(player_name, vitals, props,
     elif _j_b64:
         joseph_html = (
             '<div class="upc-joseph-row" style="opacity:0.5;cursor:default;">'
-            f'<img class="upc-joseph-avatar" '
-            f'src="data:image/png;base64,{_j_b64}" alt="Joseph M Smith">'
+            f'<img class="upc-joseph-avatar" alt="Joseph M Smith">'
             '<span class="upc-joseph-label">🎙️ Ask Joseph M Smith</span>'
             '</div>'
         )
@@ -1091,18 +1085,55 @@ def compile_unified_card_matrix(grouped_players, joseph_opinions=None):
                 joseph_opinion=opinions.get(name),
             ))
 
-    # JavaScript toggle function for Ask Joseph M Smith response panels.
-    _toggle_js = (
+    # Headshot fallback SVG (URL-safe, no quotes to break JS)
+    _fb_svg = _FALLBACK_SVG
+    _fb_hs = _FALLBACK_HEADSHOT
+
+    # Joseph avatar base64 — embed once in JS instead of per-card <img>
+    _j_b64 = _get_joseph_avatar_b64() or ""
+    _joseph_src = f"data:image/png;base64,{_j_b64}" if _j_b64 else ""
+
+    # JavaScript: DOMPurify strips inline event-handler attributes
+    # (onclick, onerror) so we attach listeners via addEventListener
+    # after the DOM is populated.
+    _init_js = (
         "<script>"
-        "function toggleJoseph(id){"
+        "(function(){"
+        # ── Headshot fallback ──
+        # Replace broken headshots with SVG silhouette (onerror is stripped)
+        f"var fb='{_fb_svg}';"
+        f"var fbH='{_fb_hs}';"
+        "document.querySelectorAll('.qcm-headshot').forEach(function(img){"
+        "img.addEventListener('error',function(){this.src=fb;});"
+        "if(img.complete&&!img.naturalWidth&&img.src.indexOf('data:')!==0)"
+        "{img.src=fb;}"
+        "});"
+        "document.querySelectorAll('.upc-headshot').forEach(function(img){"
+        "img.addEventListener('error',function(){this.src=fbH;});"
+        "if(img.complete&&!img.naturalWidth&&img.src.indexOf('data:')!==0)"
+        "{img.src=fbH;}"
+        "});"
+        # ── Joseph avatar injection (embed once, not per card) ──
+        + (
+            f"var ja='{_joseph_src}';"
+            "document.querySelectorAll('.upc-joseph-avatar,.upc-joseph-resp-avatar')"
+            ".forEach(function(img){img.src=ja;});"
+        if _joseph_src else "") +
+        # ── Joseph toggle (onclick is stripped by DOMPurify) ──
+        "document.querySelectorAll('.upc-joseph-row[data-joseph-id]')"
+        ".forEach(function(el){"
+        "el.addEventListener('click',function(){"
+        "var id=this.getAttribute('data-joseph-id');"
         "var p=document.getElementById('joseph-resp-'+id);"
         "if(p){p.style.display=p.style.display==='none'?'block':'none';}"
-        "}"
+        "});"
+        "});"
+        "})();"
         "</script>"
     )
 
     return (
         f"<style>{QUANTUM_CARD_MATRIX_CSS}{UNIFIED_PLAYER_CARD_CSS}</style>"
         f'<div class="upc-grid">{"".join(cards)}</div>'
-        f'{_toggle_js}'
+        f'{_init_js}'
     )
