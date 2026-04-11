@@ -1360,12 +1360,17 @@ with st.expander("🔧 ETL Health Monitor", expanded=False):
                         "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
                     ).fetchall()
                 ]
-                if _tables:
+                # Whitelist: only count tables whose names are
+                # simple identifiers (alphanumeric + underscore).  This
+                # prevents any injected names from reaching the query.
+                import re as _re_mod
+                _safe_tables = [t for t in _tables if _re_mod.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", t)]
+                if _safe_tables:
                     _table_rows = []
-                    for _tbl in _tables:
+                    for _tbl in _safe_tables:
                         try:
                             _cnt = _health_conn.execute(
-                                f"SELECT COUNT(*) FROM [{_tbl}]"  # noqa: S608 — table names from sqlite_master, not user input
+                                f"SELECT COUNT(*) FROM [{_tbl}]"
                             ).fetchone()[0]
                             _table_rows.append({"Table": _tbl, "Rows": f"{_cnt:,}"})
                         except Exception:
@@ -1448,10 +1453,16 @@ with st.expander("🔍 Explore Your Data", expanded=False):
                 if not _sql_db.exists():
                     st.warning("No database file found.")
                 else:
-                    # Safety: only allow SELECT queries
+                    # Safety: only allow SELECT queries — block dangerous keywords
                     _clean = _sql_query.strip().upper()
+                    _BLOCKED_KEYWORDS = (
+                        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE",
+                        "ATTACH", "DETACH", "PRAGMA", "REPLACE", "GRANT", "REVOKE",
+                    )
                     if not _clean.startswith("SELECT"):
                         st.error("❌ Only SELECT queries are allowed.")
+                    elif any(kw in _clean for kw in _BLOCKED_KEYWORDS):
+                        st.error("❌ Query contains a disallowed keyword. Only pure SELECT queries are allowed.")
                     else:
                         _sql_conn = sqlite3.connect(f"file:{_sql_db}?mode=ro", uri=True)
                         try:
