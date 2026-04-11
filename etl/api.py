@@ -1053,51 +1053,34 @@ def get_injuries(source: Optional[str] = Query(default=None, description="Filter
         return {"report_date": None, "injuries": []}
 
     if source:
-        rows = _query_rows(
-            """
-            SELECT
-                i.player_id,
-                p.full_name,
-                i.team_id,
-                t.team_name,
-                t.abbreviation,
-                i.report_date,
-                i.status,
-                i.reason,
-                i.source,
-                i.last_updated_ts
-            FROM Injury_Status i
-            LEFT JOIN Players p ON i.player_id = p.player_id
-            LEFT JOIN Teams   t ON i.team_id   = t.team_id
-            WHERE i.report_date = ? AND i.source = ?
-            ORDER BY t.abbreviation, p.full_name
-            """,
-            (report_date, source),
-            label="get_injuries",
-        )
+        source_clause = "AND i.source = ?"
+        params: tuple = (report_date, source)
     else:
-        rows = _query_rows(
-            """
-            SELECT
-                i.player_id,
-                p.full_name,
-                i.team_id,
-                t.team_name,
-                t.abbreviation,
-                i.report_date,
-                i.status,
-                i.reason,
-                i.source,
-                i.last_updated_ts
-            FROM Injury_Status i
-            LEFT JOIN Players p ON i.player_id = p.player_id
-            LEFT JOIN Teams   t ON i.team_id   = t.team_id
-            WHERE i.report_date = ?
-            ORDER BY t.abbreviation, p.full_name
-            """,
-            (report_date,),
-            label="get_injuries",
-        )
+        source_clause = ""
+        params = (report_date,)
+
+    rows = _query_rows(
+        f"""
+        SELECT
+            i.player_id,
+            p.full_name,
+            i.team_id,
+            t.team_name,
+            t.abbreviation,
+            i.report_date,
+            i.status,
+            i.reason,
+            i.source,
+            i.last_updated_ts
+        FROM Injury_Status i
+        LEFT JOIN Players p ON i.player_id = p.player_id
+        LEFT JOIN Teams   t ON i.team_id   = t.team_id
+        WHERE i.report_date = ? {source_clause}
+        ORDER BY t.abbreviation, p.full_name
+        """,
+        params,
+        label="get_injuries",
+    )
     logger.info("Found %d injury rows for %s.", len(rows), report_date)
     return {"report_date": report_date, "injuries": rows}
 

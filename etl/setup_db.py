@@ -1337,8 +1337,7 @@ def create_tables(db_path: str = DB_PATH) -> None:
             cursor.execute("DROP TABLE Injury_Status_old")
             logger.info("Injury_Status migration complete.")
 
-
-        logger.info("Creating API data tables …")
+        # ---- API data tables (added in previous iteration) ----
         cursor.execute(CREATE_STANDINGS)
         cursor.execute(CREATE_SCHEDULE)
         cursor.execute(CREATE_PLAY_BY_PLAY)
