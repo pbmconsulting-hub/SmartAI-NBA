@@ -223,114 +223,92 @@ class TestColumnValidation(unittest.TestCase):
 
 
 # =============================================================================
-# Section 4: RosterEngine._fetch_official_pdf_injuries()
+# Section 4: RosterEngine._fetch_rotowire_injuries()
 # =============================================================================
 
 @unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
-class TestRosterEnginePdfSource(unittest.TestCase):
-    """Integration tests for RosterEngine._fetch_official_pdf_injuries()."""
+class TestRosterEngineRotowireSource(unittest.TestCase):
+    """Integration tests for RosterEngine._fetch_rotowire_injuries()."""
 
     def _make_engine(self):
         from data.roster_engine import RosterEngine
         return RosterEngine()
 
-    # ── Test 10: happy path ───────────────────────────────────────────────────
-    def test_happy_path_two_players(self):
-        """Method must return dict with 2 entries when get_report() succeeds."""
-        mock_df = pd.DataFrame(
-            [
-                {
-                    "Game Date": "2026-03-25",
-                    "Game Time": "7:30 PM",
-                    "Matchup": "LAL @ BOS",
-                    "Team": "Los Angeles Lakers",
-                    "Player Name": "LeBron James",
-                    "Current Status": "Out",
-                    "Reason": "Left Knee; Soreness",
-                },
-                {
-                    "Game Date": "2026-03-25",
-                    "Game Time": "7:30 PM",
-                    "Matchup": "LAL @ BOS",
-                    "Team": "Los Angeles Lakers",
-                    "Player Name": "Anthony Davis",
-                    "Current Status": "Questionable",
-                    "Reason": "Back",
-                },
-            ]
-        )
+    # ── Test 10: live scrape fallback ─────────────────────────────────────────
+    def test_live_scrape_fallback(self):
+        """Method must return dict via live scrape when DB is unavailable."""
         engine = self._make_engine()
-        with patch("data.roster_engine.RosterEngine._fetch_official_pdf_injuries",
-                   wraps=engine._fetch_official_pdf_injuries):
-            with patch("data.nba_injury_pdf.get_report", return_value=mock_df):
-                result = engine._fetch_official_pdf_injuries()
+        raw_rows = [
+            {"player_name": "LeBron James", "team_abbrev": "LAL", "reason": "ankle",
+             "status": "Out", "est_return": "Day-to-Day", "position": "F"},
+            {"player_name": "Anthony Davis", "team_abbrev": "LAL", "reason": "back",
+             "status": "Questionable", "est_return": "", "position": "F"},
+        ]
+        with patch("data.roster_engine.RosterEngine._fetch_rotowire_injuries",
+                    wraps=engine._fetch_rotowire_injuries):
+            with patch.dict("sys.modules", {"data.etl_data_service": None}), \
+                 patch("etl.rotowire_injuries.fetch_injury_page", return_value="<html></html>"), \
+                 patch("etl.rotowire_injuries.parse_injury_table", return_value=raw_rows):
+                result = engine._fetch_rotowire_injuries()
 
         self.assertEqual(len(result), 2)
-
         lebron_key = "lebron james"
         self.assertIn(lebron_key, result)
         self.assertEqual(result[lebron_key]["status"], "Out")
-        self.assertEqual(result[lebron_key]["source"], "nba-official-pdf")
-        self.assertIn("Knee", result[lebron_key]["injury"])
+        self.assertEqual(result[lebron_key]["source"], "rotowire")
+        self.assertIn("ankle", result[lebron_key]["injury"])
 
-        ad_key = "anthony davis"
-        self.assertIn(ad_key, result)
-        self.assertEqual(result[ad_key]["status"], "Questionable")
-
-    # ── Test 11: ImportError graceful fallback ────────────────────────────────
-    def test_import_error_returns_empty(self):
-        """ImportError when importing get_report must return {}."""
+    # ── Test 11: all sources fail returns empty ──────────────────────────────
+    def test_all_sources_fail_returns_empty(self):
+        """When both DB and live scrape fail, method must return {}."""
         engine = self._make_engine()
-        with patch.dict("sys.modules", {"data.nba_injury_pdf": None}):
-            result = engine._fetch_official_pdf_injuries()
+        with patch.dict("sys.modules", {"data.etl_data_service": None}), \
+             patch.dict("sys.modules", {"etl.rotowire_injuries": None}):
+            result = engine._fetch_rotowire_injuries()
         self.assertEqual(result, {})
 
-    # ── Test 12: empty DataFrame returns {} ──────────────────────────────────
-    def test_empty_dataframe_returns_empty(self):
-        """Empty DataFrame from get_report must return {}."""
-        from data.nba_injury_pdf._constants import EXPECTED_COLUMNS
-        empty_df = pd.DataFrame(columns=EXPECTED_COLUMNS)
+    # ── Test 12: empty scrape returns {} ─────────────────────────────────────
+    def test_empty_scrape_returns_empty(self):
+        """Empty result from live scrape must return {}."""
         engine = self._make_engine()
-        with patch("data.nba_injury_pdf.get_report", return_value=empty_df):
-            result = engine._fetch_official_pdf_injuries()
+        with patch.dict("sys.modules", {"data.etl_data_service": None}), \
+             patch("etl.rotowire_injuries.fetch_injury_page", return_value="<html></html>"), \
+             patch("etl.rotowire_injuries.parse_injury_table", return_value=[]):
+            result = engine._fetch_rotowire_injuries()
         self.assertEqual(result, {})
 
 
 # =============================================================================
-# Section 5: RosterEngine.refresh() calls Source 0
+# Section 5: RosterEngine.refresh() calls RotoWire source
 # =============================================================================
 
 @unittest.skipUnless(_HAS_PANDAS, "pandas not installed")
-class TestRosterEngineRefreshSource0(unittest.TestCase):
-    """Verify that refresh() calls _fetch_official_pdf_injuries and uses results."""
+class TestRosterEngineRefreshRotowire(unittest.TestCase):
+    """Verify that refresh() calls _fetch_rotowire_injuries and uses results."""
 
-    # ── Test 13: Source 0 called and present in injury_map ───────────────────
-    def test_refresh_calls_source0_and_merges(self):
-        """Source 0 results must be present in _injury_map after refresh()."""
+    # ── Test 13: RotoWire source called and present in injury_map ────────────
+    def test_refresh_calls_rotowire_and_merges(self):
+        """RotoWire results must be present in _injury_map after refresh()."""
         from data.roster_engine import RosterEngine
 
-        pdf_data = {
+        rotowire_data = {
             "lebron james": {
                 "status": "Out",
-                "injury": "Left Knee",
+                "injury": "ankle",
                 "team": "LAL",
                 "return_date": "",
-                "source": "nba-official-pdf",
-                "game_date": "2026-03-25",
-                "game_time": "7:30 PM",
-                "matchup": "LAL @ BOS",
+                "source": "rotowire",
             }
         }
 
         engine = RosterEngine()
-        with patch.object(engine, "_fetch_official_pdf_injuries", return_value=pdf_data) as mock_src0, \
-             patch.object(engine, "_fetch_nba_api_injuries", return_value={}), \
+        with patch.object(engine, "_fetch_rotowire_injuries", return_value=rotowire_data) as mock_src, \
              patch.object(engine, "_fetch_nba_api_rosters"):
             engine.refresh(["LAL"])
 
-        mock_src0.assert_called_once()
+        mock_src.assert_called_once()
         self.assertIn("lebron james", engine._injury_map)
-        self.assertEqual(engine._injury_map["lebron james"]["source"], "nba-official-pdf")
+        self.assertEqual(engine._injury_map["lebron james"]["source"], "rotowire")
 
 
 # =============================================================================

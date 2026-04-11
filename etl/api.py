@@ -1000,6 +1000,147 @@ def get_schedule() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Injury endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/injuries")
+def get_injuries() -> dict:
+    """Return all current injury reports for the latest report date.
+
+    Joins with the ``Players`` and ``Teams`` tables to include player and team
+    names alongside the raw status fields.  Only rows for the most recent
+    ``report_date`` stored in ``Injury_Status`` are returned.
+
+    Returns:
+        JSON with a ``report_date`` and an ``injuries`` list::
+
+            {
+              "report_date": "2026-04-10",
+              "injuries": [
+                {
+                  "player_id": 2544,
+                  "full_name": "LeBron James",
+                  "team_id": 1610612747,
+                  "team_name": "Los Angeles Lakers",
+                  "abbreviation": "LAL",
+                  "report_date": "2026-04-10",
+                  "status": "Questionable",
+                  "reason": "ankle",
+                  "source": "rotowire",
+                  "last_updated_ts": "2026-04-10T21:00:00Z"
+                },
+                ...
+              ]
+            }
+
+    Raises:
+        HTTPException 500: On unexpected database errors.
+    """
+    logger.info("GET /api/injuries")
+
+    latest = _query_one(
+        "SELECT MAX(report_date) AS latest FROM Injury_Status",
+        label="get_injuries/latest_date",
+    )
+    report_date = (latest or {}).get("latest") or ""
+
+    if not report_date:
+        return {"report_date": None, "injuries": []}
+
+    rows = _query_rows(
+        """
+        SELECT
+            i.player_id,
+            p.full_name,
+            i.team_id,
+            t.team_name,
+            t.abbreviation,
+            i.report_date,
+            i.status,
+            i.reason,
+            i.source,
+            i.last_updated_ts
+        FROM Injury_Status i
+        LEFT JOIN Players p ON i.player_id = p.player_id
+        LEFT JOIN Teams   t ON i.team_id   = t.team_id
+        WHERE i.report_date = ?
+        ORDER BY t.abbreviation, p.full_name
+        """,
+        (report_date,),
+        label="get_injuries",
+    )
+    logger.info("Found %d injury rows for %s.", len(rows), report_date)
+    return {"report_date": report_date, "injuries": rows}
+
+
+@app.get("/api/players/{player_id}/injury")
+def get_player_injury(player_id: int) -> dict:
+    """Return the most recent injury status for a specific player.
+
+    Joins with the ``Teams`` table for team name and abbreviation.
+
+    Args:
+        player_id: The NBA player ID.
+
+    Returns:
+        JSON with an ``injury`` key containing the latest injury record (or
+        ``{}`` if the player has no injury record)::
+
+            {
+              "player_id": 2544,
+              "injury": {
+                "player_id": 2544,
+                "team_id": 1610612747,
+                "team_name": "Los Angeles Lakers",
+                "abbreviation": "LAL",
+                "report_date": "2026-04-10",
+                "status": "Questionable",
+                "reason": "ankle",
+                "source": "rotowire",
+                "last_updated_ts": "2026-04-10T21:00:00Z"
+              }
+            }
+
+    Raises:
+        HTTPException 404: If the player is not found in the database.
+        HTTPException 500: On unexpected database errors.
+    """
+    logger.info("GET /api/players/%d/injury", player_id)
+
+    player_row = _query_one(
+        "SELECT player_id FROM Players WHERE player_id = ?",
+        (player_id,),
+        label="get_player_injury/player",
+    )
+    if player_row is None:
+        raise HTTPException(status_code=404, detail=f"Player {player_id} not found.")
+
+    row = _query_one(
+        """
+        SELECT
+            i.player_id,
+            i.team_id,
+            t.team_name,
+            t.abbreviation,
+            i.report_date,
+            i.status,
+            i.reason,
+            i.source,
+            i.last_updated_ts
+        FROM Injury_Status i
+        LEFT JOIN Teams t ON i.team_id = t.team_id
+        WHERE i.player_id = ?
+        ORDER BY i.report_date DESC
+        LIMIT 1
+        """,
+        (player_id,),
+        label="get_player_injury",
+    )
+    return {"player_id": player_id, "injury": row or {}}
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 

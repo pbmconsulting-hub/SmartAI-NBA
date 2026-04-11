@@ -28,6 +28,7 @@ from nba_api.stats.endpoints import LeagueGameLog, ScoreboardV3
 
 from . import initial_pull
 from . import setup_db
+from .rotowire_injuries import sync_rotowire_injuries
 from .utils import get_new_rows, parse_matchup_abbreviations, upsert_dataframe
 
 logging.basicConfig(
@@ -457,6 +458,13 @@ def run_update(db_path: str = DB_PATH) -> int:
             # Refresh season dashboards even when no new games (standings etc change).
             _refresh_season_dashboards(conn, SEASON)
             conn.commit()
+            try:
+                injury_count = sync_rotowire_injuries(db_path)
+                logger.info("RotoWire injury sync: %d rows upserted.", injury_count)
+            except Exception:
+                logger.exception(
+                    "RotoWire injury sync failed — continuing without injury data."
+                )
             return 0
 
         logger.info(
@@ -472,6 +480,13 @@ def run_update(db_path: str = DB_PATH) -> int:
             conn.commit()
             _refresh_season_dashboards(conn, SEASON)
             conn.commit()
+            try:
+                injury_count = sync_rotowire_injuries(db_path)
+                logger.info("RotoWire injury sync: %d rows upserted.", injury_count)
+            except Exception:
+                logger.exception(
+                    "RotoWire injury sync failed — continuing without injury data."
+                )
             return 0
 
         _upsert_players(raw, conn)
@@ -511,6 +526,16 @@ def run_update(db_path: str = DB_PATH) -> int:
         logger.info(
             "=== Update complete. %d new log records added. ===", new_log_count
         )
+
+        # --- Sync RotoWire injury report ---
+        try:
+            injury_count = sync_rotowire_injuries(db_path)
+            logger.info("RotoWire injury sync: %d rows upserted.", injury_count)
+        except Exception:
+            logger.exception(
+                "RotoWire injury sync failed — continuing without injury data."
+            )
+
         return new_log_count
     finally:
         conn.close()
