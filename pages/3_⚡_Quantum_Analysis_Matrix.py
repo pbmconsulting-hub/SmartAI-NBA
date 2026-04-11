@@ -853,11 +853,15 @@ if run_analysis:
         else:
             props_to_analyze = list(final_props)  # Fallback: no games loaded
 
-        # ── Also skip confirmed Out/IR/Doubtful players via injury map ─────
+        # ── Also skip confirmed Out/IR players via injury map ────────────
         # If injury_map_pre is empty (failed to load), do NOT filter — just proceed.
+        # NOTE: "Doubtful" and "Questionable" players are NOT filtered here —
+        # they pass through to full analysis with an injury_status_penalty
+        # applied to the confidence score.  This matches the in-analysis
+        # injury gate which only skips clearly inactive statuses.
         injury_map_pre = st.session_state.get("injury_status_map", {})
         _INACTIVE_STATUSES = frozenset({
-            "Out", "Doubtful", "Injured Reserve", "Out (No Recent Games)",
+            "Out", "Injured Reserve", "Out (No Recent Games)",
             "Suspended", "Not With Team",
             "G League - Two-Way", "G League - On Assignment", "G League",
         })
@@ -871,7 +875,7 @@ if run_analysis:
             ]
             inj_skipped = before_inj - len(props_to_analyze)
             if inj_skipped > 0:
-                st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR/Doubtful players.")
+                st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR players.")
 
         # ── Filter to only players on real betting platforms ───────────────
         # If live platform props have been loaded, drop synthetic-only props
@@ -1610,6 +1614,13 @@ if run_analysis:
                     except Exception:
                         pass
 
+                # ── Compute injury status penalty for Doubtful/Questionable ─
+                _injury_penalty = 0.0
+                if player_status == "Doubtful":
+                    _injury_penalty = 8.0   # heavy penalty — 75% chance of sitting
+                elif player_status in ("Questionable", "GTD"):
+                    _injury_penalty = 4.0   # moderate penalty — uncertain availability
+
                 confidence_output = calculate_confidence_score(
                     probability_over=probability_over,
                     edge_percentage=edge_pct,
@@ -1623,6 +1634,7 @@ if run_analysis:
                     line_sharpness_penalty=line_sharpness_penalty,
                     trap_line_penalty=trap_line_penalty,
                     calibration_adjustment=calibration_adj,  # C10
+                    injury_status_penalty=_injury_penalty,
                     on_off_data=_on_off_data,
                     matchup_data=_matchup_data,
                 )
@@ -2248,10 +2260,17 @@ if analysis_results:
         ]
     if not st.session_state.get("chip_show_avoids"):
         # Default: hide avoids. When toggled ON, show them.
+        _avoid_count = sum(1 for r in displayed_results if r.get("should_avoid", False))
         displayed_results = [
             r for r in displayed_results
             if not r.get("should_avoid", False)
         ]
+        if _avoid_count > 0:
+            st.caption(
+                f"ℹ️ {_avoid_count} pick(s) hidden (flagged as avoid due to "
+                "low edge, high variance, or conflicting signals). "
+                "Toggle **❌ Show Avoids** above to reveal them."
+            )
 
     # ── Legacy tier multiselect (still useful for multi-tier combos) ──
     _na_filter_col1, _na_filter_col2 = st.columns(2)

@@ -2518,11 +2518,13 @@ def smart_filter_props(
               f"({summary['reduction_pct']:.0f}% reduction)")
     """
     # ── Statuses considered inactive/out ───────────────────────────────
+    # NOTE: "doubtful" is intentionally excluded — Doubtful players are
+    # analyzed with an injury_status_penalty applied to confidence
+    # scoring rather than being dropped entirely.
     _INACTIVE_STATUSES = frozenset({
         "out", "injured reserve", "ir", "suspended",
         "not with team", "g league - two-way",
         "g league - on assignment", "g league",
-        "doubtful",
     })
 
     # ── Resolve stat type filter set ────────────────────────────────────
@@ -2602,7 +2604,13 @@ def smart_filter_props(
     if injury_map:
         def _is_active(prop):
             player_key = str(prop.get("player_name", "")).lower().strip()
-            status = str(injury_map.get(player_key, "")).lower().strip()
+            entry = injury_map.get(player_key, "")
+            # Support both dict-valued maps ({"status": "Out", ...})
+            # and plain string-valued maps ("Out").
+            if isinstance(entry, dict):
+                status = str(entry.get("status", "")).lower().strip()
+            else:
+                status = str(entry).lower().strip()
             if not status:
                 return True  # No status known — assume active
             return status not in _INACTIVE_STATUSES
