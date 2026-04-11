@@ -7687,3 +7687,128 @@ def get_player_trading_card_html(
 # ============================================================
 # END SECTION: Glassmorphic Dark Theme
 # ============================================================
+
+
+# ============================================================
+# SECTION: Data Feed — Reusable Card / Widget Helpers
+# Used by pages/9_📡_Data_Feed.py to reduce inline HTML.
+# ============================================================
+
+def get_action_card_html(title: str, description: str, gradient: str = "linear-gradient(135deg,#1a1a2e,#16213e)",
+                         border_color: str = "#0f3460") -> str:
+    """Return styled card HTML for action buttons on the Data Feed page."""
+    _safe_title = _html.escape(str(title))
+    _safe_desc = str(description)  # Already HTML in some callers
+    return (
+        f'<div style="background:{gradient};border:1px solid {border_color};'
+        f'border-radius:10px;padding:16px 20px;margin-bottom:16px;">'
+        f'<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0;">{_safe_title}</div>'
+        f'<div style="color:#a0aec0;font-size:0.9rem;margin-top:4px;">{_safe_desc}</div>'
+        f'</div>'
+    )
+
+
+def get_health_card_html(label: str, badge_html: str, health_html: str, description: str) -> str:
+    """Return a single data-health card for the status dashboard."""
+    _safe_label = _html.escape(str(label))
+    _safe_desc = _html.escape(str(description))
+    return (
+        f'<div style="background:#14192b;border-radius:8px;padding:14px 16px;'
+        f'border:1px solid rgba(0,240,255,0.15);">'
+        f'<div style="font-size:0.95rem;font-weight:700;color:#c0d0e8;margin-bottom:6px;">{_safe_label}</div>'
+        f'{badge_html}'
+        f'{health_html}'
+        f'<div style="color:#8b949e;font-size:0.75rem;margin-top:4px;">{_safe_desc}</div>'
+        f'</div>'
+    )
+
+
+def get_readiness_bar_html(score: int) -> str:
+    """Return a gradient readiness-score bar (0-100)."""
+    score = max(0, min(100, int(score)))
+    if score >= 80:
+        color = "#00ff9d"
+        label_color = "#00ff9d"
+    elif score >= 50:
+        color = "#ffcc00"
+        label_color = "#ffcc00"
+    else:
+        color = "#ff4444"
+        label_color = "#ff4444"
+    return (
+        f'<div style="margin:10px 0;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">'
+        f'<span style="font-size:1.15rem;font-weight:800;color:{label_color};">Session Readiness: {score}%</span>'
+        f'<span style="font-size:0.8rem;color:#8b949e;">{"✅ Ready to analyze" if score >= 80 else "⚠️ Update recommended" if score >= 50 else "❌ Data refresh needed"}</span>'
+        f'</div>'
+        f'<div style="height:10px;background:#1a2035;border-radius:5px;overflow:hidden;">'
+        f'<div style="height:10px;width:{score}%;background:linear-gradient(90deg,#ff4444,#ffcc00,#00ff9d);'
+        f'border-radius:5px;transition:width 0.6s ease;"></div>'
+        f'</div></div>'
+    )
+
+
+def get_freshness_timeline_html(sources: list[tuple[str, str, float | None]]) -> str:
+    """
+    Visual freshness timeline for data sources.
+
+    *sources*: list of (label, emoji, age_hours_or_None).
+    """
+    rows = []
+    for label, emoji, age_h in sources:
+        if age_h is None:
+            pct = 0
+            status = "NEVER"
+            bar_color = "#553c9a"
+            text_color = "#e9d8fd"
+        else:
+            freshness = max(0.0, 1.0 - age_h / 24.0)
+            pct = round(freshness * 100)
+            if pct > 70:
+                bar_color, text_color = "#00ff9d", "#00ff9d"
+                status = f"{age_h:.0f}h ago"
+            elif pct > 30:
+                bar_color, text_color = "#ffcc00", "#ffcc00"
+                status = f"{age_h:.0f}h ago ⚠️"
+            else:
+                bar_color, text_color = "#ff4444", "#ff4444"
+                status = f"{age_h:.1f}h ago ⚠️"
+        rows.append(
+            f'<div style="display:flex;align-items:center;gap:10px;margin:4px 0;">'
+            f'<span style="min-width:130px;font-size:0.85rem;color:#c0d0e8;">{emoji} {_html.escape(str(label))}</span>'
+            f'<div style="flex:1;height:8px;background:#1a2035;border-radius:4px;overflow:hidden;">'
+            f'<div style="height:8px;width:{pct}%;background:{bar_color};border-radius:4px;"></div></div>'
+            f'<span style="min-width:90px;text-align:right;font-size:0.78rem;color:{text_color};">{status}</span>'
+            f'</div>'
+        )
+    return (
+        '<div style="background:#14192b;border-radius:8px;padding:14px 18px;'
+        'border:1px solid rgba(0,240,255,0.12);">'
+        + "\n".join(rows)
+        + '</div>'
+    )
+
+
+def get_preflight_checklist_html(checks: list[tuple[str, bool, str]]) -> str:
+    """
+    Pre-flight checklist.
+
+    *checks*: list of (label, is_ok, detail_text).
+    """
+    items = []
+    for label, ok, detail in checks:
+        icon = "✅" if ok else "⚠️"
+        color = "#00ff9d" if ok else "#ffcc00"
+        items.append(
+            f'<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">'
+            f'<span>{icon}</span>'
+            f'<span style="color:{color};font-weight:600;font-size:0.88rem;">{_html.escape(str(label))}</span>'
+            f'<span style="color:#8b949e;font-size:0.78rem;">— {_html.escape(str(detail))}</span>'
+            f'</div>'
+        )
+    return '<div style="margin:6px 0;">' + "\n".join(items) + '</div>'
+
+
+# ============================================================
+# END SECTION: Data Feed — Reusable Card / Widget Helpers
+# ============================================================
