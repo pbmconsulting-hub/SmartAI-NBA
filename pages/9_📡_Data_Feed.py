@@ -58,19 +58,23 @@ st.set_page_config(
 
 from styles.theme import (
     get_global_css,
+    get_neural_header_html,
     get_education_box_html,
     get_action_card_html,
     get_health_card_html,
     get_readiness_bar_html,
     get_freshness_timeline_html,
     get_preflight_checklist_html,
+    get_data_feed_css,
 )
 
 st.markdown(get_global_css(), unsafe_allow_html=True)
+st.markdown(get_data_feed_css(), unsafe_allow_html=True)
 
-# ── Joseph M. Smith Floating Widget ───────────────────────────
-from utils.components import inject_joseph_floating
+# ── Joseph M. Smith Hero Banner + Floating Widget ─────────────
+from utils.components import inject_joseph_floating, render_joseph_hero_banner
 st.session_state["joseph_page_context"] = "page_data_feed"
+render_joseph_hero_banner()
 inject_joseph_floating()
 
 
@@ -117,39 +121,62 @@ def safe_action(action_name: str, status_container=None):
 def _staleness_badge(timestamp_str, warn_hours=4.0, error_hours=24.0):
     """Return (badge_html, age_hours) for a data timestamp."""
     if not timestamp_str:
-        return '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">NEVER</span>', None
+        return ('<span style="display:inline-flex;align-items:center;gap:4px;'
+                'background:rgba(85,60,154,0.25);color:#b794f4;padding:3px 10px;'
+                'border-radius:20px;font-size:0.75rem;font-weight:700;'
+                'font-family:\'JetBrains Mono\',monospace;'
+                'border:1px solid rgba(85,60,154,0.3);">'
+                '<span class="df-dot-stale" style="width:6px;height:6px;background:#b794f4;'
+                'box-shadow:0 0 4px rgba(183,148,244,0.6);"></span>NEVER</span>'), None
     try:
         dt = datetime.datetime.fromisoformat(timestamp_str)
         age_h = (datetime.datetime.now() - dt).total_seconds() / 3600
         if age_h < warn_hours:
-            color, label = "#276749", f"FRESH ({age_h:.0f}h ago)"
-            text_color = "#9ae6b4"
+            bg, color, dot_cls = "rgba(0,255,157,0.10)", "#00ff9d", "df-dot-live"
+            border_c = "rgba(0,255,157,0.25)"
+            label = f"FRESH — {age_h:.0f}h ago"
         elif age_h < error_hours:
-            color, label = "#744210", f"AGING ({age_h:.0f}h ago)"
-            text_color = "#fbd38d"
+            bg, color, dot_cls = "rgba(255,204,0,0.10)", "#ffcc00", "df-dot-warn"
+            border_c = "rgba(255,204,0,0.25)"
+            label = f"AGING — {age_h:.0f}h ago"
         else:
-            color, label = "#742a2a", f"STALE ({age_h:.1f}h ago)"
-            text_color = "#feb2b2"
-        badge = f'<span style="background:{color};color:{text_color};padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">{label}</span>'
+            bg, color, dot_cls = "rgba(255,68,68,0.10)", "#ff4444", "df-dot-stale"
+            border_c = "rgba(255,68,68,0.25)"
+            label = f"STALE — {age_h:.1f}h ago"
+        badge = (
+            f'<span style="display:inline-flex;align-items:center;gap:4px;'
+            f'background:{bg};color:{color};padding:3px 10px;'
+            f'border-radius:20px;font-size:0.75rem;font-weight:700;'
+            f'font-family:\'JetBrains Mono\',monospace;'
+            f'border:1px solid {border_c};">'
+            f'<span class="{dot_cls}" style="width:6px;height:6px;"></span>{label}</span>'
+        )
         return badge, age_h
     except Exception:
-        return '<span style="background:#553c9a;color:#e9d8fd;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:700;">UNKNOWN</span>', None
+        return ('<span style="display:inline-flex;align-items:center;gap:4px;'
+                'background:rgba(85,60,154,0.25);color:#b794f4;padding:3px 10px;'
+                'border-radius:20px;font-size:0.75rem;font-weight:700;'
+                'font-family:\'JetBrains Mono\',monospace;'
+                'border:1px solid rgba(85,60,154,0.3);">'
+                'UNKNOWN</span>'), None
 
 
 def _health_bar(age_h, max_age=24.0):
-    """Return a colored health bar HTML string."""
+    """Return a colored health bar HTML string with glow effect."""
     if age_h is None:
-        pct, color = 0, "#742a2a"
+        pct, color = 0, "#553c9a"
     else:
         freshness = max(0.0, 1.0 - age_h / max_age)
         pct = round(freshness * 100)
         color = "#00ff9d" if pct > 70 else ("#ffcc00" if pct > 30 else "#ff4444")
     return (
-        f'<div style="height:6px;background:#1a2035;border-radius:3px;margin:6px 0;">'
+        f'<div style="height:6px;background:rgba(13,18,32,0.80);border-radius:3px;'
+        f'margin:8px 0;border:1px solid rgba(0,240,255,0.05);">'
         f'<div style="height:6px;width:{pct}%;background:{color};border-radius:3px;'
-        f'transition:width 0.4s ease;"></div>'
+        f'box-shadow:0 0 6px {color};transition:width 0.4s ease;"></div>'
         f'</div>'
-        f'<div style="font-size:0.72rem;color:#b0bec5;">Health: {pct}%</div>'
+        f'<div style="font-size:0.72rem;color:rgba(192,208,232,0.50);'
+        f'font-family:\'JetBrains Mono\',monospace;">Health: {pct}%</div>'
     )
 
 
@@ -209,14 +236,23 @@ def _compute_readiness():
 
 
 # ============================================================
-# SECTION: Page Header
+# SECTION: Page Header — Neural Network Header
 # ============================================================
 
-st.title("📡 Data Feed")
+st.markdown(get_neural_header_html(
+    "📡 DATA FEED",
+    "REAL-TIME NBA DATA PIPELINE • SPORTSBOOK PROPS • ETL ENGINE"
+), unsafe_allow_html=True)
+
 st.markdown(
-    "Pull real, up-to-date NBA stats and player prop lines "
-    "from PrizePicks, Underdog Fantasy, and DraftKings Pick6. "
-    "Update before each betting session for the most accurate predictions!"
+    '<div style="text-align:center;color:rgba(192,208,232,0.60);font-size:0.88rem;'
+    'margin:-12px 0 16px;line-height:1.6;">'
+    'Pull real, up-to-date NBA stats and player prop lines from '
+    '<span style="color:#00ff9d;font-weight:600;">PrizePicks</span>, '
+    '<span style="color:#ffcc00;font-weight:600;">Underdog Fantasy</span>, and '
+    '<span style="color:#00a0ff;font-weight:600;">DraftKings Pick6</span>. '
+    'Update before each betting session for maximum accuracy.</div>',
+    unsafe_allow_html=True,
 )
 
 with st.expander("📖 How to Use This Page", expanded=False):
@@ -240,8 +276,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Use "Fix All" to quickly bring stale data up to date
     """)
 
-st.divider()
-
+st.markdown("")  # spacing
 
 # ============================================================
 # SECTION: Session Readiness + Freshness Timeline
@@ -252,6 +287,11 @@ readiness_score, source_ages, timestamps = _compute_readiness()
 st.markdown(get_readiness_bar_html(readiness_score), unsafe_allow_html=True)
 
 # Data freshness timeline
+st.markdown(
+    '<div class="df-section-head" style="margin-top:16px;">DATA SOURCE STATUS</div>'
+    '<div class="df-section-sub">Real-time freshness monitoring across all data pipelines</div>',
+    unsafe_allow_html=True,
+)
 st.markdown(get_freshness_timeline_html(source_ages), unsafe_allow_html=True)
 
 # ── Staleness warning ──────────────────────────────────────────
@@ -277,6 +317,7 @@ if _alert_threshold is not None:
         if never_sources:
             msg_parts.append(f"**{', '.join(never_sources)}** never loaded")
         st.warning(f"🔔 Data Alert: {' · '.join(msg_parts)} — update recommended before analyzing!")
+st.markdown("")  # spacing
 
 
 # ── Pre-Flight Check ──────────────────────────────────────────
@@ -303,14 +344,18 @@ if not all_ok:
             st.session_state["update_action"] = "one_click"
             st.rerun()
 
-st.divider()
+st.markdown("")  # spacing
 
 
 # ============================================================
 # SECTION: Workflow Wizard (Tabbed Interface)
 # ============================================================
 
-st.subheader("🧙 Workflow Wizard")
+st.markdown(
+    '<div class="df-section-head">WORKFLOW WIZARD</div>'
+    '<div class="df-section-sub">Select a tab below to configure and execute data operations</div>',
+    unsafe_allow_html=True,
+)
 
 if "update_action" not in st.session_state:
     st.session_state["update_action"] = None
@@ -335,11 +380,10 @@ with tab_quick:
 
     # ── One-Click Full Setup ─────────────────────────────────────
     st.markdown(get_action_card_html(
-        "🏀 One-Click Full Setup (Best Choice)",
+        "🏀 ONE-CLICK FULL SETUP",
         "Retrieves tonight's games → current rosters → player stats → team stats. "
-        "<strong>Everything in one click.</strong>",
-        gradient="linear-gradient(135deg,#0f3460,#533483)",
-        border_color="#e94560",
+        "<strong>Everything in one click.</strong> The best choice for daily setup.",
+        icon_color="#e94560",
     ), unsafe_allow_html=True)
 
     oc_c1, oc_c2 = st.columns([1, 3])
@@ -350,7 +394,7 @@ with tab_quick:
     with oc_c2:
         st.caption("Best for first-time setup each day. Retrieves games first, then only tonight's team players (~1-3 min).")
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── ETL Database Section (Primary Path) ──────────────────────
     if _ETL_DB_AVAILABLE:
@@ -358,18 +402,17 @@ with tab_quick:
         _g = _ETL_DB_COUNTS.get("games", 0)
         _l = _ETL_DB_COUNTS.get("logs", 0)
         st.markdown(get_action_card_html(
-            "🗄️ ETL Database — Your DB has data",
-            f"<strong>{_p:,}</strong> players · <strong>{_g:,}</strong> games · <strong>{_l:,}</strong> logs. "
-            f"Use <em>Smart ETL Update</em> to add new games, or <em>Full ETL Pull</em> to rebuild.",
-            gradient="linear-gradient(135deg,#0a2e1a,#1a3e2e)",
-            border_color="#00ff9d",
+            "🗄️ ETL DATABASE — ACTIVE",
+            f"<span style='font-family:JetBrains Mono,monospace;'><strong>{_p:,}</strong> players · "
+            f"<strong>{_g:,}</strong> games · <strong>{_l:,}</strong> logs</span>. "
+            f"Use <em>Smart ETL Update</em> to add new games, or <em>Full ETL Pull</em> to rebuild from scratch.",
+            icon_color="#00ff9d",
         ), unsafe_allow_html=True)
     else:
         st.markdown(get_action_card_html(
-            "🗄️ ETL Database — Empty",
+            "🗄️ ETL DATABASE — EMPTY",
             "No ETL data yet. Run <strong>Full ETL Pull</strong> or <code>python -m etl.initial_pull</code> to populate.",
-            gradient="linear-gradient(135deg,#2e1a0a,#3e2e1a)",
-            border_color="#ffcc00",
+            icon_color="#ffcc00",
         ), unsafe_allow_html=True)
 
     etl_c1, etl_c2, etl_c3 = st.columns([1, 1, 2])
@@ -388,13 +431,14 @@ with tab_quick:
             "**Smart ETL** is the fastest update (~30s). **Full ETL** rebuilds the entire season (~60s)."
         )
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── Smart Update (Today's Teams) ─────────────────────────────
     st.markdown(get_action_card_html(
-        "⚡ Smart Update — Today's Teams Only",
+        "⚡ SMART UPDATE — TODAY'S TEAMS ONLY",
         "Retrieves team rosters using <code>CommonTeamRoster</code> (current, post-trade) "
         "then game logs for only those players. Takes <strong>1–2 minutes</strong> instead of 10–15.",
+        icon_color="#00f0ff",
     ), unsafe_allow_html=True)
 
     sm_c1, sm_c2 = st.columns([1, 3])
@@ -422,9 +466,16 @@ with tab_quick:
 
 # ── TAB 2: Advanced ──────────────────────────────────────────
 with tab_advanced:
-    st.markdown("**Granular controls** — use when you need to update a specific data type.")
+    st.markdown(
+        '<div style="color:rgba(192,208,232,0.65);font-size:0.88rem;margin-bottom:12px;">'
+        'Granular controls — use when you need to update a specific data type.</div>',
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("##### Individual Data Updates")
+    st.markdown(
+        '<div class="df-section-head" style="font-size:0.95rem;">INDIVIDUAL DATA UPDATES</div>',
+        unsafe_allow_html=True,
+    )
     btn_c1, btn_c2, btn_c3, btn_c4 = st.columns(4)
 
     with btn_c1:
@@ -446,15 +497,14 @@ with tab_advanced:
             st.session_state["update_action"] = "all"
             st.rerun()
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── Injury Report ────────────────────────────────────────────
     st.markdown(get_action_card_html(
-        "🏥 Real-Time Injury Report",
+        "🏥 REAL-TIME INJURY REPORT",
         "Retrieves live injury designations with NBA CDN feed as fallback — "
         "real-time GTD/Out/Doubtful status, specific injury details, and expected return dates.",
-        gradient="linear-gradient(135deg,#1a0a2e,#0f1a2e)",
-        border_color="#c800ff",
+        icon_color="#c800ff",
     ), unsafe_allow_html=True)
 
     inj_c1, inj_c2 = st.columns([1, 3])
@@ -469,15 +519,14 @@ with tab_advanced:
         else:
             st.caption("Click to pull real-time injury designations.")
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── Standings & News ─────────────────────────────────────────
     st.markdown(get_action_card_html(
-        "📊 NBA Standings & Player News",
+        "📊 NBA STANDINGS & PLAYER NEWS",
         "Retrieves current NBA standings and recent player/team news — "
         "conference ranks, W-L records, streaks, injury news, and trade updates.",
-        gradient="linear-gradient(135deg,#0a1628,#0f2040)",
-        border_color="#00c9ff",
+        icon_color="#00c9ff",
     ), unsafe_allow_html=True)
 
     sn_c1, sn_c2 = st.columns([1, 3])
@@ -492,10 +541,13 @@ with tab_advanced:
         else:
             st.caption("Retrieves conference standings and recent player/team news.")
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── Auto-Refresh / Scheduling ────────────────────────────────
-    st.markdown("##### ⏰ Auto-Refresh Settings")
+    st.markdown(
+        '<div class="df-section-head" style="font-size:0.95rem;">⏰ AUTO-REFRESH SETTINGS</div>',
+        unsafe_allow_html=True,
+    )
     ar_c1, ar_c2, ar_c3 = st.columns(3)
     with ar_c1:
         auto_refresh = st.toggle(
@@ -527,7 +579,10 @@ with tab_advanced:
             st.rerun()
 
     # ── Notification Alerts ────────────────────────────────────
-    st.markdown("##### 🔔 Notification Settings")
+    st.markdown(
+        '<div class="df-section-head" style="font-size:0.95rem;">🔔 NOTIFICATION SETTINGS</div>',
+        unsafe_allow_html=True,
+    )
     notif_c1, notif_c2 = st.columns(2)
     with notif_c1:
         notif_stale = st.toggle(
@@ -550,11 +605,16 @@ with tab_advanced:
 # ── TAB 3: Props & Enrichment ────────────────────────────────
 with tab_props:
     # ── Platform Props Section ────────────────────────────────
-    st.markdown("##### 📊 Get Platform Props")
     st.markdown(
-        "Pull **live prop lines** directly from betting platforms. "
-        "Platforms only list active players playing **tonight** — so this also "
-        "acts as a real-time active roster check!"
+        '<div class="df-section-head" style="font-size:0.95rem;">📊 LIVE PLATFORM PROPS</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="color:rgba(192,208,232,0.60);font-size:0.88rem;margin-bottom:12px;">'
+        'Pull <strong style="color:#00ff9d;">live prop lines</strong> directly from betting platforms. '
+        'Platforms only list active players playing tonight — so this also '
+        'acts as a real-time active roster check.</div>',
+        unsafe_allow_html=True,
     )
 
     st.markdown(get_education_box_html(
@@ -604,14 +664,13 @@ with tab_props:
             )
 
         # Platform status badges
-        _badge_style = (
-            "padding:3px 10px;border-radius:6px;font-size:0.82rem;font-weight:700;"
-            "margin-right:8px;display:inline-block;"
-        )
-        _pp_badge = f'<span style="{_badge_style}background:#1a4d2f;color:#b8f8c8;">{"✅" if _pp_on else "⏸️"} PrizePicks</span>'
-        _ud_badge = f'<span style="{_badge_style}background:#4d3a1a;color:#f8e4b8;">{"✅" if _ud_on else "⏸️"} Underdog</span>'
-        _dk_badge = f'<span style="{_badge_style}background:#1a2f4d;color:#bee3f8;">{"✅" if _dk_cb_on else "⏸️"} DraftKings</span>'
-        st.markdown(f'<div style="margin-bottom:12px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>', unsafe_allow_html=True)
+        _pp_cls = "df-platform-badge df-badge-pp" if _pp_on else "df-platform-badge df-badge-off"
+        _ud_cls = "df-platform-badge df-badge-ud" if _ud_on else "df-platform-badge df-badge-off"
+        _dk_cls = "df-platform-badge df-badge-dk" if _dk_cb_on else "df-platform-badge df-badge-off"
+        _pp_badge = f'<span class="{_pp_cls}"><span class="df-dot-live" style="width:6px;height:6px;"></span> PrizePicks</span>' if _pp_on else f'<span class="{_pp_cls}">⏸️ PrizePicks</span>'
+        _ud_badge = f'<span class="{_ud_cls}"><span class="df-dot-live" style="width:6px;height:6px;background:#ffcc00;box-shadow:0 0 6px rgba(255,204,0,0.7);"></span> Underdog</span>' if _ud_on else f'<span class="{_ud_cls}">⏸️ Underdog</span>'
+        _dk_badge = f'<span class="{_dk_cls}"><span class="df-dot-live" style="width:6px;height:6px;background:#00a0ff;box-shadow:0 0 6px rgba(0,160,255,0.7);"></span> DraftKings</span>' if _dk_cb_on else f'<span class="{_dk_cls}">⏸️ DraftKings</span>'
+        st.markdown(f'<div style="margin:8px 0 14px;">{_pp_badge}{_ud_badge}{_dk_badge}</div>', unsafe_allow_html=True)
         st.caption("Toggle platforms above. DraftKings requires an Odds API key (⚙️ Settings page).")
 
         # Cached props info
@@ -690,8 +749,12 @@ with tab_props:
         # ── Platform Props Comparison Dashboard ──────────────────
         _display_props = load_platform_props_from_session(st.session_state) if _SPORTSBOOK_SERVICE_AVAILABLE else []
         if _display_props:
-            st.markdown("---")
-            st.markdown("##### 📊 Props Comparison Dashboard")
+            st.markdown("")
+            st.markdown(
+                '<div class="df-section-head" style="font-size:0.95rem;">📊 PROPS COMPARISON DASHBOARD</div>'
+                '<div class="df-section-sub">Cross-platform line analysis and edge detection</div>',
+                unsafe_allow_html=True,
+            )
 
             # Grouped view by player — show cross-platform comparison
             try:
@@ -728,13 +791,18 @@ with tab_props:
                     })
                 st.dataframe(_preview_rows, hide_index=True, use_container_width=True)
 
-    st.markdown("---")
+    st.markdown("")
 
     # ── Deep Fetch: Advanced Stats Enrichment ────────────────────
-    st.markdown("##### 🔬 Advanced Stats Enrichment")
     st.markdown(
-        "Pre-fetch full advanced NBA data for tonight's games: team dashboards, "
-        "5-man lineups, player estimated metrics, rotation data, and standings context."
+        '<div class="df-section-head" style="font-size:0.95rem;">🔬 ADVANCED STATS ENRICHMENT</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="color:rgba(192,208,232,0.60);font-size:0.88rem;margin-bottom:12px;">'
+        'Pre-fetch full advanced NBA data for tonight\'s games: team dashboards, '
+        '5-man lineups, player estimated metrics, rotation data, and standings context.</div>',
+        unsafe_allow_html=True,
     )
 
     with st.expander("📖 What Does Deep Fetch Do?", expanded=False):
@@ -1211,7 +1279,11 @@ if _ROSTER_INSIGHTS_AVAILABLE:
     _roster_props = _load_pp(st.session_state)
     if _roster_props:
         st.divider()
-        st.subheader("🏥 Platform Roster Insights")
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">🏥 PLATFORM ROSTER INSIGHTS</div>'
+            '<div class="df-section-sub">Cross-referencing platform props against your player database</div>',
+            unsafe_allow_html=True,
+        )
         st.markdown(
             "Cross-reference tonight's platform props against your player database "
             "to spot **missing players** and **potential injuries**."
@@ -1260,7 +1332,11 @@ _news_display = st.session_state.get("player_news", [])
 
 if _standings_display or _news_display:
     st.divider()
-    st.subheader("📊 NBA Standings & News")
+    st.markdown(
+        '<div class="df-section-head" style="font-size:0.95rem;">📊 NBA STANDINGS & NEWS</div>'
+        '<div class="df-section-sub">Conference standings and player/team news feed</div>',
+        unsafe_allow_html=True,
+    )
 
     _sn_tab1, _sn_tab2 = st.tabs(["🏆 Standings", "📰 Player & Team News"])
 
@@ -1303,7 +1379,8 @@ if _standings_display or _news_display:
 
     with _sn_tab2:
         if _news_display:
-            _imp_colors = {"high": "#ff4444", "medium": "#ffd700", "low": "#00ff9d"}
+            _imp_colors = {"high": "rgba(255,68,68,0.15)", "medium": "rgba(255,204,0,0.15)", "low": "rgba(0,255,157,0.15)"}
+            _imp_text_colors = {"high": "#ff4444", "medium": "#ffcc00", "low": "#00ff9d"}
             _cat_emoji = {
                 "injury": "🏥", "trade": "🔄", "performance": "📈",
                 "suspension": "🚫", "contract": "💰", "roster": "📋",
@@ -1317,9 +1394,10 @@ if _standings_display or _news_display:
                 if not _title:
                     continue
                 _imp_badge = (
-                    f'<span style="background:{_imp_colors.get(_imp, "#555")};'
-                    f'color:#000;border-radius:4px;padding:1px 6px;font-size:0.72rem;'
-                    f'font-weight:700;">{_imp.upper()}</span>'
+                    f'<span style="background:{_imp_colors.get(_imp, "rgba(100,100,120,0.15)")};'
+                    f'color:{_imp_text_colors.get(_imp, "#6e7681")};border-radius:20px;padding:2px 8px;'
+                    f'font-size:0.72rem;font-weight:700;font-family:\'JetBrains Mono\',monospace;'
+                    f'border:1px solid {_imp_text_colors.get(_imp, "#6e7681")}20;">{_imp.upper()}</span>'
                     if _imp else ""
                 )
                 _who = f"**{_item.get('player_name', '')}**" if _item.get("player_name") else ""
@@ -1340,7 +1418,7 @@ if _standings_display or _news_display:
 # SECTION: ETL Health Monitor
 # ============================================================
 
-st.divider()
+st.markdown("")
 
 with st.expander("🔧 ETL Health Monitor", expanded=False):
     try:
@@ -1552,14 +1630,18 @@ with st.expander("📥 Export & Backup", expanded=False):
 # SECTION: Activity Log + Error Summary
 # ============================================================
 
-st.divider()
+st.markdown("")
 
 # Error summary
 _errors = st.session_state.get("_df_errors", [])
 if _errors:
     with st.expander(f"⚠️ Errors ({len(_errors)})", expanded=False):
         for _err in _errors:
-            st.markdown(f"- {_err}")
+            st.markdown(
+                f'<div style="color:#ff4444;font-size:0.85rem;padding:3px 0;'
+                f'font-family:\'JetBrains Mono\',monospace;">• {_err}</div>',
+                unsafe_allow_html=True,
+            )
         if st.button("🗑️ Clear Errors", key="btn_clear_errors"):
             st.session_state["_df_errors"] = []
             st.rerun()
