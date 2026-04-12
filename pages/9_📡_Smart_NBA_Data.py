@@ -43,12 +43,14 @@ except ImportError:
 
 # ETL database status
 try:
-    from data.etl_data_service import is_db_available, get_db_counts
+    from data.etl_data_service import is_db_available, get_db_counts, get_db_freshness
     _ETL_DB_AVAILABLE = is_db_available()
     _ETL_DB_COUNTS = get_db_counts() if _ETL_DB_AVAILABLE else {}
+    _ETL_DB_FRESHNESS = get_db_freshness() if _ETL_DB_AVAILABLE else {}
 except Exception:
     _ETL_DB_AVAILABLE = False
     _ETL_DB_COUNTS = {}
+    _ETL_DB_FRESHNESS = {}
 
 # ── Page config ────────────────────────────────────────────────
 st.set_page_config(
@@ -184,6 +186,13 @@ def _health_bar(age_h, max_age=24.0):
 def _compute_readiness():
     """Compute a session readiness score (0-100) from data freshness."""
     timestamps = load_last_updated()
+
+    # When last_updated.json is empty but the ETL DB has data, derive
+    # freshness timestamps from the database so the Data Source Status
+    # section populates correctly.
+    if not timestamps and _ETL_DB_FRESHNESS:
+        timestamps = dict(_ETL_DB_FRESHNESS)
+
     todays_games = st.session_state.get("todays_games", [])
 
     scores = []
@@ -194,18 +203,25 @@ def _compute_readiness():
     p_count = len(load_players_data())
     if p_age is not None and p_count > 0:
         scores.append(max(0, 100 - p_age * 4))
+    elif p_count > 0:
+        # DB has players but no timestamp — treat as moderately fresh
+        scores.append(60)
+        p_age = 12.0  # synthetic age for display
     else:
         scores.append(0)
-    source_ages.append(("Players", "👤", p_age))
+    source_ages.append(("Players", "👤", p_age if p_count > 0 or p_age is not None else None))
 
     # Teams
     t_badge, t_age = _staleness_badge(timestamps.get("teams"), 12.0, 48.0)
     t_count = len(load_teams_data())
     if t_age is not None and t_count > 0:
         scores.append(max(0, 100 - t_age * 2))
+    elif t_count > 0:
+        scores.append(60)
+        t_age = 12.0
     else:
         scores.append(0)
-    source_ages.append(("Teams", "🏟️", t_age))
+    source_ages.append(("Teams", "🏟️", t_age if t_count > 0 or t_age is not None else None))
 
     # Games
     if todays_games:
@@ -299,6 +315,21 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(get_freshness_timeline_html(source_ages), unsafe_allow_html=True)
+
+# Show ETL DB summary when available
+if _ETL_DB_AVAILABLE and _ETL_DB_COUNTS:
+    _p_cnt = _ETL_DB_COUNTS.get("players", 0)
+    _g_cnt = _ETL_DB_COUNTS.get("games", 0)
+    _l_cnt = _ETL_DB_COUNTS.get("logs", 0)
+    if _p_cnt > 0 or _g_cnt > 0:
+        st.markdown(
+            f'<div style="text-align:center;color:rgba(192,208,232,0.55);font-size:0.78rem;'
+            f'margin:4px 0 8px;font-family:\'JetBrains Mono\',monospace;">'
+            f'ETL DB: <span style="color:#00ff9d;">{_p_cnt:,}</span> players · '
+            f'<span style="color:#00ff9d;">{_g_cnt:,}</span> games · '
+            f'<span style="color:#00ff9d;">{_l_cnt:,}</span> logs</div>',
+            unsafe_allow_html=True,
+        )
 
 # ── Staleness warning ──────────────────────────────────────────
 try:
@@ -1673,8 +1704,27 @@ if _ROSTER_INSIGHTS_AVAILABLE:
 # SECTION: Standings & News Display
 # ============================================================
 
+# Auto-load standings and news from DB if not in session state
 _standings_display = st.session_state.get("league_standings", [])
 _news_display = st.session_state.get("player_news", [])
+
+if not _standings_display:
+    try:
+        from data.nba_data_service import get_standings as _auto_get_standings
+        _standings_display = _auto_get_standings()
+        if _standings_display:
+            st.session_state["league_standings"] = _standings_display
+    except Exception:
+        pass
+
+if not _news_display:
+    try:
+        from data.nba_data_service import get_player_news as _auto_get_news
+        _news_display = _auto_get_news(limit=30)
+        if _news_display:
+            st.session_state["player_news"] = _news_display
+    except Exception:
+        pass
 
 if _standings_display or _news_display:
     st.divider()
@@ -1704,13 +1754,13 @@ if _standings_display or _news_display:
                     l = t.get("losses", 0)
                     rows.append({
                         "Rank": t.get("conference_rank", "—"),
-                        "Team": t.get("team_abbreviation", ""),
+                        "Team": t.get("team_abbreviation", "") or t.get("team_name", ""),
                         "W": w, "L": l,
                         "W%": f"{t.get('win_pct', 0):.3f}",
                         "GB": f"{t.get('games_back', 0):.1f}" if t.get("games_back") else "—",
                         "Home": f"{t.get('home_wins',0)}-{t.get('home_losses',0)}",
                         "Away": f"{t.get('away_wins',0)}-{t.get('away_losses',0)}",
-                        "L10": f"{t.get('last_10_wins',0)}-{t.get('last_10_losses',0)}",
+                        "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
                         "Streak": t.get("streak", ""),
                     })
                 st.dataframe(rows, hide_index=True, use_container_width=True)

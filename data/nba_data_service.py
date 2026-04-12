@@ -447,8 +447,28 @@ def get_standings(progress_callback=None) -> list:
 def get_player_news(player_name=None, limit=20) -> list:
     """
     Retrieve recent NBA news.
-    Returns an empty list if all sources fail.
+
+    Primary source: ETL database (derives news from game logs, injuries,
+    and standings data).
+    Returns an empty list if the DB is unavailable.
     """
+    if _is_db_available():
+        try:
+            from data.etl_data_service import get_player_news_from_db
+            db_news = get_player_news_from_db(limit=limit)
+            if db_news:
+                # If player_name filter is specified, filter results
+                if player_name:
+                    name_lower = player_name.strip().lower()
+                    db_news = [
+                        n for n in db_news
+                        if name_lower in (n.get("player_name", "") or "").lower()
+                    ]
+                _logger.info("get_player_news: loaded %d item(s) from DB", len(db_news))
+                return db_news
+        except Exception as exc:
+            _logger.debug("get_player_news DB path failed: %s", exc)
+
     return []
 
 
