@@ -416,7 +416,7 @@ class TestRenderJosephSidebarWidget(unittest.TestCase):
         render_joseph_sidebar_widget()
         self.assertIn("joseph-ambient-text", self._get_sidebar_html())
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="FAKE_B64")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="FAKE_B64")
     def test_avatar_image_rendered(self, mock_avatar):
         from utils.joseph_widget import render_joseph_sidebar_widget
         render_joseph_sidebar_widget()
@@ -424,11 +424,11 @@ class TestRenderJosephSidebarWidget(unittest.TestCase):
         self.assertIn("joseph-sidebar-avatar", html)
         self.assertIn("FAKE_B64", html)
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="")
     def test_fallback_emoji_when_no_avatar(self, mock_avatar):
         from utils.joseph_widget import render_joseph_sidebar_widget
         render_joseph_sidebar_widget()
-        self.assertIn("🎙️", self._get_sidebar_html())
+        self.assertIn("🏀", self._get_sidebar_html())
 
     @patch("utils.joseph_widget.joseph_ambient_line", return_value="TEST LINE")
     @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
@@ -538,7 +538,7 @@ class TestRenderJosephFloatingWidget(unittest.TestCase):
                          if c[0] and "joseph-floating-widget" in c[0][0]]
         self.assertEqual(len(sidebar_calls), 0)
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="FLOAT_B64")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="FLOAT_B64")
     def test_avatar_image_rendered(self, mock_avatar):
         from utils.joseph_widget import render_joseph_floating_widget
         render_joseph_floating_widget()
@@ -546,11 +546,11 @@ class TestRenderJosephFloatingWidget(unittest.TestCase):
         self.assertIn("joseph-floating-avatar", html)
         self.assertIn("FLOAT_B64", html)
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="")
     def test_fallback_emoji_when_no_avatar(self, mock_avatar):
         from utils.joseph_widget import render_joseph_floating_widget
         render_joseph_floating_widget()
-        self.assertIn("🎙️", self._get_floating_html())
+        self.assertIn("🏀", self._get_floating_html())
 
     @patch("utils.joseph_widget.joseph_ambient_line", return_value="FLOAT LINE")
     @patch("utils.joseph_widget.joseph_get_ambient_context", return_value=("idle", {}))
@@ -703,7 +703,7 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
             self.assertNotIn("<script>bad</script>", str(c))
 
     @patch("utils.joseph_widget.joseph_commentary", return_value="TAKE")
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="B64IMG")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="B64IMG")
     def test_inline_avatar_rendered(self, mock_av, mock_comm):
         from utils.joseph_widget import inject_joseph_inline_commentary
         inject_joseph_inline_commentary([{"player": "AD"}])
@@ -713,13 +713,13 @@ class TestInjectJosephInlineCommentary(unittest.TestCase):
         self.assertTrue(any("B64IMG" in str(c) for c in calls))
 
     @patch("utils.joseph_widget.joseph_commentary", return_value="TAKE")
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="")
     def test_inline_emoji_fallback(self, mock_av, mock_comm):
         from utils.joseph_widget import inject_joseph_inline_commentary
         inject_joseph_inline_commentary([{"player": "KD"}])
         calls = [c for c in _mock_st.markdown.call_args_list
                  if "joseph-inline-card" in str(c)]
-        self.assertTrue(any("🎙️" in str(c) for c in calls))
+        self.assertTrue(any("🏀" in str(c) for c in calls))
 
     @patch("utils.joseph_widget.joseph_commentary", return_value="TAKE")
     def test_default_context_type(self, mock_comm):
@@ -798,7 +798,7 @@ class TestRenderJosephAskPopover(unittest.TestCase):
         call_args = _mock_st.popover.call_args
         self.assertIn("🎙️", call_args[0][0])
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="POP_B64")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="POP_B64")
     def test_popover_avatar_rendered(self, mock_avatar):
         from utils.joseph_widget import render_joseph_ask_popover
         render_joseph_ask_popover()
@@ -806,12 +806,12 @@ class TestRenderJosephAskPopover(unittest.TestCase):
         self.assertIn("joseph-popover-avatar", html)
         self.assertIn("POP_B64", html)
 
-    @patch("utils.joseph_widget.get_joseph_avatar_b64", return_value="")
+    @patch("utils.joseph_widget.get_smart_pick_pro_logo_b64", return_value="")
     def test_popover_emoji_fallback(self, mock_avatar):
         from utils.joseph_widget import render_joseph_ask_popover
         render_joseph_ask_popover()
         html = self._get_popover_html()
-        self.assertIn("🎙️", html)
+        self.assertIn("🏀", html)
 
     def test_popover_contains_name(self):
         from utils.joseph_widget import render_joseph_ask_popover

@@ -1103,11 +1103,38 @@ st.markdown("""
     padding: 0 !important;
     margin: 0 !important;
     border-radius: 16px;
+    -webkit-tap-highlight-color: rgba(0, 240, 255, 0.10);
+    min-height: 44px;
 }
 /* Hide the label/icon text inside the overlay link */
 [data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a span,
 [data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a p {
     display: none !important;
+}
+
+/* Fallback for browsers that do not support :has() — show the
+   page_link as a visible styled button below the card. */
+@supports not selector(:has(*)) {
+    [data-testid="stPageLink"] {
+        margin-top: 4px !important;
+    }
+    [data-testid="stPageLink"] a {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        padding: 8px 12px !important;
+        border-radius: 8px;
+        background: rgba(0, 240, 255, 0.08) !important;
+        border: 1px solid rgba(0, 240, 255, 0.20) !important;
+        color: #00f0ff !important;
+        font-size: 0.72rem !important;
+        font-weight: 600;
+        text-decoration: none !important;
+        min-height: 44px;
+        -webkit-tap-highlight-color: rgba(0, 240, 255, 0.10);
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════

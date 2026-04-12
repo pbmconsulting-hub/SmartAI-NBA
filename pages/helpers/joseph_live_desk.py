@@ -130,6 +130,11 @@ def get_joseph_avatar_for_vibe(vibe_status: str = "") -> str:
     return get_joseph_avatar_b64()
 
 
+def get_smart_pick_pro_logo_b64() -> str:
+    """Load Smart_Pick_Pro_Logo.png and return base64-encoded string."""
+    return _load_avatar_file("Smart_Pick_Pro_Logo.png")
+
+
 # ═════════════════════════════════════════════════════════════
 # render_live_desk_css — complete CSS for the broadcast desk
 # ═════════════════════════════════════════════════════════════
@@ -536,6 +541,55 @@ def render_live_desk_css() -> str:
 }
 .joseph-signoff-text em{color:#ff9e00}
 .joseph-signoff-icon{font-size:1.3rem;margin-bottom:6px}
+
+/* ── Mobile Responsive — Broadcast Desk ──────────────────── */
+@media (max-width: 768px){
+    .joseph-live-desk{margin:12px 0;border-radius:14px}
+    .joseph-hero{padding:16px 14px 14px;gap:12px;flex-wrap:wrap}
+    .joseph-avatar{width:56px;height:56px;border-width:2px}
+    .joseph-header-text{font-size:1rem}
+    .joseph-subtitle{font-size:0.72rem}
+    .joseph-desk-body{padding:12px 14px 16px}
+    .joseph-monologue{padding:14px 16px;border-radius:12px}
+    .joseph-monologue-label{font-size:0.70rem}
+    .joseph-monologue-text{font-size:0.84rem}
+    .joseph-kpi-bar{gap:6px}
+    .joseph-kpi{padding:5px 10px;font-size:0.76rem}
+    .joseph-segment{padding:12px 14px;border-radius:10px}
+    .joseph-segment-title{font-size:0.84rem}
+    .joseph-segment-body{font-size:0.82rem}
+    .joseph-pick-card{gap:10px;border-radius:10px}
+    .joseph-pick-rank{min-width:40px;font-size:1rem}
+    .joseph-pick-content{padding:12px 12px 10px 0}
+    .joseph-pick-player{font-size:0.92rem}
+    .joseph-pick-prop{font-size:0.80rem}
+    .joseph-pick-edge{font-size:0.76rem;padding:2px 8px}
+    .joseph-ticket{border-radius:10px}
+    .joseph-ticket-body{padding:10px 12px}
+    .joseph-signoff{padding:14px 16px}
+    .joseph-signoff-text{font-size:0.84rem}
+    .joseph-section-header{font-size:0.85rem}
+    .joseph-dawg-table{font-size:0.78rem}
+    .joseph-dawg-table th{padding:8px 10px;font-size:0.66rem}
+    .joseph-dawg-table td{padding:6px 10px}
+    .joseph-override-table{font-size:0.78rem}
+    .joseph-override-table th{padding:8px 10px;font-size:0.66rem}
+    .joseph-override-table td{padding:6px 10px}
+}
+@media (max-width: 480px){
+    .joseph-hero{padding:12px 10px;gap:10px;flex-direction:column;align-items:center;text-align:center}
+    .joseph-avatar{width:48px;height:48px}
+    .joseph-header-text{font-size:0.90rem;justify-content:center}
+    .joseph-subtitle{font-size:0.68rem;justify-content:center;flex-wrap:wrap}
+    .joseph-desk-body{padding:10px 10px 14px}
+    .joseph-monologue{padding:10px 12px}
+    .joseph-kpi{padding:4px 8px;font-size:0.72rem}
+    .joseph-segment{padding:10px 12px}
+    .joseph-pick-rank{min-width:36px;font-size:0.9rem}
+    .joseph-pick-content{padding:10px 10px 8px 0}
+    .joseph-pick-player{font-size:0.85rem}
+    .joseph-pick-prop{font-size:0.76rem;flex-direction:column;align-items:flex-start}
+}
 </style>"""
 
 
@@ -1088,13 +1142,13 @@ def render_joseph_live_desk(
     # ── Inject CSS ────────────────────────────────────────────
     st.markdown(render_live_desk_css(), unsafe_allow_html=True)
 
-    avatar_b64 = get_joseph_avatar_b64()
-    avatar_img = (
-        f'<img src="data:image/png;base64,{avatar_b64}" class="joseph-avatar" '
-        f'alt="Joseph M. Smith">'
-        if avatar_b64
+    logo_b64 = get_smart_pick_pro_logo_b64()
+    logo_img = (
+        f'<img src="data:image/png;base64,{logo_b64}" class="joseph-avatar" '
+        f'alt="Smart Pick Pro">'
+        if logo_b64
         else '<div class="joseph-avatar" style="background:#1e293b;display:flex;'
-             'align-items:center;justify-content:center;font-size:1.5rem">🎙️</div>'
+             'align-items:center;justify-content:center;font-size:1.5rem">🏀</div>'
     )
 
     desk = st.empty()
@@ -1106,7 +1160,7 @@ def render_joseph_live_desk(
         # ─────────────────────────────────────────────────────
         st.markdown(
             f'<div class="joseph-hero">'
-            f'{avatar_img}'
+            f'{logo_img}'
             f'<div class="joseph-header">'
             f'<div class="joseph-header-text">'
             f'<span class="joseph-name-accent">Joseph M. Smith\'s</span> Broadcast Desk'
