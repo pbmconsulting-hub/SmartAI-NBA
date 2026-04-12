@@ -431,17 +431,39 @@ def get_studio_css() -> str:
    ════════════════════════════════════════════════════════════ */
 @media (max-width:768px){
     .studio-mode-cards{flex-direction:column}
-    .studio-mode-card{min-width:100%;max-width:100%}
+    .studio-mode-card{min-width:100%;max-width:100%;padding:14px 16px}
     .studio-metric-row{flex-wrap:wrap}
-    .studio-metric-card{min-width:100%}
+    .studio-metric-card{min-width:100%;padding:12px 14px}
     .studio-hero-title{font-size:1.3rem}
     .studio-avatar-lg{width:80px;height:80px}
-    .studio-quick-nav{gap:6px}
-    .studio-quick-nav a{padding:5px 10px;font-size:0.7rem}
+    .studio-quick-nav{gap:6px;flex-wrap:wrap}
+    .studio-quick-nav a{padding:5px 10px;font-size:0.7rem;min-height:44px;display:inline-flex;align-items:center}
     .joseph-dawg-table,
     .joseph-override-table,
     .studio-payout-table{
-        display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;
+        display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+    }
+}
+@media (max-width:480px){
+    .studio-hero-title{font-size:1.1rem}
+    .studio-avatar-lg{width:60px;height:60px}
+    .studio-mode-card{padding:12px;border-radius:10px}
+    .studio-metric-card{padding:10px 12px;border-radius:8px}
+    .studio-quick-nav a{padding:4px 8px;font-size:0.65rem}
+}
+/* Landscape — compact layout for limited vertical space */
+@media (max-width:896px) and (orientation:landscape){
+    .studio-mode-cards{flex-direction:row;flex-wrap:wrap}
+    .studio-mode-card{min-width:calc(50% - 8px);max-width:calc(50% - 8px);padding:10px 12px}
+    .studio-metric-row{flex-wrap:wrap}
+    .studio-metric-card{min-width:calc(50% - 8px);padding:10px 12px}
+    .studio-hero-title{font-size:1.1rem}
+    .studio-avatar-lg{width:64px;height:64px}
+    .studio-quick-nav a{padding:4px 10px;font-size:0.68rem;min-height:38px}
+    .joseph-dawg-table,
+    .joseph-override-table,
+    .studio-payout-table{
+        display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
     }
 }
 </style>"""

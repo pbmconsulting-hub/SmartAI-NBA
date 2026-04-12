@@ -861,6 +861,8 @@ st.markdown("""
     height: 100%;
     position: relative;
     overflow: hidden;
+    /* Collapse bottom margin — page_link overlay handles spacing */
+    margin-bottom: 0;
 }
 .nav-card::before {
     content: '';
@@ -1062,6 +1064,158 @@ st.markdown("""
     top: -1px; left: 10%; right: 10%;
     height: 1px;
     background: linear-gradient(90deg, transparent, rgba(0,240,255,0.15), rgba(200,0,255,0.10), transparent);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Clickable Nav Cards — page_link overlay
+   Make the entire nav card area clickable by stretching
+   the st.page_link anchor over the visual card.
+   ═══════════════════════════════════════════════════════════ */
+
+/* Column containing a nav-card becomes a positioned container.
+   The cursor is visual only — the underlying st.page_link <a> provides
+   keyboard accessibility and focus styles via Streamlit defaults. */
+[data-testid="stColumn"]:has(.nav-card) {
+    position: relative;
+    cursor: pointer;
+}
+
+/* The page_link element overlays the entire column */
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    color: transparent !important;
+    font-size: 0 !important;
+    text-decoration: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 16px;
+}
+/* Hide the label/icon text inside the overlay link */
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a span,
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a p {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Landing Page — Responsive Breakpoints
+   ═══════════════════════════════════════════════════════════ */
+
+/* Tablet (481–768px): 2-column grid for nav cards */
+@media (max-width: 768px) {
+    .hero-hud { padding: 28px 22px; gap: 18px; }
+    .hero-tagline { font-size: 1.5rem; }
+    .hero-subtext { font-size: 0.82rem; }
+    .section-header { font-size: 1.15rem !important; margin: 28px 0 6px 0; }
+    .section-subheader { font-size: 0.82rem; margin-bottom: 18px; }
+    .nav-card { padding: 16px 12px; border-radius: 12px; }
+    .nav-card-icon { font-size: 1.5rem; margin-bottom: 6px; }
+    .nav-card-title { font-size: 0.78rem; }
+    .nav-card-desc { font-size: 0.68rem; }
+    .nav-row-label { font-size: 0.64rem; letter-spacing: 1.2px; margin: 16px 0 8px 4px; }
+    .status-card { padding: 14px 12px; border-radius: 10px; }
+    .status-card-value { font-size: 1.5rem; }
+    .status-card-label { font-size: 0.64rem; letter-spacing: 0.8px; }
+    .proof-card { padding: 18px 12px; }
+    .proof-card-number { font-size: 1.5rem; }
+    .proof-card-label { font-size: 0.62rem; }
+    .pillar-card-inner { padding: 22px 18px; }
+    .pillar-subtitle { font-size: 1rem; }
+    .pillar-body { font-size: 0.80rem; }
+    .pipeline-step { padding: 16px 12px; border-radius: 12px; }
+    .pipeline-step-title { font-size: 0.72rem; }
+    .pipeline-step-desc { font-size: 0.68rem; }
+    .comp-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .comp-table th { padding: 10px 12px; font-size: 0.64rem; }
+    .comp-table td { padding: 8px 12px; font-size: 0.76rem; }
+    .matchup-chip { padding: 10px 14px; border-radius: 10px; gap: 6px; }
+    .lp-divider { margin: 24px 0; }
+}
+
+/* Phone (≤480px): single-column, tighter spacing */
+@media (max-width: 480px) {
+    .hero-hud { flex-direction: column; text-align: center; padding: 22px 16px; gap: 16px; border-radius: 16px; }
+    .spp-hero-logo { width: 72px !important; }
+    .hero-tagline { font-size: 1.2rem; }
+    .hero-subtext { font-size: 0.78rem; }
+    .section-header { font-size: 1.05rem !important; margin: 20px 0 4px 0; padding-bottom: 10px; }
+    .section-subheader { font-size: 0.78rem; margin-bottom: 14px; }
+    .nav-card { padding: 14px 10px; border-radius: 10px; }
+    .nav-card-icon { font-size: 1.3rem; margin-bottom: 4px; }
+    .nav-card-title { font-size: 0.76rem; }
+    .nav-card-desc { font-size: 0.65rem; line-height: 1.4; }
+    .nav-row-label { font-size: 0.60rem; letter-spacing: 1px; margin: 12px 0 6px 4px; }
+    .status-card { padding: 10px 8px; border-radius: 8px; }
+    .status-card-value { font-size: 1.3rem; }
+    .status-card-label { font-size: 0.60rem; }
+    .proof-card { padding: 14px 10px; border-radius: 10px; }
+    .proof-card-number { font-size: 1.3rem; }
+    .proof-card-label { font-size: 0.58rem; }
+    .pillar-card { border-radius: 14px; }
+    .pillar-card-inner { padding: 18px 14px; }
+    .pillar-icon-halo { width: 48px; height: 48px; border-radius: 12px; margin-bottom: 12px; }
+    .pillar-title { font-size: 0.70rem; letter-spacing: 1px; margin-bottom: 8px; }
+    .pillar-subtitle { font-size: 0.92rem; margin-bottom: 12px; }
+    .pillar-body { font-size: 0.78rem; line-height: 1.6; }
+    .pillar-footer { font-size: 0.70rem; margin-top: 14px; padding-top: 12px; }
+    .pipeline-row { flex-direction: column; }
+    .pipeline-step { padding: 14px 10px; border-radius: 10px; }
+    .pipeline-connector { width: 100%; height: 20px; }
+    .matchup-chip { padding: 10px 12px; font-size: 0.82rem; border-radius: 8px; flex-direction: column; text-align: center; gap: 4px; }
+    .comp-table th { padding: 8px 10px; font-size: 0.60rem; }
+    .comp-table td { padding: 6px 10px; font-size: 0.72rem; }
+    .lp-footer { font-size: 0.72rem; padding-top: 14px; margin-top: 20px; }
+    .lp-divider { margin: 16px 0; }
+    .joseph-welcome-card { flex-direction: column; align-items: center; text-align: center; padding: 20px 16px; }
+    .joseph-welcome-avatar { width: 56px; height: 56px; }
+    .joseph-welcome-msg { font-size: 0.88rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Landing Page — Landscape Orientation
+   Compact vertical spacing for landscape mobile devices.
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 896px) and (orientation: landscape) {
+    .hero-hud { padding: 18px 20px; gap: 14px; border-radius: 14px; }
+    .hero-tagline { font-size: 1.2rem; }
+    .hero-subtext { font-size: 0.78rem; }
+    .spp-hero-logo { width: 64px !important; }
+    .section-header { font-size: 1.05rem !important; margin: 14px 0 4px 0 !important; padding-bottom: 6px; }
+    .section-subheader { font-size: 0.76rem; margin-bottom: 10px; }
+    .nav-card { padding: 12px 10px; border-radius: 10px; }
+    .nav-card-icon { font-size: 1.2rem; margin-bottom: 3px; }
+    .nav-card-title { font-size: 0.72rem; }
+    .nav-card-desc { font-size: 0.62rem; line-height: 1.35; }
+    .nav-row-label { font-size: 0.58rem; margin: 10px 0 4px 4px; }
+    .pillar-card-inner { padding: 16px 14px; }
+    .pillar-subtitle { font-size: 0.90rem; }
+    .pillar-body { font-size: 0.76rem; }
+    .proof-card { padding: 14px 10px; }
+    .proof-card-number { font-size: 1.2rem; }
+    .proof-card-label { font-size: 0.58rem; }
+    .status-card { padding: 10px 8px; }
+    .status-card-value { font-size: 1.2rem; }
+    .status-card-label { font-size: 0.58rem; }
+    .pipeline-step { padding: 12px 10px; }
+    .matchup-chip { padding: 8px 10px; font-size: 0.78rem; }
+    .lp-divider { margin: 12px 0; }
+    .lp-footer { font-size: 0.68rem; }
+    .joseph-welcome-card { padding: 16px 14px; gap: 14px; }
+    .joseph-welcome-avatar { width: 48px; height: 48px; }
+    .joseph-welcome-msg { font-size: 0.82rem; }
 }
 </style>
 """, unsafe_allow_html=True)
