@@ -227,9 +227,9 @@ def _get_sim_cache() -> dict:
 #      height or scroll-bar is needed.
 # ---------------------------------------------------------------------------
 
-_MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
-_HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
-_MAX_IFRAME_HEIGHT = 12000     # px — generous cap; no scrollbar inside iframes
+_MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (must fit expanded card)
+_HEIGHT_PER_PLAYER = 320       # px — each player's collapsed card + buffer for expanded state
+_MAX_IFRAME_HEIGHT = 20000     # px — generous cap; no scrollbar inside iframes
 _LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
@@ -265,9 +265,19 @@ _IFRAME_RESIZE_JS = (
     "(function(){"
     "var lastH=0,tid=0;"
     "function sendHeight(){"
-    # Use the larger of body.scrollHeight and documentElement.scrollHeight
-    # to handle cases where overflow:hidden on body could limit scrollHeight.
-    "var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);"
+    # Walk ALL children and compute max bottom to get true content height.
+    # This works even when overflow is visible/hidden — it measures the
+    # actual rendered layout rather than relying on scrollHeight which
+    # can be clamped by overflow:hidden.
+    "var h=0;"
+    "var els=document.body.children;"
+    "for(var i=0;i<els.length;i++){"
+    "var r=els[i].getBoundingClientRect();"
+    "var b=r.top+window.scrollY+r.height;"
+    "if(b>h)h=b;"
+    "}"
+    "h=Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
+    "h=Math.ceil(h)+4;"  # +4px safety margin
     # Ignore tiny height changes (< 8px) to prevent postMessage noise
     # from sub-pixel rendering differences during parent-page scroll.
     "if(Math.abs(h-lastH)<8)return;"
@@ -284,6 +294,13 @@ _IFRAME_RESIZE_JS = (
     # The 60ms delay lets the browser finish the expand/collapse layout
     # shift before we measure scrollHeight.
     "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
+    # Re-measure when Joseph M Smith panels are toggled via onclick.
+    # These use display:none/block which doesn't fire a 'toggle' event.
+    "document.addEventListener('click',function(e){"
+    "if(e.target.closest&&e.target.closest('.upc-joseph-row')){"
+    "setTimeout(sendHeight,80);"
+    "}"
+    "},true);"
     # Handle images loading late (can change content height) — debounced
     # so multiple images loading in the same frame don't create a burst
     # of postMessages that overwhelm the Streamlit WebSocket.
@@ -323,11 +340,20 @@ def _render_card_iframe(card_html, player_count):
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<style>"
-        "html{overflow:hidden;overscroll-behavior:contain;touch-action:pan-y;"
-        "contain:layout style}"
+        # overflow:visible on html/body so that:
+        #   1. scrollHeight accurately reflects the full content height
+        #      (overflow:hidden was clamping it, causing clipped cards)
+        #   2. Expanded <details> content is never cut off
+        #   3. Joseph opinion panels (toggled via JS) measure correctly
+        # The iframe itself uses scrolling=False — the postMessage height
+        # adjustment keeps the iframe exactly the right size, so no
+        # scrollbar ever appears.
+        "html{overflow:visible;overscroll-behavior:contain;touch-action:pan-y}"
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
-        "overscroll-behavior:contain;overflow:hidden;touch-action:pan-y}"
+        "overscroll-behavior:contain;overflow:visible;touch-action:pan-y}"
         "*{-webkit-tap-highlight-color:transparent}"
+        # Prevent horizontal overflow from wide cards on narrow viewports
+        ".upc-grid,.qcm-grid-container,.qcm-grid{max-width:100%;box-sizing:border-box}"
         "</style>"
         "</head><body>"
         f"{card_html}"
@@ -390,6 +416,14 @@ st.markdown(
     # ── Promote iframes to GPU layers for smoother scroll ──
     '[data-testid="stHtml"] iframe'
     '{will-change:transform}'
+    # ── Ensure iframe containers expand fully (no clipping) ──
+    # On mobile, Streamlit's stHtml wrapper can clip iframe content.
+    # Allow iframes to expand to their full content height.
+    '[data-testid="stHtml"]'
+    '{overflow:visible !important}'
+    # ── Mobile: ensure expander content doesn't clip ──
+    '.stExpander [data-testid="stExpanderDetails"]'
+    '{overflow:visible !important}'
     '</style>',
     unsafe_allow_html=True,
 )
