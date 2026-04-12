@@ -268,14 +268,16 @@ _IFRAME_RESIZE_JS = (
     # Use the larger of body.scrollHeight and documentElement.scrollHeight
     # to handle cases where overflow:hidden on body could limit scrollHeight.
     "var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);"
-    "if(Math.abs(h-lastH)<4)return;"
+    # Ignore tiny height changes (< 8px) to prevent postMessage noise
+    # from sub-pixel rendering differences during parent-page scroll.
+    "if(Math.abs(h-lastH)<8)return;"
     "lastH=h;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
     "}"
-    # Debounced wrapper — at most one postMessage per 150 ms.
+    # Debounced wrapper — at most one postMessage per 200 ms.
     # Prevents message storms when multiple events fire in quick
     # succession (e.g. several images loading at once).
-    "function debouncedSend(){clearTimeout(tid);tid=setTimeout(sendHeight,150)}"
+    "function debouncedSend(){clearTimeout(tid);tid=setTimeout(sendHeight,200)}"
     # Send initial height once DOM is ready
     "sendHeight();"
     # Re-measure only when a <details> element is toggled (user action).
@@ -321,9 +323,11 @@ def _render_card_iframe(card_html, player_count):
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<style>"
-        "html{overflow:hidden;overscroll-behavior:contain;touch-action:pan-y}"
+        "html{overflow:hidden;overscroll-behavior:contain;touch-action:pan-y;"
+        "contain:layout style}"
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
         "overscroll-behavior:contain;overflow:hidden;touch-action:pan-y}"
+        "*{-webkit-tap-highlight-color:transparent}"
         "</style>"
         "</head><body>"
         f"{card_html}"
@@ -357,7 +361,8 @@ st.markdown(
     '.main .block-container{padding-bottom:1rem !important}'
     'html,body,.stApp,[data-testid="stAppViewContainer"],'
     'section[data-testid="stMain"],.main,.block-container'
-    '{overscroll-behavior-y:contain !important}'
+    '{overscroll-behavior-y:contain !important;'
+    '-webkit-overflow-scrolling:touch}'
     # ── Mobile: prevent accidental widget taps while scrolling ──
     # ``touch-action:manipulation`` disables double-tap-to-zoom and
     # fast-tap on interactive widgets, reducing the chance that a
@@ -371,6 +376,20 @@ st.markdown(
     '[data-testid="stSelectbox"],'
     '[data-testid="stMultiSelect"]'
     '{touch-action:manipulation;min-height:48px}'
+    # ── During active scroll: disable pointer events on widgets ──
+    # The JS scroll-guard adds ``.qam-scrolling`` to ``<body>`` while
+    # the user is actively scrolling.  This prevents accidental taps
+    # on Streamlit buttons/toggles that would trigger a full-page rerun.
+    '.qam-scrolling [data-testid="stButton"] button,'
+    '.qam-scrolling [data-testid="stToggle"] label,'
+    '.qam-scrolling [data-testid="stRadio"] label,'
+    '.qam-scrolling [data-testid="stCheckbox"] label,'
+    '.qam-scrolling [data-testid="stSelectbox"] div[data-baseweb],'
+    '.qam-scrolling [data-testid="stMultiSelect"] div[data-baseweb]'
+    '{pointer-events:none !important}'
+    # ── Promote iframes to GPU layers for smoother scroll ──
+    '[data-testid="stHtml"] iframe'
+    '{will-change:transform}'
     '</style>',
     unsafe_allow_html=True,
 )
@@ -396,27 +415,42 @@ st.markdown(
         if(window.__qamScrollGuard) return;
         window.__qamScrollGuard=true;
         var tid=0;
+        var isScrolling=false;
         function getCardIframes(){
             /* Only target iframes inside stHtml containers (QAM card iframes),
                NOT Streamlit's own component/WebSocket iframes */
             return document.querySelectorAll('[data-testid="stHtml"] iframe');
         }
         function disableIframes(){
+            isScrolling=true;
             getCardIframes().forEach(function(f){
                 f.style.pointerEvents='none';
             });
+            /* Also disable Streamlit buttons/toggles during active scroll
+               to prevent accidental taps that trigger full-page reruns.
+               Uses a CSS class so we can cleanly remove it later. */
+            document.body.classList.add('qam-scrolling');
         }
         function enableIframes(){
+            isScrolling=false;
             getCardIframes().forEach(function(f){
                 f.style.pointerEvents='';
             });
+            document.body.classList.remove('qam-scrolling');
         }
         /* Use the Streamlit main scroll container if available */
         var sc=document.querySelector('[data-testid="stAppViewContainer"]')||window;
         sc.addEventListener('scroll',function(){
             disableIframes();
             clearTimeout(tid);
-            tid=setTimeout(enableIframes,300);
+            tid=setTimeout(enableIframes,350);
+        },{passive:true});
+        /* Also listen on touchmove — catches scroll momentum before the
+           browser fires the 'scroll' event on the container */
+        sc.addEventListener('touchmove',function(){
+            if(!isScrolling) disableIframes();
+            clearTimeout(tid);
+            tid=setTimeout(enableIframes,350);
         },{passive:true});
     })();
     </script>""",
@@ -476,16 +510,17 @@ _INJURY_STALE_HOURS = 4
 _INJURY_REFRESH_COOLDOWN_SECS = 1800  # 30 minutes
 
 # Short-circuit: if we already checked in this page load cycle
-# (i.e. within the last 60 seconds), skip the entire block.
-# This prevents repeated file-stat calls during rapid reruns.
+# (i.e. within the last 120 seconds), skip the entire block.
+# This prevents repeated file-stat calls during rapid reruns
+# (e.g. scroll-triggered reruns on mobile that happen seconds apart).
 import time as _time_mod
 _injury_check_ts = st.session_state.get("_injury_check_ts", 0)
 _secs_since_check = _time_mod.time() - _injury_check_ts
 
-if _secs_since_check < 60:
+if _secs_since_check < 120:
     _should_auto_refresh_injuries = False
 else:
-    # Record the check so subsequent rapid reruns (within 60s) skip it
+    # Record the check so subsequent rapid reruns (within 120s) skip it
     st.session_state["_injury_check_ts"] = _time_mod.time()
     if not st.session_state["injury_status_map"]:
         _should_auto_refresh_injuries = True
@@ -2097,19 +2132,22 @@ if run_analysis:
                 from data.nba_data_service import get_todays_players as _get_today
                 _roster_result = _get_today(todays_games, progress_callback=None)
                 if _roster_result:
-                    # Re-run the full analysis now that players.csv is populated.
-                    # Simply clearing the analysis cache and re-running the page gives
-                    # every player a complete projection from real season averages
-                    # rather than the position-prior estimates used above.
                     try:
                         load_players_data.clear()  # bust Streamlit's CSV cache
                     except Exception:
                         pass
                     st.success(
-                        f"✅ Smart Roster Update complete — re-running analysis with "
-                        f"fresh player data for {len(_unmatched_players)} player(s)."
+                        f"✅ Smart Roster Update complete — fresh player data loaded "
+                        f"for {len(_unmatched_players)} player(s). Results below use "
+                        f"the best available data."
                     )
-                    st.rerun()
+                    # NOTE: st.rerun() was intentionally REMOVED here.
+                    # The rerun forced the entire ~3000-line page to re-execute,
+                    # which on mobile cascaded into an infinite rerun loop
+                    # (scroll → widget touch → rerun → re-render → scroll → …).
+                    # The current analysis results are already computed and will
+                    # be stored in session_state below.  The updated roster will
+                    # be used automatically on the NEXT analysis run.
             except Exception as _su_err:
                 # Non-fatal — proceed with existing results
                 _logger.warning(f"Smart Update error (non-fatal): {_su_err}")
