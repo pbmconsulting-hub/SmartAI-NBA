@@ -717,159 +717,171 @@ if mode == "🏀 GAMES TONIGHT":
                         except Exception:
                             pass
 
+                    # ── Persist result so it survives page navigation ──
                     if result:
                         # Hot Take Mode: flip verdicts on best_props
                         if st.session_state.get("joseph_hot_take_mode", False):
                             _raw_props = result.get("best_props", [])
                             result["best_props"] = _apply_hot_take_to_list(_raw_props)
-                            st.markdown(
-                                '<div style="background:rgba(255,68,68,0.08);'
-                                'border:1px solid rgba(255,68,68,0.3);border-radius:8px;'
-                                'padding:8px 14px;margin-bottom:10px;color:#ff4444;'
-                                'font-size:0.82rem;font-weight:600">'
-                                '🔥 HOT TAKE — Joseph is going AGAINST the model on these picks!</div>',
-                                unsafe_allow_html=True,
-                            )
-
-                        # Avatar + commentary (Enhancement 18: use helper)
-                        try:
-                            commentary = joseph_commentary(
-                                [result], "analysis_results"
-                            )
-                        except Exception:
-                            commentary = ""
-
-                        if commentary:
-                            st.markdown(
-                                render_avatar_commentary(commentary),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Game narrative
-                        narrative = result.get("game_narrative", "")
-                        if narrative:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "📖 GAME NARRATIVE",
-                                    "body": _html.escape(narrative),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Pace take
-                        pace = result.get("pace_take", "")
-                        if pace:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "⚡ PACE TAKE",
-                                    "body": _html.escape(pace),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Scheme analysis
-                        scheme = result.get("scheme_analysis", "")
-                        if scheme:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "🛡️ SCHEME ANALYSIS",
-                                    "body": _html.escape(scheme),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Key matchup
-                        matchup = result.get("key_matchup", result.get("matchup", ""))
-                        if matchup:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "🔑 KEY MATCHUP",
-                                    "body": _html.escape(str(matchup)),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Joseph's top 3 bets for this game
-                        best_props = result.get("best_props", [])[:3]
-                        if best_props:
-                            st.markdown(
-                                '<div class="joseph-segment-title">'
-                                '🎯 Joseph\'s Top 3 Bets for this Game'
-                                '</div>',
-                                unsafe_allow_html=True,
-                            )
-                            for bp in best_props:
-                                v = bp.get("verdict", "LEAN")
-                                emoji = VERDICT_EMOJIS.get(
-                                    v.upper().replace(" ", "_"), "✅"
-                                )
-                                bp_name = _html.escape(str(bp.get("player_name", bp.get("player", ""))))
-                                bp_rant = _html.escape(str(bp.get("rant", "")))
-                                st.markdown(
-                                    render_broadcast_segment({
-                                        "title": f"{bp_name}",
-                                        "body": bp_rant,
-                                        "verdict": v,
-                                    }),
-                                    unsafe_allow_html=True,
-                                )
-
-                        # Game total and spread opinions
-                        total_opinion = result.get("total_opinion", result.get("joseph_game_total_take", ""))
-                        if total_opinion:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "📊 TOTAL OPINION",
-                                    "body": _html.escape(total_opinion),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        spread_opinion = result.get("spread_opinion", result.get("joseph_spread_take", ""))
-                        if spread_opinion:
-                            st.markdown(
-                                render_broadcast_segment({
-                                    "title": "📏 SPREAD OPINION",
-                                    "body": _html.escape(spread_opinion),
-                                }),
-                                unsafe_allow_html=True,
-                            )
-
-                        # Risk warning
-                        risk = result.get("blowout_risk", result.get("risk_warning", ""))
-                        if risk:
-                            st.markdown(
-                                f'<div style="color:#eab308;font-size:0.88rem;'
-                                f'margin:10px 0;padding:10px 14px;'
-                                f'border-left:3px solid #eab308;'
-                                f'background:rgba(234,179,8,0.06);'
-                                f'border-radius:4px">'
-                                f'⚠️ <strong>Risk Warning:</strong> '
-                                f'{_html.escape(str(risk))}'
-                                f'</div>',
-                                unsafe_allow_html=True,
-                            )
-
-                        # Nerd stats (Enhancement 20: consolidated helper)
-                        with st.expander("📊 Nerd Stats"):
-                            _game_nerd_keys = [
-                                "pace_take", "scheme_analysis", "blowout_risk",
-                                "game_narrative", "total_opinion", "joseph_game_total_take",
-                                "spread_opinion", "joseph_spread_take",
-                                "betting_angle", "risk_warning",
-                            ]
-                            _nerd_html = render_nerd_stats(result, keys=_game_nerd_keys)
-                            if _nerd_html:
-                                st.markdown(_nerd_html, unsafe_allow_html=True)
+                            result["_hot_take_applied"] = True
+                        st.session_state.setdefault("studio_game_results", {})[g_idx] = result
+                        st.rerun()
                     else:
+                        st.session_state.setdefault("studio_game_results", {})[g_idx] = None
+
+            # ── Display cached game analysis from session_state ──
+            _cached_result = st.session_state.get("studio_game_results", {}).get(g_idx)
+            if _cached_result:
+                result = _cached_result
+                if result.get("_hot_take_applied"):
+                    st.markdown(
+                        '<div style="background:rgba(255,68,68,0.08);'
+                        'border:1px solid rgba(255,68,68,0.3);border-radius:8px;'
+                        'padding:8px 14px;margin-bottom:10px;color:#ff4444;'
+                        'font-size:0.82rem;font-weight:600">'
+                        '🔥 HOT TAKE — Joseph is going AGAINST the model on these picks!</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                # Avatar + commentary (Enhancement 18: use helper)
+                try:
+                    commentary = joseph_commentary(
+                        [result], "analysis_results"
+                    )
+                except Exception:
+                    commentary = ""
+
+                if commentary:
+                    st.markdown(
+                        render_avatar_commentary(commentary),
+                        unsafe_allow_html=True,
+                    )
+
+                # Game narrative
+                narrative = result.get("game_narrative", "")
+                if narrative:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "📖 GAME NARRATIVE",
+                            "body": _html.escape(narrative),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                # Pace take
+                pace = result.get("pace_take", "")
+                if pace:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "⚡ PACE TAKE",
+                            "body": _html.escape(pace),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                # Scheme analysis
+                scheme = result.get("scheme_analysis", "")
+                if scheme:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "🛡️ SCHEME ANALYSIS",
+                            "body": _html.escape(scheme),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                # Key matchup
+                matchup = result.get("key_matchup", result.get("matchup", ""))
+                if matchup:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "🔑 KEY MATCHUP",
+                            "body": _html.escape(str(matchup)),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                # Joseph's top 3 bets for this game
+                best_props = result.get("best_props", [])[:3]
+                if best_props:
+                    st.markdown(
+                        '<div class="joseph-segment-title">'
+                        '🎯 Joseph\'s Top 3 Bets for this Game'
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
+                    for bp in best_props:
+                        v = bp.get("verdict", "LEAN")
+                        emoji = VERDICT_EMOJIS.get(
+                            v.upper().replace(" ", "_"), "✅"
+                        )
+                        bp_name = _html.escape(str(bp.get("player_name", bp.get("player", ""))))
+                        bp_rant = _html.escape(str(bp.get("rant", "")))
                         st.markdown(
-                            render_empty_state(
-                                "Joseph couldn't analyze this game — data may be limited.",
-                                cta_text="Run ⚡ Neural Analysis →",
-                                cta_page="/⚡_Quantum_Analysis_Matrix",
-                            ),
+                            render_broadcast_segment({
+                                "title": f"{bp_name}",
+                                "body": bp_rant,
+                                "verdict": v,
+                            }),
                             unsafe_allow_html=True,
                         )
+
+                # Game total and spread opinions
+                total_opinion = result.get("total_opinion", result.get("joseph_game_total_take", ""))
+                if total_opinion:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "📊 TOTAL OPINION",
+                            "body": _html.escape(total_opinion),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                spread_opinion = result.get("spread_opinion", result.get("joseph_spread_take", ""))
+                if spread_opinion:
+                    st.markdown(
+                        render_broadcast_segment({
+                            "title": "📏 SPREAD OPINION",
+                            "body": _html.escape(spread_opinion),
+                        }),
+                        unsafe_allow_html=True,
+                    )
+
+                # Risk warning
+                risk = result.get("blowout_risk", result.get("risk_warning", ""))
+                if risk:
+                    st.markdown(
+                        f'<div style="color:#eab308;font-size:0.88rem;'
+                        f'margin:10px 0;padding:10px 14px;'
+                        f'border-left:3px solid #eab308;'
+                        f'background:rgba(234,179,8,0.06);'
+                        f'border-radius:4px">'
+                        f'⚠️ <strong>Risk Warning:</strong> '
+                        f'{_html.escape(str(risk))}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+
+                # Nerd stats (Enhancement 20: consolidated helper)
+                with st.expander("📊 Nerd Stats"):
+                    _game_nerd_keys = [
+                        "pace_take", "scheme_analysis", "blowout_risk",
+                        "game_narrative", "total_opinion", "joseph_game_total_take",
+                        "spread_opinion", "joseph_spread_take",
+                        "betting_angle", "risk_warning",
+                    ]
+                    _nerd_html = render_nerd_stats(result, keys=_game_nerd_keys)
+                    if _nerd_html:
+                        st.markdown(_nerd_html, unsafe_allow_html=True)
+            elif _cached_result is None and g_idx in st.session_state.get("studio_game_results", {}):
+                st.markdown(
+                    render_empty_state(
+                        "Joseph couldn't analyze this game — data may be limited.",
+                        cta_text="Run ⚡ Neural Analysis →",
+                        cta_page="/⚡_Quantum_Analysis_Matrix",
+                    ),
+                    unsafe_allow_html=True,
+                )
 
 
 # ─────────────────────────────────────────────────────────────

@@ -956,9 +956,6 @@ def _render_sim_card(sim_result: dict):
 
 # ─── Run simulation for selected players ────────────────────
 if run_sim and selected_names:
-    _mode_label = " (Scenario)" if _scenario_mode else (" (Compare)" if _compare_mode else "")
-    st.subheader(f"📊 Simulation Results — {len(selected_names)} Player(s){_mode_label}")
-
     try:
         # Enhancement 4: Animated progress bar per player + per stat
         _all_sim_results = []
@@ -1024,34 +1021,47 @@ if run_sim and selected_names:
             except Exception:
                 pass
 
+        # ── Persist results in session_state so they survive page navigation ──
+        if _all_sim_results:
+            st.session_state["last_sim_results"] = _all_sim_results
+            st.session_state["last_sim_compare_mode"] = _compare_mode
+            st.session_state["last_sim_scenario_mode"] = _scenario_mode
+            # Enhancement 11: Save to session history
+            if "sim_history" not in st.session_state:
+                st.session_state["sim_history"] = []
+            for _sr in _all_sim_results:
+                st.session_state["sim_history"].append({
+                    "timestamp": _datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "player": _sr["player"].get("name", ""),
+                    "team": _sr["player"].get("team", ""),
+                    "mode": "Scenario" if _scenario_mode else ("Compare" if _compare_mode else "Standard"),
+                    "stats_summary": {
+                        s: {"proj": v.get("projected", 0), "avg": v.get("season_avg", 0)}
+                        for s, v in _sr["stats"].items()
+                    },
+                })
+            st.rerun()
+
     except Exception as _sim_err:
         _sim_err_str = str(_sim_err)
         if "WebSocketClosedError" not in _sim_err_str and "StreamClosedError" not in _sim_err_str:
             st.error(f"❌ Simulation failed: {_sim_err}")
-        _all_sim_results = []
         if _joseph_sim_loader is not None:
             try:
                 _joseph_sim_loader.empty()
             except Exception:
                 pass
 
-    # Enhancement 11: Save to session history
-    if _all_sim_results:
-        if "sim_history" not in st.session_state:
-            st.session_state["sim_history"] = []
-        for _sr in _all_sim_results:
-            st.session_state["sim_history"].append({
-                "timestamp": _datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "player": _sr["player"].get("name", ""),
-                "team": _sr["player"].get("team", ""),
-                "mode": "Scenario" if _scenario_mode else ("Compare" if _compare_mode else "Standard"),
-                "stats_summary": {
-                    s: {"proj": v.get("projected", 0), "avg": v.get("season_avg", 0)}
-                    for s, v in _sr["stats"].items()
-                },
-            })
+# ─── Display simulation results from session_state ──────────
+_all_sim_results = st.session_state.get("last_sim_results", [])
+_display_compare = st.session_state.get("last_sim_compare_mode", _compare_mode)
+_display_scenario = st.session_state.get("last_sim_scenario_mode", _scenario_mode)
 
-    if _compare_mode and len(_all_sim_results) >= 2:
+if _all_sim_results:
+    _mode_label = " (Scenario)" if _display_scenario else (" (Compare)" if _display_compare else "")
+    st.subheader(f"📊 Simulation Results — {len(_all_sim_results)} Player(s){_mode_label}")
+
+    if _display_compare and len(_all_sim_results) >= 2:
         # ── Compare Mode: side-by-side table for all selected players ──
         st.markdown("**📊 Compare Mode — Side-by-Side Stat Projections**")
         _cmp_header = ["Stat"] + [r["player"].get("name", "") for r in _all_sim_results]
@@ -1259,7 +1269,7 @@ if run_sim and selected_names:
                     except Exception as _mh_exc:
                         pass  # Matchup history is optional — never break the page
 
-            elif _scenario_mode:
+            elif _display_scenario:
                 st.caption(
                     f"ℹ️ No recent game log stored for {_pname_log}. "
                     "Scenario simulation uses season averages + your overrides."
