@@ -482,37 +482,27 @@ st.markdown(
         if(window.__qamScrollGuard) return;
         window.__qamScrollGuard=true;
         var tid=0;
-        var isScrolling=false;
         /* Inject a CSS rule once to batch-disable pointer events on iframes
            during scroll.  Avoids per-iframe style mutations which cause
            layout thrashing that cascades into postMessage storms. */
         var sheet=document.createElement('style');
         sheet.textContent='.qam-scrolling [data-testid="stHtml"] iframe{pointer-events:none !important}';
         document.head.appendChild(sheet);
-        function disableIframes(){
-            if(isScrolling) return;
-            isScrolling=true;
-            /* Uses a single CSS class on body — no per-iframe style mutations */
+        function onScroll(){
+            /* Always add class + refresh the re-enable timer so continuous
+               scrolling keeps iframes disabled until scrolling stops. */
             document.body.classList.add('qam-scrolling');
-        }
-        function enableIframes(){
-            isScrolling=false;
-            document.body.classList.remove('qam-scrolling');
+            clearTimeout(tid);
+            tid=setTimeout(function(){
+                document.body.classList.remove('qam-scrolling');
+            },500);
         }
         /* Use the Streamlit main scroll container if available */
         var sc=document.querySelector('[data-testid="stAppViewContainer"]')||window;
-        sc.addEventListener('scroll',function(){
-            disableIframes();
-            clearTimeout(tid);
-            tid=setTimeout(enableIframes,500);
-        },{passive:true});
+        sc.addEventListener('scroll',onScroll,{passive:true});
         /* Also listen on touchmove — catches scroll momentum before the
            browser fires the 'scroll' event on the container */
-        sc.addEventListener('touchmove',function(){
-            disableIframes();
-            clearTimeout(tid);
-            tid=setTimeout(enableIframes,500);
-        },{passive:true});
+        sc.addEventListener('touchmove',onScroll,{passive:true});
     })();
     </script>""",
     unsafe_allow_html=True,
