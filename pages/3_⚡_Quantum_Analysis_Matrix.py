@@ -2183,7 +2183,11 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
         every full-page rerun (triggered by mobile scroll events) was a
         major contributor to the rerun cascade.  As a fragment, this
         section only re-executes when a widget *inside* it is touched.
+
+        Reads ``analysis_results`` from session state directly so the
+        fragment stays independent of outer-scope closures.
         """
+        _desk_analysis_results = st.session_state.get("analysis_results", [])
         try:
             from pages.helpers.joseph_live_desk import render_joseph_live_desk
             from data.advanced_metrics import enrich_player_god_mode
@@ -2205,7 +2209,7 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
 
             with st.container():
                 render_joseph_live_desk(
-                    analysis_results=analysis_results,
+                    analysis_results=_desk_analysis_results,
                     enriched_players=_enriched_lookup,
                     teams_data=_teams,
                     todays_games=_games,
@@ -2215,7 +2219,7 @@ if analysis_results and st.session_state.get("joseph_enabled", True):
             # when available; fall back to raw analysis_results.
             _joseph_results = st.session_state.get("joseph_results", [])
             inject_joseph_inline_commentary(
-                _joseph_results if _joseph_results else analysis_results,
+                _joseph_results if _joseph_results else _desk_analysis_results,
                 "analysis_results",
             )
 
@@ -2246,10 +2250,21 @@ def _render_results_fragment():
     Widgets inside this fragment (filter chips, sort controls, tier
     multiselect, etc.) will only re-run *this* function on interaction,
     preventing full-page reruns that cascade on mobile.
+
+    All data is read from ``st.session_state`` so the fragment remains
+    independent of outer-scope closures during fragment-only re-runs.
     """
-    if not analysis_results:
-        if not run_analysis:
-            if current_props:
+    # Read all needed state directly inside the fragment so values stay
+    # fresh across fragment re-runs (closures would hold stale refs).
+    _frag_analysis_results = st.session_state.get("analysis_results", [])
+    _frag_current_props = load_props_from_session(st.session_state)
+
+    if not _frag_analysis_results:
+        # ``run_analysis`` is a momentary button — always False after the
+        # initial page run, so we check the session-state flag instead.
+        _analysis_running = st.session_state.get("_qam_analysis_requested", False)
+        if not _analysis_running:
+            if _frag_current_props:
                 st.info("👆 Click **Run Analysis** to analyze all loaded props.")
             else:
                 _has_games = bool(st.session_state.get("todays_games"))
@@ -2274,11 +2289,11 @@ def _render_results_fragment():
     # Filter results
     if show_all_or_top == "Top picks only (edge ≥ threshold)":
         displayed_results = [
-            r for r in analysis_results
+            r for r in _frag_analysis_results
             if abs(r.get("edge_percentage", 0)) >= minimum_edge
         ]
     else:
-        displayed_results = analysis_results
+        displayed_results = _frag_analysis_results
 
     # ── Feature 14: Quick Filter Chips ──────────────────────────────
     # Render filter chips as Streamlit columns of toggle buttons.
@@ -2409,7 +2424,7 @@ def _render_results_fragment():
     displayed_results = _deduped
 
     # ── Summary metrics ────────────────────────────────────────
-    total_analyzed   = len(analysis_results)
+    total_analyzed   = len(_frag_analysis_results)
     total_over_picks = sum(1 for r in displayed_results if r.get("direction") == "OVER")
     total_under_picks= sum(1 for r in displayed_results if r.get("direction") == "UNDER")
     platinum_count   = sum(1 for r in displayed_results if r.get("tier") == "Platinum")
@@ -2418,7 +2433,7 @@ def _render_results_fragment():
         sum(abs(r.get("edge_percentage", 0)) for r in displayed_results) / len(displayed_results)
         if displayed_results else 0
     )
-    unmatched_count  = sum(1 for r in analysis_results if not r.get("player_matched", True))
+    unmatched_count  = sum(1 for r in _frag_analysis_results if not r.get("player_matched", True))
 
     # Phase 3: DFS aggregate metrics
     _dfs_results = [r for r in displayed_results if r.get("dfs_parlay_ev")]
@@ -2549,7 +2564,7 @@ def _render_results_fragment():
         # Deduplicate: same player may have multiple stat types, each flagged separately.
         # Only count and list each unique player name once.
         unmatched_names_deduped = list(dict.fromkeys(
-            r.get("player_name", "") for r in analysis_results
+            r.get("player_name", "") for r in _frag_analysis_results
             if not r.get("player_matched", True)
             and not r.get("player_is_out", False)  # exclude confirmed-out players
         ))
@@ -2628,7 +2643,7 @@ def _render_results_fragment():
     # SECTION B: Uncertain Picks (Risk Warnings — conflicting forces)
     # ============================================================
     _uncertain_picks = [
-        r for r in analysis_results
+        r for r in _frag_analysis_results
         if r.get("is_uncertain", False)
         and not r.get("player_is_out", False)
     ]
@@ -2731,11 +2746,11 @@ def _render_results_fragment():
                 away_record = f"{aw}-{al}" if aw is not None and al is not None and (aw > 0 or al > 0) else "N/A"
 
                 home_players = [
-                    r.get("player_name", "") for r in analysis_results
+                    r.get("player_name", "") for r in _frag_analysis_results
                     if r.get("player_team") == home_t and not r.get("player_is_out", False)
                 ][:5]
                 away_players = [
-                    r.get("player_name", "") for r in analysis_results
+                    r.get("player_name", "") for r in _frag_analysis_results
                     if r.get("player_team") == away_t and not r.get("player_is_out", False)
                 ][:5]
 
