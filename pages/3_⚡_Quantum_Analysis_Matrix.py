@@ -229,9 +229,9 @@ def _get_sim_cache() -> dict:
 
 _MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
 _HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
-_MAX_IFRAME_HEIGHT = 8000      # px — cap before ResizeObserver takes over
-_RESIZE_DEBOUNCE_MS = 200      # ms — debounce rapid ResizeObserver events (mobile-safe)
-_LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
+_MAX_IFRAME_HEIGHT = 12000     # px — generous cap; no scrollbar inside iframes
+_RESIZE_DEBOUNCE_MS = 350      # ms — debounce for ResizeObserver (mobile-safe)
+_LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
 # Injury status confidence penalties (points deducted from SAFE Score)
@@ -241,55 +241,41 @@ _QUESTIONABLE_INJURY_PENALTY = 4.0  # Questionable/GTD: uncertain availability
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
-# Auto-resize JavaScript injected into every card-matrix iframe.
-# Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
-# the iframe height whenever the content changes (e.g. <details> toggle).
-# Uses a scroll guard + height-change threshold to prevent mobile reload
-# loops caused by address-bar show/hide cycling scrollHeight.
+# ── Iframe auto-height script (v3 — mobile-safe) ────────────────────────────
+# Sends ``streamlit:setFrameHeight`` postMessage so Streamlit adjusts the
+# iframe height.  Designed to MINIMISE postMessage traffic:
 #
-# Mobile hardening (v2):
-#   • Listens for the *parent* window's scroll events so the guard also
-#     engages when the user scrolls the Streamlit page (not only touches
-#     inside the iframe).
-#   • Uses ``window.visualViewport.resize`` to detect address-bar
-#     show/hide on mobile (changes viewport height without a touch).
-#   • Rate-limits postMessages to at most one every ``_RESIZE_MIN_INTERVAL_MS``
-#     to prevent a cascade of height messages from many iframes from
-#     overwhelming the Streamlit React frontend and causing a WebSocket
-#     disconnect → full rerun.
-_RESIZE_MIN_INTERVAL_MS = 500  # minimum ms between postMessage calls
+#   • On load: sends ONE height message.
+#   • On ``<details>`` toggle: sends ONE height message (user-initiated only).
+#   • On mobile scroll / address-bar show-hide: does NOTHING.  The iframe
+#     uses ``scrolling=False`` and a generous initial ``height`` so it never
+#     needs continuous ResizeObserver-driven resize.
+#
+# Previous versions used a ResizeObserver watching ``document.body`` which
+# fired on every CSS reflow (including mobile address-bar show/hide and
+# parent-page scroll-induced relayouts).  With 20-30+ iframes on the page
+# this cascaded hundreds of postMessages per scroll, overwhelmed the
+# Streamlit React frontend, caused WebSocket disconnects, and triggered
+# a full page rerun (the "app restart" the user reported).
+#
+# The new approach removes the ResizeObserver entirely and instead uses a
+# targeted ``toggle`` event listener that fires ONLY when the user clicks
+# a ``<details>/<summary>`` element.
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var timer,lastH=0,scrolling=false,lastSent=0;"
+    "var lastH=0;"
     "function sendHeight(){"
-    "if(scrolling)return;"
-    "clearTimeout(timer);timer=setTimeout(function(){"
-    "var now=Date.now();"
-    f"if(now-lastSent<{_RESIZE_MIN_INTERVAL_MS})return;"
     "var h=document.body.scrollHeight;"
-    "if(Math.abs(h-lastH)<8)return;"
-    "lastH=h;lastSent=now;"
-    "window.parent.postMessage({type:'streamlit:setFrameHeight',"
-    f"height:h}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
-    # Touch events inside the iframe
-    "window.addEventListener('touchmove',function(){scrolling=true;clearTimeout(timer)},{passive:true});"
-    "window.addEventListener('touchend',function(){setTimeout(function(){scrolling=false;sendHeight()},300)},{passive:true});"
-    # Parent scroll events — guards against address-bar show/hide on mobile
-    "var pst;"
-    "try{window.parent.addEventListener('scroll',function(){"
-    "scrolling=true;clearTimeout(timer);clearTimeout(pst);"
-    "pst=setTimeout(function(){scrolling=false;sendHeight()},400)"
-    "},{passive:true})}catch(e){}"
-    # visualViewport resize — mobile address bar animation
-    "try{if(window.visualViewport){"
-    "var vvt;"
-    "window.visualViewport.addEventListener('resize',function(){"
-    "scrolling=true;clearTimeout(timer);clearTimeout(vvt);"
-    "vvt=setTimeout(function(){scrolling=false;sendHeight()},500)"
-    "})}}catch(e){}"
-    "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
-    "document.addEventListener('toggle',sendHeight,true);"
+    "if(Math.abs(h-lastH)<4)return;"
+    "lastH=h;"
+    "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
+    "}"
+    # Send initial height once DOM is ready
+    "sendHeight();"
+    # Re-measure only when a <details> element is toggled (user action)
+    "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
+    # Also handle images loading late (can change content height)
     "window.addEventListener('load',sendHeight)"
     "})()"
     "</script>"
@@ -297,12 +283,17 @@ _IFRAME_RESIZE_JS = (
 
 
 def _render_card_iframe(card_html, player_count):
-    """Render *card_html* inside a self-resizing iframe.
+    """Render *card_html* inside a non-scrolling iframe with auto-height.
 
     Uses ``streamlit.components.v1.html()`` which creates a real ``<iframe>``
-    with full CSS isolation.  A ``ResizeObserver`` inside the iframe posts
-    ``streamlit:setFrameHeight`` messages so the iframe auto-grows when
-    ``<details>`` cards are expanded.
+    with full CSS isolation.  A lightweight script inside the iframe sends
+    a single ``streamlit:setFrameHeight`` message on load and on
+    ``<details>`` toggle so the iframe height matches its content.
+
+    The iframe uses ``scrolling=False`` — it should never need a scrollbar
+    because the initial ``height`` estimate is generous and the script
+    corrects it on load.  This eliminates the ResizeObserver feedback loop
+    that caused mobile "app restart" issues.
 
     Parameters
     ----------
@@ -311,21 +302,24 @@ def _render_card_iframe(card_html, player_count):
         :func:`utils.renderers.compile_unified_card_matrix`.
     player_count : int
         Number of player groups — used to estimate the initial iframe
-        height before the ``ResizeObserver`` adjusts it.
+        height before the load-time script adjusts it.
     """
     _est_h = max(_MIN_IFRAME_HEIGHT, min(player_count * _HEIGHT_PER_PLAYER, _MAX_IFRAME_HEIGHT))
     _doc = (
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>html{overflow-y:auto;overscroll-behavior:contain}"
-        "body{margin:0;padding:0;background:transparent;color:#e0e0e0;overscroll-behavior:contain}</style>"
+        "<style>"
+        "html{overflow:hidden;overscroll-behavior:contain}"
+        "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
+        "overscroll-behavior:contain;overflow:hidden}"
+        "</style>"
         "</head><body>"
         f"{card_html}"
         f"{_IFRAME_RESIZE_JS}"
         "</body></html>"
     )
-    _components.html(_doc, height=_est_h, scrolling=True)
+    _components.html(_doc, height=_est_h, scrolling=False)
 
 
 st.set_page_config(
