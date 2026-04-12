@@ -18,8 +18,10 @@ class TestStickySummaryCSS(unittest.TestCase):
         self.assertIn(".qam-sticky-summary", QUANTUM_CARD_MATRIX_CSS)
 
     def test_sticky_position(self):
+        """qam-sticky-summary should NOT use position:sticky (removed to
+        prevent scroll-triggered layout thrashing on mobile)."""
         from styles.theme import QUANTUM_CARD_MATRIX_CSS
-        self.assertIn("position: sticky", QUANTUM_CARD_MATRIX_CSS)
+        self.assertNotIn("position: sticky", QUANTUM_CARD_MATRIX_CSS)
 
     def test_sticky_z_index(self):
         from styles.theme import QUANTUM_CARD_MATRIX_CSS
