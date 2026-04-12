@@ -414,21 +414,10 @@ h1, h2, h3, h4, h5, h6 {
     text-shadow: 0 0 8px rgba(0,240,255,0.5);
 }
 
-/* ─── Sidebar Logo — enlarged per branding directive ─────── */
-[data-testid="stLogo"] {
-    max-width: none !important;
-    width: auto !important;
-    height: auto !important;
-}
-[data-testid="stLogo"] img,
-[data-testid="stSidebarHeader"] img {
-    width: 100% !important;
-    max-width: 220px !important;
-    height: auto !important;
-    object-fit: contain !important;
-    transform: scale(1.2);
-    margin-left: -5px;
-}
+/* ─── Sidebar Logo — removed per branding directive ──────── */
+/* Logo is no longer rendered via st.logo() in the sidebar.   */
+/* It now appears only in the main content area via           */
+/* _render_spp_nav_logo().                                    */
 
 /* ─── Streamlit native elements on dark bg ───────────────── */
 /* Metric glassmorphic card treatment */
@@ -1465,8 +1454,8 @@ button[kind="primary"]:hover {
 }
 
 /* ─── Sidebar NBA Branding ────────────────────────────────── */
-/* Logo is now rendered via st.logo() at the top of the       */
-/* sidebar; the text pseudo-element has been removed.         */
+/* Logo is rendered via _render_spp_nav_logo() in the main    */
+/* content area; st.logo() is no longer used.                 */
 
 /* ─── Half-Court Arc Watermark ────────────────────────────── */
 /* Subtle basketball court arc on main content background     */

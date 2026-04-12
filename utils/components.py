@@ -305,14 +305,7 @@ def inject_joseph_floating():
     _auto_save_page_state()
 
     # ── Site-wide Smart Pick Pro Logo ─────────────────────────
-    # Show the logo in the sidebar header via st.logo() so it
-    # appears at the very top of every page instead of text.
-    _logo_path = _get_spp_logo_path()
-    if _logo_path:
-        try:
-            st.logo(_logo_path)
-        except Exception:
-            pass
+    # Render the logo centered at the top of the main content area.
     _render_spp_nav_logo()
 
     # ── Global Broadcast Ticker ───────────────────────────────
