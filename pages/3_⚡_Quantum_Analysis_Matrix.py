@@ -228,8 +228,8 @@ def _get_sim_cache() -> dict:
 # ---------------------------------------------------------------------------
 
 _MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (must fit expanded card)
-_HEIGHT_PER_PLAYER = 320       # px — each player's collapsed card + buffer for expanded state
-_MAX_IFRAME_HEIGHT = 20000     # px — generous cap; no scrollbar inside iframes
+_HEIGHT_PER_PLAYER = 520       # px — each player's collapsed card + generous buffer for expanded props
+_MAX_IFRAME_HEIGHT = 30000     # px — generous cap; no scrollbar inside iframes
 _LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
@@ -276,8 +276,17 @@ _IFRAME_RESIZE_JS = (
     "var b=r.top+window.scrollY+r.height;"
     "if(b>h)h=b;"
     "}"
+    # Also walk all open <details> and Joseph response panels to catch
+    # expanded content that may extend below the direct children.
+    "document.querySelectorAll('details[open] .upc-body, .upc-joseph-response').forEach(function(el){"
+    "if(el.offsetHeight>0){"
+    "var r2=el.getBoundingClientRect();"
+    "var b2=r2.top+window.scrollY+r2.height;"
+    "if(b2>h)h=b2;"
+    "}"
+    "});"
     "h=Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
-    "h=Math.ceil(h)+4;"  # +4px safety margin
+    "h=Math.ceil(h)+8;"  # +8px safety margin (increased from 4)
     # Ignore tiny height changes (< 8px) to prevent postMessage noise
     # from sub-pixel rendering differences during parent-page scroll.
     "if(Math.abs(h-lastH)<8)return;"
@@ -291,16 +300,37 @@ _IFRAME_RESIZE_JS = (
     # Send initial height once DOM is ready
     "sendHeight();"
     # Re-measure only when a <details> element is toggled (user action).
-    # The 60ms delay lets the browser finish the expand/collapse layout
-    # shift before we measure scrollHeight.
-    "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
+    # The 120ms delay (increased from 60ms) lets the browser finish the
+    # expand/collapse layout shift AND lets any CSS animations complete
+    # before we measure scrollHeight.  A second deferred measurement at
+    # 400ms catches slow layout paints on lower-end mobile devices.
+    "document.addEventListener('toggle',function(){"
+    "setTimeout(sendHeight,120);"
+    "setTimeout(sendHeight,400);"
+    "},true);"
     # Re-measure when Joseph M Smith panels are toggled via onclick.
     # These use display:none/block which doesn't fire a 'toggle' event.
+    # Uses dual deferred measurements like the toggle handler.
     "document.addEventListener('click',function(e){"
     "if(e.target.closest&&e.target.closest('.upc-joseph-row')){"
-    "setTimeout(sendHeight,80);"
+    "setTimeout(sendHeight,120);"
+    "setTimeout(sendHeight,400);"
     "}"
     "},true);"
+    # MutationObserver: catch display:none→block style changes on
+    # Joseph response panels that won't fire toggle or click events
+    # (e.g. animated reveals).  Only watches style attribute changes,
+    # not subtree, so it doesn't fire on every DOM change.
+    "var mo=new MutationObserver(function(muts){"
+    "for(var i=0;i<muts.length;i++){"
+    "if(muts[i].target.classList&&muts[i].target.classList.contains('upc-joseph-response')){"
+    "debouncedSend();break;"
+    "}"
+    "}"
+    "});"
+    "document.querySelectorAll('.upc-joseph-response').forEach(function(el){"
+    "mo.observe(el,{attributes:true,attributeFilter:['style']})"
+    "});"
     # Handle images loading late (can change content height) — debounced
     # so multiple images loading in the same frame don't create a burst
     # of postMessages that overwhelm the Streamlit WebSocket.
@@ -420,10 +450,13 @@ st.markdown(
     # On mobile, Streamlit's stHtml wrapper can clip iframe content.
     # Allow iframes to expand to their full content height.
     '[data-testid="stHtml"]'
-    '{overflow:visible !important}'
+    '{overflow:visible !important;max-height:none !important}'
+    # ── Ensure Streamlit iframe wrapper div has no height constraint ──
+    '[data-testid="stHtml"] > div'
+    '{overflow:visible !important;max-height:none !important}'
     # ── Mobile: ensure expander content doesn't clip ──
     '.stExpander [data-testid="stExpanderDetails"]'
-    '{overflow:visible !important}'
+    '{overflow:visible !important;max-height:none !important}'
     '</style>',
     unsafe_allow_html=True,
 )
@@ -450,26 +483,20 @@ st.markdown(
         window.__qamScrollGuard=true;
         var tid=0;
         var isScrolling=false;
-        function getCardIframes(){
-            /* Only target iframes inside stHtml containers (QAM card iframes),
-               NOT Streamlit's own component/WebSocket iframes */
-            return document.querySelectorAll('[data-testid="stHtml"] iframe');
-        }
+        /* Inject a CSS rule once to batch-disable pointer events on iframes
+           during scroll.  Avoids per-iframe style mutations which cause
+           layout thrashing that cascades into postMessage storms. */
+        var sheet=document.createElement('style');
+        sheet.textContent='.qam-scrolling [data-testid="stHtml"] iframe{pointer-events:none !important}';
+        document.head.appendChild(sheet);
         function disableIframes(){
+            if(isScrolling) return;
             isScrolling=true;
-            getCardIframes().forEach(function(f){
-                f.style.pointerEvents='none';
-            });
-            /* Also disable Streamlit buttons/toggles during active scroll
-               to prevent accidental taps that trigger full-page reruns.
-               Uses a CSS class so we can cleanly remove it later. */
+            /* Uses a single CSS class on body — no per-iframe style mutations */
             document.body.classList.add('qam-scrolling');
         }
         function enableIframes(){
             isScrolling=false;
-            getCardIframes().forEach(function(f){
-                f.style.pointerEvents='';
-            });
             document.body.classList.remove('qam-scrolling');
         }
         /* Use the Streamlit main scroll container if available */
@@ -477,14 +504,14 @@ st.markdown(
         sc.addEventListener('scroll',function(){
             disableIframes();
             clearTimeout(tid);
-            tid=setTimeout(enableIframes,350);
+            tid=setTimeout(enableIframes,500);
         },{passive:true});
         /* Also listen on touchmove — catches scroll momentum before the
            browser fires the 'scroll' event on the container */
         sc.addEventListener('touchmove',function(){
-            if(!isScrolling) disableIframes();
+            disableIframes();
             clearTimeout(tid);
-            tid=setTimeout(enableIframes,350);
+            tid=setTimeout(enableIframes,500);
         },{passive:true});
     })();
     </script>""",

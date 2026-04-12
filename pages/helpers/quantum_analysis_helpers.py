@@ -29,8 +29,7 @@ JOSEPH_DESK_SIZE_CSS = """<style>
     padding:10px 12px !important;
     margin:10px 0 !important;
     font-size:0.85rem !important;
-    max-height:40vh;
-    overflow-y:auto;
+    overflow-y:visible;
 }
 .joseph-live-desk .joseph-desk-avatar{
     width:40px !important;height:40px !important;
