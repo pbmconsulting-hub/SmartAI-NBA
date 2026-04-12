@@ -501,6 +501,16 @@ div[data-testid="stNotification"][data-type="info"] {
 }
 .stExpander { background: rgba(13,18,32,0.80) !important; border: 1px solid rgba(0,240,255,0.15) !important; border-radius: 12px !important; }
 .stExpander summary, .stExpander [data-testid="stExpanderToggleIcon"] + span { color: #e0eeff !important; font-size: 1rem !important; font-weight: 600 !important; }
+/* Ensure expander content area never clips iframes or expanded cards.
+   Without this, some Streamlit versions apply overflow:hidden on the
+   details content wrapper, which clips self-resizing iframes that
+   contain expandable <details> player cards. */
+.stExpander details,
+[data-testid="stExpander"] details,
+[data-testid="stExpanderDetails"] {
+    overflow: visible !important;
+    max-height: none !important;
+}
 button[kind="primary"] {
     background: linear-gradient(135deg, #00ffd5, #00b4ff) !important;
     color: #070A13 !important;

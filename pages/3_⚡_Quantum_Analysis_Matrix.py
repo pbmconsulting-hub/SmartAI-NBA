@@ -222,9 +222,9 @@ def _get_sim_cache() -> dict:
 #      mid-render WebSocket closure does not crash the page.
 #   2. CSS isolation — card styles cannot leak into (or be affected by) the
 #      main Streamlit page.
-#   3. Self-resizing — a ResizeObserver + toggle listener adjusts the iframe
+#   3. Self-resizing — targeted toggle / click listeners adjust the iframe
 #      height when <details> cards are expanded / collapsed, so no fixed
-#      height or scroll-bar is needed.
+#      height or scroll-bar is needed (ResizeObserver was removed in v3).
 # ---------------------------------------------------------------------------
 
 _MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (must fit expanded card)
@@ -240,35 +240,48 @@ _QUESTIONABLE_INJURY_PENALTY = 4.0  # Questionable/GTD: uncertain availability
 # Tier → emoji mapping used in incremental rendering feedback
 _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "🥉"}
 
-# ── Iframe auto-height script (v3 — mobile-safe) ────────────────────────────
+# ── Iframe auto-height script (v4 — mobile-safe, anti-cutoff) ────────────────
 # Sends ``streamlit:setFrameHeight`` postMessage so Streamlit adjusts the
-# iframe height.  Designed to MINIMISE postMessage traffic:
+# iframe height.  Designed to MINIMISE postMessage traffic while ensuring
+# expanded content is NEVER cut off:
 #
-#   • On load: sends ONE height message.
-#   • On ``<details>`` toggle: sends ONE height message (user-initiated only).
-#   • On mobile scroll / address-bar show-hide: does NOTHING.  The iframe
-#     uses ``scrolling=False`` and a generous initial ``height`` so it never
-#     needs continuous ResizeObserver-driven resize.
+#   • On load: sends ONE height message (staggered by random 50-250 ms so
+#     multiple iframes on the page don't all fire at the same instant and
+#     overwhelm the Streamlit React frontend).
+#   • On ``<details>`` toggle: sends FOUR deferred measurements
+#     (150 / 400 / 800 / 1500 ms) via ``requestAnimationFrame`` to guarantee
+#     we capture the final layout even on slow mobile devices where CSS
+#     animations (qcm-fade-in-up 0.4 s) and grid reflows take longer.
+#     Toggle sends use ``force=true`` which bypasses the noise-threshold
+#     and rate-limiter so the height update is always delivered.
+#   • On mobile scroll / address-bar show-hide: does NOTHING.
 #
-# Previous versions used a ResizeObserver watching ``document.body`` which
-# fired on every CSS reflow (including mobile address-bar show/hide and
-# parent-page scroll-induced relayouts).  With 20-30+ iframes on the page
-# this cascaded hundreds of postMessages per scroll, overwhelmed the
-# Streamlit React frontend, caused WebSocket disconnects, and triggered
-# a full page rerun (the "app restart" the user reported).
+# v3 used only 2 toggle measurements (120 / 400 ms) with an 8 px safety
+# margin and included ``img.onload`` handlers.  This was insufficient:
+#   – The 8 px margin failed to cover border-box rounding on some devices,
+#     leaving expanded prop cards clipped at the bottom.
+#   – ``img.onload`` handlers on each iframe created a stream of
+#     postMessages as headshot images loaded asynchronously; with 6+
+#     iframes × many images this overwhelmed the Streamlit WebSocket
+#     on mobile, triggered disconnects, and caused full page reruns
+#     (the "app restart" bug the user reported).
 #
-# The new approach removes the ResizeObserver entirely and instead uses a
-# targeted ``toggle`` event listener that fires ONLY when the user clicks
-# a ``<details>/<summary>`` element.
+# v4 fixes both issues:
+#   – Safety margin increased from 8 px → 32 px.
+#   – Four measurement retries (up from 2), each inside
+#     requestAnimationFrame for pixel-accurate layout.
+#   – Force-send on toggle/click bypasses noise filter and rate limiter.
+#   – img.onload handlers REMOVED — the toggle/click handlers cover
+#     all user-initiated height changes; any ±few px from late images
+#     is acceptable and absorbed by the 32 px margin.
+#   – Initial sendHeight staggered by random 50-250 ms.
+#   – Non-forced sends rate-limited to one per 300 ms.
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var lastH=0,tid=0;"
-    "function sendHeight(){"
-    # Walk ALL children and compute max bottom to get true content height.
-    # This works even when overflow is visible/hidden — it measures the
-    # actual rendered layout rather than relying on scrollHeight which
-    # can be clamped by overflow:hidden.
+    "var lastH=0,tid=0,lastSent=0;"
+    "function measureH(){"
+    # Walk ALL direct children and compute max bottom.
     "var h=0;"
     "var els=document.body.children;"
     "for(var i=0;i<els.length;i++){"
@@ -276,7 +289,7 @@ _IFRAME_RESIZE_JS = (
     "var b=r.top+window.scrollY+r.height;"
     "if(b>h)h=b;"
     "}"
-    # Also walk all open <details> and Joseph response panels to catch
+    # Walk all open <details> and Joseph response panels to catch
     # expanded content that may extend below the direct children.
     "document.querySelectorAll('details[open] .upc-body, .upc-joseph-response').forEach(function(el){"
     "if(el.offsetHeight>0){"
@@ -285,58 +298,62 @@ _IFRAME_RESIZE_JS = (
     "if(b2>h)h=b2;"
     "}"
     "});"
-    "h=Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
-    "h=Math.ceil(h)+8;"  # +8px safety margin — accounts for border-box rounding on mobile Safari
-    # Ignore tiny height changes (< 8px) to prevent postMessage noise
-    # from sub-pixel rendering differences during parent-page scroll.
-    "if(Math.abs(h-lastH)<8)return;"
-    "lastH=h;"
-    "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
+    "return Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
     "}"
-    # Debounced wrapper — at most one postMessage per 200 ms.
-    # Prevents message storms when multiple events fire in quick
-    # succession (e.g. several images loading at once).
-    "function debouncedSend(){clearTimeout(tid);tid=setTimeout(sendHeight,200)}"
-    # Send initial height once DOM is ready
-    "sendHeight();"
-    # Re-measure only when a <details> element is toggled (user action).
-    # The 120ms delay (increased from 60ms) lets the browser finish the
-    # expand/collapse layout shift AND lets any CSS animations complete
-    # before we measure scrollHeight.  A second deferred measurement at
-    # 400ms catches slow layout paints on lower-end mobile devices.
+    # Send height to Streamlit.  ``force`` bypasses the noise-threshold
+    # and rate-limiter — used for user-initiated actions (toggle, click)
+    # where we MUST update the height promptly.
+    "function send(force){"
+    "var h=Math.ceil(measureH())+32;"  # +32px safety margin (up from +8)
+    "var d=Math.abs(h-lastH);"
+    # Force: always send unless height is truly identical (< 1px)
+    "if(force){if(d<1)return;}"
+    # Non-force: skip tiny changes (< 8px) and rate-limit to 1 msg / 300ms
+    "else{if(d<8)return;"
+    "var n=Date.now();if(n-lastSent<300)return;}"
+    "lastH=h;lastSent=Date.now();"
+    "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*');"
+    "}"
+    # Schedule a forced measurement inside requestAnimationFrame (after
+    # the browser finishes layout) with a preceding setTimeout delay.
+    "function raf(ms){setTimeout(function(){requestAnimationFrame(function(){send(true)})},ms)}"
+    # Debounced non-forced send for background events (350 ms).
+    "function dSend(){clearTimeout(tid);tid=setTimeout(function(){send(false)},350)}"
+    # ── Initial height ──────────────────────────────────────
+    # Stagger by 50-250 ms random delay so multiple iframes don't
+    # fire at the same instant and overwhelm the Streamlit frontend.
+    "setTimeout(function(){send(false)},50+Math.floor(Math.random()*200));"
+    # ── Toggle handler ──────────────────────────────────────
+    # Four deferred measurements (150 / 400 / 800 / 1500 ms) ensure
+    # we capture the final layout even on slow mobile devices with
+    # CSS animations (qcm-fade-in-up takes 0.4 s) and grid reflows.
+    # Uses force=true so the height update is always delivered.
     "document.addEventListener('toggle',function(){"
-    "setTimeout(sendHeight,120);"
-    "setTimeout(sendHeight,400);"
+    "raf(150);raf(400);raf(800);raf(1500);"
     "},true);"
-    # Re-measure when Joseph M Smith panels are toggled via onclick.
-    # These use display:none/block which doesn't fire a 'toggle' event.
-    # Uses dual deferred measurements like the toggle handler.
+    # ── Joseph M Smith panel toggle (uses display:none/block) ──
     "document.addEventListener('click',function(e){"
     "if(e.target.closest&&e.target.closest('.upc-joseph-row')){"
-    "setTimeout(sendHeight,120);"
-    "setTimeout(sendHeight,400);"
+    "raf(150);raf(400);raf(800);"
     "}"
     "},true);"
-    # MutationObserver: catch display:none→block style changes on
-    # Joseph response panels that won't fire toggle or click events
-    # (e.g. animated reveals).  Only watches style attribute changes,
-    # not subtree, so it doesn't fire on every DOM change.
+    # ── MutationObserver for animated Joseph panel reveals ──
     "var mo=new MutationObserver(function(muts){"
     "for(var i=0;i<muts.length;i++){"
     "if(muts[i].target.classList&&muts[i].target.classList.contains('upc-joseph-response')){"
-    "debouncedSend();break;"
+    "dSend();break;"
     "}"
     "}"
     "});"
     "document.querySelectorAll('.upc-joseph-response').forEach(function(el){"
     "mo.observe(el,{attributes:true,attributeFilter:['style']})"
     "});"
-    # Handle images loading late (can change content height) — debounced
-    # so multiple images loading in the same frame don't create a burst
-    # of postMessages that overwhelm the Streamlit WebSocket.
-    "document.querySelectorAll('img').forEach(function(img){"
-    "if(!img.complete)img.addEventListener('load',debouncedSend)"
-    "})"
+    # NOTE: img load handlers intentionally REMOVED in v4.  They
+    # created a stream of postMessages as images loaded async; with
+    # 6+ iframes this overwhelmed the Streamlit WebSocket on mobile,
+    # triggering disconnects and full page reruns.  The toggle / click
+    # handlers cover all user-initiated height changes; any residual
+    # ±few px from late-loading images is absorbed by the 32 px margin.
     "})()"
     "</script>"
 )
@@ -346,14 +363,16 @@ def _render_card_iframe(card_html, player_count):
     """Render *card_html* inside a non-scrolling iframe with auto-height.
 
     Uses ``streamlit.components.v1.html()`` which creates a real ``<iframe>``
-    with full CSS isolation.  A lightweight script inside the iframe sends
-    a single ``streamlit:setFrameHeight`` message on load and on
-    ``<details>`` toggle so the iframe height matches its content.
+    with full CSS isolation.  The v4 resize script inside the iframe sends
+    a staggered ``streamlit:setFrameHeight`` message on load and up to four
+    ``requestAnimationFrame``-wrapped measurements on ``<details>`` toggle
+    (150 / 400 / 800 / 1500 ms) so expanded content is never cut off.
 
     The iframe uses ``scrolling=False`` — it should never need a scrollbar
     because the initial ``height`` estimate is generous and the script
-    corrects it on load.  This eliminates the ResizeObserver feedback loop
-    that caused mobile "app restart" issues.
+    corrects it on load.  Image-load handlers were removed in v4 to
+    eliminate the postMessage storms that caused mobile "app restart"
+    issues (WebSocket disconnects from too-frequent messages).
 
     Parameters
     ----------
