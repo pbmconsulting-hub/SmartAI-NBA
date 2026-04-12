@@ -350,12 +350,16 @@ st.markdown(
     '{overscroll-behavior-y:contain !important}'
     # ── Mobile: prevent accidental widget taps while scrolling ──
     # ``touch-action:manipulation`` disables double-tap-to-zoom and
-    # fast-tap on toggle/radio/checkbox widgets, reducing the chance
-    # that a scroll gesture accidentally triggers a Streamlit rerun.
+    # fast-tap on interactive widgets, reducing the chance that a
+    # scroll gesture accidentally triggers a Streamlit rerun.
     # ``min-height:48px`` meets mobile touch-target guidelines.
+    # Applied to ALL interactive Streamlit widget containers.
     '[data-testid="stToggle"],'
     '[data-testid="stRadio"],'
-    '[data-testid="stCheckbox"]'
+    '[data-testid="stCheckbox"],'
+    '[data-testid="stButton"],'
+    '[data-testid="stSelectbox"],'
+    '[data-testid="stMultiSelect"]'
     '{touch-action:manipulation;min-height:48px}'
     '</style>',
     unsafe_allow_html=True,
@@ -756,24 +760,16 @@ if _dedup_removed > 0:
 # SECTION: Analysis Runner
 # ============================================================
 
-run_col, show_col = st.columns([1, 2])
-
-with run_col:
-    run_analysis = st.button(
-        "🚀 Run Analysis",
-        type="primary",
-        width="stretch",
-        disabled=(len(final_props) == 0),
-        help="Analyze all loaded props with Quantum Matrix Engine 5.6",
-    )
-
-with show_col:
-    show_all_or_top = st.radio(
-        "Show:",
-        ["All picks", "Top picks only (edge ≥ threshold)"],
-        horizontal=True,
-        index=0,
-    )
+# NOTE: The "Show: All picks / Top picks only" radio was moved INSIDE
+# _render_results_fragment() so that interacting with it only reruns the
+# fragment — NOT the entire ~3000-line page.  This is the single biggest
+# fix for the "page restarts when scrolling" problem on mobile.
+run_analysis = st.button(
+    "🚀 Run Analysis",
+    type="primary",
+    disabled=(len(final_props) == 0),
+    help="Analyze all loaded props with Quantum Matrix Engine 5.6",
+)
 
 # ── Feature 14: Quick Filter Chips ──────────────────────────────
 # Initialise session-state keys for filter chips (persist across reruns).
@@ -785,6 +781,9 @@ for _chip_key in ("chip_platinum", "chip_gold_plus", "chip_high_edge",
 # ── Feature 15: Sort selector ───────────────────────────────────
 if "qam_sort_key" not in st.session_state:
     st.session_state["qam_sort_key"] = "Confidence Score ↓"
+
+# Default for the show-all/top radio (rendered inside the results fragment).
+st.session_state.setdefault("qam_show_mode", "All picks")
 
 if run_analysis:
     # Set a flag so that if the user navigates away during analysis
@@ -2151,8 +2150,10 @@ if (
 
 analysis_results = st.session_state.get("analysis_results", [])
 
-# Build a player → news lookup from API-NBA news in session state.
-# This is used to show injury/trade/performance alerts on prop cards.
+# NOTE: _player_news_lookup was previously built here and captured by the
+# results fragment via closure.  It is now built inside the fragment itself
+# to avoid closure dependencies.  Keeping a top-level reference for any
+# non-fragment code that might still use it.
 _player_news_lookup: dict = {}  # {player_name_lower: [news_item, ...]}
 for _ni in st.session_state.get("player_news", []):
     _ni_player = _ni.get("player_name", "").strip().lower()
@@ -2251,13 +2252,26 @@ def _render_results_fragment():
     multiselect, etc.) will only re-run *this* function on interaction,
     preventing full-page reruns that cascade on mobile.
 
-    All data is read from ``st.session_state`` so the fragment remains
-    independent of outer-scope closures during fragment-only re-runs.
+    All data is read from ``st.session_state`` (or via cached loaders)
+    so the fragment remains **independent of outer-scope closures**
+    during fragment-only re-runs.  NO outer variables are captured.
     """
-    # Read all needed state directly inside the fragment so values stay
-    # fresh across fragment re-runs (closures would hold stale refs).
+    # ── Read ALL needed state directly inside the fragment ────────
+    # This ensures values are fresh on every fragment re-run AND
+    # eliminates closure captures that would tie the fragment to the
+    # full-page execution scope.
     _frag_analysis_results = st.session_state.get("analysis_results", [])
     _frag_current_props = load_props_from_session(st.session_state)
+    _frag_minimum_edge = st.session_state.get("minimum_edge_threshold", 5.0)
+    _frag_todays_games = st.session_state.get("todays_games", [])
+    _frag_players_data = load_players_data()
+
+    # Build player → news lookup inside the fragment (was a closure before).
+    _frag_player_news_lookup: dict = {}
+    for _ni in st.session_state.get("player_news", []):
+        _ni_player = _ni.get("player_name", "").strip().lower()
+        if _ni_player:
+            _frag_player_news_lookup.setdefault(_ni_player, []).append(_ni)
 
     if not _frag_analysis_results:
         # ``run_analysis`` is a momentary button — always False after the
@@ -2267,7 +2281,7 @@ def _render_results_fragment():
             if _frag_current_props:
                 st.info("👆 Click **Run Analysis** to analyze all loaded props.")
             else:
-                _has_games = bool(st.session_state.get("todays_games"))
+                _has_games = bool(_frag_todays_games)
                 if _has_games:
                     st.warning(
                         "⚠️ No props loaded yet. "
@@ -2286,11 +2300,24 @@ def _render_results_fragment():
 
     st.divider()
 
+    # ── Show mode radio (moved here from top-level to avoid full-page reruns) ──
+    _SHOW_MODE_OPTIONS = ["All picks", "Top picks only (edge ≥ threshold)"]
+    _show_mode = st.radio(
+        "Show:",
+        _SHOW_MODE_OPTIONS,
+        horizontal=True,
+        index=_SHOW_MODE_OPTIONS.index(
+            st.session_state.get("qam_show_mode", "All picks")
+        ),
+        key="_qam_show_mode_radio",
+    )
+    st.session_state["qam_show_mode"] = _show_mode
+
     # Filter results
-    if show_all_or_top == "Top picks only (edge ≥ threshold)":
+    if _show_mode == "Top picks only (edge ≥ threshold)":
         displayed_results = [
             r for r in _frag_analysis_results
-            if abs(r.get("edge_percentage", 0)) >= minimum_edge
+            if abs(r.get("edge_percentage", 0)) >= _frag_minimum_edge
         ]
     else:
         displayed_results = _frag_analysis_results
@@ -2521,7 +2548,7 @@ def _render_results_fragment():
                     _added += 1
             if _added:
                 st.success(f"✅ Added {_added} Platinum pick(s).")
-                st.rerun()
+                st.rerun(scope="fragment")
             else:
                 st.info("All Platinum picks already added.")
     with _qb_col2:
@@ -2556,7 +2583,7 @@ def _render_results_fragment():
                     _added += 1
             if _added:
                 st.success(f"✅ Added {_added} Gold+ pick(s).")
-                st.rerun()
+                st.rerun(scope="fragment")
             else:
                 st.info("All Gold+ picks already added.")
 
@@ -2601,7 +2628,7 @@ def _render_results_fragment():
     }
     _slate_news: list = []
     for _pname_lower in _slate_players:
-        for _news_item in _player_news_lookup.get(_pname_lower, []):
+        for _news_item in _frag_player_news_lookup.get(_pname_lower, []):
             _slate_news.append(_news_item)
     # Sort by impact (high > medium > low) then by published date
     _imp_order = {"high": 0, "medium": 1, "low": 2}
@@ -2730,8 +2757,8 @@ def _render_results_fragment():
         st.info("Not enough high-edge picks to build parlay combinations. Lower the edge threshold or add more props.")
 
     # ── Team Breakdown (when single game) ────────────────────────
-    if len(todays_games) == 1:
-        g = todays_games[0]
+    if len(_frag_todays_games) == 1:
+        g = _frag_todays_games[0]
         home_t = g.get("home_team", "")
         away_t = g.get("away_team", "")
         if home_t and away_t:
@@ -2797,7 +2824,7 @@ def _render_results_fragment():
     # ClosedError crash that occurred when large HTML payloads were sent
     # over the Tornado WebSocket mid-rerun.
     _active_results = [r for r in displayed_results if not r.get("player_is_out", False)]
-    _grouped = _group_props(_active_results, players_data, todays_games)
+    _grouped = _group_props(_active_results, _frag_players_data, _frag_todays_games)
 
     if _grouped:
         st.markdown(
@@ -2827,7 +2854,7 @@ def _render_results_fragment():
         # Build team → game-matchup label mapping from todays_games.
         _team_to_game: dict[str, str] = {}
         _game_meta_map: dict[str, dict] = {}  # matchup_label → game dict
-        for _g in (todays_games or []):
+        for _g in (_frag_todays_games or []):
             _ht = (_g.get("home_team") or "").upper().strip()
             _at = (_g.get("away_team") or "").upper().strip()
             if _ht and _at:
@@ -2902,7 +2929,7 @@ def _render_results_fragment():
     # Show OUT players in a separate collapsed section
     _out_display = [r for r in displayed_results if r.get("player_is_out", False)]
     if _out_display:
-        _out_grouped = _group_props(_out_display, players_data, todays_games)
+        _out_grouped = _group_props(_out_display, _frag_players_data, _frag_todays_games)
         if _out_grouped:
             st.markdown(
                 '<div style="font-size:0.78rem;color:#64748b;margin:12px 0 4px;">'
@@ -2960,7 +2987,7 @@ def _render_results_fragment():
     if st.session_state.get("selected_picks"):
         if st.button("🗑️ Clear Selected Picks"):
             st.session_state["selected_picks"] = []
-            st.rerun()
+            st.rerun(scope="fragment")
 
 
 _render_results_fragment()
