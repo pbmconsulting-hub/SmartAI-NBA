@@ -8616,6 +8616,11 @@ UNIFIED_PLAYER_CARD_CSS = """
     }
     .upc-body {
         padding: 0 8px 10px;
+        overflow: visible;
+    }
+    .upc-body .qcm-grid-container,
+    .upc-body .qcm-grid {
+        overflow: visible;
     }
     .upc-joseph-row {
         padding: 6px 8px;
