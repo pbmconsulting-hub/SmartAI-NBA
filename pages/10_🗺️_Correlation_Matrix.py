@@ -213,35 +213,23 @@ if _off_diag:
     _num_pairs = len(_off_diag)
 
     st.markdown(
-        '<div style="display:flex;flex-wrap:wrap;gap:12px;margin:16px 0;">'
+        '<div class="corr-stats-bar">'
         # Mean
-        '<div style="flex:1;min-width:120px;background:linear-gradient(135deg,#070A13,#0F172A);'
-        'border:1px solid rgba(0,240,255,0.15);border-radius:8px;padding:10px 14px;text-align:center;">'
-        '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">Mean r</div>'
-        f'<div style="color:#00f0ff;font-size:1.15rem;font-weight:800;'
-        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
-        f'">{_mean_r:+.3f}</div></div>'
+        '<div class="corr-stat-card" style="border:1px solid rgba(0,240,255,0.15);">'
+        '<div class="corr-stat-label">Mean r</div>'
+        f'<div class="corr-stat-value" style="color:#00f0ff;">{_mean_r:+.3f}</div></div>'
         # Max
-        '<div style="flex:1;min-width:120px;background:linear-gradient(135deg,#070A13,#0F172A);'
-        'border:1px solid rgba(0,255,157,0.18);border-radius:8px;padding:10px 14px;text-align:center;">'
-        '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">Max r</div>'
-        f'<div style="color:#00ff9d;font-size:1.15rem;font-weight:800;'
-        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
-        f'">{_max_r_val:+.3f}</div></div>'
+        '<div class="corr-stat-card" style="border:1px solid rgba(0,255,157,0.18);">'
+        '<div class="corr-stat-label">Max r</div>'
+        f'<div class="corr-stat-value" style="color:#00ff9d;">{_max_r_val:+.3f}</div></div>'
         # Min
-        '<div style="flex:1;min-width:120px;background:linear-gradient(135deg,#070A13,#0F172A);'
-        'border:1px solid rgba(255,94,0,0.18);border-radius:8px;padding:10px 14px;text-align:center;">'
-        '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">Min r</div>'
-        f'<div style="color:#ff5e00;font-size:1.15rem;font-weight:800;'
-        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
-        f'">{_min_r_val:+.3f}</div></div>'
+        '<div class="corr-stat-card" style="border:1px solid rgba(255,94,0,0.18);">'
+        '<div class="corr-stat-label">Min r</div>'
+        f'<div class="corr-stat-value" style="color:#ff5e00;">{_min_r_val:+.3f}</div></div>'
         # Pairs
-        '<div style="flex:1;min-width:120px;background:linear-gradient(135deg,#070A13,#0F172A);'
-        'border:1px solid rgba(148,163,184,0.12);border-radius:8px;padding:10px 14px;text-align:center;">'
-        '<div style="color:#64748b;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;">Pairs</div>'
-        f'<div style="color:#c0d0e8;font-size:1.15rem;font-weight:800;'
-        f"font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums;"
-        f'">{_num_pairs}</div></div>'
+        '<div class="corr-stat-card" style="border:1px solid rgba(148,163,184,0.12);">'
+        '<div class="corr-stat-label">Pairs</div>'
+        f'<div class="corr-stat-value" style="color:#c0d0e8;">{_num_pairs}</div></div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -253,7 +241,17 @@ if _off_diag:
 try:
     import plotly.graph_objects as go
 
-    # Short labels (first name initial + last + stat)
+    # Stat abbreviations for shorter mobile-friendly labels
+    _STAT_ABBR = {
+        "Points": "PTS", "Rebounds": "REB", "Assists": "AST",
+        "Threes": "3PM", "Three Pointers Made": "3PM",
+        "Steals": "STL", "Blocks": "BLK", "Turnovers": "TO",
+        "Pts+Reb+Ast": "PRA", "Pts+Reb": "P+R", "Pts+Ast": "P+A",
+        "Reb+Ast": "R+A", "Fantasy Score": "FPTS",
+        "Double Double": "DD", "Triple Double": "TD",
+    }
+
+    # Short labels (first name initial + last + abbreviated stat)
     short_labels = []
     for lbl in _selected:
         parts = lbl.split(" — ")
@@ -263,7 +261,11 @@ try:
             if len(name_parts) > 1 else parts[0]
         )
         stat = parts[1] if len(parts) > 1 else ""
+        stat = _STAT_ABBR.get(stat, stat)
         short_labels.append(f"{short_name} {stat}")
+
+    # Scale annotation font size based on matrix size
+    _annot_size = max(8, min(12, 14 - n))
 
     # Diverging color scale: red (negative) → slate (zero) → green (positive)
     fig = go.Figure(data=go.Heatmap(
@@ -283,36 +285,45 @@ try:
         texttemplate="%{text}",
         textfont=dict(
             family="JetBrains Mono, monospace",
-            size=12,
+            size=_annot_size,
             color="#e2e8f0",
         ),
         hoverongaps=False,
         colorbar=dict(
             title=dict(text="Pearson r", font=dict(color="#94a3b8")),
             tickfont=dict(color="#64748b", family="JetBrains Mono, monospace"),
+            thickness=12,
+            len=0.8,
         ),
     ))
+
+    # Dynamic tick font: shrink when many props
+    _tick_size = max(8, min(10, 12 - n // 2))
 
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", color="#e2e8f0"),
         xaxis=dict(
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=_tick_size, color="#94a3b8"),
             showgrid=True,
             gridcolor="rgba(148,163,184,0.08)",
+            tickangle=-45,
         ),
         yaxis=dict(
-            tickfont=dict(size=10, color="#94a3b8"),
+            tickfont=dict(size=_tick_size, color="#94a3b8"),
             showgrid=True,
             gridcolor="rgba(148,163,184,0.08)",
             autorange="reversed",
         ),
-        margin=dict(l=10, r=10, t=30, b=10),
-        height=max(350, n * 50 + 100),
+        margin=dict(l=10, r=10, t=30, b=max(60, n * 8 + 20)),
+        height=max(400, n * 55 + 120),
     )
 
+    # Wrap in scrollable container for mobile
+    st.markdown('<div class="corr-heatmap-wrap">', unsafe_allow_html=True)
     st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 except ImportError:
     st.error(
@@ -338,10 +349,9 @@ for i in range(n):
 
 if _max_r > 0.3:
     st.markdown(
-        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);border:1px solid rgba(0,255,157,0.25);'
-        f'border-radius:8px;padding:12px 16px;margin:12px 0;">'
-        f'<span style="color:#00ff9d;font-weight:700;font-size:0.85rem;">🔗 Positive Correlation Detected</span><br>'
-        f'<span style="color:#c0d0e8;font-size:0.82rem;">'
+        f'<div class="corr-insight" style="border:1px solid rgba(0,255,157,0.25);">'
+        f'<span class="corr-insight-title" style="color:#00ff9d;">🔗 Positive Correlation Detected</span><br>'
+        f'<span class="corr-insight-body">'
         f'<b>{_html.escape(_max_pair[0])}</b> and <b>{_html.escape(_max_pair[1])}</b> '
         f'show <span style="color:#00ff9d;font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
         f'r = {_max_r:+.2f}</span>.  Their simulation distributions move together — '
@@ -351,10 +361,9 @@ if _max_r > 0.3:
 
 if _min_r < -0.15:
     st.markdown(
-        f'<div style="background:linear-gradient(135deg,#070A13,#0F172A);border:1px solid rgba(255,94,0,0.25);'
-        f'border-radius:8px;padding:12px 16px;margin:8px 0;">'
-        f'<span style="color:#ff5e00;font-weight:700;font-size:0.85rem;">🔀 Negative Correlation Detected</span><br>'
-        f'<span style="color:#c0d0e8;font-size:0.82rem;">'
+        f'<div class="corr-insight" style="border:1px solid rgba(255,94,0,0.25);">'
+        f'<span class="corr-insight-title" style="color:#ff5e00;">🔀 Negative Correlation Detected</span><br>'
+        f'<span class="corr-insight-body">'
         f'<b>{_html.escape(_min_pair[0])}</b> and <b>{_html.escape(_min_pair[1])}</b> '
         f'show <span style="color:#ff5e00;font-family:\'JetBrains Mono\',monospace;font-variant-numeric:tabular-nums;">'
         f'r = {_min_r:+.2f}</span>.  These props tend to diverge — one going over '
@@ -364,10 +373,9 @@ if _min_r < -0.15:
 
 if _max_r <= 0.3 and _min_r >= -0.15:
     st.markdown(
-        '<div style="background:linear-gradient(135deg,#070A13,#0F172A);border:1px solid rgba(148,163,184,0.15);'
-        'border-radius:8px;padding:12px 16px;margin:12px 0;">'
-        '<span style="color:#94a3b8;font-weight:700;font-size:0.85rem;">📊 Low Correlation</span><br>'
-        '<span style="color:#c0d0e8;font-size:0.82rem;">'
+        '<div class="corr-insight" style="border:1px solid rgba(148,163,184,0.15);">'
+        '<span class="corr-insight-title" style="color:#94a3b8;">📊 Low Correlation</span><br>'
+        '<span class="corr-insight-body">'
         'No strong pairwise correlations detected.  These props appear '
         'largely independent — parlay math can treat their probabilities '
         'as multiplicative without a significant correlation penalty.</span></div>',
