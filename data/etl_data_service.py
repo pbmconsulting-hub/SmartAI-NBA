@@ -982,6 +982,9 @@ def get_db_freshness() -> dict:
         result: dict = {}
 
         # Players freshness: based on latest game log date
+        # Shared fallback timestamp derived from latest game data or current time
+        _fallback_ts: str | None = None
+
         try:
             row = conn.execute(
                 """
@@ -993,11 +996,13 @@ def get_db_freshness() -> dict:
             if row and row["latest_date"]:
                 # Convert date to ISO timestamp (assume end of day)
                 result["players"] = f"{row['latest_date']}T23:59:00"
+                _fallback_ts = result["players"]
             else:
                 # Check if Players table at least has rows
                 cnt = conn.execute("SELECT COUNT(*) FROM Players").fetchone()[0]
                 if cnt > 0:
-                    result["players"] = datetime.datetime.now().isoformat()
+                    _fallback_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    result["players"] = _fallback_ts
         except Exception:
             pass
 
@@ -1005,17 +1010,7 @@ def get_db_freshness() -> dict:
         try:
             cnt = conn.execute("SELECT COUNT(*) FROM Teams").fetchone()[0]
             if cnt > 0:
-                # Check League_Dash_Team_Stats for more accurate timestamp
-                try:
-                    dash_cnt = conn.execute(
-                        "SELECT COUNT(*) FROM League_Dash_Team_Stats"
-                    ).fetchone()[0]
-                    if dash_cnt > 0:
-                        result["teams"] = result.get("players") or datetime.datetime.now().isoformat()
-                    else:
-                        result["teams"] = result.get("players") or datetime.datetime.now().isoformat()
-                except Exception:
-                    result["teams"] = result.get("players") or datetime.datetime.now().isoformat()
+                result["teams"] = _fallback_ts or datetime.datetime.now(datetime.timezone.utc).isoformat()
         except Exception:
             pass
 
@@ -1033,7 +1028,7 @@ def get_db_freshness() -> dict:
         try:
             cnt = conn.execute("SELECT COUNT(*) FROM Standings").fetchone()[0]
             if cnt > 0:
-                result["standings"] = result.get("players") or datetime.datetime.now().isoformat()
+                result["standings"] = _fallback_ts or datetime.datetime.now(datetime.timezone.utc).isoformat()
         except Exception:
             pass
 
@@ -1230,7 +1225,7 @@ def get_player_news_from_db(limit: int = 25) -> list[dict]:
                     "title": f"🏆 {tname}: {w}-{lo} ({wp:.3f})",
                     "body": (
                         f"{tname} ({conf}) has a {w}-{lo} record "
-                        f"({wp:.1%} win rate). Current streak: {streak}."
+                        f"({wp:.3f} W%). Current streak: {streak}."
                     ),
                     "category": "roster",
                     "impact": "low",

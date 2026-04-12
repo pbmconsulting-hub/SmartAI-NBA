@@ -1100,7 +1100,7 @@ with tab_nba_data:
                         "GB": f"{t.get('games_back', 0):.1f}" if t.get("games_back") else "—",
                         "Home": f"{t.get('home_wins', 0)}-{t.get('home_losses', 0)}",
                         "Away": f"{t.get('away_wins', 0)}-{t.get('away_losses', 0)}",
-                        "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        "L10": t.get("last_10", "—"),
                         "Streak": t.get("streak", ""),
                     })
                 st.dataframe(rows, hide_index=True, use_container_width=True)
@@ -1165,7 +1165,7 @@ with tab_nba_data:
                             "L": t.get("losses", 0),
                             "W%": f"{t.get('win_pct', 0):.3f}",
                             "Streak": t.get("streak", ""),
-                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                            "L10": t.get("last_10", "—"),
                         })
                     st.dataframe(_lock_rows, hide_index=True, use_container_width=True)
 
@@ -1180,7 +1180,7 @@ with tab_nba_data:
                             "L": t.get("losses", 0),
                             "W%": f"{t.get('win_pct', 0):.3f}",
                             "Streak": t.get("streak", ""),
-                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                            "L10": t.get("last_10", "—"),
                         })
                     st.dataframe(_pi_rows, hide_index=True, use_container_width=True)
 
@@ -1195,7 +1195,7 @@ with tab_nba_data:
                             "L": t.get("losses", 0),
                             "W%": f"{t.get('win_pct', 0):.3f}",
                             "Streak": t.get("streak", ""),
-                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                            "L10": t.get("last_10", "—"),
                         })
                     st.dataframe(_out_rows, hide_index=True, use_container_width=True)
 
@@ -1760,7 +1760,7 @@ if _standings_display or _news_display:
                         "GB": f"{t.get('games_back', 0):.1f}" if t.get("games_back") else "—",
                         "Home": f"{t.get('home_wins',0)}-{t.get('home_losses',0)}",
                         "Away": f"{t.get('away_wins',0)}-{t.get('away_losses',0)}",
-                        "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        "L10": t.get("last_10", "—"),
                         "Streak": t.get("streak", ""),
                     })
                 st.dataframe(rows, hide_index=True, use_container_width=True)
