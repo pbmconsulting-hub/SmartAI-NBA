@@ -479,32 +479,32 @@ def _get_player_db_intel(player: dict) -> dict:
         return intel
     try:
         intel["recent_games"] = _db_last_n_games(player_id, 10) or []
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_player_db_intel: recent_games failed — %s", exc)
     try:
         intel["splits"] = _db_player_splits(player_id) or {}
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_player_db_intel: splits failed — %s", exc)
     try:
         all_clutch = _db_clutch_stats() or []
         for c in all_clutch:
             if int(c.get("PLAYER_ID", 0) or 0) == player_id:
                 intel["clutch_stats"] = c
                 break
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_player_db_intel: clutch_stats failed — %s", exc)
     try:
         intel["career_stats"] = _db_career_stats(player_id) or []
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_player_db_intel: career_stats failed — %s", exc)
     try:
         all_est = _db_estimated_metrics() or []
         for e in all_est:
             if int(e.get("PLAYER_ID", 0) or 0) == player_id:
                 intel["estimated_metrics"] = e
                 break
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_player_db_intel: estimated_metrics failed — %s", exc)
     intel["available"] = bool(intel["recent_games"] or intel["splits"])
     return intel
 
@@ -523,8 +523,8 @@ def _get_team_db_intel(team_id: int | str) -> dict:
         return intel
     try:
         intel["recent_stats"] = _db_team_recent_stats(team_id, 10) or []
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("_get_team_db_intel: recent_stats failed — %s", exc)
     intel["available"] = bool(intel["recent_stats"])
     return intel
 
@@ -1600,6 +1600,10 @@ def _pick_commentary(stat_type):
 def determine_verdict(edge, confidence_score, avoid=False):
     """Map edge % and confidence score to a verdict string.
 
+    Uses :data:`VERDICT_THRESHOLDS` to classify the pick.  The function
+    checks tiers from most aggressive (``"SMASH"``) to most cautious
+    (``"STAY_AWAY"``), returning the first match.
+
     Parameters
     ----------
     edge : float
@@ -1616,6 +1620,26 @@ def determine_verdict(edge, confidence_score, avoid=False):
     """
     if avoid:
         return "STAY_AWAY"
+
+    edge = _safe_float(edge, 0.0)
+    confidence_score = _safe_float(confidence_score, 0.0)
+
+    smash = VERDICT_THRESHOLDS["SMASH"]
+    lean = VERDICT_THRESHOLDS["LEAN"]
+    fade = VERDICT_THRESHOLDS["FADE"]
+    stay = VERDICT_THRESHOLDS["STAY_AWAY"]
+
+    if edge >= smash["min_edge"] and confidence_score >= smash["min_confidence"]:
+        return "SMASH"
+    if edge >= lean["min_edge"] and confidence_score >= lean["min_confidence"]:
+        return "LEAN"
+    # Check STAY_AWAY before FADE — it's a stricter subset (lower thresholds).
+    if edge <= stay["max_edge"] and confidence_score <= stay["max_confidence"]:
+        return "STAY_AWAY"
+    if edge <= fade["max_edge"] and confidence_score <= fade["max_confidence"]:
+        return "FADE"
+
+    # Default: numbers fall between tiers — conservative lean.
     return "LEAN"
 
 
@@ -1782,14 +1806,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             strategy = {}
 
         # --- Verdict ---
-        if edge >= 8.0:
-            verdict = "SMASH"
-        elif edge >= 5.0:
-            verdict = "LEAN"
-        elif edge >= 2.0:
-            verdict = "FADE"
-        else:
-            verdict = "STAY_AWAY"
+        verdict = determine_verdict(edge, confidence)
 
         # --- Narrative tags ---
         narrative_tags = []

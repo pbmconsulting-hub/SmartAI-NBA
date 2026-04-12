@@ -7,6 +7,26 @@
 # CONNECTS TO: agent/live_persona.py (prompt generation),
 #              agent/payload_builder.py (grudge buffer update)
 # ============================================================
+"""Pillar 4 response parser — validate and normalise Joseph's LLM output.
+
+Defines :data:`VIBE_RESPONSE_SCHEMA` (the strict JSON schema) and
+provides a multi-layer fallback chain for parsing raw LLM text into
+a structured dict the Streamlit UI can render.
+
+Functions
+---------
+validate_vibe_response
+    Check a dict against the schema; raise ``ValueError`` on failure.
+parse_vibe_response
+    Parse raw LLM text with fallback chain (JSON → code-fence strip
+    → regex extraction → raw-text heuristic).
+build_openai_response_format
+    Return the JSON Schema for OpenAI ``response_format`` parameter.
+generate_vibe_css_class
+    Map a vibe status to a CSS class name.
+get_vibe_emoji
+    Map a vibe status to its emoji.
+"""
 
 import json
 import logging

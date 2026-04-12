@@ -7,6 +7,24 @@
 # CONNECTS TO: engine/joseph_brain.py, pages/helpers/joseph_live_desk.py,
 #              engine/joseph_bets.py, utils/auth.py
 # ============================================================
+"""Joseph M. Smith's global UI widgets for Streamlit pages.
+
+Provides the sidebar avatar with ambient commentary, a floating
+bottom-right widget, inline pick-level commentary injection, and
+an "Ask Joseph" popover.  CSS is injected once per render via
+``_inject_widget_css()``.
+
+Functions
+---------
+render_joseph_sidebar_widget
+    Sidebar avatar + ambient one-liner + optional track record badge.
+render_joseph_floating_widget
+    Fixed-position floating widget with rotating commentary.
+inject_joseph_inline_commentary
+    Render an inline card with Joseph's reaction to a specific result.
+render_joseph_ask_popover
+    Popover CTA that triggers Joseph commentary on demand.
+"""
 
 import html as _html
 import logging

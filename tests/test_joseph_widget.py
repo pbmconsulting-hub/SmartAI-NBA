@@ -3,6 +3,11 @@
 # PURPOSE: Tests for utils/joseph_widget.py
 #          (Joseph's global sidebar widget — Layer 9)
 # ============================================================
+"""Tests for :mod:`utils.joseph_widget` — Joseph's global sidebar widget.
+
+Covers CSS injection, sidebar widget rendering, floating widget,
+inline commentary injection, and the Ask Joseph popover.
+"""
 import sys, os, unittest
 from unittest.mock import MagicMock, patch
 
@@ -980,6 +985,30 @@ class TestFloatingWidgetMessageRotation(unittest.TestCase):
         if _mock_st.markdown.called:
             html_out = _mock_st.markdown.call_args[0][0]
             self.assertIn('id="joseph-floating-ambient-text"', html_out)
+
+
+# ============================================================
+# _joseph_typing_generator
+# ============================================================
+
+
+class TestJosephTypingGenerator(unittest.TestCase):
+    """Tests for _joseph_typing_generator()."""
+
+    def test_yields_all_words(self):
+        from utils.joseph_widget import _joseph_typing_generator
+        words = list(_joseph_typing_generator("Hello World"))
+        self.assertEqual("".join(words), "Hello World")
+
+    def test_single_word(self):
+        from utils.joseph_widget import _joseph_typing_generator
+        words = list(_joseph_typing_generator("SMASH"))
+        self.assertEqual("".join(words), "SMASH")
+
+    def test_empty_string(self):
+        from utils.joseph_widget import _joseph_typing_generator
+        words = list(_joseph_typing_generator(""))
+        self.assertEqual("".join(words), "")
 
 
 if __name__ == "__main__":

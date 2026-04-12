@@ -8,6 +8,22 @@
 # CONNECTS TO: pages/helpers/joseph_live_desk.py (avatar loader),
 #              styles/theme.py (theme consistency)
 # ============================================================
+"""Joseph M. Smith animated loading screen with rotating NBA fun facts.
+
+Renders a full-screen glassmorphic overlay featuring Joseph's avatar,
+a basketball spinner, and 582+ curated NBA fun facts that rotate on
+a configurable interval.  Uses ``st.html()`` (not ``st.markdown``)
+so the embedded ``<script>`` for fact rotation actually executes.
+
+Functions
+---------
+get_random_facts
+    Return *n* unique facts from :data:`NBA_FUN_FACTS`.
+render_joseph_loading_screen
+    Emit the full animated loading overlay via ``st.html()``.
+joseph_loading_placeholder
+    Create a dismissable Streamlit placeholder wrapping the loader.
+"""
 
 import html as _html
 import json

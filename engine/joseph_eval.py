@@ -3,6 +3,22 @@
 # PURPOSE: Joseph's INDEPENDENT player evaluation — his OWN grades
 # CONNECTS TO: data/advanced_metrics.py, engine/math_helpers.py
 # ============================================================
+"""Joseph M. Smith's independent player evaluation and grading system.
+
+Grades players on a letter-grade scale using custom metrics such as
+gravity score (offensive spacing threat) and switchability (defensive
+versatility).  Provides position-specific takes, scheme-fit analysis,
+and head-to-head player comparisons.
+
+Exports
+-------
+ARCHETYPE_PROFILES : dict
+    Metadata for each of the 13 player archetypes.
+joseph_grade_player
+    Full player grading with letter grade, archetype, and narrative.
+joseph_compare_players
+    Head-to-head comparison of two players.
+"""
 
 import logging
 import math

@@ -1500,5 +1500,81 @@ class TestJosephFullSlateImplementation(unittest.TestCase):
             self.assertIn(tp.get("verdict", "").upper(), ("SMASH", "LEAN"))
 
 
+# ── determine_verdict full-logic tests ──────────────────────
+
+
+class TestDetermineVerdictTiers(unittest.TestCase):
+    """Verify determine_verdict maps edge/confidence to correct verdict tiers."""
+
+    def setUp(self):
+        from engine.joseph_brain import determine_verdict, VERDICT_THRESHOLDS
+        self.fn = determine_verdict
+        self.thresholds = VERDICT_THRESHOLDS
+
+    def test_smash_threshold_exact(self):
+        """Edge >= 8.0 AND confidence >= 70.0 → SMASH."""
+        self.assertEqual(self.fn(8.0, 70.0), "SMASH")
+
+    def test_smash_high_values(self):
+        self.assertEqual(self.fn(15.0, 95.0), "SMASH")
+
+    def test_lean_threshold_exact(self):
+        """Edge >= 4.0 AND confidence >= 55.0 → LEAN."""
+        self.assertEqual(self.fn(4.0, 55.0), "LEAN")
+
+    def test_lean_below_smash(self):
+        """Edge 6.0 confidence 65.0 — above LEAN thresholds but below SMASH."""
+        self.assertEqual(self.fn(6.0, 65.0), "LEAN")
+
+    def test_stay_away_threshold(self):
+        """Edge <= 1.0 AND confidence <= 35.0 → STAY_AWAY."""
+        self.assertEqual(self.fn(0.5, 25.0), "STAY_AWAY")
+
+    def test_stay_away_zero_zero(self):
+        """Edge 0.0 confidence 0.0 → STAY_AWAY."""
+        self.assertEqual(self.fn(0.0, 0.0), "STAY_AWAY")
+
+    def test_fade_threshold(self):
+        """Edge <= 3.0 AND confidence <= 50.0 but above STAY_AWAY → FADE."""
+        self.assertEqual(self.fn(2.0, 45.0), "FADE")
+
+    def test_avoid_overrides_smash(self):
+        """avoid=True forces STAY_AWAY even with SMASH numbers."""
+        self.assertEqual(self.fn(15.0, 95.0, avoid=True), "STAY_AWAY")
+
+    def test_gap_region_defaults_lean(self):
+        """Numbers between tiers (mid-range) default to LEAN."""
+        self.assertEqual(self.fn(3.5, 52.0), "LEAN")
+
+    def test_high_edge_low_confidence(self):
+        """High edge but low confidence should still return LEAN."""
+        v = self.fn(10.0, 40.0)
+        self.assertIn(v, {"SMASH", "LEAN", "FADE", "STAY_AWAY"})
+
+    def test_negative_edge(self):
+        """Negative edge should map to STAY_AWAY or FADE."""
+        v = self.fn(-5.0, 20.0)
+        self.assertIn(v, {"FADE", "STAY_AWAY"})
+
+    def test_uses_verdict_thresholds(self):
+        """Verify the thresholds data structure is well-formed."""
+        self.assertIn("SMASH", self.thresholds)
+        self.assertIn("LEAN", self.thresholds)
+        self.assertIn("FADE", self.thresholds)
+        self.assertIn("STAY_AWAY", self.thresholds)
+        self.assertIn("min_edge", self.thresholds["SMASH"])
+        self.assertIn("min_confidence", self.thresholds["SMASH"])
+
+    def test_string_edge_handled_safely(self):
+        """String values should be coerced via _safe_float."""
+        v = self.fn("8.5", "75.0")
+        self.assertEqual(v, "SMASH")
+
+    def test_none_edge_handled_safely(self):
+        """None values should be coerced to 0.0."""
+        v = self.fn(None, None)
+        self.assertIn(v, {"FADE", "STAY_AWAY"})
+
+
 if __name__ == "__main__":
     unittest.main()

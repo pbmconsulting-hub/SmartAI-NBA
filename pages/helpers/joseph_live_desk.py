@@ -4,6 +4,25 @@
 #          prop cards on the Neural Analysis page (page 3).
 # CONNECTS TO: engine/joseph_brain.py, styles/theme.py
 # ============================================================
+"""Joseph M. Smith's Live Broadcast Desk renderer.
+
+Builds the full HTML/CSS for Joseph's on-air broadcast desk that
+sits above prop cards on the Quantum Analysis Matrix page.  Includes
+avatar loaders (multiple mood variants), broadcast segment cards,
+the Dawg Board, override reports, nerd-stats tables, confidence
+gauges, verdict heatmaps, and skeleton loading placeholders.
+
+Functions
+---------
+get_joseph_avatar_b64 / get_joseph_avatar_panicking_b64 / ...
+    Load and base64-encode avatar PNGs (cached via ``@st.cache_data``).
+render_live_desk_css
+    Return the full ``<style>`` block for the broadcast desk.
+render_broadcast_segment
+    Single analysis card with verdict badge and nerd stats.
+render_joseph_live_desk
+    **Main entry point** — orchestrates the entire broadcast desk.
+"""
 
 import os
 import base64

@@ -5,6 +5,15 @@
 #   - engine.joseph_eval     (letter_grade, gravity, switchability, grade, compare)
 #   - engine.joseph_strategy (scheme detection, mismatch rules, game strategy)
 # ============================================================
+"""Tests for Joseph Foundation modules.
+
+Covers ``data.advanced_metrics`` (normalize, archetype classification,
+narrative tags, enrichment), ``engine.joseph_eval`` (grading, gravity
+score, switchability, comparison), ``engine.joseph_strategy`` (scheme
+detection, mismatch rules, game analysis), ``tracking.joseph_diary``
+(diary CRUD, week summary, yesterday reference), and
+``agent.live_persona`` (fragment pools, live reactions, streaming).
+"""
 
 import sys
 import os
@@ -606,6 +615,275 @@ class TestJosephStrategyAnalyze(unittest.TestCase):
         self.assertIsInstance(result["away_scheme"], dict)
         self.assertIn("primary_scheme", result["home_scheme"])
         self.assertIn("primary_scheme", result["away_scheme"])
+
+
+# ============================================================
+# Joseph Diary Tests
+# ============================================================
+
+
+class TestDiaryLogAndGet(unittest.TestCase):
+    """Test diary_log_entry / diary_get_entry round-trip."""
+
+    def setUp(self):
+        import tempfile, json
+        self._tmpdir = tempfile.mkdtemp()
+        self._diary_path = os.path.join(self._tmpdir, "joseph_diary.json")
+        # Patch the diary file path so we don't touch the real file
+        import tracking.joseph_diary as _mod
+        self._orig_path = _mod._DIARY_FILE
+        _mod._DIARY_FILE = self._diary_path
+
+    def tearDown(self):
+        import tracking.joseph_diary as _mod
+        _mod._DIARY_FILE = self._orig_path
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_log_and_retrieve(self):
+        from tracking.joseph_diary import diary_log_entry, diary_get_entry
+        ok = diary_log_entry(date_str="2025-01-15", entry={"wins": 3, "losses": 1, "mood": "hot"})
+        self.assertTrue(ok)
+        entry = diary_get_entry("2025-01-15")
+        self.assertEqual(entry["wins"], 3)
+        self.assertEqual(entry["losses"], 1)
+        self.assertEqual(entry["mood"], "hot")
+
+    def test_default_date_is_today(self):
+        from tracking.joseph_diary import diary_log_entry, diary_get_entry
+        import datetime
+        diary_log_entry(entry={"wins": 1, "losses": 0})
+        entry = diary_get_entry()  # defaults to today
+        self.assertEqual(entry["wins"], 1)
+
+    def test_get_missing_entry_returns_empty(self):
+        from tracking.joseph_diary import diary_get_entry
+        entry = diary_get_entry("2020-01-01")
+        self.assertEqual(entry, {})
+
+
+class TestDiaryWeekSummary(unittest.TestCase):
+    """Test diary_get_week_summary including streak and brag logic."""
+
+    def setUp(self):
+        import tempfile
+        self._tmpdir = tempfile.mkdtemp()
+        self._diary_path = os.path.join(self._tmpdir, "joseph_diary.json")
+        import tracking.joseph_diary as _mod
+        self._orig_path = _mod._DIARY_FILE
+        _mod._DIARY_FILE = self._diary_path
+
+    def tearDown(self):
+        import tracking.joseph_diary as _mod
+        _mod._DIARY_FILE = self._orig_path
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_empty_week_returns_structure(self):
+        from tracking.joseph_diary import diary_get_week_summary
+        result = diary_get_week_summary()
+        self.assertIn("week_wins", result)
+        self.assertIn("week_losses", result)
+        self.assertIn("win_rate", result)
+        self.assertIn("brag_intensity", result)
+        self.assertIn("narrative_arc", result)
+        self.assertIn("narrative", result)
+        self.assertEqual(result["week_wins"], 0)
+
+    def test_brag_intensity_range(self):
+        from tracking.joseph_diary import diary_get_week_summary
+        result = diary_get_week_summary()
+        self.assertGreaterEqual(result["brag_intensity"], 0.0)
+        self.assertLessEqual(result["brag_intensity"], 100.0)
+
+
+class TestDiaryYesterdayReference(unittest.TestCase):
+    """Test diary_get_yesterday_reference returns a non-empty string."""
+
+    def setUp(self):
+        import tempfile
+        self._tmpdir = tempfile.mkdtemp()
+        self._diary_path = os.path.join(self._tmpdir, "joseph_diary.json")
+        import tracking.joseph_diary as _mod
+        self._orig_path = _mod._DIARY_FILE
+        _mod._DIARY_FILE = self._diary_path
+
+    def tearDown(self):
+        import tracking.joseph_diary as _mod
+        _mod._DIARY_FILE = self._orig_path
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_returns_string(self):
+        from tracking.joseph_diary import diary_get_yesterday_reference
+        ref = diary_get_yesterday_reference()
+        self.assertIsInstance(ref, str)
+        # Empty diary may return empty string — just check type
+
+    def test_winning_yesterday(self):
+        from tracking.joseph_diary import diary_log_entry, diary_get_yesterday_reference
+        import datetime
+        yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+        diary_log_entry(date_str=yesterday, entry={"wins": 5, "losses": 1, "mood": "hot"})
+        ref = diary_get_yesterday_reference()
+        self.assertIsInstance(ref, str)
+        self.assertGreater(len(ref), 5)
+
+
+class TestDiaryUpdateFromTrackRecord(unittest.TestCase):
+    """Test diary_update_from_track_record."""
+
+    def setUp(self):
+        import tempfile
+        self._tmpdir = tempfile.mkdtemp()
+        self._diary_path = os.path.join(self._tmpdir, "joseph_diary.json")
+        import tracking.joseph_diary as _mod
+        self._orig_path = _mod._DIARY_FILE
+        _mod._DIARY_FILE = self._diary_path
+
+    def tearDown(self):
+        import tracking.joseph_diary as _mod
+        _mod._DIARY_FILE = self._orig_path
+        import shutil
+        shutil.rmtree(self._tmpdir, ignore_errors=True)
+
+    def test_hot_mood(self):
+        from tracking.joseph_diary import diary_update_from_track_record, diary_get_entry
+        diary_update_from_track_record({"wins": 8, "losses": 2, "win_rate": 0.8})
+        entry = diary_get_entry()
+        self.assertEqual(entry["mood"], "hot")
+
+    def test_cold_mood(self):
+        from tracking.joseph_diary import diary_update_from_track_record, diary_get_entry
+        diary_update_from_track_record({"wins": 2, "losses": 8, "win_rate": 0.2})
+        entry = diary_get_entry()
+        self.assertEqual(entry["mood"], "cold")
+
+    def test_neutral_mood(self):
+        from tracking.joseph_diary import diary_update_from_track_record, diary_get_entry
+        diary_update_from_track_record({"wins": 5, "losses": 5, "win_rate": 0.5})
+        entry = diary_get_entry()
+        self.assertEqual(entry["mood"], "neutral")
+
+
+# ============================================================
+# Live Persona Fragment Pool Tests
+# ============================================================
+
+
+class TestLivePersonaFragmentPools(unittest.TestCase):
+    """Verify fragment pool completeness in live_persona.py."""
+
+    def test_blowout_screams_non_empty(self):
+        from agent.live_persona import _BLOWOUT_SCREAMS
+        self.assertGreater(len(_BLOWOUT_SCREAMS), 0)
+        for s in _BLOWOUT_SCREAMS:
+            self.assertIsInstance(s, str)
+            self.assertGreater(len(s), 5)
+
+    def test_foul_rants_non_empty(self):
+        from agent.live_persona import _FOUL_RANTS
+        self.assertGreater(len(_FOUL_RANTS), 0)
+
+    def test_cashed_brags_non_empty(self):
+        from agent.live_persona import _CASHED_BRAGS
+        self.assertGreater(len(_CASHED_BRAGS), 0)
+
+    def test_on_pace_vibes_non_empty(self):
+        from agent.live_persona import _ON_PACE_VIBES
+        self.assertGreater(len(_ON_PACE_VIBES), 0)
+
+    def test_behind_pace_worry_non_empty(self):
+        from agent.live_persona import _BEHIND_PACE_WORRY
+        self.assertGreater(len(_BEHIND_PACE_WORRY), 0)
+
+    def test_sub_vibe_options(self):
+        from agent.live_persona import SUB_VIBE_OPTIONS
+        self.assertIsInstance(SUB_VIBE_OPTIONS, tuple)
+        self.assertGreater(len(SUB_VIBE_OPTIONS), 0)
+
+    def test_quarter_voice_has_four_quarters(self):
+        from agent.live_persona import _QUARTER_VOICE
+        for q in ("Q1", "Q2", "Q3", "Q4"):
+            self.assertIn(q, _QUARTER_VOICE)
+            self.assertGreater(len(_QUARTER_VOICE[q]), 0)
+
+
+class TestGetJosephLiveReaction(unittest.TestCase):
+    """Test the offline fragment-based reaction generator."""
+
+    def setUp(self):
+        from agent.live_persona import get_joseph_live_reaction
+        self.fn = get_joseph_live_reaction
+
+    def test_invalid_input_returns_string(self):
+        """Non-dict input returns a generic vibe string."""
+        result = self.fn("not a dict")
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 5)
+
+    def test_none_input_returns_string(self):
+        result = self.fn(None)
+        self.assertIsInstance(result, str)
+
+    def test_cashed_over(self):
+        result = self.fn({"cashed": True, "direction": "OVER"})
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 5)
+
+    def test_cashed_under(self):
+        result = self.fn({"cashed": True, "direction": "UNDER"})
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 5)
+
+    def test_blowout_over(self):
+        result = self.fn({"blowout_risk": True, "direction": "OVER"})
+        self.assertIsInstance(result, str)
+
+    def test_on_pace_under(self):
+        result = self.fn({"on_pace": True, "direction": "UNDER"})
+        self.assertIsInstance(result, str)
+
+    def test_behind_pace_under(self):
+        result = self.fn({"on_pace": False, "direction": "UNDER"})
+        self.assertIsInstance(result, str)
+
+    def test_foul_trouble(self):
+        result = self.fn({"foul_trouble": True, "direction": "OVER"})
+        self.assertIsInstance(result, str)
+
+    def test_overtime_includes_prefix(self):
+        result = self.fn({"is_overtime": True, "cashed": True, "direction": "OVER"})
+        self.assertIsInstance(result, str)
+
+    def test_quarter_prefix_applied(self):
+        result = self.fn({"quarter": "Q4", "direction": "OVER", "on_pace": True})
+        self.assertIsInstance(result, str)
+        self.assertGreater(len(result), 5)
+
+    def test_redemption_arc(self):
+        result = self.fn({"is_redemption": True, "direction": "OVER"})
+        self.assertIsInstance(result, str)
+
+    def test_record_chase(self):
+        result = self.fn({"record_chase": True, "record_remaining": 5,
+                          "record_stat": "assists", "direction": "OVER"})
+        self.assertIsInstance(result, str)
+
+
+class TestStreamJosephText(unittest.TestCase):
+    """Test the typing-effect generator."""
+
+    def test_yields_characters(self):
+        from agent.live_persona import stream_joseph_text
+        gen = stream_joseph_text("Hello", delay=0)
+        chars = list(gen)
+        self.assertEqual("".join(chars), "Hello")
+
+    def test_empty_string(self):
+        from agent.live_persona import stream_joseph_text
+        chars = list(stream_joseph_text("", delay=0))
+        self.assertEqual(chars, [])
 
 
 # ============================================================

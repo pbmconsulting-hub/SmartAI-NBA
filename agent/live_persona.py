@@ -10,6 +10,20 @@
 #   • get_joseph_live_reaction() — fast local fragment assembly.
 #   • build_live_joseph_messages() — full prompt builder for LLM.
 # ============================================================
+"""Joseph M. Smith's live-game persona engine (Pillar 4).
+
+Two generation paths:
+
+1. **Fast offline** — :func:`get_joseph_live_reaction` assembles a
+   one-liner from curated fragment pools keyed by game state
+   (cashed, blowout, foul trouble, on-pace, behind, etc.).
+2. **Full LLM** — :func:`build_live_joseph_messages` constructs an
+   OpenAI-compatible message list using :data:`LIVE_JOSEPH_PROMPT`
+   and the structured payload from ``agent/payload_builder.py``.
+
+The module also provides :func:`stream_joseph_text` for a
+character-by-character typing effect in Streamlit.
+"""
 
 import json
 import random

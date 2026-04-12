@@ -5,11 +5,36 @@
 #          across sessions so he can reference yesterday's calls.
 # CONNECTS TO: tracking/database.py, engine/joseph_bets.py
 # ============================================================
+"""Joseph M. Smith's persistent daily diary.
+
+Reads and writes ``joseph_diary.json`` (in the same directory) to
+store daily win/loss records, mood, narrative arc, brag intensity,
+and streak information.  This lets Joseph reference yesterday's
+performance and adjust his tone across sessions.
+
+.. note::
+   ``joseph_diary.json`` is written at runtime and should be listed
+   in ``.gitignore`` to avoid noisy timestamp diffs.
+
+Functions
+---------
+diary_log_entry
+    Write or update today's diary entry.
+diary_get_entry
+    Retrieve a single day's entry.
+diary_get_week_summary
+    Aggregate the current week's stats and narrative arc.
+diary_get_yesterday_reference
+    Generate a self-referential comment about yesterday's results.
+diary_update_from_track_record
+    Sync today's diary from the bet-tracker track record.
+"""
 
 import json
 import os
 import datetime
 import logging
+import random
 
 try:
     from utils.logger import get_logger
@@ -141,12 +166,14 @@ def diary_get_week_summary() -> dict:
         week_losses += l
 
         if w > l:
+            # Winning day: extend win streak (positive) or reset from loss streak
             if last_result == "win":
                 streak += 1
             else:
                 streak = 1
                 last_result = "win"
         elif l > w:
+            # Losing day: extend loss streak (negative) or reset from win streak
             if last_result == "loss":
                 streak -= 1
             else:
@@ -230,7 +257,6 @@ def diary_get_yesterday_reference() -> str:
             f"Split day yesterday ({wins}-{losses}). Not bad, not great. Today we go ALL IN.",
         ]
 
-    import random
     return random.choice(lines)
 
 
