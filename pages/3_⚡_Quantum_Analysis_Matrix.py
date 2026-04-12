@@ -734,6 +734,9 @@ if "qam_sort_key" not in st.session_state:
     st.session_state["qam_sort_key"] = "Confidence Score ↓"
 
 if run_analysis:
+    # Set a flag so that if the user navigates away during analysis
+    # and comes back, the page knows to offer a re-run.
+    st.session_state["_qam_analysis_requested"] = True
     _analysis_start_time = time.time()
     # ── Joseph Loading Screen — NBA fun facts while analysis runs ──
     try:
@@ -1996,6 +1999,8 @@ if run_analysis:
 
         st.session_state["analysis_results"] = analysis_results_list
         st.session_state["analysis_timestamp"] = datetime.datetime.now()
+        # Clear the requested flag — analysis completed successfully.
+        st.session_state.pop("_qam_analysis_requested", None)
 
         # ── Persist analysis session to SQLite (survives page refresh/inactivity) ──
         try:
@@ -2061,6 +2066,18 @@ if run_analysis:
 # ============================================================
 # END SECTION: Analysis Runner
 # ============================================================
+
+# ── Auto-retry notice: if user navigated away during analysis ──
+if (
+    st.session_state.get("_qam_analysis_requested")
+    and not st.session_state.get("analysis_results")
+    and not run_analysis
+):
+    st.warning(
+        "⚠️ **Analysis was interrupted** (you may have navigated away before it finished). "
+        "Click **🚀 Run Analysis** above to restart."
+    )
+    st.session_state.pop("_qam_analysis_requested", None)
 
 # ============================================================
 # SECTION: Display Analysis Results

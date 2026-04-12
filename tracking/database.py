@@ -2633,6 +2633,16 @@ _PERSISTED_PAGE_STATE_KEYS = (
     "league_standings",
     "analysis_timestamp",
     "line_snapshots",
+    "last_sim_results",
+    "last_sim_compare_mode",
+    "last_sim_scenario_mode",
+    "built_entries",
+    "built_entries_platform",
+    "built_entries_fee",
+    "built_entries_size",
+    "optimal_slips",
+    "studio_game_results",
+    "custom_game_analysis",
 )
 
 
