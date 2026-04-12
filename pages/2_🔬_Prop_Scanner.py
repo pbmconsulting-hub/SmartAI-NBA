@@ -1104,7 +1104,7 @@ else:
                 _dots = get_form_dots_html(
                     _qrow.get("form_results", []),
                     window=5,
-                    prop_line=float(_qrow.get("line", 0) or 0),
+                    prop_line=float(_qrow.get("line", 0)),
                 )
                 _card_htmls.append(get_qa_card_html(_qrow, _dots))
 
