@@ -155,7 +155,6 @@ from data.data_manager import (
     get_player_status,
     get_status_badge_html,
     load_injury_status,
-    filter_props_to_platform_players,
 )
 
 # Import the theme helpers — including new QDS generators
@@ -177,7 +176,7 @@ from styles.theme import (
 )
 
 from data.platform_mappings import COMBO_STATS, FANTASY_SCORING
-from data.sportsbook_service import smart_filter_props as _smart_filter_props
+
 from utils.renderers import compile_card_matrix as _compile_card_matrix
 from utils.renderers import compile_unified_card_matrix as _compile_unified_matrix
 from utils.renderers import build_horizontal_card_html as _build_h_card
@@ -881,45 +880,6 @@ if run_analysis:
             if inj_skipped > 0:
                 st.info(f"ℹ️ Skipping **{inj_skipped}** prop(s) for confirmed Out/IR players.")
 
-        # ── Filter to only players on real betting platforms ───────────────
-        # If live platform props have been loaded, drop synthetic-only props
-        # for players who don't appear on any real betting app today.
-        # EXCEPTION: Players who already have active bets are never filtered out.
-        _live_platform_props = st.session_state.get("platform_props", [])
-        if _live_platform_props:
-            # Build set of players with active bets — these should always be analyzed
-            _active_bet_names = set()
-            for _ab in st.session_state.get("active_bets", []):
-                _abn = (_ab.get("player_name") or "").strip().lower()
-                if _abn:
-                    _active_bet_names.add(_abn)
-            for _ab in st.session_state.get("analysis_results", []):
-                _abn = (_ab.get("player_name") or "").strip().lower()
-                if _abn:
-                    _active_bet_names.add(_abn)
-
-            # First apply the platform filter
-            _filtered = filter_props_to_platform_players(props_to_analyze, _live_platform_props)
-
-            # Then re-add any props for players with active bets that were dropped
-            if _active_bet_names:
-                _filtered_names = {(p.get("player_name") or "").strip().lower() for p in _filtered}
-                _rescued = [
-                    p for p in props_to_analyze
-                    if (p.get("player_name") or "").strip().lower() in _active_bet_names
-                    and (p.get("player_name") or "").strip().lower() not in _filtered_names
-                ]
-                _filtered.extend(_rescued)
-
-            plat_players_skipped = len(props_to_analyze) - len(_filtered)
-            props_to_analyze = _filtered
-            if plat_players_skipped > 0:
-                st.info(
-                    f"ℹ️ Skipping **{plat_players_skipped}** prop(s) for players not found on "
-                    f"any sportsbook today. "
-                    f"Players with active bets are always included. ({len(props_to_analyze)} remaining)"
-                )
-
         # ── Filter to selected platforms (from ⚙️ Settings) ──────────────
         _selected_platforms = st.session_state.get(
             "selected_platforms", ["PrizePicks", "Underdog Fantasy", "DraftKings Pick6"]
@@ -949,25 +909,6 @@ if run_analysis:
                 f"**{_plat}**: {_n}" for _plat, _n in sorted(_plat_counts.items())
             )
             st.caption(f"📊 Analyzing: {_plat_summary}")
-
-        # ── Pre-Analysis Filter: team + injury + dedup only (no stat-type cap) ─
-        # All stat types are passed through — no funnel or stat-type filtering.
-        _before_filter = len(props_to_analyze)
-        props_to_analyze, _filter_summary = _smart_filter_props(
-            all_props=props_to_analyze,
-            players_data=players_data,
-            todays_games=todays_games,
-            injury_map=st.session_state.get("injury_status_map", {}),
-            max_props_per_player=None,  # No per-player cap
-            stat_types=None,            # Accept ALL stat types
-            deduplicate_cross_platform=True,
-        )
-        _after_filter = len(props_to_analyze)
-        if _before_filter > _after_filter:
-            st.info(
-                f"🎯 **Pre-Analysis Filter**: Reduced **{_before_filter}** → **{_after_filter}** props "
-                f"(team/injury/dedup only — all stat types included)."
-            )
 
         total_props_count    = len(props_to_analyze)
         if total_props_count == 0:
