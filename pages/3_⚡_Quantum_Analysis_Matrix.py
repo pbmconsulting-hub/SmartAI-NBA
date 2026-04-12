@@ -246,20 +246,48 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 # the iframe height whenever the content changes (e.g. <details> toggle).
 # Uses a scroll guard + height-change threshold to prevent mobile reload
 # loops caused by address-bar show/hide cycling scrollHeight.
+#
+# Mobile hardening (v2):
+#   • Listens for the *parent* window's scroll events so the guard also
+#     engages when the user scrolls the Streamlit page (not only touches
+#     inside the iframe).
+#   • Uses ``window.visualViewport.resize`` to detect address-bar
+#     show/hide on mobile (changes viewport height without a touch).
+#   • Rate-limits postMessages to at most one every ``_RESIZE_MIN_INTERVAL_MS``
+#     to prevent a cascade of height messages from many iframes from
+#     overwhelming the Streamlit React frontend and causing a WebSocket
+#     disconnect → full rerun.
+_RESIZE_MIN_INTERVAL_MS = 500  # minimum ms between postMessage calls
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var timer,lastH=0,scrolling=false;"
+    "var timer,lastH=0,scrolling=false,lastSent=0;"
     "function sendHeight(){"
     "if(scrolling)return;"
     "clearTimeout(timer);timer=setTimeout(function(){"
+    "var now=Date.now();"
+    f"if(now-lastSent<{_RESIZE_MIN_INTERVAL_MS})return;"
     "var h=document.body.scrollHeight;"
-    "if(Math.abs(h-lastH)<4)return;"
-    "lastH=h;"
+    "if(Math.abs(h-lastH)<8)return;"
+    "lastH=h;lastSent=now;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',"
     f"height:h}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    # Touch events inside the iframe
     "window.addEventListener('touchmove',function(){scrolling=true;clearTimeout(timer)},{passive:true});"
     "window.addEventListener('touchend',function(){setTimeout(function(){scrolling=false;sendHeight()},300)},{passive:true});"
+    # Parent scroll events — guards against address-bar show/hide on mobile
+    "var pst;"
+    "try{window.parent.addEventListener('scroll',function(){"
+    "scrolling=true;clearTimeout(timer);clearTimeout(pst);"
+    "pst=setTimeout(function(){scrolling=false;sendHeight()},400)"
+    "},{passive:true})}catch(e){}"
+    # visualViewport resize — mobile address bar animation
+    "try{if(window.visualViewport){"
+    "var vvt;"
+    "window.visualViewport.addEventListener('resize',function(){"
+    "scrolling=true;clearTimeout(timer);clearTimeout(vvt);"
+    "vvt=setTimeout(function(){scrolling=false;sendHeight()},500)"
+    "})}}catch(e){}"
     "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
     "document.addEventListener('toggle',sendHeight,true);"
     "window.addEventListener('load',sendHeight)"
@@ -313,11 +341,18 @@ st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Reduce excessive bottom padding / blank space ─────────────
 # Also disable pull-to-refresh on mobile to prevent accidental reloads
-# when scrolling through player bets.
+# when scrolling through player bets.  The overscroll-behavior rule must
+# cover EVERY scrollable ancestor Streamlit renders — not just html/body
+# — because the actual scrolling container is a nested <div> (e.g.
+# .main, [data-testid="stAppViewContainer"]).  Without this the mobile
+# browser still triggers its native pull-to-refresh gesture and
+# "restarts" the app mid-scroll.
 st.markdown(
     '<style>'
     '.main .block-container{padding-bottom:1rem !important}'
-    'html,body{overscroll-behavior-y:contain}'
+    'html,body,.stApp,[data-testid="stAppViewContainer"],'
+    'section[data-testid="stMain"],.main,.block-container'
+    '{overscroll-behavior-y:contain !important}'
     '</style>',
     unsafe_allow_html=True,
 )
