@@ -1757,7 +1757,7 @@ input:focus, textarea:focus, select:focus,
 /* ─── Mobile Viewport — ensure proper scaling on phones ──── */
 /* (Streamlit sets the viewport meta, but we reinforce touch behaviour) */
 
-/* ─── Responsive — Mobile Touch-Ups ──────────────────────── */
+/* ─── Responsive — Mobile Touch-Ups (≤768px) ────────────── */
 @media (max-width: 768px) {
     html, body, [class*="css"] { font-size: 14px !important; }
     .neural-header-title { font-size: 1.4rem !important; }
@@ -1798,9 +1798,33 @@ input:focus, textarea:focus, select:focus,
         left: 0 !important;
         height: 100vh !important;
         height: 100dvh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
         transition: transform 0.3s cubic-bezier(0.4,0,0.2,1),
                     visibility 0.3s !important;
         box-shadow: 4px 0 24px rgba(0,0,0,0.6) !important;
+    }
+    /* Sidebar inner content — must scroll so nav links are reachable */
+    [data-testid="stSidebar"] > div:first-child {
+        height: 100% !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch !important;
+        display: flex !important;
+        flex-direction: column !important;
+        padding-bottom: 24px !important;
+    }
+    /* Navigation section inside sidebar — always visible */
+    [data-testid="stSidebar"] [data-testid="stSidebarNav"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"],
+    [data-testid="stSidebar"] nav,
+    [data-testid="stSidebar"] ul[data-testid="stSidebarNavItems"] {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        overflow: visible !important;
+        max-height: none !important;
     }
     /* When Streamlit collapses the sidebar, slide it off-screen */
     [data-testid="stSidebar"][aria-expanded="false"] {
@@ -1855,16 +1879,36 @@ input:focus, textarea:focus, select:focus,
         color: #00f0ff !important;
     }
 
-    /* Sidebar nav links — tall touch targets */
+    /* Sidebar nav links — tall touch targets, always visible */
     [data-testid="stSidebar"] .stPageLink,
     [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
-    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] li a,
+    [data-testid="stSidebar"] nav a {
         min-height: 48px !important;
         display: flex !important;
         align-items: center !important;
         padding: 10px 16px !important;
         font-size: 0.95rem !important;
         border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        color: #c0d0e8 !important;
+        text-decoration: none !important;
+    }
+    /* Active nav link highlight */
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"][aria-current="page"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a[aria-current="page"] {
+        background: rgba(0,240,255,0.08) !important;
+        border-left: 3px solid #00f0ff !important;
+        color: #00f0ff !important;
+        font-weight: 600 !important;
+    }
+    /* Sidebar nav separator (Streamlit renders <hr> between sections) */
+    [data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"],
+    [data-testid="stSidebar"] nav hr {
+        border-color: rgba(255,255,255,0.06) !important;
+        margin: 4px 0 !important;
     }
     /* Hide "Powered by" footer & branding on mobile to save space */
     [data-testid="stSidebar"]::after,
@@ -1947,9 +1991,25 @@ input:focus, textarea:focus, select:focus,
 
     /* ─── Metrics — compact on mobile ─────────────────────── */
     [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
+
+    /* ─── Glassmorphic cards — tighter on mobile ─────────── */
+    .glass-card {
+        padding: 14px 16px !important;
+        border-radius: 12px !important;
+    }
+
+    /* ─── QDS cards — fit mobile screens ─────────────────── */
+    .qds-prop-card {
+        padding: 14px !important;
+        margin-bottom: 14px !important;
+    }
+    .qds-player-img {
+        width: 56px !important;
+        height: 56px !important;
+    }
 }
 
-/* ─── Extra-small screens (phones in portrait) ───────────── */
+/* ─── Extra-small screens (phones in portrait, ≤480px) ───── */
 @media (max-width: 480px) {
     [data-testid="stSidebar"] {
         width: 100vw !important;
@@ -1983,6 +2043,120 @@ input:focus, textarea:focus, select:focus,
     .pipeline-connector::before { width: 2px !important; height: 100% !important; }
     /* Section headers smaller */
     .section-header { font-size: 1.1rem !important; }
+    /* Tabs even more compact */
+    [data-testid="stTabs"] button[role="tab"] {
+        padding: 6px 10px !important;
+        font-size: 0.78rem !important;
+    }
+    /* Sidebar nav links tighter on small screens */
+    [data-testid="stSidebar"] .stPageLink,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
+        min-height: 44px !important;
+        padding: 8px 14px !important;
+        font-size: 0.88rem !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LANDSCAPE ORIENTATION — Mobile phones & small tablets
+   Landscape has very limited vertical space. Reduce chrome
+   and padding, keep content compact.
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 896px) and (orientation: landscape) {
+    /* Reduce top padding since landscape has less vertical space */
+    .main .block-container {
+        padding-top: 48px !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    /* Hamburger button: smaller and in the corner */
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"],
+    button[kind="header"],
+    header[data-testid="stHeader"] button[kind="header"],
+    header[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"],
+    header[data-testid="stHeader"] > div > button {
+        top: 6px !important;
+        left: 6px !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        padding: 6px 8px !important;
+    }
+    /* Header takes less vertical space in landscape */
+    header[data-testid="stHeader"] {
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+    }
+    /* Sidebar — narrower in landscape to preserve content area */
+    [data-testid="stSidebar"] {
+        width: 260px !important;
+        max-width: 50vw !important;
+    }
+    /* Sidebar nav links — more compact in landscape */
+    [data-testid="stSidebar"] .stPageLink,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
+        min-height: 40px !important;
+        padding: 6px 12px !important;
+        font-size: 0.85rem !important;
+    }
+    /* Keep columns side-by-side in landscape (don't stack) */
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
+    /* Reduce vertical margins/padding in landscape */
+    .section-header { margin: 16px 0 4px 0 !important; }
+    .lp-divider { margin: 14px 0 !important; }
+    /* Metrics — more compact */
+    [data-testid="stMetricValue"] { font-size: 1.1rem !important; }
+    [data-testid="stMetricLabel"] { font-size: 0.68rem !important; }
+    /* Cards — tighter */
+    .smartai-card, .premium-metric-card {
+        padding: 10px 12px !important;
+    }
+    .glass-card { padding: 12px 14px !important; }
+    /* Tabs — compact */
+    [data-testid="stTabs"] button[role="tab"] {
+        min-height: 38px !important;
+        padding: 6px 12px !important;
+        font-size: 0.80rem !important;
+    }
+    /* Expanders — compact */
+    [data-testid="stExpander"] summary {
+        min-height: 38px !important;
+        padding: 8px 12px !important;
+    }
+    /* Font size slightly smaller in landscape to fit more */
+    html, body, [class*="css"] { font-size: 13px !important; }
+}
+
+/* ─── Landscape — extra small phones (≤667px height typical) ── */
+@media (max-height: 450px) and (orientation: landscape) {
+    .main .block-container {
+        padding-top: 40px !important;
+    }
+    /* Sidebar: full height, compact items */
+    [data-testid="stSidebar"] {
+        width: 240px !important;
+        max-width: 45vw !important;
+    }
+    [data-testid="stSidebar"] .stPageLink,
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
+        min-height: 36px !important;
+        padding: 5px 10px !important;
+        font-size: 0.80rem !important;
+    }
+    /* Hero / headers should be smaller */
+    .neural-header-title { font-size: 1.1rem !important; }
 }
 
 /* ─── Premium animated gradient border — Neural Header ─── */

@@ -451,4 +451,19 @@ def get_studio_css() -> str:
     .studio-metric-card{padding:10px 12px;border-radius:8px}
     .studio-quick-nav a{padding:4px 8px;font-size:0.65rem}
 }
+/* Landscape — compact layout for limited vertical space */
+@media (max-width:896px) and (orientation:landscape){
+    .studio-mode-cards{flex-direction:row;flex-wrap:wrap}
+    .studio-mode-card{min-width:calc(50% - 8px);max-width:calc(50% - 8px);padding:10px 12px}
+    .studio-metric-row{flex-wrap:wrap}
+    .studio-metric-card{min-width:calc(50% - 8px);padding:10px 12px}
+    .studio-hero-title{font-size:1.1rem}
+    .studio-avatar-lg{width:64px;height:64px}
+    .studio-quick-nav a{padding:4px 10px;font-size:0.68rem;min-height:38px}
+    .joseph-dawg-table,
+    .joseph-override-table,
+    .studio-payout-table{
+        display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+    }
+}
 </style>"""

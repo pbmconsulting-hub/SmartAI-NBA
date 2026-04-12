@@ -1183,6 +1183,40 @@ st.markdown("""
     .joseph-welcome-avatar { width: 56px; height: 56px; }
     .joseph-welcome-msg { font-size: 0.88rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Landing Page — Landscape Orientation
+   Compact vertical spacing for landscape mobile devices.
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 896px) and (orientation: landscape) {
+    .hero-hud { padding: 18px 20px; gap: 14px; border-radius: 14px; }
+    .hero-tagline { font-size: 1.2rem; }
+    .hero-subtext { font-size: 0.78rem; }
+    .spp-hero-logo { width: 64px !important; }
+    .section-header { font-size: 1.05rem !important; margin: 14px 0 4px 0 !important; padding-bottom: 6px; }
+    .section-subheader { font-size: 0.76rem; margin-bottom: 10px; }
+    .nav-card { padding: 12px 10px; border-radius: 10px; }
+    .nav-card-icon { font-size: 1.2rem; margin-bottom: 3px; }
+    .nav-card-title { font-size: 0.72rem; }
+    .nav-card-desc { font-size: 0.62rem; line-height: 1.35; }
+    .nav-row-label { font-size: 0.58rem; margin: 10px 0 4px 4px; }
+    .pillar-card-inner { padding: 16px 14px; }
+    .pillar-subtitle { font-size: 0.90rem; }
+    .pillar-body { font-size: 0.76rem; }
+    .proof-card { padding: 14px 10px; }
+    .proof-card-number { font-size: 1.2rem; }
+    .proof-card-label { font-size: 0.58rem; }
+    .status-card { padding: 10px 8px; }
+    .status-card-value { font-size: 1.2rem; }
+    .status-card-label { font-size: 0.58rem; }
+    .pipeline-step { padding: 12px 10px; }
+    .matchup-chip { padding: 8px 10px; font-size: 0.78rem; }
+    .lp-divider { margin: 12px 0; }
+    .lp-footer { font-size: 0.68rem; }
+    .joseph-welcome-card { padding: 16px 14px; gap: 14px; }
+    .joseph-welcome-avatar { width: 48px; height: 48px; }
+    .joseph-welcome-msg { font-size: 0.82rem; }
+}
 </style>
 """, unsafe_allow_html=True)
 
