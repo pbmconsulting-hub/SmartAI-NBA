@@ -188,7 +188,7 @@ def diary_get_week_summary() -> dict:
         "narrative_arc": arc,
         "narrative": narrative,
         "brag_intensity": round(brag_intensity, 1),
-        "win_rate": round(win_rate, 3),
+        "win_rate": round(win_rate * 100, 1),
     }
 
 
@@ -247,9 +247,10 @@ def diary_update_from_track_record(track_record: dict) -> bool:
     bool — True if saved successfully.
     """
     win_rate = track_record.get("win_rate", 0)
-    if win_rate > 0.6:
+    # win_rate from joseph_get_track_record() is a percentage (0-100)
+    if win_rate > 60.0:
         mood = "hot"
-    elif win_rate < 0.4:
+    elif win_rate < 40.0:
         mood = "cold"
     else:
         mood = "neutral"

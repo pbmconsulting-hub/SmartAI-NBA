@@ -15,6 +15,7 @@ data/game_logs_cache.json
 data/game_logs/
 tracking/clv_log.json
 tracking/line_movement.json
+tracking/joseph_diary.json
 
 # Pipeline-generated data files — runtime artifacts, only .gitkeep is tracked
 data/raw/*.parquet
