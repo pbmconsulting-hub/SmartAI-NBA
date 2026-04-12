@@ -491,14 +491,15 @@ _secs_since_check = _time_mod.time() - _injury_check_ts
 
 if _secs_since_check < 60:
     _should_auto_refresh_injuries = False
-elif not st.session_state["injury_status_map"]:
-    _should_auto_refresh_injuries = True
-    st.session_state["_injury_check_ts"] = _time_mod.time()
 else:
+    # Record the check so subsequent rapid reruns (within 60s) skip it
     st.session_state["_injury_check_ts"] = _time_mod.time()
-    _should_auto_refresh_injuries = False
-    # Check if we already refreshed recently in this session
-    _last_refresh_ts = st.session_state.get("_injury_last_refreshed_at")
+    if not st.session_state["injury_status_map"]:
+        _should_auto_refresh_injuries = True
+    else:
+        _should_auto_refresh_injuries = False
+        # Check if we already refreshed recently in this session
+        _last_refresh_ts = st.session_state.get("_injury_last_refreshed_at")
     if _last_refresh_ts is not None:
         _mins_since = (_time_mod.time() - _last_refresh_ts) / 60
         if _mins_since < 30:
