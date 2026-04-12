@@ -278,6 +278,19 @@ footer { display: none !important; }
    toggle / hamburger button remains visible and tappable at all times. */
 @media (min-width: 769px) {
     header[data-testid="stHeader"] { display: none !important; }
+    /* Force sidebar to stay expanded on desktop — the header (with the
+       re-open toggle) is hidden, so we must prevent the user from
+       collapsing the sidebar; otherwise it can never be reopened.       */
+    [data-testid="stSidebar"] {
+        transform: none !important;
+        visibility: visible !important;
+        transition: none !important;
+    }
+    /* Hide the close / collapse button inside the sidebar on desktop */
+    [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebar"] button[kind="header"] {
+        display: none !important;
+    }
 }
 @media (max-width: 768px) {
     header[data-testid="stHeader"] {
