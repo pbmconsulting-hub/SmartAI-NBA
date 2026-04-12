@@ -1992,6 +1992,47 @@ input:focus, textarea:focus, select:focus,
         width: 56px !important;
         height: 56px !important;
     }
+
+    /* ─── Game Report — QDS report layout on tablets ──────── */
+    .qds-container {
+        max-width: 100% !important;
+        padding: 0 10px !important;
+    }
+    .qds-na-card {
+        padding: 14px !important;
+        margin-bottom: 14px !important;
+    }
+    .qds-na-metrics-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    .qds-na-strategy-table,
+    .qds-strategy-table {
+        display: block !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-width: 100% !important;
+    }
+    .qds-collapsible-content {
+        padding: 0 12px !important;
+    }
+    .qds-collapsible.open .qds-collapsible-content {
+        padding: 12px !important;
+    }
+    .qds-game-teams {
+        padding: 10px 14px !important;
+        gap: 10px !important;
+    }
+    .qds-na-matchup {
+        gap: 10px !important;
+        padding: 10px !important;
+    }
+    .qds-na-verdict {
+        padding: 10px 14px !important;
+    }
+    .qds-report-title-text {
+        font-size: clamp(1.1rem, 3.5vw, 1.6rem) !important;
+    }
 }
 
 /* ─── Extra-small screens (phones in portrait, ≤480px) ───── */
@@ -2040,6 +2081,106 @@ input:focus, textarea:focus, select:focus,
         min-height: 44px !important;
         padding: 8px 14px !important;
         font-size: 0.88rem !important;
+    }
+
+    /* ─── Game Report — QDS report on phones ─────────────── */
+    .qds-container {
+        padding: 0 6px !important;
+    }
+    .qds-na-card {
+        padding: 10px !important;
+        margin-bottom: 10px !important;
+    }
+    .qds-na-metrics-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+    }
+    .qds-na-metric-card {
+        padding: 8px !important;
+    }
+    .qds-na-metric-label {
+        font-size: 0.62rem !important;
+    }
+    .qds-na-metric-value {
+        font-size: 0.88rem !important;
+    }
+    .qds-na-matchup {
+        flex-direction: column !important;
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+    .qds-na-team-logo {
+        width: 36px !important;
+        height: 36px !important;
+    }
+    .qds-na-score {
+        font-size: 1.3rem !important;
+    }
+    .qds-na-player-name {
+        font-size: 0.9rem !important;
+    }
+    .qds-na-prop-desc {
+        font-size: 0.92rem !important;
+    }
+    .qds-na-strategy-table th,
+    .qds-na-strategy-table td {
+        padding: 6px 8px !important;
+        font-size: 0.75rem !important;
+    }
+    .qds-na-verdict {
+        padding: 8px 12px !important;
+        font-size: 0.82rem !important;
+    }
+    .qds-na-logic-item {
+        gap: 6px !important;
+        padding: 6px 0 !important;
+    }
+    .qds-collapsible-header {
+        padding: 10px 12px !important;
+    }
+    .qds-collapsible-title {
+        font-size: 0.88rem !important;
+        gap: 6px !important;
+    }
+    .qds-collapsible.open .qds-collapsible-content {
+        padding: 10px !important;
+    }
+    .qds-game-teams {
+        padding: 8px 10px !important;
+        gap: 8px !important;
+        flex-direction: column !important;
+    }
+    .qds-team-logo {
+        width: 32px !important;
+        height: 32px !important;
+    }
+    .qds-team-name-txt {
+        font-size: 0.85rem !important;
+    }
+    .qds-game-date,
+    .qds-framework {
+        font-size: 0.75rem !important;
+        padding: 6px 12px !important;
+    }
+    .qds-report-title-text {
+        font-size: clamp(1rem, 3vw, 1.4rem) !important;
+    }
+    .qds-final-word {
+        padding: 12px !important;
+    }
+    .qds-final-text {
+        font-size: 0.85rem !important;
+    }
+    .qds-prop-card {
+        padding: 10px !important;
+    }
+    .qds-player-img {
+        width: 48px !important;
+        height: 48px !important;
+    }
+    .qds-metrics-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
     }
 }
 
@@ -3649,6 +3790,51 @@ h1,h2,h3,h4{font-family:'Orbitron',sans-serif;letter-spacing:0.5px;font-weight:7
   .qds-team-cards{flex-direction:row;}
   .qds-team-card{flex:1;}
   .qds-game-meta{flex-direction:row;}
+}
+
+/* ── Mobile: Game Report (≤768px) ── */
+@media(max-width:768px){
+  .qds-container{max-width:100%!important;padding:0 10px!important;}
+  .qds-report-title-text{font-size:clamp(1.1rem,3.5vw,1.6rem)!important;}
+  .qds-collapsible-content{padding:0 12px!important;}
+  .qds-collapsible.open .qds-collapsible-content{padding:12px!important;}
+  .qds-game-teams{padding:10px 14px!important;gap:10px!important;}
+  .qds-metrics-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;}
+  .qds-prop-card{padding:14px!important;}
+  .qds-strategy-table{display:block!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;max-width:100%!important;}
+  .qds-final-word{padding:14px!important;}
+  .qds-player-img{width:56px!important;height:56px!important;}
+}
+
+/* ── Mobile: Game Report (≤480px phones) ── */
+@media(max-width:480px){
+  .qds-container{padding:0 6px!important;}
+  .qds-report-title-text{font-size:clamp(1rem,3vw,1.4rem)!important;}
+  .qds-collapsible-header{padding:10px 12px!important;}
+  .qds-collapsible-title{font-size:0.88rem!important;gap:6px!important;}
+  .qds-collapsible.open .qds-collapsible-content{padding:10px!important;}
+  .qds-game-teams{padding:8px 10px!important;gap:8px!important;flex-direction:column!important;}
+  .qds-team-logo{width:32px!important;height:32px!important;}
+  .qds-team-name-txt{font-size:0.85rem!important;}
+  .qds-vs-separator{font-size:0.85rem!important;padding:3px 10px!important;}
+  .qds-game-date,.qds-framework{font-size:0.75rem!important;padding:6px 12px!important;}
+  .qds-metrics-grid{grid-template-columns:1fr 1fr!important;gap:6px!important;}
+  .qds-metric-item{padding:10px!important;}
+  .qds-metric-name{font-size:0.75rem!important;}
+  .qds-prop-card{padding:10px!important;}
+  .qds-prop-badge{top:8px!important;right:8px!important;font-size:0.65rem!important;padding:3px 7px!important;}
+  .qds-player-img{width:48px!important;height:48px!important;}
+  .qds-player-name{font-size:0.95rem!important;}
+  .qds-player-prop{font-size:0.85rem!important;}
+  .qds-confidence-labels{font-size:0.75rem!important;}
+  .qds-strategy-table th,.qds-strategy-table td{padding:6px 8px!important;font-size:0.75rem!important;}
+  .qds-logic-item{padding:10px!important;margin-bottom:8px!important;}
+  .qds-logic-text{font-size:0.82rem!important;}
+  .qds-final-word{padding:12px!important;}
+  .qds-final-text{font-size:0.85rem!important;}
+  .qds-cta-text{font-size:0.82rem!important;}
+  .qds-prop-verdict{padding:8px 12px!important;font-size:0.78rem!important;}
+  .qds-bonus-item{font-size:0.75rem!important;}
 }
 </style>"""
 
