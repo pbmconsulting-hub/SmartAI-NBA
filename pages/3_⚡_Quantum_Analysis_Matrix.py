@@ -725,7 +725,7 @@ with show_col:
 # ── Feature 14: Quick Filter Chips ──────────────────────────────
 # Initialise session-state keys for filter chips (persist across reruns).
 for _chip_key in ("chip_platinum", "chip_gold_plus", "chip_high_edge",
-                  "chip_hot_form", "chip_show_avoids"):
+                  "chip_hot_form", "chip_hide_avoids"):
     if _chip_key not in st.session_state:
         st.session_state[_chip_key] = False
 
@@ -2190,9 +2190,9 @@ if analysis_results:
             key="_chip_hot_form_toggle",
         )
     with _chip_col5:
-        st.session_state["chip_show_avoids"] = st.toggle(
-            "❌ Show Avoids", value=st.session_state.get("chip_show_avoids", False),
-            key="_chip_show_avoids_toggle",
+        st.session_state["chip_hide_avoids"] = st.toggle(
+            "❌ Hide Avoids", value=st.session_state.get("chip_hide_avoids", False),
+            key="_chip_hide_avoids_toggle",
         )
 
     # Apply chip filters (chips are additive — if multiple are active
@@ -2220,8 +2220,8 @@ if analysis_results:
             r for r in displayed_results
             if (r.get("recent_form_ratio") or 0) >= 1.05
         ]
-    if not st.session_state.get("chip_show_avoids"):
-        # Default: hide avoids. When toggled ON, show them.
+    if st.session_state.get("chip_hide_avoids"):
+        # Only hide avoids when the user explicitly toggles this ON.
         _avoid_count = sum(1 for r in displayed_results if r.get("should_avoid", False))
         displayed_results = [
             r for r in displayed_results
@@ -2231,7 +2231,7 @@ if analysis_results:
             st.caption(
                 f"ℹ️ {_avoid_count} pick(s) hidden (flagged as avoid due to "
                 "low edge, high variance, or conflicting signals). "
-                "Toggle **❌ Show Avoids** above to reveal them."
+                "Disable **❌ Hide Avoids** to reveal them."
             )
 
     # ── Legacy tier multiselect (still useful for multi-tier combos) ──
