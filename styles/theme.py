@@ -2104,13 +2104,16 @@ input:focus, textarea:focus, select:focus,
         padding: 6px 12px !important;
         font-size: 0.85rem !important;
     }
-    /* Keep columns side-by-side in landscape (don't stack) */
+    /* Keep columns side-by-side in landscape (don't stack).
+       Reset min-width to allow natural flex sizing rather than the
+       calc(50% - 8px) from the portrait ≤768px rule. */
     [data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: wrap !important;
     }
     [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-        min-width: 0 !important;
+        min-width: calc(33% - 8px) !important;
+        flex: 1 1 auto !important;
     }
     /* Reduce vertical margins/padding in landscape */
     .section-header { margin: 16px 0 4px 0 !important; }

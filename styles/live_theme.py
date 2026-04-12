@@ -850,13 +850,21 @@ def get_live_sweat_css() -> str:
     .sweat-card-headshot { width: 36px; height: 27px; }
     .sweat-reaction-btn { padding: 3px 8px; font-size: 0.9rem; min-height: 44px; }
 }
-/* Landscape — compact for limited vertical space */
-@media (max-width: 896px) and (orientation: landscape) {
+/* Landscape — compact for limited vertical space.
+   Use min-width: 481px to avoid overlap with ≤480px portrait rule. */
+@media (min-width: 481px) and (max-width: 896px) and (orientation: landscape) {
     .espn-game-card { width: 180px; padding: 8px 10px 6px; }
     .sweat-cards-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .sweat-card { padding: 10px; }
     .sweat-score-number { font-size: 2rem; }
     .sweat-card-headshot { width: 36px; height: 27px; }
+}
+/* Landscape small phones (≤480px width in landscape) */
+@media (max-width: 480px) and (orientation: landscape) {
+    .espn-game-card { width: 160px; }
+    .sweat-cards-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .sweat-card { padding: 8px; }
+    .sweat-score-number { font-size: 1.8rem; }
 }
 </style>"""
 
