@@ -2848,6 +2848,8 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
 
         # 2. Select body sentences based on energy — prefer stat-specific
         #    templates so Joseph talks about each stat differently.
+        #    Counts intentionally reduced from (2/2/3/4) to (1/1/2/2) for
+        #    tighter rants; data sentences added below provide the depth.
         body_count = {"low": 1, "medium": 1, "high": 2, "nuclear": 2}.get(energy, 1)
         raw_stat = str(prop.get("stat", prop.get("stat_type", "")) or "").lower().strip()
         stat_cat = _STAT_CATEGORY_MAP.get(raw_stat)
