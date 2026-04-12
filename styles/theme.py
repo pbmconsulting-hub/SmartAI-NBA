@@ -5821,24 +5821,208 @@ _PLAYER_INTEL_CSS = """
                       padding: 4px 10px; border-radius: 0 6px 6px 0; font-size: 0.78rem; color: #70ceff; margin-bottom:4px; }
 
 /* ─── Quick Analysis Panel (Prop Scanner) ─────────────── */
-.qa-row {
-    background: rgba(13,20,45,0.55);
-    border: 1px solid rgba(0,240,255,0.09);
-    border-radius: 8px;
-    padding: 8px 12px;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-.qa-player   { font-weight: 700; color: #e8f4ff; font-size: 0.88rem; min-width: 140px; }
-.qa-stat     { color: #8a9bb8; font-size: 0.78rem; }
-.qa-line     { color: #c0d0e8; font-weight: 600; font-size: 0.85rem; }
+
+/* Keep legacy classes for the intel strip renderer */
 .qa-edge     { font-weight: 700; font-size: 0.82rem; }
 .qa-edge-pos { color: #00e57a; }
 .qa-edge-neg { color: #ff5050; }
 .qa-edge-neu { color: #8a9bb8; }
+
+/* ── QA Card Grid ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+.qa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 14px;
+    padding: 8px 0;
+    width: 100%;
+}
+.qa-count-bar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 14px; margin-bottom: 10px;
+    background: rgba(13,20,45,0.55); border-radius: 8px;
+    border: 1px solid rgba(0,240,255,0.07);
+    font-family: 'Inter', sans-serif; font-size: 0.78rem; color: #8a9bb8;
+}
+.qa-count-bar b { color: #e0eeff; }
+
+/* ── KPI Summary Bar ──────────────────────────────────── */
+.qa-kpi-bar {
+    display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.qa-kpi {
+    flex: 1 1 160px;
+    background: rgba(11,14,26,0.80);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px 18px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+}
+.qa-kpi-value {
+    font-size: 1.8rem; font-weight: 800; line-height: 1.1;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qa-kpi-label {
+    font-size: 0.72rem; color: #8a9bb8; text-transform: uppercase;
+    letter-spacing: 0.08em; margin-top: 4px;
+}
+.qa-kpi-hot  .qa-kpi-value { color: #ff7b2e; }
+.qa-kpi-cold .qa-kpi-value { color: #5bc8f5; }
+.qa-kpi-flag .qa-kpi-value { color: #ffc800; }
+.qa-kpi-hot  { border-color: rgba(255,123,46,0.25); }
+.qa-kpi-cold { border-color: rgba(91,200,245,0.25); }
+.qa-kpi-flag { border-color: rgba(255,200,0,0.25);  }
+
+/* ── Individual Prop Card ─────────────────────────────── */
+@keyframes qa-card-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.qa-card {
+    background: rgba(11,14,26,0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 16px 18px 14px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.40), 0 0 12px rgba(0,240,255,0.03);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    animation: qa-card-in 0.35s ease both;
+    font-family: 'Inter', sans-serif;
+    color: #e0eeff;
+    position: relative;
+    overflow: hidden;
+}
+.qa-card:hover {
+    border-color: rgba(0,240,255,0.22);
+    box-shadow: 0 6px 26px rgba(0,0,0,0.50), 0 0 20px rgba(0,240,255,0.08);
+    transform: translateY(-2px);
+}
+/* Left accent bar showing edge direction */
+.qa-card::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 4px; border-radius: 14px 0 0 14px;
+}
+.qa-card-pos::before { background: linear-gradient(180deg, #00e57a 0%, #00c8ff 100%); }
+.qa-card-neg::before { background: linear-gradient(180deg, #ff5050 0%, #ff8844 100%); }
+.qa-card-neu::before { background: linear-gradient(180deg, #5a6e8a 0%, #3a4560 100%); }
+
+/* Header row: player · team · platform */
+.qa-card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; padding-left: 8px;
+}
+.qa-card-player {
+    font-size: 0.95rem; font-weight: 700; color: #ffffff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 65%;
+}
+.qa-card-team {
+    font-size: 0.72rem; color: #8a9bb8; font-weight: 500;
+    margin-left: 6px;
+}
+.qa-card-platform {
+    font-size: 0.68rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 5px; text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(0,240,255,0.10); color: #00d4ff;
+    border: 1px solid rgba(0,240,255,0.18);
+}
+
+/* Stat + Line row */
+.qa-card-stat-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding-left: 8px; margin-bottom: 10px;
+}
+.qa-card-stat {
+    font-size: 0.74rem; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.07em; font-family: 'JetBrains Mono', monospace;
+}
+.qa-card-line {
+    font-size: 1.35rem; font-weight: 800; color: #ffffff;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
+}
+.qa-card-avg {
+    font-size: 0.72rem; color: #6b7b96; font-weight: 500;
+}
+
+/* Metrics row: edge, hit rate, form */
+.qa-card-metrics {
+    display: flex; gap: 8px; align-items: stretch;
+    padding-left: 8px; margin-bottom: 8px;
+}
+.qa-card-metric-box {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: center;
+}
+.qa-card-metric-val {
+    font-size: 1.0rem; font-weight: 700; line-height: 1.2;
+    font-family: 'JetBrains Mono', monospace;
+}
+.qa-card-metric-lbl {
+    font-size: 0.62rem; color: #6b7b96; text-transform: uppercase;
+    letter-spacing: 0.07em; margin-top: 2px;
+}
+.qa-card-metric-val.qa-val-pos { color: #00e57a; }
+.qa-card-metric-val.qa-val-neg { color: #ff5050; }
+.qa-card-metric-val.qa-val-neu { color: #8a9bb8; }
+
+/* Hit-rate mini bar */
+.qa-hr-bar-bg {
+    width: 100%; height: 4px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; margin-top: 4px; overflow: hidden;
+}
+.qa-hr-bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.5s ease;
+}
+.qa-hr-bar-fill.hr-hot  { background: linear-gradient(90deg, #ff7b2e, #ff9b5e); }
+.qa-hr-bar-fill.hr-cold { background: linear-gradient(90deg, #5bc8f5, #8adcff); }
+.qa-hr-bar-fill.hr-mid  { background: linear-gradient(90deg, #5a6e8a, #8a9bb8); }
+
+/* Form dots + availability footer */
+.qa-card-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 8px 0; border-top: 1px solid rgba(255,255,255,0.05);
+}
+.qa-card-footer-left {
+    display: flex; align-items: center; gap: 6px;
+}
+.qa-card-footer-right {
+    display: flex; align-items: center; gap: 6px;
+}
+/* Streak pill */
+.qa-streak-pill {
+    font-size: 0.68rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 5px; white-space: nowrap;
+}
+.qa-streak-hot  { background: rgba(255,100,0,0.12); color: #ffaa60; border: 1px solid rgba(255,100,0,0.25); }
+.qa-streak-cold { background: rgba(0,160,255,0.12); color: #70ceff; border: 1px solid rgba(0,160,255,0.25); }
+
+/* Direction arrow */
+.qa-dir-arrow {
+    font-size: 0.85rem; font-weight: 700; margin-left: 2px;
+}
+.qa-dir-over  { color: #00e57a; }
+.qa-dir-under { color: #ff5050; }
+.qa-dir-dash  { color: #5a6e8a; }
+
+/* ── Responsive: stack metrics on narrow screens ──────── */
+@media (max-width: 420px) {
+    .qa-card-metrics { flex-direction: column; }
+    .qa-grid { grid-template-columns: 1fr; }
+}
 </style>
 """
 
@@ -5957,6 +6141,129 @@ def get_intel_strip_html(
   </div>
 </div>
 """
+
+
+def get_qa_kpi_bar_html(
+    hot_count: int, cold_count: int, flagged_count: int, total_count: int,
+) -> str:
+    """Return HTML for the Quick Analysis KPI summary bar."""
+    return f"""
+<div class="qa-kpi-bar">
+  <div class="qa-kpi qa-kpi-hot">
+    <div class="qa-kpi-value">{hot_count}</div>
+    <div class="qa-kpi-label">🔥 Hot Players</div>
+  </div>
+  <div class="qa-kpi qa-kpi-cold">
+    <div class="qa-kpi-value">{cold_count}</div>
+    <div class="qa-kpi-label">🧊 Cold Players</div>
+  </div>
+  <div class="qa-kpi qa-kpi-flag">
+    <div class="qa-kpi-value">{flagged_count}</div>
+    <div class="qa-kpi-label">⚠️ Injury Flagged</div>
+  </div>
+  <div class="qa-kpi">
+    <div class="qa-kpi-value" style="color:#e0eeff;">{total_count}</div>
+    <div class="qa-kpi-label">📊 Total Props</div>
+  </div>
+</div>
+"""
+
+
+def get_qa_card_html(row: dict, form_dots_html: str) -> str:
+    """Return a single Quick Analysis prop card as HTML.
+
+    *row* is a dict from ``build_quick_analysis_rows()``.
+    *form_dots_html* is pre-rendered output from ``get_form_dots_html()``.
+    """
+    import html as _h
+
+    player = _h.escape(row.get("player_name", ""))
+    stat = _h.escape(row.get("stat_type", "").replace("_", " ").title())
+    line = row.get("line", 0)
+    avg = row.get("season_avg", 0.0)
+    edge = row.get("edge_pct", 0.0)
+    direction = row.get("direction", "—")
+    hr = row.get("hit_rate", 0.0)
+    form_label = row.get("form_label", "No Data")
+    avail_badge = row.get("availability_badge", "🟢 Active")
+    avail_cls = row.get("availability_class", "avail-active")
+    inj_note = row.get("injury_note", "")
+    streak = row.get("streak_label", "")
+    platform = row.get("platform", "")
+    team = _h.escape(row.get("team", row.get("player_team", "")))
+
+    # Card accent class
+    card_accent = "qa-card-pos" if edge >= 4 else "qa-card-neg" if edge <= -4 else "qa-card-neu"
+
+    # Edge display
+    edge_sign = "+" if edge >= 0 else ""
+    edge_val_cls = "qa-val-pos" if edge >= 4 else "qa-val-neg" if edge <= -4 else "qa-val-neu"
+
+    # Hit rate
+    hr_pct = int(hr * 100)
+    hr_bar_cls = "hr-hot" if "Hot" in form_label else "hr-cold" if "Cold" in form_label else "hr-mid"
+
+    # Direction arrow
+    if "Over" in direction or "OVER" in direction:
+        dir_html = '<span class="qa-dir-arrow qa-dir-over">▲</span>'
+    elif "Under" in direction or "UNDER" in direction:
+        dir_html = '<span class="qa-dir-arrow qa-dir-under">▼</span>'
+    else:
+        dir_html = '<span class="qa-dir-arrow qa-dir-dash">—</span>'
+
+    # Platform badge
+    plat_html = (
+        f'<span class="qa-card-platform">{_h.escape(platform)}</span>'
+        if platform else ""
+    )
+
+    # Average display
+    avg_html = f'<span class="qa-card-avg">avg {avg:.1f}</span>' if avg > 0 else ""
+
+    # Availability badge
+    inj_title = f' title="{_h.escape(inj_note)}"' if inj_note else ""
+    avail_html = f'<span class="avail-badge {avail_cls}"{inj_title}>{avail_badge}</span>'
+
+    # Streak pill
+    streak_html = ""
+    if streak:
+        streak_cls = "qa-streak-hot" if "Over" in streak else "qa-streak-cold"
+        streak_html = f'<span class="qa-streak-pill {streak_cls}">{_h.escape(streak)}</span>'
+
+    return f"""<div class="qa-card {card_accent}">
+  <div class="qa-card-header">
+    <div>
+      <span class="qa-card-player">{player}</span>
+      <span class="qa-card-team">{team}</span>
+    </div>
+    {plat_html}
+  </div>
+  <div class="qa-card-stat-row">
+    <span class="qa-card-stat">{stat}</span>
+    <span class="qa-card-line">{line}</span>
+    {avg_html}
+  </div>
+  <div class="qa-card-metrics">
+    <div class="qa-card-metric-box">
+      <div class="qa-card-metric-val {edge_val_cls}">{edge_sign}{edge:.1f}%{dir_html}</div>
+      <div class="qa-card-metric-lbl">Edge</div>
+    </div>
+    <div class="qa-card-metric-box">
+      <div class="qa-card-metric-val" style="color:#e0eeff;">{hr_pct}%</div>
+      <div class="qa-hr-bar-bg"><div class="qa-hr-bar-fill {hr_bar_cls}" style="width:{hr_pct}%;"></div></div>
+      <div class="qa-card-metric-lbl">Hit Rate</div>
+    </div>
+  </div>
+  <div class="qa-card-footer">
+    <div class="qa-card-footer-left">
+      {form_dots_html}
+      {streak_html}
+    </div>
+    <div class="qa-card-footer-right">
+      {avail_html}
+    </div>
+  </div>
+</div>"""
 
 
 # ============================================================
