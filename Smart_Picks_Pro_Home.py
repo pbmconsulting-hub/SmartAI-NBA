@@ -861,7 +861,7 @@ st.markdown("""
     height: 100%;
     position: relative;
     overflow: hidden;
-    /* Bottom margin to fill visual gap before page_link */
+    /* Collapse bottom margin — page_link overlay handles spacing */
     margin-bottom: 0;
 }
 .nav-card::before {
@@ -1072,7 +1072,9 @@ st.markdown("""
    the st.page_link anchor over the visual card.
    ═══════════════════════════════════════════════════════════ */
 
-/* Column containing a nav-card becomes a positioned container */
+/* Column containing a nav-card becomes a positioned container.
+   The cursor is visual only — the underlying st.page_link <a> provides
+   keyboard accessibility and focus styles via Streamlit defaults. */
 [data-testid="stColumn"]:has(.nav-card) {
     position: relative;
     cursor: pointer;

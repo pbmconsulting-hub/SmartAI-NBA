@@ -1776,6 +1776,8 @@ input:focus, textarea:focus, select:focus,
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
 
     /* ─── Columns: wrap to 2-per-row on tablets ────────────── */
+    /* gap and calc() are coupled: calc(50% - <gap>) ensures two
+       columns fit side-by-side with the specified gap. */
     [data-testid="stHorizontalBlock"] {
         flex-wrap: wrap !important;
         gap: 8px !important;
