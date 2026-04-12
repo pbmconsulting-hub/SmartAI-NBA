@@ -265,7 +265,9 @@ _IFRAME_RESIZE_JS = (
     "(function(){"
     "var lastH=0;"
     "function sendHeight(){"
-    "var h=document.body.scrollHeight;"
+    # Use the larger of body.scrollHeight and documentElement.scrollHeight
+    # to handle cases where overflow:hidden on body could limit scrollHeight.
+    "var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);"
     "if(Math.abs(h-lastH)<4)return;"
     "lastH=h;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
@@ -273,11 +275,14 @@ _IFRAME_RESIZE_JS = (
     # Send initial height once DOM is ready
     "sendHeight();"
     # Re-measure only when a <details> element is toggled (user action).
-    # The 60ms delay lets the browser finish the expand/collapse layout
-    # shift before we measure scrollHeight.
-    "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
+    # Two-phase delay: 80ms for initial layout, then 300ms for any CSS
+    # transitions / images that may shift content height.
+    "document.addEventListener('toggle',function(){"
+    "setTimeout(sendHeight,80);"
+    "setTimeout(sendHeight,350);"
+    "},true);"
     # Also handle images loading late (can change content height)
-    "window.addEventListener('load',sendHeight)"
+    "window.addEventListener('load',function(){sendHeight();setTimeout(sendHeight,200)})"
     "})()"
     "</script>"
 )
@@ -312,8 +317,10 @@ def _render_card_iframe(card_html, player_count):
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<style>"
         "html{overflow:hidden;overscroll-behavior:contain}"
+        # Body uses overflow:visible so scrollHeight reflects ALL content.
+        # The iframe itself uses scrolling=False to prevent scroll bars.
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
-        "overscroll-behavior:contain;overflow:hidden}"
+        "overscroll-behavior:contain;overflow:visible}"
         "</style>"
         "</head><body>"
         f"{card_html}"

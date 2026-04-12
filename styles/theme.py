@@ -8323,6 +8323,25 @@ UNIFIED_PLAYER_CARD_CSS = """
     padding: 2px 7px;
 }
 
+/* Prop summary pills in collapsed header */
+.upc-prop-pills {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+.upc-prop-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.64rem;
+    font-variant-numeric: tabular-nums;
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 2px 8px;
+    white-space: nowrap;
+}
+
 /* Right-side summary info */
 .upc-summary-right {
     display: flex;
@@ -8467,6 +8486,10 @@ UNIFIED_PLAYER_CARD_CSS = """
     .upc-summary-right {
         width: 100%;
         justify-content: flex-end;
+    }
+    .upc-prop-pill {
+        font-size: 0.58rem;
+        padding: 1px 5px;
     }
 }
 """
