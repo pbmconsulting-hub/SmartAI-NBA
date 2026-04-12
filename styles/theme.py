@@ -1964,7 +1964,7 @@ input:focus, textarea:focus, select:focus,
     /* ─── Mobile images & media ───────────────────────────── */
     /* Exclude fixed-size headshot / avatar classes that rely on explicit
        width+height for circular rendering (border-radius:50%). */
-    img:not(.qcm-headshot):not(.upc-headshot):not(.bet-card-headshot):not(.gm-card-headshot):not(.gm-modal-headshot):not(.joseph-welcome-avatar):not(.upc-joseph-avatar):not(.upc-joseph-resp-avatar):not(.qds-player-img):not(.sweat-card-headshot) {
+    img:not(.qcm-headshot):not(.upc-headshot):not(.bet-card-headshot):not(.gm-card-headshot):not(.gm-modal-headshot):not(.joseph-welcome-avatar):not(.upc-joseph-avatar):not(.upc-joseph-resp-avatar):not(.qds-player-img):not(.sweat-card-headshot):not(.joseph-floating-avatar):not(.joseph-avatar):not(.joseph-avatar-sm):not(.joseph-sidebar-avatar):not(.joseph-inline-avatar):not(.joseph-popover-avatar) {
         max-width: 100% !important; height: auto !important;
     }
     iframe { max-width: 100% !important; }

@@ -1161,13 +1161,13 @@ def render_joseph_live_desk(
     # ── Inject CSS ────────────────────────────────────────────
     st.markdown(render_live_desk_css(), unsafe_allow_html=True)
 
-    logo_b64 = get_smart_pick_pro_logo_b64()
+    avatar_b64 = get_joseph_avatar_b64()
     logo_img = (
-        f'<img src="data:image/png;base64,{logo_b64}" class="joseph-avatar" '
-        f'alt="Smart Pick Pro">'
-        if logo_b64
+        f'<img src="data:image/png;base64,{avatar_b64}" class="joseph-avatar" '
+        f'alt="Joseph M. Smith">'
+        if avatar_b64
         else '<div class="joseph-avatar" style="background:#1e293b;display:flex;'
-             'align-items:center;justify-content:center;font-size:1.5rem">🏀</div>'
+             'align-items:center;justify-content:center;font-size:1.5rem">🎙️</div>'
     )
 
     desk = st.empty()
