@@ -1194,30 +1194,8 @@ def render_joseph_live_desk(
         )
 
         # ─────────────────────────────────────────────────────
-        # SEGMENT 0 — Opening Monologue
-        # ─────────────────────────────────────────────────────
-        opening_text = ""
-        try:
-            opening_text = joseph_quick_take(analysis_results, teams_data, todays_games)
-        except Exception as exc:
-            _logger.warning("joseph_quick_take failed: %s", exc)
-            opening_text = "Good evening, everybody. The board is loaded tonight and I've got some STRONG takes for you."
-
-        st.markdown(
-            '<div class="joseph-desk-body">',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown(
-            f'<div class="joseph-monologue">'
-            f'<div class="joseph-monologue-label">📢 OPENING MONOLOGUE</div>'
-            f'<div class="joseph-monologue-text">{_html.escape(opening_text)}</div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
-        # ─────────────────────────────────────────────────────
         # Run Joseph full analysis on top 20 by edge
+        # (computed BEFORE the monologue so counts & picks match)
         # ─────────────────────────────────────────────────────
         joseph_results = st.session_state.get("joseph_results", [])
         if not joseph_results and analysis_results:
@@ -1260,6 +1238,30 @@ def render_joseph_live_desk(
             joseph_results = computed
             st.session_state["joseph_results"] = joseph_results
             progress_placeholder.empty()
+
+        # ─────────────────────────────────────────────────────
+        # SEGMENT 0 — Opening Monologue
+        # (uses joseph_results so numbers match KPI bar & picks)
+        # ─────────────────────────────────────────────────────
+        opening_text = ""
+        try:
+            opening_text = joseph_quick_take(joseph_results, teams_data, todays_games)
+        except Exception as exc:
+            _logger.warning("joseph_quick_take failed: %s", exc)
+            opening_text = "Good evening, everybody. The board is loaded tonight and I've got some STRONG takes for you."
+
+        st.markdown(
+            '<div class="joseph-desk-body">',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f'<div class="joseph-monologue">'
+            f'<div class="joseph-monologue-label">📢 OPENING MONOLOGUE</div>'
+            f'<div class="joseph-monologue-text">{_html.escape(opening_text)}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
         # ─────────────────────────────────────────────────────
         # KPI Summary Bar
