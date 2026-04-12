@@ -5,6 +5,23 @@
 # CONNECTS TO: tracking/bet_tracker.py, tracking/database.py
 # LAYER: 8 — Joseph Bet Tracker Integration
 # ============================================================
+"""Connect Joseph M. Smith's analysis picks to the bet tracking system.
+
+Logs Joseph's picks to the database, retrieves his historical track
+record, and calculates win-rate / accuracy metrics per verdict tier
+(SMASH, LEAN) and for override calls.
+
+Functions
+---------
+joseph_auto_log_bets
+    Persist Joseph's picks from a completed analysis run.
+joseph_get_track_record
+    Aggregate win/loss/pending stats and ROI estimate.
+joseph_get_accuracy_by_verdict
+    Break down accuracy by verdict tier.
+joseph_get_override_accuracy
+    Measure how often Joseph's overrides beat the model.
+"""
 
 import datetime
 import logging

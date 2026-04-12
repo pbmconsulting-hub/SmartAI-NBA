@@ -5,6 +5,30 @@
 #          across sessions so he can reference yesterday's calls.
 # CONNECTS TO: tracking/database.py, engine/joseph_bets.py
 # ============================================================
+"""Joseph M. Smith's persistent daily diary.
+
+Reads and writes ``joseph_diary.json`` (in the same directory) to
+store daily win/loss records, mood, narrative arc, brag intensity,
+and streak information.  This lets Joseph reference yesterday's
+performance and adjust his tone across sessions.
+
+.. note::
+   ``joseph_diary.json`` is written at runtime and should be listed
+   in ``.gitignore`` to avoid noisy timestamp diffs.
+
+Functions
+---------
+diary_log_entry
+    Write or update today's diary entry.
+diary_get_entry
+    Retrieve a single day's entry.
+diary_get_week_summary
+    Aggregate the current week's stats and narrative arc.
+diary_get_yesterday_reference
+    Generate a self-referential comment about yesterday's results.
+diary_update_from_track_record
+    Sync today's diary from the bet-tracker track record.
+"""
 
 import json
 import os

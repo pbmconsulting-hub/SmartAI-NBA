@@ -8,6 +8,26 @@
 #              data/live_game_tracker.py (live box-score data),
 #              agent/live_persona.py (prompt consumption)
 # ============================================================
+"""Pillar 4 payload builder — compile game-state JSON for the LLM.
+
+Classifies the current game into one of eight canonical states
+(e.g. ``GAME_STATE_CASHED``, ``GAME_STATE_BLOWOUT``) and assembles
+a structured payload dict consumed by
+:func:`agent.live_persona.build_live_joseph_messages`.
+
+Classes
+-------
+GrudgeBuffer
+    Fixed-size deque storing the last *N* rants so the LLM prompt
+    can include them for anti-repetition.
+
+Functions
+---------
+classify_game_state
+    Determine the canonical game state from pace / shooting / score data.
+build_live_vibe_payload
+    Assemble the full payload dict for the LLM persona prompt.
+"""
 
 import logging
 from collections import deque

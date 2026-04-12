@@ -3,6 +3,12 @@
 # PURPOSE: Tests for utils/joseph_loading.py — Joseph's animated
 #          loading screen with rotating NBA fun facts.
 # ============================================================
+"""Tests for :mod:`utils.joseph_loading` — animated loading screen.
+
+Validates the NBA fun-facts pool (uniqueness, length, count),
+CSS animations, ``st.html()`` rendering path, and avatar fallback
+behaviour.
+"""
 
 import sys
 import os

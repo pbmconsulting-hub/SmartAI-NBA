@@ -5,6 +5,15 @@
 #   - engine.joseph_eval     (letter_grade, gravity, switchability, grade, compare)
 #   - engine.joseph_strategy (scheme detection, mismatch rules, game strategy)
 # ============================================================
+"""Tests for Joseph Foundation modules.
+
+Covers ``data.advanced_metrics`` (normalize, archetype classification,
+narrative tags, enrichment), ``engine.joseph_eval`` (grading, gravity
+score, switchability, comparison), ``engine.joseph_strategy`` (scheme
+detection, mismatch rules, game analysis), ``tracking.joseph_diary``
+(diary CRUD, week summary, yesterday reference), and
+``agent.live_persona`` (fragment pools, live reactions, streaming).
+"""
 
 import sys
 import os

@@ -3,6 +3,12 @@
 # PURPOSE: Tests for pages/helpers/joseph_live_desk.py
 #          (Joseph's Live Broadcast Desk helper — Layer 6)
 # ============================================================
+"""Tests for :mod:`pages.helpers.joseph_live_desk` — broadcast desk.
+
+Covers avatar loading, CSS generation, broadcast segment rendering,
+Dawg Board, override reports, nerd-stats HTML, and the main
+``render_joseph_live_desk()`` entry point.
+"""
 import sys, os, unittest
 from unittest.mock import patch, MagicMock
 
@@ -353,6 +359,227 @@ class TestPlayerNameLookupWiring(unittest.TestCase):
                       "enriched_players lookup must lowercase the key")
         self.assertIn(".strip()", snippet,
                       "enriched_players lookup must strip whitespace")
+
+
+# ============================================================
+# render_avatar_commentary
+# ============================================================
+
+
+class TestRenderAvatarCommentary(unittest.TestCase):
+    """Tests for render_avatar_commentary()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_avatar_commentary
+        self.fn = render_avatar_commentary
+
+    def test_returns_html_string(self):
+        html = self.fn("Great pick tonight!")
+        self.assertIsInstance(html, str)
+        self.assertIn("Great pick tonight!", html)
+
+    def test_default_size_small_class(self):
+        html = self.fn("Test")
+        self.assertIn("joseph-avatar-sm", html)
+
+    def test_large_size_class(self):
+        html = self.fn("Test", size=64)
+        self.assertIn("joseph-avatar", html)
+
+    def test_html_escaping(self):
+        html = self.fn("<script>alert(1)</script>")
+        self.assertNotIn("<script>", html)
+
+
+# ============================================================
+# render_confidence_gauge_svg
+# ============================================================
+
+
+class TestRenderConfidenceGaugeSvg(unittest.TestCase):
+    """Tests for render_confidence_gauge_svg()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_confidence_gauge_svg
+        self.fn = render_confidence_gauge_svg
+
+    def test_returns_svg_html(self):
+        html = self.fn(probability=75.0)
+        self.assertIsInstance(html, str)
+        self.assertIn("svg", html.lower())
+
+    def test_zero_probability(self):
+        html = self.fn(probability=0.0)
+        self.assertIsInstance(html, str)
+
+    def test_hundred_probability(self):
+        html = self.fn(probability=100.0)
+        self.assertIsInstance(html, str)
+
+    def test_with_ev_and_synergy(self):
+        html = self.fn(probability=60.0, ev=5.2, synergy=0.8)
+        self.assertIsInstance(html, str)
+
+
+# ============================================================
+# render_skeleton_cards
+# ============================================================
+
+
+class TestRenderSkeletonCards(unittest.TestCase):
+    """Tests for render_skeleton_cards()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_skeleton_cards
+        self.fn = render_skeleton_cards
+
+    def test_returns_html_string(self):
+        html = self.fn()
+        self.assertIsInstance(html, str)
+        self.assertIn("skeleton", html.lower())
+
+    def test_default_count_3(self):
+        html = self.fn()
+        self.assertEqual(html.count("studio-skeleton-card"), 3)
+
+    def test_custom_count(self):
+        html = self.fn(count=5)
+        self.assertEqual(html.count("studio-skeleton-card"), 5)
+
+    def test_zero_count(self):
+        html = self.fn(count=0)
+        self.assertNotIn("studio-skeleton-card", html)
+
+
+# ============================================================
+# render_outcome_badge
+# ============================================================
+
+
+class TestRenderOutcomeBadge(unittest.TestCase):
+    """Tests for render_outcome_badge()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_outcome_badge
+        self.fn = render_outcome_badge
+
+    def test_win_badge_green(self):
+        html = self.fn("Win")
+        self.assertIn("✅", html)
+
+    def test_loss_badge_red(self):
+        html = self.fn("Loss")
+        self.assertIn("❌", html)
+
+    def test_pending_badge(self):
+        html = self.fn("pending")
+        self.assertIn("⏳", html)
+
+    def test_push_badge(self):
+        html = self.fn("push")
+        self.assertIn("⏳", html)
+
+    def test_case_insensitive(self):
+        html_upper = self.fn("WIN")
+        html_lower = self.fn("win")
+        self.assertIn("✅", html_upper)
+        self.assertIn("✅", html_lower)
+
+    def test_unknown_defaults_pending(self):
+        html = self.fn("unknown-value")
+        self.assertIn("⏳", html)
+
+
+# ============================================================
+# render_empty_state
+# ============================================================
+
+
+class TestRenderEmptyState(unittest.TestCase):
+    """Tests for render_empty_state()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_empty_state
+        self.fn = render_empty_state
+
+    def test_returns_html_string(self):
+        html = self.fn("No picks yet")
+        self.assertIsInstance(html, str)
+        self.assertIn("No picks yet", html)
+
+    def test_with_cta(self):
+        html = self.fn("No picks yet", cta_text="Go to Picks", cta_page="/picks")
+        self.assertIn("Go to Picks", html)
+
+    def test_without_cta(self):
+        html = self.fn("Empty")
+        self.assertIsInstance(html, str)
+
+
+# ============================================================
+# render_verdict_heatmap_html
+# ============================================================
+
+
+class TestRenderVerdictHeatmapHtml(unittest.TestCase):
+    """Tests for render_verdict_heatmap_html()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import render_verdict_heatmap_html
+        self.fn = render_verdict_heatmap_html
+
+    def test_empty_results(self):
+        html = self.fn([])
+        self.assertIsInstance(html, str)
+
+    def test_single_smash(self):
+        html = self.fn([{"verdict": "SMASH"}])
+        self.assertIn("SMASH", html)
+
+    def test_multiple_verdicts(self):
+        results = [
+            {"verdict": "SMASH"},
+            {"verdict": "LEAN"},
+            {"verdict": "LEAN"},
+            {"verdict": "FADE"},
+        ]
+        html = self.fn(results)
+        self.assertIn("SMASH", html)
+        self.assertIn("LEAN", html)
+        self.assertIn("FADE", html)
+
+    def test_missing_verdict_key(self):
+        html = self.fn([{"player": "LeBron"}])
+        self.assertIsInstance(html, str)
+
+
+# ============================================================
+# get_joseph_avatar_for_vibe
+# ============================================================
+
+
+class TestGetJosephAvatarForVibe(unittest.TestCase):
+    """Tests for get_joseph_avatar_for_vibe()."""
+
+    def setUp(self):
+        from pages.helpers.joseph_live_desk import get_joseph_avatar_for_vibe
+        self.fn = get_joseph_avatar_for_vibe
+
+    def test_returns_string(self):
+        result = self.fn("Panic")
+        self.assertIsInstance(result, str)
+
+    def test_victory_vibe(self):
+        result = self.fn("Victory")
+        self.assertIsInstance(result, str)
+
+    def test_empty_vibe(self):
+        result = self.fn("")
+        self.assertIsInstance(result, str)
+
+    def test_unknown_vibe(self):
+        result = self.fn("Unknown")
+        self.assertIsInstance(result, str)
 
 
 if __name__ == "__main__":
