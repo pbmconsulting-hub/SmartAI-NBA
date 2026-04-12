@@ -1,9 +1,10 @@
 # ============================================================
-# FILE: pages/9_📡_Data_Feed.py
-# PURPOSE: Streamlit page — data refresh control panel.
-#          Consolidated "Workflow Wizard" UI with readiness
-#          scoring, activity log, pre-flight checks, and
-#          export / explorer tools.
+# FILE: pages/9_📡_Smart_NBA_Data.py
+# PURPOSE: Streamlit page — Smart NBA Data hub.
+#          Consolidated data refresh control panel with readiness
+#          scoring, activity log, pre-flight checks, player stats,
+#          stat leaders, team stats, standings, playoff picture,
+#          and export / explorer tools.
 # ============================================================
 
 import datetime
@@ -51,7 +52,7 @@ except Exception:
 
 # ── Page config ────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Data Feed — SmartBetPro NBA",
+    page_title="Smart NBA Data — SmartBetPro NBA",
     page_icon="📡",
     layout="wide",
 )
@@ -73,7 +74,7 @@ st.markdown(get_data_feed_css(), unsafe_allow_html=True)
 
 # ── Joseph M. Smith Hero Banner + Floating Widget ─────────────
 from utils.components import inject_joseph_floating, render_joseph_hero_banner
-st.session_state["joseph_page_context"] = "page_data_feed"
+st.session_state["joseph_page_context"] = "page_smart_nba_data"
 render_joseph_hero_banner()
 inject_joseph_floating()
 
@@ -240,14 +241,15 @@ def _compute_readiness():
 # ============================================================
 
 st.markdown(get_neural_header_html(
-    "📡 DATA FEED",
-    "REAL-TIME NBA DATA PIPELINE • SPORTSBOOK PROPS • ETL ENGINE"
+    "📡 SMART NBA DATA",
+    "REAL-TIME NBA DATA PIPELINE • PLAYER STATS • STANDINGS • STAT LEADERS • SPORTSBOOK PROPS"
 ), unsafe_allow_html=True)
 
 st.markdown(
     '<div style="text-align:center;color:rgba(192,208,232,0.60);font-size:0.88rem;'
     'margin:-12px 0 16px;line-height:1.6;">'
-    'Pull real, up-to-date NBA stats and player prop lines from '
+    'Your complete NBA data hub — pull real-time stats, browse league leaders, '
+    'view standings, playoff picture, and live prop lines from '
     '<span style="color:#00ff9d;font-weight:600;">PrizePicks</span>, '
     '<span style="color:#ffcc00;font-weight:600;">Underdog Fantasy</span>, and '
     '<span style="color:#00a0ff;font-weight:600;">DraftKings Pick6</span>. '
@@ -257,17 +259,21 @@ st.markdown(
 
 with st.expander("📖 How to Use This Page", expanded=False):
     st.markdown("""
-    ### Data Feed — Keep Your Data Fresh
+    ### Smart NBA Data — Your Complete NBA Data Hub
     
-    The Data Feed connects to **live NBA data sources** to keep your analysis accurate and current.
+    Smart NBA Data connects to **live NBA data sources** to keep your analysis accurate and current.
+    Browse player stats, stat leaders, team stats, standings, and the playoff picture — all in one place.
     
     **Recommended Daily Workflow**
     1. **Quick Setup tab** → Click "One-Click Full Setup" or "Smart ETL Update"
     2. **Props & Enrichment tab** → Load live prop lines from sportsbooks
-    3. Check the **Session Readiness** score at the top — aim for 80%+
+    3. **NBA Data Hub tab** → Browse player stats, stat leaders, team stats, standings & playoff picture
+    4. Check the **Session Readiness** score at the top — aim for 80%+
     
     **Data Sources**
     - Real-time NBA player stats, team metrics, and game logs
+    - League leaders across all stat categories
+    - Conference standings and playoff picture
     - Live odds from PrizePicks, Underdog Fantasy, and DraftKings Pick6
     
     💡 **Pro Tips:**
@@ -360,10 +366,11 @@ st.markdown(
 if "update_action" not in st.session_state:
     st.session_state["update_action"] = None
 
-tab_quick, tab_advanced, tab_props = st.tabs([
+tab_quick, tab_advanced, tab_props, tab_nba_data = st.tabs([
     "⚡ Quick Setup",
     "🔧 Advanced",
     "📊 Props & Enrichment",
+    "🏀 NBA Data Hub",
 ])
 
 
@@ -836,6 +843,343 @@ with tab_props:
             st.rerun()
 
 
+# ── TAB 4: NBA Data Hub ──────────────────────────────────────
+with tab_nba_data:
+    st.markdown(
+        '<div style="color:rgba(192,208,232,0.65);font-size:0.88rem;margin-bottom:12px;">'
+        'Browse live NBA data — player stats, stat leaders, team stats, conference standings, '
+        'and the playoff picture.</div>',
+        unsafe_allow_html=True,
+    )
+
+    _nba_sub_tab1, _nba_sub_tab2, _nba_sub_tab3, _nba_sub_tab4, _nba_sub_tab5 = st.tabs([
+        "👤 Player Stats",
+        "🏆 Stat Leaders",
+        "🏟️ Team Stats",
+        "📊 Standings",
+        "🏀 Playoff Picture",
+    ])
+
+    # ── Sub-Tab: Player Stats ────────────────────────────────
+    with _nba_sub_tab1:
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">👤 PLAYER STATS</div>'
+            '<div class="df-section-sub">Current season averages for all loaded players</div>',
+            unsafe_allow_html=True,
+        )
+
+        _ps_players = load_players_data()
+        if _ps_players:
+            # Search / filter
+            _ps_search = st.text_input("🔍 Search player by name:", key="nba_hub_player_search")
+            _ps_filtered = _ps_players
+            if _ps_search:
+                _ps_filtered = [
+                    p for p in _ps_players
+                    if _ps_search.lower() in p.get("name", "").lower()
+                ]
+
+            # Sort options
+            _ps_sort_col, _ps_sort_dir = st.columns([2, 1])
+            with _ps_sort_col:
+                _ps_sort = st.selectbox(
+                    "Sort by:",
+                    ["points_avg", "rebounds_avg", "assists_avg", "steals_avg", "blocks_avg",
+                     "threes_avg", "minutes_avg", "name"],
+                    index=0,
+                    key="nba_hub_player_sort",
+                )
+            with _ps_sort_dir:
+                _ps_dir = st.selectbox("Order:", ["Descending", "Ascending"], key="nba_hub_player_dir")
+
+            _ps_reverse = _ps_dir == "Descending"
+            try:
+                _ps_filtered = sorted(
+                    _ps_filtered,
+                    key=lambda p: float(p.get(_ps_sort, 0) or 0) if _ps_sort != "name" else p.get("name", "").lower(),
+                    reverse=_ps_reverse if _ps_sort != "name" else not _ps_reverse,
+                )
+            except (ValueError, TypeError):
+                pass
+
+            # Build display table
+            _ps_rows = []
+            for _p in _ps_filtered[:100]:
+                _ps_rows.append({
+                    "Player": _p.get("name", ""),
+                    "Team": _p.get("team", ""),
+                    "GP": _p.get("games_played", ""),
+                    "MIN": _p.get("minutes_avg", ""),
+                    "PTS": _p.get("points_avg", ""),
+                    "REB": _p.get("rebounds_avg", ""),
+                    "AST": _p.get("assists_avg", ""),
+                    "STL": _p.get("steals_avg", ""),
+                    "BLK": _p.get("blocks_avg", ""),
+                    "3PM": _p.get("threes_avg", ""),
+                    "TOV": _p.get("turnovers_avg", ""),
+                    "FG%": _p.get("fg_pct", ""),
+                })
+            if _ps_rows:
+                st.dataframe(_ps_rows, hide_index=True, use_container_width=True)
+                st.caption(f"Showing {len(_ps_rows)} of {len(_ps_filtered)} players (max 100).")
+            elif _ps_search:
+                st.info(f"No players matching '{_ps_search}'.")
+        else:
+            st.info("No player data loaded yet. Use the **Quick Setup** tab to pull player stats.")
+
+    # ── Sub-Tab: Stat Leaders ────────────────────────────────
+    with _nba_sub_tab2:
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">🏆 LEAGUE STAT LEADERS</div>'
+            '<div class="df-section-sub">Top performers across key statistical categories</div>',
+            unsafe_allow_html=True,
+        )
+
+        _sl_players = load_players_data()
+        if _sl_players:
+            _LEADER_CATEGORIES = [
+                ("points_avg", "🔥 Scoring Leaders", "PTS"),
+                ("rebounds_avg", "💪 Rebounding Leaders", "REB"),
+                ("assists_avg", "🎯 Assist Leaders", "AST"),
+                ("steals_avg", "🖐️ Steals Leaders", "STL"),
+                ("blocks_avg", "🚫 Blocks Leaders", "BLK"),
+                ("threes_avg", "🎯 Three-Point Leaders", "3PM"),
+            ]
+
+            _sl_top_n = st.slider("Show top N players:", min_value=5, max_value=25, value=10, key="nba_hub_leaders_n")
+
+            for _cat_key, _cat_title, _cat_abbr in _LEADER_CATEGORIES:
+                # Sort and get top N
+                _sl_sorted = sorted(
+                    [p for p in _sl_players if float(p.get(_cat_key, 0) or 0) > 0],
+                    key=lambda p: float(p.get(_cat_key, 0) or 0),
+                    reverse=True,
+                )[:_sl_top_n]
+
+                if _sl_sorted:
+                    with st.expander(_cat_title, expanded=False):
+                        _sl_rows = []
+                        for _rank, _p in enumerate(_sl_sorted, 1):
+                            _sl_rows.append({
+                                "Rank": _rank,
+                                "Player": _p.get("name", ""),
+                                "Team": _p.get("team", ""),
+                                _cat_abbr: _p.get(_cat_key, ""),
+                                "GP": _p.get("games_played", ""),
+                                "MIN": _p.get("minutes_avg", ""),
+                            })
+                        st.dataframe(_sl_rows, hide_index=True, use_container_width=True)
+        else:
+            st.info("No player data loaded yet. Use the **Quick Setup** tab to pull player stats.")
+
+    # ── Sub-Tab: Team Stats ──────────────────────────────────
+    with _nba_sub_tab3:
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">🏟️ TEAM STATS</div>'
+            '<div class="df-section-sub">Current season team metrics and performance data</div>',
+            unsafe_allow_html=True,
+        )
+
+        _ts_teams = load_teams_data()
+        if _ts_teams:
+            _ts_sort = st.selectbox(
+                "Sort by:",
+                ["team_name", "pace", "ortg", "drtg", "net_rating", "wins", "losses"],
+                index=0,
+                key="nba_hub_team_sort",
+            )
+            _ts_dir = st.selectbox("Order:", ["Ascending", "Descending"], key="nba_hub_team_dir")
+            _ts_reverse = _ts_dir == "Descending"
+
+            try:
+                _ts_sorted = sorted(
+                    _ts_teams,
+                    key=lambda t: (
+                        float(t.get(_ts_sort, 0) or 0) if _ts_sort != "team_name"
+                        else t.get("team_name", "").lower()
+                    ),
+                    reverse=_ts_reverse if _ts_sort != "team_name" else not _ts_reverse,
+                )
+            except (ValueError, TypeError):
+                _ts_sorted = _ts_teams
+
+            _ts_rows = []
+            for _t in _ts_sorted:
+                _ts_rows.append({
+                    "Team": _t.get("team_name", "") or _t.get("abbreviation", ""),
+                    "Abbrev": _t.get("abbreviation", ""),
+                    "W": _t.get("wins", ""),
+                    "L": _t.get("losses", ""),
+                    "Pace": _t.get("pace", ""),
+                    "ORTG": _t.get("ortg", ""),
+                    "DRTG": _t.get("drtg", ""),
+                    "Net Rtg": _t.get("net_rating", ""),
+                    "FG%": _t.get("fg_pct", ""),
+                    "3P%": _t.get("fg3_pct", ""),
+                    "FT%": _t.get("ft_pct", ""),
+                    "REB": _t.get("reb", ""),
+                    "AST": _t.get("ast", ""),
+                    "TOV": _t.get("tov", ""),
+                })
+            if _ts_rows:
+                st.dataframe(_ts_rows, hide_index=True, use_container_width=True)
+                st.caption(f"{len(_ts_rows)} teams loaded.")
+        else:
+            st.info("No team data loaded yet. Use the **Quick Setup** tab to pull team stats.")
+
+    # ── Sub-Tab: Standings ───────────────────────────────────
+    with _nba_sub_tab4:
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">📊 NBA STANDINGS</div>'
+            '<div class="df-section-sub">Conference standings with W-L records, streaks, and rankings</div>',
+            unsafe_allow_html=True,
+        )
+
+        _st_data = st.session_state.get("league_standings", [])
+        if not _st_data:
+            # Try loading from data service
+            try:
+                from data.nba_data_service import get_standings as _hub_get_standings
+                _st_data = _hub_get_standings()
+                if _st_data:
+                    st.session_state["league_standings"] = _st_data
+            except Exception:
+                pass
+
+        if _st_data:
+            _st_east = [t for t in _st_data if "east" in str(t.get("conference", "")).lower()]
+            _st_west = [t for t in _st_data if "west" in str(t.get("conference", "")).lower()]
+            _st_other = [t for t in _st_data if t not in _st_east and t not in _st_west]
+            if _st_other:
+                _st_east += _st_other
+
+            def _hub_standings_table(teams_list, title):
+                if not teams_list:
+                    return
+                st.markdown(f"**{title}**")
+                rows = []
+                for t in sorted(teams_list, key=lambda x: x.get("conference_rank", 99)):
+                    w = t.get("wins", 0)
+                    l_val = t.get("losses", 0)
+                    rows.append({
+                        "Rank": t.get("conference_rank", "—"),
+                        "Team": t.get("team_abbreviation", "") or t.get("team_name", ""),
+                        "W": w, "L": l_val,
+                        "W%": f"{t.get('win_pct', 0):.3f}",
+                        "GB": f"{t.get('games_back', 0):.1f}" if t.get("games_back") else "—",
+                        "Home": f"{t.get('home_wins', 0)}-{t.get('home_losses', 0)}",
+                        "Away": f"{t.get('away_wins', 0)}-{t.get('away_losses', 0)}",
+                        "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        "Streak": t.get("streak", ""),
+                    })
+                st.dataframe(rows, hide_index=True, use_container_width=True)
+
+            _st_col_e, _st_col_w = st.columns(2)
+            with _st_col_e:
+                _hub_standings_table(_st_east, "🏀 Eastern Conference")
+            with _st_col_w:
+                _hub_standings_table(_st_west, "🏀 Western Conference")
+        else:
+            st.info(
+                "No standings loaded yet. Click **📊 Refresh Standings & News** "
+                "in the Advanced tab, or run **One-Click Full Setup**."
+            )
+
+    # ── Sub-Tab: Playoff Picture ─────────────────────────────
+    with _nba_sub_tab5:
+        st.markdown(
+            '<div class="df-section-head" style="font-size:0.95rem;">🏀 PLAYOFF PICTURE</div>'
+            '<div class="df-section-sub">Playoff seedings, play-in tournament positions, and elimination status</div>',
+            unsafe_allow_html=True,
+        )
+
+        _pp_data = st.session_state.get("league_standings", [])
+        if not _pp_data:
+            try:
+                from data.nba_data_service import get_standings as _pp_get_standings
+                _pp_data = _pp_get_standings()
+                if _pp_data:
+                    st.session_state["league_standings"] = _pp_data
+            except Exception:
+                pass
+
+        if _pp_data:
+            _pp_east = sorted(
+                [t for t in _pp_data if "east" in str(t.get("conference", "")).lower()],
+                key=lambda x: x.get("conference_rank", 99),
+            )
+            _pp_west = sorted(
+                [t for t in _pp_data if "west" in str(t.get("conference", "")).lower()],
+                key=lambda x: x.get("conference_rank", 99),
+            )
+
+            def _playoff_section(teams_list, conf_name):
+                if not teams_list:
+                    return
+                st.markdown(f"### {conf_name}")
+
+                # Playoff-locked (seeds 1-6)
+                _locked = [t for t in teams_list if t.get("conference_rank", 99) <= 6]
+                _playin = [t for t in teams_list if 7 <= t.get("conference_rank", 99) <= 10]
+                _out = [t for t in teams_list if t.get("conference_rank", 99) > 10]
+
+                if _locked:
+                    st.markdown("**✅ Playoff Seeds (1-6)**")
+                    _lock_rows = []
+                    for t in _locked:
+                        _lock_rows.append({
+                            "Seed": t.get("conference_rank", ""),
+                            "Team": t.get("team_abbreviation", "") or t.get("team_name", ""),
+                            "W": t.get("wins", 0),
+                            "L": t.get("losses", 0),
+                            "W%": f"{t.get('win_pct', 0):.3f}",
+                            "Streak": t.get("streak", ""),
+                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        })
+                    st.dataframe(_lock_rows, hide_index=True, use_container_width=True)
+
+                if _playin:
+                    st.markdown("**🔄 Play-In Tournament (7-10)**")
+                    _pi_rows = []
+                    for t in _playin:
+                        _pi_rows.append({
+                            "Seed": t.get("conference_rank", ""),
+                            "Team": t.get("team_abbreviation", "") or t.get("team_name", ""),
+                            "W": t.get("wins", 0),
+                            "L": t.get("losses", 0),
+                            "W%": f"{t.get('win_pct', 0):.3f}",
+                            "Streak": t.get("streak", ""),
+                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        })
+                    st.dataframe(_pi_rows, hide_index=True, use_container_width=True)
+
+                if _out:
+                    st.markdown("**❌ Lottery Bound (11+)**")
+                    _out_rows = []
+                    for t in _out:
+                        _out_rows.append({
+                            "Seed": t.get("conference_rank", ""),
+                            "Team": t.get("team_abbreviation", "") or t.get("team_name", ""),
+                            "W": t.get("wins", 0),
+                            "L": t.get("losses", 0),
+                            "W%": f"{t.get('win_pct', 0):.3f}",
+                            "Streak": t.get("streak", ""),
+                            "L10": t.get("last_10", f"{t.get('last_10_wins', 0)}-{t.get('last_10_losses', 0)}"),
+                        })
+                    st.dataframe(_out_rows, hide_index=True, use_container_width=True)
+
+            _pp_col_e, _pp_col_w = st.columns(2)
+            with _pp_col_e:
+                _playoff_section(_pp_east, "🏀 Eastern Conference")
+            with _pp_col_w:
+                _playoff_section(_pp_west, "🏀 Western Conference")
+        else:
+            st.info(
+                "No standings data available for playoff picture. Click **📊 Refresh Standings & News** "
+                "in the Advanced tab, or run **One-Click Full Setup**."
+            )
+
+
 # ============================================================
 # SECTION: Execute the Selected Action
 # ============================================================
@@ -1113,7 +1457,7 @@ if current_action:
                     total_count = len(scraped_data)
 
                     if total_count == 0:
-                        st.warning("⚠️ 0 injuries found — data feed may be temporarily unavailable.")
+                        st.warning("⚠️ 0 injuries found — data source may be temporarily unavailable.")
                     else:
                         st.success(
                             f"✅ **Injury report refreshed** ({_now_str})  \n"

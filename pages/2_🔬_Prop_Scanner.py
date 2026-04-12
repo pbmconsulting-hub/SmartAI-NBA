@@ -280,7 +280,7 @@ elif _SPORTSBOOK_SERVICE_AVAILABLE:
                         f"⚠️ **{len(_missing)} player(s)** from platform props are not in your "
                         f"local database: {', '.join(_missing[:5])}"
                         + (f" and {len(_missing) - 5} more" if len(_missing) > 5 else "")
-                        + ". Run a **Smart Update** on the 📡 Data Feed page to add their stats."
+                        + ". Run a **Smart Update** on the 📡 Smart NBA Data page to add their stats."
                     )
                 st.rerun()  # Refresh so the current_props table shows the new data
             else:
@@ -680,7 +680,7 @@ if _display_props_enriched:
                 save_props_to_session(saved_props, st.session_state)
                 st.success(f"Loaded {len(saved_props)} props from props.csv!")
             else:
-                st.info("No props found. Go to **📡 Data Feed** to load live data first.")
+                st.info("No props found. Go to **📡 Smart NBA Data** to load live data first.")
             st.rerun()
 
     # Roster validation table

@@ -518,7 +518,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Sharpe ratio > 1.0 indicates consistent profitability
     
     💡 **Pro Tips:**
-    - Run "Refresh Game Logs" on the Data Feed page first to load historical data
+    - Run "Refresh Game Logs" on the Smart NBA Data page first to load historical data
     - Use **A/B Comparison Mode** to test different edge thresholds side-by-side
     - Use date range filtering to analyze specific stretches (post All-Star, playoffs, etc.)
     - Export results to CSV for deeper Excel analysis
@@ -735,7 +735,7 @@ if refresh_hist_btn and _HIST_REFRESH_AVAILABLE:
         )
     else:
         st.info(
-            "ℹ️ No game logs retrieved. This typically means the data feed is "
+            "ℹ️ No game logs retrieved. This typically means the data source is "
             "temporarily unavailable, or players don't have IDs in the loaded data."
         )
 

@@ -23,7 +23,7 @@ _PAGE_FILES = [
     ("pages/6_🧬_Entry_Builder.py", "📖 How to Use"),
     ("pages/7_🎙️_The_Studio.py", "📖 How to Use"),
     ("pages/8_🛡️_Risk_Shield.py", "📖 How to Use"),
-    ("pages/9_📡_Data_Feed.py", "📖 How to Use"),
+    ("pages/9_📡_Smart_NBA_Data.py", "📖 How to Use"),
     ("pages/10_🗺️_Correlation_Matrix.py", "📖 How to Use"),
     ("pages/11_📈_Bet_Tracker.py", "📖 How to Use"),
     ("pages/12_📊_Proving_Grounds.py", "📖 How to Use"),

@@ -1905,19 +1905,19 @@ try:
         if _teams_age_days >= 7:
             _consolidated_warnings.append(
                 f"Team stats are **{_teams_age_days} days old**. "
-                f"Go to **📡 Data Feed → Smart Update** to refresh."
+                f"Go to **📡 Smart NBA Data → Smart Update** to refresh."
             )
         elif _teams_age_days >= 3:
             _consolidated_warnings.append(
                 f"Team stats last updated {_teams_age_days} days ago. "
-                f"Consider refreshing on the Data Feed page."
+                f"Consider refreshing on the Smart NBA Data page."
             )
     else:
         from data.data_manager import load_teams_data as _load_teams
         _teams_data_check = _load_teams()
         if not _teams_data_check:
             _consolidated_warnings.append(
-                "No team stats found. Go to **📡 Data Feed → Smart Update** "
+                "No team stats found. Go to **📡 Smart NBA Data → Smart Update** "
                 "to load team data for accurate analysis."
             )
 except Exception as _exc:
@@ -2071,7 +2071,7 @@ _nav_row3 = [
     ("💦", "Live Sweat", "Track bets in real-time", "pages/0_💦_Live_Sweat.py"),
     ("📈", "Bet Tracker", "Log results, track ROI", "pages/11_📈_Bet_Tracker.py"),
     ("📊", "Proving Grounds", "Validate model accuracy", "pages/12_📊_Proving_Grounds.py"),
-    ("📡", "Data Feed", "Update player/team data", "pages/9_📡_Data_Feed.py"),
+    ("📡", "Smart NBA Data", "Player stats, standings & more", "pages/9_📡_Smart_NBA_Data.py"),
     ("⚙️", "Settings", "Tune engine parameters", "pages/13_⚙️_Settings.py"),
     ("💎", "Premium", "Unlock everything", "pages/14_💎_Subscription_Level.py"),
 ]
@@ -2222,7 +2222,7 @@ with st.expander("📊 Status Dashboard", expanded=False):
         else:
             st.success("✅ All data files present and fresh.")
 
-        st.caption("Go to **📡 Data Feed** to refresh data.")
+        st.caption("Go to **📡 Smart NBA Data** to refresh data.")
     except Exception as _exc:
         logging.getLogger(__name__).warning(f"[App] Setup step failed: {_exc}")
 
@@ -2247,7 +2247,7 @@ with st.expander("📊 Status Dashboard", expanded=False):
         )
     else:
         st.info(
-            "📊 **No live data loaded yet** — Go to the **📡 Data Feed** page to pull "
+            "📊 **No live data loaded yet** — Go to the **📡 Smart NBA Data** page to pull "
             "real, up-to-date NBA stats for accurate predictions!"
         )
 

@@ -1920,7 +1920,7 @@ def get_data_health_report():
             pass
 
     if players_count == 0:
-        warnings_list.append("No players loaded — run Data Feed to populate")
+        warnings_list.append("No players loaded — run Smart NBA Data to populate")
     if teams_count < 30:
         warnings_list.append(f"Only {teams_count}/30 teams loaded")
 
@@ -1950,7 +1950,7 @@ def get_teams_staleness_warning():
     teams_ts_str = timestamps.get("teams")
 
     if not teams_ts_str:
-        return "⚠️ teams.csv has never been updated — run Data Feed → Fetch Team Stats."
+        return "⚠️ teams.csv has never been updated — run Smart NBA Data → Fetch Team Stats."
 
     try:
         teams_ts = datetime.datetime.fromisoformat(str(teams_ts_str))
@@ -1961,12 +1961,12 @@ def get_teams_staleness_warning():
         if age_days >= _STALE_DAYS:
             return (
                 f"🔴 Team data is **{age_days:.0f} days old** — seriously stale! "
-                "Go to 📡 Data Feed → Fetch Team Stats to refresh defensive ratings."
+                "Go to 📡 Smart NBA Data → Fetch Team Stats to refresh defensive ratings."
             )
         if age_days >= _WARN_DAYS:
             return (
                 f"🟡 Team data is **{age_days:.0f} days old**. "
-                "Consider refreshing via 📡 Data Feed → Fetch Team Stats."
+                "Consider refreshing via 📡 Smart NBA Data → Fetch Team Stats."
             )
     except Exception:
         return "⚠️ Could not determine team data age — check last_updated.json."

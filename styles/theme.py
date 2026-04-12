@@ -8217,17 +8217,17 @@ def get_player_trading_card_html(
 
 
 # ============================================================
-# SECTION: Data Feed — Premium Glassmorphic Card / Widget Helpers
-# Used by pages/9_📡_Data_Feed.py.  Matches the app-wide
+# SECTION: Smart NBA Data — Premium Glassmorphic Card / Widget Helpers
+# Used by pages/9_📡_Smart_NBA_Data.py.  Matches the app-wide
 # "AI Neural Network Lab" dark theme with glassmorphism,
 # animated glows, and Orbitron / JetBrains Mono typography.
 # ============================================================
 
 
 def get_data_feed_css() -> str:
-    """Return page-specific CSS for the Data Feed page."""
+    """Return page-specific CSS for the Smart NBA Data page."""
     return """<style>
-/* ── Data Feed page animations ───────────────────────────── */
+/* ── Smart NBA Data page animations ──────────────────────── */
 @keyframes df-pulse-glow {
     0%, 100% { box-shadow: 0 0 8px rgba(0,240,255,0.15), 0 4px 20px rgba(0,0,0,0.3); }
     50%      { box-shadow: 0 0 20px rgba(0,240,255,0.30), 0 4px 28px rgba(0,0,0,0.4); }
@@ -8483,7 +8483,7 @@ def get_data_feed_css() -> str:
 
 def get_action_card_html(title: str, description: str, gradient: str = "",
                          border_color: str = "", icon_color: str = "#00f0ff") -> str:
-    """Return a premium glassmorphic action card for Data Feed buttons."""
+    """Return a premium glassmorphic action card for Smart NBA Data buttons."""
     _safe_title = _html.escape(str(title))
     _safe_desc = str(description)
     _gradient_css = f"background:{gradient};" if gradient else ""
@@ -8614,5 +8614,5 @@ def get_preflight_checklist_html(checks: list[tuple[str, bool, str]]) -> str:
 
 
 # ============================================================
-# END SECTION: Data Feed — Premium Glassmorphic Card / Widget Helpers
+# END SECTION: Smart NBA Data — Premium Glassmorphic Card / Widget Helpers
 # ============================================================

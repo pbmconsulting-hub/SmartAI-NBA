@@ -526,7 +526,7 @@ with st.expander("📖 How to Use This Page", expanded=False):
     - Focus on Platinum and Gold tier picks for best results
     - Avoid picks with ⚠️ "should avoid" flags
     - Select picks to send to Entry Builder for parlay optimization
-    - Run **Smart Update** on the Data Feed page before each session for freshest data
+    - Run **Smart Update** on the Smart NBA Data page before each session for freshest data
     """)
 
 # ── Data Freshness Banner ─────────────────────────────────────
@@ -545,13 +545,13 @@ try:
         if _players_age_h > 48:
             st.error(
                 f"🚨 **Player data is {_players_age_h:.0f}h old!** "
-                "Go to **📡 Data Feed** → Smart Update to refresh. "
+                "Go to **📡 Smart NBA Data** → Smart Update to refresh. "
                 "Stale data severely reduces projection accuracy."
             )
         elif _players_age_h > 24:
             st.warning(
                 f"⚠️ **Player data is {_players_age_h:.0f}h old.** "
-                "Consider running a **Smart Update** on the Data Feed page for the most accurate projections."
+                "Consider running a **Smart Update** on the Smart NBA Data page for the most accurate projections."
             )
         elif _players_age_h < 2:
             st.success(
@@ -2447,7 +2447,7 @@ if analysis_results:
             st.warning(
                 f"⚠️ **{unmatched_unique_count} player(s) not found** in database — "
                 + _inline
-                + " — results may be less accurate. Run a **Smart Update** on the Data Feed page to refresh roster data."
+                + " — results may be less accurate. Run a **Smart Update** on the Smart NBA Data page to refresh roster data."
             )
             if _overflow > 0:
                 with st.expander(f"See all {unmatched_unique_count} unmatched players"):
@@ -2813,7 +2813,7 @@ if analysis_results:
             "Focus on Platinum and Gold tier picks for maximum confidence.",
             "Avoid props flagged on the avoid list or with active GTD designations.",
             "Use the Entry Strategy Matrix to build 2-, 3-, or 5-leg combos.",
-            "Confirm injury status via the 🔄 Data Feed before placing bets.",
+            "Confirm injury status via 📡 Smart NBA Data before placing bets.",
         ]
         st.markdown(
             get_qds_final_verdict_html(summary, recs),
