@@ -10,6 +10,7 @@ import json
 import os
 import datetime
 import logging
+import random
 
 try:
     from utils.logger import get_logger
@@ -141,12 +142,14 @@ def diary_get_week_summary() -> dict:
         week_losses += l
 
         if w > l:
+            # Winning day: extend win streak (positive) or reset from loss streak
             if last_result == "win":
                 streak += 1
             else:
                 streak = 1
                 last_result = "win"
         elif l > w:
+            # Losing day: extend loss streak (negative) or reset from win streak
             if last_result == "loss":
                 streak -= 1
             else:
@@ -230,7 +233,6 @@ def diary_get_yesterday_reference() -> str:
             f"Split day yesterday ({wins}-{losses}). Not bad, not great. Today we go ALL IN.",
         ]
 
-    import random
     return random.choice(lines)
 
 

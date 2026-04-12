@@ -3,6 +3,21 @@
 # PURPOSE: Game strategy analysis — scheme detection, mismatches, pace
 # CONNECTS TO: data/advanced_metrics.py, engine/joseph_eval.py
 # ============================================================
+"""Game-level strategy analysis for Joseph M. Smith's reasoning pipeline.
+
+Detects defensive schemes (switch, drop, hedge, blitz, zone), identifies
+archetype-vs-scheme mismatches, and builds game narratives with pace
+analysis and betting-angle suggestions.
+
+Functions
+---------
+detect_defensive_scheme
+    Classify a team's primary defensive scheme from team-level stats.
+apply_mismatch_rules
+    Find archetype-vs-scheme mismatches and return edge boosts.
+analyze_game_strategy
+    Full game analysis with pace, spread, blowout risk, and narrative.
+"""
 
 import logging
 import math
