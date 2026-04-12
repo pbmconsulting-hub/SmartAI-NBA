@@ -1979,7 +1979,11 @@ input:focus, textarea:focus, select:focus,
     }
 
     /* ─── Mobile images & media ───────────────────────────── */
-    img { max-width: 100% !important; height: auto !important; }
+    /* Exclude fixed-size headshot / avatar classes that rely on explicit
+       width+height for circular rendering (border-radius:50%). */
+    img:not(.qcm-headshot):not(.upc-headshot):not(.bet-card-headshot):not(.gm-card-headshot):not(.gm-modal-headshot):not(.joseph-welcome-avatar):not(.upc-joseph-avatar):not(.upc-joseph-resp-avatar):not(.qds-player-img):not(.sweat-card-headshot) {
+        max-width: 100% !important; height: auto !important;
+    }
     iframe { max-width: 100% !important; }
 
     /* ─── Page links (st.page_link) — larger tap targets ──── */
@@ -2139,6 +2143,122 @@ input:focus, textarea:focus, select:focus,
     }
     /* Font size slightly smaller in landscape to fit more */
     html, body, [class*="css"] { font-size: 13px !important; }
+
+    /* ─── QCM Cards (Quantum Analysis Matrix prop cards) ───── */
+    .qcm-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+        gap: 10px !important;
+    }
+    .qcm-card {
+        padding: 12px 12px !important;
+        border-radius: 10px !important;
+    }
+    .qcm-card-header { flex-wrap: wrap !important; gap: 5px !important; }
+    .qcm-player-name { font-size: 0.88rem !important; }
+    .qcm-tier-badge { font-size: 0.60rem !important; padding: 2px 5px !important; }
+    .qcm-stat-type { font-size: 0.70rem !important; margin-bottom: 6px !important; }
+    .qcm-headshot { width: 56px !important; height: 56px !important; }
+    .qcm-identity { gap: 8px !important; margin-bottom: 8px !important; }
+    .qcm-identity-name { font-size: 0.90rem !important; }
+    .qcm-safe-score-value { font-size: 1.1rem !important; }
+    .qcm-true-line-row { padding: 6px 8px !important; margin-bottom: 6px !important; }
+    .qcm-true-line-value { font-size: 1.05rem !important; }
+    .qcm-metrics { gap: 3px !important; }
+    .qcm-metric { min-width: 48px !important; padding: 4px 3px !important; }
+    .qcm-metric-val { font-size: 0.76rem !important; }
+    .qcm-metric-lbl { font-size: 0.54rem !important; }
+    .qcm-dist-row { gap: 3px !important; }
+    .qcm-dist-cell { padding: 3px 1px !important; }
+    .qcm-dist-val { font-size: 0.68rem !important; }
+    .qcm-dist-lbl { font-size: 0.48rem !important; }
+    .qcm-forces { gap: 4px !important; }
+    .qcm-forces-col { padding: 5px 6px !important; font-size: 0.66rem !important; }
+    .qcm-breakdown { margin: 4px 0 !important; }
+    .qcm-conf-bar-wrap { margin: 3px 0 8px !important; }
+    .qcm-bonus { padding: 6px 8px !important; }
+    .qcm-bonus-title { font-size: 0.66rem !important; }
+    .qcm-context-grid { gap: 4px !important; }
+    .qcm-context-card { padding: 6px 8px !important; }
+    .qcm-h-top, .qcm-h-bottom { gap: 6px !important; }
+    .qcm-prediction { font-size: 0.72rem !important; padding: 5px 8px !important; }
+
+    /* ─── QDS Cards (Game Report) ──────────────────────────── */
+    .qds-container { padding: 0 10px !important; }
+    .qds-report-header { padding: 16px 0 10px !important; }
+    .qds-collapsible { margin-bottom: 12px !important; }
+    .qds-collapsible-header { padding: 10px 14px !important; }
+    .qds-collapsible-title { font-size: 0.90rem !important; }
+    .qds-collapsible.open .qds-collapsible-content { padding: 12px !important; }
+    .qds-prop-card { padding: 14px !important; margin-bottom: 14px !important; }
+    .qds-player-img { width: 56px !important; height: 56px !important; }
+    .qds-player-name { font-size: 0.95rem !important; }
+    .qds-metrics-grid { gap: 8px !important; margin: 10px 0 !important; }
+    .qds-metric-item { padding: 10px !important; }
+    .qds-team-card { padding: 12px !important; }
+    .qds-game-teams { padding: 10px 14px !important; gap: 10px !important; }
+    .qds-team-logo { width: 32px !important; height: 32px !important; }
+    .qds-strategy-table,
+    .qds-prop-verdict { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+
+    /* ─── UPC Cards (Player Simulator) ────────────────────── */
+    .upc-card > summary { padding: 10px 14px !important; gap: 10px !important; }
+    .upc-headshot { width: 60px !important; height: 60px !important; }
+    .upc-player-name { font-size: 0.92rem !important; }
+    .upc-stat-pill { font-size: 0.62rem !important; padding: 2px 5px !important; }
+    .upc-body { padding: 0 14px 12px !important; }
+    .upc-joseph-row { padding: 8px 10px !important; gap: 8px !important; }
+    .upc-joseph-avatar { width: 32px !important; height: 32px !important; }
+    .upc-joseph-response { padding: 10px 12px !important; }
+    .upc-joseph-resp-avatar { width: 36px !important; height: 36px !important; }
+
+    /* ─── Game Modal Cards (gm-*) ─────────────────────────── */
+    .gm-player-card { padding: 12px 10px !important; border-radius: 10px !important; }
+    .gm-card-headshot { width: 56px !important; height: 56px !important; }
+    .gm-card-name { font-size: 0.88rem !important; }
+    .gm-modal-headshot { width: 80px !important; height: 80px !important; }
+    .gm-modal-vitals { gap: 14px !important; margin-bottom: 14px !important; }
+    .gm-season-bar { gap: 10px !important; margin: 10px 0 14px !important; }
+    .gm-season-metric .val { font-size: 1.1rem !important; }
+    .gm-market-grid { gap: 6px !important; }
+    .gm-market-cell { padding: 8px 10px !important; }
+    .gm-joseph-response { padding: 12px !important; }
+    .gm-joseph-response .gm-joseph-avatar { width: 40px !important; height: 40px !important; }
+
+    /* ─── Bet Tracker Cards ───────────────────────────────── */
+    .bet-card { padding: 12px !important; }
+    .bet-card-headshot { width: 36px !important; height: 36px !important; }
+
+    /* ─── QAM Helper Cards (Parlay, DFS, etc.) ────────────── */
+    .qam-parlay-card { padding: 12px 14px !important; }
+    .qam-parlay-pick { flex-wrap: wrap !important; gap: 4px !important; }
+    .qam-parlay-pick-edge { margin-left: 0 !important; }
+    .qam-parlay-stats { flex-wrap: wrap !important; gap: 10px !important; }
+    .qam-dfs-edge { padding: 8px 12px !important; }
+    .qam-tier-dist { padding: 10px 14px !important; }
+
+    /* ─── Neural Analysis Helpers ──────────────────────────── */
+    .nah-dist-row { gap: 4px !important; }
+    .nah-dist-cell { padding: 4px !important; }
+    .nah-forces-row { gap: 6px !important; }
+    .nah-force-col { padding: 6px 8px !important; }
+    .nah-breakdown { margin: 4px 0 !important; }
+    .nah-kelly-row { padding: 6px 8px !important; }
+
+    /* ─── Tables — horizontal scroll in landscape ─────────── */
+    .stDataFrame, [data-testid="stDataFrame"],
+    .comp-table, .qds-strategy-table,
+    .joseph-dawg-table, .joseph-override-table {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        max-width: 100% !important;
+    }
+
+    /* ─── Headshot / avatar images — preserve dimensions ──── */
+    img.qcm-headshot, img.upc-headshot, img.bet-card-headshot,
+    img.gm-card-headshot, img.gm-modal-headshot,
+    img.qds-player-img, img.sweat-card-headshot {
+        height: unset !important;
+    }
 }
 
 /* ─── Landscape — extra small phones (≤667px height typical) ── */
@@ -2160,6 +2280,42 @@ input:focus, textarea:focus, select:focus,
     }
     /* Hero / headers should be smaller */
     .neural-header-title { font-size: 1.1rem !important; }
+
+    /* ─── QCM — even more compact on tiny landscape ───────── */
+    .qcm-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+        gap: 8px !important;
+    }
+    .qcm-card { padding: 10px 10px !important; }
+    .qcm-headshot { width: 48px !important; height: 48px !important; }
+    .qcm-true-line-value { font-size: 0.95rem !important; }
+    .qcm-metric { min-width: 42px !important; }
+    .qcm-metric-val { font-size: 0.72rem !important; }
+    .qcm-forces { flex-direction: column !important; }
+
+    /* ─── QDS — extra-compact on tiny landscape ───────────── */
+    .qds-prop-card { padding: 10px !important; margin-bottom: 10px !important; }
+    .qds-player-img { width: 48px !important; height: 48px !important; }
+    .qds-collapsible-header { padding: 8px 10px !important; }
+
+    /* ─── UPC — extra-compact on tiny landscape ───────────── */
+    .upc-card > summary { padding: 8px 10px !important; }
+    .upc-headshot { width: 48px !important; height: 48px !important; }
+    .upc-body { padding: 0 10px 8px !important; }
+
+    /* ─── Game Modal — extra-compact on tiny landscape ────── */
+    .gm-player-card { padding: 10px 8px !important; }
+    .gm-card-headshot { width: 48px !important; height: 48px !important; }
+    .gm-modal-headshot { width: 64px !important; height: 64px !important; }
+    .gm-season-metric .val { font-size: 0.95rem !important; }
+
+    /* ─── Bet cards — tighter ─────────────────────────────── */
+    .bet-card { padding: 10px !important; }
+    .bet-card-headshot { width: 32px !important; height: 32px !important; }
+
+    /* ─── QAM — tighter ───────────────────────────────────── */
+    .qam-parlay-card { padding: 10px 12px !important; }
+    .qam-tier-dist { padding: 8px 10px !important; }
 }
 
 /* ─── Premium animated gradient border — Neural Header ─── */
