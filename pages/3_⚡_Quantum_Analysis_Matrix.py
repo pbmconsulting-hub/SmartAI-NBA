@@ -228,8 +228,8 @@ def _get_sim_cache() -> dict:
 # ---------------------------------------------------------------------------
 
 _MIN_IFRAME_HEIGHT = 600       # px — minimum even for a single player (must fit expanded card)
-_HEIGHT_PER_PLAYER = 520       # px — each player's collapsed card + generous buffer for expanded props
-_MAX_IFRAME_HEIGHT = 30000     # px — generous cap; no scrollbar inside iframes
+_HEIGHT_PER_PLAYER = 520       # px — collapsed card (~120px) + expanded props (~300px) + Joseph panel (~100px)
+_MAX_IFRAME_HEIGHT = 30000     # px — generous cap; no scrollbar inside iframes (supports ~57 players)
 _LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
@@ -286,7 +286,7 @@ _IFRAME_RESIZE_JS = (
     "}"
     "});"
     "h=Math.max(h,document.body.scrollHeight,document.documentElement.scrollHeight);"
-    "h=Math.ceil(h)+8;"  # +8px safety margin (increased from 4)
+    "h=Math.ceil(h)+8;"  # +8px safety margin — accounts for border-box rounding on mobile Safari
     # Ignore tiny height changes (< 8px) to prevent postMessage noise
     # from sub-pixel rendering differences during parent-page scroll.
     "if(Math.abs(h-lastH)<8)return;"
