@@ -31,23 +31,6 @@ st.set_page_config(
 # ─── Inject Global CSS Theme ──────────────────────────────────
 st.markdown(get_global_css(), unsafe_allow_html=True)
 
-# ─── App Logo — Smart Pick Pro ───────────────────────────────
-# Logo is rendered per-page only on key pages (Neural Analysis, Studio,
-# Live Games, Live Sweat, Bet Tracker) instead of globally.
-_ROOT_LOGO_PATH   = os.path.join(os.path.dirname(__file__), "Smart_Pick_Pro_Logo.png")
-_ASSETS_LOGO_PATH = os.path.join(os.path.dirname(__file__), "assets", "Smart_Pick_Pro_Logo.png")
-_LOGO_PATH = _ROOT_LOGO_PATH if os.path.exists(_ROOT_LOGO_PATH) else _ASSETS_LOGO_PATH
-
-
-@st.cache_data(show_spinner=False)
-def _load_logo_b64(path: str) -> str:
-    """Read the logo PNG and return a base64-encoded string (cached per session)."""
-    try:
-        with open(path, "rb") as _f:
-            return base64.b64encode(_f.read()).decode()
-    except Exception:
-        return ""
-
 # ─── Landing Page Theme CSS — page-level overrides ───────────
 st.markdown("""
 <style>
@@ -276,23 +259,9 @@ st.markdown("""
     color: #00ff9d;
     font-weight: 600;
 }
-.spp-hero-logo {
-    width: 88px !important;
-    max-width: 100%;
-    height: auto;
-    object-fit: contain;
-    border-radius: 50%;
-    box-shadow: 0 0 30px rgba(0,240,255,0.35), 0 0 80px rgba(0,240,255,0.10);
-    flex-shrink: 0;
-    animation: breatheGlow 3s ease-in-out infinite;
-    position: relative;
-    z-index: 1;
-    border: 2px solid rgba(0,240,255,0.15);
-}
 /* Responsive: stack on mobile */
 @media (max-width: 640px) {
     .hero-hud { flex-direction: column; text-align: center; padding: 32px 24px; gap: 24px; }
-    .spp-hero-logo { width: 88px !important; max-width: 100%; }
     .hero-tagline { font-size: 1.3rem; }
 }
 
@@ -1175,7 +1144,6 @@ st.markdown("""
 /* Phone (≤480px): single-column, tighter spacing */
 @media (max-width: 480px) {
     .hero-hud { flex-direction: column; text-align: center; padding: 22px 16px; gap: 16px; border-radius: 16px; }
-    .spp-hero-logo { width: 72px !important; }
     .hero-tagline { font-size: 1.2rem; }
     .hero-subtext { font-size: 0.78rem; }
     .section-header { font-size: 1.05rem !important; margin: 20px 0 4px 0; padding-bottom: 10px; }
@@ -1219,7 +1187,6 @@ st.markdown("""
     .hero-hud { padding: 18px 20px; gap: 14px; border-radius: 14px; }
     .hero-tagline { font-size: 1.2rem; }
     .hero-subtext { font-size: 0.78rem; }
-    .spp-hero-logo { width: 64px !important; }
     .section-header { font-size: 1.05rem !important; margin: 14px 0 4px 0 !important; padding-bottom: 6px; }
     .section-subheader { font-size: 0.76rem; margin-bottom: 10px; }
     .nav-card { padding: 12px 10px; border-radius: 10px; }
@@ -1399,13 +1366,6 @@ game_count_text = (
     else "🏟️ No games loaded yet"
 )
 
-# Embed logo using cached base64 load — root-level high-res version
-_logo_b64 = _load_logo_b64(_LOGO_PATH) if os.path.exists(_LOGO_PATH) else ""
-
-_logo_img_tag = (
-    f'<img src="data:image/png;base64,{_logo_b64}" class="spp-hero-logo" alt="Smart Pick Pro logo" />'
-    if _logo_b64 else ""
-)
 
 # Ambient floating orbs behind the page
 st.markdown("""
@@ -1419,7 +1379,6 @@ st.markdown("""
 st.markdown(f"""
 <div class="hero-hud lp-anim">
   <div class="hero-hud-inner-glow"></div>
-  {_logo_img_tag}
   <div class="hero-hud-text">
     <div class="hero-tagline">THE SMARTEST NBA PLAYER PROP ENGINE ONLINE</div>
     <div class="hero-subtext"><strong>Find Tonight's Best Bets in 60 Seconds.</strong> Every Pick Tells You Why.</div>
