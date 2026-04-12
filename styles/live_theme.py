@@ -835,12 +835,20 @@ def get_live_sweat_css() -> str:
         padding: 4px 10px;
         font-size: 1rem;
     }
+    /* Ticker horizontal scroll instead of overflow */
+    .espn-ticker-track {
+        -webkit-overflow-scrolling: touch;
+    }
 }
 @media (max-width: 480px) {
-    .espn-game-card { width: 180px; }
-    .espn-team-abbr { font-size: 0.82rem; }
-    .espn-team-score { font-size: 1rem; }
-    .sweat-stat-value { font-size: 1rem; }
+    .espn-game-card { width: 160px; padding: 8px 10px 6px; }
+    .espn-team-abbr { font-size: 0.78rem; }
+    .espn-team-score { font-size: 0.95rem; }
+    .sweat-stat-value { font-size: 0.95rem; }
+    .sweat-score-number { font-size: 2rem; }
+    .sweat-card { padding: 10px; border-radius: 10px; }
+    .sweat-card-headshot { width: 36px; height: 27px; }
+    .sweat-reaction-btn { padding: 3px 8px; font-size: 0.9rem; min-height: 44px; }
 }
 </style>"""
 

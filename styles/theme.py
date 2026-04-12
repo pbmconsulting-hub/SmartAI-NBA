@@ -274,28 +274,39 @@ footer { display: none !important; }
 
 /* Hide the Streamlit header bar but keep sidebar toggle accessible.
    On desktop (>768px) — full hide is safe because sidebar is always visible.
-   On mobile (≤768px) — make header invisible yet allow its children
-   (especially the sidebar toggle / hamburger button) to render. */
+   On mobile (≤768px) — keep header transparent but ensure the sidebar
+   toggle / hamburger button remains visible and tappable at all times. */
 @media (min-width: 769px) {
     header[data-testid="stHeader"] { display: none !important; }
 }
 @media (max-width: 768px) {
     header[data-testid="stHeader"] {
         background: transparent !important;
-        height: 0 !important;
-        min-height: 0 !important;
+        /* Keep minimal height so child elements (hamburger) remain in-flow */
+        height: 48px !important;
+        min-height: 48px !important;
+        max-height: 48px !important;
         padding: 0 !important;
         margin: 0 !important;
         border: none !important;
         box-shadow: none !important;
         overflow: visible !important;
+        /* Allow click-through except on interactive children */
         pointer-events: none !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9998 !important;
     }
-    /* Re-enable pointer events on the sidebar toggle so it's tappable */
+    /* Re-enable pointer events on ALL interactive header children */
     header[data-testid="stHeader"] button,
     header[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"],
-    header[data-testid="stHeader"] [data-testid="collapsedControl"] {
+    header[data-testid="stHeader"] [data-testid="collapsedControl"],
+    header[data-testid="stHeader"] [data-testid="stToolbar"],
+    header[data-testid="stHeader"] a {
         pointer-events: auto !important;
+        visibility: visible !important;
     }
 }
 
@@ -1764,6 +1775,16 @@ input:focus, textarea:focus, select:focus,
     /* Stack metrics in fewer columns on small screens */
     [data-testid="stMetricValue"] { font-size: 1.2rem !important; }
 
+    /* ─── Columns: wrap to 2-per-row on tablets ────────────── */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        min-width: calc(50% - 8px) !important;
+        flex: 1 1 calc(50% - 8px) !important;
+    }
+
     /* ─── Mobile Sidebar — overlay with proper collapse ──── */
     [data-testid="stSidebar"] {
         min-width: 0 !important;
@@ -1791,12 +1812,16 @@ input:focus, textarea:focus, select:focus,
     }
 
     /* ─── Hamburger toggle button — ALWAYS visible & touch-friendly ──── */
-    /* This is the critical fix: the button must be visible even when
-       the sidebar is collapsed so the user can re-open the menu. */
+    /* The button must be visible even when the sidebar is collapsed
+       so the user can re-open the menu.  position: fixed takes it
+       out of the header flow so height/overflow on the header don't
+       clip it.  We use broad selectors to cover Streamlit versions. */
     [data-testid="stSidebarCollapsedControl"],
     [data-testid="collapsedControl"],
     button[kind="header"],
-    [data-testid="stHeader"] button {
+    header[data-testid="stHeader"] button[kind="header"],
+    header[data-testid="stHeader"] [data-testid="stSidebarCollapsedControl"],
+    header[data-testid="stHeader"] > div > button {
         display: flex !important;
         visibility: visible !important;
         opacity: 1 !important;
@@ -1804,8 +1829,8 @@ input:focus, textarea:focus, select:focus,
         top: 10px !important;
         left: 10px !important;
         z-index: 10000 !important;
-        background: rgba(13,18,40,0.92) !important;
-        border: 1px solid rgba(0,240,255,0.30) !important;
+        background: rgba(13,18,40,0.95) !important;
+        border: 1px solid rgba(0,240,255,0.35) !important;
         border-radius: 10px !important;
         padding: 8px 10px !important;
         min-width: 44px !important;
@@ -1813,7 +1838,7 @@ input:focus, textarea:focus, select:focus,
         width: 44px !important;
         height: 44px !important;
         cursor: pointer !important;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.4) !important;
+        box-shadow: 0 2px 16px rgba(0,0,0,0.5), 0 0 8px rgba(0,240,255,0.12) !important;
         -webkit-tap-highlight-color: rgba(0,240,255,0.15) !important;
         touch-action: manipulation !important;
         align-items: center !important;
@@ -1822,7 +1847,7 @@ input:focus, textarea:focus, select:focus,
     [data-testid="stSidebarCollapsedControl"] svg,
     [data-testid="collapsedControl"] svg,
     button[kind="header"] svg,
-    [data-testid="stHeader"] button svg {
+    header[data-testid="stHeader"] button svg {
         width: 22px !important;
         height: 22px !important;
         color: #00f0ff !important;
@@ -1830,7 +1855,8 @@ input:focus, textarea:focus, select:focus,
 
     /* Sidebar nav links — tall touch targets */
     [data-testid="stSidebar"] .stPageLink,
-    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {
+    [data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
+    [data-testid="stSidebar"] [data-testid="stSidebarNavItems"] a {
         min-height: 48px !important;
         display: flex !important;
         align-items: center !important;
@@ -1848,11 +1874,11 @@ input:focus, textarea:focus, select:focus,
         margin-left: 0 !important;
         width: 100% !important;
     }
-    /* Main block padding reduced on mobile */
+    /* Main block padding reduced on mobile — room for hamburger */
     .main .block-container {
         padding-left: 12px !important;
         padding-right: 12px !important;
-        padding-top: 56px !important;
+        padding-top: 60px !important;
         max-width: 100% !important;
     }
     /* Close button inside sidebar — enlarged for easy tapping */
@@ -1905,6 +1931,20 @@ input:focus, textarea:focus, select:focus,
         padding: 8px 14px !important;
         font-size: 0.85rem !important;
     }
+
+    /* ─── Mobile images & media ───────────────────────────── */
+    img { max-width: 100% !important; height: auto !important; }
+    iframe { max-width: 100% !important; }
+
+    /* ─── Page links (st.page_link) — larger tap targets ──── */
+    [data-testid="stPageLink"] a {
+        min-height: 44px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* ─── Metrics — compact on mobile ─────────────────────── */
+    [data-testid="stMetricLabel"] { font-size: 0.75rem !important; }
 }
 
 /* ─── Extra-small screens (phones in portrait) ───────────── */
@@ -1926,6 +1966,7 @@ input:focus, textarea:focus, select:focus,
     [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         width: 100% !important;
         flex: 1 1 100% !important;
+        min-width: 100% !important;
     }
     /* Cards need tighter padding on small phones */
     .pillar-card-inner { padding: 20px 16px !important; }
