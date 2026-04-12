@@ -762,7 +762,7 @@ if _dedup_removed > 0:
 
 # NOTE: The "Show: All picks / Top picks only" radio was moved INSIDE
 # _render_results_fragment() so that interacting with it only reruns the
-# fragment — NOT the entire ~3 000-line page.  This is the single biggest
+# fragment — NOT the entire ~3000-line page.  This is the single biggest
 # fix for the "page restarts when scrolling" problem on mobile.
 run_analysis = st.button(
     "🚀 Run Analysis",
@@ -2301,11 +2301,12 @@ def _render_results_fragment():
     st.divider()
 
     # ── Show mode radio (moved here from top-level to avoid full-page reruns) ──
+    _SHOW_MODE_OPTIONS = ["All picks", "Top picks only (edge ≥ threshold)"]
     _show_mode = st.radio(
         "Show:",
-        ["All picks", "Top picks only (edge ≥ threshold)"],
+        _SHOW_MODE_OPTIONS,
         horizontal=True,
-        index=["All picks", "Top picks only (edge ≥ threshold)"].index(
+        index=_SHOW_MODE_OPTIONS.index(
             st.session_state.get("qam_show_mode", "All picks")
         ),
         key="_qam_show_mode_radio",
