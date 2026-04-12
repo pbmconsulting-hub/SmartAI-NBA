@@ -1234,14 +1234,18 @@ class TestNewExportsImportable(unittest.TestCase):
     def test_all_new_constants_importable(self):
         from engine.joseph_brain import (
             DAWG_FACTOR_TABLE, VERDICT_EMOJIS, TICKET_NAMES,
+            STAT_BODY_TEMPLATES, _STAT_CATEGORY_MAP, _SHORT_TAKE_TEMPLATES,
         )
         self.assertIsInstance(DAWG_FACTOR_TABLE, dict)
         self.assertIsInstance(VERDICT_EMOJIS, dict)
         self.assertIsInstance(TICKET_NAMES, dict)
+        self.assertIsInstance(STAT_BODY_TEMPLATES, dict)
+        self.assertIsInstance(_STAT_CATEGORY_MAP, dict)
+        self.assertIsInstance(_SHORT_TAKE_TEMPLATES, dict)
 
     def test_all_new_functions_importable(self):
         from engine.joseph_brain import (
-            _select_fragment, build_joseph_rant,
+            _select_fragment, build_joseph_rant, build_joseph_top_pick_take,
             joseph_full_analysis, joseph_analyze_game,
             joseph_analyze_player, joseph_generate_best_bets,
             joseph_quick_take, joseph_get_ambient_context,
@@ -1250,6 +1254,7 @@ class TestNewExportsImportable(unittest.TestCase):
         )
         self.assertTrue(callable(_select_fragment))
         self.assertTrue(callable(build_joseph_rant))
+        self.assertTrue(callable(build_joseph_top_pick_take))
         self.assertTrue(callable(joseph_full_analysis))
         self.assertTrue(callable(joseph_analyze_game))
         self.assertTrue(callable(joseph_analyze_player))
@@ -1580,3 +1585,122 @@ class TestDetermineVerdictTiers(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Stat-Specific Body Templates ─────────────────────────────
+
+
+class TestStatBodyTemplates(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import STAT_BODY_TEMPLATES
+        self.templates = STAT_BODY_TEMPLATES
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.templates, dict)
+
+    def test_has_core_stat_categories(self):
+        expected = {"points", "rebounds", "assists", "steals", "blocks", "threes", "turnovers", "fantasy"}
+        self.assertEqual(set(self.templates.keys()), expected)
+
+    def test_each_stat_has_verdict_keys(self):
+        for stat, verdicts in self.templates.items():
+            for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY"):
+                self.assertIn(v, verdicts, f"{stat} missing {v}")
+
+    def test_smash_has_at_least_2_templates(self):
+        for stat, verdicts in self.templates.items():
+            self.assertGreaterEqual(len(verdicts["SMASH"]), 2, f"{stat} SMASH has too few")
+
+    def test_all_templates_are_strings(self):
+        for stat, verdicts in self.templates.items():
+            for verdict, tpls in verdicts.items():
+                for t in tpls:
+                    self.assertIsInstance(t, str, f"{stat}/{verdict} has non-string")
+
+    def test_player_placeholder_in_all(self):
+        for stat, verdicts in self.templates.items():
+            for verdict, tpls in verdicts.items():
+                for t in tpls:
+                    self.assertIn("{player}", t, f"{stat}/{verdict} missing {{player}}")
+
+
+class TestStatCategoryMap(unittest.TestCase):
+    def test_is_dict(self):
+        from engine.joseph_brain import _STAT_CATEGORY_MAP
+        self.assertIsInstance(_STAT_CATEGORY_MAP, dict)
+
+    def test_common_keys_present(self):
+        from engine.joseph_brain import _STAT_CATEGORY_MAP
+        for key in ("points", "rebounds", "assists", "steals", "blocks",
+                     "threes", "turnovers", "fantasy", "pts", "reb", "ast"):
+            self.assertIn(key, _STAT_CATEGORY_MAP)
+
+
+# ── Short Take Templates and Builder ─────────────────────────
+
+
+class TestShortTakeTemplates(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import _SHORT_TAKE_TEMPLATES
+        self.templates = _SHORT_TAKE_TEMPLATES
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.templates, dict)
+
+    def test_has_verdict_keys(self):
+        for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY", "OVERRIDE"):
+            self.assertIn(v, self.templates)
+
+    def test_each_verdict_has_entries(self):
+        for v, pool in self.templates.items():
+            self.assertGreaterEqual(len(pool), 2, f"{v} short take pool too small")
+
+    def test_all_strings(self):
+        for v, pool in self.templates.items():
+            for t in pool:
+                self.assertIsInstance(t, str)
+
+
+class TestBuildJosephTopPickTake(unittest.TestCase):
+    def test_returns_string(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "LeBron", {"stat": "points", "line": 25.5, "edge": 8.0, "direction": "OVER"}, "SMASH")
+        self.assertIsInstance(result, str)
+        self.assertTrue(len(result) > 10)
+
+    def test_contains_player_name(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "Curry", {"stat": "threes", "line": 4.5, "edge": 5.0, "direction": "OVER"}, "LEAN")
+        self.assertIn("Curry", result)
+
+    def test_is_concise(self):
+        """Short take should be 1-2 sentences, not a full paragraph."""
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "Jokic", {"stat": "rebounds", "line": 12.5, "edge": 9.0, "direction": "OVER"}, "SMASH")
+        # Short take should be under 200 chars — well under a full rant
+        self.assertLess(len(result), 200, f"Too long for a short take: {result}")
+
+    def test_shorter_than_full_rant(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, build_joseph_rant, reset_fragment_state
+        reset_fragment_state()
+        prop = {"stat": "points", "line": 25.5, "edge": 8.0, "direction": "OVER", "prob": 62.0}
+        take = build_joseph_top_pick_take("LeBron", prop, "SMASH")
+        reset_fragment_state()
+        rant = build_joseph_rant("LeBron", prop, "SMASH", [], energy="nuclear")
+        self.assertLess(len(take), len(rant),
+                        "Short take should be shorter than full rant")
+
+    def test_all_verdicts(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        for verdict in ("SMASH", "LEAN", "FADE", "STAY_AWAY", "OVERRIDE"):
+            reset_fragment_state()
+            result = build_joseph_top_pick_take(
+                "Player", {"stat": "points", "line": 20, "edge": 5, "direction": "OVER"}, verdict)
+            self.assertIsInstance(result, str)
+            self.assertTrue(len(result) > 5, f"{verdict} produced empty take")

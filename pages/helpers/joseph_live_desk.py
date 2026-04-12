@@ -1307,7 +1307,7 @@ def render_joseph_live_desk(
             prop = _html.escape(str(pick.get("prop", "")))
             line = pick.get("line", "")
             direction = _html.escape(str(pick.get("direction", "")))
-            rant = pick.get("rant", "")
+            rant = pick.get("top_pick_take", "") or pick.get("rant", "")
             edge = pick.get("edge", 0)
 
             # Verdict badge

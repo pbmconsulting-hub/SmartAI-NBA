@@ -770,6 +770,181 @@ BODY_TEMPLATES = {
     ],
 }
 
+# ═══════════════════════════════════════════════════════════════
+# A-2) STAT-SPECIFIC BODY TEMPLATES — per-stat verbiage so Joseph
+#      talks about each stat category with basketball-appropriate
+#      language instead of one-size-fits-all lines.
+#      Keyed by stat category → verdict → list[str].
+#      Placeholders: {player}, {line}, {edge}, {prob}
+# ═══════════════════════════════════════════════════════════════
+
+STAT_BODY_TEMPLATES = {
+    "points": {
+        "SMASH": [
+            "{player} is averaging buckets at a CLIP that makes {line} points look like child's play. {edge}% edge — SMASH!",
+            "The scoring output from {player} has been ELITE. {line} points? He does that in his SLEEP. {edge}% edge!",
+            "{player} is in full GO-TO scorer mode right now. {line} points is too LOW — the books are behind on this one!",
+        ],
+        "LEAN": [
+            "{player} should be able to score {line} points tonight — the matchup supports it. {edge}% edge, solid lean.",
+            "The offensive workload for {player} puts him in range of {line} points. {edge}% edge — I like the value here.",
+        ],
+        "FADE": [
+            "{player} at {line} points is a MIRAGE. The shot attempts haven't been there lately — FADE!",
+            "The scoring volume on {player} has dipped. {line} points is TOO high given the recent shot diet.",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} points? His usage rate doesn't support it. STAY AWAY!",
+            "The scoring opportunities for {player} are LIMITED tonight. {line} points is a TRAP — don't touch it!",
+        ],
+    },
+    "rebounds": {
+        "SMASH": [
+            "{player} DOMINATES the glass. {line} boards? He's going to FEAST on the offensive glass tonight. {edge}% edge!",
+            "{player} is a WRECKING BALL on the boards. {line} rebounds is DISRESPECTFUL to this man's effort level!",
+            "The rebounding matchup SCREAMS {player}. {line} boards? He's going to OWN the paint tonight!",
+        ],
+        "LEAN": [
+            "{player} has been crashing the glass consistently. {line} rebounds with a {edge}% edge — I lean OVER.",
+            "The frontcourt matchup gives {player} extra opportunities on the boards. {line} rebounds should be within reach.",
+        ],
+        "FADE": [
+            "{player} at {line} rebounds is a STRETCH. The opposing bigs box out hard and limit second chances.",
+            "Rebounding is about positioning and {player} hasn't had favorable matchups. {line} boards is too high — FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} rebounds? The minutes and matchup don't add up. STAY AWAY from the glass on this one!",
+            "The rebounding opportunities are NOT there for {player} tonight. {line} boards is a NUMBER I can't back.",
+        ],
+    },
+    "assists": {
+        "SMASH": [
+            "{player} is the CONDUCTOR of that offense. {line} dimes? His playmaking is on ANOTHER level right now. {edge}% edge!",
+            "{player}'s court vision has been SURGICAL. {line} assists is LOW for a player creating THIS many looks. SMASH!",
+            "The passing lanes are WIDE OPEN for {player}. {line} assists is a number he's been blowing past. {edge}% edge!",
+        ],
+        "LEAN": [
+            "{player} has been finding teammates at a nice rate. {line} assists with a {edge}% edge — the playmaking supports it.",
+            "The offensive system funnels opportunities through {player}. {line} dimes is achievable. Lean OVER.",
+        ],
+        "FADE": [
+            "{player} at {line} assists? The ball movement hasn't been running through him lately. FADE the dimes!",
+            "Assist numbers require teammates to CONVERT. {player} at {line} is inflated given the team's recent shooting.",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} assists? His on-ball creation has dropped OFF. STAY AWAY from the dimes tonight!",
+            "The playmaking volume for {player} doesn't support {line} assists. This is a NUMBER to avoid!",
+        ],
+    },
+    "steals": {
+        "SMASH": [
+            "{player} has been a PICKPOCKET lately — active hands, quick anticipation. {line} steals is too low. {edge}% edge!",
+            "The defensive pressure from {player} is RELENTLESS. {line} steals? This matchup is a STEAL factory. SMASH!",
+        ],
+        "LEAN": [
+            "{player}'s defensive activity has been up. {line} steals with a {edge}% edge — the deflection numbers support it.",
+            "The opposing guards are careless with the ball and {player} PREYS on that. Lean OVER on {line} steals.",
+        ],
+        "FADE": [
+            "{player} at {line} steals is a GAMBLE. Steal props are volatile and the matchup doesn't favor it. FADE!",
+            "Steals are the MOST unpredictable stat and {player} at {line} is not a number I trust tonight.",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} steals? Steals are HIGH variance by nature and this line is a TRAP!",
+            "The defensive scheme doesn't put {player} in passing lanes often enough. {line} steals? STAY AWAY!",
+        ],
+    },
+    "blocks": {
+        "SMASH": [
+            "{player} is a RIM PROTECTOR supreme. {line} blocks? He's going to be SWATTING shots all night. {edge}% edge!",
+            "The opposing team attacks the rim and {player} is WAITING for them. {line} blocks is too low. SMASH!",
+        ],
+        "LEAN": [
+            "{player} has been altering shots at the rim consistently. {line} blocks with a {edge}% edge — lean OVER.",
+            "The shot-blocking matchup favors {player}. {line} blocks is achievable given the opponent's rim attack rate.",
+        ],
+        "FADE": [
+            "{player} at {line} blocks? The opposing team AVOIDS the paint. Not enough rim attempts to generate blocks. FADE!",
+            "Block props require the opponent to ATTACK the rim. This matchup doesn't set up well for {player} tonight.",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} blocks? Blocks are FEAST or FAMINE. This isn't a matchup that supports it. STAY AWAY!",
+            "The rim protection numbers are DOWN for {player}. {line} blocks is a line I want NO part of!",
+        ],
+    },
+    "threes": {
+        "SMASH": [
+            "{player} has been LIGHTS OUT from deep. {line} threes is DISRESPECTFUL — this man is a SNIPER. {edge}% edge!",
+            "The three-point shooting from {player} has been SCORCHING. {line} triples? He's been RAINING them in. SMASH!",
+        ],
+        "LEAN": [
+            "{player}'s three-point volume and accuracy support clearing {line}. {edge}% edge — lean OVER on the triples.",
+            "The shooting splits for {player} from beyond the arc make {line} threes a reasonable play.",
+        ],
+        "FADE": [
+            "{player} at {line} threes is a TRAP. The shot attempts from deep have been inconsistent. FADE!",
+            "Three-point shooting is STREAKY by nature. {player} at {line} is a line the books set RIGHT. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} threes? The shooting volume from distance doesn't support it. STAY AWAY!",
+            "The three-point variance is TOO HIGH on {player}. {line} is a number to avoid COMPLETELY!",
+        ],
+    },
+    "turnovers": {
+        "SMASH": [
+            "{player} has been CARELESS with the ball lately. OVER {line} turnovers is the play — the handle has been LOOSE. {edge}% edge!",
+            "The ball security from {player} has been TERRIBLE. {line} turnovers? He's been coughing it up at an alarming rate!",
+        ],
+        "LEAN": [
+            "{player} tends to get sloppy against defensive pressure. {line} turnovers with a {edge}% edge — lean OVER.",
+            "The turnover-prone matchup puts {player} at risk. {line} turnovers is a realistic number tonight.",
+        ],
+        "FADE": [
+            "{player} at {line} turnovers? He's been protecting the ball well. The UNDER is the play here. FADE the over!",
+            "Turnover props are TRICKY and {player} has been disciplined. {line} is too high — FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} turnovers is UNPREDICTABLE. Turnover counts swing wildly game to game. STAY AWAY!",
+            "Turnover props are the ROULETTE WHEEL of the prop market. {player} at {line} is not worth the risk!",
+        ],
+    },
+    "fantasy": {
+        "SMASH": [
+            "{player} fills up EVERY column of the stat sheet. {line} fantasy points? He contributes EVERYWHERE. {edge}% edge!",
+            "The all-around production from {player} makes {line} fantasy points a LOCK. This man does it ALL. SMASH!",
+        ],
+        "LEAN": [
+            "{player}'s multi-category production supports {line} fantasy points. {edge}% edge — the versatility is real.",
+            "The fantasy floor for {player} is HIGH because he contributes across all categories. Lean OVER on {line}.",
+        ],
+        "FADE": [
+            "{player} at {line} fantasy points? The usage and minutes might not support it tonight. FADE!",
+            "Fantasy points require production across the board and {player}'s workload is a CONCERN. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} fantasy points? Too many variables need to break right. STAY AWAY!",
+            "The fantasy ceiling for {player} is CAPPED by the matchup tonight. {line} is a TRAP!",
+        ],
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════
+# Mapping from raw stat keys to STAT_BODY_TEMPLATES categories
+# ═══════════════════════════════════════════════════════════════
+
+_STAT_CATEGORY_MAP = {
+    "points": "points", "pts": "points", "scoring": "points",
+    "rebounds": "rebounds", "reb": "rebounds", "boards": "rebounds",
+    "assists": "assists", "ast": "assists", "dimes": "assists",
+    "steals": "steals", "stl": "steals",
+    "blocks": "blocks", "blk": "blocks",
+    "threes": "threes", "fg3m": "threes", "three_pointers_made": "threes",
+    "3pm": "threes", "3s": "threes",
+    "turnovers": "turnovers", "tov": "turnovers",
+    "fantasy": "fantasy", "fantasy_points": "fantasy",
+    "pts_reb_ast": "fantasy", "pra": "fantasy",
+}
+
 # Data-driven sentence templates — populated by _build_data_sentences()
 # Placeholders: {player}, {stat}, {line}, {edge}, {prob}, {l3_avg}, {l5_avg},
 # {l10_avg}, {hit_rate}, {trend_word}, {consistency}, {season_avg}, {home_away_note}
@@ -2431,10 +2606,18 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         if opener_text and not opener_text.rstrip().endswith("..."):
             opener_text = opener_text.rstrip(". ") + "..."
 
-        # 2. Select body sentences based on energy
-        body_count = {"low": 2, "medium": 2, "high": 3, "nuclear": 4}.get(energy, 2)
-        templates = BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
-        stat = _display_stat_name(prop.get("stat", prop.get("stat_type", "")))
+        # 2. Select body sentences based on energy — prefer stat-specific
+        #    templates so Joseph talks about each stat differently.
+        body_count = {"low": 1, "medium": 1, "high": 2, "nuclear": 2}.get(energy, 1)
+        raw_stat = str(prop.get("stat", prop.get("stat_type", "")) or "").lower().strip()
+        stat_cat = _STAT_CATEGORY_MAP.get(raw_stat)
+        stat_templates = (
+            STAT_BODY_TEMPLATES.get(stat_cat, {}).get(verdict, [])
+            if stat_cat else []
+        )
+        # Fall back to generic templates when no stat-specific ones exist
+        templates = stat_templates or BODY_TEMPLATES.get(verdict, BODY_TEMPLATES.get("LEAN", []))
+        stat = _display_stat_name(raw_stat)
         line = prop.get("line", "")
         edge = prop.get("edge", prop.get("edge_percentage", ""))
         prob = prop.get("prob", prop.get("probability_over", ""))
@@ -2518,6 +2701,98 @@ def build_joseph_rant(player: str, prop: dict, verdict: str, narrative_tags: lis
         return " ".join(p for p in parts if p)
     except Exception:
         return f"Joseph M. Smith likes {player}. {verdict}!"
+
+
+# ═══════════════════════════════════════════════════════════════
+# SHORT TAKE — concise 1-2 sentence take for Top 5 Pick cards
+# ═══════════════════════════════════════════════════════════════
+
+# Short take templates by verdict — punchy, no filler
+_SHORT_TAKE_TEMPLATES = {
+    "SMASH": [
+        "{edge}% edge on {player} {direction} {line} {stat}. The numbers are SCREAMING — SMASH!",
+        "{player} at {line} {stat}? LOCK it in. {edge}% edge and I'm ALL over it!",
+        "I see {edge}% edge and a CLEAR path for {player}. {line} {stat} is the PLAY. SMASH!",
+        "{player} {direction} {line} {stat} — {edge}% edge. This is my STRONGEST conviction tonight!",
+        "The data says {edge}% edge on {player}. {line} {stat} is a GIFT from the books. SMASH!",
+    ],
+    "LEAN": [
+        "{player} at {line} {stat} with {edge}% edge — solid VALUE. I'm leaning OVER.",
+        "The matchup supports {player} {direction} {line} {stat}. {edge}% edge — smart play.",
+        "{edge}% edge on {player}. Not my strongest but the VALUE is clear at {line} {stat}.",
+        "{player} should clear {line} {stat}. {edge}% edge — quiet value, smart bet.",
+    ],
+    "FADE": [
+        "FADING {player} at {line} {stat}. The edge is THIN at {edge}% — the books got this right.",
+        "{player} at {line} {stat}? I see a TRAP. {edge}% edge is NOT enough to back it.",
+        "The context says FADE on {player} at {line} {stat}. Don't chase this number.",
+    ],
+    "STAY_AWAY": [
+        "STAY AWAY from {player} at {line} {stat}. The edge is {edge}% — that's a TRAP!",
+        "{player} at {line} {stat}? {edge}% edge says NO. Keep your money in your POCKET.",
+        "I want NO part of {player} at {line} {stat} tonight. STAY AWAY!",
+    ],
+    "OVERRIDE": [
+        "OVERRIDE on {player} at {line} {stat}! The engine and I DISAGREE — I trust my EYES. {edge}% edge!",
+        "I'm OVERRIDING the machine on {player}. {line} {stat} — {edge}% edge. The eye test wins HERE!",
+    ],
+}
+
+
+def build_joseph_top_pick_take(player: str, prop: dict, verdict: str,
+                               db_intel: dict | None = None) -> str:
+    """Build a concise 1-2 sentence take for Top 5 pick cards.
+
+    Unlike :func:`build_joseph_rant`, which assembles a full multi-sentence
+    commentary, this produces a short, powerful statement suitable for
+    pick card display.
+
+    Parameters
+    ----------
+    player : str
+        Player display name.
+    prop : dict
+        Prop dict with ``stat``, ``line``, ``edge``, ``direction``, etc.
+    verdict : str
+        Verdict key.
+    db_intel : dict or None
+        DB-powered intel for optional trend note.
+
+    Returns
+    -------
+    str
+        A punchy 1-2 sentence take.
+    """
+    try:
+        raw_stat = str(prop.get("stat", prop.get("stat_type", "")) or "").lower().strip()
+        stat = _display_stat_name(raw_stat)
+        line = prop.get("line", "")
+        edge = prop.get("edge", prop.get("edge_percentage", 0))
+        direction = prop.get("direction", "OVER")
+
+        pool = _SHORT_TAKE_TEMPLATES.get(verdict, _SHORT_TAKE_TEMPLATES.get("LEAN", []))
+        if not pool:
+            return f"{player} {direction} {line} {stat} — {verdict}."
+
+        used_set = _used_fragments.setdefault("short_take", set())
+        avail = [i for i in range(len(pool)) if i not in used_set]
+        if not avail or len(used_set) > 0.6 * len(pool):
+            used_set.clear()
+            avail = list(range(len(pool)))
+        idx = random.choice(avail)
+        used_set.add(idx)
+
+        try:
+            take = pool[idx].format(
+                player=player, stat=stat, line=line,
+                edge=edge, direction=direction,
+            )
+        except (KeyError, IndexError):
+            take = pool[idx]
+
+        return take
+    except Exception:
+        return f"{player} — {verdict}."
 
 
 def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
@@ -2613,9 +2888,9 @@ def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
             pool = DATA_BODY_TEMPLATES.get("home_away", [])
             if pool:
                 if ha["home_boost"] > 0:
-                    note = f"He averages {ha['home_ppg']:.1f} PPG at home versus {ha['away_ppg']:.1f} on the road"
+                    note = f"He averages {ha['home_ppg']:.1f} {stat} at home versus {ha['away_ppg']:.1f} on the road"
                 else:
-                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} PPG away vs {ha['home_ppg']:.1f} at home"
+                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} {stat} away vs {ha['home_ppg']:.1f} at home"
                 tmpl = random.choice(pool)
                 try:
                     sentences.append(tmpl.format(
@@ -2979,6 +3254,14 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             db_intel=db_intel,
         )
 
+        # Concise take for Top 5 pick cards (1-2 sentences)
+        top_pick_take = build_joseph_top_pick_take(
+            player=player.get("name", "Player"),
+            prop=prop_data,
+            verdict=rant_verdict,
+            db_intel=db_intel,
+        )
+
         one_liner = (
             f"{player.get('name', 'Player')} {prop_data['direction']} {prop_data['line']} "
             f"{_display_stat_name(prop_data['stat'])}: {verdict_emoji} {verdict} ({round(joseph_edge, 1)}% edge)"
@@ -3066,6 +3349,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "confidence": round(confidence_score, 2),
             "joseph_probability": round(joseph_prob, 2),
             "rant": rant_text,
+            "top_pick_take": top_pick_take,
             "one_liner": one_liner,
             "condensed_summary": condensed_summary,
             "counter_argument": counter_argument,
@@ -3096,6 +3380,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             "confidence": 50.0,
             "joseph_probability": 50.0,
             "rant": "",
+            "top_pick_take": "",
             "one_liner": "",
             "condensed_summary": "",
             "counter_argument": "Standard variance means even good edges lose 35-40% of the time.",
