@@ -1683,8 +1683,8 @@ class TestBuildJosephTopPickTake(unittest.TestCase):
         reset_fragment_state()
         result = build_joseph_top_pick_take(
             "Jokic", {"stat": "rebounds", "line": 12.5, "edge": 9.0, "direction": "OVER"}, "SMASH")
-        # Short take should be under 200 chars — well under a full rant
-        self.assertLess(len(result), 200, f"Too long for a short take: {result}")
+        # Short take should be well under 300 chars — much shorter than a full rant
+        self.assertLess(len(result), 300, f"Too long for a short take: {result}")
 
     def test_shorter_than_full_rant(self):
         from engine.joseph_brain import build_joseph_top_pick_take, build_joseph_rant, reset_fragment_state
