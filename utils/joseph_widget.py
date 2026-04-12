@@ -24,12 +24,15 @@ except ImportError:
 
 # ── Engine imports (safe) ────────────────────────────────────
 try:
-    from pages.helpers.joseph_live_desk import get_joseph_avatar_b64
+    from pages.helpers.joseph_live_desk import get_joseph_avatar_b64, get_smart_pick_pro_logo_b64
     _AVATAR_AVAILABLE = True
 except ImportError:
     _AVATAR_AVAILABLE = False
 
     def get_joseph_avatar_b64() -> str:
+        return ""
+
+    def get_smart_pick_pro_logo_b64() -> str:
         return ""
 
 try:
@@ -346,6 +349,44 @@ _WIDGET_CSS = """<style>
     overflow:hidden;text-overflow:ellipsis;
     transition:opacity 0.6s ease;
 }
+
+/* ── Mobile Responsive — Widget ─────────────────────────────── */
+@media (max-width: 768px){
+    .joseph-floating-widget{
+        bottom:12px;right:12px;
+        padding:8px 12px 8px 8px;
+        max-width:280px;border-radius:12px;
+        gap:8px;
+    }
+    .joseph-floating-avatar{
+        width:48px;height:48px;
+    }
+    .joseph-floating-name{font-size:0.64rem}
+    .joseph-floating-ambient{font-size:0.60rem}
+    .joseph-sidebar-container{padding:10px;margin-top:8px;border-radius:10px}
+    .joseph-sidebar-avatar{width:44px;height:44px}
+    .joseph-sidebar-name{font-size:0.70rem}
+    .joseph-ambient-text{font-size:0.70rem}
+    .joseph-inline-card{padding:10px 12px;margin:8px 0;border-radius:8px}
+    .joseph-inline-avatar{width:28px;height:28px;margin-right:6px}
+    .joseph-inline-label{font-size:0.78rem}
+    .joseph-inline-text{font-size:0.78rem;margin-top:6px}
+}
+@media (max-width: 480px){
+    .joseph-floating-widget{
+        bottom:8px;right:8px;left:8px;
+        max-width:none;
+        border-radius:10px;
+        padding:6px 10px 6px 6px;
+    }
+    .joseph-floating-avatar{width:40px;height:40px}
+    .joseph-floating-name{font-size:0.60rem}
+    .joseph-floating-ambient{font-size:0.56rem;-webkit-line-clamp:1}
+    .joseph-popover-container{padding:14px;border-radius:10px}
+    .joseph-popover-avatar{width:48px;height:48px}
+    .joseph-popover-title{font-size:0.90rem}
+    .joseph-popover-body{font-size:0.82rem}
+}
 </style>"""
 
 
@@ -396,10 +437,10 @@ def render_joseph_sidebar_widget() -> None:
         pass
 
     try:
-        # ── Avatar image ──────────────────────────────────────
+        # ── Logo image ──────────────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_joseph_avatar_b64()
+            avatar_b64 = get_smart_pick_pro_logo_b64()
         except Exception:
             pass
 
@@ -407,13 +448,13 @@ def render_joseph_sidebar_widget() -> None:
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-sidebar-avatar" '
-                f'alt="Joseph M. Smith" />'
+                f'alt="Smart Pick Pro" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-sidebar-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.4rem;">🎙️</div>'
+                'background:#1a1a2e;font-size:1.4rem;">🏀</div>'
             )
 
         # ── Ambient commentary ────────────────────────────────
@@ -521,10 +562,10 @@ def render_joseph_floating_widget() -> None:
         pass
 
     try:
-        # ── Avatar image ──────────────────────────────────────
+        # ── Logo image ──────────────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_joseph_avatar_b64()
+            avatar_b64 = get_smart_pick_pro_logo_b64()
         except Exception:
             pass
 
@@ -532,13 +573,13 @@ def render_joseph_floating_widget() -> None:
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-floating-avatar" '
-                f'alt="Joseph M. Smith" />'
+                f'alt="Smart Pick Pro" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-floating-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.2rem;">🎙️</div>'
+                'background:#1a1a2e;font-size:1.2rem;">🏀</div>'
             )
 
         # ── Ambient commentary (multiple for 60-second rotation) ─
@@ -656,24 +697,24 @@ def inject_joseph_inline_commentary(
 
         escaped_commentary = _html.escape(commentary)
 
-        # ── Avatar for inline card ────────────────────────────
+        # ── Logo for inline card ────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_joseph_avatar_b64()
+            avatar_b64 = get_smart_pick_pro_logo_b64()
         except Exception:
             pass
 
         if avatar_b64:
             inline_avatar = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
-                f'class="joseph-inline-avatar" alt="Joseph" />'
+                f'class="joseph-inline-avatar" alt="Smart Pick Pro" />'
             )
         else:
             inline_avatar = (
                 '<span class="joseph-inline-avatar" '
                 'style="display:inline-flex;align-items:center;'
                 'justify-content:center;background:#1a1a2e;'
-                'font-size:0.9rem;">🎙️</span>'
+                'font-size:0.9rem;">🏀</span>'
             )
 
         # ── Verdict accent (check top result) ────────────────
@@ -753,10 +794,10 @@ def render_joseph_ask_popover(
         pass
 
     try:
-        # ── Avatar image ──────────────────────────────────────
+        # ── Logo image ──────────────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_joseph_avatar_b64()
+            avatar_b64 = get_smart_pick_pro_logo_b64()
         except Exception:
             pass
 
@@ -764,13 +805,13 @@ def render_joseph_ask_popover(
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-popover-avatar" '
-                f'alt="Joseph M. Smith" />'
+                f'alt="Smart Pick Pro" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-popover-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.6rem;">🎙️</div>'
+                'background:#1a1a2e;font-size:1.6rem;">🏀</div>'
             )
 
         # ── Commentary / ambient text ─────────────────────────

@@ -6906,6 +6906,111 @@ QUANTUM_CARD_MATRIX_CSS = """
     }
 }
 
+/* ── Mobile Responsive — Prop Cards (viewport fallback) ──── */
+@media (max-width: 768px) {
+    .qcm-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 4px 0;
+    }
+    .qcm-card {
+        padding: 14px 14px;
+        border-radius: 10px;
+    }
+    .qcm-card-header {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .qcm-player-name {
+        font-size: 0.90rem;
+        max-width: 65%;
+    }
+    .qcm-tier-badge {
+        font-size: 0.62rem;
+        padding: 2px 6px;
+    }
+    .qcm-stat-type {
+        font-size: 0.72rem;
+        margin-bottom: 8px;
+    }
+    .qcm-true-line-row {
+        padding: 8px 10px;
+        margin-bottom: 8px;
+    }
+    .qcm-true-line-value {
+        font-size: 1.1rem;
+    }
+    .qcm-metrics {
+        gap: 4px;
+    }
+    .qcm-metric {
+        min-width: 50px;
+        padding: 5px 3px;
+    }
+    .qcm-metric-val {
+        font-size: 0.80rem;
+    }
+    .qcm-metric-lbl {
+        font-size: 0.56rem;
+    }
+    .qcm-dist-row {
+        gap: 3px;
+    }
+    .qcm-dist-cell {
+        padding: 4px 1px;
+    }
+    .qcm-dist-val {
+        font-size: 0.70rem;
+    }
+    .qcm-dist-lbl {
+        font-size: 0.50rem;
+    }
+    .qcm-forces {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .qcm-forces-col {
+        padding: 6px 8px;
+        font-size: 0.68rem;
+    }
+    .qcm-h-top,
+    .qcm-h-bottom {
+        flex-direction: column;
+    }
+    .qcm-h-col-narrow {
+        flex: 1;
+    }
+    .qcm-bonus {
+        padding: 8px 10px;
+    }
+    .qcm-bonus-title {
+        font-size: 0.68rem;
+    }
+}
+@media (max-width: 480px) {
+    .qcm-card {
+        padding: 10px 10px;
+        border-radius: 8px;
+    }
+    .qcm-player-name {
+        font-size: 0.84rem;
+        max-width: 60%;
+    }
+    .qcm-true-line-value {
+        font-size: 1.0rem;
+    }
+    .qcm-prediction {
+        font-size: 0.74rem;
+        padding: 6px 10px;
+    }
+    .qcm-metric {
+        min-width: 44px;
+    }
+    .qcm-metric-val {
+        font-size: 0.74rem;
+    }
+}
+
 /* ── QAM Helper Card Classes ─────────────────────────────── */
 .qam-dfs-edge {
     background: linear-gradient(135deg, #0f1424, #14192b);
