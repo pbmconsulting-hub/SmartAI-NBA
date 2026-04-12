@@ -7966,10 +7966,16 @@ QUANTUM_CARD_MATRIX_CSS = """
 
 /* ═══════════════════════════════════════════════════════════
    Feature 13: Sticky Summary Dashboard
+   NOTE: ``position:sticky`` was removed because it caused the
+   browser to recalculate the sticky offset on every scroll
+   frame.  Inside a Streamlit ``@st.fragment`` (which is itself
+   inside a scrollable container), this continuous layout
+   recalculation overwhelmed the Streamlit WebSocket with
+   postMessage traffic from co-located iframes, triggering a
+   full page rerun ("app restart") on mobile.  The summary now
+   uses a static position with the same visual treatment.
    ═══════════════════════════════════════════════════════════ */
 .qam-sticky-summary {
-    position: sticky;
-    top: 0;
     z-index: 10;
     background: linear-gradient(180deg, #0b1120 0%, rgba(11, 17, 32, 0.97) 100%);
     backdrop-filter: blur(12px);
@@ -7979,6 +7985,7 @@ QUANTUM_CARD_MATRIX_CSS = """
     padding-left: 1rem;
     padding-right: 1rem;
     border-bottom: 1px solid rgba(0, 198, 255, 0.10);
+    border-radius: 8px;
     transition: box-shadow 0.25s ease;
 }
 .qam-sticky-summary:hover {
