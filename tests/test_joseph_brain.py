@@ -135,7 +135,10 @@ class TestStatCommentaryPool(unittest.TestCase):
         self.pool = STAT_COMMENTARY_POOL
 
     def test_has_core_stats(self):
-        for stat in ("points", "rebounds", "assists", "threes", "steals", "blocks"):
+        for stat in ("points", "rebounds", "assists", "threes", "steals",
+                     "blocks", "turnovers", "fantasy", "personal_fouls",
+                     "minutes", "double_double", "combo", "free_throws",
+                     "field_goals"):
             self.assertIn(stat, self.pool)
 
     def test_each_stat_has_entries(self):
@@ -1599,12 +1602,16 @@ class TestStatBodyTemplates(unittest.TestCase):
         self.assertIsInstance(self.templates, dict)
 
     def test_has_core_stat_categories(self):
-        expected = {"points", "rebounds", "assists", "steals", "blocks", "threes", "turnovers", "fantasy"}
+        expected = {
+            "points", "rebounds", "assists", "steals", "blocks",
+            "threes", "turnovers", "fantasy", "fouls", "minutes",
+            "combo", "double_double", "free_throws", "field_goals",
+        }
         self.assertEqual(set(self.templates.keys()), expected)
 
     def test_each_stat_has_verdict_keys(self):
         for stat, verdicts in self.templates.items():
-            for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY"):
+            for v in ("SMASH", "LEAN", "FADE", "STAY_AWAY", "OVERRIDE"):
                 self.assertIn(v, verdicts, f"{stat} missing {v}")
 
     def test_smash_has_at_least_2_templates(self):
@@ -1632,7 +1639,10 @@ class TestStatCategoryMap(unittest.TestCase):
     def test_common_keys_present(self):
         from engine.joseph_brain import _STAT_CATEGORY_MAP
         for key in ("points", "rebounds", "assists", "steals", "blocks",
-                     "threes", "turnovers", "fantasy", "pts", "reb", "ast"):
+                     "threes", "turnovers", "fantasy", "pts", "reb", "ast",
+                     "personal_fouls", "fouls", "minutes", "ftm", "fgm",
+                     "double_double", "points_rebounds", "points_assists",
+                     "blocks_steals", "points_rebounds_assists", "pra"):
             self.assertIn(key, _STAT_CATEGORY_MAP)
 
 
@@ -1704,3 +1714,95 @@ class TestBuildJosephTopPickTake(unittest.TestCase):
                 "Player", {"stat": "points", "line": 20, "edge": 5, "direction": "OVER"}, verdict)
             self.assertIsInstance(result, str)
             self.assertTrue(len(result) > 5, f"{verdict} produced empty take")
+
+
+# ── _STAT_DB_KEY_MAP coverage ─────────────────────────────────
+
+
+class TestStatDbKeyMap(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import _STAT_DB_KEY_MAP
+        self.map = _STAT_DB_KEY_MAP
+
+    def test_is_dict(self):
+        self.assertIsInstance(self.map, dict)
+
+    def test_core_stats_mapped(self):
+        for key in ("points", "rebounds", "assists", "steals", "blocks",
+                     "threes", "turnovers"):
+            self.assertIn(key, self.map)
+
+    def test_extended_stats_mapped(self):
+        for key in ("personal_fouls", "fouls", "minutes", "ftm", "fta",
+                     "fgm", "fga", "offensive_rebounds", "defensive_rebounds"):
+            self.assertIn(key, self.map)
+
+    def test_values_are_uppercase_db_keys(self):
+        for key, val in self.map.items():
+            self.assertEqual(val, val.upper(), f"{key} → {val} should be uppercase")
+
+
+# ── STAT_COMMENTARY_POOL expanded coverage ────────────────────
+
+
+class TestStatCommentaryPoolExpanded(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import STAT_COMMENTARY_POOL
+        self.pool = STAT_COMMENTARY_POOL
+
+    def test_new_stat_entries_have_5_each(self):
+        for stat in ("personal_fouls", "minutes", "double_double", "combo",
+                     "free_throws", "field_goals"):
+            self.assertIn(stat, self.pool, f"Missing pool for {stat}")
+            self.assertEqual(len(self.pool[stat]), 5, f"{stat} pool should have 5 entries")
+
+    def test_most_entries_have_player_placeholder(self):
+        """Most entries should reference {player}, allow a few generic ones."""
+        for stat, lines in self.pool.items():
+            with_player = sum(1 for l in lines if "{player}" in l)
+            self.assertGreaterEqual(with_player, 3,
+                                    f"{stat} has only {with_player}/5 entries with {{player}}")
+
+
+# ── STAT_BODY_TEMPLATES OVERRIDE coverage ─────────────────────
+
+
+class TestStatBodyOverrideTemplates(unittest.TestCase):
+    def setUp(self):
+        from engine.joseph_brain import STAT_BODY_TEMPLATES
+        self.templates = STAT_BODY_TEMPLATES
+
+    def test_all_stats_have_override(self):
+        for stat, verdicts in self.templates.items():
+            self.assertIn("OVERRIDE", verdicts, f"{stat} missing OVERRIDE templates")
+            self.assertGreaterEqual(len(verdicts["OVERRIDE"]), 2,
+                                    f"{stat} OVERRIDE needs at least 2 templates")
+
+
+# ── build_joseph_top_pick_take with new stat types ────────────
+
+
+class TestTopPickTakeNewStats(unittest.TestCase):
+    def test_fouls_stat(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "AD", {"stat": "personal_fouls", "line": 3.5, "edge": 6, "direction": "OVER"}, "LEAN")
+        self.assertIsInstance(result, str)
+        self.assertIn("AD", result)
+
+    def test_combo_stat(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "Jokic", {"stat": "points_rebounds_assists", "line": 45.5, "edge": 9, "direction": "OVER"}, "SMASH")
+        self.assertIsInstance(result, str)
+        self.assertIn("Jokic", result)
+
+    def test_double_double_stat(self):
+        from engine.joseph_brain import build_joseph_top_pick_take, reset_fragment_state
+        reset_fragment_state()
+        result = build_joseph_top_pick_take(
+            "Giannis", {"stat": "double_double", "line": 0.5, "edge": 12, "direction": "OVER"}, "SMASH")
+        self.assertIsInstance(result, str)
+        self.assertIn("Giannis", result)

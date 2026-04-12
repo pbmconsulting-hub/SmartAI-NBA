@@ -323,6 +323,14 @@ _STAT_DB_KEY_MAP = {
     "points": "PTS", "rebounds": "REB", "assists": "AST",
     "steals": "STL", "blocks": "BLK", "threes": "FG3M",
     "fg3m": "FG3M", "turnovers": "TOV",
+    "personal_fouls": "PF", "fouls": "PF", "pf": "PF",
+    "minutes": "MIN", "min": "MIN",
+    "ftm": "FTM", "free_throws_made": "FTM",
+    "fta": "FTA", "free_throws_attempted": "FTA",
+    "fgm": "FGM", "field_goals_made": "FGM",
+    "fga": "FGA", "field_goals_attempted": "FGA",
+    "offensive_rebounds": "OREB", "oreb": "OREB",
+    "defensive_rebounds": "DREB", "dreb": "DREB",
 }
 
 # ── Ask-Joseph question-answering constants ──────────────────
@@ -797,6 +805,10 @@ STAT_BODY_TEMPLATES = {
             "{player} at {line} points? His usage rate doesn't support it. STAY AWAY!",
             "The scoring opportunities for {player} are LIMITED tonight. {line} points is a TRAP — don't touch it!",
         ],
+        "OVERRIDE": [
+            "I'm OVERRIDING the engine on {player} scoring. {line} points? My eye test says the shot volume is THERE. {edge}% edge!",
+            "OVERRIDE! The machine underestimates {player}'s scoring ability tonight. {line} points is a GIFT!",
+        ],
     },
     "rebounds": {
         "SMASH": [
@@ -815,6 +827,10 @@ STAT_BODY_TEMPLATES = {
         "STAY_AWAY": [
             "{player} at {line} rebounds? The minutes and matchup don't add up. STAY AWAY from the glass on this one!",
             "The rebounding opportunities are NOT there for {player} tonight. {line} boards is a NUMBER I can't back.",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} boards! The engine doesn't see the rebounding MISMATCH I see. {line} is too low. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} rebounds. The GLASS belongs to him tonight!",
         ],
     },
     "assists": {
@@ -835,6 +851,10 @@ STAT_BODY_TEMPLATES = {
             "{player} at {line} assists? His on-ball creation has dropped OFF. STAY AWAY from the dimes tonight!",
             "The playmaking volume for {player} doesn't support {line} assists. This is a NUMBER to avoid!",
         ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} dimes! The engine is SLEEPING on his playmaking. {line} assists? He's COOKING. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} assists. The passing lanes are WIDE OPEN tonight!",
+        ],
     },
     "steals": {
         "SMASH": [
@@ -852,6 +872,10 @@ STAT_BODY_TEMPLATES = {
         "STAY_AWAY": [
             "{player} at {line} steals? Steals are HIGH variance by nature and this line is a TRAP!",
             "The defensive scheme doesn't put {player} in passing lanes often enough. {line} steals? STAY AWAY!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} steals! I've watched the FILM — the opposing guards are SLOPPY. {edge}% edge!",
+            "I'm OVERRIDING the engine on {player} steals. Active hands plus a careless opponent equals FREE steals!",
         ],
     },
     "blocks": {
@@ -871,6 +895,10 @@ STAT_BODY_TEMPLATES = {
             "{player} at {line} blocks? Blocks are FEAST or FAMINE. This isn't a matchup that supports it. STAY AWAY!",
             "The rim protection numbers are DOWN for {player}. {line} blocks is a line I want NO part of!",
         ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} blocks! The opponent's paint attack rate is SKY HIGH and the engine missed it. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} rim protection. This matchup is a SWAT FEST waiting to happen!",
+        ],
     },
     "threes": {
         "SMASH": [
@@ -888,6 +916,10 @@ STAT_BODY_TEMPLATES = {
         "STAY_AWAY": [
             "{player} at {line} threes? The shooting volume from distance doesn't support it. STAY AWAY!",
             "The three-point variance is TOO HIGH on {player}. {line} is a number to avoid COMPLETELY!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} from deep! The engine doesn't see the SHOOTER'S TOUCH I see. {line} threes is LOW. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} threes. He's been getting OPEN looks all week. MONEY from deep!",
         ],
     },
     "turnovers": {
@@ -907,6 +939,10 @@ STAT_BODY_TEMPLATES = {
             "{player} at {line} turnovers is UNPREDICTABLE. Turnover counts swing wildly game to game. STAY AWAY!",
             "Turnover props are the ROULETTE WHEEL of the prop market. {player} at {line} is not worth the risk!",
         ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} turnovers! The engine doesn't see the PRESSURE this defense applies. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} turnovers. The ball security issues are REAL and the data backs me up!",
+        ],
     },
     "fantasy": {
         "SMASH": [
@@ -925,6 +961,144 @@ STAT_BODY_TEMPLATES = {
             "{player} at {line} fantasy points? Too many variables need to break right. STAY AWAY!",
             "The fantasy ceiling for {player} is CAPPED by the matchup tonight. {line} is a TRAP!",
         ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} fantasy! The engine misses the ALL-AROUND production this man brings. {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} fantasy points. He stuffs the stat sheet in EVERY category!",
+        ],
+    },
+    "fouls": {
+        "SMASH": [
+            "{player} has been in FOUL TROUBLE constantly. OVER {line} fouls is the play — he can't keep his hands to himself! {edge}% edge!",
+            "The officiating crew tonight calls it TIGHT and {player} ALWAYS picks up cheap fouls. OVER {line} is a SMASH!",
+            "{player} guards aggressive drivers ALL game. {line} fouls? He's going to be WHISTLED early and often!",
+        ],
+        "LEAN": [
+            "{player} has been averaging foul trouble lately. {line} fouls with a {edge}% edge — the matchup drives contact.",
+            "The opponent attacks the paint and {player} is the primary defender. {line} fouls is realistic.",
+        ],
+        "FADE": [
+            "{player} at {line} fouls? He's been DISCIPLINED lately. The foul rate has DROPPED. FADE!",
+            "Foul props are TRICKY. {player} has stayed out of trouble recently — {line} is too high. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} fouls? Foul props are the MOST unpredictable in the market. STAY AWAY!",
+            "Fouls depend on referees more than players. {player} at {line} is pure COIN FLIP territory!",
+        ],
+        "OVERRIDE": [
+            "I'm OVERRIDING the engine on {player} fouls. I've watched the film — this man fouls on EVERY drive. {edge}% edge!",
+            "OVERRIDE on {player} {line} fouls! The ref crew tonight is WHISTLE-HAPPY and {player} can't help himself!",
+        ],
+    },
+    "minutes": {
+        "SMASH": [
+            "{player} is LOCKED into the rotation. {line} minutes? He's playing HEAVY minutes — the coach NEEDS him. {edge}% edge!",
+            "The minutes load on {player} has been MASSIVE. {line} minutes is LOW for how much he's been on the floor. SMASH!",
+        ],
+        "LEAN": [
+            "{player} has been consistently logging minutes. {line} with a {edge}% edge — the rotation supports it.",
+            "The coach trusts {player} in crunch time. {line} minutes should be within reach. Lean OVER.",
+        ],
+        "FADE": [
+            "{player} at {line} minutes? Blowout risk could CUT into playing time. FADE!",
+            "Minutes are the MOST vulnerable stat to game flow. {player} at {line} is RISKY — FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} minutes? Game script and foul trouble can KILL minutes. STAY AWAY!",
+            "Minute props are a COIN FLIP based on game flow. {player} at {line} is not worth the variance!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE! The engine doesn't account for how INDISPENSABLE {player} is right now. {line} minutes is LOW. {edge}% edge!",
+            "I'm OVERRIDING on {player} minutes. This team CANNOT afford to sit him. {line} is a GIFT!",
+        ],
+    },
+    "combo": {
+        "SMASH": [
+            "{player} fills up the stat sheet EVERY night. {line} combined? His multi-category production makes this a SMASH! {edge}% edge!",
+            "When you combine categories, {player} is ELITE. {line} is a LOW bar for this man's all-around game. SMASH!",
+            "{player} contributes in EVERY way possible. {line} combined is DISRESPECTFUL to his versatility!",
+        ],
+        "LEAN": [
+            "{player}'s all-around game supports clearing {line} combined. {edge}% edge — the versatility is real.",
+            "Combo props reward well-rounded players and {player} checks EVERY box. Lean OVER on {line}.",
+        ],
+        "FADE": [
+            "{player} at {line} combined? One category needs to CARRY and it's not guaranteed. FADE!",
+            "Combo props SOUND safe but need production across MULTIPLE stats. {player} at {line} is a STRETCH. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} combined? Combo props add VARIANCE on top of variance. STAY AWAY!",
+            "Combined stats look easy but they're DECEPTIVE. {player} at {line} is a TRAP I want no part of!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player}! The engine misses the SYNERGY in this man's game. {line} combined? LOCK it in! {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} combo. He does it ALL and {line} is too LOW!",
+        ],
+    },
+    "double_double": {
+        "SMASH": [
+            "{player} gets double-doubles in his SLEEP. This is a man who fills up TWO categories every single night. SMASH! {edge}% edge!",
+            "A double-double for {player}? That's not a QUESTION — that's a STATEMENT. He does this EVERY game. SMASH!",
+        ],
+        "LEAN": [
+            "{player} has been flirting with double-doubles regularly. {edge}% edge — the multi-category production supports it.",
+            "The workload and role for {player} put him in double-double range. Lean toward YES on this one.",
+        ],
+        "FADE": [
+            "Double-doubles require ELITE production in TWO categories simultaneously. {player} hasn't been CONSISTENT enough. FADE!",
+            "{player} reaching a double-double depends on too many variables tonight. The matchup isn't ideal — FADE!",
+        ],
+        "STAY_AWAY": [
+            "Double-double props are BINARY — yes or no. The variance is MASSIVE. STAY AWAY from {player} on this!",
+            "{player} for a double-double? Too many things need to break RIGHT. This is GAMBLING, not analysis. STAY AWAY!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE! The engine doesn't capture {player}'s DOMINANCE in two categories. Double-double is GUARANTEED. {edge}% edge!",
+            "I'm OVERRIDING the machine. {player} is a LOCK for a double-double. The eye test says YES!",
+        ],
+    },
+    "free_throws": {
+        "SMASH": [
+            "{player} gets to the FREE THROW LINE at will. {line} is LOW for a player who ATTACKS the basket this hard! {edge}% edge!",
+            "{player} draws fouls like a MAGNET. {line} free throws? He's getting to the line ALL night. SMASH!",
+        ],
+        "LEAN": [
+            "{player} has been getting to the line consistently. {line} with a {edge}% edge — the FTA rate supports it.",
+            "The aggression from {player} generates free throw opportunities. {line} is achievable. Lean OVER.",
+        ],
+        "FADE": [
+            "{player} at {line} free throws? He hasn't been attacking the rim enough to generate the attempts. FADE!",
+            "Free throw props require FREE THROW ATTEMPTS first. {player}'s recent approach doesn't support {line}. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} free throws? FT props depend on officiating AND aggressiveness. Too many variables. STAY AWAY!",
+            "Free throw volume is one of the HARDEST stats to predict. {player} at {line} is a GAMBLE!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} free throws! The engine misses how AGGRESSIVELY he attacks. {line} is too low! {edge}% edge!",
+            "I'm OVERRIDING the machine on {player} free throws. This man LIVES at the free throw line!",
+        ],
+    },
+    "field_goals": {
+        "SMASH": [
+            "{player} is putting up SHOTS at an elite rate. {line} field goals? His shot volume makes this a SMASH! {edge}% edge!",
+            "The shot attempts for {player} have been MASSIVE. {line} is LOW for his current usage. SMASH!",
+        ],
+        "LEAN": [
+            "{player}'s shot volume and efficiency support clearing {line}. {edge}% edge — lean OVER on the field goals.",
+            "The usage rate for {player} puts him in range of {line}. Lean OVER on the field goal prop.",
+        ],
+        "FADE": [
+            "{player} at {line} field goals? The shot distribution hasn't been concentrated enough. FADE!",
+            "Field goal props need VOLUME and {player}'s recent shot attempts don't support {line}. FADE!",
+        ],
+        "STAY_AWAY": [
+            "{player} at {line} field goals? Shot volume swings WILDLY with game flow. STAY AWAY!",
+            "Field goal count depends on pace, game script, and shot selection. {player} at {line} is a TRAP!",
+        ],
+        "OVERRIDE": [
+            "OVERRIDE on {player} field goals! The usage rate is SPIKING and the engine hasn't caught up. {edge}% edge!",
+            "I'm OVERRIDING on {player} field goals. The shot volume is THERE — {line} is too LOW!",
+        ],
     },
 }
 
@@ -933,6 +1107,7 @@ STAT_BODY_TEMPLATES = {
 # ═══════════════════════════════════════════════════════════════
 
 _STAT_CATEGORY_MAP = {
+    # Core stats
     "points": "points", "pts": "points", "scoring": "points",
     "rebounds": "rebounds", "reb": "rebounds", "boards": "rebounds",
     "assists": "assists", "ast": "assists", "dimes": "assists",
@@ -941,8 +1116,31 @@ _STAT_CATEGORY_MAP = {
     "threes": "threes", "fg3m": "threes", "three_pointers_made": "threes",
     "3pm": "threes", "3s": "threes",
     "turnovers": "turnovers", "tov": "turnovers",
+    # Fouls
+    "personal_fouls": "fouls", "fouls": "fouls", "pf": "fouls",
+    # Minutes
+    "minutes": "minutes", "min": "minutes",
+    # Free throws / field goals
+    "ftm": "free_throws", "free_throws_made": "free_throws",
+    "fta": "free_throws", "free_throws_attempted": "free_throws",
+    "fgm": "field_goals", "field_goals_made": "field_goals",
+    "fga": "field_goals", "field_goals_attempted": "field_goals",
+    # Sub-rebounds
+    "offensive_rebounds": "rebounds", "oreb": "rebounds",
+    "defensive_rebounds": "rebounds", "dreb": "rebounds",
+    # Combo stats
+    "points_rebounds": "combo", "pts_reb": "combo",
+    "points_assists": "combo", "pts_ast": "combo",
+    "rebounds_assists": "combo", "reb_ast": "combo",
+    "points_rebounds_assists": "combo", "pts_reb_ast": "combo", "pra": "combo",
+    "blocks_steals": "combo", "blk_stl": "combo",
+    # Double/Triple doubles
+    "double_double": "double_double",
+    "triple_double": "double_double",
+    # Fantasy
     "fantasy": "fantasy", "fantasy_points": "fantasy",
-    "pts_reb_ast": "fantasy", "pra": "fantasy",
+    "fantasy_score_pp": "fantasy", "fantasy_score_dk": "fantasy",
+    "fantasy_score_ud": "fantasy",
 }
 
 # Data-driven sentence templates — populated by _build_data_sentences()
@@ -1080,6 +1278,48 @@ STAT_COMMENTARY_POOL = {
         "{player} contributes in EVERY category — that's ELITE!",
         "When you look at fantasy production, {player} is a ONE-MAN army!",
         "{player} is a SWISS ARMY KNIFE of basketball production!",
+    ],
+    "personal_fouls": [
+        "{player} picks up fouls like they're GOING OUT OF STYLE!",
+        "Foul trouble is {player}'s middle name — referees LOVE blowing that whistle!",
+        "When {player} guards aggressive players, the fouls PILE UP!",
+        "{player} can't keep his hands to himself and the refs are WATCHING!",
+        "The whistle is {player}'s WORST enemy out there tonight!",
+    ],
+    "minutes": [
+        "{player} is an IRON MAN — this man logs HEAVY minutes every night!",
+        "The coaching staff TRUSTS {player} to be out there when it matters!",
+        "Minutes are the FOUNDATION of every other stat and {player} gets PLENTY!",
+        "{player}'s conditioning is ELITE — he can play 35+ minutes without breaking a sweat!",
+        "When the game is CLOSE, {player} is NOT coming off the floor!",
+    ],
+    "double_double": [
+        "{player} getting a double-double is like the SUN rising — it just HAPPENS!",
+        "A double-double for {player}? That's a TUESDAY for this man!",
+        "{player} dominates TWO categories every single night — that's RARE talent!",
+        "When you can get a double-double CONSISTENTLY, you're in ELITE company. {player} IS that company!",
+        "{player} fills up the stat sheet in MULTIPLE columns — that's a COMPLETE player!",
+    ],
+    "combo": [
+        "Combined stats are where {player} SHINES — he does it ALL!",
+        "{player} is a MULTI-TOOL weapon who contributes EVERYWHERE on the floor!",
+        "When you add up ALL the categories, {player} is one of the BEST in the league!",
+        "Combo props LOVE versatile players and {player} is the DEFINITION of versatile!",
+        "{player} doesn't just score — he rebounds, assists, and IMPACTS every possession!",
+    ],
+    "free_throws": [
+        "{player} gets to the FREE THROW LINE by attacking the basket with FORCE!",
+        "Drawing fouls is an ART and {player} is a MASTER of it!",
+        "{player} lives at the charity stripe — he DEMANDS contact!",
+        "Free throws are FREE points and {player} EARNS them every night!",
+        "The whistle LOVES {player} because he plays with AGGRESSION!",
+    ],
+    "field_goals": [
+        "{player} puts up shots with CONFIDENCE and CONVICTION!",
+        "Shot volume is KING in the prop market and {player} SHOOTS!",
+        "{player}'s shot attempts are THROUGH THE ROOF — this man HUNTS his shot!",
+        "When {player} gets in rhythm, the field goals come in BUNCHES!",
+        "You can't score without SHOOTING and {player} is NOT afraid to let it fly!",
     ],
 }
 
@@ -2715,26 +2955,34 @@ _SHORT_TAKE_TEMPLATES = {
         "I see {edge}% edge and a CLEAR path for {player}. {line} {stat} is the PLAY. SMASH!",
         "{player} {direction} {line} {stat} — {edge}% edge. This is my STRONGEST conviction tonight!",
         "The data says {edge}% edge on {player}. {line} {stat} is a GIFT from the books. SMASH!",
+        "I've studied the tape. {player} {direction} {line} {stat} at {edge}% edge is my LOCK of the night!",
+        "{player} {direction} {line} {stat}? The matchup data is OVERWHELMING. {edge}% edge — SMASH!",
     ],
     "LEAN": [
-        "{player} at {line} {stat} with {edge}% edge — solid VALUE. I'm leaning OVER.",
+        "{player} at {line} {stat} with {edge}% edge — solid VALUE. I'm leaning {direction}.",
         "The matchup supports {player} {direction} {line} {stat}. {edge}% edge — smart play.",
         "{edge}% edge on {player}. Not my strongest but the VALUE is clear at {line} {stat}.",
         "{player} should clear {line} {stat}. {edge}% edge — quiet value, smart bet.",
+        "I like {player} {direction} {line} {stat}. {edge}% edge — the numbers support a lean.",
+        "The context favors {player} at {line} {stat}. {edge}% edge — good enough to play.",
     ],
     "FADE": [
         "FADING {player} at {line} {stat}. The edge is THIN at {edge}% — the books got this right.",
         "{player} at {line} {stat}? I see a TRAP. {edge}% edge is NOT enough to back it.",
         "The context says FADE on {player} at {line} {stat}. Don't chase this number.",
+        "{player} at {line} {stat}? Pass. The matchup doesn't support it and {edge}% edge confirms.",
+        "Not touching {player} at {line} {stat}. The edge is {edge}% — that's a FADE.",
     ],
     "STAY_AWAY": [
         "STAY AWAY from {player} at {line} {stat}. The edge is {edge}% — that's a TRAP!",
         "{player} at {line} {stat}? {edge}% edge says NO. Keep your money in your POCKET.",
         "I want NO part of {player} at {line} {stat} tonight. STAY AWAY!",
+        "{player} at {line} {stat}? DANGEROUS. The data says walk away. {edge}% edge.",
     ],
     "OVERRIDE": [
         "OVERRIDE on {player} at {line} {stat}! The engine and I DISAGREE — I trust my EYES. {edge}% edge!",
         "I'm OVERRIDING the machine on {player}. {line} {stat} — {edge}% edge. The eye test wins HERE!",
+        "The machine missed something on {player}. {line} {stat} — OVERRIDE at {edge}% edge!",
     ],
 }
 
@@ -2887,10 +3135,12 @@ def _build_data_sentences(player: str, prop: dict, db_intel: dict | None,
         if ha["home_ppg"] > 0 and ha["away_ppg"] > 0 and abs(ha["home_boost"]) > 5:
             pool = DATA_BODY_TEMPLATES.get("home_away", [])
             if pool:
+                # ha['home_ppg']/['away_ppg'] are always POINTS from the splits
+                # API, so always label them as PPG regardless of the prop stat.
                 if ha["home_boost"] > 0:
-                    note = f"He averages {ha['home_ppg']:.1f} {stat} at home versus {ha['away_ppg']:.1f} on the road"
+                    note = f"He averages {ha['home_ppg']:.1f} PPG at home versus {ha['away_ppg']:.1f} on the road"
                 else:
-                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} {stat} away vs {ha['home_ppg']:.1f} at home"
+                    note = f"He actually averages MORE on the road — {ha['away_ppg']:.1f} PPG away vs {ha['home_ppg']:.1f} at home"
                 tmpl = random.choice(pool)
                 try:
                     sentences.append(tmpl.format(
