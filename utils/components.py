@@ -354,21 +354,33 @@ def _inject_session_keepalive():
                Streamlit sometimes hides the sidebar toggle button
                or nests it inside an invisible parent. This observer
                ensures the toggle button is always visible and
-               tappable on mobile (≤768px). */
+               tappable on mobile (≤768px).
+
+               THROTTLED to avoid feedback loops: the style mutations
+               we apply (display/visibility/opacity) would re-trigger
+               the MutationObserver without the throttle guard.  A
+               rAF-debounced check runs at most once per animation
+               frame (~16ms). */
+            var _sidebarPending = false;
             function ensureSidebarToggle() {
                 if (window.innerWidth > 768) return;
-                var selectors = [
-                    '[data-testid="stSidebarCollapsedControl"]',
-                    '[data-testid="collapsedControl"]'
-                ];
-                selectors.forEach(function(sel) {
-                    var btn = document.querySelector(sel);
-                    if (btn) {
-                        btn.style.display = 'flex';
-                        btn.style.visibility = 'visible';
-                        btn.style.opacity = '1';
-                        btn.style.pointerEvents = 'auto';
-                    }
+                if (_sidebarPending) return;
+                _sidebarPending = true;
+                requestAnimationFrame(function() {
+                    _sidebarPending = false;
+                    var selectors = [
+                        '[data-testid="stSidebarCollapsedControl"]',
+                        '[data-testid="collapsedControl"]'
+                    ];
+                    selectors.forEach(function(sel) {
+                        var btn = document.querySelector(sel);
+                        if (btn) {
+                            btn.style.display = 'flex';
+                            btn.style.visibility = 'visible';
+                            btn.style.opacity = '1';
+                            btn.style.pointerEvents = 'auto';
+                        }
+                    });
                 });
             }
             /* Run once and observe DOM mutations — scoped to the
@@ -392,7 +404,7 @@ def _inject_session_keepalive():
                     }
                     ensureSidebarToggle();
                 });
-                bodyObs.observe(document.body, { childList: true, subtree: true });
+                bodyObs.observe(document.body, { childList: true, subtree: false });
             }
 
             /* Also run on resize in case the user rotates their phone */
