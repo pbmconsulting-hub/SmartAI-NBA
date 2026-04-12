@@ -230,7 +230,6 @@ def _get_sim_cache() -> dict:
 _MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
 _HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
 _MAX_IFRAME_HEIGHT = 12000     # px — generous cap; no scrollbar inside iframes
-_RESIZE_DEBOUNCE_MS = 350      # ms — debounce for ResizeObserver (mobile-safe)
 _LAZY_CHUNK_SIZE = 50          # players per iframe — larger chunks = fewer iframes
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
@@ -273,7 +272,9 @@ _IFRAME_RESIZE_JS = (
     "}"
     # Send initial height once DOM is ready
     "sendHeight();"
-    # Re-measure only when a <details> element is toggled (user action)
+    # Re-measure only when a <details> element is toggled (user action).
+    # The 60ms delay lets the browser finish the expand/collapse layout
+    # shift before we measure scrollHeight.
     "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
     # Also handle images loading late (can change content height)
     "window.addEventListener('load',sendHeight)"
