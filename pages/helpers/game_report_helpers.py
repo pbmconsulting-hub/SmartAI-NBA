@@ -127,12 +127,12 @@ def get_matchup_card_html(
 
     return (
         f'<div style="background:linear-gradient(135deg,rgba(0,255,213,0.04) 0%,rgba(0,180,255,0.04) 100%);'
-        f'border:1px solid rgba(0,255,213,0.12);border-radius:12px;padding:14px 20px;'
+        f'border:1px solid rgba(0,255,213,0.12);border-radius:12px;padding:12px 14px;'
         f'margin-bottom:6px;">'
         + time_html
         + f'<div style="display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;">'
         # Away team
-        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:90px;">'
+        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px;">'
         f'<img src="{away_logo}" onerror="this.src=\'{NBA_LOGO_FALLBACK}\'" '
         f'style="width:44px;height:44px;object-fit:contain;'
         f'filter:drop-shadow(0 0 6px rgba(0,180,255,0.4));" alt="{safe_away}">'
@@ -148,7 +148,7 @@ def get_matchup_card_html(
         f'<div style="font-family:\'Orbitron\',sans-serif;font-size:0.85rem;color:#8a9bb8;'
         f'padding:4px 12px;background:rgba(0,180,255,0.08);border-radius:20px;">@</div>'
         # Home team
-        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:90px;">'
+        f'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:70px;">'
         f'<img src="{home_logo}" onerror="this.src=\'{NBA_LOGO_FALLBACK}\'" '
         f'style="width:44px;height:44px;object-fit:contain;'
         f'filter:drop-shadow(0 0 6px rgba(0,180,255,0.4));" alt="{safe_home}">'
@@ -228,19 +228,19 @@ def get_h2h_bars_html(away_abbrev: str, home_abbrev: str, stats: list) -> str:
         h_bar_color = "#00ff9d" if not a_better else "#8b949e"
 
         rows_html += (
-            f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+            f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">'
             # Away value
-            f'<div style="width:48px;text-align:right;font-size:0.75rem;color:{a_bar_color};'
+            f'<div style="width:40px;text-align:right;font-size:0.72rem;color:{a_bar_color};'
             f'font-weight:600;">{a_val:.1f}</div>'
             # Bars
-            f'<div style="flex:1;display:flex;align-items:center;gap:4px;">'
+            f'<div style="flex:1;display:flex;align-items:center;gap:3px;">'
             f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;'
             f'position:relative;overflow:hidden;">'
             f'<div style="position:absolute;right:0;width:{a_pct}%;height:10px;'
             f'background:{a_bar_color};border-radius:3px;'
             f'transition:width 1.5s cubic-bezier(0.4,0,0.2,1);"></div>'
             f'</div>'
-            f'<div style="width:52px;text-align:center;font-size:0.72rem;font-weight:700;'
+            f'<div style="width:44px;text-align:center;font-size:0.65rem;font-weight:700;'
             f'color:#c0d0e8;font-family:\'Orbitron\',sans-serif;">{_html.escape(label)}</div>'
             f'<div style="flex:1;height:10px;background:#1a2035;border-radius:3px;'
             f'overflow:hidden;">'
@@ -249,13 +249,13 @@ def get_h2h_bars_html(away_abbrev: str, home_abbrev: str, stats: list) -> str:
             f'</div>'
             f'</div>'
             # Home value
-            f'<div style="width:48px;text-align:left;font-size:0.75rem;color:{h_bar_color};'
+            f'<div style="width:40px;text-align:left;font-size:0.72rem;color:{h_bar_color};'
             f'font-weight:600;">{h_val:.1f}</div>'
             f'</div>'
         )
 
     return (
-        f'<div style="background:rgba(0,0,0,0.25);border-radius:10px;padding:16px 20px;'
+        f'<div style="background:rgba(0,0,0,0.25);border-radius:10px;padding:12px 14px;'
         f'margin-top:8px;border:1px solid rgba(0,255,213,0.08);">'
         f'<div style="font-family:\'Orbitron\',sans-serif;font-size:0.72rem;color:#8a9bb8;'
         f'font-weight:600;margin-bottom:12px;letter-spacing:1px;text-align:center;">'
@@ -491,7 +491,7 @@ def get_narrative_card_html(
     safe_home = _html.escape(str(home_team))
 
     return (
-        f'<div style="background:rgba(20,26,45,0.90);border-radius:12px;padding:22px 24px;'
+        f'<div style="background:rgba(20,26,45,0.90);border-radius:12px;padding:18px 16px;'
         f'border-left:4px solid {home_color};border-right:4px solid {away_color};'
         f'border-top:1px solid rgba(0,255,213,0.10);border-bottom:1px solid rgba(0,255,213,0.10);'
         f'position:relative;overflow:hidden;">'
