@@ -916,8 +916,8 @@ STAT_COMMENTARY_POOL = {
 VERDICT_THRESHOLDS = {
     "SMASH": {"min_edge": 8.0, "min_confidence": 70.0},
     "LEAN": {"min_edge": 4.0, "min_confidence": 55.0},
-    "FADE": {"max_edge": 3.0, "max_confidence": 50.0},
-    "STAY_AWAY": {"max_edge": 1.0, "max_confidence": 35.0},
+    "FADE": {"min_edge": 2.0, "max_edge": 3.0, "max_confidence": 50.0},
+    "STAY_AWAY": {"min_edge": float("-inf"), "max_edge": 1.0, "max_confidence": 35.0},
     "OVERRIDE": {"min_edge": 0.0, "min_confidence": 0.0},
 }
 
@@ -1602,10 +1602,10 @@ def determine_verdict(edge, confidence_score, avoid=False):
 
     Uses ``VERDICT_THRESHOLDS`` for the edge-based waterfall:
 
-    * **SMASH** — edge ≥ 8 %
-    * **LEAN**  — edge ≥ 5 %
-    * **FADE**  — edge ≥ 2 %
-    * **STAY_AWAY** — edge < 2 %
+    * **SMASH** — edge ≥ ``VERDICT_THRESHOLDS["SMASH"]["min_edge"]``
+    * **LEAN**  — edge ≥ ``VERDICT_THRESHOLDS["LEAN"]["min_edge"]``
+    * **FADE**  — edge ≥ ``VERDICT_THRESHOLDS["FADE"]["min_edge"]``
+    * **STAY_AWAY** — everything below FADE
 
     Parameters
     ----------
@@ -1619,7 +1619,7 @@ def determine_verdict(edge, confidence_score, avoid=False):
     Returns
     -------
     str
-        One of ``"SMASH"``, ``"LEAN"``, ``"FADE"``, ``"STAY_AWAY"``, ``"OVERRIDE"``.
+        One of ``"SMASH"``, ``"LEAN"``, ``"FADE"``, ``"STAY_AWAY"``.
     """
     if avoid:
         return "STAY_AWAY"
@@ -1627,11 +1627,14 @@ def determine_verdict(edge, confidence_score, avoid=False):
     edge = _safe_float(edge, 0.0)
 
     smash_edge = VERDICT_THRESHOLDS.get("SMASH", {}).get("min_edge", 8.0)
+    lean_edge = VERDICT_THRESHOLDS.get("LEAN", {}).get("min_edge", 4.0)
+    fade_edge = VERDICT_THRESHOLDS.get("FADE", {}).get("min_edge", 2.0)
+
     if edge >= smash_edge:
         return "SMASH"
-    if edge >= 5.0:
+    if edge >= lean_edge:
         return "LEAN"
-    if edge >= 2.0:
+    if edge >= fade_edge:
         return "FADE"
     return "STAY_AWAY"
 
