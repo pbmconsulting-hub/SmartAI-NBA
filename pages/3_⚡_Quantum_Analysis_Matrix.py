@@ -520,7 +520,7 @@ _secs_since_check = _time_mod.time() - _injury_check_ts
 if _secs_since_check < 120:
     _should_auto_refresh_injuries = False
 else:
-    # Record the check so subsequent rapid reruns (within 60s) skip it
+    # Record the check so subsequent rapid reruns (within 120s) skip it
     st.session_state["_injury_check_ts"] = _time_mod.time()
     if not st.session_state["injury_status_map"]:
         _should_auto_refresh_injuries = True
