@@ -5191,7 +5191,7 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         # Top pick sentence with trend data
         if smash_picks:
             top = smash_picks[0]
-            pname = top.get("player_name", top.get("name", "my top pick"))
+            pname = top.get("player_name", top.get("player", top.get("name", "my top pick")))
             edge = round(_extract_edge(top), 1)
             trend = top.get("db_trend", "")
             hit_rate = top.get("hit_rate", 0)
@@ -5213,13 +5213,13 @@ def joseph_quick_take(analysis_results: list, teams_data: dict,
         # Avoid sentence
         if avoid_picks:
             avoid = avoid_picks[0]
-            aname = avoid.get("player_name", avoid.get("name", "one play"))
+            aname = avoid.get("player_name", avoid.get("player", avoid.get("name", "one play")))
             middle2 = f"But STAY AWAY from {aname} — that's a TRAP and I can smell it from here!"
         elif n_total > 3:
             lean_picks = [r for r in (analysis_results or []) if r.get("verdict") == "LEAN"]
             if lean_picks:
                 bold = lean_picks[0]
-                bname = bold.get("player_name", bold.get("name", "a sleeper"))
+                bname = bold.get("player_name", bold.get("player", bold.get("name", "a sleeper")))
                 middle2 = f"My BOLD prediction: {bname} is going to SURPRISE people tonight. Watch for it!"
             else:
                 middle2 = "The slate is COMPETITIVE and I see value scattered across MULTIPLE games."
