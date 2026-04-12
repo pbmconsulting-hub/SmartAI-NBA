@@ -923,13 +923,15 @@ _FALLBACK_HEADSHOT = (
 )
 
 
-def _build_unified_player_header(player_name, vitals):
+def _build_unified_player_header(player_name, vitals, props=None):
     """Build the always-visible summary header for a unified player card.
 
     Args:
         player_name (str): Display name.
         vitals (dict): ``{"headshot_url", "position", "team",
             "next_opponent", "season_stats": {"ppg","rpg","apg"}}``.
+        props (list[dict] | None): Prop analysis results — used to show
+            prop summaries (e.g. "More 4.5 FGA") in the collapsed header.
 
     Returns:
         str: HTML for the ``<summary>`` content (not the tag itself).
@@ -952,6 +954,51 @@ def _build_unified_player_header(player_name, vitals):
         f'{team}</span>'
     ) if team and team != "N/A" else ""
 
+    # Build prop summary pills for the collapsed header
+    prop_pills_html = ""
+    if props:
+        _stat_emoji = {
+            "points": "🏀", "rebounds": "📊", "assists": "🎯",
+            "threes": "🎯", "steals": "⚡", "blocks": "🛡️",
+            "turnovers": "❌", "fga": "🏀", "ftm": "🏀",
+            "pts+reb": "📊", "pts+ast": "🎯", "reb+ast": "📊",
+            "pts+reb+ast": "🏀", "fantasy_score": "⭐",
+            "double_double": "✌️", "triple_double": "🏆",
+        }
+        _tier_colors = {
+            "platinum": "#c800ff", "gold": "#ff5e00",
+            "silver": "#b0c0d8", "bronze": "#64748b",
+        }
+        pills = []
+        for p in props:
+            stat = (p.get("stat_type", "") or "").lower()
+            stat_label = _escape(
+                (p.get("stat_type", "") or "").replace("_", " ").title()
+            )
+            line = p.get("prop_line", p.get("line", 0))
+            try:
+                line_d = f"{float(line):g}"
+            except (ValueError, TypeError):
+                line_d = "—"
+            prob_over = p.get("probability_over", 0)
+            direction = p.get("direction", "")
+            if not direction:
+                try:
+                    direction = "OVER" if prob_over and float(prob_over) >= 0.5 else "UNDER"
+                except (ValueError, TypeError):
+                    direction = "OVER"
+            dir_label = "More" if direction.upper() == "OVER" else "Less"
+            emoji = _stat_emoji.get(stat, "🏀")
+            tier = (p.get("tier", "") or "").lower()
+            pill_border = _tier_colors.get(tier, "#334155")
+            pills.append(
+                f'<span class="upc-prop-pill" style="border-color:{pill_border};">'
+                f'{emoji} {dir_label} {line_d} {stat_label}</span>'
+            )
+        prop_pills_html = (
+            f'<div class="upc-prop-pills">{"".join(pills)}</div>'
+        )
+
     return (
         f'<img class="upc-headshot" src="{headshot}" alt="{safe_name}" '
         f'onerror="this.onerror=null;this.src=\'{_FALLBACK_HEADSHOT}\'">'
@@ -963,6 +1010,7 @@ def _build_unified_player_header(player_name, vitals):
         f'<span class="upc-stat-pill">{rpg} RPG</span>'
         f'<span class="upc-stat-pill">{apg} APG</span>'
         f'</div>'
+        f'{prop_pills_html}'
         f'</div>'
     )
 
@@ -988,7 +1036,7 @@ def build_unified_player_card_html(player_name, vitals, props,
     Returns:
         str: HTML ``<details>`` element for one player.
     """
-    header_html = _build_unified_player_header(player_name, vitals)
+    header_html = _build_unified_player_header(player_name, vitals, props)
     prop_count = len(props)
     prop_label = f"{prop_count} prop{'s' if prop_count != 1 else ''}"
 

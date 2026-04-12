@@ -265,7 +265,9 @@ _IFRAME_RESIZE_JS = (
     "(function(){"
     "var lastH=0,tid=0;"
     "function sendHeight(){"
-    "var h=document.body.scrollHeight;"
+    # Use the larger of body.scrollHeight and documentElement.scrollHeight
+    # to handle cases where overflow:hidden on body could limit scrollHeight.
+    "var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight);"
     "if(Math.abs(h-lastH)<4)return;"
     "lastH=h;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
