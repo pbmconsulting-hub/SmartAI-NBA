@@ -397,22 +397,30 @@ def get_all_players() -> list[dict]:
 
 def get_all_teams() -> list[dict]:
     """
-    Return all 30 NBA teams with pace/ORTG/DRTG from Team_Game_Stats.
+    Return all 30 NBA teams with pace/ORTG/DRTG and extended stats.
 
-    Falls back to static Teams-table columns when Team_Game_Stats is empty.
-    Each dict mirrors the CSV format expected by engine/projections.py:
-        abbreviation, team_name, pace, ortg, drtg
+    Sources (in priority order):
+    1. League_Dash_Team_Stats — has W/L, FG%, 3P%, FT%, REB, AST, TOV
+    2. Team_Game_Stats — has pace/ORTG/DRTG per game
+    3. Standings — has wins/losses
+    4. Teams table — static pace/ORTG/DRTG defaults
+
+    Each dict has:
+        abbreviation, team_name, pace, ortg, drtg, net_rating,
+        wins, losses, fg_pct, fg3_pct, ft_pct, reb, ast, tov
     """
     conn = _get_conn()
     if conn is None:
         return []
     try:
+        # Base query: teams + pace/ortg/drtg from Team_Game_Stats
         rows = conn.execute(
             """
             SELECT
                 t.team_id,
                 t.abbreviation,
                 t.team_name,
+                t.conference,
                 COALESCE(AVG(tgs.pace_est), t.pace)  AS pace,
                 COALESCE(AVG(tgs.ortg_est), t.ortg)  AS ortg,
                 COALESCE(AVG(tgs.drtg_est), t.drtg)  AS drtg
@@ -429,17 +437,91 @@ def get_all_teams() -> list[dict]:
             except (TypeError, ValueError):
                 return 0.0
 
-        return [
-            {
-                "team_id":      int(r["team_id"]),
+        # Try to get extended stats from League_Dash_Team_Stats
+        dash_map: dict[int, dict] = {}
+        try:
+            dash_rows = conn.execute(
+                """
+                SELECT team_id, w, l, w_pct, fg_pct, fg3_pct, ft_pct,
+                       reb, ast, tov, stl, blk, pts, plus_minus
+                FROM League_Dash_Team_Stats
+                ORDER BY team_id
+                """
+            ).fetchall()
+            for dr in dash_rows:
+                dash_map[int(dr["team_id"])] = dict(dr)
+        except Exception:
+            pass
+
+        # Try to get wins/losses from Standings as fallback
+        standings_map: dict[int, dict] = {}
+        if not dash_map:
+            try:
+                st_rows = conn.execute(
+                    "SELECT team_id, wins, losses, win_pct FROM Standings"
+                ).fetchall()
+                for sr in st_rows:
+                    standings_map[int(sr["team_id"])] = dict(sr)
+            except Exception:
+                pass
+
+        # Compute wins/losses from game logs as last fallback
+        wl_map: dict[int, dict] = {}
+        if not dash_map and not standings_map:
+            try:
+                # Count wins and losses per team from Player_Game_Logs
+                # (one row per player per game, so we need DISTINCT game_id)
+                wl_rows = conn.execute(
+                    """
+                    SELECT p.team_id,
+                           COUNT(DISTINCT CASE WHEN l.wl = 'W' THEN l.game_id END) AS wins,
+                           COUNT(DISTINCT CASE WHEN l.wl = 'L' THEN l.game_id END) AS losses
+                    FROM Player_Game_Logs l
+                    JOIN Players p ON l.player_id = p.player_id
+                    WHERE p.team_id IS NOT NULL
+                    GROUP BY p.team_id
+                    """
+                ).fetchall()
+                for wr in wl_rows:
+                    wl_map[int(wr["team_id"])] = {
+                        "wins": int(wr["wins"] or 0),
+                        "losses": int(wr["losses"] or 0),
+                    }
+            except Exception:
+                pass
+
+        result = []
+        for r in rows:
+            tid = int(r["team_id"])
+            ortg_val = _r(r["ortg"])
+            drtg_val = _r(r["drtg"])
+            dash = dash_map.get(tid, {})
+            st_data = standings_map.get(tid, {})
+            wl_data = wl_map.get(tid, {})
+
+            # Wins/losses: prefer dash → standings → wl_map
+            wins = int(dash.get("w") or st_data.get("wins") or wl_data.get("wins") or 0)
+            losses = int(dash.get("l") or st_data.get("losses") or wl_data.get("losses") or 0)
+
+            result.append({
+                "team_id":      tid,
                 "abbreviation": r["abbreviation"] or "",
                 "team_name":    r["team_name"] or "",
+                "conference":   r["conference"] or "",
                 "pace":         _r(r["pace"]),
-                "ortg":         _r(r["ortg"]),
-                "drtg":         _r(r["drtg"]),
-            }
-            for r in rows
-        ]
+                "ortg":         ortg_val,
+                "drtg":         drtg_val,
+                "net_rating":   _r(ortg_val - drtg_val),
+                "wins":         wins,
+                "losses":       losses,
+                "fg_pct":       _r(dash.get("fg_pct", 0), 3),
+                "fg3_pct":      _r(dash.get("fg3_pct", 0), 3),
+                "ft_pct":       _r(dash.get("ft_pct", 0), 3),
+                "reb":          _r(dash.get("reb", 0)),
+                "ast":          _r(dash.get("ast", 0)),
+                "tov":          _r(dash.get("tov", 0)),
+            })
+        return result
     except Exception as exc:
         _logger.warning("get_all_teams failed: %s", exc)
         return []
@@ -885,6 +967,282 @@ def get_db_counts() -> dict:
         conn.close()
 
 
+def get_db_freshness() -> dict:
+    """
+    Derive data freshness timestamps from the ETL database.
+
+    Returns a dict with ISO timestamp strings for each data category,
+    or ``None`` values when no data exists:
+        players, teams, injuries, games, standings
+    """
+    conn = _get_conn()
+    if conn is None:
+        return {}
+    try:
+        result: dict = {}
+
+        # Players freshness: based on latest game log date
+        # Shared fallback timestamp derived from latest game data or current time
+        _fallback_ts: str | None = None
+
+        try:
+            row = conn.execute(
+                """
+                SELECT MAX(g.game_date) AS latest_date
+                FROM Player_Game_Logs l
+                JOIN Games g ON l.game_id = g.game_id
+                """
+            ).fetchone()
+            if row and row["latest_date"]:
+                # Convert date to ISO timestamp (assume end of day)
+                result["players"] = f"{row['latest_date']}T23:59:00"
+                _fallback_ts = result["players"]
+            else:
+                # Check if Players table at least has rows
+                cnt = conn.execute("SELECT COUNT(*) FROM Players").fetchone()[0]
+                if cnt > 0:
+                    _fallback_ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    result["players"] = _fallback_ts
+        except Exception:
+            pass
+
+        # Teams freshness: check if Teams table has data
+        try:
+            cnt = conn.execute("SELECT COUNT(*) FROM Teams").fetchone()[0]
+            if cnt > 0:
+                result["teams"] = _fallback_ts or datetime.datetime.now(datetime.timezone.utc).isoformat()
+        except Exception:
+            pass
+
+        # Injuries freshness
+        try:
+            row = conn.execute(
+                "SELECT MAX(report_date) AS latest FROM Injury_Status"
+            ).fetchone()
+            if row and row["latest"]:
+                result["injuries"] = f"{row['latest']}T12:00:00"
+        except Exception:
+            pass
+
+        # Standings freshness
+        try:
+            cnt = conn.execute("SELECT COUNT(*) FROM Standings").fetchone()[0]
+            if cnt > 0:
+                result["standings"] = _fallback_ts or datetime.datetime.now(datetime.timezone.utc).isoformat()
+        except Exception:
+            pass
+
+        return result
+    except Exception as exc:
+        _logger.warning("get_db_freshness failed: %s", exc)
+        return {}
+    finally:
+        conn.close()
+
+
+def get_player_news_from_db(limit: int = 25) -> list[dict]:
+    """
+    Generate player news items from database game log data.
+
+    Derives recent notable performances, hot/cold streaks,
+    and milestone games from actual game log data.
+
+    Returns a list of dicts with keys: title, body, category,
+    impact, player_name, published_at
+    """
+    conn = _get_conn()
+    if conn is None:
+        return []
+    try:
+        news: list[dict] = []
+
+        # Get the latest game date in the DB for the "published_at" field
+        try:
+            latest_row = conn.execute(
+                "SELECT MAX(game_date) AS latest FROM Games"
+            ).fetchone()
+            latest_date = (latest_row["latest"] if latest_row else None) or ""
+        except Exception:
+            latest_date = ""
+
+        # 1. Recent standout performances (40+ pts, 20+ reb, 15+ ast,
+        #    triple-doubles) from the last 10 game dates
+        try:
+            perf_rows = conn.execute(
+                """
+                SELECT p.first_name, p.last_name, p.team_abbreviation,
+                       l.pts, l.reb, l.ast, l.stl, l.blk, g.game_date,
+                       g.matchup, l.fg3m
+                FROM Player_Game_Logs l
+                JOIN Players p ON l.player_id = p.player_id
+                JOIN Games g ON l.game_id = g.game_id
+                WHERE g.game_date >= (
+                    SELECT game_date FROM Games
+                    GROUP BY game_date ORDER BY game_date DESC
+                    LIMIT 1 OFFSET 9
+                )
+                AND (l.pts >= 40 OR l.reb >= 18 OR l.ast >= 15
+                     OR (l.pts >= 10 AND l.reb >= 10 AND l.ast >= 10)
+                     OR l.fg3m >= 8)
+                ORDER BY g.game_date DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+            for pr in perf_rows:
+                name = f"{pr['first_name']} {pr['last_name']}".strip()
+                team = pr["team_abbreviation"] or ""
+                pts = int(pr["pts"] or 0)
+                reb = int(pr["reb"] or 0)
+                ast = int(pr["ast"] or 0)
+                fg3m = int(pr["fg3m"] or 0)
+                gd = pr["game_date"] or latest_date
+
+                is_triple = pts >= 10 and reb >= 10 and ast >= 10
+
+                if is_triple:
+                    title = f"🔥 {name} records triple-double: {pts}/{reb}/{ast}"
+                    impact = "high"
+                elif pts >= 40:
+                    title = f"🔥 {name} erupts for {pts} points"
+                    impact = "high"
+                elif fg3m >= 8:
+                    title = f"🎯 {name} drains {fg3m} three-pointers"
+                    impact = "medium"
+                elif reb >= 18:
+                    title = f"💪 {name} dominates the boards with {reb} rebounds"
+                    impact = "medium"
+                else:
+                    title = f"🎯 {name} dishes {ast} assists"
+                    impact = "medium"
+
+                body = (
+                    f"{name} ({team}) posted {pts} PTS, {reb} REB, {ast} AST "
+                    f"on {gd}."
+                )
+                news.append({
+                    "title": title,
+                    "body": body,
+                    "category": "performance",
+                    "impact": impact,
+                    "player_name": name,
+                    "published_at": gd,
+                })
+        except Exception as exc:
+            _logger.debug("Performance news query failed: %s", exc)
+
+        # 2. Scoring leaders — top 5 PPG this season
+        try:
+            leader_rows = conn.execute(
+                """
+                SELECT p.first_name, p.last_name, p.team_abbreviation,
+                       ROUND(AVG(l.pts), 1) AS ppg,
+                       COUNT(l.game_id) AS gp
+                FROM Player_Game_Logs l
+                JOIN Players p ON l.player_id = p.player_id
+                GROUP BY l.player_id
+                HAVING gp >= 10
+                ORDER BY ppg DESC
+                LIMIT 5
+                """
+            ).fetchall()
+            if leader_rows:
+                for rank, lr in enumerate(leader_rows, 1):
+                    name = f"{lr['first_name']} {lr['last_name']}".strip()
+                    team = lr["team_abbreviation"] or ""
+                    ppg = float(lr["ppg"] or 0)
+                    gp = int(lr["gp"] or 0)
+                    news.append({
+                        "title": f"📊 #{rank} Scoring Leader: {name} averaging {ppg} PPG",
+                        "body": f"{name} ({team}) is averaging {ppg} points per game over {gp} games this season.",
+                        "category": "performance",
+                        "impact": "medium" if rank <= 3 else "low",
+                        "player_name": name,
+                        "published_at": latest_date,
+                    })
+        except Exception as exc:
+            _logger.debug("Leader news query failed: %s", exc)
+
+        # 3. Injury reports from DB
+        try:
+            injury_rows = conn.execute(
+                """
+                SELECT p.first_name, p.last_name, p.team_abbreviation,
+                       i.status, i.reason, i.report_date
+                FROM Injury_Status i
+                JOIN Players p ON i.player_id = p.player_id
+                WHERE i.status NOT IN ('Active', 'Available')
+                ORDER BY i.report_date DESC
+                LIMIT 15
+                """
+            ).fetchall()
+            for ir in injury_rows:
+                name = f"{ir['first_name']} {ir['last_name']}".strip()
+                team = ir["team_abbreviation"] or ""
+                status = ir["status"] or "Unknown"
+                reason = ir["reason"] or ""
+                rd = ir["report_date"] or latest_date
+
+                severity = "high" if status in ("Out", "Injured Reserve") else "medium"
+                title = f"🏥 {name} ({team}) — {status}"
+                body = f"{name} is listed as {status}."
+                if reason:
+                    body += f" Reason: {reason}."
+
+                news.append({
+                    "title": title,
+                    "body": body,
+                    "category": "injury",
+                    "impact": severity,
+                    "player_name": name,
+                    "published_at": rd,
+                })
+        except Exception as exc:
+            _logger.debug("Injury news query failed: %s", exc)
+
+        # 4. Team standings highlights (top/bottom teams)
+        try:
+            st_rows = conn.execute(
+                """
+                SELECT t.abbreviation, t.team_name,
+                       s.wins, s.losses, s.win_pct,
+                       s.str_current_streak AS streak, s.conference
+                FROM Standings s
+                JOIN Teams t ON t.team_id = s.team_id
+                ORDER BY s.win_pct DESC
+                LIMIT 5
+                """
+            ).fetchall()
+            for sr in st_rows:
+                tname = sr["team_name"] or sr["abbreviation"] or ""
+                w = int(sr["wins"] or 0)
+                lo = int(sr["losses"] or 0)
+                wp = float(sr["win_pct"] or 0)
+                streak = sr["streak"] or ""
+                conf = sr["conference"] or ""
+                news.append({
+                    "title": f"🏆 {tname}: {w}-{lo} ({wp:.3f})",
+                    "body": (
+                        f"{tname} ({conf}) has a {w}-{lo} record "
+                        f"({wp:.3f} W%). Current streak: {streak}."
+                    ),
+                    "category": "roster",
+                    "impact": "low",
+                    "player_name": "",
+                    "published_at": latest_date,
+                })
+        except Exception as exc:
+            _logger.debug("Team standings news query failed: %s", exc)
+
+        return news[:limit]
+    except Exception as exc:
+        _logger.warning("get_player_news_from_db failed: %s", exc)
+        return []
+    finally:
+        conn.close()
+
+
 # ── Standings ─────────────────────────────────────────────────────────────────
 
 
@@ -892,8 +1250,9 @@ def get_standings() -> list[dict]:
     """
     Read current NBA standings from the Standings table.
 
-    Returns a list of dicts with keys: team_abbreviation, conference,
-    conference_rank, wins, losses, win_pct, streak, last_10.
+    Returns a list of dicts with keys: team_abbreviation, team_name,
+    conference, conference_rank, wins, losses, win_pct, streak, last_10,
+    home_wins, home_losses, away_wins, away_losses, games_back.
     """
     conn = _get_conn()
     if conn is None:
@@ -902,18 +1261,48 @@ def get_standings() -> list[dict]:
         rows = conn.execute(
             """
             SELECT t.abbreviation AS team_abbreviation,
+                   t.team_name,
                    s.conference,
                    s.playoff_rank AS conference_rank,
                    s.wins,
                    s.losses,
                    s.win_pct,
                    s.str_current_streak AS streak,
-                   s.l10 AS last_10
+                   s.l10 AS last_10,
+                   s.home,
+                   s.road,
+                   s.conference_games_back AS games_back
             FROM Standings s
             JOIN Teams t ON t.team_id = s.team_id
             """
         ).fetchall()
-        return _rows_to_dicts(rows)
+
+        result = []
+        for r in _rows_to_dicts(rows):
+            # Parse home record like "20-5"
+            home_str = r.get("home") or "0-0"
+            away_str = r.get("road") or "0-0"
+            try:
+                hp = home_str.split("-")
+                hw, hl = int(hp[0]), int(hp[1]) if len(hp) > 1 else 0
+            except (ValueError, IndexError):
+                hw, hl = 0, 0
+            try:
+                ap = away_str.split("-")
+                aw, al = int(ap[0]), int(ap[1]) if len(ap) > 1 else 0
+            except (ValueError, IndexError):
+                aw, al = 0, 0
+
+            r["home_wins"] = hw
+            r["home_losses"] = hl
+            r["away_wins"] = aw
+            r["away_losses"] = al
+            # Clean up raw home/road columns
+            r.pop("home", None)
+            r.pop("road", None)
+            result.append(r)
+
+        return result
     except Exception as exc:
         _logger.warning("get_standings failed: %s", exc)
         return []
