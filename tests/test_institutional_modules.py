@@ -278,21 +278,21 @@ class TestPearsonSimCorrelation(unittest.TestCase):
 
 
 class TestSessionStateDefaults(unittest.TestCase):
-    """Tests for app.py session state initialization of bankroll/Kelly keys."""
+    """Tests for Smart_Picks_Pro_Home.py session state initialization of bankroll/Kelly keys."""
 
     def test_app_initializes_total_bankroll(self):
-        """Verify that app.py contains total_bankroll initialization."""
+        """Verify that Smart_Picks_Pro_Home.py contains total_bankroll initialization."""
         import os
-        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Picks_Pro_Home.py")
         with open(app_path, "r") as f:
             content = f.read()
         self.assertIn('"total_bankroll"', content)
         self.assertIn('st.session_state["total_bankroll"]', content)
 
     def test_app_initializes_kelly_multiplier(self):
-        """Verify that app.py contains kelly_multiplier initialization."""
+        """Verify that Smart_Picks_Pro_Home.py contains kelly_multiplier initialization."""
         import os
-        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Picks_Pro_Home.py")
         with open(app_path, "r") as f:
             content = f.read()
         self.assertIn('"kelly_multiplier"', content)
@@ -301,7 +301,7 @@ class TestSessionStateDefaults(unittest.TestCase):
     def test_default_total_bankroll_is_1000(self):
         """Verify the default bankroll is $1000."""
         import os
-        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Picks_Pro_Home.py")
         with open(app_path, "r") as f:
             content = f.read()
         # Verify the specific initialization pattern
@@ -310,7 +310,7 @@ class TestSessionStateDefaults(unittest.TestCase):
     def test_default_kelly_multiplier_is_025(self):
         """Verify the default Kelly multiplier is 0.25 (Quarter Kelly)."""
         import os
-        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
+        app_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Smart_Picks_Pro_Home.py")
         with open(app_path, "r") as f:
             content = f.read()
         # Verify the specific initialization pattern

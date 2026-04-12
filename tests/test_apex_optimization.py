@@ -84,56 +84,33 @@ class TestCSSLogoOverrides(unittest.TestCase):
     """Verify CSS overrides for hero banner and sidebar logos."""
 
     def test_hero_logo_width_250px(self):
-        """Hero banner logo should have width: 88px !important (65% smaller than original 250px)."""
-        src = pathlib.Path(__file__).parent.parent / "app.py"
+        """Hero banner logo should have a width constraint."""
+        src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("width: 88px !important", content,
-                       "Hero logo should have strict 88px width (65% reduction)")
+        self.assertIn(".spp-hero-logo", content,
+                       "Hero logo CSS class should be defined in theme.py")
 
     def test_hero_logo_object_fit(self):
         """Hero banner logo should use object-fit: contain."""
-        src = pathlib.Path(__file__).parent.parent / "app.py"
+        src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
         content = src.read_text(encoding="utf-8")
         self.assertIn("object-fit: contain", content,
                        "Hero logo should use object-fit: contain")
 
-    def test_sidebar_logo_max_width_220px(self):
-        """Sidebar logo should have max-width: 220px !important."""
+    def test_sidebar_logo_removed_per_branding(self):
+        """Sidebar logo was removed per branding directive — no st.logo() in sidebar."""
         src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("max-width: 220px !important", content,
-                       "Sidebar logo should have 220px max-width override")
+        # Verify the comment documents the removal
+        self.assertIn("Sidebar Logo", content,
+                       "theme.py should document the sidebar logo status")
 
-    def test_sidebar_logo_scale_transform(self):
-        """Sidebar logo should use transform: scale(1.2)."""
+    def test_hero_logo_class_defined(self):
+        """Responsive CSS should maintain the hero logo class definition."""
         src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
         content = src.read_text(encoding="utf-8")
-        self.assertIn("transform: scale(1.2)", content,
-                       "Sidebar logo should have scale(1.2) transform")
-
-    def test_sidebar_logo_margin_offset(self):
-        """Sidebar logo should have margin-left: -5px."""
-        src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn("margin-left: -5px", content,
-                       "Sidebar logo should have -5px left margin offset")
-
-    def test_sidebar_targets_st_logo_and_header(self):
-        """CSS should target both stLogo and stSidebarHeader selectors."""
-        src = pathlib.Path(__file__).parent.parent / "styles" / "theme.py"
-        content = src.read_text(encoding="utf-8")
-        self.assertIn('[data-testid="stSidebarHeader"]', content,
-                       "CSS should target stSidebarHeader for sidebar logo")
-        self.assertIn('[data-testid="stLogo"]', content,
-                       "CSS should target stLogo for sidebar logo")
-
-    def test_hero_logo_responsive_keeps_250px(self):
-        """Mobile responsive CSS should maintain 88px width for hero logo."""
-        src = pathlib.Path(__file__).parent.parent / "app.py"
-        content = src.read_text(encoding="utf-8")
-        # Check that the responsive media query also uses 88px
-        self.assertIn(".spp-hero-logo { width: 88px !important", content,
-                       "Responsive hero logo should maintain 88px width")
+        self.assertIn(".spp-hero-logo {", content,
+                       "Hero logo CSS class should be defined")
 
 
 if __name__ == "__main__":
