@@ -455,10 +455,10 @@ def render_joseph_sidebar_widget() -> None:
         pass
 
     try:
-        # ── Logo image ──────────────────────────────────────
+        # ── Joseph avatar image ─────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_smart_pick_pro_logo_b64()
+            avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             pass
 
@@ -466,13 +466,13 @@ def render_joseph_sidebar_widget() -> None:
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-sidebar-avatar" '
-                f'alt="Smart Pick Pro" />'
+                f'alt="Joseph M. Smith" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-sidebar-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.4rem;">🏀</div>'
+                'background:#1a1a2e;font-size:1.4rem;">🎙️</div>'
             )
 
         # ── Ambient commentary ────────────────────────────────
@@ -580,10 +580,10 @@ def render_joseph_floating_widget() -> None:
         pass
 
     try:
-        # ── Logo image ──────────────────────────────────────
+        # ── Joseph avatar image ─────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_smart_pick_pro_logo_b64()
+            avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             pass
 
@@ -591,13 +591,13 @@ def render_joseph_floating_widget() -> None:
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-floating-avatar" '
-                f'alt="Smart Pick Pro" />'
+                f'alt="Joseph M. Smith" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-floating-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.2rem;">🏀</div>'
+                'background:#1a1a2e;font-size:1.2rem;">🎙️</div>'
             )
 
         # ── Ambient commentary (multiple for 60-second rotation) ─
@@ -715,24 +715,24 @@ def inject_joseph_inline_commentary(
 
         escaped_commentary = _html.escape(commentary)
 
-        # ── Logo for inline card ────────────────────────────
+        # ── Joseph avatar for inline card ──────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_smart_pick_pro_logo_b64()
+            avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             pass
 
         if avatar_b64:
             inline_avatar = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
-                f'class="joseph-inline-avatar" alt="Smart Pick Pro" />'
+                f'class="joseph-inline-avatar" alt="Joseph M. Smith" />'
             )
         else:
             inline_avatar = (
                 '<span class="joseph-inline-avatar" '
                 'style="display:inline-flex;align-items:center;'
                 'justify-content:center;background:#1a1a2e;'
-                'font-size:0.9rem;">🏀</span>'
+                'font-size:0.9rem;">🎙️</span>'
             )
 
         # ── Verdict accent (check top result) ────────────────
@@ -812,10 +812,10 @@ def render_joseph_ask_popover(
         pass
 
     try:
-        # ── Logo image ──────────────────────────────────────
+        # ── Joseph avatar image ─────────────────────────────
         avatar_b64 = ""
         try:
-            avatar_b64 = get_smart_pick_pro_logo_b64()
+            avatar_b64 = get_joseph_avatar_b64()
         except Exception:
             pass
 
@@ -823,13 +823,13 @@ def render_joseph_ask_popover(
             avatar_html = (
                 f'<img src="data:image/png;base64,{avatar_b64}" '
                 f'class="joseph-popover-avatar" '
-                f'alt="Smart Pick Pro" />'
+                f'alt="Joseph M. Smith" />'
             )
         else:
             avatar_html = (
                 '<div class="joseph-popover-avatar" '
                 'style="display:flex;align-items:center;justify-content:center;'
-                'background:#1a1a2e;font-size:1.6rem;">🏀</div>'
+                'background:#1a1a2e;font-size:1.6rem;">🎙️</div>'
             )
 
         # ── Commentary / ambient text ─────────────────────────

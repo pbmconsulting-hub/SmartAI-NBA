@@ -1465,26 +1465,8 @@ button[kind="primary"]:hover {
 }
 
 /* ─── Sidebar NBA Branding ────────────────────────────────── */
-/* Adds "🏀 Smart Pick Pro — NBA Edition" below the   */
-/* existing "⚡ Powered by Quantum Matrix Engine 5.6" text.   */
-[data-testid="stSidebar"]::before {
-    content: "🏀 Smart Pick Pro · NBA Edition";
-    display: block;
-    position: fixed;
-    bottom: 44px;
-    left: 0;
-    width: 100%;
-    padding: 0 20px;
-    box-sizing: border-box;
-    text-align: center;
-    font-size: 0.62rem;
-    font-family: 'Bebas Neue', 'Oswald', 'Courier New', monospace;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    color: rgba(200,16,46,0.80) !important;
-    pointer-events: none;
-    text-shadow: 0 0 8px rgba(200,16,46,0.35);
-}
+/* Logo is now rendered via st.logo() at the top of the       */
+/* sidebar; the text pseudo-element has been removed.         */
 
 /* ─── Half-Court Arc Watermark ────────────────────────────── */
 /* Subtle basketball court arc on main content background     */
@@ -1910,9 +1892,8 @@ input:focus, textarea:focus, select:focus,
         border-color: rgba(255,255,255,0.06) !important;
         margin: 4px 0 !important;
     }
-    /* Hide "Powered by" footer & branding on mobile to save space */
-    [data-testid="stSidebar"]::after,
-    [data-testid="stSidebar"]::before {
+    /* Hide "Powered by" footer on mobile to save space */
+    [data-testid="stSidebar"]::after {
         display: none !important;
     }
     /* Ensure main content doesn't shift under the overlay sidebar */

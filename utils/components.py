@@ -36,6 +36,22 @@ def _get_spp_logo_b64() -> str:
     return ""
 
 
+@functools.lru_cache(maxsize=1)
+def _get_spp_logo_path() -> str:
+    """Return the resolved file-system path to the Smart Pick Pro logo (cached)."""
+    _this = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(_this, "..", "assets", "Smart_Pick_Pro_Logo.png"),
+        os.path.join(os.getcwd(), "assets", "Smart_Pick_Pro_Logo.png"),
+        os.path.join(os.getcwd(), "Smart_Pick_Pro_Logo.png"),
+    ]
+    for path in candidates:
+        norm = os.path.normpath(path)
+        if os.path.isfile(norm):
+            return norm
+    return ""
+
+
 # ── Cached Hero Banner Loader ─────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def _get_hero_banner_b64() -> str:
@@ -289,6 +305,14 @@ def inject_joseph_floating():
     _auto_save_page_state()
 
     # ── Site-wide Smart Pick Pro Logo ─────────────────────────
+    # Show the logo in the sidebar header via st.logo() so it
+    # appears at the very top of every page instead of text.
+    _logo_path = _get_spp_logo_path()
+    if _logo_path:
+        try:
+            st.logo(_logo_path)
+        except Exception:
+            pass
     _render_spp_nav_logo()
 
     # ── Global Broadcast Ticker ───────────────────────────────
