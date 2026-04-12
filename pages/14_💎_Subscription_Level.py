@@ -285,7 +285,7 @@ with st.expander("📖 How Subscriptions Work", expanded=False):
     
     **Free Tier**
     - View live scores and basic game information
-    - Access the Data Feed for stat updates
+    - Access Smart NBA Data for stats, standings & more
     - Limited analysis features
     
     **Premium Tier**
@@ -504,7 +504,7 @@ with col_compare:
       <td><span class="check-yes">✓</span></td>
     </tr>
     <tr>
-      <td>⚙️ Settings &amp; Data Feed</td>
+      <td>⚙️ Settings &amp; Smart NBA Data</td>
       <td><span class="check-yes">✓</span></td>
       <td><span class="check-yes">✓</span></td>
     </tr>

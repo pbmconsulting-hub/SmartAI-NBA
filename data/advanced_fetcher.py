@@ -9,7 +9,7 @@
 # CONNECTS TO:
 #   - data/nba_live_fetcher.py — the NBA API gateway
 #   - data/nba_data_service.py — public wrappers
-#   - pages/9_📡_Data_Feed.py — "Deep Fetch" button
+#   - pages/9_📡_Smart_NBA_Data.py — "Deep Fetch" button
 #
 # USAGE:
 #   from data.advanced_fetcher import enrich_tonights_slate

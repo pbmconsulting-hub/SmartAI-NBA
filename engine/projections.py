@@ -251,7 +251,7 @@ def compute_league_average_game_total(teams_data=None):
 
     Args:
         teams_data (list of dict, optional): Team rows from teams.csv or the
-            live data feed. Each dict should contain at minimum one of:
+            live data service. Each dict should contain at minimum one of:
             - "pts" (float): team points per game (offensive)
             - "opp_pts" or "pts_against" (float): opponent points per game
 

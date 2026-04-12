@@ -78,7 +78,7 @@ def load_players_data():
     Example:
         players = load_players_data()
         if not players:
-            # Prompt user to retrieve live data from the Data Feed page
+            # Prompt user to retrieve live data from the Smart NBA Data page
             pass
         else:
             lebron = players[0]
@@ -1238,7 +1238,7 @@ def load_props_from_session(session_state):
         return session_state["current_props"]
 
     # 2. Fall back to live-retrieved platform props saved by Live Games /
-    #    Data Feed pages so Neural Analysis always finds real data.
+    #    Smart NBA Data pages so Neural Analysis always finds real data.
     if session_state.get("platform_props"):
         return session_state["platform_props"]
 
@@ -1537,7 +1537,7 @@ def is_using_live_data():
         if is_using_live_data():
             st.success("Using live data!")
         else:
-            st.info("No live data loaded — go to Data Feed to update.")
+            st.info("No live data loaded — go to Smart NBA Data to update.")
     """
     # Check if the timestamp file exists
     if not LAST_UPDATED_JSON_PATH.exists():
@@ -1728,7 +1728,7 @@ def get_data_health_report():
             _logger.warning(f"[DataManager] Unexpected error: {_exc}")
 
     if players_count == 0:
-        warnings.append("No players loaded — run Data Feed to populate")
+        warnings.append("No players loaded — run Smart NBA Data to populate")
     if teams_count < 30:
         warnings.append(f"Only {teams_count}/30 teams loaded")
 

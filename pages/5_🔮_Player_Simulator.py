@@ -417,7 +417,7 @@ if _load_logs_btn and selected_names:
     if _gl_errors:
         st.warning(
             f"⚠️ Could not load logs for {_gl_errors} player(s) — "
-            "player IDs may be missing. Run a Smart Update on the Data Feed page first."
+            "player IDs may be missing. Run a Smart Update on the Smart NBA Data page first."
         )
 
 st.divider()

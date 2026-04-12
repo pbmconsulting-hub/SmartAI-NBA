@@ -317,7 +317,7 @@ Your browser will automatically open to **http://localhost:8501** with the app r
 Once the app is running:
 
 1. Go to the **⚙️ Settings** page (page 13) and enter your API keys (if you have them)
-2. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
+2. Go to **📡 Smart NBA Data** (page 9) and click **Smart Update** to fetch tonight's data
 3. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
 4. Go to **⚡ Quantum Analysis Matrix** (page 3) and click **Run Analysis**
 
@@ -386,7 +386,7 @@ Smart Pick Pro/
 │   ├── 6_🧬_Entry_Builder.py          # Build optimal DFS entries (parlays)
 │   ├── 7_🎙️_The_Studio.py            # Joseph M. Smith AI analyst desk
 │   ├── 8_🛡️_Risk_Shield.py           # Flagged picks to avoid
-│   ├── 9_📡_Data_Feed.py              # Fetch live NBA data from APIs
+│   ├── 9_📡_Smart_NBA_Data.py          # Smart NBA Data hub — stats, standings, leaders
 │   ├── 10_🗺️_Correlation_Matrix.py   # Prop correlation analysis
 │   ├── 11_📈_Bet_Tracker.py           # Bet tracking & model health
 │   ├── 12_📊_Proving_Grounds.py         # Historical backtesting engine (Proving Grounds)
@@ -577,11 +577,16 @@ Shows which props to skip and explains exactly WHY:
 - Low edge, trap lines, sharp lines, high variance, low confidence
 - Educational content explains each risk flag
 
-### 📡 Page 9: Data Feed
-Fetch live NBA data from API-NBA API and The Odds API:
+### 📡 Page 9: Smart NBA Data
+Your complete NBA data hub — pull stats, browse league leaders, view standings & playoff picture:
+- **Player Stats** — browse season averages for all loaded players
+- **Stat Leaders** — top performers in scoring, rebounds, assists, steals, blocks, 3PM
+- **Team Stats** — team metrics including pace, ORTG, DRTG, and net rating
+- **Standings** — conference standings with W-L records and streaks
+- **Playoff Picture** — seedings, play-in positions, and lottery bound teams
 - **Smart Update** — only tonight's teams (fast)
 - **Full Update** — all NBA player stats
-- **Fetch Props** — live odds from 15+ sportsbooks
+- **Fetch Props** — live odds from sportsbooks
 
 ### 🗺️ Page 10: Correlation Matrix
 Analyze how player props correlate with each other within games.
@@ -626,7 +631,7 @@ prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
    cp .streamlit/secrets.toml.example .streamlit/secrets.toml
    # Edit .streamlit/secrets.toml and replace the placeholder values with your real keys
    ```
-5. Go to **📡 Data Feed** (page 9) and click **Smart Update** to fetch tonight's data
+5. Go to **📡 Smart NBA Data** (page 9) and click **Smart Update** to fetch tonight's data
 6. Go to **📡 Live Games** (page 1) and click **⚡ One-Click Setup** to load games + live props
 
 ### When to Update
@@ -651,7 +656,7 @@ prop lines from **PrizePicks**, **Underdog Fantasy**, and **DraftKings Pick6**.
 ## 📊 How to Add Your Own Data
 
 ### Adding a New Player
-Go to **📡 Data Feed** and run a **Smart Update** to pull tonight's active roster.
+Go to **📡 Smart NBA Data** and run a **Smart Update** to pull tonight's active roster.
 Player data is stored in `data/players.csv` — you can also edit it directly.
 
 ### Entering Tonight's Props
@@ -730,7 +735,7 @@ Go to **🔬 Prop Scanner** (page 2) and either enter props manually, upload a C
 
 Check that you have:
 1. Games configured on **📡 Live Games** (page 1) — use **⚡ One-Click Setup**
-2. Run a **Smart Update** on the **📡 Data Feed** page to load live player data
+2. Run a **Smart Update** on the **📡 Smart NBA Data** page to load live player data
 3. Stat types are lowercase: `points`, `rebounds`, `assists`, `threes`, etc.
 
 ---

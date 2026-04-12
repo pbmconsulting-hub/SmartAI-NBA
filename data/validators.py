@@ -146,7 +146,7 @@ def check_data_freshness(last_updated_json_path):
 
     if not os.path.exists(last_updated_json_path):
         result["is_stale"] = True
-        result["warning_message"] = "No data has been retrieved yet. Go to Data Feed to update."
+        result["warning_message"] = "No data has been retrieved yet. Go to Smart NBA Data to update."
         return result
 
     try:
@@ -181,7 +181,7 @@ def check_data_freshness(last_updated_json_path):
         if days_old > DATA_STALE_DAYS:
             result["is_stale"] = True
             result["warning_message"] = (
-                f"⚠️ Data is {days_old} days old. Go to Data Feed to update."
+                f"⚠️ Data is {days_old} days old. Go to Smart NBA Data to update."
             )
 
     except Exception as e:
