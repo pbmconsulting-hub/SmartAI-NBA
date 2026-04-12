@@ -369,40 +369,43 @@ st.markdown(
     '[data-testid="stSelectbox"],'
     '[data-testid="stMultiSelect"]'
     '{touch-action:manipulation;min-height:48px}'
-    # ── Prevent iframes from intercepting scroll events ──────
-    # During momentum scroll on mobile, iframes can capture touch
-    # events and cause Streamlit component re-renders.  Setting
-    # pointer-events:none on iframes WHILE the user is scrolling
-    # is handled by the JS below; this CSS sets a safe default
-    # transition so the pointer-events change is not jarring.
-    'iframe{transition:pointer-events 0.1s}'
     '</style>',
     unsafe_allow_html=True,
 )
 
-# ── JavaScript: Disable iframe pointer events during scroll ──────
+# ── JavaScript: Disable QAM card iframe pointer events during scroll ──
 # When the user is actively scrolling, iframes can accidentally
 # capture touch/pointer events and trigger Streamlit component
 # re-renders (postMessage traffic, focus changes, etc.).  This
-# script sets pointer-events:none on all iframes during scroll
+# script sets pointer-events:none on QAM card iframes during scroll
 # and re-enables them 300ms after scrolling stops.
 #
-# Also adds a touch-move handler that prevents pull-to-refresh
-# when the page is scrolled to the top on mobile browsers where
-# overscroll-behavior CSS is not fully supported (older Safari).
+# IMPORTANT: Only targets iframes inside Streamlit's component
+# containers (data-testid="stHtml"), NOT the Streamlit framework
+# iframes used for WebSocket communication.  Previously this
+# targeted ALL iframes which broke the WebSocket connection.
+#
+# The touchmove pull-to-refresh prevention now uses {passive:true}
+# with CSS overscroll-behavior instead of e.preventDefault(), which
+# was blocking the main thread and starving WebSocket heartbeats.
 st.markdown(
     """<script>
     (function(){
         if(window.__qamScrollGuard) return;
         window.__qamScrollGuard=true;
         var tid=0;
+        function getCardIframes(){
+            /* Only target iframes inside stHtml containers (QAM card iframes),
+               NOT Streamlit's own component/WebSocket iframes */
+            return document.querySelectorAll('[data-testid="stHtml"] iframe');
+        }
         function disableIframes(){
-            document.querySelectorAll('iframe').forEach(function(f){
+            getCardIframes().forEach(function(f){
                 f.style.pointerEvents='none';
             });
         }
         function enableIframes(){
-            document.querySelectorAll('iframe').forEach(function(f){
+            getCardIframes().forEach(function(f){
                 f.style.pointerEvents='';
             });
         }
@@ -413,18 +416,6 @@ st.markdown(
             clearTimeout(tid);
             tid=setTimeout(enableIframes,300);
         },{passive:true});
-        /* Prevent pull-to-refresh at scroll-top on iOS Safari */
-        var lastY=0;
-        document.addEventListener('touchstart',function(e){
-            lastY=e.touches[0].clientY;
-        },{passive:true});
-        document.addEventListener('touchmove',function(e){
-            var el=document.scrollingElement||document.documentElement;
-            var dy=e.touches[0].clientY-lastY;
-            if(el.scrollTop<=0 && dy>0){
-                e.preventDefault();
-            }
-        },{passive:false});
     })();
     </script>""",
     unsafe_allow_html=True,
@@ -500,12 +491,25 @@ else:
         _should_auto_refresh_injuries = False
         # Check if we already refreshed recently in this session
         _last_refresh_ts = st.session_state.get("_injury_last_refreshed_at")
-    if _last_refresh_ts is not None:
-        _mins_since = (_time_mod.time() - _last_refresh_ts) / 60
-        if _mins_since < 30:
-            _should_auto_refresh_injuries = False
+        if _last_refresh_ts is not None:
+            _mins_since = (_time_mod.time() - _last_refresh_ts) / 60
+            if _mins_since < 30:
+                _should_auto_refresh_injuries = False
+            else:
+                # Been 30+ minutes since last refresh — re-check file age
+                try:
+                    import datetime as _dt
+                    from pathlib import Path as _Path
+                    _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
+                    if _inj_json_path.exists():
+                        _inj_age_hours = (
+                            _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
+                        ) / 3600.0
+                        _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
+                except Exception:
+                    pass
         else:
-            # Been 30+ minutes since last refresh — re-check file age
+            # No record of a refresh this session — check file age
             try:
                 import datetime as _dt
                 from pathlib import Path as _Path
@@ -516,20 +520,7 @@ else:
                     ) / 3600.0
                     _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
             except Exception:
-                pass
-    else:
-        # No record of a refresh this session — check file age
-        try:
-            import datetime as _dt
-            from pathlib import Path as _Path
-            _inj_json_path = _Path(__file__).parent.parent / "data" / "injury_status.json"
-            if _inj_json_path.exists():
-                _inj_age_hours = (
-                    _dt.datetime.now().timestamp() - _inj_json_path.stat().st_mtime
-                ) / 3600.0
-                _should_auto_refresh_injuries = _inj_age_hours > _INJURY_STALE_HOURS
-        except Exception:
-            pass  # Staleness check is best-effort
+                pass  # Staleness check is best-effort
 
 if _should_auto_refresh_injuries:
     try:
