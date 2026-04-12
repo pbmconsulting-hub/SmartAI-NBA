@@ -8248,7 +8248,7 @@ UNIFIED_PLAYER_CARD_CSS = """
     transition: border-color 0.25s ease, box-shadow 0.25s ease;
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
-    overflow: hidden;
+    overflow: visible;
 }
 .upc-card[open] {
     border-color: rgba(0, 240, 255, 0.22);
@@ -8480,15 +8480,55 @@ UNIFIED_PLAYER_CARD_CSS = """
 }
 
 /* ── Responsive ─────────────────────────────────────────── */
-@media (max-width: 640px) {
+
+/* ── Desktop: ensure body expands fully ──────────────────── */
+.upc-body {
+    overflow: visible;
+}
+.upc-body .qcm-grid-container {
+    overflow: visible;
+}
+.upc-body .qcm-grid {
+    overflow: visible;
+}
+
+/* ── Mobile portrait (phones ≤ 768px) ────────────────────── */
+@media (max-width: 768px) {
+    .upc-grid {
+        gap: 10px;
+        padding: 4px 0;
+    }
+    .upc-card {
+        border-radius: 10px;
+        overflow: visible;
+    }
     .upc-card > summary {
         flex-wrap: wrap;
-        gap: 10px;
-        padding: 12px 14px;
+        gap: 8px;
+        padding: 12px 12px;
     }
     .upc-headshot {
-        width: 60px;
-        height: 60px;
+        width: 56px;
+        height: 56px;
+    }
+    .upc-identity {
+        min-width: 0;
+        flex: 1;
+    }
+    .upc-player-name {
+        font-size: 0.92rem;
+        white-space: normal;
+        word-break: break-word;
+    }
+    .upc-subtitle {
+        font-size: 0.66rem;
+    }
+    .upc-stats {
+        gap: 4px;
+    }
+    .upc-stat-pill {
+        font-size: 0.60rem;
+        padding: 1px 5px;
     }
     .upc-summary-right {
         width: 100%;
@@ -8498,7 +8538,120 @@ UNIFIED_PLAYER_CARD_CSS = """
         font-size: 0.58rem;
         padding: 1px 5px;
     }
+    .upc-prop-pills {
+        gap: 4px;
+        margin-top: 4px;
+    }
+    .upc-prop-count {
+        font-size: 0.66rem;
+        padding: 3px 8px;
+    }
+    .upc-chevron {
+        font-size: 0.92rem;
+    }
+    .upc-body {
+        padding: 0 10px 14px;
+        overflow: visible;
+    }
+    .upc-body .qcm-grid-container,
+    .upc-body .qcm-grid {
+        overflow: visible;
+    }
+    .upc-joseph-row {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    .upc-joseph-avatar {
+        width: 30px;
+        height: 30px;
+    }
+    .upc-joseph-label {
+        font-size: 0.75rem;
+    }
+    .upc-joseph-response {
+        padding: 10px 12px;
+    }
+    .upc-joseph-resp-avatar {
+        width: 36px;
+        height: 36px;
+    }
+    .upc-joseph-resp-name {
+        font-size: 0.80rem;
+    }
+    .upc-joseph-resp-role {
+        font-size: 0.64rem;
+    }
+    .upc-joseph-resp-lock {
+        font-size: 0.82rem;
+    }
+    .upc-joseph-resp-rant {
+        font-size: 0.78rem;
+        line-height: 1.55;
+    }
 }
+
+/* ── Extra-small phones (≤ 480px) ────────────────────────── */
+@media (max-width: 480px) {
+    .upc-card > summary {
+        gap: 6px;
+        padding: 10px 10px;
+    }
+    .upc-headshot {
+        width: 48px;
+        height: 48px;
+    }
+    .upc-player-name {
+        font-size: 0.84rem;
+    }
+    .upc-subtitle {
+        font-size: 0.60rem;
+    }
+    .upc-stat-pill {
+        font-size: 0.56rem;
+        padding: 1px 4px;
+    }
+    .upc-prop-pill {
+        font-size: 0.52rem;
+        padding: 1px 4px;
+    }
+    .upc-body {
+        padding: 0 8px 10px;
+    }
+    .upc-joseph-row {
+        padding: 6px 8px;
+        gap: 6px;
+    }
+    .upc-joseph-avatar {
+        width: 26px;
+        height: 26px;
+    }
+    .upc-joseph-label {
+        font-size: 0.70rem;
+    }
+    .upc-joseph-response {
+        padding: 8px 10px;
+    }
+    .upc-joseph-resp-avatar {
+        width: 30px;
+        height: 30px;
+    }
+    .upc-joseph-resp-name {
+        font-size: 0.74rem;
+    }
+    .upc-joseph-resp-lock {
+        font-size: 0.76rem;
+    }
+    .upc-joseph-resp-rant {
+        font-size: 0.72rem;
+        line-height: 1.5;
+    }
+}
+/* NOTE: The 640px breakpoint that was here has been removed.
+   All its rules are already covered by the 768px breakpoint above,
+   and having it AFTER the 480px breakpoint was overriding the
+   smaller-phone sizes (e.g. headshot 48px was being reset to 60px
+   on screens ≤480px because 480 < 640, so both matched but 640px
+   came last and won). */
 """
 
 
