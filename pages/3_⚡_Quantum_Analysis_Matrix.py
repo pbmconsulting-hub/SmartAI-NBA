@@ -245,7 +245,7 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 # iframe height.  Designed to MINIMISE postMessage traffic while ensuring
 # expanded content is NEVER cut off:
 #
-#   • On load: sends ONE height message (staggered by random 50-250 ms so
+#   • On load: sends ONE height message (staggered by random 50-249 ms so
 #     multiple iframes on the page don't all fire at the same instant and
 #     overwhelm the Streamlit React frontend).
 #   • On ``<details>`` toggle: sends FOUR deferred measurements
@@ -274,7 +274,7 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 #   – img.onload handlers REMOVED — the toggle/click handlers cover
 #     all user-initiated height changes; any ±few px from late images
 #     is acceptable and absorbed by the 32 px margin.
-#   – Initial sendHeight staggered by random 50-250 ms.
+#   – Initial sendHeight staggered by random 50-249 ms.
 #   – Non-forced sends rate-limited to one per 300 ms.
 _IFRAME_RESIZE_JS = (
     "<script>"
@@ -320,7 +320,7 @@ _IFRAME_RESIZE_JS = (
     # Debounced non-forced send for background events (350 ms).
     "function dSend(){clearTimeout(tid);tid=setTimeout(function(){send(false)},350)}"
     # ── Initial height ──────────────────────────────────────
-    # Stagger by 50-250 ms random delay so multiple iframes don't
+    # Stagger by 50-249 ms random delay so multiple iframes don't
     # fire at the same instant and overwhelm the Streamlit frontend.
     "setTimeout(function(){send(false)},50+Math.floor(Math.random()*200));"
     # ── Toggle handler ──────────────────────────────────────
