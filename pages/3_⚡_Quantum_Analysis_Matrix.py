@@ -263,21 +263,29 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var lastH=0;"
+    "var lastH=0,tid=0;"
     "function sendHeight(){"
     "var h=document.body.scrollHeight;"
     "if(Math.abs(h-lastH)<4)return;"
     "lastH=h;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',height:h},'*')"
     "}"
+    # Debounced wrapper — at most one postMessage per 150 ms.
+    # Prevents message storms when multiple events fire in quick
+    # succession (e.g. several images loading at once).
+    "function debouncedSend(){clearTimeout(tid);tid=setTimeout(sendHeight,150)}"
     # Send initial height once DOM is ready
     "sendHeight();"
     # Re-measure only when a <details> element is toggled (user action).
     # The 60ms delay lets the browser finish the expand/collapse layout
     # shift before we measure scrollHeight.
     "document.addEventListener('toggle',function(){setTimeout(sendHeight,60)},true);"
-    # Also handle images loading late (can change content height)
-    "window.addEventListener('load',sendHeight)"
+    # Handle images loading late (can change content height) — debounced
+    # so multiple images loading in the same frame don't create a burst
+    # of postMessages that overwhelm the Streamlit WebSocket.
+    "document.querySelectorAll('img').forEach(function(img){"
+    "if(!img.complete)img.addEventListener('load',debouncedSend)"
+    "})"
     "})()"
     "</script>"
 )
@@ -311,9 +319,9 @@ def _render_card_iframe(card_html, player_count):
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<style>"
-        "html{overflow:hidden;overscroll-behavior:contain}"
+        "html{overflow:hidden;overscroll-behavior:contain;touch-action:pan-y}"
         "body{margin:0;padding:0;background:transparent;color:#e0e0e0;"
-        "overscroll-behavior:contain;overflow:hidden}"
+        "overscroll-behavior:contain;overflow:hidden;touch-action:pan-y}"
         "</style>"
         "</head><body>"
         f"{card_html}"
@@ -361,7 +369,64 @@ st.markdown(
     '[data-testid="stSelectbox"],'
     '[data-testid="stMultiSelect"]'
     '{touch-action:manipulation;min-height:48px}'
+    # ── Prevent iframes from intercepting scroll events ──────
+    # During momentum scroll on mobile, iframes can capture touch
+    # events and cause Streamlit component re-renders.  Setting
+    # pointer-events:none on iframes WHILE the user is scrolling
+    # is handled by the JS below; this CSS sets a safe default
+    # transition so the pointer-events change is not jarring.
+    'iframe{transition:pointer-events 0.1s}'
     '</style>',
+    unsafe_allow_html=True,
+)
+
+# ── JavaScript: Disable iframe pointer events during scroll ──────
+# When the user is actively scrolling, iframes can accidentally
+# capture touch/pointer events and trigger Streamlit component
+# re-renders (postMessage traffic, focus changes, etc.).  This
+# script sets pointer-events:none on all iframes during scroll
+# and re-enables them 300ms after scrolling stops.
+#
+# Also adds a touch-move handler that prevents pull-to-refresh
+# when the page is scrolled to the top on mobile browsers where
+# overscroll-behavior CSS is not fully supported (older Safari).
+st.markdown(
+    """<script>
+    (function(){
+        if(window.__qamScrollGuard) return;
+        window.__qamScrollGuard=true;
+        var tid=0;
+        function disableIframes(){
+            document.querySelectorAll('iframe').forEach(function(f){
+                f.style.pointerEvents='none';
+            });
+        }
+        function enableIframes(){
+            document.querySelectorAll('iframe').forEach(function(f){
+                f.style.pointerEvents='';
+            });
+        }
+        /* Use the Streamlit main scroll container if available */
+        var sc=document.querySelector('[data-testid="stAppViewContainer"]')||window;
+        sc.addEventListener('scroll',function(){
+            disableIframes();
+            clearTimeout(tid);
+            tid=setTimeout(enableIframes,300);
+        },{passive:true});
+        /* Prevent pull-to-refresh at scroll-top on iOS Safari */
+        var lastY=0;
+        document.addEventListener('touchstart',function(e){
+            lastY=e.touches[0].clientY;
+        },{passive:true});
+        document.addEventListener('touchmove',function(e){
+            var el=document.scrollingElement||document.documentElement;
+            var dy=e.touches[0].clientY-lastY;
+            if(el.scrollTop<=0 && dy>0){
+                e.preventDefault();
+            }
+        },{passive:false});
+    })();
+    </script>""",
     unsafe_allow_html=True,
 )
 
@@ -369,7 +434,7 @@ st.markdown(
 from utils.components import render_global_settings, inject_joseph_floating, render_joseph_hero_banner
 with st.sidebar:
     render_global_settings()
-st.session_state["joseph_page_context"] = "page_analysis"
+st.session_state.setdefault("joseph_page_context", "page_analysis")
 inject_joseph_floating()
 render_joseph_hero_banner()
 
@@ -412,15 +477,29 @@ if not st.session_state.get("analysis_results"):
 # ─── Auto-refresh injury data if empty or stale (>4 hours) ──
 # Use a 30-minute in-session cooldown to avoid re-loading on every
 # page navigation, while still updating when data is genuinely stale.
+# A short-circuit flag prevents redundant stat() calls on rapid
+# reruns (e.g. scroll-triggered reruns that happen seconds apart).
 _INJURY_STALE_HOURS = 4
 _INJURY_REFRESH_COOLDOWN_SECS = 1800  # 30 minutes
 
-_should_auto_refresh_injuries = not st.session_state["injury_status_map"]
-if not _should_auto_refresh_injuries:
+# Short-circuit: if we already checked in this page load cycle
+# (i.e. within the last 60 seconds), skip the entire block.
+# This prevents repeated file-stat calls during rapid reruns.
+import time as _time_mod
+_injury_check_ts = st.session_state.get("_injury_check_ts", 0)
+_secs_since_check = _time_mod.time() - _injury_check_ts
+
+if _secs_since_check < 60:
+    _should_auto_refresh_injuries = False
+elif not st.session_state["injury_status_map"]:
+    _should_auto_refresh_injuries = True
+    st.session_state["_injury_check_ts"] = _time_mod.time()
+else:
+    st.session_state["_injury_check_ts"] = _time_mod.time()
+    _should_auto_refresh_injuries = False
     # Check if we already refreshed recently in this session
     _last_refresh_ts = st.session_state.get("_injury_last_refreshed_at")
     if _last_refresh_ts is not None:
-        import time as _time_mod
         _mins_since = (_time_mod.time() - _last_refresh_ts) / 60
         if _mins_since < 30:
             _should_auto_refresh_injuries = False
@@ -2478,10 +2557,15 @@ def _render_results_fragment():
     sum_col4.metric("💎 Platinum", platinum_count)
     sum_col5.metric("Gold 🥇",     gold_count)
 
-    # ── Feature 13: Sticky Summary Dashboard ────────────────────
-    # Wrap the DFS Edge + Tier Distribution into a sticky container
-    # so they remain visible while scrolling through results.
-    st.markdown('<div class="qam-sticky-summary">', unsafe_allow_html=True)
+    # ── Feature 13: Summary Dashboard ──────────────────────────────
+    # DFS Edge + Tier Distribution rendered inside a styled container.
+    # NOTE: Previously used split st.markdown('<div class="qam-sticky-summary">')
+    # and st.markdown('</div>') which risked orphaned tags if an exception
+    # occurred between them, producing malformed HTML that forced Streamlit
+    # to re-render and contributed to the "page restart" issue.
+
+    # Build the summary HTML block as a single unit
+    _summary_parts: list[str] = []
 
     # Phase 3: DFS Edge row (only shown when DFS metrics exist)
     if _dfs_results:
@@ -2492,9 +2576,8 @@ def _render_results_fragment():
             for r in _dfs_results
             if (r.get("dfs_parlay_ev") or {}).get("best_tier") is not None
         ) / max(_beats_be_count, 1)
-        st.markdown(
-            _render_dfs_flex_edge_html(_beats_be_count, len(_dfs_results), _avg_dfs_edge),
-            unsafe_allow_html=True,
+        _summary_parts.append(
+            _render_dfs_flex_edge_html(_beats_be_count, len(_dfs_results), _avg_dfs_edge)
         )
 
     # ── Slate Summary Dashboard ────────────────────────────────
@@ -2505,15 +2588,20 @@ def _render_results_fragment():
         key=lambda r: r.get("confidence_score", 0),
         default=None,
     )
-    st.markdown(
+    _summary_parts.append(
         _render_tier_distribution_html(
             platinum_count, gold_count, silver_count, bronze_count,
             avg_edge, best_pick,
-        ),
-        unsafe_allow_html=True,
+        )
     )
 
-    st.markdown('</div>', unsafe_allow_html=True)  # close .qam-sticky-summary
+    # Emit as a single st.markdown call with the wrapper div
+    st.markdown(
+        '<div class="qam-sticky-summary">'
+        + "".join(_summary_parts)
+        + '</div>',
+        unsafe_allow_html=True,
+    )
 
     # ── Quick-select buttons ───────────────────────────────────
     _qb_col1, _qb_col2, _qb_col3 = st.columns([1, 1, 2])
@@ -2547,8 +2635,7 @@ def _render_results_fragment():
                     })
                     _added += 1
             if _added:
-                st.success(f"✅ Added {_added} Platinum pick(s).")
-                st.rerun(scope="fragment")
+                st.toast(f"✅ Added {_added} Platinum pick(s).")
             else:
                 st.info("All Platinum picks already added.")
     with _qb_col2:
@@ -2582,8 +2669,7 @@ def _render_results_fragment():
                     })
                     _added += 1
             if _added:
-                st.success(f"✅ Added {_added} Gold+ pick(s).")
-                st.rerun(scope="fragment")
+                st.toast(f"✅ Added {_added} Gold+ pick(s).")
             else:
                 st.info("All Gold+ picks already added.")
 
@@ -2987,7 +3073,7 @@ def _render_results_fragment():
     if st.session_state.get("selected_picks"):
         if st.button("🗑️ Clear Selected Picks"):
             st.session_state["selected_picks"] = []
-            st.rerun(scope="fragment")
+            st.toast("🗑️ Selected picks cleared.")
 
 
 _render_results_fragment()
