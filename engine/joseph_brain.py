@@ -1600,6 +1600,13 @@ def _pick_commentary(stat_type):
 def determine_verdict(edge, confidence_score, avoid=False):
     """Map edge % and confidence score to a verdict string.
 
+    Uses ``VERDICT_THRESHOLDS`` for the edge-based waterfall:
+
+    * **SMASH** — edge ≥ 8 %
+    * **LEAN**  — edge ≥ 5 %
+    * **FADE**  — edge ≥ 2 %
+    * **STAY_AWAY** — edge < 2 %
+
     Parameters
     ----------
     edge : float
@@ -1616,7 +1623,17 @@ def determine_verdict(edge, confidence_score, avoid=False):
     """
     if avoid:
         return "STAY_AWAY"
-    return "LEAN"
+
+    edge = _safe_float(edge, 0.0)
+
+    smash_edge = VERDICT_THRESHOLDS.get("SMASH", {}).get("min_edge", 8.0)
+    if edge >= smash_edge:
+        return "SMASH"
+    if edge >= 5.0:
+        return "LEAN"
+    if edge >= 2.0:
+        return "FADE"
+    return "STAY_AWAY"
 
 
 def build_rant(verdict, player="", stat="", line="", edge="", prob=""):
@@ -1782,14 +1799,7 @@ def joseph_analyze_pick(player_data, prop_line, stat_type, game_context,
             strategy = {}
 
         # --- Verdict ---
-        if edge >= 8.0:
-            verdict = "SMASH"
-        elif edge >= 5.0:
-            verdict = "LEAN"
-        elif edge >= 2.0:
-            verdict = "FADE"
-        else:
-            verdict = "STAY_AWAY"
+        verdict = determine_verdict(edge, confidence)
 
         # --- Narrative tags ---
         narrative_tags = []
@@ -2888,14 +2898,7 @@ def joseph_full_analysis(analysis_result: dict, player: dict, game: dict,
             override_direction = "UPGRADE" if joseph_edge > qme_edge else "DOWNGRADE"
 
         # Step 6 — CONCLUDE
-        if joseph_edge >= 8.0:
-            verdict = "SMASH"
-        elif joseph_edge >= 5.0:
-            verdict = "LEAN"
-        elif joseph_edge >= 2.0:
-            verdict = "FADE"
-        else:
-            verdict = "STAY_AWAY"
+        verdict = determine_verdict(joseph_edge, confidence_score)
         verdict_emoji = VERDICT_EMOJIS.get(verdict, "")
 
         prop_data = {

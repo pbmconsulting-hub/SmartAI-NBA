@@ -260,6 +260,32 @@ class TestDetermineVerdictStub(unittest.TestCase):
         v = determine_verdict(10.0, 80.0, avoid=True)
         self.assertEqual(v, "STAY_AWAY")
 
+    def test_smash_on_high_edge(self):
+        from engine.joseph_brain import determine_verdict
+        self.assertEqual(determine_verdict(10.0, 80.0), "SMASH")
+        self.assertEqual(determine_verdict(8.0, 70.0), "SMASH")
+        self.assertEqual(determine_verdict(15.0, 90.0), "SMASH")
+
+    def test_lean_on_mid_edge(self):
+        from engine.joseph_brain import determine_verdict
+        self.assertEqual(determine_verdict(5.0, 60.0), "LEAN")
+        self.assertEqual(determine_verdict(7.9, 65.0), "LEAN")
+
+    def test_fade_on_low_edge(self):
+        from engine.joseph_brain import determine_verdict
+        self.assertEqual(determine_verdict(2.0, 50.0), "FADE")
+        self.assertEqual(determine_verdict(4.9, 40.0), "FADE")
+
+    def test_stay_away_on_minimal_edge(self):
+        from engine.joseph_brain import determine_verdict
+        self.assertEqual(determine_verdict(1.0, 30.0), "STAY_AWAY")
+        self.assertEqual(determine_verdict(0.0, 10.0), "STAY_AWAY")
+        self.assertEqual(determine_verdict(-2.0, 20.0), "STAY_AWAY")
+
+    def test_avoid_overrides_high_edge(self):
+        from engine.joseph_brain import determine_verdict
+        self.assertEqual(determine_verdict(15.0, 95.0, avoid=True), "STAY_AWAY")
+
 
 class TestBuildRantStub(unittest.TestCase):
     def test_returns_string(self):
