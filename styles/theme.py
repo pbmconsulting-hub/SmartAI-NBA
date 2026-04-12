@@ -1465,26 +1465,8 @@ button[kind="primary"]:hover {
 }
 
 /* ─── Sidebar NBA Branding ────────────────────────────────── */
-/* Adds "🏀 Smart Pick Pro — NBA Edition" below the   */
-/* existing "⚡ Powered by Quantum Matrix Engine 5.6" text.   */
-[data-testid="stSidebar"]::before {
-    content: "🏀 Smart Pick Pro · NBA Edition";
-    display: block;
-    position: fixed;
-    bottom: 44px;
-    left: 0;
-    width: 100%;
-    padding: 0 20px;
-    box-sizing: border-box;
-    text-align: center;
-    font-size: 0.62rem;
-    font-family: 'Bebas Neue', 'Oswald', 'Courier New', monospace;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    color: rgba(200,16,46,0.80) !important;
-    pointer-events: none;
-    text-shadow: 0 0 8px rgba(200,16,46,0.35);
-}
+/* Logo is now rendered via st.logo() at the top of the       */
+/* sidebar; the text pseudo-element has been removed.         */
 
 /* ─── Half-Court Arc Watermark ────────────────────────────── */
 /* Subtle basketball court arc on main content background     */
@@ -1910,9 +1892,8 @@ input:focus, textarea:focus, select:focus,
         border-color: rgba(255,255,255,0.06) !important;
         margin: 4px 0 !important;
     }
-    /* Hide "Powered by" footer & branding on mobile to save space */
-    [data-testid="stSidebar"]::after,
-    [data-testid="stSidebar"]::before {
+    /* Hide "Powered by" footer on mobile to save space */
+    [data-testid="stSidebar"]::after {
         display: none !important;
     }
     /* Ensure main content doesn't shift under the overlay sidebar */
@@ -2369,6 +2350,123 @@ input:focus, textarea:focus, select:focus,
     100% { background-position: 200% center; }
 }
 /* NOTE: .tier-platinum is now a metallic badge — no text-clip needed */
+
+/* ═══════════════════════════════════════════════════════════
+   CORRELATION MATRIX — Mobile Responsive
+   ═══════════════════════════════════════════════════════════ */
+.corr-stats-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0;
+}
+.corr-stat-card {
+    flex: 1;
+    min-width: 120px;
+    background: linear-gradient(135deg, #070A13, #0F172A);
+    border-radius: 8px;
+    padding: 10px 14px;
+    text-align: center;
+}
+.corr-stat-label {
+    color: #64748b;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.corr-stat-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+}
+.corr-insight {
+    background: linear-gradient(135deg, #070A13, #0F172A);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 12px 0;
+}
+.corr-insight-title {
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.corr-insight-body {
+    color: #c0d0e8;
+    font-size: 0.82rem;
+}
+.corr-heatmap-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -4px;
+    padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+    .corr-stats-bar {
+        gap: 8px;
+    }
+    .corr-stat-card {
+        min-width: calc(50% - 8px);
+        flex: 1 1 calc(50% - 8px);
+        padding: 8px 10px;
+    }
+    .corr-stat-value {
+        font-size: 1rem;
+    }
+    .corr-insight {
+        padding: 10px 12px;
+        margin: 8px 0;
+    }
+    .corr-insight-title {
+        font-size: 0.80rem;
+    }
+    .corr-insight-body {
+        font-size: 0.78rem;
+    }
+    /* Force the Plotly heatmap container to allow horizontal scroll */
+    .corr-heatmap-wrap {
+        margin: 0 -8px;
+        padding: 0 8px 8px;
+    }
+    .corr-heatmap-wrap .stPlotlyChart,
+    .corr-heatmap-wrap [data-testid="stPlotlyChart"] {
+        min-width: 480px;
+    }
+}
+
+@media (max-width: 480px) {
+    .corr-stats-bar {
+        flex-direction: column;
+        gap: 6px;
+    }
+    .corr-stat-card {
+        min-width: 100%;
+        flex: 1 1 100%;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .corr-stat-label {
+        font-size: 0.62rem;
+    }
+    .corr-stat-value {
+        font-size: 0.95rem;
+    }
+    .corr-insight {
+        padding: 8px 10px;
+    }
+    .corr-insight-title {
+        font-size: 0.76rem;
+    }
+    .corr-insight-body {
+        font-size: 0.74rem;
+    }
+    .corr-heatmap-wrap .stPlotlyChart,
+    .corr-heatmap-wrap [data-testid="stPlotlyChart"] {
+        min-width: 400px;
+    }
+}
 </style>
 """
 
