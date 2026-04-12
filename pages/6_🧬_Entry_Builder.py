@@ -805,259 +805,258 @@ if _stored_entries:
     st.success(f"✅ Built {len(_show_entries)} optimal entries!"
                + (f" (budget-limited to {_effective_max})" if session_budget > 0 and _effective_max < len(_stored_entries) else ""))
 
-    if True:  # Maintain original indentation structure
-        for entry_rank, entry in enumerate(_show_entries, start=1):
-            picks = entry["picks"]
-            ev_result = entry["ev_result"]
-            confidence = entry["combined_confidence"]
-            ev_display = format_ev_display(ev_result, entry_fee)
+    for entry_rank, entry in enumerate(_show_entries, start=1):
+        picks = entry["picks"]
+        ev_result = entry["ev_result"]
+        confidence = entry["combined_confidence"]
+        ev_display = format_ev_display(ev_result, entry_fee)
 
-            ev_color = "green" if ev_display["is_positive_ev"] else "red"
-            ev_label = ev_display["ev_label"]
-            roi_label = ev_display["roi_label"]
+        ev_color = "green" if ev_display["is_positive_ev"] else "red"
+        ev_label = ev_display["ev_label"]
+        roi_label = ev_display["roi_label"]
 
-            # ── Visual Parlay Card ────────────────────────────────────────
-            _card_border = "#00ff9d" if ev_display["is_positive_ev"] else "#ff4444"
-            _pick_cells = ""
-            for _pick in picks:
-                _pdir = _pick.get("direction", "OVER")
-                _parrow = "⬆️" if _pdir == "OVER" else "⬇️"
-                _ptier = _pick.get("tier_emoji", "🥉")
-                _pprob = _pick.get("probability_over", 0.5)
-                _pdisp_prob = (_pprob if _pdir == "OVER" else 1.0 - _pprob) * 100
-                _pname = _pick.get("player_name", "")
-                _pstat = _pick.get("stat_type", "").title()
-                _pline = _pick.get("line", 0)
-                _pedge = _pick.get("edge_percentage", 0)
-                _pteam = _pick.get("team", "")
-                _is_locked = _pname in st.session_state.get("locked_legs", set())
-                _lock_badge = ' <span style="background:#c800ff;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.68rem;">🔒 LOCKED</span>' if _is_locked else ""
-                _prob_color = "#00ff9d" if _pdisp_prob >= 60 else ("#ffcc00" if _pdisp_prob >= 55 else "#ff6b6b")
-                _pick_cells += (
-                    f'<div style="flex:1;min-width:120px;background:rgba(0,0,0,0.3);border-radius:8px;'
-                    f'padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.08);">'
-                    f'<div style="font-size:0.75rem;color:#8a9bb8;">{_html_eb.escape(_pteam)}</div>'
-                    f'<div style="font-size:0.88rem;font-weight:700;color:#c0d0e8;margin:4px 0;">'
-                    f'{_html_eb.escape(_pname)}{_lock_badge}</div>'
-                    f'<div style="font-size:1.1rem;color:{_prob_color};font-weight:800;">'
-                    f'{_parrow} {_pdir}</div>'
-                    f'<div style="font-size:0.8rem;color:#8a9bb8;">{_pstat} {_pline}</div>'
-                    f'<div style="font-size:0.85rem;color:{_prob_color};font-weight:700;">{_pdisp_prob:.0f}%</div>'
-                    f'<div style="font-size:0.72rem;color:#8a9bb8;">{_ptier} Edge: {_pedge:+.1f}%</div>'
-                    f'</div>'
-                )
-
-            st.markdown(
-                f'<div style="background:#14192b;border-radius:10px;padding:16px 20px;'
-                f'margin-bottom:16px;border-top:3px solid {_card_border};">'
-                f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
-                f'<div style="font-family:Orbitron,sans-serif;font-size:1rem;color:{_card_border};font-weight:700;">'
-                f'Entry #{entry_rank}</div>'
-                f'<div style="display:flex;gap:16px;font-size:0.85rem;">'
-                f'<span style="color:{_card_border};font-weight:700;">EV: {_html_eb.escape(ev_label)}</span>'
-                f'<span style="color:#8a9bb8;">ROI: {_html_eb.escape(roi_label)}</span>'
-                f'<span style="color:#8a9bb8;">Confidence: {confidence:.0f}/100</span>'
-                f'</div></div>'
-                f'<div style="display:flex;gap:8px;flex-wrap:wrap;">{_pick_cells}</div>'
-                f'</div>',
-                unsafe_allow_html=True,
+        # ── Visual Parlay Card ────────────────────────────────────────
+        _card_border = "#00ff9d" if ev_display["is_positive_ev"] else "#ff4444"
+        _pick_cells = ""
+        for _pick in picks:
+            _pdir = _pick.get("direction", "OVER")
+            _parrow = "⬆️" if _pdir == "OVER" else "⬇️"
+            _ptier = _pick.get("tier_emoji", "🥉")
+            _pprob = _pick.get("probability_over", 0.5)
+            _pdisp_prob = (_pprob if _pdir == "OVER" else 1.0 - _pprob) * 100
+            _pname = _pick.get("player_name", "")
+            _pstat = _pick.get("stat_type", "").title()
+            _pline = _pick.get("line", 0)
+            _pedge = _pick.get("edge_percentage", 0)
+            _pteam = _pick.get("team", "")
+            _is_locked = _pname in st.session_state.get("locked_legs", set())
+            _lock_badge = ' <span style="background:#c800ff;color:#fff;padding:1px 5px;border-radius:3px;font-size:0.68rem;">🔒 LOCKED</span>' if _is_locked else ""
+            _prob_color = "#00ff9d" if _pdisp_prob >= 60 else ("#ffcc00" if _pdisp_prob >= 55 else "#ff6b6b")
+            _pick_cells += (
+                f'<div style="flex:1;min-width:120px;background:rgba(0,0,0,0.3);border-radius:8px;'
+                f'padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.08);">'
+                f'<div style="font-size:0.75rem;color:#8a9bb8;">{_html_eb.escape(_pteam)}</div>'
+                f'<div style="font-size:0.88rem;font-weight:700;color:#c0d0e8;margin:4px 0;">'
+                f'{_html_eb.escape(_pname)}{_lock_badge}</div>'
+                f'<div style="font-size:1.1rem;color:{_prob_color};font-weight:800;">'
+                f'{_parrow} {_pdir}</div>'
+                f'<div style="font-size:0.8rem;color:#8a9bb8;">{_pstat} {_pline}</div>'
+                f'<div style="font-size:0.85rem;color:{_prob_color};font-weight:700;">{_pdisp_prob:.0f}%</div>'
+                f'<div style="font-size:0.72rem;color:#8a9bb8;">{_ptier} Edge: {_pedge:+.1f}%</div>'
+                f'</div>'
             )
 
-            # Correlation risk warnings
-            corr_risk = entry.get("correlation_risk", {})
-            corr_warnings = corr_risk.get("warnings", [])
-            if corr_warnings:
-                for w in corr_warnings:
-                    st.warning(w)
-            if ev_result.get("correlation_discount_applied"):
-                discount_pct = round((1.0 - corr_risk.get("discount_multiplier", 1.0)) * 100)
-                st.caption(f"📉 Correlation discount applied: −{discount_pct}% EV adjustment")
+        st.markdown(
+            f'<div style="background:#14192b;border-radius:10px;padding:16px 20px;'
+            f'margin-bottom:16px;border-top:3px solid {_card_border};">'
+            f'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+            f'<div style="font-family:Orbitron,sans-serif;font-size:1rem;color:{_card_border};font-weight:700;">'
+            f'Entry #{entry_rank}</div>'
+            f'<div style="display:flex;gap:16px;font-size:0.85rem;">'
+            f'<span style="color:{_card_border};font-weight:700;">EV: {_html_eb.escape(ev_label)}</span>'
+            f'<span style="color:#8a9bb8;">ROI: {_html_eb.escape(roi_label)}</span>'
+            f'<span style="color:#8a9bb8;">Confidence: {confidence:.0f}/100</span>'
+            f'</div></div>'
+            f'<div style="display:flex;gap:8px;flex-wrap:wrap;">{_pick_cells}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-            # Weakest link warning + swap suggestion + Swap button (#12)
-            weakest = entry.get("weakest_link")
-            weakest_label = entry.get("weakest_link_label", "")
-            weakest_prob = entry.get("weakest_link_probability", 0.5)
-            if weakest and weakest_prob < 0.60:
-                swap = suggest_swap(weakest, qualifying_picks, picks)
-                if swap:
-                    st.warning(
-                        f"⚠️ **Weakest leg:** {weakest_label} — "
-                        f"consider swapping: {swap.get('swap_reason', '')}"
-                    )
-                    if st.button(
-                        f"🔄 Swap: Replace with {swap.get('player_name','')}",
-                        key=f"swap_built_{entry_rank}",
-                    ):
-                        _new_picks = [
-                            swap if (p.get("player_name") == weakest.get("player_name") and p.get("stat_type") == weakest.get("stat_type"))
-                            else p
-                            for p in st.session_state.get("selected_picks", [])
-                        ]
-                        st.session_state["selected_picks"] = _new_picks
-                        st.rerun()
-                else:
-                    st.caption(f"⚠️ Weakest leg: {weakest_label}")
+        # Correlation risk warnings
+        corr_risk = entry.get("correlation_risk", {})
+        corr_warnings = corr_risk.get("warnings", [])
+        if corr_warnings:
+            for w in corr_warnings:
+                st.warning(w)
+        if ev_result.get("correlation_discount_applied"):
+            discount_pct = round((1.0 - corr_risk.get("discount_multiplier", 1.0)) * 100)
+            st.caption(f"📉 Correlation discount applied: −{discount_pct}% EV adjustment")
 
-            # Show payout breakdown
-            with st.expander(f"💰 Entry #{entry_rank} Payout Breakdown"):
-                prob_per_hits = ev_result.get("probability_per_hits", {})
-                payout_per_hits = ev_result.get("payout_per_hits", {})
-
-                breakdown_rows = []
-                for hits in sorted(prob_per_hits.keys(), reverse=True):
-                    prob_pct = prob_per_hits[hits] * 100
-                    payout = payout_per_hits.get(hits, 0)
-                    breakdown_rows.append({
-                        "Hits": hits,
-                        "Probability": f"{prob_pct:.1f}%",
-                        "Payout": f"${payout:.2f}",
-                    })
-
-                st.dataframe(breakdown_rows, width="stretch", hide_index=True)
-                st.caption(
-                    f"**Total Expected Return:** ${ev_result.get('total_expected_return', 0):.2f} "
-                    f"on ${entry_fee:.2f} entry = **Net EV: {ev_label}**"
+        # Weakest link warning + swap suggestion + Swap button (#12)
+        weakest = entry.get("weakest_link")
+        weakest_label = entry.get("weakest_link_label", "")
+        weakest_prob = entry.get("weakest_link_probability", 0.5)
+        if weakest and weakest_prob < 0.60:
+            swap = suggest_swap(weakest, qualifying_picks, picks)
+            if swap:
+                st.warning(
+                    f"⚠️ **Weakest leg:** {weakest_label} — "
+                    f"consider swapping: {swap.get('swap_reason', '')}"
                 )
-
-            # Feature 5: Kelly bankroll sizing
-            try:
-                if calculate_kelly_fraction is not None and bankroll_amount > 0:
-                    _win_prob = entry.get("combined_probability", 0.5)
-                    _payout_mult = entry.get("ev_result", {}).get("best_payout_multiplier", 3.0)
-                    if _payout_mult > 0:
-                        _kelly = calculate_kelly_fraction(_win_prob, _payout_mult, kelly_mode)
-                        _recommended_bet = round(_kelly * bankroll_amount, 2)
-                        if _recommended_bet > 0:
-                            st.caption(f"💰 Kelly sizing: **${_recommended_bet:.2f}** ({_kelly*100:.1f}% of bankroll) — {kelly_mode} Kelly")
-            except Exception as _exc:
-                logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
-
-            # Feature 10: Flex vs Power recommendation
-            try:
-                if selected_platform == "DraftKings":
-                    _entry_probs = [
-                        p.get("probability_over", 0.5) if p.get("direction") == "OVER"
-                        else 1.0 - p.get("probability_over", 0.5)
-                        for p in entry.get("picks", [])
+                if st.button(
+                    f"🔄 Swap: Replace with {swap.get('player_name','')}",
+                    key=f"swap_built_{entry_rank}",
+                ):
+                    _new_picks = [
+                        swap if (p.get("player_name") == weakest.get("player_name") and p.get("stat_type") == weakest.get("stat_type"))
+                        else p
+                        for p in st.session_state.get("selected_picks", [])
                     ]
-                    if len(_entry_probs) >= 2:
-                        _play_type = optimize_play_type(_entry_probs, len(_entry_probs), "DraftKings")
-                        _pt_color = "green" if _play_type["recommended_play_type"] == "Power" else "blue"
-                        st.markdown(
-                            f"**Play Type:** :{_pt_color}[{_play_type['recommended_play_type']} recommended]** — "
-                            f"Flex EV: ${_play_type['flex_ev']:.2f} | Power EV: ${_play_type['power_ev']:.2f}<br>"
-                            f"_{_play_type['reasoning']}_",
-                            unsafe_allow_html=True,
-                        )
-            except Exception as _exc:
-                logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
+                    st.session_state["selected_picks"] = _new_picks
+                    st.rerun()
+            else:
+                st.caption(f"⚠️ Weakest leg: {weakest_label}")
 
-            # ── One-Click "Log to Bet Tracker" (#9) ──────────────────
-            if st.button(f"📋 Log Entry #{entry_rank} to Bet Tracker", key=f"log_entry_{entry_rank}"):
-                try:
-                    from tracking.database import insert_bet as _insert_bet_eb
-                    _today_str = _dt.date.today().isoformat()
-                    _logged_count = 0
-                    for _lp in picks:
-                        _bet_data = {
-                            "bet_date": _today_str,
-                            "player_name": _lp.get("player_name", ""),
-                            "team": _lp.get("player_team", _lp.get("team", "")),
-                            "stat_type": _lp.get("stat_type", ""),
-                            "prop_line": float(_lp.get("line", 0)),
-                            "direction": _lp.get("direction", "OVER"),
-                            "platform": selected_platform,
-                            "confidence_score": float(_lp.get("confidence_score", 0)),
-                            "probability_over": float(_lp.get("probability_over", 0.5)),
-                            "edge_percentage": float(_lp.get("edge_percentage", 0)),
-                            "tier": _lp.get("tier", "Bronze"),
-                            "entry_type": "parlay",
-                            "entry_fee": float(entry_fee),
-                            "notes": f"Entry #{entry_rank} ({entry_size}-pick, EV: {ev_label})",
-                            "auto_logged": 1,
-                        }
-                        _row_id = _insert_bet_eb(_bet_data)
-                        if _row_id:
-                            _logged_count += 1
-                    if _logged_count:
-                        st.success(f"✅ Logged {_logged_count} leg(s) from Entry #{entry_rank} to Bet Tracker!")
-                    else:
-                        st.error("Failed to log entry. Check database connection.")
-                except Exception as _log_exc:
-                    st.error(f"Error logging entry: {_log_exc}")
+        # Show payout breakdown
+        with st.expander(f"💰 Entry #{entry_rank} Payout Breakdown"):
+            prob_per_hits = ev_result.get("probability_per_hits", {})
+            payout_per_hits = ev_result.get("payout_per_hits", {})
 
-            st.markdown("---")
-
-        # ════ JOSEPH REACTS TO ENTRY ════
-        if st.session_state.get("joseph_enabled", True):
-            try:
-                from utils.joseph_widget import inject_joseph_inline_commentary
-                st.session_state["joseph_entry_just_built"] = True
-                _entry_results = [{"player_name": leg.get("player_name",""), "stat_type": leg.get("stat_type",""),
-                                   "line": leg.get("line",0), "direction": leg.get("direction",""),
-                                   "edge_percentage": leg.get("edge_percentage",0)}
-                                  for entry in (_stored_entries[:3] if _stored_entries else [])
-                                  for leg in entry.get("legs", [])]
-                if _entry_results:
-                    inject_joseph_inline_commentary(_entry_results, "entry_built")
-            except Exception:
-                pass
-        # ════ END JOSEPH ENTRY REACTION ════
-
-        # ════ AUTO-LOG ENTRIES TO BET TRACKER (B10) ════
-        # Automatically save each built entry as a parlay in the Bet Tracker
-        # database so users can track multi-leg results from the 🎰 Parlays tab.
-        try:
-            from tracking.database import insert_entry as _eb_insert_entry, insert_bet as _eb_insert_bet, link_bets_to_entry as _eb_link
-            import datetime as _dt_eb
-
-            _today_str = _dt_eb.date.today().isoformat()
-            _logged_count = 0
-
-            for _entry in _show_entries:
-                _ev_result = _entry.get("ev_result", {})
-                _ev_net = _ev_result.get("net_expected_value", 0.0)
-                _picks = _entry.get("picks", [])
-
-                _entry_id = _eb_insert_entry({
-                    "entry_date": _today_str,
-                    "platform": selected_platform,
-                    "entry_type": "parlay",
-                    "entry_fee": float(entry_fee),
-                    "expected_value": _ev_net,
-                    "pick_count": len(_picks),
-                    "notes": f"Auto-logged from Entry Builder",
+            breakdown_rows = []
+            for hits in sorted(prob_per_hits.keys(), reverse=True):
+                prob_pct = prob_per_hits[hits] * 100
+                payout = payout_per_hits.get(hits, 0)
+                breakdown_rows.append({
+                    "Hits": hits,
+                    "Probability": f"{prob_pct:.1f}%",
+                    "Payout": f"${payout:.2f}",
                 })
 
-                if _entry_id and _picks:
-                    _leg_ids = []
-                    for _pick in _picks:
-                        _bet_id = _eb_insert_bet({
-                            "bet_date": _today_str,
-                            "player_name": _pick.get("player_name", ""),
-                            "team": _pick.get("team", ""),
-                            "stat_type": _pick.get("stat_type", ""),
-                            "prop_line": _pick.get("line", 0.0),
-                            "direction": _pick.get("direction", ""),
-                            "platform": selected_platform,
-                            "confidence_score": _pick.get("confidence_score", 0.0),
-                            "tier": _pick.get("tier", ""),
-                            "edge_percentage": _pick.get("edge_percentage", 0.0),
-                            "player_id": _pick.get("player_id", ""),
-                            "entry_fee": float(entry_fee) / max(len(_picks), 1),
-                        })
-                        if _bet_id:
-                            _leg_ids.append(_bet_id)
+            st.dataframe(breakdown_rows, width="stretch", hide_index=True)
+            st.caption(
+                f"**Total Expected Return:** ${ev_result.get('total_expected_return', 0):.2f} "
+                f"on ${entry_fee:.2f} entry = **Net EV: {ev_label}**"
+            )
 
-                    if _leg_ids:
-                        _eb_link(_leg_ids, _entry_id)
+        # Feature 5: Kelly bankroll sizing
+        try:
+            if calculate_kelly_fraction is not None and bankroll_amount > 0:
+                _win_prob = entry.get("combined_probability", 0.5)
+                _payout_mult = entry.get("ev_result", {}).get("best_payout_multiplier", 3.0)
+                if _payout_mult > 0:
+                    _kelly = calculate_kelly_fraction(_win_prob, _payout_mult, kelly_mode)
+                    _recommended_bet = round(_kelly * bankroll_amount, 2)
+                    if _recommended_bet > 0:
+                        st.caption(f"💰 Kelly sizing: **${_recommended_bet:.2f}** ({_kelly*100:.1f}% of bankroll) — {kelly_mode} Kelly")
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
+
+        # Feature 10: Flex vs Power recommendation
+        try:
+            if selected_platform == "DraftKings":
+                _entry_probs = [
+                    p.get("probability_over", 0.5) if p.get("direction") == "OVER"
+                    else 1.0 - p.get("probability_over", 0.5)
+                    for p in entry.get("picks", [])
+                ]
+                if len(_entry_probs) >= 2:
+                    _play_type = optimize_play_type(_entry_probs, len(_entry_probs), "DraftKings")
+                    _pt_color = "green" if _play_type["recommended_play_type"] == "Power" else "blue"
+                    st.markdown(
+                        f"**Play Type:** :{_pt_color}[{_play_type['recommended_play_type']} recommended]** — "
+                        f"Flex EV: ${_play_type['flex_ev']:.2f} | Power EV: ${_play_type['power_ev']:.2f}<br>"
+                        f"_{_play_type['reasoning']}_",
+                        unsafe_allow_html=True,
+                    )
+        except Exception as _exc:
+            logging.getLogger(__name__).warning(f"[EntryBuilder] Unexpected error: {_exc}")
+
+        # ── One-Click "Log to Bet Tracker" (#9) ──────────────────
+        if st.button(f"📋 Log Entry #{entry_rank} to Bet Tracker", key=f"log_entry_{entry_rank}"):
+            try:
+                from tracking.database import insert_bet as _insert_bet_eb
+                _today_str = _dt.date.today().isoformat()
+                _logged_count = 0
+                for _lp in picks:
+                    _bet_data = {
+                        "bet_date": _today_str,
+                        "player_name": _lp.get("player_name", ""),
+                        "team": _lp.get("player_team", _lp.get("team", "")),
+                        "stat_type": _lp.get("stat_type", ""),
+                        "prop_line": float(_lp.get("line", 0)),
+                        "direction": _lp.get("direction", "OVER"),
+                        "platform": selected_platform,
+                        "confidence_score": float(_lp.get("confidence_score", 0)),
+                        "probability_over": float(_lp.get("probability_over", 0.5)),
+                        "edge_percentage": float(_lp.get("edge_percentage", 0)),
+                        "tier": _lp.get("tier", "Bronze"),
+                        "entry_type": "parlay",
+                        "entry_fee": float(entry_fee),
+                        "notes": f"Entry #{entry_rank} ({entry_size}-pick, EV: {ev_label})",
+                        "auto_logged": 1,
+                    }
+                    _row_id = _insert_bet_eb(_bet_data)
+                    if _row_id:
                         _logged_count += 1
+                if _logged_count:
+                    st.success(f"✅ Logged {_logged_count} leg(s) from Entry #{entry_rank} to Bet Tracker!")
+                else:
+                    st.error("Failed to log entry. Check database connection.")
+            except Exception as _log_exc:
+                st.error(f"Error logging entry: {_log_exc}")
 
-            if _logged_count > 0:
-                st.toast(f"🎰 Auto-logged {_logged_count} entries to the Bet Tracker → Parlays tab.")
-        except Exception as _eb_log_exc:
-            logging.getLogger(__name__).debug(f"[EntryBuilder] Auto-log to tracker: {_eb_log_exc}")
-        # ════ END AUTO-LOG ════
+        st.markdown("---")
+
+    # ════ JOSEPH REACTS TO ENTRY ════
+    if st.session_state.get("joseph_enabled", True):
+        try:
+            from utils.joseph_widget import inject_joseph_inline_commentary
+            st.session_state["joseph_entry_just_built"] = True
+            _entry_results = [{"player_name": leg.get("player_name",""), "stat_type": leg.get("stat_type",""),
+                               "line": leg.get("line",0), "direction": leg.get("direction",""),
+                               "edge_percentage": leg.get("edge_percentage",0)}
+                              for entry in (_stored_entries[:3] if _stored_entries else [])
+                              for leg in entry.get("legs", [])]
+            if _entry_results:
+                inject_joseph_inline_commentary(_entry_results, "entry_built")
+        except Exception:
+            pass
+    # ════ END JOSEPH ENTRY REACTION ════
+
+    # ════ AUTO-LOG ENTRIES TO BET TRACKER (B10) ════
+    # Automatically save each built entry as a parlay in the Bet Tracker
+    # database so users can track multi-leg results from the 🎰 Parlays tab.
+    try:
+        from tracking.database import insert_entry as _eb_insert_entry, insert_bet as _eb_insert_bet, link_bets_to_entry as _eb_link
+        import datetime as _dt_eb
+
+        _today_str = _dt_eb.date.today().isoformat()
+        _logged_count = 0
+
+        for _entry in _show_entries:
+            _ev_result = _entry.get("ev_result", {})
+            _ev_net = _ev_result.get("net_expected_value", 0.0)
+            _picks = _entry.get("picks", [])
+
+            _entry_id = _eb_insert_entry({
+                "entry_date": _today_str,
+                "platform": selected_platform,
+                "entry_type": "parlay",
+                "entry_fee": float(entry_fee),
+                "expected_value": _ev_net,
+                "pick_count": len(_picks),
+                "notes": f"Auto-logged from Entry Builder",
+            })
+
+            if _entry_id and _picks:
+                _leg_ids = []
+                for _pick in _picks:
+                    _bet_id = _eb_insert_bet({
+                        "bet_date": _today_str,
+                        "player_name": _pick.get("player_name", ""),
+                        "team": _pick.get("team", ""),
+                        "stat_type": _pick.get("stat_type", ""),
+                        "prop_line": _pick.get("line", 0.0),
+                        "direction": _pick.get("direction", ""),
+                        "platform": selected_platform,
+                        "confidence_score": _pick.get("confidence_score", 0.0),
+                        "tier": _pick.get("tier", ""),
+                        "edge_percentage": _pick.get("edge_percentage", 0.0),
+                        "player_id": _pick.get("player_id", ""),
+                        "entry_fee": float(entry_fee) / max(len(_picks), 1),
+                    })
+                    if _bet_id:
+                        _leg_ids.append(_bet_id)
+
+                if _leg_ids:
+                    _eb_link(_leg_ids, _entry_id)
+                    _logged_count += 1
+
+        if _logged_count > 0:
+            st.toast(f"🎰 Auto-logged {_logged_count} entries to the Bet Tracker → Parlays tab.")
+    except Exception as _eb_log_exc:
+        logging.getLogger(__name__).debug(f"[EntryBuilder] Auto-log to tracker: {_eb_log_exc}")
+    # ════ END AUTO-LOG ════
 
     # Feature 5: Session risk summary
     try:
