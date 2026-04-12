@@ -1399,6 +1399,14 @@ if _home_one_click:
     import time as _hoc_time
     st.subheader("⚡ One-Click Setup")
     st.markdown("Running **Auto-Load** + **Get Live Props** in one step…")
+
+    # ── Joseph Loading Screen — NBA fun facts while loading slate ──
+    try:
+        from utils.joseph_loading import joseph_loading_placeholder
+        _hoc_joseph_loader = joseph_loading_placeholder("Loading tonight's slate")
+    except Exception:
+        _hoc_joseph_loader = None
+
     _hoc_bar = st.progress(0)
     _hoc_status = st.empty()
 
@@ -1499,6 +1507,12 @@ if _home_one_click:
         _hoc_bar.progress(100)
         _hoc_status.empty()
         _hoc_bar.empty()
+        # Dismiss the Joseph loading screen
+        if _hoc_joseph_loader is not None:
+            try:
+                _hoc_joseph_loader.empty()
+            except Exception:
+                pass
 
         _hoc_total = len(st.session_state.get("current_props", []))
         st.success(
@@ -1515,6 +1529,12 @@ if _home_one_click:
     except Exception as _hoc_err:
         _hoc_bar.empty()
         _hoc_status.empty()
+        # Dismiss the Joseph loading screen on error
+        if _hoc_joseph_loader is not None:
+            try:
+                _hoc_joseph_loader.empty()
+            except Exception:
+                pass
         _hoc_err_str = str(_hoc_err)
         if "WebSocketClosedError" in _hoc_err_str or "StreamClosedError" in _hoc_err_str:
             pass
