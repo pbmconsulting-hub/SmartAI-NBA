@@ -230,7 +230,7 @@ def _get_sim_cache() -> dict:
 _MIN_IFRAME_HEIGHT = 400       # px — minimum even for a single player
 _HEIGHT_PER_PLAYER = 200       # px — collapsed card ≈ 180 px + padding
 _MAX_IFRAME_HEIGHT = 8000      # px — cap before ResizeObserver takes over
-_RESIZE_DEBOUNCE_MS = 50       # ms — debounce rapid ResizeObserver events
+_RESIZE_DEBOUNCE_MS = 200      # ms — debounce rapid ResizeObserver events (mobile-safe)
 _LAZY_CHUNK_SIZE = 15          # players per iframe — chunked to keep DOM small
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
 
@@ -244,13 +244,22 @@ _TIER_EMOJI = {"Platinum": "💎", "Gold": "🥇", "Silver": "🥈", "Bronze": "
 # Auto-resize JavaScript injected into every card-matrix iframe.
 # Sends ``streamlit:setFrameHeight`` postMessages so Streamlit adjusts
 # the iframe height whenever the content changes (e.g. <details> toggle).
+# Uses a scroll guard + height-change threshold to prevent mobile reload
+# loops caused by address-bar show/hide cycling scrollHeight.
 _IFRAME_RESIZE_JS = (
     "<script>"
     "(function(){"
-    "var timer;"
-    "function sendHeight(){clearTimeout(timer);timer=setTimeout(function(){"
+    "var timer,lastH=0,scrolling=false;"
+    "function sendHeight(){"
+    "if(scrolling)return;"
+    "clearTimeout(timer);timer=setTimeout(function(){"
+    "var h=document.body.scrollHeight;"
+    "if(Math.abs(h-lastH)<4)return;"
+    "lastH=h;"
     "window.parent.postMessage({type:'streamlit:setFrameHeight',"
-    f"height:document.body.scrollHeight}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    f"height:h}},'*')}},{_RESIZE_DEBOUNCE_MS})}}"
+    "window.addEventListener('touchmove',function(){scrolling=true;clearTimeout(timer)},{passive:true});"
+    "window.addEventListener('touchend',function(){setTimeout(function(){scrolling=false;sendHeight()},300)},{passive:true});"
     "sendHeight();new ResizeObserver(sendHeight).observe(document.body);"
     "document.addEventListener('toggle',sendHeight,true);"
     "window.addEventListener('load',sendHeight)"
@@ -281,8 +290,8 @@ def _render_card_iframe(card_html, player_count):
         "<!DOCTYPE html><html><head>"
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<style>html{overflow-y:auto}"
-        "body{margin:0;padding:0;background:transparent;color:#e0e0e0}</style>"
+        "<style>html{overflow-y:auto;overscroll-behavior:contain}"
+        "body{margin:0;padding:0;background:transparent;color:#e0e0e0;overscroll-behavior:contain}</style>"
         "</head><body>"
         f"{card_html}"
         f"{_IFRAME_RESIZE_JS}"
@@ -303,8 +312,13 @@ st.markdown(get_qds_css(), unsafe_allow_html=True)
 st.markdown(_get_gm_css(), unsafe_allow_html=True)
 
 # ── Reduce excessive bottom padding / blank space ─────────────
+# Also disable pull-to-refresh on mobile to prevent accidental reloads
+# when scrolling through player bets.
 st.markdown(
-    '<style>.main .block-container{padding-bottom:1rem !important}</style>',
+    '<style>'
+    '.main .block-container{padding-bottom:1rem !important}'
+    'html,body{overscroll-behavior-y:contain}'
+    '</style>',
     unsafe_allow_html=True,
 )
 
