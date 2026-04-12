@@ -586,7 +586,7 @@ def build_quick_analysis_rows(
             prop_line = 0.0
 
         # Look up player stats
-        player_data = find_player_by_name(player_name, players_data) or {}
+        player_data = find_player_by_name(players_data, player_name) or {}
 
         # Season avg
         avg_key = f"{stat_type}_avg"

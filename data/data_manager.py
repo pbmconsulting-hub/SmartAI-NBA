@@ -537,6 +537,8 @@ def _build_player_index(players_list):
     normalized_index = {}  # normalized name → player
 
     for player in players_list:
+        if not isinstance(player, dict):
+            continue
         raw_name = player.get("name", "")
         lname = raw_name.lower().strip()
         nname = normalize_player_name(raw_name)
@@ -621,6 +623,8 @@ def find_player_by_name_fuzzy(players_list, player_name):
     # --- Pass 4: Partial / substring match on normalized names (O(n) fallback) ---
     if len(search_normalized) > 3:
         for player in players_list:
+            if not isinstance(player, dict):
+                continue
             stored_normalized = normalize_player_name(player.get("name", ""))
             if (search_normalized in stored_normalized or stored_normalized in search_normalized):
                 return player

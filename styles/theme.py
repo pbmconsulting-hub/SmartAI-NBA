@@ -6023,6 +6023,42 @@ _PLAYER_INTEL_CSS = """
     .qa-card-metrics { flex-direction: column; }
     .qa-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Landscape mobile: compact QA components ─────────── */
+@media (max-width: 896px) and (orientation: landscape) {
+    .qa-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 10px;
+    }
+    .qa-kpi-bar { gap: 8px; margin-bottom: 10px; }
+    .qa-kpi {
+        padding: 10px 14px;
+        flex: 1 1 120px;
+    }
+    .qa-kpi-value { font-size: 1.4rem; }
+    .qa-kpi-label { font-size: 0.65rem; }
+    .qa-card {
+        padding: 12px 14px 10px;
+    }
+    .qa-card-player { font-size: 0.85rem; }
+    .qa-card-line { font-size: 1.15rem; }
+    .qa-card-metric-box { padding: 6px 8px; }
+    .qa-card-metric-val { font-size: 0.88rem; }
+    .qa-count-bar { padding: 6px 12px; font-size: 0.72rem; }
+}
+
+/* ── Landscape extra-small phones (very short viewport) ── */
+@media (max-height: 450px) and (orientation: landscape) {
+    .qa-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 8px;
+    }
+    .qa-kpi { padding: 8px 10px; flex: 1 1 100px; }
+    .qa-kpi-value { font-size: 1.2rem; }
+    .qa-card { padding: 10px 12px 8px; }
+    .qa-card-line { font-size: 1.05rem; }
+    .qa-card-metrics { gap: 6px; }
+}
 </style>
 """
 
