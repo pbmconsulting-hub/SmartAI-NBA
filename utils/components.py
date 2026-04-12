@@ -304,10 +304,6 @@ def inject_joseph_floating():
     _auto_restore_page_state()
     _auto_save_page_state()
 
-    # ── Site-wide Smart Pick Pro Logo ─────────────────────────
-    # Render the logo centered at the top of the main content area.
-    _render_spp_nav_logo()
-
     # ── Global Broadcast Ticker ───────────────────────────────
     try:
         _render_broadcast_ticker()
