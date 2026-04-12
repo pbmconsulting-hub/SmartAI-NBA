@@ -8646,25 +8646,12 @@ UNIFIED_PLAYER_CARD_CSS = """
         line-height: 1.5;
     }
 }
-@media (max-width: 640px) {
-    .upc-card > summary {
-        flex-wrap: wrap;
-        gap: 10px;
-        padding: 12px 14px;
-    }
-    .upc-headshot {
-        width: 60px;
-        height: 60px;
-    }
-    .upc-summary-right {
-        width: 100%;
-        justify-content: flex-end;
-    }
-    .upc-prop-pill {
-        font-size: 0.58rem;
-        padding: 1px 5px;
-    }
-}
+/* NOTE: The 640px breakpoint that was here has been removed.
+   All its rules are already covered by the 768px breakpoint above,
+   and having it AFTER the 480px breakpoint was overriding the
+   smaller-phone sizes (e.g. headshot 48px was being reset to 60px
+   on screens ≤480px because 480 < 640, so both matched but 640px
+   came last and won). */
 """
 
 
