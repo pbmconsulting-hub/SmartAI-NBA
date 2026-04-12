@@ -1013,7 +1013,7 @@ else:
             build_quick_analysis_rows,
             aggregate_streak_summary,
         )
-        from styles.theme import get_player_intel_css, get_form_dots_html
+        from styles.theme import get_player_intel_css, get_form_dots_html, get_qa_card_html, get_qa_kpi_bar_html
         _QA_AVAILABLE = True
     except ImportError:
         _QA_AVAILABLE = False
@@ -1045,18 +1045,17 @@ else:
                 for r in _qa_rows
             ]
             _streak_summary = aggregate_streak_summary(_all_intel_stubs)
+            _flagged_count = sum(1 for r in _qa_rows if r.get("is_flagged"))
 
-            _col_h, _col_c, _col_n = st.columns(3)
-            with _col_h:
-                st.metric("🔥 Hot Players", _streak_summary["hot_count"],
-                          help="Players hitting the over in 70%+ of last 5 games")
-            with _col_c:
-                st.metric("🧊 Cold Players", _streak_summary["cold_count"],
-                          help="Players hitting the over in 30% or fewer of last 5 games")
-            with _col_n:
-                _flagged_count = sum(1 for r in _qa_rows if r.get("is_flagged"))
-                st.metric("⚠️ Injury Flagged", _flagged_count,
-                          help="Players with GTD / Day-to-Day / Questionable status")
+            st.markdown(
+                get_qa_kpi_bar_html(
+                    hot_count=_streak_summary["hot_count"],
+                    cold_count=_streak_summary["cold_count"],
+                    flagged_count=_flagged_count,
+                    total_count=len(_qa_rows),
+                ),
+                unsafe_allow_html=True,
+            )
 
             # ── Filters ────────────────────────────────────────────────
             _qa_filter_col1, _qa_filter_col2, _qa_filter_col3 = st.columns(3)
@@ -1098,79 +1097,29 @@ else:
             else:
                 _filtered_rows.sort(key=lambda r: r.get("player_name", ""))
 
-            st.caption(f"Showing {len(_filtered_rows)} of {len(_qa_rows)} props")
-
-            # ── Quick Analysis rows ────────────────────────────────────
+            # ── Quick Analysis cards ───────────────────────────────────
+            # Build all card HTML and render as a single batched grid
+            _card_htmls = []
             for _qrow in _filtered_rows:
-                _qp = _qrow.get("player_name", "")
-                _qs = _qrow.get("stat_type", "")
-                _ql = _qrow.get("line", 0)
-                _qavg = _qrow.get("season_avg", 0.0)
-                _qedge = _qrow.get("edge_pct", 0.0)
-                _qdir = _qrow.get("direction", "—")
-                _qhr = _qrow.get("hit_rate", 0.0)
-                _qfl = _qrow.get("form_label", "No Data")
-                _qform = _qrow.get("form_results", [])
-                _qavail = _qrow.get("availability_badge", "🟢 Active")
-                _qinj = _qrow.get("injury_note", "")
-                _qstreak = _qrow.get("streak_label", "")
-                _qplat = _qrow.get("platform", "")
-                _qteam = _qrow.get("team", _qrow.get("player_team", ""))
+                _dots = get_form_dots_html(
+                    _qrow.get("form_results", []),
+                    window=5,
+                    prop_line=float(_qrow.get("line", 0) or 0),
+                )
+                _card_htmls.append(get_qa_card_html(_qrow, _dots))
 
-                with st.container(border=True):
-                    _c_player, _c_stat, _c_edge, _c_form, _c_status = st.columns(
-                        [3, 2, 2, 2, 2]
-                    )
-
-                    # Player + team + platform
-                    with _c_player:
-                        _plat_str = f" · {_qplat}" if _qplat else ""
-                        st.markdown(f"**{_qp}** · {_qteam}{_plat_str}")
-
-                    # Stat type + line + average
-                    with _c_stat:
-                        _stat_disp = _qs.replace("_", " ").title()
-                        _avg_str = f" (avg {_qavg:.1f})" if _qavg > 0 else ""
-                        st.markdown(f"{_stat_disp} **{_ql}**{_avg_str}")
-
-                    # Edge %
-                    with _c_edge:
-                        _edge_sign = "+" if _qedge >= 0 else ""
-                        _edge_val = f"{_edge_sign}{_qedge:.1f}%"
-                        if _qedge >= 4:
-                            st.markdown(f":green[**{_edge_val}**] {_qdir}")
-                        elif _qedge <= -4:
-                            st.markdown(f":red[**{_edge_val}**] {_qdir}")
-                        else:
-                            st.markdown(f":gray[**{_edge_val}**] {_qdir}")
-
-                    # Form dots + hit rate
-                    with _c_form:
-                        _dots_html = get_form_dots_html(
-                            _qform, window=5, prop_line=float(_ql or 0)
-                        )
-                        _hr_pct = int(_qhr * 100)
-                        if "Hot" in _qfl:
-                            _hr_md = f":orange[**{_hr_pct}% over**]"
-                        elif "Cold" in _qfl:
-                            _hr_md = f":blue[**{_hr_pct}% over**]"
-                        else:
-                            _hr_md = f":gray[{_hr_pct}% over]"
-                        st.markdown(
-                            f"{_dots_html} {_hr_md}",
-                            unsafe_allow_html=True,
-                        )
-
-                    # Availability + streak
-                    with _c_status:
-                        st.markdown(_qavail)
-                        if _qinj:
-                            st.caption(_qinj)
-                        if _qstreak:
-                            if "Over" in _qstreak:
-                                st.markdown(f"🔥 :orange[{_qstreak}]")
-                            else:
-                                st.markdown(f"🧊 :blue[{_qstreak}]")
+            _count_bar = (
+                f'<div class="qa-count-bar">'
+                f'<span>Showing <b>{len(_filtered_rows)}</b> of '
+                f'<b>{len(_qa_rows)}</b> props</span></div>'
+            )
+            _grid_html = (
+                _count_bar
+                + '<div class="qa-grid">'
+                + "\n".join(_card_htmls)
+                + "</div>"
+            )
+            st.markdown(_grid_html, unsafe_allow_html=True)
 
             # ── Hot/Cold summary footer ────────────────────────────────
             if _streak_summary["hot_players"]:
