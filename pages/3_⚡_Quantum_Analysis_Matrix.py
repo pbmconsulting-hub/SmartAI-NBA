@@ -348,6 +348,15 @@ st.markdown(
     'html,body,.stApp,[data-testid="stAppViewContainer"],'
     'section[data-testid="stMain"],.main,.block-container'
     '{overscroll-behavior-y:contain !important}'
+    # ── Mobile: prevent accidental widget taps while scrolling ──
+    # ``touch-action:manipulation`` disables double-tap-to-zoom and
+    # fast-tap on toggle/radio/checkbox widgets, reducing the chance
+    # that a scroll gesture accidentally triggers a Streamlit rerun.
+    # ``min-height:48px`` meets mobile touch-target guidelines.
+    '[data-testid="stToggle"],'
+    '[data-testid="stRadio"],'
+    '[data-testid="stCheckbox"]'
+    '{touch-action:manipulation;min-height:48px}'
     '</style>',
     unsafe_allow_html=True,
 )
@@ -1999,7 +2008,15 @@ if run_analysis:
             1 for r in analysis_results_list if not r.get("player_is_out", False)
         )
         _unmatched_ratio = len(_unmatched_players) / max(_total_non_out, 1)
-        if _unmatched_ratio > 0.20 and todays_games:
+        if (
+            _unmatched_ratio > 0.20
+            and todays_games
+            and not st.session_state.get("_smart_update_attempted")
+        ):
+            # Guard: only attempt the auto-update once per session to
+            # prevent an infinite rerun loop when the fetch always fails
+            # or the mismatch persists after updating.
+            st.session_state["_smart_update_attempted"] = True
             st.info(
                 f"🔄 **{len(_unmatched_players)} player(s) not found** in local database "
                 f"({_unmatched_ratio*100:.0f}% of props). Triggering Smart Roster Update…"
@@ -2091,7 +2108,12 @@ if run_analysis:
             # Auto-logging is best-effort — never block the main analysis flow
             _logger.warning(f"Auto-log error (non-fatal): {_auto_log_err}")
 
-        st.rerun()
+        # NOTE: st.rerun() was removed here.  The results are already
+        # stored in st.session_state["analysis_results"] and will render
+        # naturally when the script continues past the ``if run_analysis:``
+        # block.  The rerun was forcing a double-render which, on mobile,
+        # cascaded into an infinite rerun loop (scroll → widget touch →
+        # rerun → re-render → scroll → …).
     except Exception as _analysis_err:
         _err_str = str(_analysis_err)
         if "WebSocketClosedError" not in _err_str and "StreamClosedError" not in _err_str:
@@ -2148,57 +2170,105 @@ if analysis_results and st.session_state.get("_analysis_session_reloaded_at"):
 # ════ JOSEPH M. SMITH LIVE BROADCAST DESK ════
 # Reduce Joseph's container size by 60% on this page per design requirements.
 # CSS extracted to pages/helpers/quantum_analysis_helpers.py
+# Wrapped in @st.fragment so the heavy enrichment loop does NOT re-execute
+# on every scroll-triggered rerun — only when the fragment itself reruns.
 if analysis_results and st.session_state.get("joseph_enabled", True):
     st.markdown(_JOSEPH_DESK_SIZE_CSS, unsafe_allow_html=True)
-    try:
-        from pages.helpers.joseph_live_desk import render_joseph_live_desk
-        from data.advanced_metrics import enrich_player_god_mode
-        from data.data_manager import load_players_data, load_teams_data
-        from engine.joseph_bets import joseph_auto_log_bets
-        from utils.joseph_widget import inject_joseph_inline_commentary
 
-        _players = load_players_data()
-        _teams = {t.get("abbreviation", "").upper(): t for t in load_teams_data()}
-        _games = st.session_state.get("todays_games", [])
+    @st.fragment
+    def _render_joseph_desk():
+        """Render Joseph's Live Broadcast Desk in an isolated fragment.
 
-        _enriched = []
-        for _p in _players:
-            try:
-                _enriched.append(enrich_player_god_mode(_p, _games, _teams))
-            except Exception:
-                _enriched.append(_p)
-        _enriched_lookup = {str(p.get("name", "")).lower().strip(): p for p in _enriched}
+        The ``enrich_player_god_mode`` loop is expensive — running it on
+        every full-page rerun (triggered by mobile scroll events) was a
+        major contributor to the rerun cascade.  As a fragment, this
+        section only re-executes when a widget *inside* it is touched.
+        """
+        try:
+            from pages.helpers.joseph_live_desk import render_joseph_live_desk
+            from data.advanced_metrics import enrich_player_god_mode
+            from data.data_manager import load_players_data, load_teams_data
+            from engine.joseph_bets import joseph_auto_log_bets
+            from utils.joseph_widget import inject_joseph_inline_commentary
 
-        with st.container():
-            render_joseph_live_desk(
-                analysis_results=analysis_results,
-                enriched_players=_enriched_lookup,
-                teams_data=_teams,
-                todays_games=_games,
+            _players = load_players_data()
+            _teams = {t.get("abbreviation", "").upper(): t for t in load_teams_data()}
+            _games = st.session_state.get("todays_games", [])
+
+            _enriched = []
+            for _p in _players:
+                try:
+                    _enriched.append(enrich_player_god_mode(_p, _games, _teams))
+                except Exception:
+                    _enriched.append(_p)
+            _enriched_lookup = {str(p.get("name", "")).lower().strip(): p for p in _enriched}
+
+            with st.container():
+                render_joseph_live_desk(
+                    analysis_results=analysis_results,
+                    enriched_players=_enriched_lookup,
+                    teams_data=_teams,
+                    todays_games=_games,
+                )
+
+            # Use joseph_results (enriched with verdicts) for inline commentary
+            # when available; fall back to raw analysis_results.
+            _joseph_results = st.session_state.get("joseph_results", [])
+            inject_joseph_inline_commentary(
+                _joseph_results if _joseph_results else analysis_results,
+                "analysis_results",
             )
 
-        # Use joseph_results (enriched with verdicts) for inline commentary
-        # when available; fall back to raw analysis_results.
-        _joseph_results = st.session_state.get("joseph_results", [])
-        inject_joseph_inline_commentary(
-            _joseph_results if _joseph_results else analysis_results,
-            "analysis_results",
-        )
+            if not st.session_state.get("joseph_bets_logged", False):
+                if _joseph_results:
+                    _logged_count, _logged_msg = joseph_auto_log_bets(_joseph_results)
+                    if _logged_count > 0:
+                        st.toast(f"🎙️ {_logged_msg}")
+                    st.session_state["joseph_bets_logged"] = True
 
-        if not st.session_state.get("joseph_bets_logged", False):
-            if _joseph_results:
-                _logged_count, _logged_msg = joseph_auto_log_bets(_joseph_results)
-                if _logged_count > 0:
-                    st.toast(f"🎙️ {_logged_msg}")
-                st.session_state["joseph_bets_logged"] = True
+            st.divider()
+        except Exception as _joseph_err:
+            import logging
+            logging.getLogger(__name__).warning(f"Joseph Live Desk error: {_joseph_err}")
 
-        st.divider()
-    except Exception as _joseph_err:
-        import logging
-        logging.getLogger(__name__).warning(f"Joseph Live Desk error: {_joseph_err}")
+    _render_joseph_desk()
 # ════ END JOSEPH LIVE DESK ════
 
-if analysis_results:
+
+# ── Fragment: isolate results display so widget interactions (toggles,
+#    filter chips, multiselect, sort selectbox) only re-render this
+#    section — NOT the entire ~2900-line page.  This is the single
+#    highest-impact fix for the mobile rerun cascade.
+@st.fragment
+def _render_results_fragment():
+    """Display analysis results inside a Streamlit fragment.
+
+    Widgets inside this fragment (filter chips, sort controls, tier
+    multiselect, etc.) will only re-run *this* function on interaction,
+    preventing full-page reruns that cascade on mobile.
+    """
+    if not analysis_results:
+        if not run_analysis:
+            if current_props:
+                st.info("👆 Click **Run Analysis** to analyze all loaded props.")
+            else:
+                _has_games = bool(st.session_state.get("todays_games"))
+                if _has_games:
+                    st.warning(
+                        "⚠️ No props loaded yet. "
+                        "Go to **🔬 Prop Scanner** and click **🤖 Auto-Generate Props for Tonight** "
+                        "to instantly create props for all active players on tonight's teams — "
+                        "or click **🔄 Auto-Load Tonight's Games** on the **📡 Live Games** page "
+                        "to reload games and auto-generate props in one step."
+                    )
+                else:
+                    st.warning(
+                        "⚠️ No props loaded and no games found. "
+                        "Start on the **📡 Live Games** page — click **🔄 Auto-Load Tonight's Games** "
+                        "to load tonight's schedule and auto-generate props for all active players."
+                    )
+        return
+
     st.divider()
 
     # Filter results
@@ -2877,25 +2947,8 @@ if analysis_results:
             st.session_state["selected_picks"] = []
             st.rerun()
 
-elif not run_analysis:
-    if current_props:
-        st.info("👆 Click **Run Analysis** to analyze all loaded props.")
-    else:
-        _has_games = bool(st.session_state.get("todays_games"))
-        if _has_games:
-            st.warning(
-                "⚠️ No props loaded yet. "
-                "Go to **🔬 Prop Scanner** and click **🤖 Auto-Generate Props for Tonight** "
-                "to instantly create props for all active players on tonight's teams — "
-                "or click **🔄 Auto-Load Tonight's Games** on the **📡 Live Games** page "
-                "to reload games and auto-generate props in one step."
-            )
-        else:
-            st.warning(
-                "⚠️ No props loaded and no games found. "
-                "Start on the **📡 Live Games** page — click **🔄 Auto-Load Tonight's Games** "
-                "to load tonight's schedule and auto-generate props for all active players."
-            )
+
+_render_results_fragment()
 
 # ============================================================
 # END SECTION: Display Analysis Results
