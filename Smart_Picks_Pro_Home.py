@@ -832,6 +832,8 @@ st.markdown("""
     overflow: hidden;
     /* Collapse bottom margin — page_link overlay handles spacing */
     margin-bottom: 0;
+    /* Let clicks pass through to the page_link overlay underneath */
+    pointer-events: none;
 }
 .nav-card::before {
     content: '';
@@ -841,11 +843,12 @@ st.markdown("""
 .nav-card.cat-workflow::before { background: linear-gradient(90deg, #00f0ff, #0088ff); }
 .nav-card.cat-analysis::before { background: linear-gradient(90deg, #c800ff, #ff5e00); }
 .nav-card.cat-manage::before  { background: linear-gradient(90deg, #00ff9d, #00d4ff); }
-/* Gradient border glow on hover per category */
-.nav-card.cat-workflow:hover { border-color: rgba(0,240,255,0.30); box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 10px 30px rgba(0,0,0,0.40); }
-.nav-card.cat-analysis:hover { border-color: rgba(200,0,255,0.30); box-shadow: 0 0 30px rgba(200,0,255,0.10), 0 10px 30px rgba(0,0,0,0.40); }
-.nav-card.cat-manage:hover   { border-color: rgba(0,255,157,0.30); box-shadow: 0 0 30px rgba(0,255,157,0.10), 0 10px 30px rgba(0,0,0,0.40); }
-.nav-card:hover {
+/* Gradient border glow on hover per category — triggered at column level
+   because .nav-card has pointer-events:none (clicks pass to overlay). */
+[data-testid="stColumn"]:has(.nav-card):hover .nav-card.cat-workflow { border-color: rgba(0,240,255,0.30); box-shadow: 0 0 30px rgba(0,240,255,0.10), 0 10px 30px rgba(0,0,0,0.40); }
+[data-testid="stColumn"]:has(.nav-card):hover .nav-card.cat-analysis { border-color: rgba(200,0,255,0.30); box-shadow: 0 0 30px rgba(200,0,255,0.10), 0 10px 30px rgba(0,0,0,0.40); }
+[data-testid="stColumn"]:has(.nav-card):hover .nav-card.cat-manage   { border-color: rgba(0,255,157,0.30); box-shadow: 0 0 30px rgba(0,255,157,0.10), 0 10px 30px rgba(0,0,0,0.40); }
+[data-testid="stColumn"]:has(.nav-card):hover .nav-card {
     transform: translateY(-6px) scale(1.02);
 }
 .nav-card-icon {
@@ -854,7 +857,7 @@ st.markdown("""
     transition: transform 0.35s ease;
     display: inline-block;
 }
-.nav-card:hover .nav-card-icon { transform: scale(1.2); }
+[data-testid="stColumn"]:has(.nav-card):hover .nav-card-icon { transform: scale(1.2); }
 .nav-card-title {
     font-size: 0.84rem;
     font-weight: 700;
@@ -1049,6 +1052,13 @@ st.markdown("""
     cursor: pointer;
 }
 
+/* Streamlit element wrappers inside nav-card columns must not block clicks
+   from reaching the page_link overlay. */
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stMarkdown"],
+[data-testid="stColumn"]:has(.nav-card) [data-testid="stElementContainer"]:has(.nav-card) {
+    pointer-events: none;
+}
+
 /* The page_link element overlays the entire column */
 [data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] {
     position: absolute;
@@ -1059,6 +1069,7 @@ st.markdown("""
     z-index: 5;
     margin: 0 !important;
     padding: 0 !important;
+    pointer-events: auto !important;
 }
 [data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a {
     display: block;
@@ -1074,6 +1085,7 @@ st.markdown("""
     border-radius: 16px;
     -webkit-tap-highlight-color: rgba(0, 240, 255, 0.10);
     min-height: 44px;
+    pointer-events: auto !important;
 }
 /* Hide the label/icon text inside the overlay link */
 [data-testid="stColumn"]:has(.nav-card) [data-testid="stPageLink"] a span,
