@@ -22,6 +22,42 @@ import os as _os
 
 _logger_theme = _logging.getLogger(__name__)
 
+# ── Line Value vs Average Badge ──────────────────────────────
+
+def get_line_value_badge_html(gap_pct: float) -> str:
+    """Return an HTML badge showing how far a prop line is from the season average.
+
+    Returns empty string if gap is within the -8% to +8% neutral zone.
+
+    Args:
+        gap_pct: ``(prop_line - season_avg) / season_avg * 100``.
+            Negative = line below avg (OVER value, green).
+            Positive = line above avg (UNDER value, orange).
+    """
+    try:
+        gap_pct = float(gap_pct)
+    except (TypeError, ValueError):
+        return ""
+    if -8.0 < gap_pct < 8.0:
+        return ""  # Neutral zone — no badge
+    if gap_pct <= -8.0:
+        return (
+            f'<span style="display:inline-block;background:rgba(0,255,157,0.13);'
+            f'color:#00ff9d;font-size:0.72rem;font-weight:700;padding:2px 7px;'
+            f'border-radius:5px;border:1px solid #00ff9d40;margin-left:6px;'
+            f'vertical-align:middle;">'
+            f'\U0001f4c9 {gap_pct:+.1f}% vs Avg</span>'
+        )
+    else:
+        return (
+            f'<span style="display:inline-block;background:rgba(255,153,102,0.13);'
+            f'color:#ff9966;font-size:0.72rem;font-weight:700;padding:2px 7px;'
+            f'border-radius:5px;border:1px solid #ff996640;margin-left:6px;'
+            f'vertical-align:middle;">'
+            f'\U0001f4c8 +{gap_pct:.1f}% vs Avg</span>'
+        )
+
+
 # ── Centralised logo paths ──────────────────────────────────────
 GOBLIN_LOGO_PATH = _os.path.join("assets", "New_Goblin_Logo.png")
 DEMON_LOGO_PATH  = _os.path.join("assets", "New_Demon_Logo.png")
@@ -3958,6 +3994,18 @@ def get_game_report_html(game=None, analysis_results=None):
         under_f = pick.get("forces", {}).get("under_forces", [])
         items = (over_f + under_f)[:max_n]
         html_out = ""
+        # Render any Line Value badge first (prominently)
+        for f in (over_f + under_f):
+            fname = f.get("name", "") if isinstance(f, dict) else ""
+            if fname in ("Low Line Value", "High Line Value"):
+                _gap = f.get("gap_pct", 0)
+                badge = get_line_value_badge_html(_gap)
+                if badge:
+                    html_out += (
+                        f'<div class="qds-bonus-item">'
+                        f'<div class="qds-bonus-text">{badge}</div></div>'
+                    )
+                break
         for f in items:
             lbl  = f.get("label", f.get("factor", ""))
             desc = f.get("description", f.get("detail", ""))
@@ -4070,6 +4118,18 @@ def get_game_report_html(game=None, analysis_results=None):
             if platform else ""
         )
 
+        # Line Value vs Average badge (display-only)
+        _line_val_badge = ""
+        _stat_key = stat.lower()
+        _season_avg_for_line = float(
+            pick.get(f"season_{_stat_key}_avg",
+                     pick.get(f"{_stat_key}_avg",
+                              pick.get("season_average", 0))) or 0
+        )
+        if _season_avg_for_line > 0 and line > 0:
+            _lv_gap_pct = (line - _season_avg_for_line) / _season_avg_for_line * 100.0
+            _line_val_badge = get_line_value_badge_html(_lv_gap_pct)
+
         # Extract plain-English verdict for the prop card footer
         pick_verdict = (pick.get("explanation") or {}).get("verdict") or pick.get("recommendation", "")
         verdict_html = (
@@ -4087,7 +4147,7 @@ def get_game_report_html(game=None, analysis_results=None):
       <h3 class="qds-player-name">{_html.escape(player)} {team_badge_html}</h3>
       <div class="qds-player-prop">
         <span class="qds-prop-emoji">{prop_emoji}</span>
-        <span><span style="color:{'var(--qds-success)' if direction == 'OVER' else '#ff5e00'};font-weight:700;">{direction}</span> {line} {stat}</span>{plat_html}
+        <span><span style="color:{'var(--qds-success)' if direction == 'OVER' else '#ff5e00'};font-weight:700;">{direction}</span> {line} {stat}</span>{_line_val_badge}{plat_html}
       </div>
       <div class="qds-safe-score">
         <span class="qds-score-value"><i class="fas fa-shield-alt"></i> {ss:.1f} / 10</span>

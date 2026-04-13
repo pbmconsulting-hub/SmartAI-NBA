@@ -857,10 +857,38 @@ def detect_line_sharpness(prop_line, season_average, stat_type="points") -> dict
         }
     elif abs_gap_pct >= 8.0:
         # Line is 8%+ away from average — real edge territory.
-        # Don't add a force (the Projection vs Line force already captures this),
-        # but this confirms the edge is real, not a trap.
-        # We return None here because the existing "Model Projection" force handles it.
-        return None
+        # Return a directional force that captures the Line Value vs Average gap.
+        if gap_pct <= -8.0:
+            # OVER boost: line is below season average — easier to cover
+            # 8% → 0.60, 11% → 0.94, 15% → 1.40, 22% → 1.80, 30%+ → 2.0
+            abs_gap = abs(gap_pct)
+            strength = min(2.0, (abs_gap - 8.0) / 7.0 * 0.8 + 0.6)
+            return {
+                "name": "Low Line Value",
+                "description": (
+                    f"Line ({prop_line}) is {abs_gap:.1f}% below season avg "
+                    f"({season_average:.1f}) — player only needs to hit "
+                    f"{100 - abs_gap:.0f}% of normal production to cover"
+                ),
+                "strength": round(strength, 2),
+                "direction": "OVER",
+                "gap_pct": round(gap_pct, 1),  # negative = below avg
+            }
+        else:
+            # UNDER boost: line is above season average — harder to cover
+            # 8% → 0.50, 15% → 1.00, 22% → 1.50, 30%+ → 1.8
+            strength = min(1.8, (gap_pct - 8.0) / 11.0 * 1.2 + 0.5)
+            return {
+                "name": "High Line Value",
+                "description": (
+                    f"Line ({prop_line}) is {gap_pct:.1f}% above season avg "
+                    f"({season_average:.1f}) — player needs an above-average "
+                    f"night to cover"
+                ),
+                "strength": round(strength, 2),
+                "direction": "UNDER",
+                "gap_pct": round(gap_pct, 1),  # positive = above avg
+            }
     else:
         # Gap between 3% and 8% — moderate zone, no special force needed
         return None

@@ -1396,6 +1396,7 @@ with _tab_builder:
                             "over_probability": over_prob_gb,
                             "confidence_score": conf_score_gb,
                             "minutes_used": pdata_adj_gb["minutes_avg"],
+                            "season_avg": stat_avg_gb,
                         })
 
                 prog_gb.empty()
@@ -1468,6 +1469,7 @@ with _tab_builder:
                         over_prob=over_prob_r,
                         confidence=conf_r,
                         minutes=r_gb["minutes_used"],
+                        season_avg=r_gb.get("season_avg", 0),
                     ),
                     unsafe_allow_html=True,
                 )

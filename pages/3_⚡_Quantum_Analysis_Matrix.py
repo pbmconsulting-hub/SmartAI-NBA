@@ -1557,7 +1557,16 @@ if run_analysis:
                 )
                 line_sharpness_penalty = 0.0
                 if line_sharpness_force is not None:
-                    line_sharpness_penalty = min(8.0, line_sharpness_force.get("strength", 0) * 2.5)
+                    # Only apply the penalty for the sharp line case (UNDER
+                    # direction, < 3% gap).  The new OVER/UNDER boost forces
+                    # (Low/High Line Value) go into the directional forces
+                    # list only — they must NOT feed into the penalty.
+                    _lsf_name = line_sharpness_force.get("name", "")
+                    if (
+                        line_sharpness_force.get("direction") == "UNDER"
+                        and _lsf_name.startswith("Sharp Line")
+                    ):
+                        line_sharpness_penalty = min(8.0, line_sharpness_force.get("strength", 0) * 2.5)
 
                 trap_line_result = detect_trap_line(
                     prop_line=prop_line,

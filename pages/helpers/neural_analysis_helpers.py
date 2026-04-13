@@ -27,6 +27,7 @@ from styles.theme import (
     get_form_dots_html,
     get_matchup_grade_badge_html,
     get_intel_strip_html,
+    get_line_value_badge_html,
 )
 
 try:
@@ -207,9 +208,17 @@ def render_inline_breakdown_html(result, accent_color="#00f0ff", show_forces=Tru
             for f in flist:
                 if not isinstance(f, dict):
                     continue
+                fname = str(f.get("name", "") or "")
+                # Line Value badge rendered prominently at the top
+                if fname in ("Low Line Value", "High Line Value"):
+                    _gap = f.get("gap_pct", 0)
+                    badge = get_line_value_badge_html(_gap)
+                    if badge:
+                        parts.insert(0, f'<div class="nah-force-item">{badge}</div>')
+                    continue
                 strength = max(1, min(5, round(float(f.get("strength", 1)))))
                 stars = "⭐" * strength
-                name = _html.escape(str(f.get("name", "") or ""))
+                name = _html.escape(fname)
                 parts.append(
                     f'<div class="nah-force-item">{stars} {name}</div>'
                 )
