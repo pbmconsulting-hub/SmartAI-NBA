@@ -357,6 +357,28 @@ def render_quantum_edge_gap_banner_html(
 
 _NBA_HEADSHOT_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
 
+# SVG circumference for the edge gauge (r=25, C=2*pi*25 ≈ 157)
+_GAUGE_CIRCUMFERENCE = 157
+
+
+def _edge_gauge_svg(edge_pct: float, display: str) -> str:
+    """Return an inline SVG circular gauge for the edge percentage.
+
+    The ring fills proportionally: 0% = empty, ≥50% = full.
+    """
+    clamped = max(0.0, min(50.0, abs(edge_pct)))
+    fill_frac = clamped / 50.0
+    offset = _GAUGE_CIRCUMFERENCE * (1 - fill_frac)
+    return (
+        f'<svg class="qeg-edge-gauge" viewBox="0 0 64 64">'
+        f'<circle class="qeg-gauge-bg" cx="32" cy="32" r="25"/>'
+        f'<circle class="qeg-gauge-ring" cx="32" cy="32" r="25" '
+        f'stroke-dasharray="{_GAUGE_CIRCUMFERENCE}" '
+        f'stroke-dashoffset="{offset:.1f}"/>'
+        f'<text class="qeg-gauge-text" x="32" y="32">{_html.escape(display)}</text>'
+        f'</svg>'
+    )
+
 
 def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     """Return HTML for a single Quantum Edge Gap pick card.
@@ -419,8 +441,10 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     # Projection
     projection = result.get("adjusted_projection", 0)
     try:
-        proj_display = f"{float(projection):.1f}"
+        proj_val = float(projection)
+        proj_display = f"{proj_val:.1f}"
     except (ValueError, TypeError):
+        proj_val = 0
         proj_display = "—"
 
     # Percentiles
@@ -490,23 +514,31 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         else ""
     )
 
+    # Stagger animation delay
+    delay_style = f' style="animation-delay:{(rank - 1) * 0.08:.2f}s;"' if rank > 0 else ""
+
+    # Edge gauge SVG
+    gauge_svg = _edge_gauge_svg(edge_val, edge_display)
+
+    # Prop call line (e.g. "▲ More 25.5 Points")
+    prop_call = f"{dir_arrow} {dir_label} {line_display} {stat_display}"
+
     return (
-        f'<div class="qeg-card {card_dir_css}">'
-        # ── Top row: rank + identity + center (conf bar + metrics) + edge ──
+        f'<div class="qeg-card {card_dir_css}"{delay_style}>'
+        # ── TOP: rank + identity + center (conf bar + metrics) + edge gauge ──
         f'<div class="qeg-card-top">'
-        # Rank
         f'{rank_html}'
         # Identity
         f'<div class="qeg-card-identity">'
         f'{headshot_html}'
         f'<div class="qeg-player-info">'
         f'<span class="qeg-player-name">{player_name}</span>'
-        f'<span class="qeg-player-meta">{team} · {stat_display} · {platform}</span>'
+        f'<span class="qeg-player-meta">{team} · {platform}</span>'
+        f'<span class="qeg-player-prop">{prop_call}</span>'
         f'</div>'
         f'</div>'
         # Center: confidence bar + metric pills
         f'<div class="qeg-card-center">'
-        # Confidence bar
         f'<div class="qeg-conf-row">'
         f'<span class="qeg-conf-label">SAFE</span>'
         f'<div class="qeg-conf-bar-track">'
@@ -514,14 +546,9 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'</div>'
         f'<span class="qeg-conf-val">{confidence:.0f}</span>'
         f'</div>'
-        # Metrics strip
         f'<div class="qeg-card-metrics">'
         f'<div class="qeg-metric">'
         f'<span class="qeg-direction-badge {dir_css}">{dir_arrow} {dir_label}</span>'
-        f'</div>'
-        f'<div class="qeg-metric">'
-        f'<div class="qeg-metric-val">{line_display}</div>'
-        f'<div class="qeg-metric-lbl">Line</div>'
         f'</div>'
         f'<div class="qeg-metric">'
         f'<div class="qeg-metric-val">{prob_pct}</div>'
@@ -533,22 +560,46 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'</div>'
         f'</div>'
         f'</div>'
-        # Edge highlight callout
+        # Edge gauge callout
         f'<div class="qeg-edge-highlight">'
-        f'{edge_display}'
+        f'{gauge_svg}'
         f'<span class="qeg-edge-highlight-lbl">Edge</span>'
         f'</div>'
         f'</div>'
-        # ── Bottom row: stat blocks ──
+        # ── MID: Line vs Projection comparison ──
+        f'<div class="qeg-card-mid">'
+        f'<div class="qeg-compare-block">'
+        f'<span class="qeg-compare-icon">📊</span>'
+        f'<div class="qeg-compare-data">'
+        f'<span class="qeg-compare-val">{line_display}</span>'
+        f'<span class="qeg-compare-lbl">Line</span>'
+        f'</div>'
+        f'</div>'
+        f'<div class="qeg-compare-block">'
+        f'<span class="qeg-compare-icon">🎯</span>'
+        f'<div class="qeg-compare-data">'
+        f'<span class="qeg-compare-val">{proj_display}</span>'
+        f'<span class="qeg-compare-lbl">Projection</span>'
+        f'</div>'
+        f'</div>'
+        f'<div class="qeg-compare-block">'
+        f'<span class="qeg-compare-icon">⚡</span>'
+        f'<div class="qeg-compare-data">'
+        f'<span class="qeg-compare-val">{edge_display}</span>'
+        f'<span class="qeg-compare-lbl">Edge</span>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+        # ── BOTTOM: percentile stat blocks ──
         f'<div class="qeg-card-bottom">'
+        f'<div class="qeg-stat-block">'
+        f'<div class="qeg-stat-block-title">P10 / Median / P90</div>'
+        f'<div class="qeg-stat-block-val">{p10_d} / {p50_d} / {p90_d}</div>'
+        f'</div>'
         f'<div class="qeg-stat-block">'
         f'<div class="qeg-stat-block-title">Projection</div>'
         f'<div class="qeg-stat-block-val">{proj_display}</div>'
         f'{avg_sub_html}'
-        f'</div>'
-        f'<div class="qeg-stat-block">'
-        f'<div class="qeg-stat-block-title">P10 / Median / P90</div>'
-        f'<div class="qeg-stat-block-val">{p10_d} / {p50_d} / {p90_d}</div>'
         f'</div>'
         f'<div class="qeg-stat-block">'
         f'<div class="qeg-stat-block-title">Edge %</div>'

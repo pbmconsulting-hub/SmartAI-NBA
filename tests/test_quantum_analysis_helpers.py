@@ -416,6 +416,20 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("qeg-edge-highlight-lbl", html)
         # Direction arrow
         self.assertIn("▲", html)
+        # Circular edge gauge SVG
+        self.assertIn("qeg-edge-gauge", html)
+        self.assertIn("qeg-gauge-ring", html)
+        self.assertIn("stroke-dashoffset", html)
+        # Mid comparison row
+        self.assertIn("qeg-card-mid", html)
+        self.assertIn("qeg-compare-block", html)
+        self.assertIn("Line", html)
+        self.assertIn("Projection", html)
+        # Prop call line
+        self.assertIn("qeg-player-prop", html)
+        self.assertIn("▲ OVER 25.5 Points", html)
+        # Stagger animation delay
+        self.assertIn("animation-delay:0.00s", html)
 
     def test_under_card(self):
         result = {
@@ -444,6 +458,10 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("💎", html)  # Platinum tier emoji
         # Direction arrow for under
         self.assertIn("▼", html)
+        # Gauge present for under cards too
+        self.assertIn("qeg-edge-gauge", html)
+        # Under prop call
+        self.assertIn("▼ UNDER 4.5 Threes", html)
 
     def test_xss_prevention(self):
         result = {
@@ -509,6 +527,26 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         html = render_quantum_edge_gap_card_html(result)
         self.assertNotIn("Avg:", html)
 
+    def test_stagger_animation_delay(self):
+        result = {"player_name": "Player", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result, rank=5)
+        self.assertIn("animation-delay:0.32s", html)
+
+    def test_gauge_offset_scales_with_edge(self):
+        """Edge gauge ring offset should decrease as |edge| increases."""
+        result_low = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
+        result_high = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
+        html_low = render_quantum_edge_gap_card_html(result_low)
+        html_high = render_quantum_edge_gap_card_html(result_high)
+        # Both should have the gauge
+        self.assertIn("stroke-dashoffset", html_low)
+        self.assertIn("stroke-dashoffset", html_high)
+        # Extract offsets — higher edge => smaller offset
+        import re
+        offset_low = float(re.search(r'stroke-dashoffset="([\d.]+)"', html_low).group(1))
+        offset_high = float(re.search(r'stroke-dashoffset="([\d.]+)"', html_high).group(1))
+        self.assertGreater(offset_low, offset_high)
+
 
 class TestQuantumEdgeGapCSS(unittest.TestCase):
     """Verify edge gap CSS is present in the theme."""
@@ -549,6 +587,24 @@ class TestQuantumEdgeGapCSS(unittest.TestCase):
     def test_css_has_hover_states(self):
         from styles.theme import QUANTUM_CARD_MATRIX_CSS
         self.assertIn("qeg-card:hover", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_gauge_ring(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-gauge-ring", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-gauge-fill", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_edge_pulse(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-edge-pulse", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_compare_section(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card-mid", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-compare-block", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_shimmer_top_line(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card::after", QUANTUM_CARD_MATRIX_CSS)
 
 
 class TestParlayCard(unittest.TestCase):

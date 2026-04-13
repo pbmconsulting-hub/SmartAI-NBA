@@ -7801,42 +7801,47 @@ QUANTUM_CARD_MATRIX_CSS = """
 }
 /* ── Quantum Edge Gap Section ─────────────────────────────── */
 @keyframes qeg-border-glow {
-    0%, 100% { box-shadow: 0 0 16px rgba(0, 255, 136, 0.18), inset 0 0 10px rgba(0, 255, 136, 0.03); }
-    50%      { box-shadow: 0 0 32px rgba(0, 255, 136, 0.30), inset 0 0 20px rgba(0, 255, 136, 0.06); }
+    0%, 100% { box-shadow: 0 0 18px rgba(0, 255, 136, 0.15), inset 0 0 12px rgba(0, 255, 136, 0.02); }
+    50%      { box-shadow: 0 0 36px rgba(0, 255, 136, 0.28), inset 0 0 24px rgba(0, 255, 136, 0.05); }
 }
 @keyframes qeg-scanline {
     0%   { transform: translateY(-100%); }
     100% { transform: translateY(100%); }
 }
+@keyframes qeg-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
 .qam-edge-gap-banner {
-    background: linear-gradient(135deg, #041a10 0%, #0a2618 40%, #082318 70%, #041a10 100%);
-    border: 2px solid #00ff88;
-    border-radius: 14px;
-    padding: 22px 26px 20px;
-    margin-bottom: 16px;
-    animation: qeg-border-glow 3s ease-in-out infinite;
+    background: linear-gradient(135deg, #021208 0%, #0a2618 30%, #061f12 60%, #041a10 100%);
+    border: 1px solid rgba(0, 255, 136, 0.40);
+    border-radius: 16px;
+    padding: 24px 28px 22px;
+    margin-bottom: 18px;
+    animation: qeg-border-glow 4s ease-in-out infinite;
     position: relative;
     overflow: hidden;
 }
-/* Scanline sweep effect */
+/* Scanline sweep */
 .qam-edge-gap-banner::before {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; height: 200%;
     background: linear-gradient(180deg,
         transparent 0%,
-        rgba(0, 255, 136, 0.04) 45%,
-        rgba(0, 255, 136, 0.10) 50%,
-        rgba(0, 255, 136, 0.04) 55%,
+        rgba(0, 255, 136, 0.03) 44%,
+        rgba(0, 255, 136, 0.08) 50%,
+        rgba(0, 255, 136, 0.03) 56%,
         transparent 100%);
-    animation: qeg-scanline 4s linear infinite;
+    animation: qeg-scanline 5s linear infinite;
     pointer-events: none;
 }
-/* Corner radial accent */
+/* Mesh gradient overlay */
 .qam-edge-gap-banner::after {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at 5% 0%, rgba(0, 255, 136, 0.12) 0%, transparent 50%),
-                radial-gradient(ellipse at 95% 100%, rgba(0, 255, 136, 0.06) 0%, transparent 50%);
+    background: radial-gradient(ellipse at 8% 0%, rgba(0, 255, 136, 0.10) 0%, transparent 45%),
+                radial-gradient(ellipse at 92% 100%, rgba(0, 255, 136, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(0, 255, 136, 0.02) 0%, transparent 60%);
     pointer-events: none;
 }
 .qam-edge-gap-banner-inner {
@@ -7845,42 +7850,50 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qam-edge-gap-banner-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: 14px;
+    margin-bottom: 10px;
 }
 .qam-edge-gap-banner-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px; height: 44px;
-    background: rgba(0, 255, 136, 0.12);
-    border: 1px solid rgba(0, 255, 136, 0.35);
-    border-radius: 10px;
-    font-size: 1.3rem;
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.16), rgba(0, 255, 136, 0.06));
+    border: 1px solid rgba(0, 255, 136, 0.40);
+    border-radius: 12px;
+    font-size: 1.4rem;
     flex-shrink: 0;
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.12);
 }
 .qam-edge-gap-banner h3 {
     color: #00ff88;
     font-family: Orbitron, sans-serif;
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     margin: 0;
-    letter-spacing: 0.08em;
-    text-shadow: 0 0 16px rgba(0, 255, 136, 0.45);
+    letter-spacing: 0.10em;
+    text-shadow: 0 0 20px rgba(0, 255, 136, 0.50),
+                 0 0 40px rgba(0, 255, 136, 0.15);
 }
 .qam-edge-gap-banner h3 span {
-    font-size: 0.72rem;
-    color: #80ffbb;
+    display: inline-block;
+    font-size: 0.68rem;
+    color: #0a0f1a;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 400;
-    margin-left: 10px;
-    letter-spacing: 0.04em;
+    font-weight: 700;
+    margin-left: 12px;
+    letter-spacing: 0.06em;
+    background: linear-gradient(135deg, #00ff88, #00cc6a);
+    padding: 3px 10px;
+    border-radius: 5px;
+    text-shadow: none;
+    vertical-align: middle;
 }
 .qam-edge-gap-banner p {
-    color: #80ffbb;
-    font-size: 0.82rem;
-    margin: 0 0 14px;
-    line-height: 1.55;
-    max-width: 720px;
+    color: rgba(128, 255, 187, 0.85);
+    font-size: 0.80rem;
+    margin: 0 0 16px;
+    line-height: 1.60;
+    max-width: 680px;
 }
 .qeg-stats-row {
     display: flex;
@@ -7888,141 +7901,180 @@ QUANTUM_CARD_MATRIX_CSS = """
     flex-wrap: wrap;
 }
 .qeg-stat-pill {
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 255, 136, 0.14));
-    border: 1px solid rgba(0, 255, 136, 0.28);
+    background: rgba(0, 255, 136, 0.06);
+    border: 1px solid rgba(0, 255, 136, 0.22);
     border-radius: 10px;
-    padding: 10px 16px;
+    padding: 10px 18px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 78px;
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
-    transition: border-color 0.2s ease, transform 0.2s ease;
+    min-width: 80px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 .qeg-stat-pill:hover {
-    border-color: rgba(0, 255, 136, 0.50);
-    transform: translateY(-1px);
+    border-color: rgba(0, 255, 136, 0.55);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 255, 136, 0.10);
 }
 .qeg-stat-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.15rem;
+    font-size: 1.20rem;
     font-weight: 700;
     color: #00ff88;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.35);
 }
 .qeg-stat-lbl {
-    font-size: 0.65rem;
-    color: #80ffbb;
+    font-size: 0.62rem;
+    color: rgba(128, 255, 187, 0.75);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     margin-top: 3px;
 }
 
 /* ── Quantum Edge Gap individual card ────────────────────── */
 @keyframes qeg-card-slide-in {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; transform: translateY(16px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes qeg-edge-pulse {
+    0%, 100% { box-shadow: 0 0 12px rgba(0, 255, 136, 0.15); }
+    50%      { box-shadow: 0 0 28px rgba(0, 255, 136, 0.35), 0 0 48px rgba(0, 255, 136, 0.10); }
+}
+@keyframes qeg-gauge-fill {
+    from { stroke-dashoffset: 157; }
 }
 .qeg-card {
-    background: linear-gradient(135deg, rgba(8, 20, 14, 0.95), rgba(12, 30, 22, 0.92));
-    border: 1px solid rgba(0, 255, 136, 0.20);
-    border-left: 4px solid #00ff88;
-    border-radius: 14px;
+    background: linear-gradient(160deg, rgba(6, 18, 12, 0.96) 0%, rgba(10, 28, 20, 0.94) 40%, rgba(8, 22, 16, 0.92) 100%);
+    border: 1px solid rgba(0, 255, 136, 0.16);
+    border-left: 5px solid #00ff88;
+    border-radius: 16px;
     padding: 0;
     margin-bottom: 14px;
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
-    animation: qeg-card-slide-in 0.4s ease both;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    animation: qeg-card-slide-in 0.5s ease both;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     position: relative;
     overflow: hidden;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.40), 0 0 12px rgba(0, 255, 136, 0.06);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45),
+                0 0 16px rgba(0, 255, 136, 0.04),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .qeg-card:hover {
-    border-color: rgba(0, 255, 136, 0.40);
-    box-shadow: 0 6px 32px rgba(0, 0, 0, 0.50), 0 0 24px rgba(0, 255, 136, 0.14);
+    border-color: rgba(0, 255, 136, 0.35);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55),
+                0 0 32px rgba(0, 255, 136, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
     transform: translateY(-2px);
 }
+/* Radial glow from left edge */
 .qeg-card::before {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at 0% 0%, rgba(0, 255, 136, 0.06) 0%, transparent 40%);
+    background: radial-gradient(ellipse at -5% 50%, rgba(0, 255, 136, 0.07) 0%, transparent 35%),
+                linear-gradient(180deg, rgba(0, 255, 136, 0.02) 0%, transparent 30%);
+    pointer-events: none;
+}
+/* Top shimmer line */
+.qeg-card::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.20), transparent);
     pointer-events: none;
 }
 .qeg-card-over  { border-left-color: #00ff88; }
 .qeg-card-under {
     border-left-color: #ff4444;
-    background: linear-gradient(135deg, rgba(20, 8, 10, 0.95), rgba(30, 12, 16, 0.92));
+    background: linear-gradient(160deg, rgba(18, 6, 8, 0.96) 0%, rgba(28, 10, 14, 0.94) 40%, rgba(22, 8, 12, 0.92) 100%);
 }
 .qeg-card-under::before {
-    background: radial-gradient(ellipse at 0% 0%, rgba(255, 68, 68, 0.05) 0%, transparent 40%);
+    background: radial-gradient(ellipse at -5% 50%, rgba(255, 68, 68, 0.06) 0%, transparent 35%),
+                linear-gradient(180deg, rgba(255, 68, 68, 0.02) 0%, transparent 30%);
 }
-.qeg-card-under .qeg-metric { border-color: rgba(255, 68, 68, 0.10); background: rgba(255, 68, 68, 0.05); }
+.qeg-card-under::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 68, 68, 0.18), transparent);
+}
+.qeg-card-under .qeg-metric { border-color: rgba(255, 68, 68, 0.10); background: rgba(255, 68, 68, 0.04); }
 .qeg-card-under .qeg-metric-val { color: #ff6b6b; }
-.qeg-card-under .qeg-edge-highlight { background: rgba(255, 68, 68, 0.12); border-color: rgba(255, 68, 68, 0.35); color: #ff4444; }
+.qeg-card-under .qeg-edge-highlight { background: linear-gradient(135deg, rgba(255, 68, 68, 0.08), rgba(255, 68, 68, 0.16)); border-color: rgba(255, 68, 68, 0.35); color: #ff4444; animation-name: qeg-edge-pulse-red; }
 .qeg-card-under .qeg-conf-bar-fill { background: linear-gradient(90deg, #ff4444, #ff6b6b) !important; }
-.qeg-card-under .qeg-stat-block { border-color: rgba(255, 68, 68, 0.10); background: rgba(255, 68, 68, 0.03); }
-.qeg-card-under:hover { border-color: rgba(255, 68, 68, 0.40); box-shadow: 0 6px 32px rgba(0, 0, 0, 0.50), 0 0 24px rgba(255, 68, 68, 0.12); }
+.qeg-card-under .qeg-stat-block { border-color: rgba(255, 68, 68, 0.08); background: rgba(255, 68, 68, 0.02); }
+.qeg-card-under .qeg-gauge-ring { stroke: #ff4444; }
+.qeg-card-under .qeg-gauge-text { fill: #ff4444; }
+.qeg-card-under:hover { border-color: rgba(255, 68, 68, 0.40); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 32px rgba(255, 68, 68, 0.10); }
+@keyframes qeg-edge-pulse-red {
+    0%, 100% { box-shadow: 0 0 12px rgba(255, 68, 68, 0.15); }
+    50%      { box-shadow: 0 0 28px rgba(255, 68, 68, 0.35), 0 0 48px rgba(255, 68, 68, 0.10); }
+}
 
-/* Card top section: rank + identity + metrics + edge */
+/* Card top section: rank + identity + center + edge callout */
 .qeg-card-top {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 18px 20px 14px;
+    gap: 16px;
+    padding: 18px 22px 14px;
     position: relative;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 .qeg-rank {
     flex: 0 0 auto;
-    width: 32px; height: 32px;
+    width: 34px; height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.18), rgba(0, 255, 136, 0.08));
-    border: 1px solid rgba(0, 255, 136, 0.35);
-    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.20), rgba(0, 255, 136, 0.06));
+    border: 1px solid rgba(0, 255, 136, 0.40);
+    border-radius: 10px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.82rem;
+    font-size: 0.80rem;
     font-weight: 800;
     color: #00ff88;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
 }
-.qeg-card-under .qeg-rank { background: linear-gradient(135deg, rgba(255, 68, 68, 0.18), rgba(255, 68, 68, 0.08)); border-color: rgba(255, 68, 68, 0.35); color: #ff6b6b; }
+.qeg-card-under .qeg-rank { background: linear-gradient(135deg, rgba(255, 68, 68, 0.20), rgba(255, 68, 68, 0.06)); border-color: rgba(255, 68, 68, 0.40); color: #ff6b6b; text-shadow: 0 0 8px rgba(255, 68, 68, 0.3); }
 .qeg-card-identity {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-width: 175px;
+    gap: 12px;
+    min-width: 180px;
 }
 .qeg-headshot {
-    width: 52px; height: 52px;
+    width: 56px; height: 56px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid rgba(0, 255, 136, 0.30);
+    border: 2px solid rgba(0, 255, 136, 0.28);
     background: #0a1a12;
     flex-shrink: 0;
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.08);
 }
-.qeg-card-under .qeg-headshot { border-color: rgba(255, 68, 68, 0.30); }
+.qeg-card-under .qeg-headshot { border-color: rgba(255, 68, 68, 0.28); box-shadow: 0 0 12px rgba(255, 68, 68, 0.06); }
 .qeg-player-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
 }
 .qeg-player-name {
-    font-size: 0.92rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: #f0f4f8;
     line-height: 1.2;
 }
 .qeg-player-meta {
     font-size: 0.70rem;
-    color: #70909e;
+    color: #607a8a;
     line-height: 1.3;
 }
+.qeg-player-prop {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #00ff88;
+    margin-top: 1px;
+}
+.qeg-card-under .qeg-player-prop { color: #ff6b6b; }
 .qeg-card-center {
     flex: 1;
     display: flex;
@@ -8031,28 +8083,30 @@ QUANTUM_CARD_MATRIX_CSS = """
     min-width: 0;
     position: relative;
 }
-/* Confidence bar in card */
+/* Confidence bar */
 .qeg-conf-row {
     display: flex; align-items: center; gap: 8px;
 }
 .qeg-conf-label {
-    font-size: 0.62rem; color: #70909e;
-    text-transform: uppercase; letter-spacing: 0.06em;
+    font-size: 0.60rem; color: #607a8a;
+    text-transform: uppercase; letter-spacing: 0.07em;
     font-family: 'JetBrains Mono', monospace;
     min-width: 36px;
 }
 .qeg-conf-bar-track {
-    flex: 1; height: 6px;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 3px; overflow: hidden;
+    flex: 1; height: 7px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px; overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 @keyframes qeg-conf-expand {
     from { width: 0; }
 }
 .qeg-conf-bar-fill {
-    height: 100%; border-radius: 3px;
-    background: linear-gradient(90deg, #00ff88, #00cc6a);
-    animation: qeg-conf-expand 0.6s ease-out both;
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, #00cc6a, #00ff88);
+    animation: qeg-conf-expand 0.8s ease-out both;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.25);
 }
 .qeg-conf-val {
     font-family: 'JetBrains Mono', monospace;
@@ -8069,13 +8123,13 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qeg-metric {
     text-align: center;
     padding: 5px 10px;
-    background: rgba(0, 255, 136, 0.05);
-    border: 1px solid rgba(0, 255, 136, 0.10);
-    border-radius: 7px;
-    min-width: 56px;
-    transition: border-color 0.2s ease;
+    background: rgba(0, 255, 136, 0.04);
+    border: 1px solid rgba(0, 255, 136, 0.08);
+    border-radius: 8px;
+    min-width: 54px;
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
-.qeg-metric:hover { border-color: rgba(0, 255, 136, 0.25); }
+.qeg-metric:hover { border-color: rgba(0, 255, 136, 0.22); background: rgba(0, 255, 136, 0.06); }
 .qeg-metric-val {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.88rem;
@@ -8084,112 +8138,194 @@ QUANTUM_CARD_MATRIX_CSS = """
     font-variant-numeric: tabular-nums;
 }
 .qeg-metric-lbl {
-    font-size: 0.58rem;
-    color: #70909e;
+    font-size: 0.56rem;
+    color: #607a8a;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     margin-top: 2px;
 }
 .qeg-direction-badge {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.70rem;
     font-weight: 700;
-    padding: 3px 10px;
+    padding: 4px 12px;
     border-radius: 6px;
     letter-spacing: 0.06em;
 }
 .qeg-dir-over {
-    background: rgba(0, 255, 136, 0.15);
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.12), rgba(0, 255, 136, 0.20));
     color: #00ff88;
-    border: 1px solid rgba(0, 255, 136, 0.30);
+    border: 1px solid rgba(0, 255, 136, 0.35);
 }
 .qeg-dir-under {
-    background: rgba(255, 68, 68, 0.15);
+    background: linear-gradient(135deg, rgba(255, 68, 68, 0.12), rgba(255, 68, 68, 0.20));
     color: #ff4444;
-    border: 1px solid rgba(255, 68, 68, 0.30);
+    border: 1px solid rgba(255, 68, 68, 0.35);
 }
-/* Edge highlight callout */
+
+/* Edge highlight callout — prominent right-side badge */
 .qeg-edge-highlight {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.25rem;
-    font-weight: 800;
-    padding: 8px 16px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.10), rgba(0, 255, 136, 0.18));
-    border: 1px solid rgba(0, 255, 136, 0.35);
-    color: #00ff88;
-    text-align: center;
-    min-width: 88px;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.35);
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 255, 136, 0.16));
+    border: 1px solid rgba(0, 255, 136, 0.30);
+    min-width: 100px;
     position: relative;
+    animation: qeg-edge-pulse 3s ease-in-out infinite;
+}
+.qeg-edge-gauge {
+    display: block;
+    width: 64px; height: 64px;
+    margin-bottom: 2px;
+}
+.qeg-gauge-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.06);
+    stroke-width: 4;
+}
+.qeg-gauge-ring {
+    fill: none;
+    stroke: #00ff88;
+    stroke-width: 4;
+    stroke-linecap: round;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+    animation: qeg-gauge-fill 1s ease-out both;
+    filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.35));
+}
+.qeg-gauge-text {
+    fill: #00ff88;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    text-anchor: middle;
+    dominant-baseline: central;
 }
 .qeg-edge-highlight-lbl {
-    font-size: 0.55rem;
-    font-weight: 400;
-    color: #80a0b8;
+    font-size: 0.56rem;
+    font-weight: 600;
+    color: #607a8a;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-top: 2px;
+    letter-spacing: 0.08em;
     text-shadow: none;
+}
+
+/* Card mid section: line vs projection comparison bar */
+.qeg-card-mid {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    padding: 0 22px;
+    position: relative;
+}
+.qeg-card-mid::before {
+    content: '';
+    position: absolute; top: 0; left: 22px; right: 22px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+}
+.qeg-compare-block {
+    flex: 1;
+    padding: 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.qeg-compare-block + .qeg-compare-block {
+    border-left: 1px solid rgba(255, 255, 255, 0.04);
+    padding-left: 16px;
+    margin-left: 16px;
+}
+.qeg-compare-icon {
+    font-size: 0.85rem;
+    opacity: 0.60;
+}
+.qeg-compare-data {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.qeg-compare-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #e0eeff;
+}
+.qeg-compare-lbl {
+    font-size: 0.58rem;
+    color: #607a8a;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
 }
 
 /* Card bottom section: stat blocks */
 .qeg-card-bottom {
     display: flex;
     gap: 8px;
-    padding: 12px 20px 16px;
+    padding: 12px 22px 18px;
     position: relative;
+}
+.qeg-card-bottom::before {
+    content: '';
+    position: absolute; top: 0; left: 22px; right: 22px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
 }
 .qeg-stat-block {
     flex: 1;
-    min-width: 100px;
-    background: rgba(0, 255, 136, 0.03);
-    border: 1px solid rgba(0, 255, 136, 0.08);
-    border-radius: 8px;
-    padding: 10px 12px;
-    transition: border-color 0.2s ease;
+    min-width: 90px;
+    background: rgba(0, 255, 136, 0.02);
+    border: 1px solid rgba(0, 255, 136, 0.06);
+    border-radius: 10px;
+    padding: 10px 14px;
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
-.qeg-stat-block:hover { border-color: rgba(0, 255, 136, 0.20); }
+.qeg-stat-block:hover { border-color: rgba(0, 255, 136, 0.18); background: rgba(0, 255, 136, 0.04); }
 .qeg-stat-block-title {
-    font-size: 0.62rem;
-    color: #70909e;
+    font-size: 0.58rem;
+    color: #607a8a;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
     margin-bottom: 4px;
     font-family: 'JetBrains Mono', monospace;
 }
 .qeg-stat-block-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.88rem;
+    font-size: 0.90rem;
     font-weight: 600;
     color: #e0eeff;
 }
 .qeg-stat-block-sub {
-    font-size: 0.62rem;
-    color: #607080;
+    font-size: 0.60rem;
+    color: #506070;
     margin-top: 2px;
 }
 
 /* ── Quantum Edge Gap responsive ─────────────────────────── */
 @media (max-width: 768px) {
-    .qam-edge-gap-banner { padding: 16px 16px 14px; }
+    .qam-edge-gap-banner { padding: 16px 16px 14px; border-radius: 12px; }
     .qam-edge-gap-banner h3 { font-size: 1rem; }
-    .qam-edge-gap-banner h3 span { display: block; margin: 4px 0 0; }
+    .qam-edge-gap-banner h3 span { display: block; margin: 6px 0 0; }
+    .qam-edge-gap-banner-icon { width: 40px; height: 40px; font-size: 1.2rem; }
     .qeg-stats-row { gap: 6px; }
-    .qeg-stat-pill { padding: 8px 10px; min-width: 60px; }
-    .qeg-stat-val { font-size: 0.95rem; }
+    .qeg-stat-pill { padding: 8px 10px; min-width: 62px; }
+    .qeg-stat-val { font-size: 1.0rem; }
     .qeg-card-top { flex-wrap: wrap; padding: 14px 14px 10px; gap: 10px; }
-    .qeg-card-center { min-width: 100%; }
-    .qeg-edge-highlight { min-width: 72px; font-size: 1.05rem; padding: 6px 12px; }
+    .qeg-card-center { min-width: 100%; order: 3; }
+    .qeg-edge-highlight { min-width: 80px; }
+    .qeg-edge-gauge { width: 52px; height: 52px; }
+    .qeg-card-mid { flex-wrap: wrap; padding: 0 14px; gap: 0; }
+    .qeg-compare-block + .qeg-compare-block { border-left: none; padding-left: 0; margin-left: 0; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px; margin-top: 6px; }
     .qeg-card-bottom { flex-wrap: wrap; padding: 10px 14px 14px; }
     .qeg-stat-block { min-width: calc(50% - 6px); }
-    .qeg-rank { width: 28px; height: 28px; font-size: 0.72rem; }
+    .qeg-rank { width: 28px; height: 28px; font-size: 0.72rem; border-radius: 8px; }
+    .qeg-headshot { width: 48px; height: 48px; }
 }
 .qam-gold-banner {
     background: linear-gradient(135deg, #1a1200, #231800);
