@@ -270,10 +270,10 @@ line_movements = detect_line_movements(current_props)
 # SECTION: Main Tabs Layout
 # ============================================================
 
-tab_dashboard, tab_load, tab_table, tab_manual = st.tabs([
+tab_table, tab_dashboard, tab_load, tab_manual = st.tabs([
+    "📋 Props Table & Smart Scan",
     "📊 Dashboard",
     "🔄 Load Props",
-    "📋 Props Table & Smart Scan",
     "✏️ Manual Entry",
 ])
 
@@ -827,7 +827,7 @@ with tab_table:
             "Filters apply to the table and carry into analysis."
         )
 
-        # Filter bar
+        # Filter bar — Row 1
         filter_col1, filter_col2, filter_col3, filter_col4, filter_col5 = st.columns([2, 2, 2, 2, 3])
         with filter_col1:
             filter_platform = st.multiselect(
@@ -846,17 +846,20 @@ with tab_table:
                 key="scan_stat_filter",
             )
         with filter_col3:
-            filter_line_max = st.slider(
-                "Max Line Value",
-                min_value=0.0, max_value=60.0, value=60.0, step=0.5,
-                key="scan_line_max",
+            filter_team = st.multiselect(
+                "Team",
+                options=sorted({p.get("player_team", p.get("team", "")) for p in display_enriched_table if p.get("player_team") or p.get("team")}),
+                default=[],
+                placeholder="All teams",
+                key="scan_team_filter",
             )
         with filter_col4:
-            filter_healthy_only = st.toggle(
-                "Healthy Only",
-                value=True,
-                key="scan_healthy_filter",
-                help="Hide GTD/Out players from Smart Scan results",
+            filter_line_type = st.multiselect(
+                "Line Type",
+                options=["⚪ Standard", "🟢 Goblin", "🔴 Demon"],
+                default=[],
+                placeholder="All types",
+                key="scan_line_type_filter",
             )
         with filter_col5:
             search_player = st.text_input(
@@ -865,19 +868,80 @@ with tab_table:
                 key="scan_player_search",
             )
 
+        # Filter bar — Row 2
+        filter_col6, filter_col7, filter_col8, filter_col9 = st.columns([2, 3, 3, 3])
+        with filter_col6:
+            filter_healthy_only = st.toggle(
+                "Healthy Only",
+                value=True,
+                key="scan_healthy_filter",
+                help="Hide GTD/Out players from Smart Scan results",
+            )
+        with filter_col7:
+            filter_line_range = st.slider(
+                "Line Range",
+                min_value=0.0, max_value=60.0, value=(0.0, 60.0), step=0.5,
+                key="scan_line_range",
+            )
+        with filter_col8:
+            filter_confidence = st.slider(
+                "Min Confidence",
+                min_value=0, max_value=100, value=0, step=5,
+                key="scan_confidence_min",
+            )
+        with filter_col9:
+            filter_value_signal = st.multiselect(
+                "Value Line",
+                options=["🔥 Low Line", "✅ Fair", "⚠️ High Line"],
+                default=[],
+                placeholder="All signals",
+                key="scan_value_filter",
+            )
+
         # Apply Smart Scan filters
         scanned_props = display_enriched_table[:]
         if filter_platform:
             scanned_props = [p for p in scanned_props if p.get("platform", "") in filter_platform]
         if filter_stat:
             scanned_props = [p for p in scanned_props if p.get("stat_type", "").capitalize() in filter_stat]
-        scanned_props = [p for p in scanned_props if float(p.get("line", 0)) <= filter_line_max]
+        if filter_team:
+            scanned_props = [p for p in scanned_props if p.get("player_team", p.get("team", "")) in filter_team]
+        if filter_line_type:
+            _line_type_map = {"goblin": "🟢 Goblin", "demon": "🔴 Demon"}
+            scanned_props = [
+                p for p in scanned_props
+                if _line_type_map.get(p.get("odds_type", "standard"), "⚪ Standard") in filter_line_type
+            ]
+        line_min, line_max = filter_line_range
+        scanned_props = [p for p in scanned_props if line_min <= float(p.get("line", 0)) <= line_max]
         if filter_healthy_only:
             healthy_names_set = {p.get("player_name", "") for p, _, _ in healthy_props}
             scanned_props = [p for p in scanned_props if p.get("player_name", "") in healthy_names_set]
         if search_player.strip():
             search_lower = search_player.strip().lower()
             scanned_props = [p for p in scanned_props if search_lower in p.get("player_name", "").lower()]
+        if filter_confidence > 0:
+            # Pre-compute confidence for filtering
+            def _prop_confidence(p):
+                s = p.get("stat_type", "").capitalize()
+                a = get_season_avg(p, s)
+                d = round((float(p.get("line", 0)) - a) / a * 100, 1) if a > 0 else 0
+                si = get_player_status(p.get("player_name", ""), injury_status_map)
+                return compute_confidence_score(d, si.get("status", "Active"))
+            scanned_props = [p for p in scanned_props if _prop_confidence(p) >= filter_confidence]
+        if filter_value_signal:
+            def _prop_value_signal(p):
+                s = p.get("stat_type", "").capitalize()
+                a = get_season_avg(p, s)
+                d = round((float(p.get("line", 0)) - a) / a * 100, 1) if a > 0 else 0
+                if a and d < -12:
+                    return "🔥 Low Line"
+                elif a and d > 15:
+                    return "⚠️ High Line"
+                elif a:
+                    return "✅ Fair"
+                return "—"
+            scanned_props = [p for p in scanned_props if _prop_value_signal(p) in filter_value_signal]
 
         # Default sort by edge/value (absolute line_vs_avg_pct, descending)
         scanned_props.sort(key=lambda p: abs(float(p.get("line_vs_avg_pct", 0) or 0)), reverse=True)
@@ -913,6 +977,26 @@ with tab_table:
 
                 sp_conf = compute_confidence_score(sp_diff, sp_player_status)
 
+                # Value Line signal
+                if sp_avg and sp_diff < -12:
+                    sp_value = "🔥 Low Line"
+                elif sp_avg and sp_diff > 15:
+                    sp_value = "⚠️ High Line"
+                elif sp_avg:
+                    sp_value = "✅ Fair"
+                else:
+                    sp_value = "—"
+
+                # Context Line
+                if sp_avg and sp_diff > 10:
+                    sp_context = f"↑{sp_diff:.0f}% above avg"
+                elif sp_avg and sp_diff < -10:
+                    sp_context = f"↓{abs(sp_diff):.0f}% below avg"
+                elif sp_avg:
+                    sp_context = "near avg"
+                else:
+                    sp_context = "—"
+
                 scan_rows.append({
                     "Player": sp_name,
                     "Stat": sp_stat,
@@ -923,6 +1007,8 @@ with tab_table:
                     }.get(sp.get("odds_type", "standard"), "⚪ Standard"),
                     "Season Avg": round(sp_avg, 1) if sp_avg else "—",
                     "Line vs Avg": sp_vs,
+                    "Value Line": sp_value,
+                    "Context Line": sp_context,
                     "Confidence": sp_conf,
                     "Platform": sp.get("platform", ""),
                 })
@@ -934,6 +1020,8 @@ with tab_table:
                     "Line": st.column_config.NumberColumn(format="%.1f"),
                     "Season Avg": st.column_config.NumberColumn(format="%.1f"),
                     "Line vs Avg": st.column_config.TextColumn(),
+                    "Value Line": st.column_config.TextColumn(),
+                    "Context Line": st.column_config.TextColumn(),
                     "Confidence": st.column_config.ProgressColumn(
                         min_value=0, max_value=100, format="%d",
                     ),
@@ -1074,7 +1162,7 @@ with tab_table:
 
                 confidence = compute_confidence_score(line_diff, p_status)
 
-                # Value signal
+                # Value Line signal
                 if season_avg and line_diff < -12:
                     value_signal = "🔥 Low Line"
                 elif season_avg and line_diff > 15:
@@ -1083,6 +1171,16 @@ with tab_table:
                     value_signal = "✅ Fair"
                 else:
                     value_signal = "—"
+
+                # Context Line
+                if season_avg and line_diff > 10:
+                    context_line = f"↑{line_diff:.0f}% above avg"
+                elif season_avg and line_diff < -10:
+                    context_line = f"↓{abs(line_diff):.0f}% below avg"
+                elif season_avg:
+                    context_line = "near avg"
+                else:
+                    context_line = "—"
 
                 display_rows.append({
                     "#": i + 1,
@@ -1096,7 +1194,8 @@ with tab_table:
                         "demon":  "🔴 Demon",
                     }.get(prop.get("odds_type", "standard"), "⚪ Standard"),
                     "Season Avg": round(season_avg, 1) if season_avg else "—",
-                    "Value Signal": value_signal,
+                    "Value Line": value_signal,
+                    "Context Line": context_line,
                     "Confidence": confidence,
                     "Platform": platform,
                     "Date": prop.get("game_date", ""),
@@ -1109,6 +1208,8 @@ with tab_table:
                 column_config={
                     "Line": st.column_config.NumberColumn(format="%.1f"),
                     "Season Avg": st.column_config.NumberColumn(format="%.1f"),
+                    "Value Line": st.column_config.TextColumn(),
+                    "Context Line": st.column_config.TextColumn(),
                     "Confidence": st.column_config.ProgressColumn(
                         min_value=0, max_value=100, format="%d",
                     ),
