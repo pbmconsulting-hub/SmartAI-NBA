@@ -621,8 +621,6 @@ def filter_qeg_picks(
     filtered: list = []
     for r in results:
         odds_type = str(r.get("odds_type", "standard")).strip().lower()
-        if odds_type in _QEG_EXCLUDED_ODDS_TYPES:
-            continue
         if odds_type != "standard":
             continue
         if abs(r.get("edge_percentage", 0)) < thr:
