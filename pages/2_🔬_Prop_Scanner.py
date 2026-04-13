@@ -236,6 +236,30 @@ def get_season_avg(prop, stat_type):
     return float(stat_avg_map.get(stat_key, 0) or 0)
 
 
+# ── Helper: compute value line signal ─────────────────────────
+def get_value_line_label(season_avg, line_diff_pct):
+    """Return the Value Line label based on season avg and line diff %."""
+    if season_avg and line_diff_pct < -12:
+        return "🔥 Low Line"
+    elif season_avg and line_diff_pct > 15:
+        return "⚠️ High Line"
+    elif season_avg:
+        return "✅ Fair"
+    return "—"
+
+
+# ── Helper: compute context line description ──────────────────
+def get_context_line_label(season_avg, line_diff_pct):
+    """Return the Context Line label based on season avg and line diff %."""
+    if season_avg and line_diff_pct > 10:
+        return f"↑{line_diff_pct:.0f}% above avg"
+    elif season_avg and line_diff_pct < -10:
+        return f"↓{abs(line_diff_pct):.0f}% below avg"
+    elif season_avg:
+        return "near avg"
+    return "—"
+
+
 # ── Helper: get status emoji ──────────────────────────────────
 STATUS_EMOJI_MAP = {
     "Out": "🔴", "Injured Reserve": "🔴", "Doubtful": "🔴",
@@ -921,7 +945,6 @@ with tab_table:
             search_lower = search_player.strip().lower()
             scanned_props = [p for p in scanned_props if search_lower in p.get("player_name", "").lower()]
         if filter_confidence > 0:
-            # Pre-compute confidence for filtering
             def _prop_confidence(p):
                 s = p.get("stat_type", "").capitalize()
                 a = get_season_avg(p, s)
@@ -934,13 +957,7 @@ with tab_table:
                 s = p.get("stat_type", "").capitalize()
                 a = get_season_avg(p, s)
                 d = round((float(p.get("line", 0)) - a) / a * 100, 1) if a > 0 else 0
-                if a and d < -12:
-                    return "🔥 Low Line"
-                elif a and d > 15:
-                    return "⚠️ High Line"
-                elif a:
-                    return "✅ Fair"
-                return "—"
+                return get_value_line_label(a, d)
             scanned_props = [p for p in scanned_props if _prop_value_signal(p) in filter_value_signal]
 
         # Default sort by edge/value (absolute line_vs_avg_pct, descending)
@@ -977,25 +994,8 @@ with tab_table:
 
                 sp_conf = compute_confidence_score(sp_diff, sp_player_status)
 
-                # Value Line signal
-                if sp_avg and sp_diff < -12:
-                    sp_value = "🔥 Low Line"
-                elif sp_avg and sp_diff > 15:
-                    sp_value = "⚠️ High Line"
-                elif sp_avg:
-                    sp_value = "✅ Fair"
-                else:
-                    sp_value = "—"
-
-                # Context Line
-                if sp_avg and sp_diff > 10:
-                    sp_context = f"↑{sp_diff:.0f}% above avg"
-                elif sp_avg and sp_diff < -10:
-                    sp_context = f"↓{abs(sp_diff):.0f}% below avg"
-                elif sp_avg:
-                    sp_context = "near avg"
-                else:
-                    sp_context = "—"
+                sp_value = get_value_line_label(sp_avg, sp_diff)
+                sp_context = get_context_line_label(sp_avg, sp_diff)
 
                 scan_rows.append({
                     "Player": sp_name,
@@ -1162,25 +1162,8 @@ with tab_table:
 
                 confidence = compute_confidence_score(line_diff, p_status)
 
-                # Value Line signal
-                if season_avg and line_diff < -12:
-                    value_signal = "🔥 Low Line"
-                elif season_avg and line_diff > 15:
-                    value_signal = "⚠️ High Line"
-                elif season_avg:
-                    value_signal = "✅ Fair"
-                else:
-                    value_signal = "—"
-
-                # Context Line
-                if season_avg and line_diff > 10:
-                    context_line = f"↑{line_diff:.0f}% above avg"
-                elif season_avg and line_diff < -10:
-                    context_line = f"↓{abs(line_diff):.0f}% below avg"
-                elif season_avg:
-                    context_line = "near avg"
-                else:
-                    context_line = "—"
+                value_signal = get_value_line_label(season_avg, line_diff)
+                context_line = get_context_line_label(season_avg, line_diff)
 
                 display_rows.append({
                     "#": i + 1,
