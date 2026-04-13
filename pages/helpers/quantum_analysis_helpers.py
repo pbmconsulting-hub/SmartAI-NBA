@@ -584,7 +584,51 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     )
 
 
-# ── Quantum Edge Gap Deduplication & Grouping ────────────────────────────────
+# ── Quantum Edge Gap Filtering, Deduplication & Grouping ─────────────────────
+
+# Labels that must be excluded from the Quantum Edge Gap section.
+_QEG_EXCLUDED_ODDS_TYPES = frozenset({"goblin", "demon"})
+
+
+def filter_qeg_picks(
+    results: list,
+    edge_threshold: float | None = None,
+) -> list:
+    """Return QEG-qualified picks from *results*.
+
+    Filtering rules (derived from the Prop Scanner's line-type taxonomy):
+
+    1. **Standard lines only** – ``odds_type`` must be ``"standard"`` (or
+       absent, which defaults to ``"standard"``).
+    2. **Exclude goblins / demons** – any pick whose ``odds_type`` is
+       ``"goblin"`` or ``"demon"`` is dropped.
+    3. **Edge threshold** – ``|edge_percentage| >= edge_threshold`` (defaults
+       to :data:`_QEG_EDGE_THRESHOLD`).
+    4. **No other hiding** – picks with extreme deviations (line far above/
+       below average) are *not* filtered out.  ``should_avoid`` and
+       ``player_is_out`` are intentionally *not* checked here so that
+       extreme-edge picks are always surfaced.
+
+    Parameters
+    ----------
+    results:
+        Full list of analysis result dicts (e.g. ``displayed_results``).
+    edge_threshold:
+        Minimum absolute edge %. Defaults to the module-level
+        ``_QEG_EDGE_THRESHOLD`` (20.0).
+    """
+    thr = edge_threshold if edge_threshold is not None else _QEG_EDGE_THRESHOLD
+    filtered: list = []
+    for r in results:
+        odds_type = str(r.get("odds_type", "standard")).strip().lower()
+        if odds_type in _QEG_EXCLUDED_ODDS_TYPES:
+            continue
+        if odds_type != "standard":
+            continue
+        if abs(r.get("edge_percentage", 0)) < thr:
+            continue
+        filtered.append(r)
+    return filtered
 
 
 def deduplicate_qeg_picks(picks: list) -> list:

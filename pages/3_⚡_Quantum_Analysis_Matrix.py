@@ -524,6 +524,7 @@ from pages.helpers.quantum_analysis_helpers import (
     render_quantum_edge_gap_banner_html as _render_edge_gap_banner_html,
     render_quantum_edge_gap_grouped_html as _render_edge_gap_grouped_html,
     deduplicate_qeg_picks as _deduplicate_qeg_picks,
+    filter_qeg_picks as _filter_qeg_picks,
     IMPACT_COLORS as _IMP_COLORS,
     CATEGORY_EMOJI as _CAT_EMOJI,
 )
@@ -1103,6 +1104,7 @@ if run_analysis:
                         "player_status": player_status,
                         "player_status_note": injury_note,
                         "player_id": "",
+                        "odds_type": prop.get("odds_type", "standard"),
                     })
                     continue
 
@@ -1810,6 +1812,8 @@ if run_analysis:
                     ),
                     # Simulation array for fair-value odds explorer / slider
                     "simulated_results": simulation_output.get("simulated_results", []),
+                    # Prop Scanner line type (standard / goblin / demon)
+                    "odds_type": prop.get("odds_type", "standard"),
                 }
 
                 # ── Phase 2: DFS Fixed-Payout Metrics ───────────────────────
@@ -2008,6 +2012,7 @@ if run_analysis:
                     "player_status": "Analysis Error",
                     "player_status_note": str(_prop_loop_err),
                     "player_id": "",
+                    "odds_type": prop.get("odds_type", "standard"),
                     "composite_win_score": 0.0,
                     "win_score_grade": "F",
                     "win_score_label": "Error",
@@ -2726,14 +2731,11 @@ def _render_results_fragment():
                     unsafe_allow_html=True,
                 )
 
-    # ── ⚡ Quantum Edge Gap (extreme-edge picks ≥ ±20%, standard only) ─────
-    _edge_gap_picks = [
-        r for r in displayed_results
-        if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
-        and not r.get("should_avoid", False)
-        and not r.get("player_is_out", False)
-        and str(r.get("bet_type", "standard")).lower() == "standard"
-    ]
+    # ── ⚡ Quantum Edge Gap (standard-line, extreme-edge picks ≥ ±20%) ─────
+    # Only pull bets from the Standard Line Type on the Prop Scanner.
+    # Exclude any bets labeled "goblin" or "demon".  Do not hide extreme
+    # deviations — should_avoid / player_is_out are intentionally not checked.
+    _edge_gap_picks = _filter_qeg_picks(displayed_results)
     _edge_gap_picks = _deduplicate_qeg_picks(_edge_gap_picks)
     _edge_gap_picks = sorted(
         _edge_gap_picks,
