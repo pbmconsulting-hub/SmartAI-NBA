@@ -361,6 +361,13 @@ _NBA_HEADSHOT_CDN = "https://cdn.nba.com/headshots/nba/latest/260x190"
 _GAUGE_CIRCUMFERENCE = 157
 
 
+_STAT_AVG_KEYS = {
+    "points": "season_pts_avg",
+    "rebounds": "season_reb_avg",
+    "assists": "season_ast_avg",
+}
+
+
 def _edge_gauge_svg(edge_pct: float, display: str) -> str:
     """Return an inline SVG circular gauge for the edge percentage.
 
@@ -465,13 +472,8 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         p90_d = "—"
 
     # Season average for this stat type (for comparison)
-    _stat_avg_keys = {
-        "points": "season_pts_avg",
-        "rebounds": "season_reb_avg",
-        "assists": "season_ast_avg",
-    }
     stat_key_lower = stat_type.lower().replace(" ", "_")
-    season_avg_key = _stat_avg_keys.get(stat_key_lower, "")
+    season_avg_key = _STAT_AVG_KEYS.get(stat_key_lower, "")
     season_avg = result.get(season_avg_key, 0) if season_avg_key else 0
     try:
         season_avg = float(season_avg)
@@ -520,7 +522,7 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     # Edge gauge SVG
     gauge_svg = _edge_gauge_svg(edge_val, edge_display)
 
-    # Prop call line (e.g. "▲ More 25.5 Points")
+    # Prop call line (e.g. "▲ OVER 25.5 Points")
     prop_call = f"{dir_arrow} {dir_label} {line_display} {stat_display}"
 
     return (
