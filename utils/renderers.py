@@ -29,13 +29,17 @@ except ImportError:
     import logging as _logging
     _logger = _logging.getLogger(__name__)
 
-from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors, get_force_bar_html
+from styles.theme import QUANTUM_CARD_MATRIX_CSS, UNIFIED_PLAYER_CARD_CSS, get_team_colors, get_force_bar_html, get_line_value_badge_html
 
 try:
     from data.player_profile_service import get_headshot_url as _get_headshot_url
 except ImportError:  # pragma: no cover
     def _get_headshot_url(name):  # type: ignore[misc]
         return "https://cdn.nba.com/headshots/nba/latest/1040x760/fallback.png"
+
+
+# get_line_value_badge_html is imported from styles.theme and re-exported
+# for backward compatibility — single source of truth lives in theme.py.
 
 
 # ── Joseph M Smith avatar (cached base64) ────────────────────

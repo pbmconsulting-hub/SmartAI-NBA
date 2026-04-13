@@ -13,6 +13,7 @@ from styles.theme import (
     get_team_colors,
     get_qds_confidence_bar_html,
     get_qds_metrics_grid_html,
+    get_line_value_badge_html,
 )
 
 ESPN_NBA = "https://a.espncdn.com/i/teamlogos/nba/500"
@@ -366,6 +367,7 @@ def get_builder_prop_card_html(
     over_prob: float,
     confidence: float,
     minutes: float,
+    season_avg: float = 0.0,
 ) -> str:
     """Render a QDS-styled prop card for Game Builder results.
 
@@ -379,6 +381,7 @@ def get_builder_prop_card_html(
         over_prob: Over probability (0.0-1.0).
         confidence: Confidence score (0-100).
         minutes: Minutes used.
+        season_avg: Player's season average for this stat (0 = unavailable).
 
     Returns:
         HTML string for the prop card.
@@ -422,6 +425,17 @@ def get_builder_prop_card_html(
         f"{safe_stat} {safe_dir} {prop_line}", confidence, tier_icon
     )
 
+    # Line Value vs Average badge (display-only)
+    _line_val_badge = ""
+    try:
+        _s_avg = float(season_avg or 0)
+        _p_line = float(prop_line or 0)
+        if _s_avg > 0 and _p_line > 0:
+            _lv_gap = (_p_line - _s_avg) / _s_avg * 100.0
+            _line_val_badge = get_line_value_badge_html(_lv_gap)
+    except (TypeError, ValueError):
+        pass
+
     metrics = get_qds_metrics_grid_html([
         {"label": "Projected", "value": f"{projected:.1f}", "icon": "🎯"},
         {"label": "Probability", "value": f"{prob_pct:.1f}%", "icon": "📊"},
@@ -449,7 +463,7 @@ def get_builder_prop_card_html(
         f'<div class="qds-na-player-name">{safe_name}'
         f'<span class="qds-na-team-badge" style="background:{team_color};color:#fff;">'
         f'{safe_team}</span></div>'
-        f'<div class="qds-na-prop-desc">{safe_stat} {safe_dir} {prop_line}</div>'
+        f'<div class="qds-na-prop-desc">{safe_stat} {safe_dir} {prop_line}{_line_val_badge}</div>'
         f'</div>'
         f'<div style="text-align:center;flex-shrink:0;">'
         f'<div style="font-size:0.65rem;color:var(--qds-text-muted);'
