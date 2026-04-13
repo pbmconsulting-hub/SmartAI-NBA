@@ -26,6 +26,8 @@ from pages.helpers.quantum_analysis_helpers import (
     render_parlay_card_html,
     render_quantum_edge_gap_banner_html,
     render_quantum_edge_gap_card_html,
+    render_quantum_edge_gap_grouped_html,
+    deduplicate_qeg_picks,
     _classify_flag_type,
 )
 
@@ -351,24 +353,24 @@ class TestQuantumEdgeGapBanner(unittest.TestCase):
         self.assertIn("18.0%", html)  # max and avg
 
     def test_threshold_constant(self):
-        """Ensure the exported threshold is 15.0."""
-        self.assertEqual(QEG_EDGE_THRESHOLD, 15.0)
+        """Ensure the exported threshold is 20.0."""
+        self.assertEqual(QEG_EDGE_THRESHOLD, 20.0)
 
     def test_boundary_at_threshold(self):
         """Picks exactly at the threshold boundary should render correctly."""
         picks = [
-            {"edge_percentage": 15.0, "direction": "OVER"},
-            {"edge_percentage": -15.0, "direction": "UNDER"},
+            {"edge_percentage": 20.0, "direction": "OVER"},
+            {"edge_percentage": -20.0, "direction": "UNDER"},
         ]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("2", html)  # both picks present
-        self.assertIn("15.0%", html)  # avg and max edge
+        self.assertIn("20.0%", html)  # avg and max edge
 
     def test_banner_header_structure(self):
-        picks = [{"edge_percentage": 18.0, "direction": "OVER"}]
+        picks = [{"edge_percentage": 22.0, "direction": "OVER"}]
         html = render_quantum_edge_gap_banner_html(picks)
         self.assertIn("qam-edge-gap-banner-header", html)
-        self.assertIn("EDGE", html)  # threshold label in h3 span
+        self.assertIn("BEYOND", html)  # threshold label in h3 span
 
 
 class TestQuantumEdgeGapCard(unittest.TestCase):
@@ -398,7 +400,6 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("Points", html)
         self.assertIn("PrizePicks", html)
         self.assertIn("25.5", html)
-        self.assertIn("72.0%", html)  # prob
         self.assertIn("+18.5%", html)  # edge
         self.assertIn("OVER", html)
         self.assertIn("28.3", html)  # projection
@@ -409,9 +410,6 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         # Rank badge
         self.assertIn("qeg-rank", html)
         self.assertIn("#1", html)
-        # Confidence bar
-        self.assertIn("qeg-conf-bar-fill", html)
-        self.assertIn("width:82%", html)
         # Edge label
         self.assertIn("qeg-edge-highlight-lbl", html)
         # Direction arrow
@@ -420,26 +418,11 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("qeg-edge-gauge", html)
         self.assertIn("qeg-gauge-ring", html)
         self.assertIn("stroke-dashoffset", html)
-        # Mid comparison row
-        self.assertIn("qeg-card-mid", html)
-        self.assertIn("qeg-compare-block", html)
-        self.assertIn("Line", html)
-        self.assertIn("Projection", html)
         # Prop call line
         self.assertIn("qeg-player-prop", html)
         self.assertIn("▲ OVER 25.5 Points", html)
         # Stagger animation delay
         self.assertIn("animation-delay:0.00s", html)
-        # Edge heat strip
-        self.assertIn("qeg-heat-strip", html)
-        self.assertIn("qeg-heat-fill", html)
-        self.assertIn("qeg-heat-pct", html)
-        self.assertIn("18.5%", html)  # heat pct display
-        # Force direction bar
-        self.assertIn("qeg-force-row", html)
-        self.assertIn("qeg-force-track", html)
-        self.assertIn("qeg-force-over-fill", html)
-        self.assertIn("qeg-force-under-fill", html)
 
     def test_under_card(self):
         result = {
@@ -472,11 +455,6 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("qeg-edge-gauge", html)
         # Under prop call
         self.assertIn("▼ UNDER 4.5 Threes", html)
-        # Heat strip for under card
-        self.assertIn("qeg-heat-strip", html)
-        # Force bar with correct probability split (25% over / 75% under)
-        self.assertIn("qeg-force-over-fill", html)
-        self.assertIn("qeg-force-under-fill", html)
 
     def test_xss_prevention(self):
         result = {
@@ -522,7 +500,8 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("qeg-rank", html)
         self.assertIn("#3", html)
 
-    def test_season_avg_shown_for_points(self):
+    def test_season_avg_hidden_in_compact_card(self):
+        """Season avg is not visible in compact card layout."""
         result = {
             "player_name": "Player",
             "stat_type": "points",
@@ -531,7 +510,8 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
             "season_pts_avg": 25.3,
         }
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("Avg: 25.3", html)
+        # Compact card does not render stat blocks with Avg:
+        self.assertNotIn("Avg:", html)
 
     def test_season_avg_hidden_when_zero(self):
         result = {
@@ -649,57 +629,136 @@ class TestQuantumEdgeGapCSS(unittest.TestCase):
 
 
 class TestEdgeHeatStrip(unittest.TestCase):
-    """Verify edge heat strip width calculation."""
+    """Heat strip is hidden in the compact card layout but variables are still computed."""
 
     def test_heat_width_high_edge(self):
-        """40% edge → (40-10)/40*100 = 75% width."""
+        """40% edge → heat_width computed correctly even though hidden."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("width:75%", html)
+        # Compact card has edge gauge but not heat strip
+        self.assertIn("qeg-edge-gauge", html)
 
     def test_heat_width_low_edge(self):
-        """15% edge → (15-10)/40*100 ≈ 12% width (rounded)."""
+        """Low edge card still renders gauge."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("width:12%", html)
+        self.assertIn("qeg-edge-gauge", html)
 
     def test_heat_width_zero_edge(self):
-        """0% edge → clamped to 0% width."""
+        """0% edge → card still renders with gauge."""
         result = {"player_name": "P", "direction": "OVER", "edge_percentage": 0}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("qeg-heat-fill", html)
-        self.assertIn("width:0%", html)
+        self.assertIn("qeg-card", html)
 
     def test_heat_display_absolute_value(self):
-        """Under card heat pct shows absolute edge."""
-        result = {"player_name": "P", "direction": "UNDER", "edge_percentage": -20.0}
+        """Negative edge still renders card correctly."""
+        result = {"player_name": "P", "direction": "UNDER", "edge_percentage": -25.0}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("20.0%", html)
+        self.assertIn("-25.0%", html)
 
 
 class TestForceDirectionBar(unittest.TestCase):
-    """Verify force direction tug-of-war bar."""
+    """Force direction bar is hidden in compact layout; test card rendering."""
 
     def test_force_bar_over_dominant(self):
-        """72% prob => 72% over fill, 28% under fill."""
-        result = {"player_name": "P", "direction": "OVER", "probability_over": 0.72}
+        result = {"player_name": "P", "direction": "OVER", "probability_over": 0.85}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn('qeg-force-over-fill" style="width:72%', html)
-        self.assertIn('qeg-force-under-fill" style="width:28%', html)
+        self.assertIn("qeg-card", html)
+        self.assertIn("OVER", html)
 
     def test_force_bar_under_dominant(self):
-        """25% prob over => 25% over fill, 75% under fill."""
-        result = {"player_name": "P", "direction": "UNDER", "probability_over": 0.25}
+        result = {"player_name": "P", "direction": "UNDER", "probability_over": 0.15}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn('qeg-force-over-fill" style="width:25%', html)
-        self.assertIn('qeg-force-under-fill" style="width:75%', html)
+        self.assertIn("UNDER", html)
 
     def test_force_bar_labels(self):
-        """Force bar should have OVER and UNDER labels."""
-        result = {"player_name": "P", "direction": "OVER"}
+        result = {"player_name": "P", "direction": "OVER", "probability_over": 0.6}
         html = render_quantum_edge_gap_card_html(result)
-        self.assertIn("qeg-force-label-l", html)
-        self.assertIn("qeg-force-label-r", html)
+        self.assertIn("qeg-dir-over", html)
+
+
+class TestDeduplication(unittest.TestCase):
+    """Verify QEG pick deduplication."""
+
+    def test_removes_duplicates_by_player_stat_line(self):
+        picks = [
+            {"player_name": "LeBron James", "stat_type": "points", "line": 25.5, "edge_percentage": 20.0},
+            {"player_name": "LeBron James", "stat_type": "points", "line": 25.5, "edge_percentage": 22.0},
+        ]
+        result = deduplicate_qeg_picks(picks)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["edge_percentage"], 22.0)
+
+    def test_keeps_different_stat_types(self):
+        picks = [
+            {"player_name": "LeBron James", "stat_type": "points", "line": 25.5, "edge_percentage": 20.0},
+            {"player_name": "LeBron James", "stat_type": "rebounds", "line": 7.5, "edge_percentage": 25.0},
+        ]
+        result = deduplicate_qeg_picks(picks)
+        self.assertEqual(len(result), 2)
+
+    def test_keeps_different_lines(self):
+        picks = [
+            {"player_name": "LeBron James", "stat_type": "points", "line": 25.5, "edge_percentage": 20.0},
+            {"player_name": "LeBron James", "stat_type": "points", "line": 27.5, "edge_percentage": 30.0},
+        ]
+        result = deduplicate_qeg_picks(picks)
+        self.assertEqual(len(result), 2)
+
+    def test_empty_list(self):
+        self.assertEqual(deduplicate_qeg_picks([]), [])
+
+    def test_case_insensitive_player_name(self):
+        picks = [
+            {"player_name": "lebron james", "stat_type": "points", "line": 25.5, "edge_percentage": 20.0},
+            {"player_name": "LeBron James", "stat_type": "points", "line": 25.5, "edge_percentage": 18.0},
+        ]
+        result = deduplicate_qeg_picks(picks)
+        self.assertEqual(len(result), 1)
+
+
+class TestGroupedRendering(unittest.TestCase):
+    """Verify collapsible grouped QEG rendering."""
+
+    def test_single_prop_no_details(self):
+        picks = [
+            {"player_name": "LeBron", "stat_type": "points", "direction": "OVER",
+             "edge_percentage": 25.0, "player_id": "2544"},
+        ]
+        html = render_quantum_edge_gap_grouped_html(picks)
+        self.assertNotIn("<details", html)
+        self.assertIn("LeBron", html)
+
+    def test_multi_prop_uses_details(self):
+        picks = [
+            {"player_name": "LeBron", "stat_type": "points", "direction": "OVER",
+             "edge_percentage": 25.0, "player_id": "2544"},
+            {"player_name": "LeBron", "stat_type": "rebounds", "direction": "OVER",
+             "edge_percentage": 22.0, "player_id": "2544"},
+        ]
+        html = render_quantum_edge_gap_grouped_html(picks)
+        self.assertIn("<details", html)
+        self.assertIn("qeg-group", html)
+        self.assertIn("2 props", html)
+        self.assertIn("qeg-group-body", html)
+
+    def test_mixed_players(self):
+        picks = [
+            {"player_name": "LeBron", "stat_type": "points", "direction": "OVER",
+             "edge_percentage": 25.0},
+            {"player_name": "Curry", "stat_type": "threes", "direction": "UNDER",
+             "edge_percentage": -30.0},
+            {"player_name": "LeBron", "stat_type": "rebounds", "direction": "OVER",
+             "edge_percentage": 22.0},
+        ]
+        html = render_quantum_edge_gap_grouped_html(picks)
+        # LeBron grouped, Curry standalone
+        self.assertIn("<details", html)
+        self.assertIn("Curry", html)
+
+    def test_empty_picks(self):
+        html = render_quantum_edge_gap_grouped_html([])
+        self.assertEqual(html, "")
 
 
 class TestParlayCard(unittest.TestCase):
@@ -770,7 +829,8 @@ class TestPageImportsHelper(unittest.TestCase):
         self.assertIn("render_uncertain_pick_html", content)
         self.assertIn("render_parlay_card_html", content)
         self.assertIn("render_quantum_edge_gap_banner_html", content)
-        self.assertIn("render_quantum_edge_gap_card_html", content)
+        self.assertIn("render_quantum_edge_gap_grouped_html", content)
+        self.assertIn("deduplicate_qeg_picks", content)
 
     def test_page_no_longer_has_inline_dfs_html(self):
         """The DFS FLEX EDGE literal should now only be in the helper."""

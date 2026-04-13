@@ -294,7 +294,7 @@ def render_uncertain_pick_html(pick: dict, inline_breakdown_html: str = "") -> s
 
 # ── Quantum Edge Gap Banner ──────────────────────────────────────────────────
 
-_QEG_EDGE_THRESHOLD = 15.0  # Minimum absolute edge % to qualify
+_QEG_EDGE_THRESHOLD = 20.0  # Minimum absolute edge % to qualify (±20% and beyond)
 
 QEG_EDGE_THRESHOLD = _QEG_EDGE_THRESHOLD  # Public alias for page import
 
@@ -324,6 +324,8 @@ def render_quantum_edge_gap_banner_html(
         else 0
     )
 
+    _thr = int(_QEG_EDGE_THRESHOLD)
+
     return (
         '<div class="qam-edge-gap-banner">'
         '<div class="qam-edge-gap-banner-inner">'
@@ -331,12 +333,12 @@ def render_quantum_edge_gap_banner_html(
         '<div class="qam-edge-gap-banner-header">'
         '<div class="qam-edge-gap-banner-icon">⚡</div>'
         '<h3>Quantum Edge Gap'
-        f'<span>≥&thinsp;{_QEG_EDGE_THRESHOLD:.0f}% EDGE</span></h3>'
+        f'<span>±{_thr}%&thinsp;&amp;&thinsp;BEYOND</span></h3>'
         '</div>'
         '<p>'
-        'Extreme-edge picks where the model projects a massive advantage '
-        'over the line — high-conviction opportunities with the largest '
-        'separation between projection and market.'
+        f'Standard-line picks where the model projects ≥&thinsp;+{_thr}% or '
+        f'≤&thinsp;-{_thr}% edge — high-conviction opportunities with the '
+        'largest separation between projection and market.'
         '</p>'
         '<div class="qeg-stats-row">'
         f'<div class="qeg-stat-pill"><span class="qeg-stat-val">{total}</span>'
@@ -541,7 +543,6 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
 
     return (
         f'<div class="qeg-card {card_dir_css}"{delay_style}>'
-        # ── TOP: rank + identity + center (conf bar + metrics) + edge gauge ──
         f'<div class="qeg-card-top">'
         f'{rank_html}'
         # Identity
@@ -550,25 +551,22 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'<div class="qeg-player-info">'
         f'<span class="qeg-player-name">{player_name}</span>'
         f'<span class="qeg-player-meta">{team} · {platform}</span>'
-        f'<span class="qeg-player-prop">{prop_call}</span>'
         f'</div>'
         f'</div>'
-        # Center: confidence bar + metric pills
+        # Compact metrics row
         f'<div class="qeg-card-center">'
-        f'<div class="qeg-conf-row">'
-        f'<span class="qeg-conf-label">SAFE</span>'
-        f'<div class="qeg-conf-bar-track">'
-        f'<div class="qeg-conf-bar-fill" style="width:{conf_pct:.0f}%;"></div>'
-        f'</div>'
-        f'<span class="qeg-conf-val">{confidence:.0f}</span>'
-        f'</div>'
+        f'<span class="qeg-player-prop">{prop_call}</span>'
         f'<div class="qeg-card-metrics">'
         f'<div class="qeg-metric">'
         f'<span class="qeg-direction-badge {dir_css}">{dir_arrow} {dir_label}</span>'
         f'</div>'
         f'<div class="qeg-metric">'
-        f'<div class="qeg-metric-val">{prob_pct}</div>'
-        f'<div class="qeg-metric-lbl">Prob</div>'
+        f'<div class="qeg-metric-val">{proj_display}</div>'
+        f'<div class="qeg-metric-lbl">Proj</div>'
+        f'</div>'
+        f'<div class="qeg-metric">'
+        f'<div class="qeg-metric-val">{confidence:.0f}</div>'
+        f'<div class="qeg-metric-lbl">SAFE</div>'
         f'</div>'
         f'<div class="qeg-metric">'
         f'<div class="qeg-metric-val">{tier_emoji} {tier}</div>'
@@ -582,68 +580,82 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'<span class="qeg-edge-highlight-lbl">Edge</span>'
         f'</div>'
         f'</div>'
-        # ── MID: Edge heat strip + Line vs Projection comparison ──
-        f'<div class="qeg-card-mid">'
-        # Edge intensity heat strip
-        f'<div class="qeg-heat-strip">'
-        f'<span class="qeg-heat-label">Edge Intensity</span>'
-        f'<div class="qeg-heat-bar">'
-        f'<div class="qeg-heat-fill" style="width:{heat_width:.0f}%;"></div>'
-        f'</div>'
-        f'<span class="qeg-heat-pct">{heat_pct_display}</span>'
-        f'</div>'
-        # Comparison blocks
-        f'<div class="qeg-compare-block">'
-        f'<span class="qeg-compare-icon">📊</span>'
-        f'<div class="qeg-compare-data">'
-        f'<span class="qeg-compare-val">{line_display}</span>'
-        f'<span class="qeg-compare-lbl">Line</span>'
-        f'</div>'
-        f'</div>'
-        f'<div class="qeg-compare-block">'
-        f'<span class="qeg-compare-icon">🎯</span>'
-        f'<div class="qeg-compare-data">'
-        f'<span class="qeg-compare-val">{proj_display}</span>'
-        f'<span class="qeg-compare-lbl">Projection</span>'
-        f'</div>'
-        f'</div>'
-        f'<div class="qeg-compare-block">'
-        f'<span class="qeg-compare-icon">⚡</span>'
-        f'<div class="qeg-compare-data">'
-        f'<span class="qeg-compare-val">{edge_display}</span>'
-        f'<span class="qeg-compare-lbl">Edge</span>'
-        f'</div>'
-        f'</div>'
-        f'</div>'
-        # ── FORCE: Over/Under probability direction bar ──
-        f'<div class="qeg-force-row">'
-        f'<div class="qeg-force-inner">'
-        f'<span class="qeg-force-label-l">OVER</span>'
-        f'<div class="qeg-force-track">'
-        f'<div class="qeg-force-over-fill" style="width:{over_pct:.0f}%;"></div>'
-        f'<div class="qeg-force-under-fill" style="width:{under_pct:.0f}%;"></div>'
-        f'</div>'
-        f'<span class="qeg-force-label-r">UNDER</span>'
-        f'</div>'
-        f'</div>'
-        # ── BOTTOM: percentile stat blocks ──
-        f'<div class="qeg-card-bottom">'
-        f'<div class="qeg-stat-block">'
-        f'<div class="qeg-stat-block-title">P10 / Median / P90</div>'
-        f'<div class="qeg-stat-block-val">{p10_d} / {p50_d} / {p90_d}</div>'
-        f'</div>'
-        f'<div class="qeg-stat-block">'
-        f'<div class="qeg-stat-block-title">Projection</div>'
-        f'<div class="qeg-stat-block-val">{proj_display}</div>'
-        f'{avg_sub_html}'
-        f'</div>'
-        f'<div class="qeg-stat-block">'
-        f'<div class="qeg-stat-block-title">Edge %</div>'
-        f'<div class="qeg-stat-block-val">{edge_display}</div>'
-        f'</div>'
-        f'</div>'
         f'</div>'
     )
+
+
+# ── Quantum Edge Gap Deduplication & Grouping ────────────────────────────────
+
+
+def deduplicate_qeg_picks(picks: list) -> list:
+    """Remove duplicate QEG picks keeping the one with the highest |edge|.
+
+    Duplicates are identified by ``(player_name, stat_type, line)`` tuple.
+    """
+    seen: dict[tuple, dict] = {}
+    for p in picks:
+        key = (
+            str(p.get("player_name", "")).strip().lower(),
+            str(p.get("stat_type", "")).strip().lower(),
+            p.get("line", p.get("prop_line", 0)),
+        )
+        existing = seen.get(key)
+        if existing is None or abs(p.get("edge_percentage", 0)) > abs(existing.get("edge_percentage", 0)):
+            seen[key] = p
+    return list(seen.values())
+
+
+def render_quantum_edge_gap_grouped_html(picks: list) -> str:
+    """Return collapsible HTML grouping QEG picks by player.
+
+    Players with a single prop render as a flat card.
+    Players with multiple props are wrapped in a ``<details>`` element
+    so the user can expand/collapse their bets, saving vertical space.
+    """
+    from collections import OrderedDict
+
+    groups: OrderedDict[str, list] = OrderedDict()
+    for p in picks:
+        name = p.get("player_name", "Unknown")
+        groups.setdefault(name, []).append(p)
+
+    parts: list[str] = []
+    global_rank = 0
+    for player_name, player_picks in groups.items():
+        if len(player_picks) == 1:
+            global_rank += 1
+            parts.append(render_quantum_edge_gap_card_html(player_picks[0], rank=global_rank))
+        else:
+            # Collapsible group
+            best_edge = max(abs(p.get("edge_percentage", 0)) for p in player_picks)
+            team = _html.escape(str(player_picks[0].get("player_team", player_picks[0].get("team", ""))))
+            player_id = player_picks[0].get("player_id", "")
+            headshot_url = (
+                f"{_NBA_HEADSHOT_CDN}/{player_id}.png" if player_id else ""
+            )
+            headshot_img = (
+                f'<img class="qeg-headshot" src="{_html.escape(headshot_url)}" '
+                f'alt="{_html.escape(player_name)}" loading="lazy">'
+                if headshot_url else ""
+            )
+            summary_line = (
+                f'{headshot_img}'
+                f'<span class="qeg-group-name">{_html.escape(player_name)}</span>'
+                f'<span class="qeg-group-meta">{team} · '
+                f'{len(player_picks)} props · '
+                f'Best edge {best_edge:.1f}%</span>'
+            )
+            inner_cards = []
+            for pp in player_picks:
+                global_rank += 1
+                inner_cards.append(render_quantum_edge_gap_card_html(pp, rank=global_rank))
+            parts.append(
+                f'<details class="qeg-group">'
+                f'<summary class="qeg-group-summary">{summary_line}</summary>'
+                f'<div class="qeg-group-body">{"".join(inner_cards)}</div>'
+                f'</details>'
+            )
+    return "".join(parts)
 
 
 # ── Gold Tier Banner ──────────────────────────────────────────────────────────

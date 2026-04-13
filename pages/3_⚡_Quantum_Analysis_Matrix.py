@@ -522,7 +522,8 @@ from pages.helpers.quantum_analysis_helpers import (
     render_parlay_card_html as _render_parlay_card_html,
     render_game_matchup_card_html as _render_game_matchup_card_html,
     render_quantum_edge_gap_banner_html as _render_edge_gap_banner_html,
-    render_quantum_edge_gap_card_html as _render_edge_gap_card_html,
+    render_quantum_edge_gap_grouped_html as _render_edge_gap_grouped_html,
+    deduplicate_qeg_picks as _deduplicate_qeg_picks,
     IMPACT_COLORS as _IMP_COLORS,
     CATEGORY_EMOJI as _CAT_EMOJI,
 )
@@ -2725,13 +2726,15 @@ def _render_results_fragment():
                     unsafe_allow_html=True,
                 )
 
-    # ── ⚡ Quantum Edge Gap (extreme-edge picks ≥ 15%) ────────────────────
+    # ── ⚡ Quantum Edge Gap (extreme-edge picks ≥ ±20%, standard only) ─────
     _edge_gap_picks = [
         r for r in displayed_results
         if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
         and not r.get("should_avoid", False)
         and not r.get("player_is_out", False)
+        and str(r.get("bet_type", "standard")).lower() == "standard"
     ]
+    _edge_gap_picks = _deduplicate_qeg_picks(_edge_gap_picks)
     _edge_gap_picks = sorted(
         _edge_gap_picks,
         key=lambda r: abs(r.get("edge_percentage", 0)),
@@ -2744,11 +2747,10 @@ def _render_results_fragment():
             _render_edge_gap_banner_html(_edge_gap_picks),
             unsafe_allow_html=True,
         )
-        for _eg_idx, _eg in enumerate(_edge_gap_picks, start=1):
-            st.markdown(
-                _render_edge_gap_card_html(_eg, rank=_eg_idx),
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            _render_edge_gap_grouped_html(_edge_gap_picks),
+            unsafe_allow_html=True,
+        )
         st.divider()
 
     # ── 🏆 Best Single Bets (shown before parlays for maximum visibility) ─
