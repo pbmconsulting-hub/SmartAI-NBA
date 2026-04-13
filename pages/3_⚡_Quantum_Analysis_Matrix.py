@@ -225,6 +225,8 @@ def _get_sim_cache() -> dict:
 
 _LAZY_CHUNK_SIZE = 50          # players per st.html() call — larger chunks = fewer DOM injections
 _MAX_BIO_PREFETCH_WORKERS = 8  # max threads for parallel bio pre-fetching
+_MAX_TOP_PICKS = 8             # max props flagged as "Top Pick" in the summary bar
+_MAX_UNCERTAIN_NAMES = 6       # max player names shown in the uncertain-picks banner
 
 # Injury status confidence penalties (points deducted from SAFE Score)
 _DOUBTFUL_INJURY_PENALTY = 8.0      # Doubtful: ~75% chance of sitting
@@ -2721,7 +2723,7 @@ def _render_results_fragment():
     if _uncertain_picks:
         _unc_names = list(dict.fromkeys(
             r.get("player_name", "Unknown") for r in _uncertain_picks
-        ))[:6]
+        ))[:_MAX_UNCERTAIN_NAMES]
         _unc_overflow = len(_uncertain_picks) - len(_unc_names)
         _unc_summary = ", ".join(_html.escape(n) for n in _unc_names)
         if _unc_overflow > 0:
@@ -2775,7 +2777,7 @@ def _render_results_fragment():
         _single_bet_pool,
         key=lambda r: (r.get("confidence_score", 0), abs(r.get("edge_percentage", 0))),
         reverse=True,
-    )[:8]  # Top 8 picks get the badge
+    )[:_MAX_TOP_PICKS]  # Top picks get the badge
 
     # Flag each top pick in the original results list
     _best_pick_keys: set = set()

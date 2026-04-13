@@ -9034,6 +9034,10 @@ QUANTUM_CARD_MATRIX_CSS = """
 
 /* ── AI/Tech Theme Accents ─────────────────────────────────── */
 /* Subtle neural-net grid pattern on game matchup cards */
+.qam-matchup-card {
+    position: relative;
+    overflow: hidden;
+}
 .qam-matchup-card::before {
     content: '';
     position: absolute;
@@ -9046,10 +9050,6 @@ QUANTUM_CARD_MATRIX_CSS = """
     background: radial-gradient(circle at 20% 50%, rgba(0,198,255,0.03) 0%, transparent 50%),
                 radial-gradient(circle at 80% 50%, rgba(255,94,0,0.02) 0%, transparent 50%);
     opacity: 0.7;
-}
-.qam-matchup-card {
-    position: relative;
-    overflow: hidden;
 }
 """
 
