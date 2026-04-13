@@ -28,6 +28,7 @@ from pages.helpers.quantum_analysis_helpers import (
     render_quantum_edge_gap_card_html,
     render_quantum_edge_gap_grouped_html,
     deduplicate_qeg_picks,
+    filter_qeg_picks,
     _classify_flag_type,
 )
 
@@ -717,6 +718,107 @@ class TestDeduplication(unittest.TestCase):
         self.assertEqual(len(result), 1)
 
 
+class TestFilterQegPicks(unittest.TestCase):
+    """Verify QEG pick filtering by odds_type and edge threshold."""
+
+    def _pick(self, odds_type="standard", edge=25.0, **kw):
+        base = {
+            "player_name": "Test Player",
+            "stat_type": "points",
+            "line": 20.5,
+            "edge_percentage": edge,
+            "odds_type": odds_type,
+        }
+        base.update(kw)
+        return base
+
+    def test_standard_included(self):
+        """Standard odds_type picks meeting the edge threshold pass."""
+        result = filter_qeg_picks([self._pick(odds_type="standard", edge=25.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_goblin_excluded(self):
+        """Goblin odds_type picks are excluded."""
+        result = filter_qeg_picks([self._pick(odds_type="goblin", edge=30.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_demon_excluded(self):
+        """Demon odds_type picks are excluded."""
+        result = filter_qeg_picks([self._pick(odds_type="demon", edge=30.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_missing_odds_type_defaults_to_standard(self):
+        """Picks without odds_type default to 'standard' and pass."""
+        pick = self._pick(edge=25.0)
+        del pick["odds_type"]
+        result = filter_qeg_picks([pick])
+        self.assertEqual(len(result), 1)
+
+    def test_below_edge_threshold_excluded(self):
+        """Picks below the edge threshold are excluded."""
+        result = filter_qeg_picks([self._pick(edge=15.0)])
+        self.assertEqual(len(result), 0)
+
+    def test_negative_edge_above_threshold_included(self):
+        """Negative edge with abs >= threshold is included (UNDER direction)."""
+        result = filter_qeg_picks([self._pick(edge=-25.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_custom_threshold(self):
+        """Custom edge_threshold overrides the default."""
+        result = filter_qeg_picks([self._pick(edge=10.0)], edge_threshold=5.0)
+        self.assertEqual(len(result), 1)
+
+    def test_should_avoid_not_filtered(self):
+        """Picks with should_avoid=True are NOT filtered (extreme deviations shown)."""
+        result = filter_qeg_picks([self._pick(edge=30.0, should_avoid=True)])
+        self.assertEqual(len(result), 1)
+
+    def test_player_is_out_not_filtered(self):
+        """Picks with player_is_out=True are NOT filtered out by QEG."""
+        result = filter_qeg_picks([self._pick(edge=30.0, player_is_out=True)])
+        self.assertEqual(len(result), 1)
+
+    def test_extreme_negative_deviation_shown(self):
+        """A prop with line value far below average (extreme -edge) is shown."""
+        result = filter_qeg_picks([self._pick(edge=-50.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_extreme_positive_deviation_shown(self):
+        """A prop with line value far above average (extreme +edge) is shown."""
+        result = filter_qeg_picks([self._pick(edge=60.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_mixed_odds_types(self):
+        """Only standard picks pass when mixed with goblin and demon."""
+        picks = [
+            self._pick(odds_type="standard", edge=25.0),
+            self._pick(odds_type="goblin", edge=30.0),
+            self._pick(odds_type="demon", edge=35.0),
+            self._pick(odds_type="standard", edge=22.0),
+        ]
+        result = filter_qeg_picks(picks)
+        self.assertEqual(len(result), 2)
+        for r in result:
+            self.assertEqual(r["odds_type"], "standard")
+
+    def test_empty_list(self):
+        """Empty input returns empty output."""
+        self.assertEqual(filter_qeg_picks([]), [])
+
+    def test_case_insensitive_odds_type(self):
+        """odds_type matching is case-insensitive."""
+        result = filter_qeg_picks([self._pick(odds_type="Standard", edge=25.0)])
+        self.assertEqual(len(result), 1)
+
+    def test_bet_type_field_ignored(self):
+        """bet_type field is NOT used for filtering; only odds_type matters."""
+        pick = self._pick(odds_type="standard", edge=25.0)
+        pick["bet_type"] = "some_other_type"
+        result = filter_qeg_picks([pick])
+        self.assertEqual(len(result), 1)
+
+
 class TestGroupedRendering(unittest.TestCase):
     """Verify collapsible grouped QEG rendering."""
 
@@ -831,6 +933,7 @@ class TestPageImportsHelper(unittest.TestCase):
         self.assertIn("render_quantum_edge_gap_banner_html", content)
         self.assertIn("render_quantum_edge_gap_grouped_html", content)
         self.assertIn("deduplicate_qeg_picks", content)
+        self.assertIn("filter_qeg_picks", content)
 
     def test_page_no_longer_has_inline_dfs_html(self):
         """The DFS FLEX EDGE literal should now only be in the helper."""

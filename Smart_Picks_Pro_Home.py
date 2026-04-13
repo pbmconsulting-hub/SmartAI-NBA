@@ -21,6 +21,7 @@ from pages.helpers.quantum_analysis_helpers import (
     render_quantum_edge_gap_banner_html as _render_edge_gap_banner_html,
     render_quantum_edge_gap_grouped_html as _render_edge_gap_grouped_html,
     deduplicate_qeg_picks as _deduplicate_qeg_picks,
+    filter_qeg_picks as _filter_qeg_picks,
 )
 
 # ============================================================
@@ -1564,18 +1565,12 @@ if _home_one_click:
 # ============================================================
 
 # ============================================================
-# SECTION 1B: Quantum Edge Gap — Extreme-edge picks (shown when
-#             analysis results exist with |edge| ≥ 20%, standard only)
+# SECTION 1B: Quantum Edge Gap — Extreme-edge standard-line picks
+#             (|edge| ≥ 20%, odds_type="standard" only, no goblins/demons)
 # ============================================================
 
 _home_analysis = st.session_state.get("analysis_results", [])
-_home_edge_gap_picks = [
-    r for r in _home_analysis
-    if abs(r.get("edge_percentage", 0)) >= _QEG_EDGE_THRESHOLD
-    and not r.get("should_avoid", False)
-    and not r.get("player_is_out", False)
-    and str(r.get("bet_type", "standard")).lower() == "standard"
-]
+_home_edge_gap_picks = _filter_qeg_picks(_home_analysis)
 _home_edge_gap_picks = _deduplicate_qeg_picks(_home_edge_gap_picks)
 _home_edge_gap_picks = sorted(
     _home_edge_gap_picks,
