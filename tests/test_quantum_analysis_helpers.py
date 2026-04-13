@@ -13,6 +13,7 @@ from pages.helpers.quantum_analysis_helpers import (
     SIGNAL_LABELS,
     PARLAY_STARS,
     PARLAY_LABELS,
+    QEG_EDGE_THRESHOLD,
     render_dfs_flex_edge_html,
     render_tier_distribution_html,
     render_news_alert_html,
@@ -23,6 +24,8 @@ from pages.helpers.quantum_analysis_helpers import (
     render_best_single_bets_header_html,
     render_parlays_header_html,
     render_parlay_card_html,
+    render_quantum_edge_gap_banner_html,
+    render_quantum_edge_gap_card_html,
     _classify_flag_type,
 )
 
@@ -305,6 +308,400 @@ class TestBannerHeaders(unittest.TestCase):
         self.assertIn("EDGE Score", html)
 
 
+class TestQuantumEdgeGapBanner(unittest.TestCase):
+    """Verify Quantum Edge Gap banner rendering."""
+
+    def test_banner_with_picks(self):
+        picks = [
+            {"edge_percentage": 18.5, "direction": "OVER"},
+            {"edge_percentage": -16.2, "direction": "UNDER"},
+            {"edge_percentage": 20.0, "direction": "OVER"},
+        ]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("Quantum Edge Gap", html)
+        self.assertIn("qam-edge-gap-banner", html)
+        self.assertIn("qam-edge-gap-banner-inner", html)
+        self.assertIn("qam-edge-gap-banner-icon", html)
+        self.assertIn("3", html)  # total picks
+        self.assertIn("2", html)  # over count
+        self.assertIn("1", html)  # under count
+        self.assertIn("18.2%", html)  # avg edge
+        self.assertIn("20.0%", html)  # max edge
+
+    def test_banner_empty_picks(self):
+        html = render_quantum_edge_gap_banner_html([])
+        self.assertIn("Quantum Edge Gap", html)
+        self.assertIn("0", html)
+        self.assertIn("0.0%", html)
+
+    def test_banner_all_over(self):
+        picks = [
+            {"edge_percentage": 15.5, "direction": "OVER"},
+            {"edge_percentage": 17.0, "direction": "OVER"},
+        ]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("qeg-stats-row", html)
+        self.assertIn("qeg-stat-pill", html)
+
+    def test_banner_all_under(self):
+        picks = [
+            {"edge_percentage": -18.0, "direction": "UNDER"},
+        ]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("18.0%", html)  # max and avg
+
+    def test_threshold_constant(self):
+        """Ensure the exported threshold is 15.0."""
+        self.assertEqual(QEG_EDGE_THRESHOLD, 15.0)
+
+    def test_boundary_at_threshold(self):
+        """Picks exactly at the threshold boundary should render correctly."""
+        picks = [
+            {"edge_percentage": 15.0, "direction": "OVER"},
+            {"edge_percentage": -15.0, "direction": "UNDER"},
+        ]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("2", html)  # both picks present
+        self.assertIn("15.0%", html)  # avg and max edge
+
+    def test_banner_header_structure(self):
+        picks = [{"edge_percentage": 18.0, "direction": "OVER"}]
+        html = render_quantum_edge_gap_banner_html(picks)
+        self.assertIn("qam-edge-gap-banner-header", html)
+        self.assertIn("EDGE", html)  # threshold label in h3 span
+
+
+class TestQuantumEdgeGapCard(unittest.TestCase):
+    """Verify Quantum Edge Gap individual card rendering."""
+
+    def test_over_card(self):
+        result = {
+            "player_name": "LeBron James",
+            "stat_type": "points",
+            "player_team": "LAL",
+            "platform": "PrizePicks",
+            "tier": "Gold",
+            "line": 25.5,
+            "confidence_score": 82,
+            "probability_over": 0.72,
+            "edge_percentage": 18.5,
+            "direction": "OVER",
+            "adjusted_projection": 28.3,
+            "percentile_10": 20.1,
+            "percentile_50": 27.5,
+            "percentile_90": 35.2,
+            "player_id": "2544",
+        }
+        html = render_quantum_edge_gap_card_html(result, rank=1)
+        self.assertIn("LeBron James", html)
+        self.assertIn("LAL", html)
+        self.assertIn("Points", html)
+        self.assertIn("PrizePicks", html)
+        self.assertIn("25.5", html)
+        self.assertIn("72.0%", html)  # prob
+        self.assertIn("+18.5%", html)  # edge
+        self.assertIn("OVER", html)
+        self.assertIn("28.3", html)  # projection
+        self.assertIn("qeg-card-over", html)
+        self.assertIn("qeg-dir-over", html)
+        self.assertIn("🥇", html)  # Gold tier emoji
+        self.assertIn("2544.png", html)  # headshot
+        # Rank badge
+        self.assertIn("qeg-rank", html)
+        self.assertIn("#1", html)
+        # Confidence bar
+        self.assertIn("qeg-conf-bar-fill", html)
+        self.assertIn("width:82%", html)
+        # Edge label
+        self.assertIn("qeg-edge-highlight-lbl", html)
+        # Direction arrow
+        self.assertIn("▲", html)
+        # Circular edge gauge SVG
+        self.assertIn("qeg-edge-gauge", html)
+        self.assertIn("qeg-gauge-ring", html)
+        self.assertIn("stroke-dashoffset", html)
+        # Mid comparison row
+        self.assertIn("qeg-card-mid", html)
+        self.assertIn("qeg-compare-block", html)
+        self.assertIn("Line", html)
+        self.assertIn("Projection", html)
+        # Prop call line
+        self.assertIn("qeg-player-prop", html)
+        self.assertIn("▲ OVER 25.5 Points", html)
+        # Stagger animation delay
+        self.assertIn("animation-delay:0.00s", html)
+        # Edge heat strip
+        self.assertIn("qeg-heat-strip", html)
+        self.assertIn("qeg-heat-fill", html)
+        self.assertIn("qeg-heat-pct", html)
+        self.assertIn("18.5%", html)  # heat pct display
+        # Force direction bar
+        self.assertIn("qeg-force-row", html)
+        self.assertIn("qeg-force-track", html)
+        self.assertIn("qeg-force-over-fill", html)
+        self.assertIn("qeg-force-under-fill", html)
+
+    def test_under_card(self):
+        result = {
+            "player_name": "Steph Curry",
+            "stat_type": "threes",
+            "player_team": "GSW",
+            "platform": "DraftKings",
+            "tier": "Platinum",
+            "line": 4.5,
+            "confidence_score": 90,
+            "probability_over": 0.25,
+            "edge_percentage": -17.2,
+            "direction": "UNDER",
+            "adjusted_projection": 3.1,
+            "percentile_10": 1.0,
+            "percentile_50": 3.0,
+            "percentile_90": 5.5,
+            "player_id": "201939",
+        }
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("Steph Curry", html)
+        self.assertIn("UNDER", html)
+        self.assertIn("-17.2%", html)
+        self.assertIn("qeg-card-under", html)
+        self.assertIn("qeg-dir-under", html)
+        self.assertIn("💎", html)  # Platinum tier emoji
+        # Direction arrow for under
+        self.assertIn("▼", html)
+        # Gauge present for under cards too
+        self.assertIn("qeg-edge-gauge", html)
+        # Under prop call
+        self.assertIn("▼ UNDER 4.5 Threes", html)
+        # Heat strip for under card
+        self.assertIn("qeg-heat-strip", html)
+        # Force bar with correct probability split (25% over / 75% under)
+        self.assertIn("qeg-force-over-fill", html)
+        self.assertIn("qeg-force-under-fill", html)
+
+    def test_xss_prevention(self):
+        result = {
+            "player_name": '<script>alert("xss")</script>',
+            "stat_type": "points",
+            "player_team": "LAL",
+            "platform": "Test",
+            "tier": "Gold",
+            "line": 20.0,
+            "confidence_score": 50,
+            "probability_over": 0.5,
+            "edge_percentage": 16.0,
+            "direction": "OVER",
+            "adjusted_projection": 22.0,
+        }
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertNotIn("<script>", html)
+        self.assertIn("&lt;script&gt;", html)
+
+    def test_missing_fields_defaults(self):
+        result = {"player_name": "Test Player"}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("Test Player", html)
+        self.assertIn("qeg-card", html)
+
+    def test_no_headshot_without_player_id(self):
+        result = {
+            "player_name": "No ID Player",
+            "stat_type": "rebounds",
+            "direction": "OVER",
+        }
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertNotIn("qeg-headshot", html)
+
+    def test_rank_zero_hides_badge(self):
+        result = {"player_name": "Player", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result, rank=0)
+        self.assertNotIn("qeg-rank", html)
+
+    def test_rank_positive_shows_badge(self):
+        result = {"player_name": "Player", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result, rank=3)
+        self.assertIn("qeg-rank", html)
+        self.assertIn("#3", html)
+
+    def test_season_avg_shown_for_points(self):
+        result = {
+            "player_name": "Player",
+            "stat_type": "points",
+            "direction": "OVER",
+            "adjusted_projection": 28.0,
+            "season_pts_avg": 25.3,
+        }
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("Avg: 25.3", html)
+
+    def test_season_avg_hidden_when_zero(self):
+        result = {
+            "player_name": "Player",
+            "stat_type": "points",
+            "direction": "OVER",
+        }
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertNotIn("Avg:", html)
+
+    def test_stagger_animation_delay(self):
+        result = {"player_name": "Player", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result, rank=5)
+        self.assertIn("animation-delay:0.32s", html)
+
+    def test_gauge_offset_scales_with_edge(self):
+        """Edge gauge ring offset should decrease as |edge| increases."""
+        result_low = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
+        result_high = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
+        html_low = render_quantum_edge_gap_card_html(result_low)
+        html_high = render_quantum_edge_gap_card_html(result_high)
+        # Both should have the gauge
+        self.assertIn("stroke-dashoffset", html_low)
+        self.assertIn("stroke-dashoffset", html_high)
+        # Extract offsets — higher edge => smaller offset
+        import re
+        offset_low = float(re.search(r'stroke-dashoffset="([\d.]+)"', html_low).group(1))
+        offset_high = float(re.search(r'stroke-dashoffset="([\d.]+)"', html_high).group(1))
+        self.assertGreater(offset_low, offset_high)
+
+
+class TestQuantumEdgeGapCSS(unittest.TestCase):
+    """Verify edge gap CSS is present in the theme."""
+
+    def test_css_has_edge_gap_banner(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qam-edge-gap-banner", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_edge_gap_card(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_edge_gap_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-border-glow", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_slide_in_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card-slide-in", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_confidence_bar(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-conf-bar-fill", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-conf-expand", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_rank_badge(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-rank", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_under_card_theme(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card-under", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_responsive_rules(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("@media (max-width: 768px)", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_hover_states(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card:hover", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_gauge_ring(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-gauge-ring", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-gauge-fill", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_edge_pulse(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-edge-pulse", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_compare_section(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card-mid", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-compare-block", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_shimmer_top_line(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-card::after", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_heat_strip(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-heat-strip", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-fill", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-bar", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-pct", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_force_direction_bar(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-force-row", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-track", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-over-fill", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-under-fill", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_grid_scroll_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-grid-scroll", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_heat_pulse_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-heat-pulse", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_force_fill_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-force-fill", QUANTUM_CARD_MATRIX_CSS)
+
+
+class TestEdgeHeatStrip(unittest.TestCase):
+    """Verify edge heat strip width calculation."""
+
+    def test_heat_width_high_edge(self):
+        """40% edge → (40-10)/40*100 = 75% width."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("width:75%", html)
+
+    def test_heat_width_low_edge(self):
+        """15% edge → (15-10)/40*100 ≈ 12% width (rounded)."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("width:12%", html)
+
+    def test_heat_width_zero_edge(self):
+        """0% edge → clamped to 0% width."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("qeg-heat-fill", html)
+        self.assertIn("width:0%", html)
+
+    def test_heat_display_absolute_value(self):
+        """Under card heat pct shows absolute edge."""
+        result = {"player_name": "P", "direction": "UNDER", "edge_percentage": -20.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("20.0%", html)
+
+
+class TestForceDirectionBar(unittest.TestCase):
+    """Verify force direction tug-of-war bar."""
+
+    def test_force_bar_over_dominant(self):
+        """72% prob => 72% over fill, 28% under fill."""
+        result = {"player_name": "P", "direction": "OVER", "probability_over": 0.72}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn('qeg-force-over-fill" style="width:72%', html)
+        self.assertIn('qeg-force-under-fill" style="width:28%', html)
+
+    def test_force_bar_under_dominant(self):
+        """25% prob over => 25% over fill, 75% under fill."""
+        result = {"player_name": "P", "direction": "UNDER", "probability_over": 0.25}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn('qeg-force-over-fill" style="width:25%', html)
+        self.assertIn('qeg-force-under-fill" style="width:75%', html)
+
+    def test_force_bar_labels(self):
+        """Force bar should have OVER and UNDER labels."""
+        result = {"player_name": "P", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("qeg-force-label-l", html)
+        self.assertIn("qeg-force-label-r", html)
+
+
 class TestParlayCard(unittest.TestCase):
     """Verify parlay combo card rendering."""
 
@@ -372,6 +769,8 @@ class TestPageImportsHelper(unittest.TestCase):
         self.assertIn("render_market_movement_html", content)
         self.assertIn("render_uncertain_pick_html", content)
         self.assertIn("render_parlay_card_html", content)
+        self.assertIn("render_quantum_edge_gap_banner_html", content)
+        self.assertIn("render_quantum_edge_gap_card_html", content)
 
     def test_page_no_longer_has_inline_dfs_html(self):
         """The DFS FLEX EDGE literal should now only be in the helper."""
