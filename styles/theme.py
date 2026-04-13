@@ -7132,6 +7132,45 @@ QUANTUM_CARD_MATRIX_CSS = """
     color: #64748b;
 }
 
+/* ── Compact Card (inside Unified Player Cards) ─────────── */
+/* When a prop card lives inside a <details> player card the
+   player identity is already visible in the outer header.
+   Compact mode removes the headshot and name, replacing them
+   with a streamlined tier-badge + prop-description header. */
+.qcm-card-compact {
+    padding: 14px 16px;
+}
+.qcm-compact-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.qcm-compact-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+.qcm-compact-prop {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #00f0ff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.qcm-card-compact .qcm-safe-score {
+    padding: 2px 6px;
+}
+.qcm-card-compact .qcm-safe-score-value {
+    font-size: 1.1rem;
+}
+
 /* ── Confidence Bar ─────────────────────────────────────── */
 .qcm-conf-bar-wrap {
     margin: 4px 0 10px;
@@ -7474,6 +7513,12 @@ QUANTUM_CARD_MATRIX_CSS = """
     .qcm-bonus-title {
         font-size: 0.68rem;
     }
+    .qcm-card-compact {
+        padding: 12px 12px;
+    }
+    .qcm-compact-prop {
+        font-size: 0.80rem;
+    }
 }
 @media (max-width: 480px) {
     .qcm-card {
@@ -7496,6 +7541,15 @@ QUANTUM_CARD_MATRIX_CSS = """
     }
     .qcm-metric-val {
         font-size: 0.74rem;
+    }
+    .qcm-card-compact {
+        padding: 8px 10px;
+    }
+    .qcm-compact-prop {
+        font-size: 0.74rem;
+    }
+    .qcm-card-compact .qcm-safe-score-value {
+        font-size: 0.95rem;
     }
 }
 

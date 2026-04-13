@@ -163,7 +163,7 @@ def _build_bonus_factors(result):
     return bonus[:6]
 
 
-def _build_single_card_html(result, index=0):
+def _build_single_card_html(result, index=0, compact=False):
     """
     Build a single Quantum Card HTML string from an analysis result dict.
 
@@ -176,6 +176,11 @@ def _build_single_card_html(result, index=0):
     Args:
         result (dict): A single prop analysis result from the engine.
         index (int): The card's position index (used for stagger delay).
+        compact (bool): When *True*, suppress the full identity row
+            (headshot, player name, team badge) and show a streamlined
+            prop-focused header instead.  Used when the card is rendered
+            inside a Unified Player Card that already displays the
+            player identity in its own header.
 
     Returns:
         str: The HTML string for this single card.
@@ -462,8 +467,24 @@ def _build_single_card_html(result, index=0):
         )
 
     _tier_glow_cls = f" qcm-card-{tier_lower}" if tier_lower in ("platinum", "gold") else ""
-    return f"""<div class="qcm-card{_tier_glow_cls}" style="animation-delay:{delay_ms}ms;">
-  <div class="qcm-card-header">
+    _compact_cls = " qcm-card-compact" if compact else ""
+
+    # ── Build the identity / header section ──────────────────────
+    if compact:
+        # Compact mode: streamlined prop-focused header (no headshot / name)
+        identity_html = f"""  <div class="qcm-compact-header">
+    <div class="qcm-compact-left">
+      <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
+      <span class="qcm-compact-prop">{prop_text}</span>
+    </div>
+    <div class="qcm-safe-score">
+      <div class="qcm-safe-score-label">SAFE Score™</div>
+      <div class="qcm-safe-score-value">{safe_score_str}<span>/10</span></div>
+    </div>
+  </div>"""
+    else:
+        # Full mode: headshot + player name + team badge + prop + SAFE score
+        identity_html = f"""  <div class="qcm-card-header">
     <span class="qcm-stat-type">{_escape(stat_type.replace('_', ' '))} <span class="qcm-team">· {team}</span> <span class="qcm-platform">· {platform}</span></span>
     <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
   </div>
@@ -477,7 +498,10 @@ def _build_single_card_html(result, index=0):
       <div class="qcm-safe-score-label">SAFE Score™</div>
       <div class="qcm-safe-score-value">{safe_score_str}<span>/10</span></div>
     </div>
-  </div>
+  </div>"""
+
+    return f"""<div class="qcm-card{_tier_glow_cls}{_compact_cls}" style="animation-delay:{delay_ms}ms;">
+{identity_html}
   <div class="qcm-true-line-row">
     <span class="qcm-true-line-label">True Line ({direction_escaped})</span>
     <span class="qcm-true-line-value">{true_line_display}</span>
@@ -1078,8 +1102,10 @@ def build_unified_player_card_html(player_name, vitals, props,
     else:
         joseph_html = ""
 
-    # Build individual prop cards inside the body
-    card_strings = [_build_single_card_html(p, i) for i, p in enumerate(props)]
+    # Build individual prop cards inside the body (compact mode: no
+    # redundant headshot / player name since the parent card header
+    # already displays the player identity).
+    card_strings = [_build_single_card_html(p, i, compact=True) for i, p in enumerate(props)]
     body_html = (
         f'<div class="upc-body">'
         f'<div class="qcm-grid-container">'
