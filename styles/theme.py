@@ -7514,7 +7514,7 @@ QUANTUM_CARD_MATRIX_CSS = """
         font-size: 0.68rem;
     }
     .qcm-card-compact {
-        padding: 12px 12px;
+        padding: 12px;
     }
     .qcm-compact-prop {
         font-size: 0.80rem;

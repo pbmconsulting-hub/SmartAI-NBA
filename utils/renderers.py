@@ -472,10 +472,11 @@ def _build_single_card_html(result, index=0, compact=False):
     # ── Build the identity / header section ──────────────────────
     if compact:
         # Compact mode: streamlined prop-focused header (no headshot / name)
+        _prop_title = _escape(prop_text)
         identity_html = f"""  <div class="qcm-compact-header">
     <div class="qcm-compact-left">
       <span class="qcm-tier-badge qcm-tier-{tier_lower}">{_escape(tier)}</span>
-      <span class="qcm-compact-prop">{prop_text}</span>
+      <span class="qcm-compact-prop" title="{_prop_title}">{prop_text}</span>
     </div>
     <div class="qcm-safe-score">
       <div class="qcm-safe-score-label">SAFE Score™</div>
