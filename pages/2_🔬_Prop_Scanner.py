@@ -70,6 +70,7 @@ try:
 except Exception:
     _PREM_PATH = "/14_%F0%9F%92%8E_Subscription_Level"
 FREE_PROP_LIMIT = 5   # Free users can manually enter up to 5 props
+SMART_SCAN_PAGE_SIZE = 30  # Number of Smart Scan results per page
 user_is_premium = _is_premium_user()
 
 st.title("🔬 Prop Scanner")
@@ -885,7 +886,7 @@ with tab_table:
 
         if scanned_props:
             # ── Paginated Smart Scan dataframe ────────────────────
-            ITEMS_PER_PAGE = 30
+            ITEMS_PER_PAGE = SMART_SCAN_PAGE_SIZE
             total_pages = max(1, (len(scanned_props) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE)
             scan_page = st.number_input(
                 "Page",
