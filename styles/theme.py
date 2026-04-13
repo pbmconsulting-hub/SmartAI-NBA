@@ -7799,10 +7799,14 @@ QUANTUM_CARD_MATRIX_CSS = """
     color: #ffe082;
     font-size: 0.82rem;
 }
-/* ── Quantum Edge Gap Section ─────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   QUANTUM EDGE GAP – Premium Section
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Animations ──────────────────────────────────────────────── */
 @keyframes qeg-border-glow {
-    0%, 100% { box-shadow: 0 0 18px rgba(0, 255, 136, 0.15), inset 0 0 12px rgba(0, 255, 136, 0.02); }
-    50%      { box-shadow: 0 0 36px rgba(0, 255, 136, 0.28), inset 0 0 24px rgba(0, 255, 136, 0.05); }
+    0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.12), 0 0 60px rgba(0, 255, 136, 0.04), inset 0 0 30px rgba(0, 255, 136, 0.02); }
+    50%      { box-shadow: 0 0 40px rgba(0, 255, 136, 0.22), 0 0 80px rgba(0, 255, 136, 0.08), inset 0 0 40px rgba(0, 255, 136, 0.04); }
 }
 @keyframes qeg-scanline {
     0%   { transform: translateY(-100%); }
@@ -7812,36 +7816,69 @@ QUANTUM_CARD_MATRIX_CSS = """
     0%   { background-position: -200% 0; }
     100% { background-position: 200% 0; }
 }
+@keyframes qeg-grid-scroll {
+    0%   { background-position: 0 0; }
+    100% { background-position: 40px 40px; }
+}
+@keyframes qeg-card-slide-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes qeg-edge-pulse {
+    0%, 100% { box-shadow: 0 0 14px rgba(0, 255, 136, 0.12), 0 0 40px rgba(0, 255, 136, 0.04); }
+    50%      { box-shadow: 0 0 32px rgba(0, 255, 136, 0.30), 0 0 60px rgba(0, 255, 136, 0.10); }
+}
+@keyframes qeg-edge-pulse-red {
+    0%, 100% { box-shadow: 0 0 14px rgba(255, 68, 68, 0.12), 0 0 40px rgba(255, 68, 68, 0.04); }
+    50%      { box-shadow: 0 0 32px rgba(255, 68, 68, 0.30), 0 0 60px rgba(255, 68, 68, 0.10); }
+}
+@keyframes qeg-gauge-fill {
+    from { stroke-dashoffset: 157; }
+}
+@keyframes qeg-conf-expand {
+    from { width: 0; }
+}
+@keyframes qeg-heat-pulse {
+    0%, 100% { opacity: 0.85; }
+    50%      { opacity: 1; }
+}
+@keyframes qeg-force-fill {
+    from { width: 0; }
+}
+
+/* ── Banner ──────────────────────────────────────────────────── */
 .qam-edge-gap-banner {
-    background: linear-gradient(135deg, #021208 0%, #0a2618 30%, #061f12 60%, #041a10 100%);
-    border: 1px solid rgba(0, 255, 136, 0.40);
-    border-radius: 16px;
-    padding: 24px 28px 22px;
-    margin-bottom: 18px;
-    animation: qeg-border-glow 4s ease-in-out infinite;
+    background: linear-gradient(145deg, #010d07 0%, #071e14 25%, #0a261a 50%, #061b10 75%, #030f08 100%);
+    border: 1px solid rgba(0, 255, 136, 0.30);
+    border-radius: 20px;
+    padding: 28px 32px 26px;
+    margin-bottom: 20px;
+    animation: qeg-border-glow 5s ease-in-out infinite;
     position: relative;
     overflow: hidden;
 }
-/* Scanline sweep */
+/* Circuit-board grid background */
 .qam-edge-gap-banner::before {
     content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 200%;
-    background: linear-gradient(180deg,
-        transparent 0%,
-        rgba(0, 255, 136, 0.03) 44%,
-        rgba(0, 255, 136, 0.08) 50%,
-        rgba(0, 255, 136, 0.03) 56%,
-        transparent 100%);
-    animation: qeg-scanline 5s linear infinite;
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 136, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 136, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: qeg-grid-scroll 20s linear infinite;
     pointer-events: none;
+    mask-image: radial-gradient(ellipse at 50% 50%, black 20%, transparent 70%);
+    -webkit-mask-image: radial-gradient(ellipse at 50% 50%, black 20%, transparent 70%);
 }
-/* Mesh gradient overlay */
+/* Multi-point radial mesh overlay */
 .qam-edge-gap-banner::after {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at 8% 0%, rgba(0, 255, 136, 0.10) 0%, transparent 45%),
-                radial-gradient(ellipse at 92% 100%, rgba(0, 255, 136, 0.05) 0%, transparent 40%),
-                radial-gradient(circle at 50% 50%, rgba(0, 255, 136, 0.02) 0%, transparent 60%);
+    background:
+        radial-gradient(ellipse at 5% 5%, rgba(0, 255, 136, 0.14) 0%, transparent 40%),
+        radial-gradient(ellipse at 95% 95%, rgba(0, 255, 136, 0.08) 0%, transparent 35%),
+        radial-gradient(ellipse at 50% 0%, rgba(0, 255, 136, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 80% 30%, rgba(0, 200, 100, 0.04) 0%, transparent 30%);
     pointer-events: none;
 }
 .qam-edge-gap-banner-inner {
@@ -7850,191 +7887,215 @@ QUANTUM_CARD_MATRIX_CSS = """
 .qam-edge-gap-banner-header {
     display: flex;
     align-items: center;
-    gap: 14px;
-    margin-bottom: 10px;
+    gap: 16px;
+    margin-bottom: 12px;
 }
 .qam-edge-gap-banner-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px; height: 48px;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.16), rgba(0, 255, 136, 0.06));
-    border: 1px solid rgba(0, 255, 136, 0.40);
-    border-radius: 12px;
-    font-size: 1.4rem;
+    width: 52px; height: 52px;
+    background: linear-gradient(145deg, rgba(0, 255, 136, 0.20), rgba(0, 255, 136, 0.06));
+    border: 1px solid rgba(0, 255, 136, 0.45);
+    border-radius: 14px;
+    font-size: 1.5rem;
     flex-shrink: 0;
-    box-shadow: 0 0 16px rgba(0, 255, 136, 0.12);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.15), inset 0 0 8px rgba(0, 255, 136, 0.05);
+    position: relative;
+}
+.qam-edge-gap-banner-icon::after {
+    content: '';
+    position: absolute; inset: -3px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 255, 136, 0.08);
+    pointer-events: none;
 }
 .qam-edge-gap-banner h3 {
     color: #00ff88;
     font-family: Orbitron, sans-serif;
-    font-size: 1.25rem;
+    font-size: 1.30rem;
     margin: 0;
-    letter-spacing: 0.10em;
-    text-shadow: 0 0 20px rgba(0, 255, 136, 0.50),
-                 0 0 40px rgba(0, 255, 136, 0.15);
+    letter-spacing: 0.12em;
+    text-shadow: 0 0 24px rgba(0, 255, 136, 0.55),
+                 0 0 48px rgba(0, 255, 136, 0.18),
+                 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .qam-edge-gap-banner h3 span {
     display: inline-block;
-    font-size: 0.68rem;
+    font-size: 0.64rem;
     color: #0a0f1a;
     font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    margin-left: 12px;
-    letter-spacing: 0.06em;
-    background: linear-gradient(135deg, #00ff88, #00cc6a);
-    padding: 3px 10px;
-    border-radius: 5px;
+    font-weight: 800;
+    margin-left: 14px;
+    letter-spacing: 0.08em;
+    background: linear-gradient(135deg, #00ff88, #00e07a, #00cc6a);
+    padding: 4px 12px;
+    border-radius: 6px;
     text-shadow: none;
     vertical-align: middle;
+    box-shadow: 0 2px 8px rgba(0, 255, 136, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 .qam-edge-gap-banner p {
-    color: rgba(128, 255, 187, 0.85);
-    font-size: 0.80rem;
-    margin: 0 0 16px;
-    line-height: 1.60;
-    max-width: 680px;
+    color: rgba(160, 220, 190, 0.80);
+    font-size: 0.78rem;
+    margin: 0 0 18px;
+    line-height: 1.65;
+    max-width: 640px;
+    letter-spacing: 0.01em;
 }
+/* Stats pills row */
 .qeg-stats-row {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
 }
 .qeg-stat-pill {
-    background: rgba(0, 255, 136, 0.06);
-    border: 1px solid rgba(0, 255, 136, 0.22);
-    border-radius: 10px;
-    padding: 10px 18px;
+    background: linear-gradient(160deg, rgba(0, 255, 136, 0.04), rgba(0, 255, 136, 0.10));
+    border: 1px solid rgba(0, 255, 136, 0.18);
+    border-radius: 12px;
+    padding: 12px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 80px;
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+    min-width: 82px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    position: relative;
+}
+.qeg-stat-pill::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.15), transparent);
+    border-radius: 12px 12px 0 0;
 }
 .qeg-stat-pill:hover {
-    border-color: rgba(0, 255, 136, 0.55);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0, 255, 136, 0.10);
+    border-color: rgba(0, 255, 136, 0.50);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 24px rgba(0, 255, 136, 0.12), 0 0 12px rgba(0, 255, 136, 0.06);
+    background: linear-gradient(160deg, rgba(0, 255, 136, 0.08), rgba(0, 255, 136, 0.15));
 }
 .qeg-stat-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.20rem;
+    font-size: 1.25rem;
     font-weight: 700;
     color: #00ff88;
     font-variant-numeric: tabular-nums;
-    text-shadow: 0 0 10px rgba(0, 255, 136, 0.35);
+    text-shadow: 0 0 14px rgba(0, 255, 136, 0.40);
+    line-height: 1.2;
 }
 .qeg-stat-lbl {
-    font-size: 0.62rem;
-    color: rgba(128, 255, 187, 0.75);
+    font-size: 0.58rem;
+    color: rgba(128, 255, 187, 0.65);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-top: 3px;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+    font-weight: 500;
 }
 
-/* ── Quantum Edge Gap individual card ────────────────────── */
-@keyframes qeg-card-slide-in {
-    from { opacity: 0; transform: translateY(16px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes qeg-edge-pulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(0, 255, 136, 0.15); }
-    50%      { box-shadow: 0 0 28px rgba(0, 255, 136, 0.35), 0 0 48px rgba(0, 255, 136, 0.10); }
-}
-@keyframes qeg-gauge-fill {
-    from { stroke-dashoffset: 157; }
-}
+/* ── Individual card ─────────────────────────────────────────── */
 .qeg-card {
-    background: linear-gradient(160deg, rgba(6, 18, 12, 0.96) 0%, rgba(10, 28, 20, 0.94) 40%, rgba(8, 22, 16, 0.92) 100%);
-    border: 1px solid rgba(0, 255, 136, 0.16);
+    background: linear-gradient(160deg, rgba(4, 14, 10, 0.97) 0%, rgba(8, 24, 18, 0.95) 35%, rgba(6, 20, 14, 0.93) 100%);
+    border: 1px solid rgba(0, 255, 136, 0.12);
     border-left: 5px solid #00ff88;
-    border-radius: 16px;
+    border-radius: 18px;
     padding: 0;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
     font-family: 'Inter', sans-serif;
     color: #e0eeff;
     animation: qeg-card-slide-in 0.5s ease both;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     position: relative;
     overflow: hidden;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45),
-                0 0 16px rgba(0, 255, 136, 0.04),
-                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.50),
+                0 0 20px rgba(0, 255, 136, 0.03),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 .qeg-card:hover {
-    border-color: rgba(0, 255, 136, 0.35);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55),
-                0 0 32px rgba(0, 255, 136, 0.12),
-                inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    transform: translateY(-2px);
+    border-color: rgba(0, 255, 136, 0.30);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.60),
+                0 0 40px rgba(0, 255, 136, 0.10),
+                inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(-3px);
 }
-/* Radial glow from left edge */
+/* Left-edge radial glow + circuit grid */
 .qeg-card::before {
     content: '';
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: radial-gradient(ellipse at -5% 50%, rgba(0, 255, 136, 0.07) 0%, transparent 35%),
-                linear-gradient(180deg, rgba(0, 255, 136, 0.02) 0%, transparent 30%);
+    background:
+        radial-gradient(ellipse at -5% 50%, rgba(0, 255, 136, 0.08) 0%, transparent 30%),
+        linear-gradient(180deg, rgba(0, 255, 136, 0.015) 0%, transparent 25%);
     pointer-events: none;
 }
 /* Top shimmer line */
 .qeg-card::after {
     content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.20), transparent);
+    position: absolute; top: 0; left: 5px; right: 0; height: 1px;
+    background: linear-gradient(90deg, rgba(0, 255, 136, 0.30), rgba(0, 255, 136, 0.08) 50%, transparent);
     pointer-events: none;
 }
+
+/* OVER/UNDER card theming */
 .qeg-card-over  { border-left-color: #00ff88; }
 .qeg-card-under {
     border-left-color: #ff4444;
-    background: linear-gradient(160deg, rgba(18, 6, 8, 0.96) 0%, rgba(28, 10, 14, 0.94) 40%, rgba(22, 8, 12, 0.92) 100%);
+    background: linear-gradient(160deg, rgba(14, 4, 6, 0.97) 0%, rgba(24, 8, 12, 0.95) 35%, rgba(20, 6, 10, 0.93) 100%);
 }
 .qeg-card-under::before {
-    background: radial-gradient(ellipse at -5% 50%, rgba(255, 68, 68, 0.06) 0%, transparent 35%),
-                linear-gradient(180deg, rgba(255, 68, 68, 0.02) 0%, transparent 30%);
+    background:
+        radial-gradient(ellipse at -5% 50%, rgba(255, 68, 68, 0.07) 0%, transparent 30%),
+        linear-gradient(180deg, rgba(255, 68, 68, 0.015) 0%, transparent 25%);
 }
 .qeg-card-under::after {
-    background: linear-gradient(90deg, transparent, rgba(255, 68, 68, 0.18), transparent);
+    background: linear-gradient(90deg, rgba(255, 68, 68, 0.28), rgba(255, 68, 68, 0.06) 50%, transparent);
 }
 .qeg-card-under .qeg-metric { border-color: rgba(255, 68, 68, 0.10); background: rgba(255, 68, 68, 0.04); }
 .qeg-card-under .qeg-metric-val { color: #ff6b6b; }
-.qeg-card-under .qeg-edge-highlight { background: linear-gradient(135deg, rgba(255, 68, 68, 0.08), rgba(255, 68, 68, 0.16)); border-color: rgba(255, 68, 68, 0.35); color: #ff4444; animation-name: qeg-edge-pulse-red; }
-.qeg-card-under .qeg-conf-bar-fill { background: linear-gradient(90deg, #ff4444, #ff6b6b) !important; }
-.qeg-card-under .qeg-stat-block { border-color: rgba(255, 68, 68, 0.08); background: rgba(255, 68, 68, 0.02); }
-.qeg-card-under .qeg-gauge-ring { stroke: #ff4444; }
+.qeg-card-under .qeg-edge-highlight { background: linear-gradient(145deg, rgba(255, 68, 68, 0.06), rgba(255, 68, 68, 0.14)); border-color: rgba(255, 68, 68, 0.30); animation-name: qeg-edge-pulse-red; }
+.qeg-card-under .qeg-conf-bar-fill { background: linear-gradient(90deg, #cc3333, #ff4444, #ff6b6b) !important; box-shadow: 0 0 8px rgba(255, 68, 68, 0.25) !important; }
+.qeg-card-under .qeg-stat-block { border-color: rgba(255, 68, 68, 0.06); background: rgba(255, 68, 68, 0.015); }
+.qeg-card-under .qeg-gauge-ring { stroke: #ff4444; filter: drop-shadow(0 0 5px rgba(255, 68, 68, 0.40)); }
 .qeg-card-under .qeg-gauge-text { fill: #ff4444; }
-.qeg-card-under:hover { border-color: rgba(255, 68, 68, 0.40); box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 32px rgba(255, 68, 68, 0.10); }
-@keyframes qeg-edge-pulse-red {
-    0%, 100% { box-shadow: 0 0 12px rgba(255, 68, 68, 0.15); }
-    50%      { box-shadow: 0 0 28px rgba(255, 68, 68, 0.35), 0 0 48px rgba(255, 68, 68, 0.10); }
-}
+.qeg-card-under .qeg-heat-fill { background: linear-gradient(90deg, #ff2222, #ff4444, #ff6b6b); }
+.qeg-card-under .qeg-force-over-fill { background: rgba(255, 68, 68, 0.20); }
+.qeg-card-under .qeg-force-under-fill { background: linear-gradient(90deg, #ff4444, #ff6b6b); }
+.qeg-card-under:hover { border-color: rgba(255, 68, 68, 0.35); box-shadow: 0 12px 48px rgba(0, 0, 0, 0.60), 0 0 40px rgba(255, 68, 68, 0.08); }
 
-/* Card top section: rank + identity + center + edge callout */
+/* ── Card TOP: Hero row ──────────────────────────────────────── */
 .qeg-card-top {
     display: flex;
     align-items: center;
     gap: 16px;
-    padding: 18px 22px 14px;
+    padding: 20px 24px 16px;
     position: relative;
 }
 .qeg-rank {
     flex: 0 0 auto;
-    width: 34px; height: 34px;
+    width: 36px; height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.20), rgba(0, 255, 136, 0.06));
-    border: 1px solid rgba(0, 255, 136, 0.40);
+    background: linear-gradient(145deg, rgba(0, 255, 136, 0.22), rgba(0, 255, 136, 0.06));
+    border: 1px solid rgba(0, 255, 136, 0.45);
     border-radius: 10px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.80rem;
+    font-size: 0.78rem;
     font-weight: 800;
     color: #00ff88;
-    text-shadow: 0 0 8px rgba(0, 255, 136, 0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.4);
+    position: relative;
 }
-.qeg-card-under .qeg-rank { background: linear-gradient(135deg, rgba(255, 68, 68, 0.20), rgba(255, 68, 68, 0.06)); border-color: rgba(255, 68, 68, 0.40); color: #ff6b6b; text-shadow: 0 0 8px rgba(255, 68, 68, 0.3); }
+.qeg-rank::after {
+    content: '';
+    position: absolute; inset: -2px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 255, 136, 0.08);
+}
+.qeg-card-under .qeg-rank { background: linear-gradient(145deg, rgba(255, 68, 68, 0.22), rgba(255, 68, 68, 0.06)); border-color: rgba(255, 68, 68, 0.45); color: #ff6b6b; text-shadow: 0 0 10px rgba(255, 68, 68, 0.4); }
+.qeg-card-under .qeg-rank::after { border-color: rgba(255, 68, 68, 0.08); }
+
+/* Identity block */
 .qeg-card-identity {
     flex: 0 0 auto;
     display: flex;
@@ -8043,38 +8104,44 @@ QUANTUM_CARD_MATRIX_CSS = """
     min-width: 180px;
 }
 .qeg-headshot {
-    width: 56px; height: 56px;
+    width: 60px; height: 60px;
     border-radius: 50%;
     object-fit: cover;
-    border: 2px solid rgba(0, 255, 136, 0.28);
-    background: #0a1a12;
+    border: 2.5px solid rgba(0, 255, 136, 0.25);
+    background: linear-gradient(145deg, #0a1a12, #061008);
     flex-shrink: 0;
-    box-shadow: 0 0 12px rgba(0, 255, 136, 0.08);
+    box-shadow: 0 0 16px rgba(0, 255, 136, 0.08), 0 4px 12px rgba(0, 0, 0, 0.40);
 }
-.qeg-card-under .qeg-headshot { border-color: rgba(255, 68, 68, 0.28); box-shadow: 0 0 12px rgba(255, 68, 68, 0.06); }
+.qeg-card-under .qeg-headshot { border-color: rgba(255, 68, 68, 0.25); box-shadow: 0 0 16px rgba(255, 68, 68, 0.06), 0 4px 12px rgba(0, 0, 0, 0.40); }
 .qeg-player-info {
     display: flex;
     flex-direction: column;
     gap: 3px;
 }
 .qeg-player-name {
-    font-size: 0.95rem;
+    font-size: 1.0rem;
     font-weight: 700;
-    color: #f0f4f8;
+    color: #f2f6fa;
     line-height: 1.2;
+    letter-spacing: 0.01em;
 }
 .qeg-player-meta {
-    font-size: 0.70rem;
-    color: #607a8a;
+    font-size: 0.68rem;
+    color: #587080;
     line-height: 1.3;
+    letter-spacing: 0.01em;
 }
 .qeg-player-prop {
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.74rem;
+    font-weight: 700;
     color: #00ff88;
-    margin-top: 1px;
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.2);
 }
-.qeg-card-under .qeg-player-prop { color: #ff6b6b; }
+.qeg-card-under .qeg-player-prop { color: #ff6b6b; text-shadow: 0 0 8px rgba(255, 68, 68, 0.2); }
+
+/* Center block: confidence + metrics */
 .qeg-card-center {
     flex: 1;
     display: flex;
@@ -8088,32 +8155,40 @@ QUANTUM_CARD_MATRIX_CSS = """
     display: flex; align-items: center; gap: 8px;
 }
 .qeg-conf-label {
-    font-size: 0.60rem; color: #607a8a;
-    text-transform: uppercase; letter-spacing: 0.07em;
+    font-size: 0.58rem; color: #587080;
+    text-transform: uppercase; letter-spacing: 0.08em;
     font-family: 'JetBrains Mono', monospace;
     min-width: 36px;
+    font-weight: 600;
 }
 .qeg-conf-bar-track {
-    flex: 1; height: 7px;
-    background: rgba(255, 255, 255, 0.05);
+    flex: 1; height: 8px;
+    background: rgba(255, 255, 255, 0.04);
     border-radius: 4px; overflow: hidden;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
-}
-@keyframes qeg-conf-expand {
-    from { width: 0; }
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    position: relative;
 }
 .qeg-conf-bar-fill {
     height: 100%; border-radius: 4px;
-    background: linear-gradient(90deg, #00cc6a, #00ff88);
-    animation: qeg-conf-expand 0.8s ease-out both;
-    box-shadow: 0 0 8px rgba(0, 255, 136, 0.25);
+    background: linear-gradient(90deg, #00aa55, #00cc6a, #00ff88);
+    animation: qeg-conf-expand 1.0s ease-out both;
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.30);
+    position: relative;
+}
+.qeg-conf-bar-fill::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, transparent 60%);
+    border-radius: 4px;
 }
 .qeg-conf-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem; font-weight: 700; color: #00ff88;
+    font-size: 0.80rem; font-weight: 800; color: #00ff88;
     min-width: 32px; text-align: right;
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.3);
 }
-.qeg-card-under .qeg-conf-val { color: #ff6b6b; }
+.qeg-card-under .qeg-conf-val { color: #ff6b6b; text-shadow: 0 0 6px rgba(255, 68, 68, 0.3); }
+
 /* Metrics strip */
 .qeg-card-metrics {
     display: flex;
@@ -8122,14 +8197,19 @@ QUANTUM_CARD_MATRIX_CSS = """
 }
 .qeg-metric {
     text-align: center;
-    padding: 5px 10px;
-    background: rgba(0, 255, 136, 0.04);
-    border: 1px solid rgba(0, 255, 136, 0.08);
+    padding: 6px 12px;
+    background: rgba(0, 255, 136, 0.03);
+    border: 1px solid rgba(0, 255, 136, 0.07);
     border-radius: 8px;
-    min-width: 54px;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    min-width: 56px;
+    transition: all 0.25s ease;
+    position: relative;
 }
-.qeg-metric:hover { border-color: rgba(0, 255, 136, 0.22); background: rgba(0, 255, 136, 0.06); }
+.qeg-metric:hover {
+    border-color: rgba(0, 255, 136, 0.20);
+    background: rgba(0, 255, 136, 0.06);
+    transform: translateY(-1px);
+}
 .qeg-metric-val {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.88rem;
@@ -8138,102 +8218,153 @@ QUANTUM_CARD_MATRIX_CSS = """
     font-variant-numeric: tabular-nums;
 }
 .qeg-metric-lbl {
-    font-size: 0.56rem;
-    color: #607a8a;
+    font-size: 0.54rem;
+    color: #587080;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     margin-top: 2px;
+    font-weight: 500;
 }
 .qeg-direction-badge {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.70rem;
-    font-weight: 700;
-    padding: 4px 12px;
-    border-radius: 6px;
-    letter-spacing: 0.06em;
+    font-size: 0.68rem;
+    font-weight: 800;
+    padding: 5px 14px;
+    border-radius: 7px;
+    letter-spacing: 0.07em;
 }
 .qeg-dir-over {
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.12), rgba(0, 255, 136, 0.20));
+    background: linear-gradient(145deg, rgba(0, 255, 136, 0.10), rgba(0, 255, 136, 0.20));
     color: #00ff88;
     border: 1px solid rgba(0, 255, 136, 0.35);
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.06);
 }
 .qeg-dir-under {
-    background: linear-gradient(135deg, rgba(255, 68, 68, 0.12), rgba(255, 68, 68, 0.20));
+    background: linear-gradient(145deg, rgba(255, 68, 68, 0.10), rgba(255, 68, 68, 0.20));
     color: #ff4444;
     border: 1px solid rgba(255, 68, 68, 0.35);
+    box-shadow: 0 0 8px rgba(255, 68, 68, 0.06);
 }
 
-/* Edge highlight callout — prominent right-side badge */
+/* Edge highlight callout — prominent gauge badge */
 .qeg-edge-highlight {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 10px 14px;
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(0, 255, 136, 0.08), rgba(0, 255, 136, 0.16));
-    border: 1px solid rgba(0, 255, 136, 0.30);
-    min-width: 100px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(0, 255, 136, 0.06), rgba(0, 255, 136, 0.14));
+    border: 1px solid rgba(0, 255, 136, 0.25);
+    min-width: 108px;
     position: relative;
-    animation: qeg-edge-pulse 3s ease-in-out infinite;
+    animation: qeg-edge-pulse 4s ease-in-out infinite;
+}
+.qeg-edge-highlight::before {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: 17px;
+    border: 1px solid rgba(0, 255, 136, 0.06);
+    pointer-events: none;
 }
 .qeg-edge-gauge {
     display: block;
-    width: 64px; height: 64px;
-    margin-bottom: 2px;
+    width: 68px; height: 68px;
+    margin-bottom: 3px;
 }
 .qeg-gauge-bg {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.06);
-    stroke-width: 4;
+    stroke: rgba(255, 255, 255, 0.05);
+    stroke-width: 4.5;
 }
 .qeg-gauge-ring {
     fill: none;
     stroke: #00ff88;
-    stroke-width: 4;
+    stroke-width: 4.5;
     stroke-linecap: round;
     transform: rotate(-90deg);
     transform-origin: 50% 50%;
-    animation: qeg-gauge-fill 1s ease-out both;
-    filter: drop-shadow(0 0 4px rgba(0, 255, 136, 0.35));
+    animation: qeg-gauge-fill 1.2s ease-out both;
+    filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.40));
 }
 .qeg-gauge-text {
     fill: #00ff88;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 800;
     text-anchor: middle;
     dominant-baseline: central;
 }
 .qeg-edge-highlight-lbl {
-    font-size: 0.56rem;
-    font-weight: 600;
-    color: #607a8a;
+    font-size: 0.54rem;
+    font-weight: 700;
+    color: #587080;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.10em;
     text-shadow: none;
 }
 
-/* Card mid section: line vs projection comparison bar */
+/* ── Card MID: Edge heat strip + Line vs Projection ──────────── */
 .qeg-card-mid {
     display: flex;
     align-items: stretch;
     gap: 0;
-    padding: 0 22px;
+    padding: 0 24px;
     position: relative;
 }
 .qeg-card-mid::before {
     content: '';
-    position: absolute; top: 0; left: 22px; right: 22px; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+    position: absolute; top: 0; left: 24px; right: 24px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
 }
+/* Edge heat intensity strip */
+.qeg-heat-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 0;
+    flex: 0 0 140px;
+    margin-right: 16px;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    padding-right: 16px;
+}
+.qeg-heat-label {
+    font-size: 0.54rem;
+    color: #587080;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+}
+.qeg-heat-bar {
+    height: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.qeg-heat-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #00aa55, #00ff88, #88ffcc);
+    animation: qeg-heat-pulse 2s ease-in-out infinite, qeg-force-fill 0.8s ease-out both;
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.25);
+}
+.qeg-heat-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #00ff88;
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.3);
+}
+/* Line/Projection/Edge comparison blocks */
 .qeg-compare-block {
     flex: 1;
-    padding: 12px 0;
+    padding: 14px 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -8245,86 +8376,153 @@ QUANTUM_CARD_MATRIX_CSS = """
 }
 .qeg-compare-icon {
     font-size: 0.85rem;
-    opacity: 0.60;
+    opacity: 0.55;
 }
 .qeg-compare-data {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
 }
 .qeg-compare-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 1.05rem;
+    font-size: 1.08rem;
     font-weight: 700;
-    color: #e0eeff;
+    color: #e8f0ff;
 }
 .qeg-compare-lbl {
-    font-size: 0.58rem;
-    color: #607a8a;
+    font-size: 0.56rem;
+    color: #587080;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
+    font-weight: 500;
 }
 
-/* Card bottom section: stat blocks */
+/* ── Force direction tug-of-war bar ──────────────────────────── */
+.qeg-force-row {
+    padding: 0 24px;
+    position: relative;
+}
+.qeg-force-row::before {
+    content: '';
+    position: absolute; top: 0; left: 24px; right: 24px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+}
+.qeg-force-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+}
+.qeg-force-label-l,
+.qeg-force-label-r {
+    font-size: 0.56rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    min-width: 44px;
+}
+.qeg-force-label-l { color: #00ff88; text-align: right; }
+.qeg-force-label-r { color: #ff6b6b; }
+.qeg-force-track {
+    flex: 1;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.qeg-force-over-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00cc6a, #00ff88);
+    border-radius: 5px 0 0 5px;
+    animation: qeg-force-fill 0.8s ease-out both;
+    box-shadow: 0 0 6px rgba(0, 255, 136, 0.20);
+}
+.qeg-force-under-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff4444, #ff6b6b);
+    border-radius: 0 5px 5px 0;
+    animation: qeg-force-fill 0.8s ease-out both;
+    box-shadow: 0 0 6px rgba(255, 68, 68, 0.20);
+}
+
+/* ── Card BOTTOM: stat blocks ────────────────────────────────── */
 .qeg-card-bottom {
     display: flex;
     gap: 8px;
-    padding: 12px 22px 18px;
+    padding: 14px 24px 20px;
     position: relative;
 }
 .qeg-card-bottom::before {
     content: '';
-    position: absolute; top: 0; left: 22px; right: 22px; height: 1px;
+    position: absolute; top: 0; left: 24px; right: 24px; height: 1px;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
 }
 .qeg-stat-block {
     flex: 1;
     min-width: 90px;
-    background: rgba(0, 255, 136, 0.02);
+    background: linear-gradient(160deg, rgba(0, 255, 136, 0.015), rgba(0, 255, 136, 0.04));
     border: 1px solid rgba(0, 255, 136, 0.06);
-    border-radius: 10px;
-    padding: 10px 14px;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    border-radius: 12px;
+    padding: 12px 14px;
+    transition: all 0.25s ease;
+    position: relative;
 }
-.qeg-stat-block:hover { border-color: rgba(0, 255, 136, 0.18); background: rgba(0, 255, 136, 0.04); }
+.qeg-stat-block::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 136, 0.08), transparent);
+    border-radius: 12px 12px 0 0;
+}
+.qeg-stat-block:hover {
+    border-color: rgba(0, 255, 136, 0.18);
+    background: linear-gradient(160deg, rgba(0, 255, 136, 0.03), rgba(0, 255, 136, 0.06));
+    transform: translateY(-1px);
+}
 .qeg-stat-block-title {
-    font-size: 0.58rem;
-    color: #607a8a;
+    font-size: 0.56rem;
+    color: #587080;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-bottom: 4px;
+    letter-spacing: 0.08em;
+    margin-bottom: 5px;
     font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
 }
 .qeg-stat-block-val {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.90rem;
-    font-weight: 600;
+    font-size: 0.92rem;
+    font-weight: 700;
     color: #e0eeff;
 }
 .qeg-stat-block-sub {
-    font-size: 0.60rem;
-    color: #506070;
-    margin-top: 2px;
+    font-size: 0.58rem;
+    color: #486070;
+    margin-top: 3px;
+    font-weight: 500;
 }
 
-/* ── Quantum Edge Gap responsive ─────────────────────────── */
+/* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .qam-edge-gap-banner { padding: 16px 16px 14px; border-radius: 12px; }
-    .qam-edge-gap-banner h3 { font-size: 1rem; }
+    .qam-edge-gap-banner { padding: 18px 16px 16px; border-radius: 14px; }
+    .qam-edge-gap-banner h3 { font-size: 1.05rem; }
     .qam-edge-gap-banner h3 span { display: block; margin: 6px 0 0; }
-    .qam-edge-gap-banner-icon { width: 40px; height: 40px; font-size: 1.2rem; }
+    .qam-edge-gap-banner-icon { width: 42px; height: 42px; font-size: 1.2rem; }
     .qeg-stats-row { gap: 6px; }
-    .qeg-stat-pill { padding: 8px 10px; min-width: 62px; }
-    .qeg-stat-val { font-size: 1.0rem; }
+    .qeg-stat-pill { padding: 8px 12px; min-width: 64px; }
+    .qeg-stat-val { font-size: 1.05rem; }
     .qeg-card-top { flex-wrap: wrap; padding: 14px 14px 10px; gap: 10px; }
     .qeg-card-center { min-width: 100%; order: 3; }
-    .qeg-edge-highlight { min-width: 80px; }
+    .qeg-edge-highlight { min-width: 80px; padding: 8px 12px; }
     .qeg-edge-gauge { width: 52px; height: 52px; }
     .qeg-card-mid { flex-wrap: wrap; padding: 0 14px; gap: 0; }
+    .qeg-heat-strip { flex: 1 1 100%; margin-right: 0; border-right: none; padding-right: 0; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 10px; margin-bottom: 6px; }
     .qeg-compare-block + .qeg-compare-block { border-left: none; padding-left: 0; margin-left: 0; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px; margin-top: 6px; }
+    .qeg-force-row { padding: 0 14px; }
     .qeg-card-bottom { flex-wrap: wrap; padding: 10px 14px 14px; }
     .qeg-stat-block { min-width: calc(50% - 6px); }
-    .qeg-rank { width: 28px; height: 28px; font-size: 0.72rem; border-radius: 8px; }
+    .qeg-rank { width: 30px; height: 30px; font-size: 0.70rem; border-radius: 8px; }
     .qeg-headshot { width: 48px; height: 48px; }
 }
 .qam-gold-banner {

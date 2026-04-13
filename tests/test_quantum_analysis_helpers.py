@@ -430,6 +430,16 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("▲ OVER 25.5 Points", html)
         # Stagger animation delay
         self.assertIn("animation-delay:0.00s", html)
+        # Edge heat strip
+        self.assertIn("qeg-heat-strip", html)
+        self.assertIn("qeg-heat-fill", html)
+        self.assertIn("qeg-heat-pct", html)
+        self.assertIn("18.5%", html)  # heat pct display
+        # Force direction bar
+        self.assertIn("qeg-force-row", html)
+        self.assertIn("qeg-force-track", html)
+        self.assertIn("qeg-force-over-fill", html)
+        self.assertIn("qeg-force-under-fill", html)
 
     def test_under_card(self):
         result = {
@@ -462,6 +472,11 @@ class TestQuantumEdgeGapCard(unittest.TestCase):
         self.assertIn("qeg-edge-gauge", html)
         # Under prop call
         self.assertIn("▼ UNDER 4.5 Threes", html)
+        # Heat strip for under card
+        self.assertIn("qeg-heat-strip", html)
+        # Force bar with correct probability split (25% over / 75% under)
+        self.assertIn("qeg-force-over-fill", html)
+        self.assertIn("qeg-force-under-fill", html)
 
     def test_xss_prevention(self):
         result = {
@@ -605,6 +620,85 @@ class TestQuantumEdgeGapCSS(unittest.TestCase):
     def test_css_has_shimmer_top_line(self):
         from styles.theme import QUANTUM_CARD_MATRIX_CSS
         self.assertIn("qeg-card::after", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_heat_strip(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-heat-strip", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-fill", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-bar", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-heat-pct", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_force_direction_bar(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-force-row", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-track", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-over-fill", QUANTUM_CARD_MATRIX_CSS)
+        self.assertIn("qeg-force-under-fill", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_grid_scroll_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-grid-scroll", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_heat_pulse_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-heat-pulse", QUANTUM_CARD_MATRIX_CSS)
+
+    def test_css_has_force_fill_animation(self):
+        from styles.theme import QUANTUM_CARD_MATRIX_CSS
+        self.assertIn("qeg-force-fill", QUANTUM_CARD_MATRIX_CSS)
+
+
+class TestEdgeHeatStrip(unittest.TestCase):
+    """Verify edge heat strip width calculation."""
+
+    def test_heat_width_high_edge(self):
+        """40% edge maps to (40-10)/40*100 = 75% width."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 40.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("width:75%", html)
+
+    def test_heat_width_low_edge(self):
+        """15% edge maps to (15-10)/40*100 = 12.5% width."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 15.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("width:12%", html)
+
+    def test_heat_width_zero_edge(self):
+        """0% edge maps to 0 (clamped)."""
+        result = {"player_name": "P", "direction": "OVER", "edge_percentage": 0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("qeg-heat-fill", html)
+
+    def test_heat_display_absolute_value(self):
+        """Under card heat pct shows absolute edge."""
+        result = {"player_name": "P", "direction": "UNDER", "edge_percentage": -20.0}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("20.0%", html)
+
+
+class TestForceDirectionBar(unittest.TestCase):
+    """Verify force direction tug-of-war bar."""
+
+    def test_force_bar_over_dominant(self):
+        """72% prob => 72% over fill, 28% under fill."""
+        result = {"player_name": "P", "direction": "OVER", "probability_over": 0.72}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn('qeg-force-over-fill" style="width:72%', html)
+        self.assertIn('qeg-force-under-fill" style="width:28%', html)
+
+    def test_force_bar_under_dominant(self):
+        """25% prob over => 25% over fill, 75% under fill."""
+        result = {"player_name": "P", "direction": "UNDER", "probability_over": 0.25}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn('qeg-force-over-fill" style="width:25%', html)
+        self.assertIn('qeg-force-under-fill" style="width:75%', html)
+
+    def test_force_bar_labels(self):
+        """Force bar should have OVER and UNDER labels."""
+        result = {"player_name": "P", "direction": "OVER"}
+        html = render_quantum_edge_gap_card_html(result)
+        self.assertIn("qeg-force-label-l", html)
+        self.assertIn("qeg-force-label-r", html)
 
 
 class TestParlayCard(unittest.TestCase):

@@ -525,6 +525,19 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
     # Prop call line (e.g. "▲ OVER 25.5 Points")
     prop_call = f"{dir_arrow} {dir_label} {line_display} {stat_display}"
 
+    # Edge heat bar width (clamped 0-100, mapped from 15-50% edge)
+    abs_edge = abs(edge_val)
+    heat_width = max(0, min(100, (abs_edge - 10) / 40 * 100))
+    heat_pct_display = f"{abs_edge:.1f}%"
+
+    # Force direction bar: probability split between over/under
+    try:
+        prob_val = float(prob_over)
+    except (ValueError, TypeError):
+        prob_val = 0.5
+    over_pct = max(0, min(100, prob_val * 100))
+    under_pct = 100 - over_pct
+
     return (
         f'<div class="qeg-card {card_dir_css}"{delay_style}>'
         # ── TOP: rank + identity + center (conf bar + metrics) + edge gauge ──
@@ -568,8 +581,17 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'<span class="qeg-edge-highlight-lbl">Edge</span>'
         f'</div>'
         f'</div>'
-        # ── MID: Line vs Projection comparison ──
+        # ── MID: Edge heat strip + Line vs Projection comparison ──
         f'<div class="qeg-card-mid">'
+        # Edge intensity heat strip
+        f'<div class="qeg-heat-strip">'
+        f'<span class="qeg-heat-label">Edge Intensity</span>'
+        f'<div class="qeg-heat-bar">'
+        f'<div class="qeg-heat-fill" style="width:{heat_width:.0f}%;"></div>'
+        f'</div>'
+        f'<span class="qeg-heat-pct">{heat_pct_display}</span>'
+        f'</div>'
+        # Comparison blocks
         f'<div class="qeg-compare-block">'
         f'<span class="qeg-compare-icon">📊</span>'
         f'<div class="qeg-compare-data">'
@@ -590,6 +612,17 @@ def render_quantum_edge_gap_card_html(result: dict, rank: int = 0) -> str:
         f'<span class="qeg-compare-val">{edge_display}</span>'
         f'<span class="qeg-compare-lbl">Edge</span>'
         f'</div>'
+        f'</div>'
+        f'</div>'
+        # ── FORCE: Over/Under probability direction bar ──
+        f'<div class="qeg-force-row">'
+        f'<div class="qeg-force-inner">'
+        f'<span class="qeg-force-label-l">OVER</span>'
+        f'<div class="qeg-force-track">'
+        f'<div class="qeg-force-over-fill" style="width:{over_pct:.0f}%;"></div>'
+        f'<div class="qeg-force-under-fill" style="width:{under_pct:.0f}%;"></div>'
+        f'</div>'
+        f'<span class="qeg-force-label-r">UNDER</span>'
         f'</div>'
         f'</div>'
         # ── BOTTOM: percentile stat blocks ──
